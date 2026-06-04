@@ -1,0 +1,24 @@
+{
+  "name": "Capsula",
+  "short_name": "Capsula",
+  "description": "Drug reference for Egyptian GPs",
+  "start_url": "/capsula/",
+  "display": "standalone",
+  "background_color": "#FAFAF9",
+  "theme_color": "#FAFAF9",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/capsula/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/capsula/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
