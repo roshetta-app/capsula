@@ -55,8 +55,8 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         backgroundColor: isInStock ? 'var(--color-surface)' : 'var(--color-outstock-bg)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-4) var(--space-5)',
-        marginBottom: 'var(--space-3)',
+        padding: 'var(--space-3) var(--space-4)',
+        marginBottom: 'var(--space-2)',
         cursor: 'pointer',
         opacity: isInStock ? 1 : 0.5,
         transition: 'box-shadow 0.15s ease, transform 0.1s ease',
@@ -76,7 +76,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 'var(--space-3)',
+        marginBottom: 'var(--space-2)',
       }}>
         <span style={{
           fontSize: 11,
@@ -99,6 +99,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
           backgroundColor: isInStock ? 'var(--color-instock)' : 'var(--color-outstock)',
         }} />
       </div>
+
       {/* Drug name */}
       <div style={{
         fontSize: 16,
@@ -110,95 +111,39 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         {drug.genericName}
       </div>
 
-      {/* Brands */}
-      {drug.brandNames?.length > 0 && (
-        <div style={{
-          fontSize: 13,
-          color: 'var(--color-accent)',
-          fontWeight: 500,
-          marginBottom: 'var(--space-1)',
-        }}>
-          {drug.brandNames.join(' · ')}
-        </div>
-      )}
-
-      {/* Arabic name */}
-      <div style={{
-        fontSize: 13,
-        color: 'var(--color-text-arabic)',
-        fontFamily: 'var(--font-arabic)',
-        textAlign: 'right',
-        direction: 'rtl',
-        marginBottom: 'var(--space-3)',
-      }}>
-        {drug.arabicName}
-      </div>
-
-      {/* Divider */}
-      <div style={{
-        height: 1,
-        backgroundColor: 'var(--color-border-subtle)',
-        marginBottom: 'var(--space-3)',
-      }} />
-
-      {/* Doses */}
+      {/* Brands + Arabic name row */}
       <div style={{
         display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--space-1)',
-        marginBottom: 'var(--space-3)',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
+        gap: 'var(--space-2)',
       }}>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'baseline' }}>
-          <span style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: 'var(--color-text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            minWidth: 36,
-          }}>Adult</span>
-          <span style={{
+        {drug.brandNames?.length > 0 && (
+          <div style={{
             fontSize: 13,
-            color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-mono)',
+            color: 'var(--color-accent)',
+            fontWeight: 500,
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}>
-            {drug.dose?.adult}
-          </span>
-        </div>
-        {drug.dose?.pediatric && (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'baseline' }}>
-            <span style={{
-              fontSize: 10,
-              fontWeight: 600,
-              color: 'var(--color-text-tertiary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              minWidth: 36,
-            }}>Peds</span>
-            <span style={{
-              fontSize: 13,
-              color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-mono)',
-            }}>
-              {drug.dose.pediatric}
-            </span>
+            {drug.brandNames.join(' · ')}
           </div>
         )}
-      </div>
 
-      {/* Uses preview */}
-      {drug.uses?.length > 0 && (
+        {/* Arabic name */}
         <div style={{
-          fontSize: 12,
-          color: 'var(--color-text-secondary)',
-          lineHeight: 1.4,
+          fontSize: 13,
+          color: 'var(--color-text-arabic)',
+          fontFamily: 'var(--font-arabic)',
+          textAlign: 'right',
+          direction: 'rtl',
+          flexShrink: 0,
         }}>
-          → {drug.uses.slice(0, 2).join(', ')}
-          {drug.uses.length > 2 && (
-            <span style={{ color: 'var(--color-text-tertiary)' }}> +{drug.uses.length - 2} more</span>
-          )}
+          {drug.arabicName}
         </div>
-      )}
+      </div>
     </div>
   )
 }
