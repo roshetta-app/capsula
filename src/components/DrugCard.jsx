@@ -97,10 +97,11 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
           height: 8,
           borderRadius: 'var(--radius-full)',
           backgroundColor: isInStock ? 'var(--color-instock)' : 'var(--color-outstock)',
+          flexShrink: 0,
         }} />
       </div>
 
-      {/* Drug name */}
+      {/* English generic name */}
       <div style={{
         fontSize: 16,
         fontWeight: 600,
@@ -111,39 +112,31 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         {drug.genericName}
       </div>
 
-      {/* Brands + Arabic name row */}
+      {/* Arabic generic name */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'baseline',
-        gap: 'var(--space-2)',
+        fontSize: 13,
+        color: isInStock ? 'var(--color-text-arabic)' : 'var(--color-text-tertiary)',
+        fontFamily: 'var(--font-arabic)',
+        textAlign: 'right',
+        direction: 'rtl',
+        lineHeight: 1.4,
+        marginBottom: drug.brandNames?.length > 0 ? 'var(--space-1)' : 0,
       }}>
-        {drug.brandNames?.length > 0 && (
-          <div style={{
-            fontSize: 13,
-            color: 'var(--color-accent)',
-            fontWeight: 500,
-            flex: 1,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
-            {drug.brandNames.join(' · ')}
-          </div>
-        )}
-
-        {/* Arabic name */}
-        <div style={{
-          fontSize: 13,
-          color: 'var(--color-text-arabic)',
-          fontFamily: 'var(--font-arabic)',
-          textAlign: 'right',
-          direction: 'rtl',
-          flexShrink: 0,
-        }}>
-          {drug.arabicName}
-        </div>
+        {drug.arabicName}
       </div>
+
+      {/* Brand names — separate line below Arabic name */}
+      {drug.brandNames?.length > 0 && (
+        <div style={{
+          fontSize: 12,
+          color: 'var(--color-accent)',
+          fontWeight: 500,
+          lineHeight: 1.4,
+          wordBreak: 'break-word',
+        }}>
+          {drug.brandNames.join(' · ')}
+        </div>
+      )}
     </div>
   )
 }
