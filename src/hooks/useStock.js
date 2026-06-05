@@ -28,5 +28,13 @@ export function useStock(drugs) {
     setStockMap(map)
   }
 
-  return { stockMap, toggleStock, resetAll }
+  const setAllStock = (value) => {
+    setStockMap(prev => {
+      const map = { ...prev }
+      drugs.forEach(d => { map[d.id] = value })
+      return map
+    })
+  }
+
+  return { stockMap, toggleStock, resetAll, setAllStock }
 }

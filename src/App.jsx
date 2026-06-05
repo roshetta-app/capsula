@@ -36,7 +36,7 @@ export default function App() {
     })
   }
 
-  const { stockMap, toggleStock, resetAll } = useStock(drugsData.drugs)
+  const { stockMap, toggleStock, resetAll, setAllStock } = useStock(drugsData.drugs)
   const { query, setQuery, results: searchResults } = useSearch(drugsData.drugs)
   const { activeCategory, setActiveCategory, filter } = useFilter()
 
@@ -189,6 +189,48 @@ export default function App() {
         }}>
           {filtered.length} drug{filtered.length !== 1 ? 's' : ''}
           {query && ' for "' + query + '"'}
+        </div>
+
+        {/* Bulk stock actions */}
+        <div style={{
+          display: 'flex',
+          gap: 'var(--space-2)',
+          marginBottom: 'var(--space-4)',
+        }}>
+          <button
+            onClick={() => setAllStock(true)}
+            style={{
+              flex: 1,
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+              border: '1.5px solid var(--color-instock)',
+              backgroundColor: 'var(--color-instock-bg)',
+              color: 'var(--color-instock)',
+            }}
+          >
+            ● Mark all in stock
+          </button>
+          <button
+            onClick={() => setAllStock(false)}
+            style={{
+              flex: 1,
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 13,
+              fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+              border: '1.5px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-tertiary)',
+            }}
+          >
+            ○ Mark all unavailable
+          </button>
         </div>
         {filtered.length === 0 ? (
           <div style={{
