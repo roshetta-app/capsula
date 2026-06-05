@@ -1,4 +1,4 @@
-export default function Layout({ children, onResetClick }) {
+export default function Layout({ children, onResetClick, onManageStockClick }) {
   return (
     <div style={{
       minHeight: '100dvh',
@@ -47,25 +47,45 @@ export default function Layout({ children, onResetClick }) {
           </span>
         </div>
 
-        {/* Right: Reset button only */}
-        {onResetClick && (
-          <button
-            onClick={onResetClick}
-            style={{
-              background: 'none',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              padding: '5px 12px',
-              fontSize: 12,
-              fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-              cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Reset Stock
-          </button>
-        )}
+        {/* Right: action buttons */}
+        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+          {onManageStockClick && (
+            <button
+              onClick={onManageStockClick}
+              style={{
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '5px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              Manage Stock
+            </button>
+          )}
+          {onResetClick && (
+            <button
+              onClick={onResetClick}
+              style={{
+                background: 'none',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '5px 12px',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--color-text-secondary)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              Reset Stock
+            </button>
+          )}
+        </div>
       </header>
 
       <main style={{

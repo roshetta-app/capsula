@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import Layout from './components/layout'
 import DrugCard from './components/DrugCard'
 import DrugDetail from './components/DrugDetail'
+import ManageStock from './components/ManageStock'
 import SearchBar from './components/SearchBar'
 import CategoryFilter from './components/CategoryFilter'
 import { useSearch } from './hooks/useSearch'
@@ -12,6 +13,7 @@ import './index.css'
 
 export default function App() {
   const [selectedDrug, setSelectedDrug] = useState(null)
+  const [showManageStock, setShowManageStock] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
@@ -112,7 +114,7 @@ export default function App() {
       marginTop: 'var(--space-4)',
       marginBottom: 'var(--space-2)',
       display: 'flex',
-      justifyContent: 'space-between',alignItems: 'center',
+      justifyContent: 'space-between', alignItems: 'center',
       gap: 'var(--space-3)',
     }}>
       <span style={{ fontSize: 13, color: '#92400E', fontWeight: 500 }}>
@@ -155,6 +157,22 @@ export default function App() {
     </div>
   )
 
+  // Manage Stock view
+  if (showManageStock) {
+    return (
+      <Layout onResetClick={() => setShowResetConfirm(true)}>
+        {resetBanner}
+        <ManageStock
+          drugs={drugsData.drugs}
+          stockMap={stockMap}
+          onToggle={toggleStock}
+          onBack={() => setShowManageStock(false)}
+        />
+      </Layout>
+    )
+  }
+
+  // Drug detail view
   if (selectedDrug) {
     return (
       <Layout onResetClick={() => setShowResetConfirm(true)}>
@@ -170,8 +188,12 @@ export default function App() {
     )
   }
 
+  // Main list view
   return (
-    <Layout onResetClick={() => setShowResetConfirm(true)}>
+    <Layout
+      onResetClick={() => setShowResetConfirm(true)}
+      onManageStockClick={() => setShowManageStock(true)}
+    >
       {installBanner}
       {resetBanner}
       <div style={{ paddingTop: 'var(--space-5)' }}>
@@ -232,6 +254,7 @@ export default function App() {
             ○ Mark all unavailable
           </button>
         </div>
+
         {filtered.length === 0 ? (
           <div style={{
             textAlign: 'center',
