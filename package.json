@@ -12,12 +12,16 @@
   "dependencies": {
     "@fontsource/dm-mono": "^5.2.7",
     "@fontsource/dm-sans": "^5.2.8",
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/react-fontawesome": "^3.3.1",
     "@supabase/supabase-js": "^2.107.0",
     "@tailwindcss/vite": "^4.3.0",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.17.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
+    "react-router-dom": "^7.6.2",
     "tailwindcss": "^4.3.0"
   },
   "devDependencies": {

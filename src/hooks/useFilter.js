@@ -1,5 +1,9 @@
 import { useState } from 'react'
 
+/**
+ * useFilter — category filter for FlatDrug[].
+ * Filters on drug.category which is the mapped DRUG_CATEGORIES value.
+ */
 export function useFilter() {
   const [activeCategory, setActiveCategory] = useState('all')
 
