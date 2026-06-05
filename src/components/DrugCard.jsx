@@ -1,52 +1,36 @@
-const CATEGORY_LABELS = {
-  'antibiotic': 'Antibiotic',
-  'antiviral': 'Antiviral',
-  'antifungal': 'Antifungal',
-  'antiparasitic': 'Antiparasitic',
-  'analgesic-nsaid': 'NSAID',
-  'antipyretic': 'Antipyretic',
-  'steroid': 'Steroid',
-  'antihistamine': 'Antihistamine',
-  'respiratory': 'Respiratory',
-  'gastrointestinal': 'GI',
-  'antidiabetic': 'Antidiabetic',
-  'cardiovascular': 'Cardiovascular',
-  'antihypertensive': 'Antihypertensive',
-  'vitamins-minerals': 'Vitamins',
-  'emergency': 'Emergency',
-  'topical': 'Topical',
-  'ophthalmic-otic': 'Eye / Ear',
-  'gynecological': 'Gynecological',
-  'antispasmodic': 'Antispasmodic',
-  'proton-pump-inhibitor': 'PPI',
-}
+import { DRUG_CATEGORIES } from '../config/categories'
+
+const CATEGORY_LABELS = Object.fromEntries(
+  DRUG_CATEGORIES.map(c => [c.value, c.label])
+)
 
 const CATEGORY_COLORS = {
-  'antibiotic':           { bg: '#FEF3C7', color: '#92400E' },
-  'antiviral':            { bg: '#DBEAFE', color: '#1E40AF' },
-  'antifungal':           { bg: '#EDE9FE', color: '#5B21B6' },
-  'antiparasitic':        { bg: '#D1FAE5', color: '#065F46' },
-  'analgesic-nsaid':      { bg: '#F0FDF4', color: '#166534' },
-  'antipyretic':          { bg: '#FEF9C3', color: '#854D0E' },
-  'steroid':              { bg: '#FEE2E2', color: '#991B1B' },
-  'antihistamine':        { bg: '#E0F2FE', color: '#075985' },
-  'respiratory':          { bg: '#F0F9FF', color: '#0C4A6E' },
-  'gastrointestinal':     { bg: '#FDF4FF', color: '#6B21A8' },
-  'antidiabetic':         { bg: '#ECFDF5', color: '#064E3B' },
-  'cardiovascular':       { bg: '#FFF1F2', color: '#9F1239' },
-  'antihypertensive':     { bg: '#FFF7ED', color: '#9A3412' },
-  'vitamins-minerals':    { bg: '#F7FEE7', color: '#3F6212' },
-  'emergency':            { bg: '#FEE2E2', color: '#7F1D1D' },
-  'topical':              { bg: '#F5F3FF', color: '#4C1D95' },
-  'ophthalmic-otic':      { bg: '#ECFEFF', color: '#164E63' },
-  'gynecological':        { bg: '#FDF2F8', color: '#831843' },
-  'antispasmodic':        { bg: '#FFFBEB', color: '#78350F' },
-  'proton-pump-inhibitor':{ bg: '#F0FDFA', color: '#134E4A' },
+  'antibiotic':              { bg: '#FEF3C7', color: '#92400E' },
+  'antiviral':               { bg: '#DBEAFE', color: '#1E40AF' },
+  'antifungal':              { bg: '#EDE9FE', color: '#5B21B6' },
+  'antiparasitic':           { bg: '#D1FAE5', color: '#065F46' },
+  'analgesic-nsaid':         { bg: '#F0FDF4', color: '#166534' },
+  'cardiovascular':          { bg: '#FFF1F2', color: '#9F1239' },
+  'respiratory':             { bg: '#F0F9FF', color: '#0C4A6E' },
+  'gastrointestinal':        { bg: '#FDF4FF', color: '#6B21A8' },
+  'endocrine-metabolic':     { bg: '#ECFDF5', color: '#064E3B' },
+  'neurological-psychiatric':{ bg: '#F5F3FF', color: '#4C1D95' },
+  'musculoskeletal':         { bg: '#FFF7ED', color: '#9A3412' },
+  'vitamins-minerals':       { bg: '#F7FEE7', color: '#3F6212' },
+  'dermatological':          { bg: '#F5F3FF', color: '#4C1D95' },
+  'ophthalmic-otic':         { bg: '#ECFEFF', color: '#164E63' },
+  'urological':              { bg: '#EFF6FF', color: '#1E40AF' },
+  'obstetric-gynecological': { bg: '#FDF2F8', color: '#831843' },
+  'antiparasitic':           { bg: '#D1FAE5', color: '#065F46' },
+  'other':                   { bg: '#FEE2E2', color: '#7F1D1D' },
 }
 
 export default function DrugCard({ drug, onTap, isInStock = true }) {
   const chipStyle = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
-  const label = CATEGORY_LABELS[drug.category] || drug.category
+  const label     = CATEGORY_LABELS[drug.category]  || drug.category
+
+  // FlatDrug shape: brands is an array of { id, name, nameAr, inStock, isAvailable }
+  const brandNames = drug.brands?.map(b => b.name) ?? []
 
   return (
     <div
@@ -90,8 +74,6 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         }}>
           {label}
         </span>
-
-        {/* Stock indicator dot */}
         <div style={{
           width: 8,
           height: 8,
@@ -112,7 +94,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         {drug.genericName}
       </div>
 
-      {/* Arabic generic name */}
+      {/* Arabic name */}
       <div style={{
         fontSize: 13,
         color: isInStock ? 'var(--color-text-arabic)' : 'var(--color-text-tertiary)',
@@ -120,13 +102,13 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         textAlign: 'right',
         direction: 'rtl',
         lineHeight: 1.4,
-        marginBottom: drug.brandNames?.length > 0 ? 'var(--space-1)' : 0,
+        marginBottom: brandNames.length > 0 ? 'var(--space-1)' : 0,
       }}>
         {drug.arabicName}
       </div>
 
-      {/* Brand names — separate line below Arabic name */}
-      {drug.brandNames?.length > 0 && (
+      {/* Brand names */}
+      {brandNames.length > 0 && (
         <div style={{
           fontSize: 12,
           color: 'var(--color-accent)',
@@ -134,7 +116,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
           lineHeight: 1.4,
           wordBreak: 'break-word',
         }}>
-          {drug.brandNames.join(' · ')}
+          {brandNames.join(' · ')}
         </div>
       )}
     </div>

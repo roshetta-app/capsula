@@ -1,50 +1,29 @@
 import { ArrowLeft, AlertTriangle } from 'lucide-react'
 import StockToggle from './StockToggle'
+import { DRUG_CATEGORIES } from '../config/categories'
 
-const CATEGORY_LABELS = {
-  'antibiotic': 'Antibiotic',
-  'antiviral': 'Antiviral',
-  'antifungal': 'Antifungal',
-  'antiparasitic': 'Antiparasitic',
-  'analgesic-nsaid': 'NSAID',
-  'antipyretic': 'Antipyretic',
-  'steroid': 'Steroid',
-  'antihistamine': 'Antihistamine',
-  'respiratory': 'Respiratory',
-  'gastrointestinal': 'GI',
-  'antidiabetic': 'Antidiabetic',
-  'cardiovascular': 'Cardiovascular',
-  'antihypertensive': 'Antihypertensive',
-  'vitamins-minerals': 'Vitamins',
-  'emergency': 'Emergency',
-  'topical': 'Topical',
-  'ophthalmic-otic': 'Eye / Ear',
-  'gynecological': 'Gynecological',
-  'antispasmodic': 'Antispasmodic',
-  'proton-pump-inhibitor': 'PPI',
-}
+const CATEGORY_LABELS = Object.fromEntries(
+  DRUG_CATEGORIES.map(c => [c.value, c.label])
+)
 
 const CATEGORY_COLORS = {
-  'antibiotic':           { bg: '#FEF3C7', color: '#92400E' },
-  'antiviral':            { bg: '#DBEAFE', color: '#1E40AF' },
-  'antifungal':           { bg: '#EDE9FE', color: '#5B21B6' },
-  'antiparasitic':        { bg: '#D1FAE5', color: '#065F46' },
-  'analgesic-nsaid':      { bg: '#F0FDF4', color: '#166534' },
-  'antipyretic':          { bg: '#FEF9C3', color: '#854D0E' },
-  'steroid':              { bg: '#FEE2E2', color: '#991B1B' },
-  'antihistamine':        { bg: '#E0F2FE', color: '#075985' },
-  'respiratory':          { bg: '#F0F9FF', color: '#0C4A6E' },
-  'gastrointestinal':     { bg: '#FDF4FF', color: '#6B21A8' },
-  'antidiabetic':         { bg: '#ECFDF5', color: '#064E3B' },
-  'cardiovascular':       { bg: '#FFF1F2', color: '#9F1239' },
-  'antihypertensive':     { bg: '#FFF7ED', color: '#9A3412' },
-  'vitamins-minerals':    { bg: '#F7FEE7', color: '#3F6212' },
-  'emergency':            { bg: '#FEE2E2', color: '#7F1D1D' },
-  'topical':              { bg: '#F5F3FF', color: '#4C1D95' },
-  'ophthalmic-otic':      { bg: '#ECFEFF', color: '#164E63' },
-  'gynecological':        { bg: '#FDF2F8', color: '#831843' },
-  'antispasmodic':        { bg: '#FFFBEB', color: '#78350F' },
-  'proton-pump-inhibitor':{ bg: '#F0FDFA', color: '#134E4A' },
+  'antibiotic':              { bg: '#FEF3C7', color: '#92400E' },
+  'antiviral':               { bg: '#DBEAFE', color: '#1E40AF' },
+  'antifungal':              { bg: '#EDE9FE', color: '#5B21B6' },
+  'antiparasitic':           { bg: '#D1FAE5', color: '#065F46' },
+  'analgesic-nsaid':         { bg: '#F0FDF4', color: '#166534' },
+  'cardiovascular':          { bg: '#FFF1F2', color: '#9F1239' },
+  'respiratory':             { bg: '#F0F9FF', color: '#0C4A6E' },
+  'gastrointestinal':        { bg: '#FDF4FF', color: '#6B21A8' },
+  'endocrine-metabolic':     { bg: '#ECFDF5', color: '#064E3B' },
+  'neurological-psychiatric':{ bg: '#F5F3FF', color: '#4C1D95' },
+  'musculoskeletal':         { bg: '#FFF7ED', color: '#9A3412' },
+  'vitamins-minerals':       { bg: '#F7FEE7', color: '#3F6212' },
+  'dermatological':          { bg: '#F5F3FF', color: '#4C1D95' },
+  'ophthalmic-otic':         { bg: '#ECFEFF', color: '#164E63' },
+  'urological':              { bg: '#EFF6FF', color: '#1E40AF' },
+  'obstetric-gynecological': { bg: '#FDF2F8', color: '#831843' },
+  'other':                   { bg: '#FEE2E2', color: '#7F1D1D' },
 }
 
 const Section = ({ title, children }) => (
@@ -91,8 +70,9 @@ const DoseRow = ({ label, value }) => {
       <span style={{
         fontSize: 14,
         color: 'var(--color-text-primary)',
-        fontFamily: label === 'Adult' || label === 'Peds' ? 'var(--font-mono)' : 'var(--font-body)',
+        fontFamily: 'var(--font-mono)',
         lineHeight: 1.4,
+        direction: 'auto',
       }}>
         {value}
       </span>
@@ -101,8 +81,16 @@ const DoseRow = ({ label, value }) => {
 }
 
 export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
-  const chipStyle = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
-  const label = CATEGORY_LABELS[drug.category] || drug.category
+  const chipStyle  = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
+  const label      = CATEGORY_LABELS[drug.category]  || drug.category
+
+  // FlatDrug field names
+  const brandNames      = drug.brands?.map(b => b.name) ?? []
+  const textbookDoses   = drug.textbookDoses  ?? []   // [{ group, instruction }] — textbook reference
+  const practicalDoses  = drug.practicalDoses ?? []   // [{ group, instruction }] — patient-friendly
+
+  // Prefer practicalDoses for display; fall back to textbookDoses
+  const dosesToShow = practicalDoses.length > 0 ? practicalDoses : textbookDoses
 
   return (
     <div style={{
@@ -114,7 +102,8 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
       <button
         onClick={onBack}
         style={{
-          display: 'flex',alignItems: 'center',
+          display: 'flex',
+          alignItems: 'center',
           gap: 'var(--space-2)',
           background: 'none',
           border: 'none',
@@ -171,6 +160,7 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
           </span>
         </div>
 
+        {/* Arabic name */}
         <div style={{
           fontSize: 15,
           color: 'var(--color-text-arabic)',
@@ -182,16 +172,19 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
           {drug.arabicName}
         </div>
 
-        {drug.brandNames?.length > 0 && (
+        {/* Brand names */}
+        {brandNames.length > 0 && (
           <div style={{
             fontSize: 13,
             color: 'var(--color-accent)',
             fontWeight: 500,
+            marginBottom: drug.class ? 'var(--space-1)' : 0,
           }}>
-            {drug.brandNames.join(' · ')}
+            {brandNames.join(' · ')}
           </div>
         )}
 
+        {/* Drug class */}
         {drug.class && (
           <div style={{
             fontSize: 12,
@@ -212,14 +205,17 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
         boxShadow: 'var(--shadow-card)',
       }}>
 
-        <Section title="Dose">
-          <DoseRow label="Adult" value={drug.dose?.adult} />
-          <DoseRow label="Peds" value={drug.dose?.pediatric} />
-          <DoseRow label="Duration" value={drug.dose?.duration} />
-          <DoseRow label="Route" value={drug.dose?.route} />
-          {drug.dose?.notes && <DoseRow label="Note" value={drug.dose.notes} />}
-        </Section>
+        {/* Dose — from practicalDoses / textbookDoses */}
+        {dosesToShow.length > 0 && (
+          <Section title="Dose">
+            {dosesToShow.map((d, i) => (
+              <DoseRow key={i} label={d.group} value={d.instruction} />
+            ))}
+            {drug.route && <DoseRow label="Route" value={drug.route} />}
+          </Section>
+        )}
 
+        {/* Uses */}
         {drug.uses?.length > 0 && (
           <Section title="Uses">
             <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -232,18 +228,16 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
                   position: 'relative',
                   lineHeight: 1.4,
                 }}>
-                  <span style={{
-                    position: 'absolute',
-                    left: 0,
-                    color: 'var(--color-accent)',
-                    fontWeight: 700,
-                  }}>·</span>
+                  <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)', fontWeight: 700 }}>·</span>
                   {use}
                 </li>
               ))}
             </ul>
           </Section>
-        )}{drug.warnings?.length > 0 && (
+        )}
+
+        {/* Warnings */}
+        {drug.warnings?.length > 0 && (
           <Section title={
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <AlertTriangle size={10} style={{ color: '#DC2626' }} />
@@ -260,11 +254,7 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
                   position: 'relative',
                   lineHeight: 1.4,
                 }}>
-                  <span style={{
-                    position: 'absolute',
-                    left: 0,
-                    fontWeight: 700,
-                  }}>!</span>
+                  <span style={{ position: 'absolute', left: 0, fontWeight: 700 }}>!</span>
                   {w}
                 </li>
               ))}
@@ -272,10 +262,11 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
           </Section>
         )}
 
-        {drug.forms?.length > 0 && (
-          <Section title="Forms">
+        {/* Form + concentration + route chip */}
+        {(drug.form || drug.concentration) && (
+          <Section title="Formulation">
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-              {drug.forms.map((form, i) => (
+              {[drug.form, drug.concentration].filter(Boolean).map((val, i) => (
                 <span key={i} style={{
                   fontSize: 12,
                   color: 'var(--color-text-secondary)',
@@ -285,26 +276,14 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
                   padding: '3px 10px',
                   textTransform: 'capitalize',
                 }}>
-                  {form}
+                  {val}
                 </span>
               ))}
             </div>
           </Section>
         )}
 
-        <div style={{
-          fontSize: 11,
-          color: 'var(--color-text-tertiary)',
-          fontFamily: 'var(--font-mono)',
-          marginBottom: 'var(--space-5)',
-        }}>
-          Code: {drug.code}
-        </div>
-
-        <StockToggle
-          isInStock={isInStock}
-          onToggle={onToggleStock}
-        />
+        <StockToggle isInStock={isInStock} onToggle={onToggleStock} />
       </div>
     </div>
   )
