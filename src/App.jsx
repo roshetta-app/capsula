@@ -9,7 +9,6 @@ import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
 import drugsData from './data/drugs.json'
 import './index.css'
-import StockManager from './components/StockManager'
 
 export default function App() {
   const [selectedDrug, setSelectedDrug] = useState(null)
@@ -222,3 +221,4 @@ export default function App() {
       </div>
     </Layout>
   )
+}
