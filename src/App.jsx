@@ -240,3 +240,17 @@ const INITIAL_DRUGS = [
   { id: 3, name: 'Ibuprofen 400mg',    category: 'NSAID',         inStock: false, defaultStock: false },
   // ...add all your real drugs here
 ]
+<<<<<<< HEAD
+=======
+
+export default function App() {
+  const [drugs, setDrugs] = useState(INITIAL_DRUGS)
+
+  return (
+    <div className="max-w-xl mx-auto p-6">
+      <h1 className="text-xl font-medium text-gray-800 mb-6">Stock manager</h1>
+      <StockManager drugs={drugs} onUpdate={setDrugs} />
+    </div>
+  )
+}
+>>>>>>> a3e70677a8f5c88930ef34b931a284239af65c60
