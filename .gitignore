@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 src/components/StockManager.jsx
+# Add these lines to your existing .gitignore
+
+# Environment variables — never commit
+.env
+.env.local
+.env.*.local
+
+# Supabase local dev (if used later)
+supabase/.temp/
