@@ -9,6 +9,7 @@ import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
 import drugsData from './data/drugs.json'
 import './index.css'
+import StockManager from './components/StockManager'
 
 export default function App() {
   const [selectedDrug, setSelectedDrug] = useState(null)
@@ -221,20 +222,7 @@ export default function App() {
       </div>
     </Layout>
   )
-}
-import { useState } from 'react'
-import StockManager from './components/StockManager'
-
-// Your drugs data — add inStock field to each
-const INITIAL_DRUGS = [
-  { id: 1, name: 'Amoxicillin 500mg',  category: 'Antibiotic',    inStock: true,  defaultStock: true  },
-  { id: 2, name: 'Paracetamol 1g',     category: 'Analgesic',     inStock: true,  defaultStock: true  },
-  { id: 3, name: 'Ibuprofen 400mg',    category: 'NSAID',         inStock: false, defaultStock: false },
-  // ...add all your real drugs here
-]
-
-export default function App() {
-  const [drugs, setDrugs] = useState(INITIAL_DRUGS)
+    const [drugs, setDrugs] = useState(INITIAL_DRUGS)
 
   return (
     <div className="max-w-xl mx-auto p-6">
@@ -243,3 +231,12 @@ export default function App() {
     </div>
   )
 }
+
+
+// Your drugs data — add inStock field to each
+const INITIAL_DRUGS = [
+  { id: 1, name: 'Amoxicillin 500mg',  category: 'Antibiotic',    inStock: true,  defaultStock: true  },
+  { id: 2, name: 'Paracetamol 1g',     category: 'Analgesic',     inStock: true,  defaultStock: true  },
+  { id: 3, name: 'Ibuprofen 400mg',    category: 'NSAID',         inStock: false, defaultStock: false },
+  // ...add all your real drugs here
+]
