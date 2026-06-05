@@ -1,14 +1,22 @@
 {
+  "version": "1.0",
+  "lastUpdated": "2026-06-05",
+  "totalDrugs": 138,
   "drugs": [
     {
       "id": "amoxicillin-flucloxacillin-500-tab",
       "code": "1467",
       "genericName": "Amoxicillin 250mg + Flucloxacillin 250mg",
       "arabicName": "أموكسيسيلين + فلوكلوكساسيلين 500 مجم",
-      "brandNames": ["Flumox 500"],
+      "brandNames": [
+        "Flumox 500"
+      ],
       "category": "antibiotic",
       "class": "Penicillin combination",
-      "forms": ["capsule", "tablet"],
+      "forms": [
+        "capsule",
+        "tablet"
+      ],
       "dose": {
         "adult": "1 capsule every 8 hours",
         "pediatric": "25mg/kg/day divided every 8 hours",
@@ -16,8 +24,16 @@
         "route": "oral",
         "notes": "Take on empty stomach"
       },
-      "uses": ["Skin and soft tissue infections", "Respiratory tract infections", "Mixed staphylococcal/streptococcal infections"],
-      "warnings": ["Penicillin allergy — contraindicated", "Reduce dose in renal impairment", "May cause diarrhoea — stop if severe"],
+      "uses": [
+        "Skin and soft tissue infections",
+        "Respiratory tract infections",
+        "Mixed staphylococcal/streptococcal infections"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Reduce dose in renal impairment",
+        "May cause diarrhoea — stop if severe"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -26,10 +42,16 @@
       "code": "1470",
       "genericName": "Amoxicillin 500mg",
       "arabicName": "أموكسيسيلين 500 مجم",
-      "brandNames": ["Amoxil", "Ibiamox"],
+      "brandNames": [
+        "Amoxil",
+        "Ibiamox"
+      ],
       "category": "antibiotic",
       "class": "Aminopenicillin",
-      "forms": ["capsule", "tablet"],
+      "forms": [
+        "capsule",
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg every 8 hours",
         "pediatric": "25mg/kg/day divided every 8 hours",
@@ -37,8 +59,16 @@
         "route": "oral",
         "notes": "Can be taken with or without food"
       },
-      "uses": ["Upper respiratory tract infections", "Urinary tract infections", "Otitis media", "Tonsillitis"],
-      "warnings": ["Penicillin allergy — contraindicated", "Rash common in infectious mononucleosis"],
+      "uses": [
+        "Upper respiratory tract infections",
+        "Urinary tract infections",
+        "Otitis media",
+        "Tonsillitis"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Rash common in infectious mononucleosis"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -47,10 +77,14 @@
       "code": "1471",
       "genericName": "Amoxicillin 500mg + Clavulanic acid 125mg",
       "arabicName": "أموكسيسيلين + حمض الكلافيولانيك 625 مجم",
-      "brandNames": ["Augmentin 625"],
+      "brandNames": [
+        "Augmentin 625"
+      ],
       "category": "antibiotic",
       "class": "Beta-lactam + inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet every 8–12 hours",
         "pediatric": "25mg/kg/day (amoxicillin component) divided every 8 hours",
@@ -58,8 +92,17 @@
         "route": "oral",
         "notes": "Take at the start of a meal to reduce GI upset"
       },
-      "uses": ["Sinusitis", "Lower respiratory tract infections", "Urinary tract infections", "Skin and soft tissue infections"],
-      "warnings": ["Penicillin allergy — contraindicated", "Risk of cholestatic jaundice — avoid if liver disease", "GI side effects common"],
+      "uses": [
+        "Sinusitis",
+        "Lower respiratory tract infections",
+        "Urinary tract infections",
+        "Skin and soft tissue infections"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Risk of cholestatic jaundice — avoid if liver disease",
+        "GI side effects common"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -68,10 +111,14 @@
       "code": "1474",
       "genericName": "Amoxicillin 875mg + Clavulanic acid 125mg",
       "arabicName": "أموكسيسيلين + حمض الكلافيولانيك 1 جم",
-      "brandNames": ["Augmentin 1g"],
+      "brandNames": [
+        "Augmentin 1g"
+      ],
       "category": "antibiotic",
       "class": "Beta-lactam + inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet every 12 hours",
         "pediatric": "Not recommended — use paediatric suspension",
@@ -79,8 +126,17 @@
         "route": "oral",
         "notes": "Take at the start of a meal"
       },
-      "uses": ["Lower respiratory tract infections", "Urinary tract infections", "Sinusitis", "Skin and soft tissue infections"],
-      "warnings": ["Penicillin allergy — contraindicated", "Risk of cholestatic jaundice", "Not for children under 12"],
+      "uses": [
+        "Lower respiratory tract infections",
+        "Urinary tract infections",
+        "Sinusitis",
+        "Skin and soft tissue infections"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Risk of cholestatic jaundice",
+        "Not for children under 12"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -89,10 +145,15 @@
       "code": "1596",
       "genericName": "Cephradine 1g",
       "arabicName": "سيفرادين 1 جم",
-      "brandNames": ["Velocef 1g"],
+      "brandNames": [
+        "Velocef 1g"
+      ],
       "category": "antibiotic",
       "class": "First-generation cephalosporin",
-      "forms": ["capsule", "tablet"],
+      "forms": [
+        "capsule",
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg–1g every 6–12 hours",
         "pediatric": "25–50mg/kg/day divided every 6 hours",
@@ -100,8 +161,16 @@
         "route": "oral",
         "notes": "Can be taken with food"
       },
-      "uses": ["Respiratory tract infections", "Urinary tract infections", "Skin and soft tissue infections"],
-      "warnings": ["Cephalosporin allergy — contraindicated", "Cross-sensitivity with penicillin (5–10%)", "Reduce dose in renal impairment"],
+      "uses": [
+        "Respiratory tract infections",
+        "Urinary tract infections",
+        "Skin and soft tissue infections"
+      ],
+      "warnings": [
+        "Cephalosporin allergy — contraindicated",
+        "Cross-sensitivity with penicillin (5–10%)",
+        "Reduce dose in renal impairment"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -110,10 +179,15 @@
       "code": "3807",
       "genericName": "Sulfamethoxazole 800mg + Trimethoprim 160mg",
       "arabicName": "سلفاميثوكسازول 800 + ترايميثوبريم 160",
-      "brandNames": ["Septrin", "Bactrim"],
+      "brandNames": [
+        "Septrin",
+        "Bactrim"
+      ],
       "category": "antibiotic",
       "class": "Sulfonamide + folate inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet every 12 hours",
         "pediatric": "24mg/kg/day (combined) divided every 12 hours",
@@ -121,8 +195,16 @@
         "route": "oral",
         "notes": "Drink plenty of water"
       },
-      "uses": ["Urinary tract infections", "Respiratory tract infections", "Gastrointestinal infections"],
-      "warnings": ["Sulfa allergy — contraindicated", "Avoid in G6PD deficiency", "Avoid in last trimester of pregnancy"],
+      "uses": [
+        "Urinary tract infections",
+        "Respiratory tract infections",
+        "Gastrointestinal infections"
+      ],
+      "warnings": [
+        "Sulfa allergy — contraindicated",
+        "Avoid in G6PD deficiency",
+        "Avoid in last trimester of pregnancy"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -131,10 +213,15 @@
       "code": "1613",
       "genericName": "Ciprofloxacin 500mg",
       "arabicName": "سيبروفلوكساسين 500 مجم",
-      "brandNames": ["Ciprobay", "Ciproxin"],
+      "brandNames": [
+        "Ciprobay",
+        "Ciproxin"
+      ],
       "category": "antibiotic",
       "class": "Fluoroquinolone",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg every 12 hours",
         "pediatric": "Avoid in children under 18 (except specific indications)",
@@ -142,8 +229,17 @@
         "route": "oral",
         "notes": "Avoid antacids within 2 hours of dose"
       },
-      "uses": ["Urinary tract infections", "Gastrointestinal infections", "Respiratory tract infections", "Typhoid fever"],
-      "warnings": ["Avoid in children and adolescents", "Risk of tendon rupture — especially in elderly", "Avoid in pregnancy"],
+      "uses": [
+        "Urinary tract infections",
+        "Gastrointestinal infections",
+        "Respiratory tract infections",
+        "Typhoid fever"
+      ],
+      "warnings": [
+        "Avoid in children and adolescents",
+        "Risk of tendon rupture — especially in elderly",
+        "Avoid in pregnancy"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -152,10 +248,16 @@
       "code": "3762",
       "genericName": "Azithromycin 500mg",
       "arabicName": "أزيثرومايسين 500 مجم",
-      "brandNames": ["Zithromax", "Azithrin"],
+      "brandNames": [
+        "Zithromax",
+        "Azithrin"
+      ],
       "category": "antibiotic",
       "class": "Macrolide",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "500mg once daily",
         "pediatric": "10mg/kg once daily",
@@ -163,8 +265,17 @@
         "route": "oral",
         "notes": "Take 1 hour before or 2 hours after food"
       },
-      "uses": ["Respiratory tract infections", "Atypical pneumonia", "Skin infections", "STIs (chlamydia)"],
-      "warnings": ["Macrolide allergy — contraindicated", "QT prolongation risk — avoid with other QT-prolonging drugs", "Check liver function in prolonged use"],
+      "uses": [
+        "Respiratory tract infections",
+        "Atypical pneumonia",
+        "Skin infections",
+        "STIs (chlamydia)"
+      ],
+      "warnings": [
+        "Macrolide allergy — contraindicated",
+        "QT prolongation risk — avoid with other QT-prolonging drugs",
+        "Check liver function in prolonged use"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -173,10 +284,14 @@
       "code": "0308",
       "genericName": "Oseltamivir 75mg",
       "arabicName": "أوسيلتاميفير 75 مجم",
-      "brandNames": ["Tamiflu"],
+      "brandNames": [
+        "Tamiflu"
+      ],
       "category": "antiviral",
       "class": "Neuraminidase inhibitor",
-      "forms": ["capsule"],
+      "forms": [
+        "capsule"
+      ],
       "dose": {
         "adult": "75mg twice daily",
         "pediatric": "Weight-based: 30–75mg twice daily",
@@ -184,8 +299,15 @@
         "route": "oral",
         "notes": "Start within 48 hours of symptom onset. Take with food to reduce nausea."
       },
-      "uses": ["Influenza A and B treatment", "Post-exposure influenza prophylaxis"],
-      "warnings": ["Must start within 48 hours to be effective", "Dose reduction required in renal impairment", "Neuropsychiatric events reported in children"],
+      "uses": [
+        "Influenza A and B treatment",
+        "Post-exposure influenza prophylaxis"
+      ],
+      "warnings": [
+        "Must start within 48 hours to be effective",
+        "Dose reduction required in renal impairment",
+        "Neuropsychiatric events reported in children"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -194,10 +316,16 @@
       "code": "4337",
       "genericName": "Paracetamol 500mg",
       "arabicName": "باراسيتامول 500 مجم",
-      "brandNames": ["Panadol", "Adol"],
+      "brandNames": [
+        "Panadol",
+        "Adol"
+      ],
       "category": "antipyretic",
       "class": "Analgesic / Antipyretic",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "500mg–1g every 4–6 hours (max 4g/day)",
         "pediatric": "15mg/kg every 4–6 hours (max 4 doses/day)",
@@ -205,8 +333,17 @@
         "route": "oral",
         "notes": "Do not exceed 4g/day in adults; 2g/day in liver disease"
       },
-      "uses": ["Pain relief", "Fever", "Headache", "Post-vaccination fever"],
-      "warnings": ["Hepatotoxic in overdose", "Reduce dose in liver disease and chronic alcohol use", "Check other products for hidden paracetamol content"],
+      "uses": [
+        "Pain relief",
+        "Fever",
+        "Headache",
+        "Post-vaccination fever"
+      ],
+      "warnings": [
+        "Hepatotoxic in overdose",
+        "Reduce dose in liver disease and chronic alcohol use",
+        "Check other products for hidden paracetamol content"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -215,10 +352,16 @@
       "code": "1772",
       "genericName": "Ibuprofen 200mg",
       "arabicName": "إيبوبروفين 200 مجم",
-      "brandNames": ["Brufen", "Nurofen"],
+      "brandNames": [
+        "Brufen",
+        "Nurofen"
+      ],
       "category": "analgesic-nsaid",
       "class": "NSAID",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "200–400mg every 6–8 hours (max 1.2g/day OTC)",
         "pediatric": "5–10mg/kg every 6–8 hours",
@@ -226,8 +369,17 @@
         "route": "oral",
         "notes": "Always take with food or milk"
       },
-      "uses": ["Pain relief", "Fever", "Inflammatory conditions", "Dysmenorrhoea"],
-      "warnings": ["Avoid in peptic ulcer disease", "Avoid in renal impairment", "Avoid in last trimester of pregnancy"],
+      "uses": [
+        "Pain relief",
+        "Fever",
+        "Inflammatory conditions",
+        "Dysmenorrhoea"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer disease",
+        "Avoid in renal impairment",
+        "Avoid in last trimester of pregnancy"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -236,10 +388,15 @@
       "code": "3568",
       "genericName": "Ibuprofen 400mg",
       "arabicName": "إيبوبروفين 400 مجم",
-      "brandNames": ["Brufen 400", "Motrin"],
+      "brandNames": [
+        "Brufen 400",
+        "Motrin"
+      ],
       "category": "analgesic-nsaid",
       "class": "NSAID",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "400mg every 6–8 hours (max 2.4g/day prescribed)",
         "pediatric": "5–10mg/kg every 6–8 hours",
@@ -247,8 +404,17 @@
         "route": "oral",
         "notes": "Always take with food"
       },
-      "uses": ["Moderate pain", "Fever", "Arthritis", "Dysmenorrhoea"],
-      "warnings": ["Avoid in peptic ulcer disease", "Avoid in renal impairment", "Avoid in last trimester of pregnancy"],
+      "uses": [
+        "Moderate pain",
+        "Fever",
+        "Arthritis",
+        "Dysmenorrhoea"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer disease",
+        "Avoid in renal impairment",
+        "Avoid in last trimester of pregnancy"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -257,10 +423,15 @@
       "code": "1657",
       "genericName": "Diclofenac Sodium 50mg",
       "arabicName": "ديكلوفيناك صوديوم 50 مجم",
-      "brandNames": ["Voltaren", "Cataflam Na"],
+      "brandNames": [
+        "Voltaren",
+        "Cataflam Na"
+      ],
       "category": "analgesic-nsaid",
       "class": "NSAID",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "50mg 2–3 times daily",
         "pediatric": "1mg/kg/day divided 2–3 times (not under 6 years)",
@@ -268,8 +439,17 @@
         "route": "oral",
         "notes": "Take with food. Enteric-coated: swallow whole."
       },
-      "uses": ["Pain and inflammation", "Arthritis", "Post-operative pain", "Dysmenorrhoea"],
-      "warnings": ["Avoid in peptic ulcer", "Cardiovascular risk with long-term use", "Avoid in renal impairment"],
+      "uses": [
+        "Pain and inflammation",
+        "Arthritis",
+        "Post-operative pain",
+        "Dysmenorrhoea"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer",
+        "Cardiovascular risk with long-term use",
+        "Avoid in renal impairment"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -278,10 +458,15 @@
       "code": "3102",
       "genericName": "Diclofenac Potassium 50mg",
       "arabicName": "ديكلوفيناك بوتاسيوم 50 مجم",
-      "brandNames": ["Cataflam", "Voltfast"],
+      "brandNames": [
+        "Cataflam",
+        "Voltfast"
+      ],
       "category": "analgesic-nsaid",
       "class": "NSAID",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "50mg 2–3 times daily",
         "pediatric": "1mg/kg/day divided 2–3 times",
@@ -289,8 +474,17 @@
         "route": "oral",
         "notes": "Faster onset than sodium salt — better for acute pain"
       },
-      "uses": ["Acute pain", "Dysmenorrhoea", "Post-operative pain", "Migraine"],
-      "warnings": ["Avoid in peptic ulcer", "Cardiovascular risk with long-term use", "Avoid in severe renal impairment"],
+      "uses": [
+        "Acute pain",
+        "Dysmenorrhoea",
+        "Post-operative pain",
+        "Migraine"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer",
+        "Cardiovascular risk with long-term use",
+        "Avoid in severe renal impairment"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -299,10 +493,15 @@
       "code": "3548",
       "genericName": "Acetylsalicylic Acid 75–81mg",
       "arabicName": "أسيتيل ساليسيليك أسيد 75 أو 81 مجم",
-      "brandNames": ["Aspocid", "Aspirin Protect"],
+      "brandNames": [
+        "Aspocid",
+        "Aspirin Protect"
+      ],
       "category": "analgesic-nsaid",
       "class": "Antiplatelet / NSAID",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "75–100mg once daily",
         "pediatric": "Not recommended for children (Reye's syndrome risk)",
@@ -310,8 +509,15 @@
         "route": "oral",
         "notes": "Take with food. Enteric-coated preferred."
       },
-      "uses": ["Antiplatelet: prevention of MI and stroke", "Secondary cardiovascular prevention"],
-      "warnings": ["Never use in children under 16 (Reye's syndrome)", "Risk of GI bleeding", "Avoid in active peptic ulcer"],
+      "uses": [
+        "Antiplatelet: prevention of MI and stroke",
+        "Secondary cardiovascular prevention"
+      ],
+      "warnings": [
+        "Never use in children under 16 (Reye's syndrome)",
+        "Risk of GI bleeding",
+        "Avoid in active peptic ulcer"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -320,10 +526,15 @@
       "code": "3424",
       "genericName": "Chymotrypsin + Trypsin",
       "arabicName": "كيموتريبسين + تريبسين",
-      "brandNames": ["Amizyme", "Wobenzym"],
+      "brandNames": [
+        "Amizyme",
+        "Wobenzym"
+      ],
       "category": "analgesic-nsaid",
       "class": "Proteolytic enzyme",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1–2 tablets 3 times daily",
         "pediatric": "Not established",
@@ -331,8 +542,15 @@
         "route": "oral",
         "notes": "Take between meals for anti-inflammatory effect"
       },
-      "uses": ["Post-operative oedema and inflammation", "Sports injuries", "Sinusitis adjunct"],
-      "warnings": ["Avoid in bleeding disorders", "No established paediatric dose"],
+      "uses": [
+        "Post-operative oedema and inflammation",
+        "Sports injuries",
+        "Sinusitis adjunct"
+      ],
+      "warnings": [
+        "Avoid in bleeding disorders",
+        "No established paediatric dose"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -341,10 +559,15 @@
       "code": "1314",
       "genericName": "Ferrous Salts + Folic Acid",
       "arabicName": "حوامل حديد + حمض الفوليك",
-      "brandNames": ["Ferrofolic", "Irofer FA"],
+      "brandNames": [
+        "Ferrofolic",
+        "Irofer FA"
+      ],
       "category": "vitamins-minerals",
       "class": "Iron + folate supplement",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet once or twice daily",
         "pediatric": "Not typically indicated",
@@ -352,8 +575,15 @@
         "route": "oral",
         "notes": "Take on empty stomach for best absorption. Orange juice helps. Avoid with tea/coffee."
       },
-      "uses": ["Iron deficiency anaemia in pregnancy", "Folate supplementation in pregnancy"],
-      "warnings": ["Black stools expected — reassure patient", "Constipation common", "Avoid with antacids — space by 2 hours"],
+      "uses": [
+        "Iron deficiency anaemia in pregnancy",
+        "Folate supplementation in pregnancy"
+      ],
+      "warnings": [
+        "Black stools expected — reassure patient",
+        "Constipation common",
+        "Avoid with antacids — space by 2 hours"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -362,10 +592,15 @@
       "code": "0162",
       "genericName": "Folic Acid 0.3–0.8mg",
       "arabicName": "حمض الفوليك",
-      "brandNames": ["Folicap", "Folifer"],
+      "brandNames": [
+        "Folicap",
+        "Folifer"
+      ],
       "category": "vitamins-minerals",
       "class": "B-vitamin supplement",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "400–800mcg once daily",
         "pediatric": "As prescribed",
@@ -373,8 +608,15 @@
         "route": "oral",
         "notes": "Ideally start 1 month before conception"
       },
-      "uses": ["Neural tube defect prevention", "Folate deficiency anaemia", "Pregnancy supplementation"],
-      "warnings": ["High doses may mask B12 deficiency anaemia", "Check B12 levels before starting high-dose therapy"],
+      "uses": [
+        "Neural tube defect prevention",
+        "Folate deficiency anaemia",
+        "Pregnancy supplementation"
+      ],
+      "warnings": [
+        "High doses may mask B12 deficiency anaemia",
+        "Check B12 levels before starting high-dose therapy"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -383,10 +625,16 @@
       "code": "4574",
       "genericName": "Ferrous Salt",
       "arabicName": "حديد حوامل",
-      "brandNames": ["Ferrosanol", "Haematinic"],
+      "brandNames": [
+        "Ferrosanol",
+        "Haematinic"
+      ],
       "category": "vitamins-minerals",
       "class": "Iron supplement",
-      "forms": ["capsule", "tablet"],
+      "forms": [
+        "capsule",
+        "tablet"
+      ],
       "dose": {
         "adult": "200mg (elemental iron ~65mg) 1–3 times daily",
         "pediatric": "3–6mg/kg/day elemental iron divided 2–3 times",
@@ -394,8 +642,15 @@
         "route": "oral",
         "notes": "Best absorbed on empty stomach. Black stools expected."
       },
-      "uses": ["Iron deficiency anaemia", "Iron supplementation in pregnancy"],
-      "warnings": ["Overdose dangerous in children — keep out of reach", "Constipation and GI upset common", "Avoid antacids — space by 2 hours"],
+      "uses": [
+        "Iron deficiency anaemia",
+        "Iron supplementation in pregnancy"
+      ],
+      "warnings": [
+        "Overdose dangerous in children — keep out of reach",
+        "Constipation and GI upset common",
+        "Avoid antacids — space by 2 hours"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -404,10 +659,14 @@
       "code": "3688",
       "genericName": "Elemental Iron 27mg + Folic Acid 600mcg + Vitamin B12 2.6mcg",
       "arabicName": "حديد + حمض الفوليك + فيتامين ب12",
-      "brandNames": ["Irolameen"],
+      "brandNames": [
+        "Irolameen"
+      ],
       "category": "vitamins-minerals",
       "class": "Haematinic combination",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet once daily",
         "pediatric": "Not established",
@@ -415,8 +674,16 @@
         "route": "oral",
         "notes": "Take with food if GI upset occurs"
       },
-      "uses": ["Combined iron, folate and B12 deficiency", "Pregnancy supplementation", "Megaloblastic anaemia prevention"],
-      "warnings": ["Black stools expected", "Avoid in haemochromatosis", "Space 2 hours from antacids"],
+      "uses": [
+        "Combined iron, folate and B12 deficiency",
+        "Pregnancy supplementation",
+        "Megaloblastic anaemia prevention"
+      ],
+      "warnings": [
+        "Black stools expected",
+        "Avoid in haemochromatosis",
+        "Space 2 hours from antacids"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -425,10 +692,15 @@
       "code": "2001",
       "genericName": "Vitamin B1 100mg + B6 50mg + B12 250mcg",
       "arabicName": "فيتامين ب1 – ب6 – ب12",
-      "brandNames": ["Neurobion", "Nervovit"],
+      "brandNames": [
+        "Neurobion",
+        "Nervovit"
+      ],
       "category": "vitamins-minerals",
       "class": "Neurotropic B vitamins",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet once daily",
         "pediatric": "Not established for this combination",
@@ -436,8 +708,15 @@
         "route": "oral",
         "notes": "Can be taken with food"
       },
-      "uses": ["Peripheral neuropathy", "B-vitamin deficiency", "Neuralgia adjunct"],
-      "warnings": ["High-dose B6 (>500mg/day) can cause sensory neuropathy", "Generally well tolerated"],
+      "uses": [
+        "Peripheral neuropathy",
+        "B-vitamin deficiency",
+        "Neuralgia adjunct"
+      ],
+      "warnings": [
+        "High-dose B6 (>500mg/day) can cause sensory neuropathy",
+        "Generally well tolerated"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -446,10 +725,15 @@
       "code": "4559",
       "genericName": "Vitamin C (Ascorbic Acid) 500mg",
       "arabicName": "فيتامين ج 500 مجم",
-      "brandNames": ["Redoxon", "Ce-Vi-Sol"],
+      "brandNames": [
+        "Redoxon",
+        "Ce-Vi-Sol"
+      ],
       "category": "vitamins-minerals",
       "class": "Water-soluble vitamin",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg once daily",
         "pediatric": "100–200mg once daily",
@@ -457,8 +741,15 @@
         "route": "oral",
         "notes": "Take with food to reduce gastric irritation"
       },
-      "uses": ["Vitamin C deficiency (scurvy)", "Immune support", "Iron absorption enhancement"],
-      "warnings": ["High doses may cause kidney stones in susceptible individuals", "GI upset with high doses"],
+      "uses": [
+        "Vitamin C deficiency (scurvy)",
+        "Immune support",
+        "Iron absorption enhancement"
+      ],
+      "warnings": [
+        "High doses may cause kidney stones in susceptible individuals",
+        "GI upset with high doses"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -467,10 +758,15 @@
       "code": "5802",
       "genericName": "Cholecalciferol (Vitamin D3) 1000 IU",
       "arabicName": "فيتامين د3 1000 وحدة",
-      "brandNames": ["Vidrop", "D-Vita"],
+      "brandNames": [
+        "Vidrop",
+        "D-Vita"
+      ],
       "category": "vitamins-minerals",
       "class": "Fat-soluble vitamin",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1000–2000 IU once daily",
         "pediatric": "400–1000 IU once daily",
@@ -478,8 +774,15 @@
         "route": "oral",
         "notes": "Take with a fatty meal for best absorption"
       },
-      "uses": ["Vitamin D deficiency", "Osteoporosis prevention", "Rickets prevention in children"],
-      "warnings": ["Hypercalcaemia with very high doses", "Monitor calcium levels with long-term use"],
+      "uses": [
+        "Vitamin D deficiency",
+        "Osteoporosis prevention",
+        "Rickets prevention in children"
+      ],
+      "warnings": [
+        "Hypercalcaemia with very high doses",
+        "Monitor calcium levels with long-term use"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -488,10 +791,15 @@
       "code": "4498",
       "genericName": "Zinc 25mg",
       "arabicName": "زنك 25 مجم",
-      "brandNames": ["Zincomed", "Zinc-S"],
+      "brandNames": [
+        "Zincomed",
+        "Zinc-S"
+      ],
       "category": "vitamins-minerals",
       "class": "Trace element supplement",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "25mg once daily",
         "pediatric": "10–20mg once daily",
@@ -499,8 +807,15 @@
         "route": "oral",
         "notes": "Take with food to reduce nausea"
       },
-      "uses": ["Zinc deficiency", "Diarrhoea adjunct in children", "Wound healing support"],
-      "warnings": ["Nausea and vomiting with high doses", "Prolonged use may cause copper deficiency"],
+      "uses": [
+        "Zinc deficiency",
+        "Diarrhoea adjunct in children",
+        "Wound healing support"
+      ],
+      "warnings": [
+        "Nausea and vomiting with high doses",
+        "Prolonged use may cause copper deficiency"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -509,10 +824,16 @@
       "code": "1546",
       "genericName": "Pseudoephedrine + Paracetamol + Chlorpheniramine",
       "arabicName": "سودوفيدرين + باراسيتامول + كلورفينيرامين (ضد البرد)",
-      "brandNames": ["Coldact", "Antiflu"],
+      "brandNames": [
+        "Coldact",
+        "Antiflu"
+      ],
       "category": "antihistamine",
       "class": "Decongestant + analgesic + antihistamine combination",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "1 tablet every 6–8 hours",
         "pediatric": "Not recommended under 12 years",
@@ -520,8 +841,16 @@
         "route": "oral",
         "notes": "Avoid at bedtime due to pseudoephedrine. May cause drowsiness from chlorpheniramine."
       },
-      "uses": ["Common cold symptoms", "Nasal congestion", "Runny nose with fever"],
-      "warnings": ["Avoid in hypertension (pseudoephedrine)", "Drowsiness — do not drive", "Avoid in prostate enlargement"],
+      "uses": [
+        "Common cold symptoms",
+        "Nasal congestion",
+        "Runny nose with fever"
+      ],
+      "warnings": [
+        "Avoid in hypertension (pseudoephedrine)",
+        "Drowsiness — do not drive",
+        "Avoid in prostate enlargement"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -530,10 +859,15 @@
       "code": "4317",
       "genericName": "Chlorpheniramine 4mg",
       "arabicName": "كلورفينيرامين مالبات 4 مجم",
-      "brandNames": ["Piriton", "Chlor-Trimeton"],
+      "brandNames": [
+        "Piriton",
+        "Chlor-Trimeton"
+      ],
       "category": "antihistamine",
       "class": "First-generation antihistamine",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "4mg every 4–6 hours (max 24mg/day)",
         "pediatric": "0.1mg/kg every 6 hours",
@@ -541,8 +875,17 @@
         "route": "oral",
         "notes": "Causes significant drowsiness — warn patient"
       },
-      "uses": ["Allergic rhinitis", "Urticaria", "Allergic reactions", "Common cold"],
-      "warnings": ["Drowsiness — do not drive", "Avoid in glaucoma and prostate enlargement", "Potentiates alcohol and sedatives"],
+      "uses": [
+        "Allergic rhinitis",
+        "Urticaria",
+        "Allergic reactions",
+        "Common cold"
+      ],
+      "warnings": [
+        "Drowsiness — do not drive",
+        "Avoid in glaucoma and prostate enlargement",
+        "Potentiates alcohol and sedatives"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -551,10 +894,15 @@
       "code": "1298",
       "genericName": "Salbutamol 2mg",
       "arabicName": "سالبيوتامول 2 مجم",
-      "brandNames": ["Ventolin", "Asmalin"],
+      "brandNames": [
+        "Ventolin",
+        "Asmalin"
+      ],
       "category": "respiratory",
       "class": "Short-acting beta-2 agonist",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "2–4mg 3–4 times daily",
         "pediatric": "0.1mg/kg 3–4 times daily",
@@ -562,8 +910,16 @@
         "route": "oral",
         "notes": "Inhaled route preferred for acute bronchospasm"
       },
-      "uses": ["Bronchospasm in asthma", "COPD", "Reversible airways obstruction"],
-      "warnings": ["Tachycardia and tremor common", "Hypokalaemia with high doses", "Not first choice for acute attack — use inhaler"],
+      "uses": [
+        "Bronchospasm in asthma",
+        "COPD",
+        "Reversible airways obstruction"
+      ],
+      "warnings": [
+        "Tachycardia and tremor common",
+        "Hypokalaemia with high doses",
+        "Not first choice for acute attack — use inhaler"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -572,10 +928,15 @@
       "code": "2711",
       "genericName": "Dexamethasone 8mg",
       "arabicName": "ديكساميثازون 8 مجم",
-      "brandNames": ["Decadron", "Dexona"],
+      "brandNames": [
+        "Decadron",
+        "Dexona"
+      ],
       "category": "steroid",
       "class": "Corticosteroid",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "0.5–10mg/day in divided doses (dose varies widely by indication)",
         "pediatric": "0.08–0.3mg/kg/day divided every 6–12 hours",
@@ -583,8 +944,17 @@
         "route": "oral",
         "notes": "Take with food. Never stop abruptly after prolonged use."
       },
-      "uses": ["Severe allergic reactions", "Inflammatory conditions", "Cerebral oedema", "Croup"],
-      "warnings": ["Never stop suddenly — taper the dose", "Raises blood sugar — monitor in diabetics", "Suppresses immune response — risk of infection"],
+      "uses": [
+        "Severe allergic reactions",
+        "Inflammatory conditions",
+        "Cerebral oedema",
+        "Croup"
+      ],
+      "warnings": [
+        "Never stop suddenly — taper the dose",
+        "Raises blood sugar — monitor in diabetics",
+        "Suppresses immune response — risk of infection"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -593,10 +963,15 @@
       "code": "2061",
       "genericName": "Tiemonium Methylsulphate 50mg",
       "arabicName": "تيمونيوم ميثيل سلفات 50 مجم",
-      "brandNames": ["Visceralgine", "Spasmomen"],
+      "brandNames": [
+        "Visceralgine",
+        "Spasmomen"
+      ],
       "category": "antispasmodic",
       "class": "Anticholinergic antispasmodic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "50mg 3 times daily",
         "pediatric": "Not recommended under 15 years",
@@ -604,8 +979,16 @@
         "route": "oral",
         "notes": "Take before meals"
       },
-      "uses": ["Abdominal colic", "Irritable bowel syndrome", "Biliary and renal colic"],
-      "warnings": ["Avoid in glaucoma", "Avoid in prostate enlargement", "Dry mouth and urinary retention may occur"],
+      "uses": [
+        "Abdominal colic",
+        "Irritable bowel syndrome",
+        "Biliary and renal colic"
+      ],
+      "warnings": [
+        "Avoid in glaucoma",
+        "Avoid in prostate enlargement",
+        "Dry mouth and urinary retention may occur"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -614,10 +997,15 @@
       "code": "1670",
       "genericName": "Domperidone 10mg",
       "arabicName": "دومبيريدون 10 مجم",
-      "brandNames": ["Motilium", "Dominal"],
+      "brandNames": [
+        "Motilium",
+        "Dominal"
+      ],
       "category": "gastrointestinal",
       "class": "Dopamine antagonist / prokinetic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "10mg 3 times daily before meals",
         "pediatric": "0.25mg/kg 3 times daily before meals",
@@ -625,8 +1013,16 @@
         "route": "oral",
         "notes": "Take 15–30 min before meals"
       },
-      "uses": ["Nausea and vomiting", "Gastroparesis", "Functional dyspepsia"],
-      "warnings": ["QT prolongation risk — avoid with other QT-prolonging drugs", "Avoid in liver impairment", "Cardiac risk in elderly — limit to 1 week"],
+      "uses": [
+        "Nausea and vomiting",
+        "Gastroparesis",
+        "Functional dyspepsia"
+      ],
+      "warnings": [
+        "QT prolongation risk — avoid with other QT-prolonging drugs",
+        "Avoid in liver impairment",
+        "Cardiac risk in elderly — limit to 1 week"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -635,10 +1031,15 @@
       "code": "1850",
       "genericName": "Mebendazole 100mg",
       "arabicName": "ميبندازول 100 مجم",
-      "brandNames": ["Vermox", "Ovex"],
+      "brandNames": [
+        "Vermox",
+        "Ovex"
+      ],
       "category": "antiparasitic",
       "class": "Benzimidazole anthelmintic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "100mg twice daily for 3 days (or 500mg single dose)",
         "pediatric": "Same as adult (over 2 years)",
@@ -646,8 +1047,17 @@
         "route": "oral",
         "notes": "Chew or crush tablet. Treat household contacts simultaneously."
       },
-      "uses": ["Threadworm", "Roundworm", "Hookworm", "Whipworm"],
-      "warnings": ["Not for children under 2 years", "Avoid in first trimester of pregnancy", "Treat all household members"],
+      "uses": [
+        "Threadworm",
+        "Roundworm",
+        "Hookworm",
+        "Whipworm"
+      ],
+      "warnings": [
+        "Not for children under 2 years",
+        "Avoid in first trimester of pregnancy",
+        "Treat all household members"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -656,10 +1066,15 @@
       "code": "1432",
       "genericName": "Albendazole 200mg",
       "arabicName": "ألبيندازول 200 مجم",
-      "brandNames": ["Zentel", "Alzental"],
+      "brandNames": [
+        "Zentel",
+        "Alzental"
+      ],
       "category": "antiparasitic",
       "class": "Benzimidazole anthelmintic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "400mg single dose (2 tablets)",
         "pediatric": "400mg single dose (over 2 years); 200mg if under 10kg",
@@ -667,8 +1082,18 @@
         "route": "oral",
         "notes": "Take with a fatty meal for better absorption. Repeat in 2 weeks for pinworm."
       },
-      "uses": ["Roundworm", "Hookworm", "Pinworm", "Giardia", "Hydatid disease"],
-      "warnings": ["Avoid in first trimester of pregnancy", "Liver function tests if long course", "Not for children under 1 year"],
+      "uses": [
+        "Roundworm",
+        "Hookworm",
+        "Pinworm",
+        "Giardia",
+        "Hydatid disease"
+      ],
+      "warnings": [
+        "Avoid in first trimester of pregnancy",
+        "Liver function tests if long course",
+        "Not for children under 1 year"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -677,10 +1102,14 @@
       "code": "1715",
       "genericName": "Flubendazole 100mg",
       "arabicName": "فلوبيندازول 100 مجم",
-      "brandNames": ["Fluvermal"],
+      "brandNames": [
+        "Fluvermal"
+      ],
       "category": "antiparasitic",
       "class": "Benzimidazole anthelmintic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "100mg twice daily for 3 days",
         "pediatric": "Same as adult (over 2 years)",
@@ -688,8 +1117,17 @@
         "route": "oral",
         "notes": "Treat all household members simultaneously"
       },
-      "uses": ["Threadworm", "Roundworm", "Hookworm", "Whipworm"],
-      "warnings": ["Not for children under 2 years", "Avoid in pregnancy", "Treat household contacts"],
+      "uses": [
+        "Threadworm",
+        "Roundworm",
+        "Hookworm",
+        "Whipworm"
+      ],
+      "warnings": [
+        "Not for children under 2 years",
+        "Avoid in pregnancy",
+        "Treat household contacts"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -698,10 +1136,14 @@
       "code": "3299",
       "genericName": "Metronidazole 250mg",
       "arabicName": "ميترونيدازول 250 مجم",
-      "brandNames": ["Flagyl 250"],
+      "brandNames": [
+        "Flagyl 250"
+      ],
       "category": "antiparasitic",
       "class": "Nitroimidazole",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "250mg 3 times daily",
         "pediatric": "7.5mg/kg 3 times daily",
@@ -709,8 +1151,17 @@
         "route": "oral",
         "notes": "Take with food. Avoid alcohol completely during treatment and 48 hours after."
       },
-      "uses": ["Amoebiasis", "Giardiasis", "Anaerobic bacterial infections", "Trichomoniasis"],
-      "warnings": ["Alcohol — severe reaction (disulfiram-like)", "Metallic taste common", "Avoid in first trimester"],
+      "uses": [
+        "Amoebiasis",
+        "Giardiasis",
+        "Anaerobic bacterial infections",
+        "Trichomoniasis"
+      ],
+      "warnings": [
+        "Alcohol — severe reaction (disulfiram-like)",
+        "Metallic taste common",
+        "Avoid in first trimester"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -719,10 +1170,14 @@
       "code": "3300",
       "genericName": "Metronidazole 500mg",
       "arabicName": "ميترونيدازول 500 مجم",
-      "brandNames": ["Flagyl 500"],
+      "brandNames": [
+        "Flagyl 500"
+      ],
       "category": "antiparasitic",
       "class": "Nitroimidazole",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg 2–3 times daily",
         "pediatric": "7.5mg/kg 3 times daily",
@@ -730,8 +1185,17 @@
         "route": "oral",
         "notes": "Avoid alcohol during and 48 hours after treatment"
       },
-      "uses": ["Amoebiasis", "Giardiasis", "Anaerobic infections", "H. pylori eradication (combination)"],
-      "warnings": ["Alcohol — severe disulfiram-like reaction", "Peripheral neuropathy with prolonged use", "Avoid in first trimester"],
+      "uses": [
+        "Amoebiasis",
+        "Giardiasis",
+        "Anaerobic infections",
+        "H. pylori eradication (combination)"
+      ],
+      "warnings": [
+        "Alcohol — severe disulfiram-like reaction",
+        "Peripheral neuropathy with prolonged use",
+        "Avoid in first trimester"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -740,10 +1204,14 @@
       "code": "3518",
       "genericName": "Praziquantel 600mg",
       "arabicName": "برازيكوانتيل 600 مجم",
-      "brandNames": ["Distocide"],
+      "brandNames": [
+        "Distocide"
+      ],
       "category": "antiparasitic",
       "class": "Anthelmintic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "40–75mg/kg in 2–3 divided doses in one day",
         "pediatric": "Same dose (over 4 years)",
@@ -751,8 +1219,16 @@
         "route": "oral",
         "notes": "Take with water during a meal. Do not chew — bitter taste."
       },
-      "uses": ["Schistosomiasis (bilharzia)", "Tapeworm infections", "Liver flukes"],
-      "warnings": ["Not for children under 4 years", "May cause dizziness — do not drive", "Avoid in ocular cysticercosis"],
+      "uses": [
+        "Schistosomiasis (bilharzia)",
+        "Tapeworm infections",
+        "Liver flukes"
+      ],
+      "warnings": [
+        "Not for children under 4 years",
+        "May cause dizziness — do not drive",
+        "Avoid in ocular cysticercosis"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -761,10 +1237,14 @@
       "code": "1903",
       "genericName": "Niclosamide 500mg",
       "arabicName": "نيكلوزاميد 500 مجم",
-      "brandNames": ["Yomesan"],
+      "brandNames": [
+        "Yomesan"
+      ],
       "category": "antiparasitic",
       "class": "Anthelmintic (tapeworm)",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "2g single dose (4 tablets), chewed thoroughly",
         "pediatric": "1–1.5g as single dose depending on weight",
@@ -772,8 +1252,14 @@
         "route": "oral",
         "notes": "Chew tablets thoroughly then swallow with water. Light breakfast beforehand."
       },
-      "uses": ["Tapeworm infections (Taenia saginata, Taenia solium, Diphyllobothrium)"],
-      "warnings": ["Tablets must be chewed not swallowed whole", "May cause nausea", "Follow with laxative for T. solium to prevent cysticercosis"],
+      "uses": [
+        "Tapeworm infections (Taenia saginata, Taenia solium, Diphyllobothrium)"
+      ],
+      "warnings": [
+        "Tablets must be chewed not swallowed whole",
+        "May cause nausea",
+        "Follow with laxative for T. solium to prevent cysticercosis"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -782,10 +1268,16 @@
       "code": "1659",
       "genericName": "Digestive Enzymes (Pancreatin)",
       "arabicName": "أنزيمات هاضمة (بنكرياتين)",
-      "brandNames": ["Amriz", "Creon"],
+      "brandNames": [
+        "Amriz",
+        "Creon"
+      ],
       "category": "gastrointestinal",
       "class": "Digestive enzyme",
-      "forms": ["capsule", "tablet"],
+      "forms": [
+        "capsule",
+        "tablet"
+      ],
       "dose": {
         "adult": "1–2 capsules with each meal",
         "pediatric": "As prescribed",
@@ -793,8 +1285,15 @@
         "route": "oral",
         "notes": "Take during or immediately after meals. Swallow whole — do not crush."
       },
-      "uses": ["Pancreatic exocrine insufficiency", "Digestive discomfort and bloating", "Malabsorption"],
-      "warnings": ["Avoid crushing (irritates mouth)", "High doses — risk of fibrosing colonopathy in CF patients"],
+      "uses": [
+        "Pancreatic exocrine insufficiency",
+        "Digestive discomfort and bloating",
+        "Malabsorption"
+      ],
+      "warnings": [
+        "Avoid crushing (irritates mouth)",
+        "High doses — risk of fibrosing colonopathy in CF patients"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -803,10 +1302,14 @@
       "code": "3544",
       "genericName": "Digestive Enzymes + Antispasmodic",
       "arabicName": "أنزيمات هاضمة + مضاد تقلصات",
-      "brandNames": ["Spazmodegestin"],
+      "brandNames": [
+        "Spazmodegestin"
+      ],
       "category": "gastrointestinal",
       "class": "Enzyme + antispasmodic combination",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1–2 tablets with meals 3 times daily",
         "pediatric": "Not established",
@@ -814,8 +1317,15 @@
         "route": "oral",
         "notes": "Take with meals"
       },
-      "uses": ["Irritable bowel with bloating and colic", "Functional dyspepsia", "Post-meal abdominal discomfort"],
-      "warnings": ["Anticholinergic effects — avoid in glaucoma", "Dry mouth may occur"],
+      "uses": [
+        "Irritable bowel with bloating and colic",
+        "Functional dyspepsia",
+        "Post-meal abdominal discomfort"
+      ],
+      "warnings": [
+        "Anticholinergic effects — avoid in glaucoma",
+        "Dry mouth may occur"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -824,10 +1334,14 @@
       "code": "1695",
       "genericName": "Esomeprazole 40mg",
       "arabicName": "إيزوميبرازول 40 مجم",
-      "brandNames": ["Nexium"],
+      "brandNames": [
+        "Nexium"
+      ],
       "category": "proton-pump-inhibitor",
       "class": "Proton pump inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "40mg once daily",
         "pediatric": "Not recommended under 12 years",
@@ -835,8 +1349,17 @@
         "route": "oral",
         "notes": "Take 30–60 minutes before breakfast"
       },
-      "uses": ["GERD", "Peptic ulcer disease", "H. pylori eradication (combination)", "Zollinger-Ellison syndrome"],
-      "warnings": ["Long-term use: risk of hypomagnesaemia and B12 deficiency", "May mask symptoms of gastric cancer", "Risk of C. difficile infection"],
+      "uses": [
+        "GERD",
+        "Peptic ulcer disease",
+        "H. pylori eradication (combination)",
+        "Zollinger-Ellison syndrome"
+      ],
+      "warnings": [
+        "Long-term use: risk of hypomagnesaemia and B12 deficiency",
+        "May mask symptoms of gastric cancer",
+        "Risk of C. difficile infection"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -845,10 +1368,16 @@
       "code": "4261",
       "genericName": "Omeprazole 40mg",
       "arabicName": "أوميبرازول 40 مجم",
-      "brandNames": ["Losec", "Prilosec"],
+      "brandNames": [
+        "Losec",
+        "Prilosec"
+      ],
       "category": "proton-pump-inhibitor",
       "class": "Proton pump inhibitor",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "20–40mg once daily",
         "pediatric": "0.7–3.3mg/kg/day once daily",
@@ -856,8 +1385,17 @@
         "route": "oral",
         "notes": "Take 30–60 minutes before breakfast. Swallow whole."
       },
-      "uses": ["GERD", "Peptic ulcer disease", "H. pylori eradication", "NSAID-induced ulcer prevention"],
-      "warnings": ["Long-term: hypomagnesaemia and B12 deficiency", "May mask gastric cancer symptoms", "Reduce dose in severe liver disease"],
+      "uses": [
+        "GERD",
+        "Peptic ulcer disease",
+        "H. pylori eradication",
+        "NSAID-induced ulcer prevention"
+      ],
+      "warnings": [
+        "Long-term: hypomagnesaemia and B12 deficiency",
+        "May mask gastric cancer symptoms",
+        "Reduce dose in severe liver disease"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -866,10 +1404,16 @@
       "code": "4253",
       "genericName": "Omeprazole 20mg",
       "arabicName": "أوميبرازول 20 مجم",
-      "brandNames": ["Losec 20", "Omepron"],
+      "brandNames": [
+        "Losec 20",
+        "Omepron"
+      ],
       "category": "proton-pump-inhibitor",
       "class": "Proton pump inhibitor",
-      "forms": ["tablet", "capsule"],
+      "forms": [
+        "tablet",
+        "capsule"
+      ],
       "dose": {
         "adult": "20mg once daily",
         "pediatric": "0.7–3.3mg/kg/day once daily",
@@ -877,8 +1421,15 @@
         "route": "oral",
         "notes": "Take 30–60 minutes before breakfast"
       },
-      "uses": ["GERD", "Gastric and duodenal ulcer", "H. pylori eradication"],
-      "warnings": ["Long-term: hypomagnesaemia and B12 deficiency", "May mask gastric cancer symptoms"],
+      "uses": [
+        "GERD",
+        "Gastric and duodenal ulcer",
+        "H. pylori eradication"
+      ],
+      "warnings": [
+        "Long-term: hypomagnesaemia and B12 deficiency",
+        "May mask gastric cancer symptoms"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -887,10 +1438,15 @@
       "code": "1869",
       "genericName": "Metformin 850mg",
       "arabicName": "ميتفورمين 850 مجم",
-      "brandNames": ["Glucophage", "Cidophage"],
+      "brandNames": [
+        "Glucophage",
+        "Cidophage"
+      ],
       "category": "antidiabetic",
       "class": "Biguanide",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "850mg 1–3 times daily with meals",
         "pediatric": "10mg/kg twice daily (over 10 years)",
@@ -898,8 +1454,16 @@
         "route": "oral",
         "notes": "Always take with food to reduce GI side effects. Start low and titrate."
       },
-      "uses": ["Type 2 diabetes mellitus", "Polycystic ovary syndrome (PCOS)", "Insulin resistance"],
-      "warnings": ["Stop before contrast imaging — risk of lactic acidosis", "Contraindicated in renal impairment (eGFR <30)", "Lactic acidosis risk with alcohol"],
+      "uses": [
+        "Type 2 diabetes mellitus",
+        "Polycystic ovary syndrome (PCOS)",
+        "Insulin resistance"
+      ],
+      "warnings": [
+        "Stop before contrast imaging — risk of lactic acidosis",
+        "Contraindicated in renal impairment (eGFR <30)",
+        "Lactic acidosis risk with alcohol"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -908,10 +1472,15 @@
       "code": "1738",
       "genericName": "Glimepiride 3mg",
       "arabicName": "جلايمبيرايد 3 مجم",
-      "brandNames": ["Amaryl", "Glimerid"],
+      "brandNames": [
+        "Amaryl",
+        "Glimerid"
+      ],
       "category": "antidiabetic",
       "class": "Sulphonylurea",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1–4mg once daily with breakfast",
         "pediatric": "Not recommended",
@@ -919,8 +1488,14 @@
         "route": "oral",
         "notes": "Take with first bite of breakfast. Do not skip meals."
       },
-      "uses": ["Type 2 diabetes mellitus"],
-      "warnings": ["Hypoglycaemia — especially if meal is skipped", "Avoid in renal and liver impairment", "Weight gain common"],
+      "uses": [
+        "Type 2 diabetes mellitus"
+      ],
+      "warnings": [
+        "Hypoglycaemia — especially if meal is skipped",
+        "Avoid in renal and liver impairment",
+        "Weight gain common"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -929,10 +1504,15 @@
       "code": "1735",
       "genericName": "Gliclazide 80mg",
       "arabicName": "جلايكلازايد 80 مجم",
-      "brandNames": ["Diamicron", "Glizide"],
+      "brandNames": [
+        "Diamicron",
+        "Glizide"
+      ],
       "category": "antidiabetic",
       "class": "Sulphonylurea",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "40–320mg daily in divided doses",
         "pediatric": "Not recommended",
@@ -940,8 +1520,14 @@
         "route": "oral",
         "notes": "Take with breakfast. Modified-release formulation taken once daily."
       },
-      "uses": ["Type 2 diabetes mellitus"],
-      "warnings": ["Hypoglycaemia risk — do not skip meals", "Use with caution in elderly", "Avoid in severe liver or kidney disease"],
+      "uses": [
+        "Type 2 diabetes mellitus"
+      ],
+      "warnings": [
+        "Hypoglycaemia risk — do not skip meals",
+        "Use with caution in elderly",
+        "Avoid in severe liver or kidney disease"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -950,10 +1536,15 @@
       "code": "4194",
       "genericName": "Captopril 25mg",
       "arabicName": "كابتوبريل 25 مجم",
-      "brandNames": ["Capoten", "Capozide"],
+      "brandNames": [
+        "Capoten",
+        "Capozide"
+      ],
       "category": "antihypertensive",
       "class": "ACE inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "12.5–50mg 2–3 times daily",
         "pediatric": "0.1–0.5mg/kg 2–3 times daily",
@@ -961,8 +1552,17 @@
         "route": "oral",
         "notes": "Take 1 hour before meals for best absorption"
       },
-      "uses": ["Hypertension", "Heart failure", "Diabetic nephropathy", "Post-MI cardioprotection"],
-      "warnings": ["Dry cough — very common side effect", "Hyperkalaemia — avoid with potassium-sparing diuretics", "Contraindicated in pregnancy (2nd and 3rd trimester)"],
+      "uses": [
+        "Hypertension",
+        "Heart failure",
+        "Diabetic nephropathy",
+        "Post-MI cardioprotection"
+      ],
+      "warnings": [
+        "Dry cough — very common side effect",
+        "Hyperkalaemia — avoid with potassium-sparing diuretics",
+        "Contraindicated in pregnancy (2nd and 3rd trimester)"
+      ],
       "inStock": true,
       "priority": true
     },
@@ -971,10 +1571,15 @@
       "code": "3678",
       "genericName": "Captopril 50mg + Hydrochlorothiazide 25mg",
       "arabicName": "كابتوبريل + هيدروكلوروثيازايد 50/25 مجم",
-      "brandNames": ["Capozide", "Acezide"],
+      "brandNames": [
+        "Capozide",
+        "Acezide"
+      ],
       "category": "antihypertensive",
       "class": "ACE inhibitor + thiazide diuretic",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "1 tablet once or twice daily",
         "pediatric": "Not recommended",
@@ -982,8 +1587,14 @@
         "route": "oral",
         "notes": "Take in the morning. Monitor electrolytes."
       },
-      "uses": ["Hypertension (combination therapy)"],
-      "warnings": ["Hypokalaemia from thiazide component", "Dry cough from ACE inhibitor", "Contraindicated in pregnancy"],
+      "uses": [
+        "Hypertension (combination therapy)"
+      ],
+      "warnings": [
+        "Hypokalaemia from thiazide component",
+        "Dry cough from ACE inhibitor",
+        "Contraindicated in pregnancy"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -992,10 +1603,14 @@
       "code": "1698",
       "genericName": "Ethamsylate 250mg",
       "arabicName": "إيثامسيلات 250 مجم",
-      "brandNames": ["Dicynone"],
+      "brandNames": [
+        "Dicynone"
+      ],
       "category": "cardiovascular",
       "class": "Haemostatic agent",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "500mg 4 times daily",
         "pediatric": "12.5mg/kg 4 times daily",
@@ -1003,8 +1618,16 @@
         "route": "oral",
         "notes": "Start before anticipated bleeding if used prophylactically"
       },
-      "uses": ["Menorrhagia", "Capillary bleeding", "Post-operative bleeding prevention", "Periventricular haemorrhage in neonates"],
-      "warnings": ["Not effective for major vessel bleeding", "Nausea may occur"],
+      "uses": [
+        "Menorrhagia",
+        "Capillary bleeding",
+        "Post-operative bleeding prevention",
+        "Periventricular haemorrhage in neonates"
+      ],
+      "warnings": [
+        "Not effective for major vessel bleeding",
+        "Nausea may occur"
+      ],
       "inStock": true,
       "priority": false
     },
@@ -1013,10 +1636,15 @@
       "code": "PAN40",
       "genericName": "Pantoprazole 40mg",
       "arabicName": "بانتوبرازول 40 مجم",
-      "brandNames": ["Controloc", "Pantoloc"],
+      "brandNames": [
+        "Controloc",
+        "Pantoloc"
+      ],
       "category": "proton-pump-inhibitor",
       "class": "Proton pump inhibitor",
-      "forms": ["tablet"],
+      "forms": [
+        "tablet"
+      ],
       "dose": {
         "adult": "40mg once daily",
         "pediatric": "Not recommended under 5 years",
@@ -1024,8 +1652,3004 @@
         "route": "oral",
         "notes": "Take 30–60 minutes before breakfast. Swallow whole — do not crush."
       },
-      "uses": ["GERD", "Peptic ulcer disease", "H. pylori eradication", "Zollinger-Ellison syndrome"],
-      "warnings": ["Long-term: hypomagnesaemia and B12 deficiency", "May mask gastric cancer symptoms", "Reduce dose in severe liver disease"],
+      "uses": [
+        "GERD",
+        "Peptic ulcer disease",
+        "H. pylori eradication",
+        "Zollinger-Ellison syndrome"
+      ],
+      "warnings": [
+        "Long-term: hypomagnesaemia and B12 deficiency",
+        "May mask gastric cancer symptoms",
+        "Reduce dose in severe liver disease"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-fluclox-500-inj",
+      "code": "2473",
+      "genericName": "Amoxicillin 250mg + Flucloxacillin 250mg (Injection)",
+      "arabicName": "أموكسيسيلين + فلوكلوكساسيلين 500 مجم فيال",
+      "brandNames": [
+        "Flumox 500 IV"
+      ],
+      "category": "antibiotic",
+      "class": "Penicillin combination",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "500mg–1g every 6–8 hours IV/IM",
+        "pediatric": "25–50mg/kg/day divided every 6–8 hours",
+        "duration": "5–7 days",
+        "route": "IV or IM",
+        "notes": "Reconstitute with water for injection. Administer IV slowly over 3–4 min."
+      },
+      "uses": [
+        "Skin and soft tissue infections",
+        "Respiratory tract infections",
+        "Post-operative prophylaxis"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Reduce dose in renal impairment",
+        "IV administration: risk of phlebitis"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-fluclox-1g-inj",
+      "code": "1456",
+      "genericName": "Amoxicillin 500mg + Flucloxacillin 500mg (Injection)",
+      "arabicName": "أموكسيسيلين + فلوكلوكساسيلين 1000 مجم فيال",
+      "brandNames": [
+        "Flumox 1g IV"
+      ],
+      "category": "antibiotic",
+      "class": "Penicillin combination",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1g every 6–8 hours IV/IM",
+        "pediatric": "50mg/kg/day divided every 6–8 hours",
+        "duration": "5–10 days",
+        "route": "IV or IM",
+        "notes": "Reconstitute and administer slowly"
+      },
+      "uses": [
+        "Severe skin and soft tissue infections",
+        "Hospital-acquired infections",
+        "Surgical prophylaxis"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Reduce dose in renal impairment"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-1g-inj",
+      "code": "1457",
+      "genericName": "Amoxicillin 1g (Injection)",
+      "arabicName": "أموكسيسيلين 1000 مجم فيال",
+      "brandNames": [
+        "Ibiamox 1g"
+      ],
+      "category": "antibiotic",
+      "class": "Aminopenicillin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "500mg–1g every 8 hours IV/IM",
+        "pediatric": "25–50mg/kg/day in divided doses",
+        "duration": "5–7 days",
+        "route": "IV or IM",
+        "notes": "Reconstitute with water for injection or saline"
+      },
+      "uses": [
+        "Respiratory tract infections",
+        "Urinary tract infections",
+        "Meningitis (high dose)"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Rash in infectious mononucleosis"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "ampicillin-sulbactam-750-inj",
+      "code": "1485",
+      "genericName": "Ampicillin 500mg + Sulbactam 250mg (Injection)",
+      "arabicName": "أمبيسيلين + سالباكتام 750 مجم فيال",
+      "brandNames": [
+        "Unasyn 750",
+        "Unicktam 750"
+      ],
+      "category": "antibiotic",
+      "class": "Beta-lactam + inhibitor",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "750mg–1.5g every 6–8 hours IV/IM",
+        "pediatric": "150mg/kg/day divided every 6–8 hours",
+        "duration": "5–14 days",
+        "route": "IV or IM",
+        "notes": "Reconstitute with compatible diluent. IV infusion over 15–30 min."
+      },
+      "uses": [
+        "Intra-abdominal infections",
+        "Skin and soft tissue infections",
+        "Gynaecological infections"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Reduce dose in renal impairment",
+        "Diarrhoea common"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "ampicillin-sulbactam-1500-inj",
+      "code": "2770",
+      "genericName": "Ampicillin 1g + Sulbactam 500mg (Injection)",
+      "arabicName": "أمبيسيلين + سالباكتام 1500 مجم فيال",
+      "brandNames": [
+        "Unasyn 1500",
+        "Unicktam 1500"
+      ],
+      "category": "antibiotic",
+      "class": "Beta-lactam + inhibitor",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1.5–3g every 6–8 hours IV",
+        "pediatric": "150–300mg/kg/day divided every 6–8 hours",
+        "duration": "5–14 days",
+        "route": "IV",
+        "notes": "IV infusion preferred. Administer over 15–30 min."
+      },
+      "uses": [
+        "Severe intra-abdominal infections",
+        "Hospital-acquired pneumonia",
+        "Sepsis"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Monitor renal function",
+        "Hepatic dysfunction reported"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "benzathine-penicillin-1200k-inj",
+      "code": "2365",
+      "genericName": "Benzathine Benzylpenicillin 1,200,000 IU",
+      "arabicName": "إنزاثين بنزيلبنسيلين 1200000 فيال",
+      "brandNames": [
+        "Benzathine Penicillin G",
+        "Penidure"
+      ],
+      "category": "antibiotic",
+      "class": "Long-acting penicillin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1.2 million IU as single IM dose",
+        "pediatric": "600,000 IU single IM dose (under 30kg)",
+        "duration": "Single dose (or monthly for prophylaxis)",
+        "route": "IM",
+        "notes": "Deep IM injection only — NEVER IV. Divide dose between two injection sites in children."
+      },
+      "uses": [
+        "Streptococcal pharyngitis",
+        "Rheumatic fever prophylaxis",
+        "Early syphilis"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated (anaphylaxis risk)",
+        "Never give IV — fatal",
+        "Have adrenaline available"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "cefotaxime-500-inj",
+      "code": "3256",
+      "genericName": "Cefotaxime 500mg (Injection)",
+      "arabicName": "سيفاتاكسيم 500 مجم فيال",
+      "brandNames": [
+        "Claforan 500"
+      ],
+      "category": "antibiotic",
+      "class": "Third-generation cephalosporin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1–2g every 8–12 hours IV/IM",
+        "pediatric": "50–200mg/kg/day divided every 6–8 hours",
+        "duration": "5–10 days",
+        "route": "IV or IM",
+        "notes": "Reconstitute with water for injection. IV over 3–5 min or infusion over 20–60 min."
+      },
+      "uses": [
+        "Meningitis",
+        "Pneumonia",
+        "Septicaemia",
+        "Gonorrhoea"
+      ],
+      "warnings": [
+        "Cephalosporin allergy — contraindicated",
+        "Cross-sensitivity with penicillin (5–10%)",
+        "Reduce dose in renal impairment"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "cefotaxime-1g-inj",
+      "code": "2307",
+      "genericName": "Cefotaxime 1g (Injection)",
+      "arabicName": "سيفاتاكسيم 1 جم فيال",
+      "brandNames": [
+        "Claforan 1g"
+      ],
+      "category": "antibiotic",
+      "class": "Third-generation cephalosporin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1–2g every 8–12 hours IV/IM",
+        "pediatric": "50–200mg/kg/day in divided doses",
+        "duration": "5–10 days",
+        "route": "IV or IM",
+        "notes": "High doses for meningitis: 2g every 4–6 hours IV"
+      },
+      "uses": [
+        "Meningitis",
+        "Severe pneumonia",
+        "Septicaemia",
+        "Intra-abdominal infections"
+      ],
+      "warnings": [
+        "Cephalosporin allergy — contraindicated",
+        "Monitor renal function in prolonged use",
+        "Superinfection risk"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "diclofenac-na-75-inj",
+      "code": "0020",
+      "genericName": "Diclofenac Sodium 75mg (Injection)",
+      "arabicName": "ديكلوفيناك صوديوم 75 مجم أمبول",
+      "brandNames": [
+        "Voltaren Ampoule",
+        "Diclac Ampoule"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "NSAID",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "75mg IM once or twice daily (max 150mg/day)",
+        "pediatric": "1mg/kg/dose (over 1 year, specialist use)",
+        "duration": "2–3 days IM; then switch to oral",
+        "route": "IM (deep)",
+        "notes": "Deep IM injection into upper outer quadrant of gluteus. Never IV bolus. Max 2 days IM."
+      },
+      "uses": [
+        "Acute pain",
+        "Renal colic",
+        "Post-operative pain",
+        "Musculoskeletal pain"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer",
+        "Avoid in renal failure",
+        "Rotate injection sites — tissue damage risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "ketoprofen-100-inj",
+      "code": "1804",
+      "genericName": "Ketoprofen 100mg (Injection)",
+      "arabicName": "كيتوبروفين 100 أمبول",
+      "brandNames": [
+        "Profenid Ampoule"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "NSAID",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "50–100mg every 8 hours IM or IV infusion",
+        "pediatric": "Not recommended under 15 years",
+        "duration": "1–3 days; switch to oral when possible",
+        "route": "IM or IV infusion",
+        "notes": "IV: dilute in 100ml saline and infuse over 20 min. IM: deep injection."
+      },
+      "uses": [
+        "Moderate to severe acute pain",
+        "Post-operative pain",
+        "Renal colic",
+        "Dysmenorrhoea"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer",
+        "Avoid in renal impairment",
+        "GI bleeding risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "insulin-mixed-30-70-inj",
+      "code": "4578",
+      "genericName": "Human Insulin Mixed 30/70",
+      "arabicName": "أنسولين بشري مخلوط 30/70 فيال",
+      "brandNames": [
+        "Mixtard 30/70",
+        "Humulin 30/70"
+      ],
+      "category": "antidiabetic",
+      "class": "Biphasic insulin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "Individualised — typically 0.5–1 unit/kg/day SC divided twice daily",
+        "pediatric": "0.5–1 unit/kg/day (specialist initiation)",
+        "duration": "Ongoing",
+        "route": "SC",
+        "notes": "Inject 30 min before meals. Mix gently by rolling vial. Rotate injection sites."
+      },
+      "uses": [
+        "Type 1 diabetes mellitus",
+        "Type 2 diabetes requiring insulin"
+      ],
+      "warnings": [
+        "Hypoglycaemia — potentially life-threatening",
+        "Store in refrigerator (2–8°C)",
+        "Do not freeze"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "vitamin-b12-1mg-inj",
+      "code": "2099",
+      "genericName": "Vitamin B12 (Cyanocobalamin) 1mg Injection",
+      "arabicName": "فيتامين ب12 أمبول 1 مجم",
+      "brandNames": [
+        "Cytamen",
+        "B12 Injection"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Water-soluble vitamin",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1mg IM on alternate days for 2 weeks, then 1mg every 3 months",
+        "pediatric": "As prescribed",
+        "duration": "As prescribed; often lifelong",
+        "route": "IM",
+        "notes": "Give IM, not IV. For pernicious anaemia — lifelong treatment."
+      },
+      "uses": [
+        "B12 deficiency (pernicious anaemia)",
+        "Megaloblastic anaemia",
+        "Neurological manifestations of B12 deficiency"
+      ],
+      "warnings": [
+        "Do not give IV — serious reactions reported",
+        "Folic acid alone may mask B12 deficiency",
+        "Monitor potassium during initial treatment"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "atropine-1mg-inj",
+      "code": "0765",
+      "genericName": "Atropine Sulfate 1mg/ml",
+      "arabicName": "أتروبين 1 مجم / ملي أمبول",
+      "brandNames": [
+        "Atropine Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Anticholinergic",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "0.5–1mg IV every 3–5 min (max 3mg for bradycardia)",
+        "pediatric": "0.02mg/kg IV (min 0.1mg, max 0.5mg)",
+        "duration": "As needed in emergency",
+        "route": "IV (IM or ET if no IV access)",
+        "notes": "Bradycardia: give IV push. Pre-anaesthetic: 0.3–0.6mg IM 30–60 min before."
+      },
+      "uses": [
+        "Symptomatic bradycardia",
+        "Organophosphate poisoning",
+        "Pre-anaesthetic medication",
+        "Asystole"
+      ],
+      "warnings": [
+        "Doses under 0.5mg may cause paradoxical bradycardia",
+        "Avoid in narrow-angle glaucoma",
+        "Tachyarrhythmia risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "adrenaline-1mg-inj",
+      "code": "4129",
+      "genericName": "Adrenaline (Epinephrine) 1mg/ml",
+      "arabicName": "أدرينالين 1 مجم / ملي أمبول",
+      "brandNames": [
+        "Epinephrine Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Sympathomimetic",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "Anaphylaxis: 0.5mg (0.5ml of 1:1000) IM into anterolateral thigh. Cardiac arrest: 1mg IV every 3–5 min.",
+        "pediatric": "Anaphylaxis: 0.01mg/kg IM (max 0.5mg)",
+        "duration": "As needed in emergency",
+        "route": "IM (anaphylaxis); IV (cardiac arrest)",
+        "notes": "Anaphylaxis: always IM into thigh, not SC. Repeat every 5–15 min if needed."
+      },
+      "uses": [
+        "Anaphylaxis",
+        "Cardiac arrest",
+        "Severe bronchospasm",
+        "Croup (nebulised)"
+      ],
+      "warnings": [
+        "Correct route is critical — IM for anaphylaxis",
+        "Risk of arrhythmia",
+        "Avoid IV in non-cardiac-arrest settings unless resuscitation-ready"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "aminophylline-250-inj",
+      "code": "1271",
+      "genericName": "Aminophylline 250mg Injection",
+      "arabicName": "أمينوفيلين أو ثيوفيلين أمبول",
+      "brandNames": [
+        "Aminophylline Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Methylxanthine bronchodilator",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "Loading: 5mg/kg IV over 20–30 min. Maintenance: 0.5mg/kg/hour infusion.",
+        "pediatric": "Loading: 5mg/kg IV over 20–30 min; maintenance 0.7–1mg/kg/hour",
+        "duration": "Until clinical improvement",
+        "route": "IV slow infusion",
+        "notes": "Never give as IV bolus. Monitor ECG. Narrow therapeutic window — risk of toxicity."
+      },
+      "uses": [
+        "Severe asthma (when beta-2 agonists fail)",
+        "Acute severe COPD exacerbation"
+      ],
+      "warnings": [
+        "Narrow therapeutic index — risk of arrhythmia and seizures",
+        "Multiple drug interactions",
+        "Monitor theophylline levels if available"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "dexamethasone-8mg-inj",
+      "code": "0333",
+      "genericName": "Dexamethasone 8mg/2ml Injection",
+      "arabicName": "ديكساميثازون أمبول 8 مجم / 2 ملي",
+      "brandNames": [
+        "Decadron Ampoule",
+        "Dexona Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Corticosteroid",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "4–20mg IV/IM depending on indication",
+        "pediatric": "0.15–0.6mg/kg/dose IV/IM",
+        "duration": "As needed; transition to oral when stable",
+        "route": "IV or IM",
+        "notes": "Cerebral oedema: 10mg IV loading, then 4mg every 6h. Croup: single 0.6mg/kg IM dose."
+      },
+      "uses": [
+        "Severe allergic reactions",
+        "Croup",
+        "Cerebral oedema",
+        "Adrenal crisis",
+        "Anti-emetic"
+      ],
+      "warnings": [
+        "Do not stop abruptly after prolonged use",
+        "Raises blood glucose — monitor diabetics",
+        "Immunosuppression — infection risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "chlorpheniramine-5mg-inj",
+      "code": "4553",
+      "genericName": "Chlorpheniramine 5mg Injection",
+      "arabicName": "كلورفينيرامين 5 مجم أمبول",
+      "brandNames": [
+        "Piriton Injection"
+      ],
+      "category": "emergency",
+      "class": "First-generation antihistamine",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "10mg IV/IM (can repeat every 4–6 hours)",
+        "pediatric": "0.1mg/kg IV/IM",
+        "duration": "As needed",
+        "route": "IV slow or IM",
+        "notes": "For IV: dilute and inject slowly over 1 minute. Used in anaphylaxis after adrenaline."
+      },
+      "uses": [
+        "Anaphylaxis (adjunct after adrenaline)",
+        "Severe allergic reactions",
+        "Urticaria"
+      ],
+      "warnings": [
+        "Drowsiness — do not drive",
+        "IV too fast causes hypotension",
+        "Anticholinergic effects"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "phytomenadione-10mg-inj",
+      "code": "4178",
+      "genericName": "Phytomenadione (Vitamin K1) 10mg",
+      "arabicName": "فيتومينادايون فيتامين ك أمبول",
+      "brandNames": [
+        "Konakion",
+        "Vitamin K Injection"
+      ],
+      "category": "emergency",
+      "class": "Vitamin K / Haemostatic",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1–10mg slow IV or IM; repeat after 3–4 hours if needed",
+        "pediatric": "Neonate prophylaxis: 1mg IM at birth. Treatment: 0.5–1mg IV.",
+        "duration": "As needed",
+        "route": "IV slow or IM",
+        "notes": "Anaphylaxis risk with rapid IV — give very slowly. IM preferred if not life-threatening."
+      },
+      "uses": [
+        "Warfarin reversal",
+        "Vitamin K deficiency bleeding",
+        "Neonatal haemorrhagic disease prevention"
+      ],
+      "warnings": [
+        "Anaphylaxis with rapid IV injection",
+        "Full anticoagulant reversal may cause re-thrombosis",
+        "Onset 6–24 hours (oral) vs 1–2 hours (IV)"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "furosemide-40mg-inj",
+      "code": "1729",
+      "genericName": "Furosemide 40mg Injection",
+      "arabicName": "فيوروسيميد 40 مجم أمبول",
+      "brandNames": [
+        "Lasix Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Loop diuretic",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "20–80mg IV slowly (1mg/min). May repeat after 2 hours.",
+        "pediatric": "0.5–1mg/kg IV slowly (max 40mg/dose)",
+        "duration": "As needed",
+        "route": "IV slow (1mg/min)",
+        "notes": "Do not inject faster than 4mg/min — ototoxicity risk. Monitor urine output and electrolytes."
+      },
+      "uses": [
+        "Acute pulmonary oedema",
+        "Severe hypertension",
+        "Fluid overload",
+        "Hypercalcaemia"
+      ],
+      "warnings": [
+        "Rapid injection causes ototoxicity",
+        "Hypokalaemia — monitor electrolytes",
+        "Dehydration and hypotension risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "tiemonium-5mg-inj",
+      "code": "2058",
+      "genericName": "Tiemonium Methylsulphate 5mg/2ml Injection",
+      "arabicName": "ثيمونيوم ميثيل سلفات أمبول",
+      "brandNames": [
+        "Spasmofarerin",
+        "Visceralgin Ampoule"
+      ],
+      "category": "emergency",
+      "class": "Anticholinergic antispasmodic",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "5mg IV or IM, repeat if needed after 30 min",
+        "pediatric": "Not recommended under 15 years",
+        "duration": "As needed for acute colic",
+        "route": "IV slow or IM",
+        "notes": "For acute colicky pain. Switch to oral when pain controlled."
+      },
+      "uses": [
+        "Biliary colic",
+        "Renal colic",
+        "Gastrointestinal spasm"
+      ],
+      "warnings": [
+        "Avoid in glaucoma and prostate enlargement",
+        "Anticholinergic side effects",
+        "Tachycardia may occur"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "salbutamol-nebuliser",
+      "code": "1358",
+      "genericName": "Salbutamol 5mg/ml (Nebuliser Solution)",
+      "arabicName": "سالبيوتامول محلول نيبولايزر",
+      "brandNames": [
+        "Ventolin Nebules",
+        "Asthalin Respirator Solution"
+      ],
+      "category": "emergency",
+      "class": "Short-acting beta-2 agonist",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "2.5–5mg nebulised every 20 min for 3 doses, then as needed",
+        "pediatric": "2.5mg nebulised every 20–30 min",
+        "duration": "As needed for acute attack",
+        "route": "Inhalation (nebuliser)",
+        "notes": "Dilute to 3–4ml with normal saline. Continuous nebulisation possible in severe asthma."
+      },
+      "uses": [
+        "Acute severe asthma",
+        "Acute COPD exacerbation",
+        "Bronchospasm"
+      ],
+      "warnings": [
+        "Hypokalaemia with high doses — especially with steroids and theophylline",
+        "Tachycardia and tremor",
+        "Monitor SpO2 during treatment"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "glucose-5-infusion",
+      "code": "3612",
+      "genericName": "Glucose 5% Infusion 500ml",
+      "arabicName": "محلول دكستروز 5% 500 ملي زجاجة",
+      "brandNames": [
+        "Dextrose 5%"
+      ],
+      "category": "emergency",
+      "class": "IV fluid",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "500ml–1L IV at rate determined by clinical need",
+        "pediatric": "Maintenance: 100ml/kg/day (first 10kg) — Holliday-Segar formula",
+        "duration": "As clinically required",
+        "route": "IV infusion",
+        "notes": "Use for hypoglycaemia, fluid maintenance, and as IV drug diluent. Monitor blood glucose."
+      },
+      "uses": [
+        "Hypoglycaemia treatment",
+        "IV fluid and caloric maintenance",
+        "Dilution of IV medications"
+      ],
+      "warnings": [
+        "Avoid in hyponatraemia — may worsen cerebral oedema",
+        "Hyperglycaemia in diabetics",
+        "Not suitable as sole fluid replacement in haemorrhage"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "saline-09-infusion",
+      "code": "4107",
+      "genericName": "Sodium Chloride 0.9% (Normal Saline) 500ml",
+      "arabicName": "محلول ملح 0.9% 500 ملي زجاجة",
+      "brandNames": [
+        "Normal Saline 0.9%"
+      ],
+      "category": "emergency",
+      "class": "IV fluid / crystalloid",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "500ml–1L IV; rate titrated to clinical response",
+        "pediatric": "Resuscitation: 10–20ml/kg IV bolus over 15–30 min",
+        "duration": "As clinically required",
+        "route": "IV infusion",
+        "notes": "First-line for fluid resuscitation. Can be used for drug dilution. Monitor for hyperchloraemic acidosis in large volumes."
+      },
+      "uses": [
+        "Fluid resuscitation",
+        "Dehydration replacement",
+        "IV drug dilution",
+        "Hyponatraemia correction (careful)"
+      ],
+      "warnings": [
+        "Large volumes may cause hyperchloraemic metabolic acidosis",
+        "Avoid in hypernatraemia",
+        "Monitor electrolytes"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "tetanus-toxoid-1500-inj",
+      "code": "4751",
+      "genericName": "Tetanus Toxoid 1500 IU",
+      "arabicName": "مصل تيتانوس 1500 وحدة",
+      "brandNames": [
+        "Tetanus Antitoxin"
+      ],
+      "category": "emergency",
+      "class": "Passive immunisation",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1500–3000 IU IM or SC (after test dose)",
+        "pediatric": "750–1500 IU IM or SC",
+        "duration": "Single prophylactic dose",
+        "route": "IM or SC",
+        "notes": "Always perform sensitivity test before full dose. Have adrenaline ready. Give at different site from wound care."
+      },
+      "uses": [
+        "Tetanus prophylaxis after wounds",
+        "Incomplete immunisation with contaminated injuries"
+      ],
+      "warnings": [
+        "Anaphylaxis risk — mandatory sensitivity test",
+        "Equine-derived product — hypersensitivity common",
+        "Not a substitute for tetanus vaccine course"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-125-syrup",
+      "code": "1459",
+      "genericName": "Amoxicillin 125mg/5ml Suspension",
+      "arabicName": "أموكسيسيلين 125 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Amoxil 125 Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Aminopenicillin",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "25mg/kg/day divided every 8 hours (5ml = 125mg)",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Reconstitute with water to the mark. Shake before use. Refrigerate after reconstitution; use within 7 days."
+      },
+      "uses": [
+        "Otitis media",
+        "Tonsillitis",
+        "Upper respiratory tract infections in children",
+        "UTI in children"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Rash in infectious mononucleosis",
+        "Discard unused suspension after 7 days"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-250-syrup",
+      "code": "1463",
+      "genericName": "Amoxicillin 250mg/5ml Suspension",
+      "arabicName": "أموكسيسيلين 250 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Amoxil 250 Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Aminopenicillin",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "25mg/kg/day divided every 8 hours (5ml = 250mg)",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Reconstitute with water to marked line. Refrigerate after mixing; discard after 7 days."
+      },
+      "uses": [
+        "Bacterial infections in older children",
+        "Otitis media",
+        "Sinusitis",
+        "UTI"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Diarrhoea common",
+        "Rash in viral illness"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-clav-228-syrup",
+      "code": "1475",
+      "genericName": "Amoxicillin 200mg + Clavulanic Acid 28.5mg/5ml Suspension",
+      "arabicName": "أموكسيسيلين + حمض كلافيولانيك 228 أوجمنتين",
+      "brandNames": [
+        "Augmentin 228 Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Beta-lactam + inhibitor",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "25mg/kg/day (amoxicillin component) divided every 12 hours",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Reconstitute with water. Refrigerate and use within 7 days. Give at start of meal."
+      },
+      "uses": [
+        "Otitis media",
+        "Sinusitis",
+        "Lower respiratory tract infections",
+        "Skin infections in children"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "Diarrhoea and GI upset common",
+        "Cholestatic jaundice risk"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "amoxicillin-clav-457-syrup",
+      "code": "1468",
+      "genericName": "Amoxicillin 400mg + Clavulanic Acid 57mg/5ml Suspension",
+      "arabicName": "أموكسيسيلين + حمض كلافيولانيك 457 أوجمنتين",
+      "brandNames": [
+        "Augmentin 457 Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Beta-lactam + inhibitor",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "25–45mg/kg/day (amoxicillin) divided every 12 hours",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Higher-dose formulation for resistant organisms. Give with food."
+      },
+      "uses": [
+        "Resistant otitis media",
+        "Sinusitis",
+        "Lower respiratory tract infections"
+      ],
+      "warnings": [
+        "Penicillin allergy — contraindicated",
+        "GI side effects",
+        "Cholestatic jaundice with long use"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "azithromycin-200-syrup",
+      "code": "3543",
+      "genericName": "Azithromycin 200mg/5ml Suspension",
+      "arabicName": "أزيثرومايسين 200 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Zithromax Syrup",
+        "Azithrin Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Macrolide",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "10mg/kg once daily for 3 days (or 30mg/kg single dose)",
+        "duration": "3 days",
+        "route": "oral",
+        "notes": "Reconstitute with water. Shake well. Refrigerate; discard after 10 days. Give 1h before or 2h after food."
+      },
+      "uses": [
+        "Respiratory tract infections in children",
+        "Ear infections",
+        "Skin infections",
+        "Community-acquired pneumonia"
+      ],
+      "warnings": [
+        "Macrolide allergy — contraindicated",
+        "QT prolongation risk",
+        "Hepatotoxicity with prolonged use"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "cefadroxil-500-syrup",
+      "code": "1569",
+      "genericName": "Cefadroxil 500mg/5ml Syrup",
+      "arabicName": "سيفادروكسيل 500 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Quresicef 500 Syrup",
+        "Duricef Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "First-generation cephalosporin",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "500mg–1g twice daily",
+        "pediatric": "25–50mg/kg/day divided every 12 hours",
+        "duration": "7–10 days",
+        "route": "oral",
+        "notes": "Reconstitute with water. Refrigerate; use within 14 days."
+      },
+      "uses": [
+        "Streptococcal pharyngitis",
+        "Skin and soft tissue infections",
+        "Urinary tract infections"
+      ],
+      "warnings": [
+        "Cephalosporin allergy — contraindicated",
+        "Cross-sensitivity with penicillin (5–10%)",
+        "Reduce dose in renal impairment"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "cotrimoxazole-200-40-syrup",
+      "code": "4557",
+      "genericName": "Sulfamethoxazole 200mg + Trimethoprim 40mg/5ml",
+      "arabicName": "سلفاميثوكسازول + ترايميثوبريم 200/40 سيبتازول",
+      "brandNames": [
+        "Septazol Syrup",
+        "Bactrim Syrup"
+      ],
+      "category": "antibiotic",
+      "class": "Sulfonamide + folate inhibitor",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "24mg/kg/day (combined) divided every 12 hours",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Maintain adequate hydration. Weight-based dosing essential."
+      },
+      "uses": [
+        "Urinary tract infections in children",
+        "Respiratory tract infections",
+        "GI infections"
+      ],
+      "warnings": [
+        "Sulfa allergy — contraindicated",
+        "Avoid in G6PD deficiency",
+        "Avoid in neonates under 6 weeks"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "paracetamol-120-syrup",
+      "code": "1944",
+      "genericName": "Paracetamol 120mg/5ml Syrup",
+      "arabicName": "باراسيتامول شراب 120 مجم / 5 ملي",
+      "brandNames": [
+        "Panadol Baby Syrup",
+        "Adol Syrup"
+      ],
+      "category": "antipyretic",
+      "class": "Analgesic / Antipyretic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "15mg/kg every 4–6 hours (max 4 doses/day). Use weight-based dosing table.",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Use the measuring syringe/cup provided. Do not exceed 4 doses in 24 hours."
+      },
+      "uses": [
+        "Fever in children",
+        "Mild pain in children",
+        "Post-vaccination fever"
+      ],
+      "warnings": [
+        "Hepatotoxic in overdose",
+        "Do not combine with other paracetamol-containing products",
+        "Seek medical advice if fever persists >3 days"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "ibuprofen-100-syrup",
+      "code": "3567",
+      "genericName": "Ibuprofen 100mg/5ml Suspension",
+      "arabicName": "إيبوبروفين شراب 100 مجم / 5 ملي",
+      "brandNames": [
+        "Brufen Syrup",
+        "Nurofen for Children"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "NSAID",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "5–10mg/kg every 6–8 hours (max 30mg/kg/day)",
+        "duration": "As needed, short courses",
+        "route": "oral",
+        "notes": "Give with food or milk. Shake suspension before use. Use measuring device."
+      },
+      "uses": [
+        "Fever in children",
+        "Pain in children",
+        "Inflammatory conditions"
+      ],
+      "warnings": [
+        "Not for children under 3 months or under 5kg",
+        "Avoid in asthma sensitive to NSAIDs",
+        "Avoid with renal impairment"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "ketoprofen-100-syrup",
+      "code": "1801",
+      "genericName": "Ketoprofen 100mg Suspension",
+      "arabicName": "كيتوبروفين شراب",
+      "brandNames": [
+        "Profenid Syrup"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "NSAID",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "50–100mg 2–3 times daily",
+        "pediatric": "Not recommended under 15 years",
+        "duration": "Short courses",
+        "route": "oral",
+        "notes": "Take with food"
+      },
+      "uses": [
+        "Pain and inflammation",
+        "Dysmenorrhoea",
+        "Post-operative pain"
+      ],
+      "warnings": [
+        "Avoid in peptic ulcer",
+        "Avoid in renal impairment",
+        "GI side effects common"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "chlorpheniramine-2-syrup",
+      "code": "1602",
+      "genericName": "Chlorpheniramine 2mg/5ml Syrup",
+      "arabicName": "كلورفينيرامين 2 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Piriton Syrup"
+      ],
+      "category": "antihistamine",
+      "class": "First-generation antihistamine",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (4mg) every 4–6 hours",
+        "pediatric": "1–2 years: 1.25ml; 2–6 years: 2.5ml; 6–12 years: 5ml; all every 4–6 hours",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Causes significant drowsiness — warn parents"
+      },
+      "uses": [
+        "Allergic rhinitis",
+        "Urticaria",
+        "Insect bite reactions",
+        "Common cold"
+      ],
+      "warnings": [
+        "Sedation — do not drive",
+        "Avoid in neonates",
+        "Potentiates CNS depressants"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "salbutamol-2mg-syrup",
+      "code": "4549",
+      "genericName": "Salbutamol 2mg/5ml Syrup",
+      "arabicName": "سالبيوتامول 2 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Ventolin Syrup",
+        "Asmalin Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Short-acting beta-2 agonist",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (4mg) 3–4 times daily",
+        "pediatric": "0.1mg/kg 3–4 times daily",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Inhaled route preferred for acute attacks. Oral useful for prevention in young children."
+      },
+      "uses": [
+        "Bronchospasm in asthma",
+        "COPD",
+        "Airway hyperreactivity in children"
+      ],
+      "warnings": [
+        "Tachycardia and tremor common",
+        "Hypokalaemia with high doses",
+        "Inhaler always preferred for acute attacks"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "bromhexine-4-syrup",
+      "code": "4303",
+      "genericName": "Bromhexine 4mg/5ml Syrup",
+      "arabicName": "برومهكسين 4 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Bisolvon Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Mucolytic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (8mg) 3 times daily",
+        "pediatric": "2–6 years: 2.5ml; 6–12 years: 5ml; all 3 times daily",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Encourage adequate fluid intake. Thins and loosens mucus."
+      },
+      "uses": [
+        "Productive cough",
+        "Bronchitis",
+        "Respiratory conditions with viscous mucus"
+      ],
+      "warnings": [
+        "Not for dry cough",
+        "Nausea may occur at high doses",
+        "Generally well tolerated"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "guaifenesin-syrup",
+      "code": "4639",
+      "genericName": "Guaifenesin + Diphenhydramine Syrup (Tussin)",
+      "arabicName": "جوافيزين + ديفنهيدرامين شراب توسين",
+      "brandNames": [
+        "Tussin Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Expectorant + antihistamine combination",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml every 6–8 hours",
+        "pediatric": "Not recommended under 2 years",
+        "duration": "3–5 days",
+        "route": "oral",
+        "notes": "Drink plenty of fluids. Diphenhydramine component causes drowsiness."
+      },
+      "uses": [
+        "Productive cough with congestion",
+        "Upper respiratory tract infections"
+      ],
+      "warnings": [
+        "Drowsiness from diphenhydramine",
+        "Avoid in children under 2",
+        "Do not use with other CNS depressants"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "carbocysteine-120-syrup",
+      "code": "0295",
+      "genericName": "Carbocysteine 120mg/5ml (Paediatric Syrup)",
+      "arabicName": "كاربوسيستين أطفال شراب ميوكوسول 120 مجم",
+      "brandNames": [
+        "Mucosolvan Children Syrup",
+        "Mucosol Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Mucolytic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "2–5 years: 2.5ml (60mg); 6–12 years: 5ml (120mg); all 4 times daily",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Give before meals. Encourage fluid intake."
+      },
+      "uses": [
+        "Productive cough in children",
+        "Bronchitis with viscous mucus",
+        "URTI with cough"
+      ],
+      "warnings": [
+        "Not for children under 2 years",
+        "Avoid in active peptic ulcer",
+        "Not for dry or unproductive cough"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "carbocysteine-250-adult-syrup",
+      "code": "0133",
+      "genericName": "Carbocysteine 250mg/5ml (Adult Syrup)",
+      "arabicName": "كاربوسيستين كبار شراب ميوكوسول 250 مجم",
+      "brandNames": [
+        "Mucosolvan Adult Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Mucolytic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "15ml (750mg) 3 times daily initially, then 10ml 3 times daily",
+        "pediatric": "Not recommended — use paediatric formulation",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Take before meals. Ensure adequate fluid intake."
+      },
+      "uses": [
+        "Productive cough in adults",
+        "Chronic bronchitis",
+        "Respiratory conditions with viscous secretions"
+      ],
+      "warnings": [
+        "Avoid in active peptic ulcer",
+        "Not for dry cough",
+        "Nausea at high doses"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "cold-compound-syrup",
+      "code": "2050",
+      "genericName": "Paracetamol + Pseudoephedrine + Chlorpheniramine Syrup",
+      "arabicName": "سودوفيدرين + باراسيتامول + كلورفينيرامين شراب",
+      "brandNames": [
+        "Coldact Syrup",
+        "Antiflu Syrup"
+      ],
+      "category": "antihistamine",
+      "class": "Decongestant + analgesic + antihistamine combination",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml every 6–8 hours",
+        "pediatric": "Not recommended under 6 years",
+        "duration": "3–5 days",
+        "route": "oral",
+        "notes": "Drowsiness expected. Avoid at night before driving the next morning."
+      },
+      "uses": [
+        "Cold symptoms in children (over 6)",
+        "Nasal congestion with fever and runny nose"
+      ],
+      "warnings": [
+        "Avoid in hypertension (pseudoephedrine)",
+        "Drowsiness — do not drive",
+        "Avoid in prostate enlargement"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "loratadine-5-syrup",
+      "code": "0992",
+      "genericName": "Loratadine 5mg/5ml Syrup",
+      "arabicName": "لوراتيدين 5 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Claritin Syrup",
+        "Lorano Syrup"
+      ],
+      "category": "antihistamine",
+      "class": "Second-generation antihistamine",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (10mg) once daily",
+        "pediatric": "2–12 years under 30kg: 5ml (5mg) once daily; over 30kg: 10ml once daily",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Non-sedating. Can be taken with or without food."
+      },
+      "uses": [
+        "Allergic rhinitis",
+        "Urticaria",
+        "Hay fever"
+      ],
+      "warnings": [
+        "Reduce dose in liver impairment",
+        "Not for children under 2 years",
+        "Generally non-sedating but caution with hepatic disease"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "ambroxol-syrup",
+      "code": "4294",
+      "genericName": "Ambroxol Syrup",
+      "arabicName": "أمبروكسول شراب",
+      "brandNames": [
+        "Mucosolvan Syrup",
+        "Ambroxol Syrup"
+      ],
+      "category": "respiratory",
+      "class": "Mucolytic / Expectorant",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (30mg) 3 times daily",
+        "pediatric": "Under 2: 1.25ml; 2–5: 2.5ml; 6–12: 5ml; all 2–3 times daily",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Take after meals. Encourage fluid intake for best effect."
+      },
+      "uses": [
+        "Productive cough",
+        "Bronchitis",
+        "COPD with mucus",
+        "Respiratory infections with secretions"
+      ],
+      "warnings": [
+        "Not for dry cough",
+        "Nausea at high doses",
+        "Rare severe skin reactions reported"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "dexamethasone-05-syrup",
+      "code": "4608",
+      "genericName": "Dexamethasone 0.5mg/5ml Syrup",
+      "arabicName": "ديكساميثازون شراب 0.5 مجم / 5 ملي — أورازون",
+      "brandNames": [
+        "Orazone Syrup",
+        "Dexasone Syrup"
+      ],
+      "category": "steroid",
+      "class": "Corticosteroid",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "0.5–10mg/day in divided doses",
+        "pediatric": "0.08–0.3mg/kg/day divided every 6–12 hours",
+        "duration": "As prescribed — taper if prolonged",
+        "route": "oral",
+        "notes": "Take with food. Do not stop abruptly after prolonged use."
+      },
+      "uses": [
+        "Croup (outpatient)",
+        "Severe allergic reactions",
+        "Inflammatory conditions in children"
+      ],
+      "warnings": [
+        "Never stop suddenly if used >1 week",
+        "Raises blood glucose",
+        "Growth suppression with prolonged use in children"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "nitazoxanide-syrup",
+      "code": "9999",
+      "genericName": "Nitazoxanide Syrup (Nanazoxide)",
+      "arabicName": "نانازوكسيد شراب",
+      "brandNames": [
+        "Nanazoxide Syrup"
+      ],
+      "category": "antiparasitic",
+      "class": "Antiprotozoal / Anthelmintic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "500mg (25ml) twice daily with food for 3 days",
+        "pediatric": "1–3 years: 5ml (100mg); 4–11 years: 10ml (200mg); all twice daily for 3 days",
+        "duration": "3 days",
+        "route": "oral",
+        "notes": "Always take with food — improves absorption and tolerability. Shake well."
+      },
+      "uses": [
+        "Giardiasis",
+        "Cryptosporidiosis",
+        "Rotavirus diarrhoea",
+        "Intestinal protozoal infections"
+      ],
+      "warnings": [
+        "Urine may turn yellow — reassure patient",
+        "Avoid in liver impairment",
+        "GI side effects common"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "digestive-enzymes-syrup",
+      "code": "1660",
+      "genericName": "Digestive Enzymes Syrup",
+      "arabicName": "إنزيمات هاضمة شراب",
+      "brandNames": [
+        "Amriz Syrup",
+        "Cotazym Drops"
+      ],
+      "category": "gastrointestinal",
+      "class": "Digestive enzyme",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "5–10ml 3 times daily with meals",
+        "pediatric": "2.5–5ml 3 times daily with meals",
+        "duration": "With meals as needed",
+        "route": "oral",
+        "notes": "Take during or immediately after meals. Shake well before use."
+      },
+      "uses": [
+        "Digestive enzyme deficiency in children",
+        "Bloating and flatulence",
+        "Malabsorption"
+      ],
+      "warnings": [
+        "Avoid high doses in CF patients (fibrosing colonopathy risk)",
+        "Generally well tolerated"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "metronidazole-125-syrup",
+      "code": "0964",
+      "genericName": "Metronidazole 125mg/5ml Syrup",
+      "arabicName": "ميترونيدازول 125 مجم / 5 ملي شراب للأطفال",
+      "brandNames": [
+        "Flagyl Suspension",
+        "Metrozine Syrup"
+      ],
+      "category": "antiparasitic",
+      "class": "Nitroimidazole",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "7.5mg/kg 3 times daily for 5–7 days",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Take with food. Avoid alcohol entirely during treatment and 48 hours after."
+      },
+      "uses": [
+        "Amoebiasis in children",
+        "Giardiasis in children",
+        "Anaerobic infections in children"
+      ],
+      "warnings": [
+        "Alcohol — severe disulfiram-like reaction",
+        "Metallic taste common",
+        "Avoid in first trimester"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "nifuroxazide-200-syrup",
+      "code": "1906",
+      "genericName": "Nifuroxazide 200mg/5ml Suspension",
+      "arabicName": "نيفيروكسازايد شراب للإسهال",
+      "brandNames": [
+        "Ercefuryl Syrup",
+        "Nifuroxazide Suspension"
+      ],
+      "category": "antiparasitic",
+      "class": "Nitrofuran intestinal antiseptic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml (400mg) 3 times daily",
+        "pediatric": "1 month–6 years: 5ml (200mg) 3 times daily; over 6 years: adult dose",
+        "duration": "5–7 days",
+        "route": "oral",
+        "notes": "Shake well before use. Treats intestinal infections without systemic absorption."
+      },
+      "uses": [
+        "Acute bacterial gastroenteritis",
+        "Traveller's diarrhoea",
+        "Intestinal infections"
+      ],
+      "warnings": [
+        "Not for systemic infections",
+        "Does not treat viral diarrhoea",
+        "Oral rehydration remains essential"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "albendazole-100-syrup",
+      "code": "1431",
+      "genericName": "Albendazole 100mg/5ml Syrup",
+      "arabicName": "ألبيندازول 100 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Zentel Syrup",
+        "Alzental Syrup"
+      ],
+      "category": "antiparasitic",
+      "class": "Benzimidazole anthelmintic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "20ml (400mg) single dose",
+        "pediatric": "Over 2 years: 20ml (400mg) single dose; under 10kg: 10ml (200mg)",
+        "duration": "Single dose",
+        "route": "oral",
+        "notes": "Take with a fatty meal for best absorption. Shake well."
+      },
+      "uses": [
+        "Roundworm",
+        "Hookworm",
+        "Pinworm",
+        "Giardia in children"
+      ],
+      "warnings": [
+        "Not for children under 1 year",
+        "Avoid in first trimester of pregnancy",
+        "Repeat dose after 2 weeks for pinworm"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "flubendazole-100-syrup",
+      "code": "1716",
+      "genericName": "Flubendazole 100mg/5ml Syrup",
+      "arabicName": "فلوبندازول 100 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Fluvermal Syrup"
+      ],
+      "category": "antiparasitic",
+      "class": "Benzimidazole anthelmintic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "5ml (100mg) twice daily for 3 days",
+        "pediatric": "Same as adult (over 2 years)",
+        "duration": "3 days",
+        "route": "oral",
+        "notes": "Treat all household members. Shake well."
+      },
+      "uses": [
+        "Threadworm",
+        "Roundworm",
+        "Hookworm in children"
+      ],
+      "warnings": [
+        "Not for children under 2 years",
+        "Avoid in pregnancy",
+        "Retreat household contacts"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "mebendazole-100-syrup",
+      "code": "1851",
+      "genericName": "Mebendazole 100mg/5ml Syrup",
+      "arabicName": "ميبندازول 100 مجم / 5 ملي شراب",
+      "brandNames": [
+        "Vermox Syrup"
+      ],
+      "category": "antiparasitic",
+      "class": "Benzimidazole anthelmintic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "5ml (100mg) twice daily for 3 days",
+        "pediatric": "Same as adult (over 2 years)",
+        "duration": "3 days",
+        "route": "oral",
+        "notes": "Shake well. Treat all household members simultaneously."
+      },
+      "uses": [
+        "Threadworm",
+        "Roundworm",
+        "Hookworm",
+        "Whipworm"
+      ],
+      "warnings": [
+        "Not for children under 2 years",
+        "Avoid in first trimester of pregnancy"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "lactulose-syrup",
+      "code": "3511",
+      "genericName": "Lactulose Syrup 200ml",
+      "arabicName": "لاكتولوز 200 ملي شراب",
+      "brandNames": [
+        "Duphalac",
+        "Lactulose Solution"
+      ],
+      "category": "gastrointestinal",
+      "class": "Osmotic laxative",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "15–30ml once or twice daily",
+        "pediatric": "Under 1 year: 2.5ml twice daily; 1–5 years: 5ml twice daily; 5–10 years: 10ml twice daily",
+        "duration": "As needed — constipation; hepatic encephalopathy: ongoing",
+        "route": "oral",
+        "notes": "Mix with water or juice. Effect takes 48 hours. Adjust dose to produce 2–3 soft stools/day."
+      },
+      "uses": [
+        "Constipation",
+        "Hepatic encephalopathy prevention and treatment"
+      ],
+      "warnings": [
+        "Flatulence and bloating initially",
+        "Electrolyte imbalance with prolonged high doses",
+        "Contains lactose and galactose — avoid in rare galactosaemia"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "tiemonium-10-syrup",
+      "code": "3123",
+      "genericName": "Tiemonium Methylsulphate 10mg/5ml Syrup",
+      "arabicName": "ثيمونيوم ميثيل سلفات 10 مجم شراب تيموجين",
+      "brandNames": [
+        "Timogen Syrup"
+      ],
+      "category": "antispasmodic",
+      "class": "Anticholinergic antispasmodic",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "15ml (30mg) 3 times daily",
+        "pediatric": "0.2mg/kg 3 times daily",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Take before meals"
+      },
+      "uses": [
+        "Abdominal colic in children",
+        "Irritable bowel syndrome",
+        "Intestinal spasm"
+      ],
+      "warnings": [
+        "Avoid in glaucoma",
+        "Anticholinergic effects (dry mouth, urinary retention)",
+        "Not recommended in neonates"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "antacid-suspension",
+      "code": "3271",
+      "genericName": "Aluminium Hydroxide + Magnesium Hydroxide + Simethicone 355ml",
+      "arabicName": "ألومنيوم هيدروكسيد + ماغنيسيوم هيدروكسيد — ميوبان / مالوكس",
+      "brandNames": [
+        "Maalox",
+        "Miopan"
+      ],
+      "category": "gastrointestinal",
+      "class": "Antacid",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10–20ml 4 times daily (1–3 hours after meals and at bedtime)",
+        "pediatric": "0.5ml/kg per dose",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Shake well before use. Space 2 hours from other medications (reduces absorption)."
+      },
+      "uses": [
+        "Heartburn and indigestion",
+        "GERD symptoms relief",
+        "Peptic ulcer symptom relief",
+        "Flatulence"
+      ],
+      "warnings": [
+        "Reduces absorption of many drugs — space 2 hours apart",
+        "Avoid in renal failure (aluminium toxicity)",
+        "Constipation from aluminium; diarrhoea from magnesium"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "zinc-10-syrup",
+      "code": "2106",
+      "genericName": "Zinc Sulphate 10mg/5ml Powder for Syrup",
+      "arabicName": "شراب زنك 10 مجم / 5 ملي",
+      "brandNames": [
+        "Zincomed Syrup"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Trace element supplement",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "Under 6 months: 2.5ml (5mg); 6 months–5 years: 5ml (10mg) once daily",
+        "duration": "10–14 days for acute diarrhoea; or as prescribed",
+        "route": "oral",
+        "notes": "WHO-recommended adjunct for diarrhoea in children under 5. Reconstitute before use."
+      },
+      "uses": [
+        "Zinc deficiency in children",
+        "Acute diarrhoea adjunct (under 5 years)",
+        "Growth support"
+      ],
+      "warnings": [
+        "Nausea at high doses",
+        "Prolonged use may impair copper absorption"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "zinc-20-syrup",
+      "code": "2107",
+      "genericName": "Zinc Sulphate 20mg/5ml Powder for Syrup",
+      "arabicName": "شراب زنك 20 مجم / 5 ملي",
+      "brandNames": [
+        "Zincomed 20 Syrup"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Trace element supplement",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "5ml (20mg) once daily",
+        "pediatric": "5–10ml once daily depending on age",
+        "duration": "As prescribed",
+        "route": "oral",
+        "notes": "Take with food to reduce nausea"
+      },
+      "uses": [
+        "Zinc deficiency",
+        "Wound healing support",
+        "Diarrhoea adjunct in children"
+      ],
+      "warnings": [
+        "GI upset at high doses",
+        "Avoid prolonged high-dose use without monitoring"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "multivitamin-grandvit-syrup",
+      "code": "2419",
+      "genericName": "Vitamins B6 + Riboflavin + B2 + Thiamine + Nicotinamide Syrup",
+      "arabicName": "الفيتامينات والمعادن الأساسية شراب جراندفيت",
+      "brandNames": [
+        "Grandvit Syrup"
+      ],
+      "category": "vitamins-minerals",
+      "class": "B-complex multivitamin",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml once daily",
+        "pediatric": "5ml once daily",
+        "duration": "As prescribed",
+        "route": "oral",
+        "notes": "Take with food"
+      },
+      "uses": [
+        "B-vitamin deficiency prevention",
+        "Nutritional supplementation in children",
+        "Recovery from illness"
+      ],
+      "warnings": [
+        "Urine may turn yellow (riboflavin) — reassure patient",
+        "Generally well tolerated"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "iron-syrup",
+      "code": "0077",
+      "genericName": "Iron Syrup 8–10mg/ml",
+      "arabicName": "حديد 10 مجم / ملي شراب",
+      "brandNames": [
+        "Ferrosanol Syrup",
+        "Iron Syrup"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Iron supplement",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "5–10ml (50–100mg elemental iron) daily",
+        "pediatric": "3–6mg/kg/day elemental iron in divided doses",
+        "duration": "3–6 months to replenish stores",
+        "route": "oral",
+        "notes": "Dilute in water or juice. Take on empty stomach if tolerated. Stains teeth — use a straw."
+      },
+      "uses": [
+        "Iron deficiency anaemia",
+        "Iron supplementation in infants and children"
+      ],
+      "warnings": [
+        "Stains teeth — use straw, rinse mouth",
+        "Black stools expected",
+        "Overdose dangerous in children — keep out of reach"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "vitamin-d-2800-drops",
+      "code": "4644",
+      "genericName": "Cholecalciferol (Vitamin D3) 2800 IU/ml Drops",
+      "arabicName": "كولكالسيفيرول فيتامين د3 — في درويز",
+      "brandNames": [
+        "Vidrop",
+        "D-Vita Drops"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Fat-soluble vitamin",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "1–2 drops daily (2800–5600 IU)",
+        "pediatric": "1 drop daily (2800 IU) for prevention; more for deficiency",
+        "duration": "As prescribed",
+        "route": "oral",
+        "notes": "Can be added to milk or food. Concentrated drops — measure carefully."
+      },
+      "uses": [
+        "Vitamin D deficiency",
+        "Rickets prevention",
+        "Neonatal supplementation"
+      ],
+      "warnings": [
+        "Hypercalcaemia with overdose",
+        "Monitor calcium with high long-term doses",
+        "Concentrated — exact dosing essential"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "calcium-vit-d-syrup",
+      "code": "2049",
+      "genericName": "Calcium + Vitamin D Syrup",
+      "arabicName": "كالسيوم شراب",
+      "brandNames": [
+        "Calciol Syrup",
+        "Calcium D Syrup"
+      ],
+      "category": "vitamins-minerals",
+      "class": "Calcium + vitamin D supplement",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "10ml twice daily",
+        "pediatric": "5–10ml twice daily",
+        "duration": "As prescribed",
+        "route": "oral",
+        "notes": "Shake well. Take with meals."
+      },
+      "uses": [
+        "Calcium and vitamin D deficiency",
+        "Rickets prevention",
+        "Bone health in children"
+      ],
+      "warnings": [
+        "Hypercalcaemia with excess vitamin D",
+        "Avoid in hypercalcaemia or hypercalciuria",
+        "Space 2 hours from iron supplements"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "oseltamivir-12-syrup",
+      "code": "1338",
+      "genericName": "Oseltamivir 12mg/ml Syrup",
+      "arabicName": "أوسيلتاميفير 12 مجم / ملي شراب تاميفلو",
+      "brandNames": [
+        "Tamiflu Suspension"
+      ],
+      "category": "antiviral",
+      "class": "Neuraminidase inhibitor",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "Under 1 year: 3mg/kg twice daily. 1–12 years: weight-based (30–75mg twice daily)",
+        "duration": "5 days",
+        "route": "oral",
+        "notes": "Must start within 48 hours of symptom onset. Take with food to reduce nausea."
+      },
+      "uses": [
+        "Influenza A and B treatment in children",
+        "Post-exposure prophylaxis"
+      ],
+      "warnings": [
+        "Must start within 48 hours to be effective",
+        "Dose reduction in renal impairment",
+        "Neuropsychiatric events reported — monitor children"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "gentamicin-eye-drops",
+      "code": "4666",
+      "genericName": "Gentamicin 0.3% Eye Drops",
+      "arabicName": "جنتاميسين 0.3% نقط عين",
+      "brandNames": [
+        "Gentamicin Eye Drops",
+        "Garamycin Eye Drops"
+      ],
+      "category": "ophthalmic-otic",
+      "class": "Aminoglycoside antibiotic (topical)",
+      "forms": [
+        "drops"
+      ],
+      "dose": {
+        "adult": "1–2 drops every 2–4 hours (severe); every 4–6 hours (mild-moderate)",
+        "pediatric": "Same as adult",
+        "duration": "5–7 days",
+        "route": "topical (ophthalmic)",
+        "notes": "Wash hands before use. Apply pressure to inner corner of eye for 1 min after instillation."
+      },
+      "uses": [
+        "Bacterial conjunctivitis",
+        "Blepharitis",
+        "Corneal ulcers"
+      ],
+      "warnings": [
+        "Do not wear contact lenses during treatment",
+        "May cause transient stinging",
+        "Prolonged use risks superinfection"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "dexamethasone-neomycin-eye-oint",
+      "code": "0934",
+      "genericName": "Dexamethasone 1mg + Neomycin 3.5mg + Polymyxin Eye Ointment",
+      "arabicName": "ديكساميثازون + نيوميسين + بوليميكسين مرهم عين — ديكساترول",
+      "brandNames": [
+        "Dexatrol Eye Ointment"
+      ],
+      "category": "ophthalmic-otic",
+      "class": "Corticosteroid + antibiotic combination",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Small ribbon into conjunctival sac 3–4 times daily",
+        "pediatric": "Same as adult",
+        "duration": "5–7 days (max)",
+        "route": "topical (ophthalmic)",
+        "notes": "Wash hands. Apply at bedtime for best comfort. Tilt head back and apply to lower lid."
+      },
+      "uses": [
+        "Bacterial conjunctivitis with inflammation",
+        "Post-operative eye infection prevention",
+        "Blepharoconjunctivitis"
+      ],
+      "warnings": [
+        "Never use if herpetic eye disease suspected — steroids worsen herpes",
+        "Can raise intraocular pressure with prolonged use",
+        "Limit to 5–7 days without specialist review"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "oxytetracycline-polymyxin-eye-oint",
+      "code": "4299",
+      "genericName": "Oxytetracycline + Polymyxin Eye Ointment",
+      "arabicName": "أوكسي تتراسيكلين + بولي ميكسين مرهم عين — اوكسيبول",
+      "brandNames": [
+        "Oxybull Eye Ointment",
+        "Terramycin Eye Ointment"
+      ],
+      "category": "ophthalmic-otic",
+      "class": "Antibiotic combination (topical)",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Small ribbon into conjunctival sac 3–4 times daily",
+        "pediatric": "Same as adult (safe in neonates for prophylaxis)",
+        "duration": "5–7 days",
+        "route": "topical (ophthalmic)",
+        "notes": "Safe in neonates. Commonly used for ophthalmia neonatorum prophylaxis."
+      },
+      "uses": [
+        "Bacterial conjunctivitis",
+        "Neonatal eye infection prophylaxis",
+        "Trachoma"
+      ],
+      "warnings": [
+        "Avoid contact with other surfaces",
+        "May cause transient blurring",
+        "Discard 28 days after opening"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "naphazoline-chlorpheniramine-eye",
+      "code": "4323",
+      "genericName": "Naphazoline + Chlorpheniramine Eye Drops",
+      "arabicName": "نافازولين + كلورفينيرامين نقط عين — نوستامين",
+      "brandNames": [
+        "Nostamin Eye Drops"
+      ],
+      "category": "ophthalmic-otic",
+      "class": "Decongestant + antihistamine (ophthalmic)",
+      "forms": [
+        "drops"
+      ],
+      "dose": {
+        "adult": "1–2 drops every 3–4 hours",
+        "pediatric": "Not recommended under 6 years",
+        "duration": "3–5 days",
+        "route": "topical (ophthalmic)",
+        "notes": "Do not use for more than 5 days — rebound redness may occur"
+      },
+      "uses": [
+        "Allergic conjunctivitis",
+        "Red eye from allergies",
+        "Eye irritation"
+      ],
+      "warnings": [
+        "Rebound redness with prolonged use",
+        "Avoid in narrow-angle glaucoma",
+        "Not for children under 6"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "otocalm-ear-drops",
+      "code": "5801",
+      "genericName": "Chlorobutanol + Phenazone Ear Drops (Otocalm)",
+      "arabicName": "كلوروبيوتانول + فينازون نقط أذن — أوتوكالم",
+      "brandNames": [
+        "Otocalm Ear Drops"
+      ],
+      "category": "ophthalmic-otic",
+      "class": "Analgesic + antiseptic ear drops",
+      "forms": [
+        "drops"
+      ],
+      "dose": {
+        "adult": "3–4 drops into ear canal 2–3 times daily",
+        "pediatric": "Same as adult",
+        "duration": "3–5 days",
+        "route": "topical (otic)",
+        "notes": "Warm the bottle in hand before use. Lie with affected ear upward for 2 min after instillation."
+      },
+      "uses": [
+        "Acute otitis media pain relief (adjunct)",
+        "Otitis externa",
+        "Ear pain before specialist review"
+      ],
+      "warnings": [
+        "Do not use if eardrum is perforated",
+        "Pain relief only — treat underlying infection separately",
+        "Seek medical advice if no improvement in 48 hours"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "magnesium-citrate-sachet",
+      "code": "1848",
+      "genericName": "Magnesium Citrate Effervescent Granules",
+      "arabicName": "مغنيسيوم سيترات فوار — إيماج فوار",
+      "brandNames": [
+        "Emag Sachet"
+      ],
+      "category": "gastrointestinal",
+      "class": "Osmotic laxative / Antacid",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "1 sachet dissolved in water, once or twice daily",
+        "pediatric": "As prescribed",
+        "duration": "As needed",
+        "route": "oral",
+        "notes": "Dissolve in 200ml of water. Drink immediately while effervescent."
+      },
+      "uses": [
+        "Constipation",
+        "Magnesium supplementation",
+        "Bowel preparation"
+      ],
+      "warnings": [
+        "Diarrhoea with overuse",
+        "Avoid in renal failure",
+        "Hypermagnesaemia risk in renal impairment"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "piperazine-colchicine-sachet",
+      "code": "4218",
+      "genericName": "Piperazine + Colchicine Effervescent Granules (Urocolvine)",
+      "arabicName": "بيبيرازين + كولشيسين فوار — يوروسولفين",
+      "brandNames": [
+        "Urocolvine Sachet",
+        "Urosolvin Sachet"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "Uricosuric + anti-gout combination",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "1 sachet 2–3 times daily",
+        "pediatric": "Not recommended",
+        "duration": "During acute gout attack or as prescribed",
+        "route": "oral",
+        "notes": "Dissolve in water. Drink plenty of fluids."
+      },
+      "uses": [
+        "Gout treatment and prevention",
+        "Uric acid reduction",
+        "Acute gout attack adjunct"
+      ],
+      "warnings": [
+        "Avoid in renal failure (colchicine toxicity)",
+        "Diarrhoea common with colchicine",
+        "Multiple drug interactions with colchicine"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "renal-s-sachet",
+      "code": "1679",
+      "genericName": "Renal S (Khellin + Hexamine Effervescent)",
+      "arabicName": "رينال S",
+      "brandNames": [
+        "Renal S Sachet"
+      ],
+      "category": "analgesic-nsaid",
+      "class": "Urinary antispasmodic + antiseptic",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "1–2 sachets daily dissolved in water",
+        "pediatric": "Not established",
+        "duration": "As prescribed",
+        "route": "oral",
+        "notes": "Dissolve in water. Increase fluid intake."
+      },
+      "uses": [
+        "Urinary tract infections (adjunct)",
+        "Renal colic relief",
+        "Urinary antiseptic"
+      ],
+      "warnings": [
+        "Not a replacement for antibiotic treatment",
+        "Monitor in renal impairment",
+        "Hexamine requires acidic urine to work"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "ors-sachet",
+      "code": "1345",
+      "genericName": "Oral Rehydration Salts (ORS) Effervescent Sachet",
+      "arabicName": "محلول معالجة الجفاف فوار",
+      "brandNames": [
+        "ORS Sachet",
+        "Rehydran"
+      ],
+      "category": "emergency",
+      "class": "Oral rehydration solution",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "1 sachet in 200ml water; consume 1 litre per loose stool",
+        "pediatric": "Under 2 years: 50–100ml after each stool; over 2 years: 100–200ml after each stool",
+        "duration": "Until diarrhoea resolves",
+        "route": "oral",
+        "notes": "Dissolve in clean water only. Discard unused solution after 1 hour at room temperature or 24 hours refrigerated."
+      },
+      "uses": [
+        "Dehydration from diarrhoea and vomiting",
+        "Cholera rehydration",
+        "Gastroenteritis in children"
+      ],
+      "warnings": [
+        "Do not add extra sugar or salt to solution",
+        "Seek medical attention if no improvement in 24 hours",
+        "IV fluids if unable to drink or severe dehydration"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "fusidic-acid-2-cream",
+      "code": "0105",
+      "genericName": "Fusidic Acid 2% Cream",
+      "arabicName": "أسيد فيوسيديك 2% كريم",
+      "brandNames": [
+        "Fucidin Cream"
+      ],
+      "category": "topical",
+      "class": "Topical antibiotic",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply thinly 3–4 times daily",
+        "pediatric": "Same as adult",
+        "duration": "7 days (max 2 weeks)",
+        "route": "topical",
+        "notes": "Clean skin before application. Cover with dressing if needed."
+      },
+      "uses": [
+        "Impetigo",
+        "Infected eczema",
+        "Skin infections with Staphylococcus aureus",
+        "Secondary skin infections"
+      ],
+      "warnings": [
+        "Avoid prolonged use — risk of resistance",
+        "Avoid near eyes",
+        "Do not use on deep wounds"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "gentamicin-01-cream",
+      "code": "4571",
+      "genericName": "Gentamicin 0.1% Cream",
+      "arabicName": "جنتاميسين 0.1% كريم",
+      "brandNames": [
+        "Garamycin Cream",
+        "Gentamicin Cream"
+      ],
+      "category": "topical",
+      "class": "Topical aminoglycoside antibiotic",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply to affected area 3–4 times daily",
+        "pediatric": "Same as adult",
+        "duration": "7–10 days",
+        "route": "topical",
+        "notes": "Clean area before application. Thin layer only."
+      },
+      "uses": [
+        "Infected wounds",
+        "Impetigo",
+        "Minor skin infections",
+        "Burns with infection"
+      ],
+      "warnings": [
+        "Avoid large areas or broken skin (systemic absorption risk)",
+        "Ototoxicity possible with extensive use",
+        "Avoid in ear if eardrum perforated"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "clotrimazole-1-cream",
+      "code": "0081",
+      "genericName": "Clotrimazole 1% Cream",
+      "arabicName": "كلوتريمازول 1% كريم",
+      "brandNames": [
+        "Canesten Cream",
+        "Clotrimazole Cream"
+      ],
+      "category": "antifungal",
+      "class": "Imidazole antifungal (topical)",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply 2–3 times daily",
+        "pediatric": "Same as adult",
+        "duration": "2–4 weeks (or 2 weeks after clearing)",
+        "route": "topical",
+        "notes": "Continue treatment for 2 weeks after skin clears to prevent recurrence."
+      },
+      "uses": [
+        "Tinea (ringworm, athlete's foot, jock itch)",
+        "Candida skin infections",
+        "Pityriasis versicolor"
+      ],
+      "warnings": [
+        "Avoid in eyes",
+        "Skin irritation possible initially",
+        "Complete full course even if clearing early"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "betamethasone-01-cream",
+      "code": "4558",
+      "genericName": "Betamethasone 0.1% Cream",
+      "arabicName": "بيتاميثازون 0.1% كريم",
+      "brandNames": [
+        "Betnovate Cream",
+        "Celestone Cream"
+      ],
+      "category": "steroid",
+      "class": "Potent topical corticosteroid",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply thinly 1–2 times daily",
+        "pediatric": "Use with caution — limit to 5–7 days in children",
+        "duration": "5–7 days (maximum; longer only under specialist supervision)",
+        "route": "topical",
+        "notes": "Apply thin layer only. Avoid face and skin folds unless directed. Do not occlude."
+      },
+      "uses": [
+        "Eczema",
+        "Psoriasis",
+        "Contact dermatitis",
+        "Other steroid-responsive skin conditions"
+      ],
+      "warnings": [
+        "Skin thinning with prolonged use",
+        "Never use on face, groin, or axilla without specialist advice",
+        "Systemic absorption in children — limit area and duration"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "diclofenac-1-gel",
+      "code": "1645",
+      "genericName": "Diclofenac Sodium 1% Gel",
+      "arabicName": "ديكلوفيناك صوديوم 1% جيل",
+      "brandNames": [
+        "Voltaren Gel",
+        "Diclac Gel"
+      ],
+      "category": "topical",
+      "class": "NSAID (topical)",
+      "forms": [
+        "gel"
+      ],
+      "dose": {
+        "adult": "Apply 3–4 times daily to affected area",
+        "pediatric": "Not recommended under 14 years",
+        "duration": "7–14 days",
+        "route": "topical",
+        "notes": "Apply to skin over affected joint or muscle. Do not use under occlusive dressings."
+      },
+      "uses": [
+        "Joint and muscle pain",
+        "Sports injuries",
+        "Osteoarthritis (knee)",
+        "Post-traumatic inflammation"
+      ],
+      "warnings": [
+        "Avoid on broken or infected skin",
+        "Systemic absorption low but possible — NSAID precautions apply",
+        "Not for widespread application"
+      ],
+      "inStock": true,
+      "priority": true
+    },
+    {
+      "id": "aescin-gel",
+      "code": "4654",
+      "genericName": "Aescin 1% + Diethylamine Salicylate 5% Gel",
+      "arabicName": "إيسكين 1% + ثنائي إيثيل أمين ساليسيلات — ريبارايل",
+      "brandNames": [
+        "Reparil Gel"
+      ],
+      "category": "topical",
+      "class": "Anti-oedema + anti-inflammatory gel",
+      "forms": [
+        "gel"
+      ],
+      "dose": {
+        "adult": "Apply 2–3 times daily",
+        "pediatric": "Not recommended under 12 years",
+        "duration": "As needed",
+        "route": "topical",
+        "notes": "Apply to intact skin over affected area. Massage gently. Avoid mucous membranes."
+      },
+      "uses": [
+        "Post-traumatic swelling and bruising",
+        "Thrombophlebitis",
+        "Sports injuries",
+        "Contusions"
+      ],
+      "warnings": [
+        "External use only",
+        "Avoid near eyes and mucous membranes",
+        "Salicylate sensitivity — test on small area first"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "silver-sulfadiazine-cream",
+      "code": "2180",
+      "genericName": "Silver Sulfadiazine 1% Cream",
+      "arabicName": "سلفاديازين الفضة 1% كريم — مرهم حروق",
+      "brandNames": [
+        "Flamazine Cream",
+        "SSD Cream"
+      ],
+      "category": "topical",
+      "class": "Topical antimicrobial",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply 3–5mm layer to affected area once or twice daily",
+        "pediatric": "Avoid in newborns and premature infants",
+        "duration": "Until wound healed or grafted",
+        "route": "topical",
+        "notes": "Cleanse wound before application. Keep wound covered. Wear gloves when applying."
+      },
+      "uses": [
+        "Burns (second and third degree)",
+        "Skin grafts",
+        "Leg ulcers"
+      ],
+      "warnings": [
+        "Sulfa allergy — use with caution",
+        "Avoid in newborns — kernicterus risk",
+        "Renal and hepatic impairment may increase toxicity"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "paracetamol-125-supp",
+      "code": "1945",
+      "genericName": "Paracetamol 125mg Suppository",
+      "arabicName": "باراسيتامول 125 مجم لبوس",
+      "brandNames": [
+        "Panadol Suppository",
+        "Adol Suppository"
+      ],
+      "category": "antipyretic",
+      "class": "Analgesic / Antipyretic",
+      "forms": [
+        "suppository"
+      ],
+      "dose": {
+        "adult": "N/A — paediatric formulation",
+        "pediatric": "15mg/kg every 4–6 hours rectally (max 4 doses/day)",
+        "duration": "As needed",
+        "route": "rectal",
+        "notes": "Use when child cannot take orally (vomiting). Store below 25°C. Insert pointed end first."
+      },
+      "uses": [
+        "Fever in children when oral route not possible",
+        "Post-operative pain relief in children"
+      ],
+      "warnings": [
+        "Hepatotoxic in overdose",
+        "Do not use with other paracetamol-containing products",
+        "Slower onset than oral route"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "miconazole-400-vaginal",
+      "code": "2716",
+      "genericName": "Miconazole Nitrate 400mg Vaginal Ovule",
+      "arabicName": "ميكونازول 400 مجم تحميلة مهبلية",
+      "brandNames": [
+        "Gyno-Daktarin Ovule",
+        "Miconazole Ovule"
+      ],
+      "category": "gynecological",
+      "class": "Imidazole antifungal",
+      "forms": [
+        "ovule"
+      ],
+      "dose": {
+        "adult": "1 ovule inserted vaginally at bedtime for 3 nights",
+        "pediatric": "Not applicable",
+        "duration": "3 nights",
+        "route": "vaginal",
+        "notes": "Insert at bedtime in supine position. Use supplied applicator. Complete course even during menstruation."
+      },
+      "uses": [
+        "Vaginal candidiasis (thrush)",
+        "Vulvovaginal yeast infection"
+      ],
+      "warnings": [
+        "May damage condoms and diaphragms",
+        "Complete full course even if symptoms improve",
+        "Recurrent cases need further investigation"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "miconazole-2-vaginal-cream",
+      "code": "0078",
+      "genericName": "Miconazole 2% Vaginal Cream",
+      "arabicName": "ميكونازول 2% كريم مهبلي",
+      "brandNames": [
+        "Gyno-Daktarin Cream",
+        "Miconazole Vaginal Cream"
+      ],
+      "category": "gynecological",
+      "class": "Imidazole antifungal",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Applicatorful (5g) inserted vaginally at bedtime for 7 nights",
+        "pediatric": "Not applicable",
+        "duration": "7 nights",
+        "route": "vaginal",
+        "notes": "Use the applicator. Insert deeply at bedtime. Also apply externally to vulva for relief."
+      },
+      "uses": [
+        "Vaginal candidiasis",
+        "Vulvovaginal candidiasis with external symptoms"
+      ],
+      "warnings": [
+        "Damages latex condoms and diaphragms",
+        "Complete full course",
+        "External application also available"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "clotrimazole-100-vaginal",
+      "code": "4315",
+      "genericName": "Clotrimazole 100mg Vaginal Tablet",
+      "arabicName": "كلوتريمازول 100 مجم أقراص مهبلية",
+      "brandNames": [
+        "Canesten Vaginal Tablet",
+        "Clotrimazole Vaginal"
+      ],
+      "category": "gynecological",
+      "class": "Imidazole antifungal",
+      "forms": [
+        "tablet"
+      ],
+      "dose": {
+        "adult": "1 vaginal tablet inserted nightly for 6 nights (or 2 tablets for 3 nights)",
+        "pediatric": "Not applicable",
+        "duration": "6 nights (100mg) or 3 nights (200mg)",
+        "route": "vaginal",
+        "notes": "Use applicator. Insert deeply at bedtime. Complete full course."
+      },
+      "uses": [
+        "Vaginal candidiasis",
+        "Vaginal thrush"
+      ],
+      "warnings": [
+        "May damage condoms",
+        "Avoid during menstruation if possible",
+        "If symptoms recur — investigate for resistant strain or diabetes"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "vaginal-douche-neutral",
+      "code": "4690",
+      "genericName": "Neutral Vaginal Douche Sachet",
+      "arabicName": "أكياس تشطيف مهبلي — تانتم روز",
+      "brandNames": [
+        "Tantum Rosa"
+      ],
+      "category": "gynecological",
+      "class": "Vaginal antiseptic / cleansing",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "1 sachet dissolved in 500ml warm water, used as vaginal douche once daily",
+        "pediatric": "Not applicable",
+        "duration": "5–7 days",
+        "route": "vaginal (topical)",
+        "notes": "Dissolve completely before use. Use as directed — do not exceed recommended use."
+      },
+      "uses": [
+        "Bacterial vaginosis (adjunct)",
+        "Vaginal odour and discharge",
+        "Vulvovaginal hygiene support"
+      ],
+      "warnings": [
+        "Routine douching not recommended — disrupts normal flora",
+        "Use only when prescribed",
+        "Not a contraceptive"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "antiseptic-vaginal-douche",
+      "code": "1423",
+      "genericName": "Antiseptic Vaginal Douche",
+      "arabicName": "دوش مهبلي",
+      "brandNames": [
+        "Betadine Vaginal Douche",
+        "Cervugid Ovules"
+      ],
+      "category": "gynecological",
+      "class": "Antiseptic vaginal preparation",
+      "forms": [
+        "sachet"
+      ],
+      "dose": {
+        "adult": "As directed on product — typically once daily",
+        "pediatric": "Not applicable",
+        "duration": "5–7 days or as prescribed",
+        "route": "vaginal",
+        "notes": "Not to be used routinely. Use only as directed for specific infections."
+      },
+      "uses": [
+        "Vaginal infections (bacterial, mixed)",
+        "Vaginitis (adjunct treatment)"
+      ],
+      "warnings": [
+        "Avoid in thyroid disease (iodine-based products)",
+        "Do not use in pregnancy without medical advice",
+        "Routine douching contraindicated"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "benzydamine-mouthwash",
+      "code": "1509",
+      "genericName": "Benzydamine 0.15% Mouthwash 125ml",
+      "arabicName": "بنزيدامين 0.15% مضمضة — تانتم مضمضة",
+      "brandNames": [
+        "Tantum Verde Mouthwash"
+      ],
+      "category": "topical",
+      "class": "NSAID (topical oral)",
+      "forms": [
+        "syrup"
+      ],
+      "dose": {
+        "adult": "15ml used undiluted as gargle/rinse for 30 seconds every 1.5–3 hours",
+        "pediatric": "6–12 years: 5–10ml every 1.5–3 hours",
+        "duration": "5–7 days",
+        "route": "topical (oral)",
+        "notes": "Do not swallow. Rinse and spit out. Use full 15ml dose for adults."
+      },
+      "uses": [
+        "Painful oral mucositis",
+        "Mouth ulcers",
+        "Sore throat",
+        "Post-tonsillectomy pain"
+      ],
+      "warnings": [
+        "Do not swallow",
+        "May cause oral numbness — reassure patient",
+        "Rarely causes hypersensitivity"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "miconazole-oral-gel",
+      "code": "1883",
+      "genericName": "Miconazole 2% Oral Gel",
+      "arabicName": "ميكونازول 2% أورال جيل",
+      "brandNames": [
+        "Daktarin Oral Gel"
+      ],
+      "category": "antifungal",
+      "class": "Imidazole antifungal (oral topical)",
+      "forms": [
+        "gel"
+      ],
+      "dose": {
+        "adult": "Apply 2.5ml (half measuring spoon) to affected oral area 4 times daily after meals",
+        "pediatric": "Under 2 years: 1.25ml twice daily (risk of choking — do not apply to back of throat)",
+        "duration": "7 days after clinical resolution",
+        "route": "topical (oral)",
+        "notes": "Apply after meals and keep in mouth as long as possible. Continue 7 days after resolution."
+      },
+      "uses": [
+        "Oral candidiasis (thrush)",
+        "Denture stomatitis",
+        "Angular cheilitis"
+      ],
+      "warnings": [
+        "Choking risk in infants — apply carefully, not at back of mouth",
+        "Drug interactions: warfarin, sulphonylureas — significant levels absorbed"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "nystatin-oral-drops",
+      "code": "1357",
+      "genericName": "Nystatin 100,000 IU/ml Oral Drops",
+      "arabicName": "نيستاتين قطرة فم 100,000 وحدة / ملي",
+      "brandNames": [
+        "Mycostatin Drops",
+        "Nilstat Oral Drops"
+      ],
+      "category": "antifungal",
+      "class": "Polyene antifungal",
+      "forms": [
+        "drops"
+      ],
+      "dose": {
+        "adult": "1ml (100,000 IU) 4 times daily; rinse and swallow (or spit if swallowing concern)",
+        "pediatric": "Neonates: 1ml split across mouth 4 times daily. Children: 1ml 4 times daily.",
+        "duration": "7–14 days (continue 48 hours after symptoms resolve)",
+        "route": "topical (oral) / oral",
+        "notes": "Drop into each side of mouth. Try to keep in contact with mucosa for as long as possible before swallowing."
+      },
+      "uses": [
+        "Oral candidiasis (thrush)",
+        "Oropharyngeal candidiasis",
+        "Neonatal oral thrush"
+      ],
+      "warnings": [
+        "Not absorbed — only for local oral use",
+        "Nausea at high doses",
+        "Not effective for systemic fungal infections"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "calamine-lotion",
+      "code": "4551",
+      "genericName": "Calamine + Zinc Oxide Lotion",
+      "arabicName": "كلامين + زنك أوكسيد لوشن كلاميل",
+      "brandNames": [
+        "Calamel Lotion"
+      ],
+      "category": "topical",
+      "class": "Soothing topical preparation",
+      "forms": [
+        "cream"
+      ],
+      "dose": {
+        "adult": "Apply to affected area as needed",
+        "pediatric": "Same as adult",
+        "duration": "As needed",
+        "route": "topical",
+        "notes": "Shake well before use. Apply with cotton wool. Allow to dry."
+      },
+      "uses": [
+        "Chickenpox itch relief",
+        "Sunburn",
+        "Insect bites",
+        "Mild urticaria and prickly heat"
+      ],
+      "warnings": [
+        "External use only",
+        "Avoid broken skin",
+        "Do not use near eyes"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "cortiplex-adult-inj",
+      "code": "2339",
+      "genericName": "Corticoadrenal Extract + Vitamin B6 (Adult) 3ml",
+      "arabicName": "كورتيبليكس كبار — B6 + كورتيبليكس",
+      "brandNames": [
+        "Cortiplex Adult Ampoule"
+      ],
+      "category": "steroid",
+      "class": "Corticoadrenal extract + pyridoxine",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "1 ampoule IM once or twice daily",
+        "pediatric": "Use paediatric formulation",
+        "duration": "As prescribed",
+        "route": "IM",
+        "notes": "Deep IM injection. Used for anti-inflammatory and general support indications."
+      },
+      "uses": [
+        "General support in weakness and fatigue",
+        "Arthralgia and myalgia (adjunct)",
+        "Anti-inflammatory support"
+      ],
+      "warnings": [
+        "Corticosteroid precautions apply",
+        "Not for repeated long-term self-administration",
+        "Raises blood glucose in diabetics"
+      ],
+      "inStock": true,
+      "priority": false
+    },
+    {
+      "id": "cortiplex-pediatric-inj",
+      "code": "2046",
+      "genericName": "Corticoadrenal Extract + Vitamin B6 (Paediatric)",
+      "arabicName": "كورتيبليكس أطفال",
+      "brandNames": [
+        "Cortiplex Paediatric Ampoule"
+      ],
+      "category": "steroid",
+      "class": "Corticoadrenal extract + pyridoxine",
+      "forms": [
+        "injection"
+      ],
+      "dose": {
+        "adult": "Not applicable",
+        "pediatric": "As prescribed by physician",
+        "duration": "As prescribed",
+        "route": "IM",
+        "notes": "Paediatric lower-dose formulation. Administer by IM injection."
+      },
+      "uses": [
+        "Paediatric anti-inflammatory support",
+        "Weakness and fatigue in children"
+      ],
+      "warnings": [
+        "Corticosteroid precautions in children",
+        "Limit duration to avoid growth suppression",
+        "Monitor blood glucose"
+      ],
       "inStock": true,
       "priority": false
     }
