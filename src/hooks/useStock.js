@@ -18,5 +18,13 @@ export function useStock(drugs) {
     setStockMap(prev => ({ ...prev, [id]: value }))
   }
 
-  return { stockMap, toggleStock }
+  const setAllStock = (ids, value) => {
+    setStockMap(prev => {
+      const next = { ...prev }
+      ids.forEach(id => { next[id] = value })
+      return next
+    })
+  }
+
+  return { stockMap, toggleStock, setAllStock }
 }

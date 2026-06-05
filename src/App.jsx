@@ -36,12 +36,19 @@ export default function App() {
     })
   }
 
-  const { stockMap, toggleStock } = useStock(drugsData.drugs)
+  const { stockMap, toggleStock, setAllStock } = useStock(drugsData.drugs)
   const { query, setQuery, results: searchResults } = useSearch(drugsData.drugs)
   const { activeCategory, setActiveCategory, filter } = useFilter()
 
   const categories = [...new Set(drugsData.drugs.map(d => d.category))]
-  const filtered = filter(searchResults)
+
+  // Filter first, then sort: in-stock alphabetically, then out-of-stock alphabetically
+  const filtered = filter(searchResults).slice().sort((a, b) => {
+    const aIn = stockMap[a.id] ? 0 : 1
+    const bIn = stockMap[b.id] ? 0 : 1
+    if (aIn !== bIn) return aIn - bIn
+    return a.genericName.localeCompare(b.genericName)
+  })
 
   // Install banner (Android only)
   const installBanner = showInstallBanner && (
@@ -105,6 +112,7 @@ export default function App() {
           drugs={drugsData.drugs}
           stockMap={stockMap}
           onToggle={toggleStock}
+          onSetAll={setAllStock}
           onBack={() => setShowManageStock(false)}
         />
       </Layout>
