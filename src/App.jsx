@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { DrugProvider, useDrugContext } from './context/DrugContext'
+import { ConditionProvider } from './context/ConditionContext'
 import Layout from './components/layout'
 import DrugCard from './components/DrugCard'
 import DrugDetail from './components/DrugDetail'
@@ -8,10 +11,58 @@ import CategoryFilter from './components/CategoryFilter'
 import { useSearch } from './hooks/useSearch'
 import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
-import drugsData from './data/drugs.json'
+import { DRUG_CATEGORIES } from './config/categories'
 import './index.css'
 
-export default function App() {
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+function SkeletonCard() {
+  return (
+    <div style={{
+      backgroundColor: 'var(--color-surface)',
+      border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-3) var(--space-4)',
+      marginBottom: 'var(--space-2)',
+      boxShadow: 'var(--shadow-card)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+        <div style={shimmer({ width: 80, height: 18, borderRadius: 'var(--radius-full)' })} />
+        <div style={shimmer({ width: 8, height: 8, borderRadius: '50%' })} />
+      </div>
+      <div style={shimmer({ width: '60%', height: 18, marginBottom: 'var(--space-1)' })} />
+      <div style={shimmer({ width: '40%', height: 14 })} />
+    </div>
+  )
+}
+
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius: 'var(--radius-sm)',
+    animation: 'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
+
+// Inject shimmer keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('shimmer-style')) {
+  const style = document.createElement('style')
+  style.id = 'shimmer-style'
+  style.textContent = `
+    @keyframes shimmer {
+      0%   { opacity: 1; }
+      50%  { opacity: 0.4; }
+      100% { opacity: 1; }
+    }
+  `
+  document.head.appendChild(style)
+}
+
+// ─── Drug Library screen (uses DrugContext) ───────────────────────────────────
+
+function DrugLibraryScreen() {
+  const { drugs, loading } = useDrugContext()
   const [selectedDrug, setSelectedDrug] = useState(null)
   const [showManageStock, setShowManageStock] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
@@ -36,13 +87,15 @@ export default function App() {
     })
   }
 
-  const { stockMap, toggleStock, setAllStock } = useStock(drugsData.drugs)
-  const { query, setQuery, results: searchResults } = useSearch(drugsData.drugs)
+  const { stockMap, toggleStock, setAllStock } = useStock(drugs)
+  const { query, setQuery, results: searchResults } = useSearch(drugs)
   const { activeCategory, setActiveCategory, filter } = useFilter()
 
-  const categories = [...new Set(drugsData.drugs.map(d => d.category))]
+  // Categories derived from config (mapped values), filtered to what's actually in the data
+  const presentCategories = DRUG_CATEGORIES
+    .filter(c => drugs.some(d => d.category === c.value))
+    .map(c => c.value)
 
-  // Filter first, then sort: in-stock alphabetically, then out-of-stock alphabetically
   const filtered = filter(searchResults).slice().sort((a, b) => {
     const aIn = stockMap[a.id] ? 0 : 1
     const bIn = stockMap[b.id] ? 0 : 1
@@ -73,9 +126,7 @@ export default function App() {
           style={{
             padding: '6px 14px',
             borderRadius: 'var(--radius-sm)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
             border: 'none',
             backgroundColor: 'var(--color-accent)',
             color: 'white',
@@ -89,9 +140,7 @@ export default function App() {
           style={{
             padding: '6px 14px',
             borderRadius: 'var(--radius-sm)',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
             border: '1px solid var(--color-accent)',
             backgroundColor: 'transparent',
             color: 'var(--color-accent)',
@@ -104,12 +153,11 @@ export default function App() {
     </div>
   )
 
-  // Manage Stock view
   if (showManageStock) {
     return (
       <Layout>
         <ManageStock
-          drugs={drugsData.drugs}
+          drugs={drugs}
           stockMap={stockMap}
           onToggle={toggleStock}
           onSetAll={setAllStock}
@@ -119,11 +167,9 @@ export default function App() {
     )
   }
 
-  // Drug detail view
   if (selectedDrug) {
     return (
       <Layout>
-        {installBanner}
         <DrugDetail
           drug={selectedDrug}
           isInStock={stockMap[selectedDrug.id]}
@@ -134,19 +180,34 @@ export default function App() {
     )
   }
 
-  // Main list view
+  // Cold start — no data yet
+  if (loading && drugs.length === 0) {
+    return (
+      <Layout>
+        <div style={{ padding: 'var(--space-5) var(--space-4) 0' }}>
+          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
+            {[80, 90, 70, 100, 75].map((w, i) => (
+              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+            ))}
+          </div>
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+      </Layout>
+    )
+  }
+
   return (
     <Layout>
-      {installBanner}
-      <div style={{ paddingTop: 'var(--space-5)' }}>
+      <div style={{ padding: 'var(--space-5) var(--space-4) 0' }}>
+        {installBanner}
         <SearchBar value={query} onChange={setQuery} />
         <CategoryFilter
-          categories={categories}
+          categories={presentCategories}
           active={activeCategory}
           onSelect={setActiveCategory}
         />
 
-        {/* Drug count + Manage Stock inline */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -168,8 +229,7 @@ export default function App() {
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-sm)',
               padding: '4px 12px',
-              fontSize: 12,
-              fontWeight: 500,
+              fontSize: 12, fontWeight: 500,
               color: 'var(--color-text-secondary)',
               cursor: 'pointer',
               fontFamily: 'var(--font-body)',
@@ -186,16 +246,10 @@ export default function App() {
             color: 'var(--color-text-tertiary)',
           }}>
             <div style={{ fontSize: 32, marginBottom: 'var(--space-3)' }}>⌕</div>
-            <div style={{
-              fontSize: 15,
-              marginBottom: 'var(--space-2)',
-              color: 'var(--color-text-secondary)',
-            }}>
+            <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
               No drugs found for "{query}"
             </div>
-            <div style={{ fontSize: 13 }}>
-              Try searching by brand name or Arabic name
-            </div>
+            <div style={{ fontSize: 13 }}>Try searching by brand name or Arabic name</div>
           </div>
         ) : (
           filtered.map(drug => (
@@ -209,5 +263,45 @@ export default function App() {
         )}
       </div>
     </Layout>
+  )
+}
+
+// ─── Stub screens (replaced in later sessions) ───────────────────────────────
+
+function ConditionsScreen() {
+  return (
+    <Layout>
+      <div style={{ padding: 'var(--space-5) var(--space-4)', color: 'var(--color-text-secondary)', fontSize: 14 }}>
+        Conditions — coming in Session 3
+      </div>
+    </Layout>
+  )
+}
+
+function FavouritesScreen() {
+  return (
+    <Layout>
+      <div style={{ padding: 'var(--space-5) var(--space-4)', color: 'var(--color-text-secondary)', fontSize: 14 }}>
+        Favourites — coming in Session 6
+      </div>
+    </Layout>
+  )
+}
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+
+export default function App() {
+  return (
+    <BrowserRouter basename="/capsula">
+      <ConditionProvider>
+        <DrugProvider>
+          <Routes>
+            <Route path="/"           element={<DrugLibraryScreen />} />
+            <Route path="/conditions" element={<ConditionsScreen />} />
+            <Route path="/favourites" element={<FavouritesScreen />} />
+          </Routes>
+        </DrugProvider>
+      </ConditionProvider>
+    </BrowserRouter>
   )
 }
