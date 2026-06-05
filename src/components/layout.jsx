@@ -1,4 +1,4 @@
-export default function Layout({ children, onResetClick, onManageStockClick }) {
+export default function Layout({ children }) {
   return (
     <div style={{
       minHeight: '100dvh',
@@ -15,9 +15,8 @@ export default function Layout({ children, onResetClick, onManageStockClick }) {
         padding: 'var(--space-3) var(--space-5)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'space-between',
       }}>
-        {/* Left: Logo */}
+        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           <div style={{
             width: 26,
@@ -45,46 +44,6 @@ export default function Layout({ children, onResetClick, onManageStockClick }) {
           }}>
             Capsula
           </span>
-        </div>
-
-        {/* Right: action buttons */}
-        <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-          {onManageStockClick && (
-            <button
-              onClick={onManageStockClick}
-              style={{
-                background: 'none',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 12px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              Manage Stock
-            </button>
-          )}
-          {onResetClick && (
-            <button
-              onClick={onResetClick}
-              style={{
-                background: 'none',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '5px 12px',
-                fontSize: 12,
-                fontWeight: 500,
-                color: 'var(--color-text-secondary)',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              Reset Stock
-            </button>
-          )}
         </div>
       </header>
 

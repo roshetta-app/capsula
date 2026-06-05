@@ -1,12 +1,26 @@
+import { useMemo } from 'react'
 import { ArrowLeft } from 'lucide-react'
 
 export default function ManageStock({ drugs, stockMap, onToggle, onBack }) {
-  // Sort: in-stock first, then out-of-stock
-  const sorted = [...drugs].sort((a, b) => {
-    const aIn = stockMap[a.id] ? 1 : 0
-    const bIn = stockMap[b.id] ? 1 : 0
-    return bIn - aIn
-  })
+  // Sort order is computed ONCE on mount (snapshot of stockMap at open time).
+  // Toggling does NOT re-sort — the list stays stable while the panel is open.
+  // Next time the panel opens, it re-mounts and re-sorts fresh.
+  const sortedIds = useMemo(() => {
+    const inStock = drugs
+      .filter(d => stockMap[d.id])
+      .sort((a, b) => a.genericName.localeCompare(b.genericName))
+    const outStock = drugs
+      .filter(d => !stockMap[d.id])
+      .sort((a, b) => a.genericName.localeCompare(b.genericName))
+    return [...inStock, ...outStock].map(d => d.id)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — freeze order at mount
+
+  const drugById = useMemo(() => {
+    const map = {}
+    drugs.forEach(d => { map[d.id] = d })
+    return map
+  }, [drugs])
 
   const inStockCount = drugs.filter(d => stockMap[d.id]).length
 
@@ -65,13 +79,15 @@ export default function ManageStock({ drugs, stockMap, onToggle, onBack }) {
         overflow: 'hidden',
         boxShadow: 'var(--shadow-card)',
       }}>
-        {sorted.map((drug, index) => {
-          const isInStock = stockMap[drug.id]
-          const isLast = index === sorted.length - 1
+        {sortedIds.map((id, index) => {
+          const drug = drugById[id]
+          if (!drug) return null
+          const isInStock = stockMap[id]
+          const isLast = index === sortedIds.length - 1
 
           return (
             <div
-              key={drug.id}
+              key={id}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -111,9 +127,9 @@ export default function ManageStock({ drugs, stockMap, onToggle, onBack }) {
                 )}
               </div>
 
-              {/* Inline toggle switch */}
+              {/* Toggle switch */}
               <button
-                onClick={() => onToggle(drug.id, !isInStock)}
+                onClick={() => onToggle(id, !isInStock)}
                 aria-label={isInStock ? 'Mark unavailable' : 'Mark in stock'}
                 style={{
                   flexShrink: 0,

@@ -14,11 +14,9 @@ import './index.css'
 export default function App() {
   const [selectedDrug, setSelectedDrug] = useState(null)
   const [showManageStock, setShowManageStock] = useState(false)
-  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
 
-  // Catch the browser's install prompt event and save it for later
   useEffect(() => {
     const handler = (e) => {
       e.preventDefault()
@@ -38,19 +36,14 @@ export default function App() {
     })
   }
 
-  const { stockMap, toggleStock, resetAll, setAllStock } = useStock(drugsData.drugs)
+  const { stockMap, toggleStock } = useStock(drugsData.drugs)
   const { query, setQuery, results: searchResults } = useSearch(drugsData.drugs)
   const { activeCategory, setActiveCategory, filter } = useFilter()
 
   const categories = [...new Set(drugsData.drugs.map(d => d.category))]
   const filtered = filter(searchResults)
 
-  const handleReset = () => {
-    resetAll()
-    setShowResetConfirm(false)
-  }
-
-  // Install banner (Android only — iOS uses Share → Add to Home Screen)
+  // Install banner (Android only)
   const installBanner = showInstallBanner && (
     <div style={{
       backgroundColor: 'var(--color-accent-light)',
@@ -104,64 +97,10 @@ export default function App() {
     </div>
   )
 
-  // Reset confirmation banner
-  const resetBanner = showResetConfirm && (
-    <div style={{
-      backgroundColor: '#FEF3C7',
-      border: '1px solid #FCD34D',
-      borderRadius: 'var(--radius-md)',
-      padding: 'var(--space-4)',
-      marginTop: 'var(--space-4)',
-      marginBottom: 'var(--space-2)',
-      display: 'flex',
-      justifyContent: 'space-between', alignItems: 'center',
-      gap: 'var(--space-3)',
-    }}>
-      <span style={{ fontSize: 13, color: '#92400E', fontWeight: 500 }}>
-        Reset all drugs to In Stock?
-      </span>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
-        <button
-          onClick={handleReset}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: 13,
-            fontWeight: 600,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: '#92400E',
-            color: 'white',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          Reset
-        </button>
-        <button
-          onClick={() => setShowResetConfirm(false)}
-          style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-sm)',
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: 'pointer',
-            border: '1px solid #D97706',
-            backgroundColor: 'transparent',
-            color: '#92400E',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  )
-
   // Manage Stock view
   if (showManageStock) {
     return (
-      <Layout onResetClick={() => setShowResetConfirm(true)}>
-        {resetBanner}
+      <Layout>
         <ManageStock
           drugs={drugsData.drugs}
           stockMap={stockMap}
@@ -175,9 +114,8 @@ export default function App() {
   // Drug detail view
   if (selectedDrug) {
     return (
-      <Layout onResetClick={() => setShowResetConfirm(true)}>
+      <Layout>
         {installBanner}
-        {resetBanner}
         <DrugDetail
           drug={selectedDrug}
           isInStock={stockMap[selectedDrug.id]}
@@ -190,12 +128,8 @@ export default function App() {
 
   // Main list view
   return (
-    <Layout
-      onResetClick={() => setShowResetConfirm(true)}
-      onManageStockClick={() => setShowManageStock(true)}
-    >
+    <Layout>
       {installBanner}
-      {resetBanner}
       <div style={{ paddingTop: 'var(--space-5)' }}>
         <SearchBar value={query} onChange={setQuery} />
         <CategoryFilter
@@ -203,55 +137,37 @@ export default function App() {
           active={activeCategory}
           onSelect={setActiveCategory}
         />
-        <div style={{
-          fontSize: 12,
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 'var(--space-3)',
-          fontFamily: 'var(--font-mono)',
-        }}>
-          {filtered.length} drug{filtered.length !== 1 ? 's' : ''}
-          {query && ' for "' + query + '"'}
-        </div>
 
-        {/* Bulk stock actions */}
+        {/* Drug count + Manage Stock inline */}
         <div style={{
           display: 'flex',
-          gap: 'var(--space-2)',
-          marginBottom: 'var(--space-4)',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-3)',
         }}>
+          <div style={{
+            fontSize: 12,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-mono)',
+          }}>
+            {filtered.length} drug{filtered.length !== 1 ? 's' : ''}
+            {query && ' for "' + query + '"'}
+          </div>
           <button
-            onClick={() => setAllStock(true)}
+            onClick={() => setShowManageStock(true)}
             style={{
-              flex: 1,
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 13,
+              background: 'none',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '4px 12px',
+              fontSize: 12,
               fontWeight: 500,
-              fontFamily: 'var(--font-body)',
+              color: 'var(--color-text-secondary)',
               cursor: 'pointer',
-              border: '1.5px solid var(--color-instock)',
-              backgroundColor: 'var(--color-instock-bg)',
-              color: 'var(--color-instock)',
+              fontFamily: 'var(--font-body)',
             }}
           >
-            ● Mark all in stock
-          </button>
-          <button
-            onClick={() => setAllStock(false)}
-            style={{
-              flex: 1,
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              cursor: 'pointer',
-              border: '1.5px solid var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text-tertiary)',
-            }}
-          >
-            ○ Mark all unavailable
+            Manage Stock
           </button>
         </div>
 
