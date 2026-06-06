@@ -1,12 +1,12 @@
-const CACHE_NAME = 'capsula-v1'
+const CACHE_NAME = 'capsula-v2'
 
-// These are the core app files — cached immediately on install
+// Core app shell — cached on install
 const APP_SHELL = [
   '/capsula/',
   '/capsula/index.html',
 ]
 
-// On install: cache the app shell
+// ─── Install — cache app shell ────────────────────────────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
@@ -14,7 +14,7 @@ self.addEventListener('install', event => {
   self.skipWaiting()
 })
 
-// On activate: delete old caches
+// ─── Activate — delete old caches ────────────────────────────────────────────
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -24,11 +24,14 @@ self.addEventListener('activate', event => {
   self.clients.claim()
 })
 
-// On fetch: serve from cache, fall back to network
+// ─── Fetch ────────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url)
 
-  // drugs.json — always try network first so new drug data gets through
+  // Only handle same-origin requests
+  if (url.origin !== self.location.origin) return
+
+  // drugs.json — network first so new data always gets through
   if (url.pathname.includes('drugs.json')) {
     event.respondWith(
       fetch(event.request)
@@ -42,14 +45,34 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Everything else — cache first, network as fallback
+  // Navigation requests (page loads/refreshes) under /capsula/* →
+  // serve /capsula/index.html so React Router handles the path.
+  // This is what prevents the 404 when refreshing /capsula/drugs etc.
+  // (The 404.html trick covers the first load before SW is active;
+  //  this covers all subsequent loads once SW is installed.)
+  if (
+    event.request.mode === 'navigate' &&
+    url.pathname.startsWith('/capsula')
+  ) {
+    event.respondWith(
+      caches.match('/capsula/index.html').then(cached => {
+        return cached || fetch('/capsula/index.html')
+      })
+    )
+    return
+  }
+
+  // Everything else — cache first, network fallback
   event.respondWith(
     caches.match(event.request).then(cached => {
       return cached || fetch(event.request).then(response => {
-        const copy = response.clone()
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+        // Only cache successful same-origin responses
+        if (response.ok && url.origin === self.location.origin) {
+          const copy = response.clone()
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+        }
         return response
       })
-    }).catch(() => caches.match('/capsula/'))
+    }).catch(() => caches.match('/capsula/index.html'))
   )
 })

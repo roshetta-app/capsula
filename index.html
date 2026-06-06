@@ -22,6 +22,30 @@
     <link rel="icon" type="image/svg+xml" href="/capsula/icons/icon.svg" />
 
     <title>Capsula</title>
+
+    <!--
+      GitHub Pages SPA redirect — decode script.
+      Companion to public/404.html.
+      Runs before React boots: reads sessionStorage set by 404.html,
+      restores the original path via history.replaceState so React Router
+      sees the correct URL on mount.
+    -->
+    <script>
+      (function() {
+        var redirect = sessionStorage.getItem('gh_pages_redirect');
+        if (redirect) {
+          sessionStorage.removeItem('gh_pages_redirect');
+          try {
+            var data = JSON.parse(redirect);
+            var url = window.location.protocol + '//' + window.location.host +
+                      '/capsula' + data.path +
+                      (data.query ? '?' + data.query : '') +
+                      (data.hash  ? '#' + data.hash  : '');
+            window.history.replaceState(null, null, url);
+          } catch(e) {}
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
