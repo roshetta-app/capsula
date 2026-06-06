@@ -1,23 +1,23 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
 import { DrugProvider, useDrugContext } from './context/DrugContext'
-import { ConditionProvider, useConditionContext } from './context/ConditionContext'
+import { ConditionProvider } from './context/ConditionContext'
 import Layout from './components/layout'
 import DrugCard from './components/DrugCard'
 import DrugDetail from './components/DrugDetail'
-import ConditionCard from './components/ConditionCard'
-import ConditionDetail from './components/ConditionDetail'
 import ManageStock from './components/ManageStock'
 import SearchBar from './components/SearchBar'
 import CategoryFilter from './components/CategoryFilter'
 import { useSearch } from './hooks/useSearch'
 import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
-import { useConditionSearch } from './hooks/useConditionSearch'
 import { DRUG_CATEGORIES } from './config/categories'
-import './index.css'
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+// ─── Page-level screens ───────────────────────────────────────────────────────
+
+import ConditionsScreen from './pages/ConditionsScreen'
+
+// ─── Skeleton helper ──────────────────────────────────────────────────────────
 
 function shimmer(extra = {}) {
   return {
@@ -61,109 +61,7 @@ function SkeletonCard() {
   )
 }
 
-// ─── Conditions screen ────────────────────────────────────────────────────────
-// Primary screen — lives at /
-
-function ConditionsScreen() {
-  const { conditions, specialties, loading } = useConditionContext()
-  const [selectedCondition, setSelectedCondition] = useState(null)
-  const { query, setQuery, activeSpecialty, setActiveSpecialty, results } = useConditionSearch(conditions)
-
-  if (selectedCondition) {
-    return (
-      <Layout>
-        <ConditionDetail condition={selectedCondition} onBack={() => setSelectedCondition(null)} />
-      </Layout>
-    )
-  }
-
-  if (loading && conditions.length === 0) {
-    return (
-      <Layout>
-        <div style={{ paddingTop: 'var(--space-5)' }}>
-          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
-            {[80, 100, 70, 90].map((w, i) => (
-              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-            ))}
-          </div>
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
-        </div>
-      </Layout>
-    )
-  }
-
-  return (
-    <Layout>
-      <div style={{ paddingTop: 'var(--space-5)' }}>
-        {/* Search */}
-        <SearchBar value={query} onChange={setQuery} placeholder="Search conditions…" />
-
-        {/* Specialty filter pills */}
-        {specialties.length > 0 && (
-          <div style={{
-            display: 'flex', gap: 'var(--space-2)',
-            overflowX: 'auto', paddingBottom: 'var(--space-2)',
-            marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
-          }}>
-            {['all', ...specialties.map(s => s.id)].map(id => {
-              const isActive = activeSpecialty === id
-              const label = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveSpecialty(id)}
-                  style={{
-                    flexShrink: 0, padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: 13, fontWeight: isActive ? 600 : 400,
-                    fontFamily: 'var(--font-body)', cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                    backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-                    color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Count */}
-        <div style={{
-          fontSize: 12, color: 'var(--color-text-tertiary)',
-          fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
-        }}>
-          {results.length} condition{results.length !== 1 ? 's' : ''}
-          {query && ' for "' + query + '"'}
-        </div>
-
-        {/* List */}
-        {results.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-            <div style={{ fontSize: 32, marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-            <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
-              No conditions found for "{query}"
-            </div>
-          </div>
-        ) : (
-          results.map(condition => (
-            <ConditionCard key={condition.id} condition={condition} onTap={setSelectedCondition} />
-          ))
-        )}
-      </div>
-    </Layout>
-  )
-}
-
 // ─── Drug Library screen ──────────────────────────────────────────────────────
-// Lives at /drugs
 
 function DrugLibraryScreen() {
   const { drugs, loading } = useDrugContext()
@@ -179,7 +77,6 @@ function DrugLibraryScreen() {
     setShowInstallBanner(true)
   }
 
-  // Attach/detach listener — safe even if event never fires (iOS)
   if (typeof window !== 'undefined') {
     window.addEventListener('beforeinstallprompt', handleInstallPrompt)
   }
@@ -313,7 +210,7 @@ function DrugLibraryScreen() {
               </svg>
             </div>
             <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
-              No drugs found for "{query}"
+              No drugs found{query ? ` for "${query}"` : ''}
             </div>
             <div style={{ fontSize: 13 }}>Try searching by brand name or Arabic name</div>
           </div>
@@ -346,6 +243,39 @@ function FavouritesScreen() {
   )
 }
 
+// ─── ConditionDetailScreen stub (implemented fully in Session 4.2) ─────────────
+
+function ConditionDetailScreen() {
+  const navigate = useNavigate()
+  return (
+    <Layout>
+      <div style={{ paddingTop: 'var(--space-5)' }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--color-accent)', fontSize: 14,
+            fontFamily: 'var(--font-body)', fontWeight: 500,
+            padding: '0 0 var(--space-4)',
+          }}
+        >
+          ← Back
+        </button>
+        <div style={{
+          textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
+          color: 'var(--color-text-tertiary)',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>Condition detail</div>
+          <div style={{ fontSize: 12, marginTop: 'var(--space-2)' }}>
+            Full detail screen coming in Session 4.2
+          </div>
+        </div>
+      </div>
+    </Layout>
+  )
+}
+
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -354,10 +284,17 @@ export default function App() {
       <ConditionProvider>
         <DrugProvider>
           <Routes>
-            {/* / → Conditions (primary use case per plan Section 5.1) */}
-            <Route path="/"           element={<ConditionsScreen />} />
-            <Route path="/drugs"      element={<DrugLibraryScreen />} />
-            <Route path="/favourites" element={<FavouritesScreen />} />
+            {/* Primary screen */}
+            <Route path="/"                   element={<ConditionsScreen />} />
+
+            {/* Condition detail — full implementation in Session 4.2 */}
+            <Route path="/conditions/:slug"   element={<ConditionDetailScreen />} />
+
+            {/* Drug library */}
+            <Route path="/drugs"              element={<DrugLibraryScreen />} />
+
+            {/* Favourites — full implementation in Session 6.1 */}
+            <Route path="/favourites"         element={<FavouritesScreen />} />
           </Routes>
         </DrugProvider>
       </ConditionProvider>
