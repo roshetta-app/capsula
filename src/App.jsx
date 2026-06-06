@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { DrugProvider, useDrugContext } from './context/DrugContext'
 import { ConditionProvider, useConditionContext } from './context/ConditionContext'
@@ -61,7 +61,109 @@ function SkeletonCard() {
   )
 }
 
+// ─── Conditions screen ────────────────────────────────────────────────────────
+// Primary screen — lives at /
+
+function ConditionsScreen() {
+  const { conditions, specialties, loading } = useConditionContext()
+  const [selectedCondition, setSelectedCondition] = useState(null)
+  const { query, setQuery, activeSpecialty, setActiveSpecialty, results } = useConditionSearch(conditions)
+
+  if (selectedCondition) {
+    return (
+      <Layout>
+        <ConditionDetail condition={selectedCondition} onBack={() => setSelectedCondition(null)} />
+      </Layout>
+    )
+  }
+
+  if (loading && conditions.length === 0) {
+    return (
+      <Layout>
+        <div style={{ paddingTop: 'var(--space-5)' }}>
+          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
+            {[80, 100, 70, 90].map((w, i) => (
+              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+            ))}
+          </div>
+          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+        </div>
+      </Layout>
+    )
+  }
+
+  return (
+    <Layout>
+      <div style={{ paddingTop: 'var(--space-5)' }}>
+        {/* Search */}
+        <SearchBar value={query} onChange={setQuery} placeholder="Search conditions…" />
+
+        {/* Specialty filter pills */}
+        {specialties.length > 0 && (
+          <div style={{
+            display: 'flex', gap: 'var(--space-2)',
+            overflowX: 'auto', paddingBottom: 'var(--space-2)',
+            marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
+          }}>
+            {['all', ...specialties.map(s => s.id)].map(id => {
+              const isActive = activeSpecialty === id
+              const label = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveSpecialty(id)}
+                  style={{
+                    flexShrink: 0, padding: '6px 14px',
+                    borderRadius: 'var(--radius-full)',
+                    fontSize: 13, fontWeight: isActive ? 600 : 400,
+                    fontFamily: 'var(--font-body)', cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+                    backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
+                    color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+                  }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Count */}
+        <div style={{
+          fontSize: 12, color: 'var(--color-text-tertiary)',
+          fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
+        }}>
+          {results.length} condition{results.length !== 1 ? 's' : ''}
+          {query && ' for "' + query + '"'}
+        </div>
+
+        {/* List */}
+        {results.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+            <div style={{ fontSize: 32, marginBottom: 'var(--space-3)', opacity: 0.4 }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+            </div>
+            <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
+              No conditions found for "{query}"
+            </div>
+          </div>
+        ) : (
+          results.map(condition => (
+            <ConditionCard key={condition.id} condition={condition} onTap={setSelectedCondition} />
+          ))
+        )}
+      </div>
+    </Layout>
+  )
+}
+
 // ─── Drug Library screen ──────────────────────────────────────────────────────
+// Lives at /drugs
 
 function DrugLibraryScreen() {
   const { drugs, loading } = useDrugContext()
@@ -70,15 +172,17 @@ function DrugLibraryScreen() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
 
-  useEffect(() => {
-    const handler = (e) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-      setShowInstallBanner(true)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
+  // PWA install prompt — only fires on Android Chrome
+  const handleInstallPrompt = (e) => {
+    e.preventDefault()
+    setInstallPrompt(e)
+    setShowInstallBanner(true)
+  }
+
+  // Attach/detach listener — safe even if event never fires (iOS)
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeinstallprompt', handleInstallPrompt)
+  }
 
   const handleInstall = () => {
     if (!installPrompt) return
@@ -203,7 +307,11 @@ function DrugLibraryScreen() {
 
         {filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-            <div style={{ fontSize: 32, marginBottom: 'var(--space-3)' }}>⌕</div>
+            <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+            </div>
             <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
               No drugs found for "{query}"
             </div>
@@ -219,103 +327,7 @@ function DrugLibraryScreen() {
   )
 }
 
-// ─── Conditions screen ────────────────────────────────────────────────────────
-
-function ConditionsScreen() {
-  const { conditions, specialties, loading } = useConditionContext()
-  const [selectedCondition, setSelectedCondition] = useState(null)
-  const { query, setQuery, activeSpecialty, setActiveSpecialty, results } = useConditionSearch(conditions)
-
-  if (selectedCondition) {
-    return (
-      <Layout>
-        <ConditionDetail condition={selectedCondition} onBack={() => setSelectedCondition(null)} />
-      </Layout>
-    )
-  }
-
-  if (loading && conditions.length === 0) {
-    return (
-      <Layout>
-        <div style={{ paddingTop: 'var(--space-5)' }}>
-          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
-            {[80, 100, 70, 90].map((w, i) => (
-              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-            ))}
-          </div>
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
-        </div>
-      </Layout>
-    )
-  }
-
-  return (
-    <Layout>
-      <div style={{ paddingTop: 'var(--space-5)' }}>
-        {/* Search */}
-        <SearchBar value={query} onChange={setQuery} placeholder="Search conditions…" />
-
-        {/* Specialty filter pills */}
-        {specialties.length > 0 && (
-          <div style={{
-            display: 'flex', gap: 'var(--space-2)',
-            overflowX: 'auto', paddingBottom: 'var(--space-2)',
-            marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
-          }}>
-            {['all', ...specialties.map(s => s.id)].map(id => {
-              const isActive = activeSpecialty === id
-              const label = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveSpecialty(id)}
-                  style={{
-                    flexShrink: 0, padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: 13, fontWeight: isActive ? 600 : 400,
-                    fontFamily: 'var(--font-body)', cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                    backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-                    color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Count */}
-        <div style={{
-          fontSize: 12, color: 'var(--color-text-tertiary)',
-          fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
-        }}>
-          {results.length} condition{results.length !== 1 ? 's' : ''}
-          {query && ' for "' + query + '"'}
-        </div>
-
-        {/* List */}
-        {results.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-            <div style={{ fontSize: 32, marginBottom: 'var(--space-3)' }}>⌕</div>
-            <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
-              No conditions found for "{query}"
-            </div>
-          </div>
-        ) : (
-          results.map(condition => (
-            <ConditionCard key={condition.id} condition={condition} onTap={setSelectedCondition} />
-          ))
-        )}
-      </div>
-    </Layout>
-  )
-}
-
-// ─── Favourites screen (stub) ─────────────────────────────────────────────────
+// ─── Favourites screen (stub — implemented in Session 6.1) ────────────────────
 
 function FavouritesScreen() {
   return (
@@ -328,7 +340,7 @@ function FavouritesScreen() {
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
         <div style={{ fontSize: 14, fontWeight: 500 }}>Favourites</div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Coming in Session 6</div>
+        <div style={{ fontSize: 12 }}>Coming in Session 6</div>
       </div>
     </Layout>
   )
@@ -342,8 +354,9 @@ export default function App() {
       <ConditionProvider>
         <DrugProvider>
           <Routes>
-            <Route path="/"           element={<DrugLibraryScreen />} />
-            <Route path="/conditions" element={<ConditionsScreen />} />
+            {/* / → Conditions (primary use case per plan Section 5.1) */}
+            <Route path="/"           element={<ConditionsScreen />} />
+            <Route path="/drugs"      element={<DrugLibraryScreen />} />
             <Route path="/favourites" element={<FavouritesScreen />} />
           </Routes>
         </DrugProvider>

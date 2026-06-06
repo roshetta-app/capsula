@@ -1,22 +1,34 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
+/**
+ * BottomNav — 3-tab fixed bottom navigation.
+ *
+ * Tab order (per plan Section 5.4):
+ *   0 — Conditions  /           (default / primary screen)
+ *   1 — Drugs       /drugs
+ *   2 — Favourites  /favourites
+ *
+ * Hidden on /admin/* routes.
+ * Bookmark icon fills when any favourites are saved (wired in Session 6.1).
+ */
+
 const TABS = [
   {
     path: '/',
-    label: 'Drugs',
-    icon: (active) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      </svg>
-    ),
-  },
-  {
-    path: '/conditions',
     label: 'Conditions',
     icon: (active) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
         <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
         <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+      </svg>
+    ),
+  },
+  {
+    path: '/drugs',
+    label: 'Drugs',
+    icon: (active) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
       </svg>
     ),
   },
@@ -35,7 +47,10 @@ export default function BottomNav() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Match active tab — exact for '/', startsWith for others
+  // Hide entirely on admin routes
+  if (location.pathname.startsWith('/admin')) return null
+
+  // Active tab detection — exact match for '/', startsWith for others
   const activeTab = (path) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
@@ -54,7 +69,6 @@ export default function BottomNav() {
       justifyContent: 'space-around',
       alignItems: 'stretch',
       height: 60,
-      // Safe area for iPhone home indicator
       paddingBottom: 'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
     }}>
