@@ -271,8 +271,17 @@ function DrugLibraryScreen() {
 function ConditionsScreen() {
   return (
     <Layout>
-      <div style={{ padding: 'var(--space-5) var(--space-4)', color: 'var(--color-text-secondary)', fontSize: 14 }}>
-        Conditions — coming in Session 3
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '50vh', gap: 'var(--space-3)',
+        color: 'var(--color-text-tertiary)',
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>Conditions</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Coming in Session 3.2</div>
       </div>
     </Layout>
   )
@@ -281,8 +290,16 @@ function ConditionsScreen() {
 function FavouritesScreen() {
   return (
     <Layout>
-      <div style={{ padding: 'var(--space-5) var(--space-4)', color: 'var(--color-text-secondary)', fontSize: 14 }}>
-        Favourites — coming in Session 6
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        minHeight: '50vh', gap: 'var(--space-3)',
+        color: 'var(--color-text-tertiary)',
+      }}>
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+        <div style={{ fontSize: 14, fontWeight: 500 }}>Favourites</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Coming in Session 6</div>
       </div>
     </Layout>
   )

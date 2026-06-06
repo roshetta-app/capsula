@@ -1,3 +1,5 @@
+import BottomNav from './BottomNav'
+
 export default function Layout({ children }) {
   return (
     <div style={{
@@ -6,6 +8,7 @@ export default function Layout({ children }) {
       fontFamily: 'var(--font-body)',
       color: 'var(--color-text-primary)',
     }}>
+      {/* Sticky top header */}
       <header style={{
         position: 'sticky',
         top: 0,
@@ -16,8 +19,8 @@ export default function Layout({ children }) {
         display: 'flex',
         alignItems: 'center',
       }}>
-        {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {/* Logo dot */}
           <div style={{
             width: 26,
             height: 26,
@@ -47,13 +50,16 @@ export default function Layout({ children }) {
         </div>
       </header>
 
+      {/* Main content — extra bottom padding for BottomNav (60px) + safe area */}
       <main style={{
         maxWidth: 680,
         margin: '0 auto',
-        padding: '0 var(--space-4) var(--space-12)',
+        padding: '0 var(--space-4) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>
+
+      <BottomNav />
     </div>
   )
 }
