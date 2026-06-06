@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { DrugProvider, useDrugContext } from './context/DrugContext.jsx'
-import { ConditionProvider } from './context/ConditionContext.jsx'
+import { DrugProvider, useDrugContext } from './context/DrugContext'
+import { ConditionProvider } from './context/ConditionContext'
 import Layout from './components/layout'
 import DrugCard from './components/DrugCard'
 import DrugDetail from './components/DrugDetail'
@@ -184,7 +184,7 @@ function DrugLibraryScreen() {
   if (loading && drugs.length === 0) {
     return (
       <Layout>
-        <div style={{ padding: 'var(--space-5) var(--space-4) 0' }}>
+        <div style={{ paddingTop: 'var(--space-5)' }}>
           <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
             {[80, 90, 70, 100, 75].map((w, i) => (
@@ -199,7 +199,7 @@ function DrugLibraryScreen() {
 
   return (
     <Layout>
-      <div style={{ padding: 'var(--space-5) var(--space-4) 0' }}>
+      <div style={{ paddingTop: 'var(--space-5)' }}>
         {installBanner}
         <SearchBar value={query} onChange={setQuery} />
         <CategoryFilter
