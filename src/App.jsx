@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { DrugProvider, useDrugContext } from './context/DrugContext'
 import { ConditionProvider } from './context/ConditionContext'
 import Layout from './components/layout'
@@ -16,6 +16,7 @@ import { DRUG_CATEGORIES } from './config/categories'
 // ─── Page-level screens ───────────────────────────────────────────────────────
 
 import ConditionsScreen from './pages/ConditionsScreen'
+import ConditionDetailScreen from './pages/ConditionDetailScreen'
 
 // ─── Skeleton helper ──────────────────────────────────────────────────────────
 
@@ -70,7 +71,6 @@ function DrugLibraryScreen() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [showInstallBanner, setShowInstallBanner] = useState(false)
 
-  // PWA install prompt — only fires on Android Chrome
   const handleInstallPrompt = (e) => {
     e.preventDefault()
     setInstallPrompt(e)
@@ -224,7 +224,7 @@ function DrugLibraryScreen() {
   )
 }
 
-// ─── Favourites screen (stub — implemented in Session 6.1) ────────────────────
+// ─── Favourites screen (stub — Session 6.1) ───────────────────────────────────
 
 function FavouritesScreen() {
   return (
@@ -243,39 +243,6 @@ function FavouritesScreen() {
   )
 }
 
-// ─── ConditionDetailScreen stub (implemented fully in Session 4.2) ─────────────
-
-function ConditionDetailScreen() {
-  const navigate = useNavigate()
-  return (
-    <Layout>
-      <div style={{ paddingTop: 'var(--space-5)' }}>
-        <button
-          onClick={() => navigate('/')}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--color-accent)', fontSize: 14,
-            fontFamily: 'var(--font-body)', fontWeight: 500,
-            padding: '0 0 var(--space-4)',
-          }}
-        >
-          ← Back
-        </button>
-        <div style={{
-          textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
-          color: 'var(--color-text-tertiary)',
-        }}>
-          <div style={{ fontSize: 14, fontWeight: 500 }}>Condition detail</div>
-          <div style={{ fontSize: 12, marginTop: 'var(--space-2)' }}>
-            Full detail screen coming in Session 4.2
-          </div>
-        </div>
-      </div>
-    </Layout>
-  )
-}
-
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
@@ -284,16 +251,9 @@ export default function App() {
       <ConditionProvider>
         <DrugProvider>
           <Routes>
-            {/* Primary screen */}
             <Route path="/"                   element={<ConditionsScreen />} />
-
-            {/* Condition detail — full implementation in Session 4.2 */}
             <Route path="/conditions/:slug"   element={<ConditionDetailScreen />} />
-
-            {/* Drug library */}
             <Route path="/drugs"              element={<DrugLibraryScreen />} />
-
-            {/* Favourites — full implementation in Session 6.1 */}
             <Route path="/favourites"         element={<FavouritesScreen />} />
           </Routes>
         </DrugProvider>
