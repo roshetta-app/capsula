@@ -1,16 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
-/**
- * BottomNav — 3-tab navigation bar.
- *
- * Positioning strategy:
- *   Was: position:fixed, left:0, right:0  → spans full viewport width on desktop.
- *   Now: position:sticky, bottom:0        → stays inside the layout column.
- *
- * On mobile the column is full-width so behaviour is identical to before.
- * On desktop the nav is constrained to the 680px column.
- */
-
 const TABS = [
   {
     path: '/',
@@ -46,7 +35,6 @@ export default function BottomNav() {
   const location = useLocation()
   const navigate  = useNavigate()
 
-  // Hide entirely on admin routes
   if (location.pathname.startsWith('/admin')) return null
 
   const activeTab = (path) => {
@@ -56,56 +44,63 @@ export default function BottomNav() {
 
   return (
     <nav style={{
-      position: 'sticky',
+      position: 'fixed',
       bottom: 0,
+      left: 0,
+      right: 0,
       zIndex: 100,
       backgroundColor: 'var(--color-surface)',
       borderTop: '1px solid var(--color-border)',
-      display: 'flex',
-      justifyContent: 'space-around',
-      alignItems: 'stretch',
-      height: 60,
-      // iOS safe area on mobile; no effect on desktop
       paddingBottom: 'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
     }}>
-      {TABS.map(tab => {
-        const active = activeTab(tab.path)
-        return (
-          <button
-            key={tab.path}
-            onClick={() => navigate(tab.path)}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-              transition: 'color 0.15s ease',
-              fontFamily: 'var(--font-body)',
-              padding: '8px 0',
-              WebkitTapHighlightColor: 'transparent',
-              outline: 'none',
-            }}
-            aria-label={tab.label}
-            aria-current={active ? 'page' : undefined}
-          >
-            {tab.icon(active)}
-            <span style={{
-              fontSize: 10,
-              fontWeight: active ? 600 : 400,
-              letterSpacing: '0.01em',
-            }}>
-              {tab.label}
-            </span>
-          </button>
-        )
-      })}
+      {/* Inner row — centred and capped at 680px so tabs don't spread wall-to-wall on desktop */}
+      <div style={{
+        maxWidth: 680,
+        margin: '0 auto',
+        display: 'flex',
+        justifyContent: 'space-around',
+        alignItems: 'stretch',
+        height: 60,
+      }}>
+        {TABS.map(tab => {
+          const active = activeTab(tab.path)
+          return (
+            <button
+              key={tab.path}
+              onClick={() => navigate(tab.path)}
+              style={{
+                flex: 1,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                transition: 'color 0.15s ease',
+                fontFamily: 'var(--font-body)',
+                padding: '8px 0',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none',
+              }}
+              aria-label={tab.label}
+              aria-current={active ? 'page' : undefined}
+            >
+              {tab.icon(active)}
+              <span style={{
+                fontSize: 10,
+                fontWeight: active ? 600 : 400,
+                letterSpacing: '0.01em',
+              }}>
+                {tab.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </nav>
   )
 }
