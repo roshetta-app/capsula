@@ -3,16 +3,19 @@
  *
  * Strategy:
  *   - HTML (navigation requests) → network-first, fall back to cache
- *   - JS/CSS/fonts/images        → cache-first, update in background
+ *   - JS/CSS/fonts/images        → cache-first (Vite content-hashes guarantee freshness)
  *
- * CACHE_VERSION must change on every deploy to bust stale caches.
- * The deploy.yml workflow injects the git SHA at build time via
- * a find-and-replace step (see deploy.yml changes below).
- * If that step is absent, bump the number manually before each push.
+ * Auto-update flow:
+ *   1. deploy.yml injects the git SHA → CACHE_VERSION changes every deploy
+ *   2. Browser detects new SW → installs it, calls skipWaiting()
+ *   3. On activate: delete all old caches, claim all tabs, send 'RELOAD' message
+ *   4. main.jsx receives 'RELOAD' → calls location.reload()
+ *   Result: the tab reloads itself automatically within seconds of a deploy.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
 const STATIC_CACHE  = CACHE_VERSION + '-static'
+
 const URLS_TO_PRECACHE = [
   '/capsula/',
   '/capsula/index.html',
@@ -21,7 +24,7 @@ const URLS_TO_PRECACHE = [
 // ─── Install ──────────────────────────────────────────────────────────────────
 
 self.addEventListener('install', event => {
-  // Skip waiting so the new SW activates immediately (don't wait for old tabs to close)
+  // Activate immediately — don't wait for old tabs to close
   self.skipWaiting()
 
   event.waitUntil(
@@ -32,15 +35,23 @@ self.addEventListener('install', event => {
 // ─── Activate ─────────────────────────────────────────────────────────────────
 
 self.addEventListener('activate', event => {
-  // Delete ALL old caches that don't match this version
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key !== STATIC_CACHE)
-          .map(key => caches.delete(key))
+    // 1. Delete all caches from previous versions
+    caches.keys()
+      .then(keys =>
+        Promise.all(
+          keys
+            .filter(key => key !== STATIC_CACHE)
+            .map(key => caches.delete(key))
+        )
       )
-    ).then(() => self.clients.claim())  // take control of all open tabs immediately
+      // 2. Take control of all open tabs immediately
+      .then(() => self.clients.claim())
+      // 3. Tell every open tab to reload so it picks up the new JS bundle
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => {
+        clients.forEach(client => client.postMessage({ type: 'RELOAD' }))
+      })
   )
 })
 
@@ -54,13 +65,12 @@ self.addEventListener('fetch', event => {
   if (url.origin !== location.origin) return
 
   // ── Navigation requests (HTML) → network-first ──────────────────────────
-  // This ensures a refresh always gets the latest index.html from the network.
-  // Falls back to cached version only if offline.
+  // Always try the network first so index.html is never stale.
+  // Falls back to cache only when offline.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then(response => {
-          // Cache the fresh response
           const clone = response.clone()
           caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
           return response
@@ -70,9 +80,10 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // ── Static assets (JS, CSS, fonts, images) → cache-first ────────────────
-  // Vite hashes all asset filenames, so a new deploy = new filenames = cache miss.
-  // Old hashed files are never re-requested, so this never serves stale JS.
+  // ── Vite-hashed assets (JS, CSS) → cache-first ──────────────────────────
+  // Vite fingerprints every asset filename on build, so a new deploy produces
+  // new filenames. The old hashed files are never re-requested, which means
+  // cache-first is safe and fast here.
   if (
     url.pathname.startsWith('/capsula/assets/') ||
     url.pathname.startsWith('/capsula/icons/')  ||
@@ -91,5 +102,5 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Everything else → network only (Supabase API calls, etc.)
+  // Everything else (Supabase API, etc.) → network only
 })
