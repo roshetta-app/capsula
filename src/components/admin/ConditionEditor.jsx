@@ -1,4 +1,3 @@
-/**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
  * Create or edit a condition's metadata (no prescriptions yet — Session 5.5).
@@ -16,10 +15,10 @@ import {
   updateCondition,
   fetchConditionForEdit,
   insertConditionImage,
-  updateConditionImage,
   deleteConditionImage,
   uploadConditionImage,
 } from '../../lib/adminQueries'
+import PrescriptionBuilder from '../../components/admin/PrescriptionBuilder'
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
@@ -282,10 +281,6 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
     onChange(images.map(i => i.id === imgId ? { ...i, caption } : i))
   }
 
-  async function saveCaption(imgId, caption) {
-    await updateConditionImage(imgId, { caption: caption.trim() || null })
-  }
-
   const canManage = !!conditionId
 
   return (
@@ -321,7 +316,6 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
                   type="text"
                   value={img.caption || ''}
                   onChange={e => updateCaption(img.id, e.target.value)}
-                  onBlur={e => saveCaption(img.id, e.target.value)}
                   placeholder="Caption (optional)"
                   dir="auto"
                   style={{
@@ -743,22 +737,18 @@ export default function ConditionEditor() {
           />
         </div>
 
-        {/* ── Prescriptions stub ─────────────────────────────────────────── */}
+        {/* ── Prescriptions (5.5) ────────────────────────────────────────── */}
 
         <SectionTitle>Prescriptions</SectionTitle>
-        <div style={{
-          backgroundColor: 'var(--color-bg)',
-          border: '1.5px dashed var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-5)',
-          textAlign: 'center',
-          color: 'var(--color-text-tertiary)',
-          fontSize: 13,
-        }}>
-          Prescription builder — Session 5.5
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <PrescriptionBuilder
+            conditionId={isEdit ? id : null}
+            disabled={saving}
+          />
         </div>
 
       </main>
     </div>
   )
 }
+

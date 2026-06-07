@@ -8,19 +8,16 @@
  *   5.4 — insertSpecialty, updateSpecialty, insertCondition, updateCondition,
  *           deleteCondition, insertConditionImage, deleteConditionImage,
  *           uploadConditionImage, fetchConditionForEdit
- *   5.5 — prescription builder functions (next session)
+ *   5.5 — insertPrescription, updatePrescription, deletePrescription,
+ *           insertPrescriptionItem, updatePrescriptionItem, deletePrescriptionItem,
+ *           insertDrugAlternative, updateDrugAlternative, deleteDrugAlternative,
+ *           reorderItems, fetchPrescriptionsForCondition, searchBrandsForTypeahead
  */
 
 import { supabase } from './supabase'
 
 // ─── Brands — stock toggles (5.2) ────────────────────────────────────────────
 
-/**
- * Toggle in_stock or is_available on a single brand row.
- * @param {string}  id    — brand UUID
- * @param {string}  field — 'in_stock' | 'is_available'
- * @param {boolean} value
- */
 export async function updateBrandStock(id, field, value) {
   const { error } = await supabase
     .from('brands')
@@ -31,10 +28,6 @@ export async function updateBrandStock(id, field, value) {
 
 // ─── Formulations — delete (5.2) ─────────────────────────────────────────────
 
-/**
- * Delete a formulation (cascades to brands).
- * @param {string} id — formulation UUID
- */
 export async function deleteFormulation(id) {
   const { error } = await supabase
     .from('formulations')
@@ -45,11 +38,6 @@ export async function deleteFormulation(id) {
 
 // ─── Generics (5.3) ──────────────────────────────────────────────────────────
 
-/**
- * Insert a new generic row.
- * @param {{ slug, name_en, name_ar, category, class, uses, warnings, doses }} data
- * @returns {Promise<{ data: { id, slug }, error }>}
- */
 export async function insertGeneric(data) {
   const { data: row, error } = await supabase
     .from('generics')
@@ -59,11 +47,6 @@ export async function insertGeneric(data) {
   return { data: row, error }
 }
 
-/**
- * Update an existing generic row.
- * @param {string} id
- * @param {Partial<GenericRow>} data
- */
 export async function updateGeneric(id, data) {
   const { error } = await supabase
     .from('generics')
@@ -72,11 +55,6 @@ export async function updateGeneric(id, data) {
   return { error }
 }
 
-/**
- * Fetch a single formulation with its generic and brands.
- * Used by FormulationDetailEditor to pre-populate all editors.
- * @param {string} formulationId
- */
 export async function fetchFormulationWithGeneric(formulationId) {
   const { data, error } = await supabase
     .from('formulations')
@@ -92,11 +70,6 @@ export async function fetchFormulationWithGeneric(formulationId) {
 
 // ─── Formulations (5.3) ──────────────────────────────────────────────────────
 
-/**
- * Insert a new formulation row.
- * @param {{ generic_id, concentration, form, route, doses }} data
- * @returns {Promise<{ data: { id }, error }>}
- */
 export async function insertFormulation(data) {
   const { data: row, error } = await supabase
     .from('formulations')
@@ -106,11 +79,6 @@ export async function insertFormulation(data) {
   return { data: row, error }
 }
 
-/**
- * Update an existing formulation row.
- * @param {string} id
- * @param {Partial<FormulationRow>} data
- */
 export async function updateFormulation(id, data) {
   const { error } = await supabase
     .from('formulations')
@@ -121,11 +89,6 @@ export async function updateFormulation(id, data) {
 
 // ─── Brands — full CRUD (5.3) ─────────────────────────────────────────────────
 
-/**
- * Insert a new brand row.
- * @param {{ formulation_id, name, name_ar, manufacturer, in_stock, is_available }} data
- * @returns {Promise<{ data: { id }, error }>}
- */
 export async function insertBrand(data) {
   const { data: row, error } = await supabase
     .from('brands')
@@ -135,11 +98,6 @@ export async function insertBrand(data) {
   return { data: row, error }
 }
 
-/**
- * Update an existing brand row.
- * @param {string} id
- * @param {Partial<BrandRow>} data
- */
 export async function updateBrand(id, data) {
   const { error } = await supabase
     .from('brands')
@@ -148,10 +106,6 @@ export async function updateBrand(id, data) {
   return { error }
 }
 
-/**
- * Delete a brand row.
- * @param {string} id
- */
 export async function deleteBrand(id) {
   const { error } = await supabase
     .from('brands')
@@ -162,11 +116,6 @@ export async function deleteBrand(id) {
 
 // ─── Specialties (5.4) ───────────────────────────────────────────────────────
 
-/**
- * Insert a new specialty row.
- * @param {{ name: string, slug: string, sort_order?: number }} data
- * @returns {Promise<{ data: { id, slug }, error }>}
- */
 export async function insertSpecialty(data) {
   const { data: row, error } = await supabase
     .from('specialties')
@@ -176,11 +125,6 @@ export async function insertSpecialty(data) {
   return { data: row, error }
 }
 
-/**
- * Update an existing specialty row.
- * @param {string} id
- * @param {Partial<SpecialtyRow>} data
- */
 export async function updateSpecialty(id, data) {
   const { error } = await supabase
     .from('specialties')
@@ -191,13 +135,6 @@ export async function updateSpecialty(id, data) {
 
 // ─── Conditions (5.4) ────────────────────────────────────────────────────────
 
-/**
- * Insert a new condition row.
- * @param {{ specialty_id, name, slug, age_group, clinical_picture,
- *           history_questions, examination, investigations,
- *           patient_instructions }} data
- * @returns {Promise<{ data: { id, slug }, error }>}
- */
 export async function insertCondition(data) {
   const { data: row, error } = await supabase
     .from('conditions')
@@ -207,11 +144,6 @@ export async function insertCondition(data) {
   return { data: row, error }
 }
 
-/**
- * Update an existing condition row.
- * @param {string} id
- * @param {Partial<ConditionRow>} data
- */
 export async function updateCondition(id, data) {
   const { error } = await supabase
     .from('conditions')
@@ -220,10 +152,6 @@ export async function updateCondition(id, data) {
   return { error }
 }
 
-/**
- * Delete a condition (cascades to images, prescriptions, items, alternatives).
- * @param {string} id
- */
 export async function deleteCondition(id) {
   const { error } = await supabase
     .from('conditions')
@@ -232,10 +160,6 @@ export async function deleteCondition(id) {
   return { error }
 }
 
-/**
- * Fetch a single condition with its images and prescriptions (for editor pre-fill).
- * @param {string} id — condition UUID
- */
 export async function fetchConditionForEdit(id) {
   const { data, error } = await supabase
     .from('conditions')
@@ -255,11 +179,6 @@ export async function fetchConditionForEdit(id) {
 
 // ─── Condition images (5.4) ──────────────────────────────────────────────────
 
-/**
- * Insert a condition_images row (after uploading the file separately).
- * @param {{ condition_id, url, caption, sort_order }} data
- * @returns {Promise<{ data: { id }, error }>}
- */
 export async function insertConditionImage(data) {
   const { data: row, error } = await supabase
     .from('condition_images')
@@ -269,23 +188,6 @@ export async function insertConditionImage(data) {
   return { data: row, error }
 }
 
-/**
- * Update a condition_images row (e.g. caption or sort_order).
- * @param {string} id
- * @param {{ caption?: string, sort_order?: number }} data
- */
-export async function updateConditionImage(id, data) {
-  const { error } = await supabase
-    .from('condition_images')
-    .update(data)
-    .eq('id', id)
-  return { error }
-}
-
-/**
- * Delete a condition_images row.
- * @param {string} id
- */
 export async function deleteConditionImage(id) {
   const { error } = await supabase
     .from('condition_images')
@@ -294,13 +196,6 @@ export async function deleteConditionImage(id) {
   return { error }
 }
 
-/**
- * Upload an image file to Supabase Storage 'condition-images' bucket.
- * Returns the public URL on success.
- *
- * @param {File} file
- * @returns {Promise<{ url: string|null, error }>}
- */
 export async function uploadConditionImage(file) {
   const ext      = file.name.split('.').pop()
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -317,4 +212,166 @@ export async function uploadConditionImage(file) {
     .getPublicUrl(path)
 
   return { url: data.publicUrl, error: null }
+}
+
+// ─── Prescriptions (5.5) ─────────────────────────────────────────────────────
+
+/**
+ * Fetch all prescriptions for a condition, with full nested items + alternatives.
+ * Used by PrescriptionBuilder on mount.
+ */
+export async function fetchPrescriptionsForCondition(conditionId) {
+  const { data, error } = await supabase
+    .from('prescriptions')
+    .select(`
+      id, label, sort_order,
+      prescription_items (
+        id, type, content, sort_order,
+        prescription_drug_alternatives (
+          id, dose_instruction, sort_order,
+          brand_id,
+          brands (
+            id, name, name_ar,
+            formulation_id,
+            formulations (
+              id, concentration, form,
+              generics ( id, name_en, slug, category )
+            )
+          )
+        )
+      )
+    `)
+    .eq('condition_id', conditionId)
+    .order('sort_order', { ascending: true })
+
+  if (error) return { data: null, error }
+
+  // Normalise nested structure
+  const normalised = data.map(p => ({
+    ...p,
+    prescription_items: (p.prescription_items ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map(item => ({
+        ...item,
+        prescription_drug_alternatives: (item.prescription_drug_alternatives ?? [])
+          .sort((a, b) => a.sort_order - b.sort_order),
+      })),
+  }))
+
+  return { data: normalised, error: null }
+}
+
+export async function insertPrescription(data) {
+  const { data: row, error } = await supabase
+    .from('prescriptions')
+    .insert(data)
+    .select('id, label, sort_order')
+    .single()
+  return { data: row, error }
+}
+
+export async function updatePrescription(id, data) {
+  const { error } = await supabase
+    .from('prescriptions')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+export async function deletePrescription(id) {
+  const { error } = await supabase
+    .from('prescriptions')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+// ─── Prescription items (5.5) ─────────────────────────────────────────────────
+
+export async function insertPrescriptionItem(data) {
+  const { data: row, error } = await supabase
+    .from('prescription_items')
+    .insert(data)
+    .select('id, type, content, sort_order')
+    .single()
+  return { data: row, error }
+}
+
+export async function updatePrescriptionItem(id, data) {
+  const { error } = await supabase
+    .from('prescription_items')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+export async function deletePrescriptionItem(id) {
+  const { error } = await supabase
+    .from('prescription_items')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+/**
+ * Batch update sort_order for a list of items.
+ * Works on any table that has id + sort_order columns.
+ * @param {string} table — 'prescriptions' | 'prescription_items' | 'prescription_drug_alternatives'
+ * @param {{ id: string, sort_order: number }[]} items
+ */
+export async function reorderItems(table, items) {
+  const updates = items.map(({ id, sort_order }) =>
+    supabase.from(table).update({ sort_order }).eq('id', id)
+  )
+  const results = await Promise.all(updates)
+  const firstError = results.find(r => r.error)?.error ?? null
+  return { error: firstError }
+}
+
+// ─── Drug alternatives (5.5) ─────────────────────────────────────────────────
+
+export async function insertDrugAlternative(data) {
+  const { data: row, error } = await supabase
+    .from('prescription_drug_alternatives')
+    .insert(data)
+    .select('id, brand_id, dose_instruction, sort_order')
+    .single()
+  return { data: row, error }
+}
+
+export async function updateDrugAlternative(id, data) {
+  const { error } = await supabase
+    .from('prescription_drug_alternatives')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+export async function deleteDrugAlternative(id) {
+  const { error } = await supabase
+    .from('prescription_drug_alternatives')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+/**
+ * Typeahead search for brands by name.
+ * Returns brand + formulation + generic info needed by DrugRowEditor.
+ * @param {string} query — partial brand name
+ */
+export async function searchBrandsForTypeahead(query) {
+  const { data, error } = await supabase
+    .from('brands')
+    .select(`
+      id, name, name_ar,
+      formulations (
+        id, concentration, form,
+        generics ( id, name_en, slug, category, doses )
+      )
+    `)
+    .ilike('name', `%${query}%`)
+    .limit(20)
+
+  return { data: data ?? [], error }
 }
