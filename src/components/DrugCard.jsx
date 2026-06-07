@@ -1,5 +1,5 @@
 import { Bookmark, BookmarkCheck } from 'lucide-react'
-import { useFavourites } from '../hooks/useFavourites'
+import { useFavouritesContext } from '../context/FavouritesContext'
 import { DRUG_CATEGORIES } from '../config/categories'
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -27,7 +27,7 @@ const CATEGORY_COLORS = {
 }
 
 export default function DrugCard({ drug, onTap, isInStock = true }) {
-  const { isDrugFavourited, toggleDrug } = useFavourites()
+  const { isDrugFavourited, toggleDrug } = useFavouritesContext()
   const isFavourited = isDrugFavourited(drug.id)
 
   const chipStyle  = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }

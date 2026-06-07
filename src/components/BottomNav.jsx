@@ -1,10 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useFavourites } from '../hooks/useFavourites'
+import { useFavouritesContext } from '../context/FavouritesContext'
 
 export default function BottomNav() {
   const location  = useLocation()
   const navigate  = useNavigate()
-  const { favourites } = useFavourites()
+  const { favourites } = useFavouritesContext()
 
   if (location.pathname.startsWith('/admin')) return null
 

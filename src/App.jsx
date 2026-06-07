@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { DrugProvider, useDrugContext } from './context/DrugContext'
 import { ConditionProvider } from './context/ConditionContext'
+import { FavouritesProvider } from './context/FavouritesContext'
 import Layout from './components/layout'
 import DrugCard from './components/DrugCard'
 import DrugDetail from './components/DrugDetail'
@@ -241,48 +242,50 @@ function DrugLibraryScreen() {
 export default function App() {
   return (
     <BrowserRouter basename="/capsula">
-      <ConditionProvider>
-        <DrugProvider>
-          <Routes>
+      <FavouritesProvider>
+        <ConditionProvider>
+          <DrugProvider>
+            <Routes>
 
-            {/* ── Public routes ─────────────────────────────────────────────── */}
-            <Route path="/"                 element={<ConditionsScreen />} />
-            <Route path="/conditions/:slug" element={<ConditionDetailScreen />} />
-            <Route path="/drugs"            element={<DrugLibraryScreen />} />
-            <Route path="/favourites"       element={<FavouritesScreen />} />
+              {/* ── Public routes ──────────────────────────────────────────────── */}
+              <Route path="/"                 element={<ConditionsScreen />} />
+              <Route path="/conditions/:slug" element={<ConditionDetailScreen />} />
+              <Route path="/drugs"            element={<DrugLibraryScreen />} />
+              <Route path="/favourites"       element={<FavouritesScreen />} />
 
-            {/* ── Admin routes ──────────────────────────────────────────────── */}
-            <Route path="/admin/login" element={<AdminLogin />} />
+              {/* ── Admin routes ───────────────────────────────────────────────── */}
+              <Route path="/admin/login" element={<AdminLogin />} />
 
-            <Route path="/admin"
-              element={<AuthGuard><AdminDashboard /></AuthGuard>}
-            />
-            <Route path="/admin/drugs"
-              element={<AuthGuard><DrugCMS /></AuthGuard>}
-            />
-            {/* NOTE: /new must come before /:id so React Router doesn't treat
-                "new" as a formulation UUID */}
-            <Route path="/admin/drugs/new"
-              element={<AuthGuard><AddDrugFlow /></AuthGuard>}
-            />
-            <Route path="/admin/drugs/:id"
-              element={<AuthGuard><FormulationDetailEditor /></AuthGuard>}
-            />
+              <Route path="/admin"
+                element={<AuthGuard><AdminDashboard /></AuthGuard>}
+              />
+              <Route path="/admin/drugs"
+                element={<AuthGuard><DrugCMS /></AuthGuard>}
+              />
+              {/* NOTE: /new must come before /:id so React Router doesn't treat
+                  "new" as a formulation UUID */}
+              <Route path="/admin/drugs/new"
+                element={<AuthGuard><AddDrugFlow /></AuthGuard>}
+              />
+              <Route path="/admin/drugs/:id"
+                element={<AuthGuard><FormulationDetailEditor /></AuthGuard>}
+              />
 
-            {/* ── Conditions CMS ────────────────────────────────────────────── */}
-            <Route path="/admin/conditions"
-              element={<AuthGuard><ConditionsCMS /></AuthGuard>}
-            />
-            <Route path="/admin/conditions/new"
-              element={<AuthGuard><ConditionEditor /></AuthGuard>}
-            />
-            <Route path="/admin/conditions/:id"
-              element={<AuthGuard><ConditionEditor /></AuthGuard>}
-            />
+              {/* ── Conditions CMS ─────────────────────────────────────────────── */}
+              <Route path="/admin/conditions"
+                element={<AuthGuard><ConditionsCMS /></AuthGuard>}
+              />
+              <Route path="/admin/conditions/new"
+                element={<AuthGuard><ConditionEditor /></AuthGuard>}
+              />
+              <Route path="/admin/conditions/:id"
+                element={<AuthGuard><ConditionEditor /></AuthGuard>}
+              />
 
-          </Routes>
-        </DrugProvider>
-      </ConditionProvider>
+            </Routes>
+          </DrugProvider>
+        </ConditionProvider>
+      </FavouritesProvider>
     </BrowserRouter>
   )
 }

@@ -16,7 +16,7 @@ import {
   faSyringe,
 } from '@fortawesome/free-solid-svg-icons'
 import { Bookmark, BookmarkCheck } from 'lucide-react'
-import { useFavourites } from '../hooks/useFavourites'
+import { useFavouritesContext } from '../context/FavouritesContext'
 
 // ─── Specialty → FA icon map ──────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ function ageLabel(group) {
  */
 export default function ConditionCard({ condition, onTap }) {
   const navigate = useNavigate()
-  const { isConditionFavourited, toggleCondition } = useFavourites()
+  const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const isFavourited = isConditionFavourited(condition.id)
 
   const ageStyle = AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' }

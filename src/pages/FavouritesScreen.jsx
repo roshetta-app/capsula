@@ -5,7 +5,7 @@ import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
-import { useFavourites } from '../hooks/useFavourites'
+import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ function EmptyState({ label }) {
 
 export default function FavouritesScreen() {
   const [activeTab, setActiveTab] = useState('conditions')
-  const { favourites } = useFavourites()
+  const { favourites } = useFavouritesContext()
   const { conditions } = useConditionContext()
   const { drugs } = useDrugContext()
   const { stockMap } = useStock(drugs)
