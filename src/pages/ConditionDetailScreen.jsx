@@ -20,34 +20,28 @@ function ageLabel(group) {
   return 'Adult'
 }
 
-// ─── Tab strip ────────────────────────────────────────────────────────────────
-
 const TABS = ['Prescriptions', 'Clinical Data']
 
-// ─── ConditionDetailScreen ────────────────────────────────────────────────────
+const MAX_W = 680
 
 /**
- * ConditionDetailScreen — full detail view for one condition.
+ * ConditionDetailScreen — /conditions/:slug
  *
- * Route: /conditions/:slug
+ * Responsive fix: the whole screen is wrapped in the same 680px centred
+ * column as Layout. The swipeable slide container is now scoped inside
+ * that column so the 200% trick doesn't bleed to 2800px on a wide monitor.
  *
- * - Reads slug from params, looks up condition from ConditionContext
- * - Header: back button, name, specialty tag, age badge
- * - Two-tab strip: Prescriptions (default) | Clinical Data
- * - Swipe gesture: touchstart/touchend delta > 50px → switch tab
- * - CSS translate transition between tabs
- * - ClinicalDataTab deferred to Session 4.3 — renders a clear stub
+ * On desktop the swipe gesture still works; the user can also click tabs.
  */
 export default function ConditionDetailScreen() {
-  const { slug }      = useParams()
-  const navigate      = useNavigate()
+  const { slug }    = useParams()
+  const navigate    = useNavigate()
   const { conditions, loading } = useConditionContext()
 
-  const [activeTab, setActiveTab] = useState(0)      // 0=Prescriptions, 1=Clinical Data
+  const [activeTab, setActiveTab] = useState(0)
 
-  // ─── Touch / swipe state ──────────────────────────────────────────────────
-  const touchStartX  = useRef(null)
-  const touchStartY  = useRef(null)
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
 
   function handleTouchStart(e) {
     touchStartX.current = e.touches[0].clientX
@@ -58,28 +52,21 @@ export default function ConditionDetailScreen() {
     if (touchStartX.current === null) return
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
-    // Only treat as horizontal swipe if dx dominates (avoid scroll confusion)
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx < 0 && activeTab < TABS.length - 1) setActiveTab(t => t + 1) // swipe left → next
-      if (dx > 0 && activeTab > 0)               setActiveTab(t => t - 1) // swipe right → prev
+      if (dx < 0 && activeTab < TABS.length - 1) setActiveTab(t => t + 1)
+      if (dx > 0 && activeTab > 0)               setActiveTab(t => t - 1)
     }
     touchStartX.current = null
     touchStartY.current = null
   }
 
-  // ─── Loading / not-found guards ───────────────────────────────────────────
+  // ─── Loading ──────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100dvh',
-        backgroundColor: 'var(--color-bg)',
-        fontFamily: 'var(--font-body)',
-        paddingBottom: 80,
-      }}>
+      <Shell>
         <DetailHeader onBack={() => navigate('/')} condition={null} />
         <div style={{
-          maxWidth: 680, margin: '0 auto',
           padding: 'var(--space-8) var(--space-4)',
           textAlign: 'center',
           color: 'var(--color-text-tertiary)',
@@ -87,24 +74,19 @@ export default function ConditionDetailScreen() {
         }}>
           Loading…
         </div>
-        <BottomNav />
-      </div>
+      </Shell>
     )
   }
 
   const condition = conditions.find(c => c.slug === slug)
 
+  // ─── Not found ────────────────────────────────────────────────────────────
+
   if (!condition) {
     return (
-      <div style={{
-        minHeight: '100dvh',
-        backgroundColor: 'var(--color-bg)',
-        fontFamily: 'var(--font-body)',
-        paddingBottom: 80,
-      }}>
+      <Shell>
         <DetailHeader onBack={() => navigate('/')} condition={null} />
         <div style={{
-          maxWidth: 680, margin: '0 auto',
           padding: 'var(--space-8) var(--space-4)',
           textAlign: 'center',
         }}>
@@ -115,34 +97,25 @@ export default function ConditionDetailScreen() {
             "{slug}" does not match any condition in the database.
           </div>
         </div>
-        <BottomNav />
-      </div>
+      </Shell>
     )
   }
 
   // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
-      fontFamily: 'var(--font-body)',
-      color: 'var(--color-text-primary)',
-      paddingBottom: 80, // BottomNav clearance
-    }}>
-
-      {/* ── Sticky header ── */}
+    <Shell>
+      {/* Sticky header */}
       <DetailHeader onBack={() => navigate(-1)} condition={condition} />
 
-      {/* ── Tab strip ── */}
+      {/* Tab strip — sticky below header */}
       <div style={{
         position: 'sticky',
-        top: 57,            // sits just below header (57px = header height)
+        top: 57,
         zIndex: 40,
         backgroundColor: 'var(--color-surface)',
         borderBottom: '1px solid var(--color-border)',
         display: 'flex',
-        maxWidth: '100%',
       }}>
         {TABS.map((label, i) => {
           const isActive = activeTab === i
@@ -174,37 +147,34 @@ export default function ConditionDetailScreen() {
         })}
       </div>
 
-      {/* ── Swipeable content viewport ── */}
+      {/*
+        Swipeable content viewport.
+        KEY FIX: overflow:hidden is on THIS element, which is already
+        constrained to 680px by the Shell column. So the 200% inner
+        width = 1360px max, not 2×viewport.
+      */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{ overflow: 'hidden' }}
       >
-        {/*
-          Slide container: two panels side by side.
-          CSS translate moves between panel 0 and panel 1.
-        */}
         <div style={{
           display: 'flex',
           width: '200%',
           transform: `translateX(${activeTab === 0 ? '0%' : '-50%'})`,
           transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
-
           {/* Panel 0 — Prescriptions */}
           <div style={{
             width: '50%',
             flexShrink: 0,
             padding: 'var(--space-5) var(--space-4)',
-            maxWidth: 680 / 2 * 2, // let max-width apply per-panel via inner wrapper
             boxSizing: 'border-box',
           }}>
-            <div style={{ maxWidth: 680, margin: '0 auto' }}>
-              <PrescriptionsTab
-                prescriptions={condition.prescriptions}
-                patientInstructions={condition.patientInstructions}
-              />
-            </div>
+            <PrescriptionsTab
+              prescriptions={condition.prescriptions}
+              patientInstructions={condition.patientInstructions}
+            />
           </div>
 
           {/* Panel 1 — Clinical Data */}
@@ -214,25 +184,43 @@ export default function ConditionDetailScreen() {
             padding: 'var(--space-5) var(--space-4)',
             boxSizing: 'border-box',
           }}>
-            <div style={{ maxWidth: 680, margin: '0 auto' }}>
-              <ClinicalDataTab condition={condition} />
-            </div>
+            <ClinicalDataTab condition={condition} />
           </div>
-
         </div>
       </div>
+    </Shell>
+  )
+}
 
-      <BottomNav />
+// ─── Shell — centred 680px column matching Layout ─────────────────────────────
+
+function Shell({ children }) {
+  return (
+    <div style={{
+      minHeight: '100dvh',
+      backgroundColor: 'var(--color-bg-outer)',
+      fontFamily: 'var(--font-body)',
+      color: 'var(--color-text-primary)',
+    }}>
+      <div style={{
+        maxWidth: MAX_W,
+        margin: '0 auto',
+        minHeight: '100dvh',
+        backgroundColor: 'var(--color-bg)',
+        boxShadow: '0 0 0 1px var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        paddingBottom: 60, // BottomNav clearance
+      }}>
+        {children}
+        <BottomNav />
+      </div>
     </div>
   )
 }
 
 // ─── DetailHeader ─────────────────────────────────────────────────────────────
 
-/**
- * Sticky header shared by loading, not-found, and main render states.
- * When condition is null (loading / not found), renders a minimal back bar.
- */
 function DetailHeader({ onBack, condition }) {
   const ageStyle = condition
     ? (AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' })
@@ -247,8 +235,10 @@ function DetailHeader({ onBack, condition }) {
       borderBottom: '1px solid var(--color-border)',
       padding: 'var(--space-3) var(--space-4)',
     }}>
-      {/* Back row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: condition ? 'var(--space-2)' : 0 }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        marginBottom: condition ? 'var(--space-2)' : 0,
+      }}>
         <button
           onClick={onBack}
           aria-label="Back"
@@ -267,7 +257,6 @@ function DetailHeader({ onBack, condition }) {
         </button>
       </div>
 
-      {/* Condition name + badges */}
       {condition && (
         <div>
           <h1 style={{
@@ -282,13 +271,10 @@ function DetailHeader({ onBack, condition }) {
           </h1>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            {/* Specialty tag */}
             {condition.specialtyName && (
               <span style={{
-                fontSize: 11,
-                fontWeight: 500,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
+                fontSize: 11, fontWeight: 500,
+                letterSpacing: '0.04em', textTransform: 'uppercase',
                 color: 'var(--color-text-tertiary)',
                 backgroundColor: 'var(--color-bg)',
                 border: '1px solid var(--color-border)',
@@ -298,12 +284,9 @@ function DetailHeader({ onBack, condition }) {
                 {condition.specialtyName}
               </span>
             )}
-
-            {/* Age badge */}
             {condition.ageGroup && (
               <span style={{
-                fontSize: 11,
-                fontWeight: 500,
+                fontSize: 11, fontWeight: 500,
                 backgroundColor: ageStyle.bg,
                 color: ageStyle.color,
                 padding: '2px 8px',
@@ -318,5 +301,3 @@ function DetailHeader({ onBack, condition }) {
     </header>
   )
 }
-
-

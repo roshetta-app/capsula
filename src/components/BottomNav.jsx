@@ -1,15 +1,14 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 
 /**
- * BottomNav — 3-tab fixed bottom navigation.
+ * BottomNav — 3-tab navigation bar.
  *
- * Tab order (per plan Section 5.4):
- *   0 — Conditions  /           (default / primary screen)
- *   1 — Drugs       /drugs
- *   2 — Favourites  /favourites
+ * Positioning strategy:
+ *   Was: position:fixed, left:0, right:0  → spans full viewport width on desktop.
+ *   Now: position:sticky, bottom:0        → stays inside the layout column.
  *
- * Hidden on /admin/* routes.
- * Bookmark icon fills when any favourites are saved (wired in Session 6.1).
+ * On mobile the column is full-width so behaviour is identical to before.
+ * On desktop the nav is constrained to the 680px column.
  */
 
 const TABS = [
@@ -45,12 +44,11 @@ const TABS = [
 
 export default function BottomNav() {
   const location = useLocation()
-  const navigate = useNavigate()
+  const navigate  = useNavigate()
 
   // Hide entirely on admin routes
   if (location.pathname.startsWith('/admin')) return null
 
-  // Active tab detection — exact match for '/', startsWith for others
   const activeTab = (path) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
@@ -58,10 +56,8 @@ export default function BottomNav() {
 
   return (
     <nav style={{
-      position: 'fixed',
+      position: 'sticky',
       bottom: 0,
-      left: 0,
-      right: 0,
       zIndex: 100,
       backgroundColor: 'var(--color-surface)',
       borderTop: '1px solid var(--color-border)',
@@ -69,6 +65,7 @@ export default function BottomNav() {
       justifyContent: 'space-around',
       alignItems: 'stretch',
       height: 60,
+      // iOS safe area on mobile; no effect on desktop
       paddingBottom: 'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
     }}>
