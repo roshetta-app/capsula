@@ -7,7 +7,8 @@
  *   disabled  boolean
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import {
   searchBrandsForTypeahead,
@@ -17,13 +18,27 @@ import {
   reorderItems,
 } from '../../lib/adminQueries'
 
-// ─── Brand typeahead ──────────────────────────────────────────────────────────
+// ─── Brand typeahead (portal dropdown) ───────────────────────────────────────
 
 function BrandTypeahead({ onSelect, disabled }) {
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [open,    setOpen]    = useState(false)
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0, width: 0 })
+  const inputRef = useRef(null)
+
+  // Reposition dropdown whenever it opens
+  useEffect(() => {
+    if (open && inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect()
+      setDropPos({
+        top:   rect.bottom + window.scrollY + 4,
+        left:  rect.left   + window.scrollX,
+        width: rect.width,
+      })
+    }
+  }, [open, results])
 
   async function handleChange(e) {
     const q = e.target.value
@@ -43,14 +58,63 @@ function BrandTypeahead({ onSelect, disabled }) {
     setOpen(false)
   }
 
+  const dropdown = open && (
+    <div
+      style={{
+        position: 'absolute',
+        top:   dropPos.top,
+        left:  dropPos.left,
+        width: dropPos.width,
+        zIndex: 9999,
+        backgroundColor: 'var(--color-surface)',
+        border: '1.5px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.14)',
+        maxHeight: 240,
+        overflowY: 'auto',
+      }}
+      // prevent input blur from firing before mousedown select
+      onMouseDown={e => e.preventDefault()}
+    >
+      {results.length === 0 && !loading && (
+        <div style={{ padding: '10px 12px', fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+          No brands found for "{query}"
+        </div>
+      )}
+      {results.map(brand => {
+        const f     = brand.formulations
+        const label = `${brand.name}${f ? ` — ${f.concentration} ${f.form}` : ''}`
+        const sub   = f?.generics?.name_en ?? ''
+        return (
+          <button
+            key={brand.id}
+            onMouseDown={() => handleSelect(brand)}
+            style={{
+              display: 'block', width: '100%', textAlign: 'left',
+              padding: '9px 12px', background: 'none', border: 'none',
+              cursor: 'pointer', fontFamily: 'var(--font-body)',
+              borderBottom: '1px solid var(--color-border)',
+            }}
+            onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg)'}
+            onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{label}</div>
+            {sub && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{sub}</div>}
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
     <div style={{ position: 'relative' }}>
       <input
+        ref={inputRef}
         type="text"
         value={query}
         onChange={handleChange}
         onFocus={() => results.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={() => setOpen(false)}
         placeholder="Search brand name…"
         disabled={disabled}
         style={{
@@ -64,47 +128,7 @@ function BrandTypeahead({ onSelect, disabled }) {
       {loading && (
         <div style={{ position: 'absolute', right: 10, top: 10, fontSize: 11, color: 'var(--color-text-tertiary)' }}>…</div>
       )}
-      {open && results.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-          backgroundColor: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)', boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-          maxHeight: 220, overflowY: 'auto',
-        }}>
-          {results.map(brand => {
-            const f = brand.formulations
-            const label = `${brand.name}${f ? ` — ${f.concentration} ${f.form}` : ''}`
-            const sub   = f?.generics?.name_en ?? ''
-            return (
-              <button
-                key={brand.id}
-                onMouseDown={() => handleSelect(brand)}
-                style={{
-                  display: 'block', width: '100%', textAlign: 'left',
-                  padding: '8px 12px', background: 'none', border: 'none',
-                  cursor: 'pointer', fontFamily: 'var(--font-body)',
-                  borderBottom: '1px solid var(--color-border)',
-                }}
-                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg)'}
-                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{label}</div>
-                {sub && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{sub}</div>}
-              </button>
-            )
-          })}
-        </div>
-      )}
-      {open && results.length === 0 && query.length >= 2 && !loading && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-          backgroundColor: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)', padding: '10px 12px',
-          fontSize: 13, color: 'var(--color-text-tertiary)',
-        }}>
-          No brands found for "{query}"
-        </div>
-      )}
+      {createPortal(dropdown, document.body)}
     </div>
   )
 }
@@ -112,9 +136,9 @@ function BrandTypeahead({ onSelect, disabled }) {
 // ─── Single alternative row ───────────────────────────────────────────────────
 
 function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disabled }) {
-  const brand = alt.brands
-  const f     = brand?.formulations
-  const name  = brand?.name ?? 'Unknown brand'
+  const brand  = alt.brands
+  const f      = brand?.formulations
+  const name   = brand?.name ?? 'Unknown brand'
   const detail = f ? `${f.concentration} ${f.form}` : ''
 
   return (
@@ -124,7 +148,6 @@ function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disab
       backgroundColor: 'var(--color-bg)',
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-        {/* Brand info */}
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>{name}</div>
           {detail && <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 1 }}>{detail}</div>}
@@ -133,7 +156,6 @@ function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disab
           )}
         </div>
 
-        {/* "or" divider badge */}
         {idx < total - 1 && (
           <span style={{
             fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10,
@@ -143,7 +165,6 @@ function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disab
           }}>or</span>
         )}
 
-        {/* Controls */}
         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
           <button onClick={() => onMove(idx, -1)} disabled={idx === 0 || disabled}
             style={{ background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', padding: 2, opacity: idx === 0 ? 0.3 : 1, display: 'flex' }}>
@@ -165,7 +186,6 @@ function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disab
         </div>
       </div>
 
-      {/* Dose instruction */}
       <textarea
         value={alt.dose_instruction ?? ''}
         onChange={e => onDoseChange(alt.id, e.target.value)}
@@ -194,8 +214,7 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
 
   async function handleSelectBrand(brand) {
     setAdding(true)
-    // Pre-fill dose from formulation practicalDoses[0] if available
-    const doses = brand.formulations?.generics?.doses ?? []
+    const doses   = brand.formulations?.generics?.doses ?? []
     const prefill = Array.isArray(doses) && doses.length > 0 ? doses[0].instruction : ''
 
     const { data: row, error } = await insertDrugAlternative({
@@ -206,9 +225,7 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
     })
 
     if (!error) {
-      // Attach brand data for immediate render
-      const newAlt = { ...row, brands: brand }
-      onChange({ ...item, prescription_drug_alternatives: [...alternatives, newAlt] })
+      onChange({ ...item, prescription_drug_alternatives: [...alternatives, { ...row, brands: brand }] })
     }
     setAdding(false)
   }
@@ -216,10 +233,7 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
   async function handleDelete(altId) {
     const { error } = await deleteDrugAlternative(altId)
     if (!error) {
-      onChange({
-        ...item,
-        prescription_drug_alternatives: alternatives.filter(a => a.id !== altId),
-      })
+      onChange({ ...item, prescription_drug_alternatives: alternatives.filter(a => a.id !== altId) })
     }
   }
 
@@ -233,13 +247,10 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
     await reorderItems('prescription_drug_alternatives', reordered.map(a => ({ id: a.id, sort_order: a.sort_order })))
   }
 
-  // save=true means blur — persist to Supabase; otherwise just update local state
   async function handleDoseChange(altId, value, save = false) {
     const updated = alternatives.map(a => a.id === altId ? { ...a, dose_instruction: value } : a)
     onChange({ ...item, prescription_drug_alternatives: updated })
-    if (save) {
-      await updateDrugAlternative(altId, { dose_instruction: value })
-    }
+    if (save) await updateDrugAlternative(altId, { dose_instruction: value })
   }
 
   return (
