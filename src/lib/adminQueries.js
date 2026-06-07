@@ -4,10 +4,11 @@
  * Sessions:
  *   5.2 — updateBrandStock, deleteFormulation
  *   5.3 — insertGeneric, updateGeneric, insertFormulation, updateFormulation,
- *           insertBrand, updateBrand, deleteBrand
+ *           insertBrand, updateBrand, deleteBrand, fetchFormulationWithGeneric
  *   5.4 — insertSpecialty, updateSpecialty, insertCondition, updateCondition,
- *           deleteCondition, insertConditionImage, deleteConditionImage, uploadConditionImage
- *   5.5 — prescription builder functions
+ *           deleteCondition, insertConditionImage, deleteConditionImage,
+ *           uploadConditionImage, fetchConditionForEdit
+ *   5.5 — prescription builder functions (next session)
  */
 
 import { supabase } from './supabase'
@@ -72,7 +73,7 @@ export async function updateGeneric(id, data) {
 }
 
 /**
- * Fetch a single generic with its formulations and brands.
+ * Fetch a single formulation with its generic and brands.
  * Used by FormulationDetailEditor to pre-populate all editors.
  * @param {string} formulationId
  */
@@ -157,4 +158,150 @@ export async function deleteBrand(id) {
     .delete()
     .eq('id', id)
   return { error }
+}
+
+// ─── Specialties (5.4) ───────────────────────────────────────────────────────
+
+/**
+ * Insert a new specialty row.
+ * @param {{ name: string, slug: string, sort_order?: number }} data
+ * @returns {Promise<{ data: { id, slug }, error }>}
+ */
+export async function insertSpecialty(data) {
+  const { data: row, error } = await supabase
+    .from('specialties')
+    .insert(data)
+    .select('id, slug')
+    .single()
+  return { data: row, error }
+}
+
+/**
+ * Update an existing specialty row.
+ * @param {string} id
+ * @param {Partial<SpecialtyRow>} data
+ */
+export async function updateSpecialty(id, data) {
+  const { error } = await supabase
+    .from('specialties')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+// ─── Conditions (5.4) ────────────────────────────────────────────────────────
+
+/**
+ * Insert a new condition row.
+ * @param {{ specialty_id, name, slug, age_group, clinical_picture,
+ *           history_questions, examination, investigations,
+ *           patient_instructions }} data
+ * @returns {Promise<{ data: { id, slug }, error }>}
+ */
+export async function insertCondition(data) {
+  const { data: row, error } = await supabase
+    .from('conditions')
+    .insert(data)
+    .select('id, slug')
+    .single()
+  return { data: row, error }
+}
+
+/**
+ * Update an existing condition row.
+ * @param {string} id
+ * @param {Partial<ConditionRow>} data
+ */
+export async function updateCondition(id, data) {
+  const { error } = await supabase
+    .from('conditions')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+/**
+ * Delete a condition (cascades to images, prescriptions, items, alternatives).
+ * @param {string} id
+ */
+export async function deleteCondition(id) {
+  const { error } = await supabase
+    .from('conditions')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+/**
+ * Fetch a single condition with its images and prescriptions (for editor pre-fill).
+ * @param {string} id — condition UUID
+ */
+export async function fetchConditionForEdit(id) {
+  const { data, error } = await supabase
+    .from('conditions')
+    .select(`
+      id, name, slug, age_group,
+      clinical_picture, history_questions, examination, investigations,
+      patient_instructions,
+      specialty_id,
+      specialties ( id, name, slug ),
+      condition_images ( id, url, caption, sort_order ),
+      prescriptions ( id, label, sort_order )
+    `)
+    .eq('id', id)
+    .single()
+  return { data, error }
+}
+
+// ─── Condition images (5.4) ──────────────────────────────────────────────────
+
+/**
+ * Insert a condition_images row (after uploading the file separately).
+ * @param {{ condition_id, url, caption, sort_order }} data
+ * @returns {Promise<{ data: { id }, error }>}
+ */
+export async function insertConditionImage(data) {
+  const { data: row, error } = await supabase
+    .from('condition_images')
+    .insert(data)
+    .select('id')
+    .single()
+  return { data: row, error }
+}
+
+/**
+ * Delete a condition_images row.
+ * @param {string} id
+ */
+export async function deleteConditionImage(id) {
+  const { error } = await supabase
+    .from('condition_images')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+/**
+ * Upload an image file to Supabase Storage 'condition-images' bucket.
+ * Returns the public URL on success.
+ *
+ * @param {File} file
+ * @returns {Promise<{ url: string|null, error }>}
+ */
+export async function uploadConditionImage(file) {
+  const ext      = file.name.split('.').pop()
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const path     = `public/${filename}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('condition-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+
+  if (uploadError) return { url: null, error: uploadError }
+
+  const { data } = supabase.storage
+    .from('condition-images')
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, error: null }
 }

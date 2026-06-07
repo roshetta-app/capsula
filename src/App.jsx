@@ -26,6 +26,8 @@ import AdminDashboard           from './pages/admin/AdminDashboard'
 import DrugCMS                  from './pages/admin/DrugCMS'
 import AddDrugFlow              from './pages/admin/AddDrugFlow'
 import FormulationDetailEditor  from './pages/admin/FormulationDetailEditor'
+import ConditionsCMS            from './pages/admin/ConditionsCMS'
+import ConditionEditor          from './components/admin/ConditionEditor'
 
 // ─── Skeleton helper ──────────────────────────────────────────────────────────
 
@@ -285,9 +287,15 @@ export default function App() {
               element={<AuthGuard><FormulationDetailEditor /></AuthGuard>}
             />
 
-            {/* Stubs — Session 5.4 */}
-            <Route path="/admin/conditions/*"
-              element={<AuthGuard><ComingSoon label="Conditions CMS" session="5.4" /></AuthGuard>}
+            {/* ── Conditions CMS (Session 5.4) ──────────────────────────────── */}
+            <Route path="/admin/conditions"
+              element={<AuthGuard><ConditionsCMS /></AuthGuard>}
+            />
+            <Route path="/admin/conditions/new"
+              element={<AuthGuard><ConditionEditor /></AuthGuard>}
+            />
+            <Route path="/admin/conditions/:id"
+              element={<AuthGuard><ConditionEditor /></AuthGuard>}
             />
 
           </Routes>
