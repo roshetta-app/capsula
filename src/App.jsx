@@ -13,17 +13,19 @@ import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
 import { DRUG_CATEGORIES } from './config/categories'
 
-// ─── Page-level screens ───────────────────────────────────────────────────────
+// ─── Public screens ───────────────────────────────────────────────────────────
 
 import ConditionsScreen      from './pages/ConditionsScreen'
 import ConditionDetailScreen from './pages/ConditionDetailScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
-import AuthGuard      from './components/admin/AuthGuard'
-import AdminLogin     from './pages/admin/AdminLogin'
-import AdminDashboard from './pages/admin/AdminDashboard'
-import DrugCMS        from './pages/admin/DrugCMS'
+import AuthGuard                from './components/admin/AuthGuard'
+import AdminLogin               from './pages/admin/AdminLogin'
+import AdminDashboard           from './pages/admin/AdminDashboard'
+import DrugCMS                  from './pages/admin/DrugCMS'
+import AddDrugFlow              from './pages/admin/AddDrugFlow'
+import FormulationDetailEditor  from './pages/admin/FormulationDetailEditor'
 
 // ─── Skeleton helper ──────────────────────────────────────────────────────────
 
@@ -231,7 +233,7 @@ function DrugLibraryScreen() {
   )
 }
 
-// ─── Favourites screen (stub — Session 6.1) ───────────────────────────────────
+// ─── Favourites screen ────────────────────────────────────────────────────────
 
 function FavouritesScreen() {
   return (
@@ -259,35 +261,32 @@ export default function App() {
         <DrugProvider>
           <Routes>
 
-            {/* ── Public app routes ────────────────────────────────────────── */}
+            {/* ── Public routes ─────────────────────────────────────────────── */}
             <Route path="/"                 element={<ConditionsScreen />} />
             <Route path="/conditions/:slug" element={<ConditionDetailScreen />} />
             <Route path="/drugs"            element={<DrugLibraryScreen />} />
             <Route path="/favourites"       element={<FavouritesScreen />} />
 
-            {/* ── Admin routes ─────────────────────────────────────────────── */}
+            {/* ── Admin routes ──────────────────────────────────────────────── */}
             <Route path="/admin/login" element={<AdminLogin />} />
 
-            <Route
-              path="/admin"
+            <Route path="/admin"
               element={<AuthGuard><AdminDashboard /></AuthGuard>}
             />
-            <Route
-              path="/admin/drugs"
+            <Route path="/admin/drugs"
               element={<AuthGuard><DrugCMS /></AuthGuard>}
             />
+            {/* NOTE: /new must come before /:id so React Router doesn't treat
+                "new" as a formulation UUID */}
+            <Route path="/admin/drugs/new"
+              element={<AuthGuard><AddDrugFlow /></AuthGuard>}
+            />
+            <Route path="/admin/drugs/:id"
+              element={<AuthGuard><FormulationDetailEditor /></AuthGuard>}
+            />
 
-            {/* Stubs — populated in Sessions 5.3–5.5 */}
-            <Route
-              path="/admin/drugs/new"
-              element={<AuthGuard><ComingSoon label="Add Drug" session="5.3" /></AuthGuard>}
-            />
-            <Route
-              path="/admin/drugs/:id"
-              element={<AuthGuard><ComingSoon label="Edit Drug" session="5.3" /></AuthGuard>}
-            />
-            <Route
-              path="/admin/conditions/*"
+            {/* Stubs — Session 5.4 */}
+            <Route path="/admin/conditions/*"
               element={<AuthGuard><ComingSoon label="Conditions CMS" session="5.4" /></AuthGuard>}
             />
 
@@ -298,27 +297,18 @@ export default function App() {
   )
 }
 
-// ─── Temporary stub for not-yet-built admin pages ─────────────────────────────
+// ─── Coming-soon stub ─────────────────────────────────────────────────────────
 
 function ComingSoon({ label, session }) {
   return (
     <div style={{
       minHeight: '100dvh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 'var(--space-2)',
-      color: 'var(--color-text-tertiary)',
-      backgroundColor: 'var(--color-bg)',
-      fontFamily: 'var(--font-body)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      gap: 'var(--space-2)', color: 'var(--color-text-tertiary)',
+      backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)',
     }}>
-      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
-        Built in Session {session}
-      </div>
+      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{label}</div>
+      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>Built in Session {session}</div>
     </div>
   )
 }
