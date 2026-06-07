@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
+import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
 
 // ─── Age badge ────────────────────────────────────────────────────────────────
@@ -206,7 +207,7 @@ export default function ConditionDetailScreen() {
             </div>
           </div>
 
-          {/* Panel 1 — Clinical Data (stub — built in Session 4.3) */}
+          {/* Panel 1 — Clinical Data */}
           <div style={{
             width: '50%',
             flexShrink: 0,
@@ -214,7 +215,7 @@ export default function ConditionDetailScreen() {
             boxSizing: 'border-box',
           }}>
             <div style={{ maxWidth: 680, margin: '0 auto' }}>
-              <ClinicalDataStub condition={condition} />
+              <ClinicalDataTab condition={condition} />
             </div>
           </div>
 
@@ -318,128 +319,4 @@ function DetailHeader({ onBack, condition }) {
   )
 }
 
-// ─── ClinicalDataStub ─────────────────────────────────────────────────────────
 
-/**
- * Placeholder for Session 4.3 — ClinicalDataTab.
- * Shows a legible preview of raw clinical data so the screen isn't blank.
- */
-function ClinicalDataStub({ condition }) {
-  const hasAnything =
-    condition.clinicalPicture ||
-    condition.historyQuestions?.length ||
-    condition.examination?.length ||
-    condition.investigations?.length
-
-  if (!hasAnything) {
-    return (
-      <div style={{
-        textAlign: 'center',
-        padding: 'var(--space-12) var(--space-4)',
-        color: 'var(--color-text-tertiary)',
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 'var(--space-2)' }}>
-          Clinical data
-        </div>
-        <div style={{ fontSize: 12 }}>
-          Full clinical data tab coming in Session 4.3
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-
-      {condition.clinicalPicture && (
-        <StubSection title="Clinical Picture">
-          <p dir="auto" style={{ margin: 0, fontSize: 14, lineHeight: 1.6, color: 'var(--color-text-primary)' }}>
-            {condition.clinicalPicture}
-          </p>
-        </StubSection>
-      )}
-
-      {condition.historyQuestions?.length > 0 && (
-        <StubSection title="History Questions">
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {condition.historyQuestions.map((q, i) => (
-              <li key={i} dir="auto" style={{
-                fontSize: 14, color: 'var(--color-text-primary)', lineHeight: 1.5,
-                paddingLeft: 'var(--space-4)', position: 'relative',
-              }}>
-                <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)', fontWeight: 700 }}>·</span>
-                {q}
-              </li>
-            ))}
-          </ul>
-        </StubSection>
-      )}
-
-      {condition.examination?.length > 0 && (
-        <StubSection title="Examination">
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {condition.examination.map((item, i) => (
-              <li key={i} dir="auto" style={{
-                fontSize: 14, color: 'var(--color-text-primary)', lineHeight: 1.5,
-                paddingLeft: 'var(--space-4)', position: 'relative',
-              }}>
-                <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)', fontWeight: 700 }}>·</span>
-                {item}
-              </li>
-            ))}
-          </ul>
-        </StubSection>
-      )}
-
-      {condition.investigations?.length > 0 && (
-        <StubSection title="Investigations">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {condition.investigations.map((inv, i) => (
-              <div key={i} style={{
-                backgroundColor: 'var(--color-bg)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                padding: 'var(--space-2) var(--space-3)',
-              }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: inv.note ? 2 : 0 }}>
-                  {inv.test}
-                </div>
-                {inv.note && (
-                  <div dir="auto" style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
-                    {inv.note}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </StubSection>
-      )}
-
-      <div style={{
-        fontSize: 11,
-        color: 'var(--color-text-tertiary)',
-        textAlign: 'center',
-        padding: 'var(--space-3)',
-        fontStyle: 'italic',
-      }}>
-        Full collapsible sections + image gallery — Session 4.3
-      </div>
-    </div>
-  )
-}
-
-function StubSection({ title, children }) {
-  return (
-    <div>
-      <div style={{
-        fontSize: 10, fontWeight: 700,
-        letterSpacing: '0.1em', textTransform: 'uppercase',
-        color: 'var(--color-text-tertiary)',
-        marginBottom: 'var(--space-3)',
-      }}>
-        {title}
-      </div>
-      {children}
-    </div>
-  )
-}
