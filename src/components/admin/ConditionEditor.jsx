@@ -1,3 +1,4 @@
+/**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
  * Create or edit a condition's metadata (no prescriptions yet — Session 5.5).
