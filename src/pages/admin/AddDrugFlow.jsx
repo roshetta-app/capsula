@@ -209,7 +209,7 @@ export default function AddDrugFlow() {
             {step === 2 && 'Brands'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {step === 0 && 'The drug's scientific identity — shared across all formulations'}
+            {step === 0 && "The drug's scientific identity — shared across all formulations"}
             {step === 1 && 'The specific strength, form, and route for this formulation'}
             {step === 2 && 'Commercial brands available for this formulation'}
           </div>
