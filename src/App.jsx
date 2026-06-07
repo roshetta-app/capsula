@@ -20,9 +20,10 @@ import ConditionDetailScreen from './pages/ConditionDetailScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
-import AuthGuard       from './components/admin/AuthGuard'
-import AdminLogin      from './pages/admin/AdminLogin'
-import AdminDashboard  from './pages/admin/AdminDashboard'
+import AuthGuard      from './components/admin/AuthGuard'
+import AdminLogin     from './pages/admin/AdminLogin'
+import AdminDashboard from './pages/admin/AdminDashboard'
+import DrugCMS        from './pages/admin/DrugCMS'
 
 // ─── Skeleton helper ──────────────────────────────────────────────────────────
 
@@ -265,35 +266,29 @@ export default function App() {
             <Route path="/favourites"       element={<FavouritesScreen />} />
 
             {/* ── Admin routes ─────────────────────────────────────────────── */}
-            {/* Login is public — no AuthGuard */}
             <Route path="/admin/login" element={<AdminLogin />} />
 
-            {/* All other /admin/* routes are auth-guarded */}
             <Route
               path="/admin"
-              element={
-                <AuthGuard>
-                  <AdminDashboard />
-                </AuthGuard>
-              }
+              element={<AuthGuard><AdminDashboard /></AuthGuard>}
+            />
+            <Route
+              path="/admin/drugs"
+              element={<AuthGuard><DrugCMS /></AuthGuard>}
             />
 
-            {/* Placeholder routes — populated in Sessions 5.2–5.5 */}
+            {/* Stubs — populated in Sessions 5.3–5.5 */}
             <Route
-              path="/admin/drugs/*"
-              element={
-                <AuthGuard>
-                  <ComingSoon label="Drug CMS" session="5.2" />
-                </AuthGuard>
-              }
+              path="/admin/drugs/new"
+              element={<AuthGuard><ComingSoon label="Add Drug" session="5.3" /></AuthGuard>}
+            />
+            <Route
+              path="/admin/drugs/:id"
+              element={<AuthGuard><ComingSoon label="Edit Drug" session="5.3" /></AuthGuard>}
             />
             <Route
               path="/admin/conditions/*"
-              element={
-                <AuthGuard>
-                  <ComingSoon label="Conditions CMS" session="5.4" />
-                </AuthGuard>
-              }
+              element={<AuthGuard><ComingSoon label="Conditions CMS" session="5.4" /></AuthGuard>}
             />
 
           </Routes>
