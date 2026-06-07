@@ -1,78 +1,95 @@
-const CACHE_NAME = 'capsula-v2'
+/**
+ * Capsula Service Worker
+ *
+ * Strategy:
+ *   - HTML (navigation requests) → network-first, fall back to cache
+ *   - JS/CSS/fonts/images        → cache-first, update in background
+ *
+ * CACHE_VERSION must change on every deploy to bust stale caches.
+ * The deploy.yml workflow injects the git SHA at build time via
+ * a find-and-replace step (see deploy.yml changes below).
+ * If that step is absent, bump the number manually before each push.
+ */
 
-// Core app shell — cached on install
-const APP_SHELL = [
+const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
+const STATIC_CACHE  = CACHE_VERSION + '-static'
+const URLS_TO_PRECACHE = [
   '/capsula/',
   '/capsula/index.html',
 ]
 
-// ─── Install — cache app shell ────────────────────────────────────────────────
+// ─── Install ──────────────────────────────────────────────────────────────────
+
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL))
-  )
+  // Skip waiting so the new SW activates immediately (don't wait for old tabs to close)
   self.skipWaiting()
+
+  event.waitUntil(
+    caches.open(STATIC_CACHE).then(cache => cache.addAll(URLS_TO_PRECACHE))
+  )
 })
 
-// ─── Activate — delete old caches ────────────────────────────────────────────
+// ─── Activate ─────────────────────────────────────────────────────────────────
+
 self.addEventListener('activate', event => {
+  // Delete ALL old caches that don't match this version
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
-    )
+      Promise.all(
+        keys
+          .filter(key => key !== STATIC_CACHE)
+          .map(key => caches.delete(key))
+      )
+    ).then(() => self.clients.claim())  // take control of all open tabs immediately
   )
-  self.clients.claim()
 })
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
+
 self.addEventListener('fetch', event => {
-  const url = new URL(event.request.url)
+  const { request } = event
+  const url = new URL(request.url)
 
   // Only handle same-origin requests
-  if (url.origin !== self.location.origin) return
+  if (url.origin !== location.origin) return
 
-  // drugs.json — network first so new data always gets through
-  if (url.pathname.includes('drugs.json')) {
+  // ── Navigation requests (HTML) → network-first ──────────────────────────
+  // This ensures a refresh always gets the latest index.html from the network.
+  // Falls back to cached version only if offline.
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then(response => {
-          const copy = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
+          // Cache the fresh response
+          const clone = response.clone()
+          caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
           return response
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match('/capsula/index.html'))
     )
     return
   }
 
-  // Navigation requests (page loads/refreshes) under /capsula/* →
-  // serve /capsula/index.html so React Router handles the path.
-  // This is what prevents the 404 when refreshing /capsula/drugs etc.
-  // (The 404.html trick covers the first load before SW is active;
-  //  this covers all subsequent loads once SW is installed.)
+  // ── Static assets (JS, CSS, fonts, images) → cache-first ────────────────
+  // Vite hashes all asset filenames, so a new deploy = new filenames = cache miss.
+  // Old hashed files are never re-requested, so this never serves stale JS.
   if (
-    event.request.mode === 'navigate' &&
-    url.pathname.startsWith('/capsula')
+    url.pathname.startsWith('/capsula/assets/') ||
+    url.pathname.startsWith('/capsula/icons/')  ||
+    request.destination === 'font'
   ) {
     event.respondWith(
-      caches.match('/capsula/index.html').then(cached => {
-        return cached || fetch('/capsula/index.html')
+      caches.match(request).then(cached => {
+        if (cached) return cached
+        return fetch(request).then(response => {
+          const clone = response.clone()
+          caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
+          return response
+        })
       })
     )
     return
   }
 
-  // Everything else — cache first, network fallback
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      return cached || fetch(event.request).then(response => {
-        // Only cache successful same-origin responses
-        if (response.ok && url.origin === self.location.origin) {
-          const copy = response.clone()
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy))
-        }
-        return response
-      })
-    }).catch(() => caches.match('/capsula/index.html'))
-  )
+  // Everything else → network only (Supabase API calls, etc.)
 })

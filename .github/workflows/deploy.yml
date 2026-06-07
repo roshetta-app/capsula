@@ -32,6 +32,11 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Inject build SHA into service worker
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-8)
+          sed -i "s/__BUILD_SHA__/${SHORT_SHA}/g" public/sw.js
+
       - name: Build
         run: npm run build
         env:
