@@ -15,8 +15,14 @@ import { DRUG_CATEGORIES } from './config/categories'
 
 // ─── Page-level screens ───────────────────────────────────────────────────────
 
-import ConditionsScreen from './pages/ConditionsScreen'
+import ConditionsScreen      from './pages/ConditionsScreen'
 import ConditionDetailScreen from './pages/ConditionDetailScreen'
+
+// ─── Admin screens ────────────────────────────────────────────────────────────
+
+import AuthGuard       from './components/admin/AuthGuard'
+import AdminLogin      from './pages/admin/AdminLogin'
+import AdminDashboard  from './pages/admin/AdminDashboard'
 
 // ─── Skeleton helper ──────────────────────────────────────────────────────────
 
@@ -251,13 +257,73 @@ export default function App() {
       <ConditionProvider>
         <DrugProvider>
           <Routes>
-            <Route path="/"                   element={<ConditionsScreen />} />
-            <Route path="/conditions/:slug"   element={<ConditionDetailScreen />} />
-            <Route path="/drugs"              element={<DrugLibraryScreen />} />
-            <Route path="/favourites"         element={<FavouritesScreen />} />
+
+            {/* ── Public app routes ────────────────────────────────────────── */}
+            <Route path="/"                 element={<ConditionsScreen />} />
+            <Route path="/conditions/:slug" element={<ConditionDetailScreen />} />
+            <Route path="/drugs"            element={<DrugLibraryScreen />} />
+            <Route path="/favourites"       element={<FavouritesScreen />} />
+
+            {/* ── Admin routes ─────────────────────────────────────────────── */}
+            {/* Login is public — no AuthGuard */}
+            <Route path="/admin/login" element={<AdminLogin />} />
+
+            {/* All other /admin/* routes are auth-guarded */}
+            <Route
+              path="/admin"
+              element={
+                <AuthGuard>
+                  <AdminDashboard />
+                </AuthGuard>
+              }
+            />
+
+            {/* Placeholder routes — populated in Sessions 5.2–5.5 */}
+            <Route
+              path="/admin/drugs/*"
+              element={
+                <AuthGuard>
+                  <ComingSoon label="Drug CMS" session="5.2" />
+                </AuthGuard>
+              }
+            />
+            <Route
+              path="/admin/conditions/*"
+              element={
+                <AuthGuard>
+                  <ComingSoon label="Conditions CMS" session="5.4" />
+                </AuthGuard>
+              }
+            />
+
           </Routes>
         </DrugProvider>
       </ConditionProvider>
     </BrowserRouter>
+  )
+}
+
+// ─── Temporary stub for not-yet-built admin pages ─────────────────────────────
+
+function ComingSoon({ label, session }) {
+  return (
+    <div style={{
+      minHeight: '100dvh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 'var(--space-2)',
+      color: 'var(--color-text-tertiary)',
+      backgroundColor: 'var(--color-bg)',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <div style={{ fontSize: 15, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>
+        Built in Session {session}
+      </div>
+    </div>
   )
 }
