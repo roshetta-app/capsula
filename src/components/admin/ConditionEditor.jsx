@@ -16,6 +16,7 @@ import {
   updateCondition,
   fetchConditionForEdit,
   insertConditionImage,
+  updateConditionImage,
   deleteConditionImage,
   uploadConditionImage,
 } from '../../lib/adminQueries'
@@ -281,6 +282,10 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
     onChange(images.map(i => i.id === imgId ? { ...i, caption } : i))
   }
 
+  async function saveCaption(imgId, caption) {
+    await updateConditionImage(imgId, { caption: caption.trim() || null })
+  }
+
   const canManage = !!conditionId
 
   return (
@@ -316,6 +321,7 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
                   type="text"
                   value={img.caption || ''}
                   onChange={e => updateCaption(img.id, e.target.value)}
+                  onBlur={e => saveCaption(img.id, e.target.value)}
                   placeholder="Caption (optional)"
                   dir="auto"
                   style={{

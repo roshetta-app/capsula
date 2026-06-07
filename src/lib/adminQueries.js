@@ -270,6 +270,19 @@ export async function insertConditionImage(data) {
 }
 
 /**
+ * Update a condition_images row (e.g. caption or sort_order).
+ * @param {string} id
+ * @param {{ caption?: string, sort_order?: number }} data
+ */
+export async function updateConditionImage(id, data) {
+  const { error } = await supabase
+    .from('condition_images')
+    .update(data)
+    .eq('id', id)
+  return { error }
+}
+
+/**
  * Delete a condition_images row.
  * @param {string} id
  */
