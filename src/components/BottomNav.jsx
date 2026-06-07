@@ -1,46 +1,67 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-
-const TABS = [
-  {
-    path: '/',
-    label: 'Conditions',
-    icon: (active) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-      </svg>
-    ),
-  },
-  {
-    path: '/drugs',
-    label: 'Drugs',
-    icon: (active) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      </svg>
-    ),
-  },
-  {
-    path: '/favourites',
-    label: 'Favourites',
-    icon: (active) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-      </svg>
-    ),
-  },
-]
+import { useFavourites } from '../hooks/useFavourites'
 
 export default function BottomNav() {
-  const location = useLocation()
+  const location  = useLocation()
   const navigate  = useNavigate()
+  const { favourites } = useFavourites()
 
   if (location.pathname.startsWith('/admin')) return null
+
+  const hasAnyFavourites =
+    favourites.drugs.length + favourites.conditions.length > 0
 
   const activeTab = (path) => {
     if (path === '/') return location.pathname === '/'
     return location.pathname.startsWith(path)
   }
+
+  // Icon renderers — inline SVG avoids extra icon imports in this component
+  // except for the Favourites tab which switches between bookmark variants
+  const TABS = [
+    {
+      path: '/',
+      label: 'Conditions',
+      icon: (active) => (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+          <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+        </svg>
+      ),
+    },
+    {
+      path: '/drugs',
+      label: 'Drugs',
+      icon: (active) => (
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+        </svg>
+      ),
+    },
+    {
+      path: '/favourites',
+      label: 'Favourites',
+      // BookmarkCheck (filled) when any favourites exist, Bookmark (outline) when empty
+      icon: (active) => hasAnyFavourites
+        ? (
+          // BookmarkCheck — filled bookmark with checkmark
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor"
+            strokeWidth={active ? 2 : 1.6} strokeLinecap="round" strokeLinejoin="round">
+            <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+            <polyline points="9 11 12 14 15 9" stroke="white" strokeWidth="1.8" fill="none" />
+          </svg>
+        )
+        : (
+          // Bookmark — outline only
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            strokeWidth={active ? 2.2 : 1.8} strokeLinecap="round" strokeLinejoin="round">
+            <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z" />
+          </svg>
+        ),
+    },
+  ]
 
   return (
     <nav style={{
@@ -54,7 +75,7 @@ export default function BottomNav() {
       paddingBottom: 'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
     }}>
-      {/* Inner row — centred and capped at 680px so tabs don't spread wall-to-wall on desktop */}
+      {/* Inner row — centred and capped at 680px */}
       <div style={{
         maxWidth: 680,
         margin: '0 auto',

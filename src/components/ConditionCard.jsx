@@ -15,11 +15,10 @@ import {
   faFlask,
   faSyringe,
 } from '@fortawesome/free-solid-svg-icons'
-import { Bookmark } from 'lucide-react'
+import { Bookmark, BookmarkCheck } from 'lucide-react'
+import { useFavourites } from '../hooks/useFavourites'
 
 // ─── Specialty → FA icon map ──────────────────────────────────────────────────
-// Keys match specialty slugs stored in the DB.
-// Falls back to faStethoscope for any unrecognised slug.
 
 const SPECIALTY_ICONS = {
   'neurology':          faBrain,
@@ -46,7 +45,6 @@ function specialtyIcon(slug) {
 }
 
 // ─── Age group badge colours ──────────────────────────────────────────────────
-// adult=blue  pediatric=green  both=purple  (plan Section 4.1 task 2)
 
 const AGE_STYLES = {
   adult:     { bg: '#DBEAFE', color: '#1E40AF' },
@@ -68,13 +66,12 @@ function ageLabel(group) {
  * Props:
  *   condition  ConditionFull
  *   onTap      (condition) => void   — called on card tap (navigate to detail)
- *
- * Bookmark: outline only at this stage — useFavourites wired in Session 6.1.
- * Specialty icon: FontAwesome medical icon mapped from specialty slug.
- * Age badge: coloured pill per plan spec.
  */
 export default function ConditionCard({ condition, onTap }) {
   const navigate = useNavigate()
+  const { isConditionFavourited, toggleCondition } = useFavourites()
+  const isFavourited = isConditionFavourited(condition.id)
+
   const ageStyle = AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' }
   const icon     = specialtyIcon(condition.specialtySlug)
 
@@ -89,7 +86,7 @@ export default function ConditionCard({ condition, onTap }) {
 
   function handleBookmark(e) {
     e.stopPropagation()
-    // useFavourites.toggleCondition wired in Session 6.1
+    toggleCondition(condition.id)
   }
 
   return (
@@ -134,7 +131,7 @@ export default function ConditionCard({ condition, onTap }) {
       {/* Content column */}
       <div style={{ flex: 1, minWidth: 0 }}>
 
-        {/* Top row: specialty chip + age badge */}
+        {/* Top row: specialty chip + age badge + bookmark */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -174,10 +171,10 @@ export default function ConditionCard({ condition, onTap }) {
               </span>
             )}
 
-            {/* Bookmark — stub, wired in Session 6.1 */}
+            {/* Bookmark button */}
             <button
               onClick={handleBookmark}
-              aria-label="Bookmark"
+              aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
               style={{
                 background: 'none',
                 border: 'none',
@@ -185,11 +182,15 @@ export default function ConditionCard({ condition, onTap }) {
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                color: 'var(--color-text-tertiary)',
+                color: isFavourited ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                transition: 'color 0.15s ease',
                 flexShrink: 0,
               }}
             >
-              <Bookmark size={16} />
+              {isFavourited
+                ? <BookmarkCheck size={16} />
+                : <Bookmark size={16} />
+              }
             </button>
           </div>
         </div>

@@ -1,3 +1,5 @@
+import { Bookmark, BookmarkCheck } from 'lucide-react'
+import { useFavourites } from '../hooks/useFavourites'
 import { DRUG_CATEGORIES } from '../config/categories'
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -21,16 +23,21 @@ const CATEGORY_COLORS = {
   'ophthalmic-otic':         { bg: '#ECFEFF', color: '#164E63' },
   'urological':              { bg: '#EFF6FF', color: '#1E40AF' },
   'obstetric-gynecological': { bg: '#FDF2F8', color: '#831843' },
-  'antiparasitic':           { bg: '#D1FAE5', color: '#065F46' },
   'other':                   { bg: '#FEE2E2', color: '#7F1D1D' },
 }
 
 export default function DrugCard({ drug, onTap, isInStock = true }) {
-  const chipStyle = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
-  const label     = CATEGORY_LABELS[drug.category]  || drug.category
+  const { isDrugFavourited, toggleDrug } = useFavourites()
+  const isFavourited = isDrugFavourited(drug.id)
 
-  // FlatDrug shape: brands is an array of { id, name, nameAr, inStock, isAvailable }
+  const chipStyle  = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
+  const label      = CATEGORY_LABELS[drug.category]  || drug.category
   const brandNames = drug.brands?.map(b => b.name) ?? []
+
+  function handleBookmark(e) {
+    e.stopPropagation()
+    toggleDrug(drug.id)
+  }
 
   return (
     <div
@@ -55,7 +62,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
-      {/* Top row: chip + stock dot */}
+      {/* Top row: chip + bookmark + stock dot */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -74,13 +81,39 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         }}>
           {label}
         </span>
-        <div style={{
-          width: 8,
-          height: 8,
-          borderRadius: 'var(--radius-full)',
-          backgroundColor: isInStock ? 'var(--color-instock)' : 'var(--color-outstock)',
-          flexShrink: 0,
-        }} />
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          {/* Bookmark button */}
+          <button
+            onClick={handleBookmark}
+            aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              color: isFavourited ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+              transition: 'color 0.15s ease',
+              flexShrink: 0,
+            }}
+          >
+            {isFavourited
+              ? <BookmarkCheck size={16} />
+              : <Bookmark size={16} />
+            }
+          </button>
+
+          {/* Stock dot */}
+          <div style={{
+            width: 8,
+            height: 8,
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: isInStock ? 'var(--color-instock)' : 'var(--color-outstock)',
+            flexShrink: 0,
+          }} />
+        </div>
       </div>
 
       {/* English generic name */}
