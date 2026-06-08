@@ -1,3 +1,5 @@
+FILE: src/components/admin/GenericFormModal.jsx
+================================================
 /**
  * GenericFormModal.jsx — Phase 3E
  * Full create / edit modal for a generic (molecule) record.
@@ -137,6 +139,15 @@ export default function GenericFormModal({ generic, onClose, onSaved }) {
       textbook_doses:       form.textbook_doses.length ? form.textbook_doses : null,
       textbook_dose_notes:  form.textbook_dose_notes.trim() || null,
       is_published:         form.is_published,
+    }
+
+    // Slug is required (NOT NULL). Generate on create; never overwrite on edit
+    // (changing the slug would break existing /drugs/:slug URLs).
+    if (!isEdit) {
+      payload.slug = form.name_en.trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
     }
 
     let result
@@ -732,3 +743,7 @@ const removeBtnStyle = {
   flexShrink: 0,
   marginTop: 6,
 }
+
+
+
+================================================
