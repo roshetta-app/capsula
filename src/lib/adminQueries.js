@@ -62,7 +62,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
     .select(`
       id, concentration, form, route, doses,
       generics ( id, slug, name_en, name_ar, category, class, uses_legacy, warnings_legacy, textbook_doses ),
-      brands   ( id, name, name_ar, manufacturer, in_stock, is_available )
+      brands   ( id, name, name_ar, manufacturer, is_available )
     `)
     .eq('id', formulationId)
     .single()

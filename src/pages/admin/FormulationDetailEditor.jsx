@@ -80,7 +80,6 @@ export default function FormulationDetailEditor() {
         name:         b.name,
         name_ar:      b.name_ar,
         manufacturer: b.manufacturer,
-        in_stock:     b.in_stock,
         is_available: b.is_available,
       })))
       setLoading(false)
@@ -134,7 +133,6 @@ export default function FormulationDetailEditor() {
           name:         brand.name.trim(),
           name_ar:      brand.name_ar?.trim() || null,
           manufacturer: brand.manufacturer?.trim() || null,
-          in_stock:     brand.in_stock,
           is_available: brand.is_available,
         }
         if (brand.id) {
