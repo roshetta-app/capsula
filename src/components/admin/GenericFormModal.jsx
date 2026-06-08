@@ -117,7 +117,7 @@ export default function GenericFormModal({ generic, onClose, onSaved }) {
 
     const payload = {
       name_en:              form.name_en.trim(),
-      name_ar:              form.name_ar.trim() || null,
+      name_ar:              form.name_ar.trim() || '',
       category:             form.category || null,
       class:                form.class.trim() || null,
       card_tagline:         form.card_tagline.trim() || null,
