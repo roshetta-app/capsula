@@ -16,9 +16,11 @@ import {
   deletePrescriptionItem,
   reorderItems,
 } from '../../lib/adminQueries'
-import DrugRowEditor  from './DrugRowEditor'
-import TextRowEditor  from './TextRowEditor'
-import NoteRowEditor  from './NoteRowEditor'
+import DrugRowEditor    from './DrugRowEditor'
+import TextRowEditor    from './TextRowEditor'
+import NoteRowEditor    from './NoteRowEditor'
+import ConfirmModal     from './ConfirmModal'
+import DrugPickerModal  from './DrugPickerModal'
 
 // ─── Type badge ───────────────────────────────────────────────────────────────
 
@@ -43,7 +45,7 @@ function TypeBadge({ type }) {
 
 // ─── Single item row ──────────────────────────────────────────────────────────
 
-function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
+function ItemRow({ item, idx, total, onMove, onDeleteRequest, onChange, disabled }) {
   const [expanded, setExpanded] = useState(true)
 
   const preview = item.type === 'drug'
@@ -59,16 +61,16 @@ function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
       overflow: 'hidden',
     }}>
       {/* Header row */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        padding: '8px 12px',
-        borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
-        cursor: 'pointer',
-        backgroundColor: 'var(--color-surface)',
-      }}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          padding: '8px 12px',
+          borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
+          cursor: 'pointer',
+          backgroundColor: 'var(--color-surface)',
+        }}
         onClick={() => setExpanded(e => !e)}
       >
-        {/* Drag handle area (visual only — reorder via buttons) */}
         <GripVertical size={14} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
 
         <TypeBadge type={item.type} />
@@ -80,7 +82,7 @@ function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
           {preview}
         </span>
 
-        {/* Reorder buttons */}
+        {/* Reorder */}
         <button
           onClick={e => { e.stopPropagation(); onMove(idx, -1) }}
           disabled={idx === 0 || disabled}
@@ -92,9 +94,9 @@ function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
           style={{ background: 'none', border: 'none', cursor: idx === total - 1 ? 'default' : 'pointer', padding: 2, opacity: idx === total - 1 ? 0.3 : 1, display: 'flex' }}
         ><ChevronDown size={14} /></button>
 
-        {/* Delete */}
+        {/* Delete — fires parent handler which opens ConfirmModal */}
         <button
-          onClick={e => { e.stopPropagation(); onDelete(item.id) }}
+          onClick={e => { e.stopPropagation(); onDeleteRequest(item.id) }}
           disabled={disabled}
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -109,11 +111,7 @@ function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
       {expanded && (
         <div style={{ padding: 'var(--space-3)' }}>
           {item.type === 'drug' && (
-            <DrugRowEditor
-              item={item}
-              onChange={onChange}
-              disabled={disabled}
-            />
+            <DrugRowEditor item={item} onChange={onChange} disabled={disabled} />
           )}
           {item.type === 'text' && (
             <TextRowEditor item={item} onChange={onChange} disabled={disabled} />
@@ -130,9 +128,13 @@ function ItemRow({ item, idx, total, onMove, onDelete, onChange, disabled }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function PrescriptionItemList({ prescriptionId, items, onChange, disabled }) {
-  const [adding, setAdding] = useState(false)
+  const [adding,          setAdding]          = useState(false)
+  const [pickerOpen,      setPickerOpen]      = useState(false)
+  const [confirmState,    setConfirmState]    = useState({ open: false, id: null })
 
-  async function handleAdd(type) {
+  // ─── Add item ───────────────────────────────────────────────────────────────
+
+  async function addItem(type, extraFields = {}) {
     setAdding(true)
     const sort_order = items.length
     const { data: row, error } = await insertPrescriptionItem({
@@ -140,6 +142,7 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
       type,
       content: null,
       sort_order,
+      ...extraFields,
     })
     if (!error) {
       onChange([...items, { ...row, prescription_drug_alternatives: [] }])
@@ -147,13 +150,35 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
     setAdding(false)
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('Delete this item?')) return
+  // Drug row: open picker first, then create item with show_generic_link default
+  function handleAddDrug() {
+    setPickerOpen(true)
+  }
+
+  async function handleDrugPicked(formulation) {
+    // formulation is the full object from DrugPickerModal
+    // We store no foreign key to formulation here — the drug slot identity
+    // comes from brand alternatives. We just open a blank drug slot.
+    // (Formulation context is available to the editor once brands are added.)
+    await addItem('drug', { show_generic_link: true })
+  }
+
+  // ─── Delete (ConfirmModal) ──────────────────────────────────────────────────
+
+  function handleDeleteRequest(id) {
+    setConfirmState({ open: true, id })
+  }
+
+  async function handleDeleteConfirm() {
+    const id = confirmState.id
+    setConfirmState({ open: false, id: null })
     const { error } = await deletePrescriptionItem(id)
     if (!error) {
       onChange(items.filter(i => i.id !== id))
     }
   }
+
+  // ─── Reorder ────────────────────────────────────────────────────────────────
 
   async function handleMove(idx, direction) {
     const swapIdx = idx + direction
@@ -168,6 +193,8 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
   function handleItemChange(updatedItem) {
     onChange(items.map(i => i.id === updatedItem.id ? updatedItem : i))
   }
+
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div>
@@ -188,7 +215,7 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
           idx={idx}
           total={items.length}
           onMove={handleMove}
-          onDelete={handleDelete}
+          onDeleteRequest={handleDeleteRequest}
           onChange={handleItemChange}
           disabled={disabled}
         />
@@ -196,10 +223,29 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
 
       {/* Add buttons */}
       <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-        {['drug', 'text', 'note'].map(type => (
+        <button
+          onClick={handleAddDrug}
+          disabled={adding || disabled}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            padding: '6px 14px', borderRadius: 'var(--radius-md)',
+            border: '1.5px dashed #BFDBFE',
+            backgroundColor: '#EFF6FF',
+            color: '#1D4ED8',
+            fontSize: 13, fontWeight: 500,
+            cursor: adding || disabled ? 'default' : 'pointer',
+            fontFamily: 'var(--font-body)',
+            opacity: adding || disabled ? 0.6 : 1,
+          }}
+        >
+          <Plus size={13} />
+          + Drug Row
+        </button>
+
+        {['text', 'note'].map(type => (
           <button
             key={type}
-            onClick={() => handleAdd(type)}
+            onClick={() => addItem(type)}
             disabled={adding || disabled}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
@@ -213,10 +259,28 @@ export default function PrescriptionItemList({ prescriptionId, items, onChange, 
             }}
           >
             <Plus size={13} />
-            {type === 'drug' ? '+ Drug Row' : type === 'text' ? '+ Text Row' : '+ Note Row'}
+            {type === 'text' ? '+ Text Row' : '+ Note Row'}
           </button>
         ))}
       </div>
+
+      {/* Drug picker modal */}
+      <DrugPickerModal
+        isOpen={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleDrugPicked}
+      />
+
+      {/* Delete confirm modal */}
+      <ConfirmModal
+        isOpen={confirmState.open}
+        onClose={() => setConfirmState({ open: false, id: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete item?"
+        message="This will permanently delete this row and cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

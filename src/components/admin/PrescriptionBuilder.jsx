@@ -6,8 +6,8 @@
  *   disabled     boolean
  */
 
-import { useState, useEffect } from 'react'
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Pencil } from 'lucide-react'
 import {
   fetchPrescriptionsForCondition,
   insertPrescription,
@@ -16,46 +16,90 @@ import {
   reorderItems,
 } from '../../lib/adminQueries'
 import PrescriptionItemList from './PrescriptionItemList'
+import ConfirmModal         from './ConfirmModal'
+import Modal                from './Modal'
 
-// ─── Editable label pill ──────────────────────────────────────────────────────
+// ─── Add / Rename modal ───────────────────────────────────────────────────────
 
-function LabelPill({ label, active, onClick, onRename }) {
-  const [editing, setEditing] = useState(false)
-  const [val, setVal]         = useState(label)
+function LabelModal({ isOpen, onClose, onSubmit, initialValue = '', title = 'Prescription label' }) {
+  const [val, setVal] = useState(initialValue)
+  const inputRef = useRef(null)
 
-  function commitRename() {
-    setEditing(false)
-    if (val.trim() && val.trim() !== label) {
-      onRename(val.trim())
-    } else {
-      setVal(label)
+  useEffect(() => {
+    if (isOpen) {
+      setVal(initialValue)
+      setTimeout(() => inputRef.current?.focus(), 80)
     }
-  }
+  }, [isOpen, initialValue])
 
-  if (editing) {
-    return (
-      <input
-        autoFocus
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        onBlur={commitRename}
-        onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') { setVal(label); setEditing(false) } }}
-        style={{
-          padding: '5px 12px', borderRadius: 20,
-          border: '2px solid var(--color-accent)',
-          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
-          backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)',
-          outline: 'none', minWidth: 60, maxWidth: 160,
-        }}
-      />
-    )
+  function handleSubmit(e) {
+    e.preventDefault()
+    const trimmed = val.trim()
+    if (!trimmed) return
+    onSubmit(trimmed)
+    onClose()
   }
 
   return (
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <input
+          ref={inputRef}
+          type="text"
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          placeholder='e.g. "First line", "Mild case", "Children"'
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '9px 12px',
+            border: '1.5px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 14, fontFamily: 'var(--font-body)',
+            backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text-primary)',
+            outline: 'none',
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: 'var(--space-2) var(--space-4)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-secondary)',
+              fontSize: 14, fontWeight: 500, fontFamily: 'var(--font-body)',
+              cursor: 'pointer',
+            }}
+          >Cancel</button>
+          <button
+            type="submit"
+            disabled={!val.trim()}
+            style={{
+              padding: 'var(--space-2) var(--space-4)',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              backgroundColor: val.trim() ? 'var(--color-accent)' : 'var(--color-border)',
+              color: '#fff',
+              fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+              cursor: val.trim() ? 'pointer' : 'default',
+            }}
+          >Save</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// ─── Label pill ───────────────────────────────────────────────────────────────
+
+function LabelPill({ label, active, onClick }) {
+  return (
     <button
       onClick={onClick}
-      onDoubleClick={() => setEditing(true)}
-      title="Double-click to rename"
+      title="Click to select"
       style={{
         padding: '5px 14px', borderRadius: 20, border: 'none', cursor: 'pointer',
         fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
@@ -79,7 +123,12 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
   const [error,         setError]         = useState(null)
   const [adding,        setAdding]        = useState(false)
 
-  // ─── Load on mount ─────────────────────────────────────────────────────────
+  // Modal states
+  const [addModalOpen,    setAddModalOpen]    = useState(false)
+  const [renameModal,     setRenameModal]     = useState({ open: false, id: null, label: '' })
+  const [confirmDelete,   setConfirmDelete]   = useState({ open: false, id: null, idx: null })
+
+  // ─── Load ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!conditionId) { setLoading(false); return }
@@ -100,14 +149,12 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
 
   // ─── Add prescription ──────────────────────────────────────────────────────
 
-  async function handleAdd() {
-    const label = window.prompt('Prescription label (e.g. "First line", "Mild case"):')
-    if (!label?.trim()) return
+  async function handleAddSubmit(label) {
     setAdding(true)
     const sort_order = prescriptions.length
     const { data: row, error: insertErr } = await insertPrescription({
       condition_id: conditionId,
-      label: label.trim(),
+      label,
       sort_order,
     })
     if (insertErr) {
@@ -123,9 +170,10 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
     setAdding(false)
   }
 
-  // ─── Rename prescription ──────────────────────────────────────────────────
+  // ─── Rename prescription ───────────────────────────────────────────────────
 
-  async function handleRename(id, newLabel) {
+  async function handleRenameSubmit(newLabel) {
+    const { id } = renameModal
     const { error: updateErr } = await updatePrescription(id, { label: newLabel })
     if (updateErr) {
       setError(updateErr.message ?? 'Rename failed')
@@ -134,10 +182,11 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
     setPrescriptions(prev => prev.map(p => p.id === id ? { ...p, label: newLabel } : p))
   }
 
-  // ─── Delete prescription ──────────────────────────────────────────────────
+  // ─── Delete prescription ───────────────────────────────────────────────────
 
-  async function handleDelete(id, idx) {
-    if (!window.confirm('Delete this prescription and all its items?')) return
+  async function handleDeleteConfirm() {
+    const { id, idx } = confirmDelete
+    setConfirmDelete({ open: false, id: null, idx: null })
     const { error: delErr } = await deletePrescription(id)
     if (delErr) {
       setError(delErr.message ?? 'Delete failed')
@@ -150,22 +199,20 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
     })
   }
 
-  // ─── Reorder prescriptions ────────────────────────────────────────────────
+  // ─── Reorder prescriptions ─────────────────────────────────────────────────
 
   async function handleMove(idx, direction) {
     const swapIdx = idx + direction
     if (swapIdx < 0 || swapIdx >= prescriptions.length) return
-
     const next = [...prescriptions]
     ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
     const reordered = next.map((p, i) => ({ ...p, sort_order: i }))
     setPrescriptions(reordered)
     setActiveIdx(swapIdx)
-
     await reorderItems('prescriptions', reordered.map(p => ({ id: p.id, sort_order: p.sort_order })))
   }
 
-  // ─── Update items callback (from PrescriptionItemList) ───────────────────
+  // ─── Items change callback ─────────────────────────────────────────────────
 
   function handleItemsChange(prescriptionId, newItems) {
     setPrescriptions(prev =>
@@ -173,7 +220,7 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
     )
   }
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ─── Guards ────────────────────────────────────────────────────────────────
 
   if (!conditionId) {
     return (
@@ -203,6 +250,7 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
 
   return (
     <div>
+      {/* Error banner */}
       {error && (
         <div style={{
           display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
@@ -224,41 +272,62 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
               label={p.label}
               active={i === activeIdx}
               onClick={() => setActiveIdx(i)}
-              onRename={newLabel => handleRename(p.id, newLabel)}
             />
-            {i === activeIdx && prescriptions.length > 1 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                <button
-                  onClick={() => handleMove(i, -1)}
-                  disabled={i === 0 || disabled}
-                  style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', padding: 0, opacity: i === 0 ? 0.3 : 1, display: 'flex' }}
-                ><ChevronUp size={12} /></button>
-                <button
-                  onClick={() => handleMove(i, 1)}
-                  disabled={i === prescriptions.length - 1 || disabled}
-                  style={{ background: 'none', border: 'none', cursor: i === prescriptions.length - 1 ? 'default' : 'pointer', padding: 0, opacity: i === prescriptions.length - 1 ? 0.3 : 1, display: 'flex' }}
-                ><ChevronDown size={12} /></button>
-              </div>
-            )}
+
+            {/* Controls only visible for the active tab */}
             {i === activeIdx && (
-              <button
-                onClick={() => handleDelete(p.id, i)}
-                disabled={disabled}
-                title="Delete prescription"
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  width: 24, height: 24, borderRadius: '50%',
-                  border: '1px solid #FECACA', backgroundColor: '#FEF2F2',
-                  color: '#DC2626', cursor: disabled ? 'default' : 'pointer',
-                  flexShrink: 0,
-                }}
-              ><Trash2 size={11} /></button>
+              <>
+                {/* Rename */}
+                <button
+                  onClick={() => setRenameModal({ open: true, id: p.id, label: p.label })}
+                  disabled={disabled}
+                  title="Rename prescription"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, borderRadius: '50%',
+                    border: '1px solid var(--color-border)',
+                    backgroundColor: 'var(--color-bg)',
+                    color: 'var(--color-text-tertiary)',
+                    cursor: disabled ? 'default' : 'pointer', flexShrink: 0,
+                  }}
+                ><Pencil size={11} /></button>
+
+                {/* Reorder */}
+                {prescriptions.length > 1 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <button
+                      onClick={() => handleMove(i, -1)}
+                      disabled={i === 0 || disabled}
+                      style={{ background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer', padding: 0, opacity: i === 0 ? 0.3 : 1, display: 'flex' }}
+                    ><ChevronUp size={12} /></button>
+                    <button
+                      onClick={() => handleMove(i, 1)}
+                      disabled={i === prescriptions.length - 1 || disabled}
+                      style={{ background: 'none', border: 'none', cursor: i === prescriptions.length - 1 ? 'default' : 'pointer', padding: 0, opacity: i === prescriptions.length - 1 ? 0.3 : 1, display: 'flex' }}
+                    ><ChevronDown size={12} /></button>
+                  </div>
+                )}
+
+                {/* Delete */}
+                <button
+                  onClick={() => setConfirmDelete({ open: true, id: p.id, idx: i })}
+                  disabled={disabled}
+                  title="Delete prescription"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, borderRadius: '50%',
+                    border: '1px solid #FECACA', backgroundColor: '#FEF2F2',
+                    color: '#DC2626', cursor: disabled ? 'default' : 'pointer', flexShrink: 0,
+                  }}
+                ><Trash2 size={11} /></button>
+              </>
             )}
           </div>
         ))}
 
+        {/* Add prescription */}
         <button
-          onClick={handleAdd}
+          onClick={() => setAddModalOpen(true)}
           disabled={adding || disabled}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
@@ -292,6 +361,33 @@ export default function PrescriptionBuilder({ conditionId, disabled }) {
           No prescriptions yet. Click "Add" to create one.
         </div>
       )}
+
+      {/* ── Modals ── */}
+      <LabelModal
+        isOpen={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSubmit={handleAddSubmit}
+        initialValue=""
+        title="New prescription label"
+      />
+
+      <LabelModal
+        isOpen={renameModal.open}
+        onClose={() => setRenameModal({ open: false, id: null, label: '' })}
+        onSubmit={handleRenameSubmit}
+        initialValue={renameModal.label}
+        title="Rename prescription"
+      />
+
+      <ConfirmModal
+        isOpen={confirmDelete.open}
+        onClose={() => setConfirmDelete({ open: false, id: null, idx: null })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete prescription?"
+        message="This will permanently delete this prescription and all its items."
+        confirmLabel="Delete"
+        confirmVariant="danger"
+      />
     </div>
   )
 }

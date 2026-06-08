@@ -228,6 +228,7 @@ export async function fetchPrescriptionsForCondition(conditionId) {
       id, label, sort_order,
       prescription_items (
         id, type, content, sort_order,
+        dose_override, drug_note, drug_note_ar, show_generic_link,
         prescription_drug_alternatives (
           id, dose_instruction, sort_order,
           brand_id,

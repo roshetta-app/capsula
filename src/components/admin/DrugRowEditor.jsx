@@ -9,12 +9,13 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, Link, LinkOff } from 'lucide-react'
 import {
   searchBrandsForTypeahead,
   insertDrugAlternative,
   updateDrugAlternative,
   deleteDrugAlternative,
+  updatePrescriptionItem,
   reorderItems,
 } from '../../lib/adminQueries'
 
@@ -206,11 +207,48 @@ function AlternativeRow({ alt, idx, total, onMove, onDelete, onDoseChange, disab
   )
 }
 
+// ─── Field label ──────────────────────────────────────────────────────────────
+
+function FieldLabel({ children, hint }) {
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        {children}
+      </span>
+      {hint && (
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{hint}</span>
+      )}
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DrugRowEditor({ item, onChange, disabled }) {
   const alternatives = item.prescription_drug_alternatives ?? []
   const [adding, setAdding] = useState(false)
+
+  // ─── Item-level field save (blur) ─────────────────────────────────────────
+
+  async function saveItemField(field, value) {
+    await updatePrescriptionItem(item.id, { [field]: value })
+  }
+
+  function handleItemFieldChange(field, value) {
+    onChange({ ...item, [field]: value })
+  }
+
+  function handleItemFieldBlur(field, value) {
+    saveItemField(field, value)
+  }
+
+  function handleShowGenericLinkToggle() {
+    const next = !(item.show_generic_link ?? true)
+    onChange({ ...item, show_generic_link: next })
+    saveItemField('show_generic_link', next)
+  }
+
+  // ─── Alternatives ─────────────────────────────────────────────────────────
 
   async function handleSelectBrand(brand) {
     setAdding(true)
@@ -253,40 +291,152 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
     if (save) await updateDrugAlternative(altId, { dose_instruction: value })
   }
 
+  const showLink = item.show_generic_link ?? true
+
   return (
-    <div>
-      {alternatives.length === 0 && (
-        <div style={{
-          textAlign: 'center', fontSize: 13, color: 'var(--color-text-tertiary)',
-          padding: 'var(--space-3)', border: '1.5px dashed var(--color-border)',
-          borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)',
-        }}>
-          No alternatives yet. Search a brand below.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+      {/* ── Item-level fields (Phase 3D) ── */}
+      <div style={{
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        padding: 'var(--space-3)',
+        backgroundColor: 'var(--color-bg)',
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+      }}>
+
+        {/* dose_override */}
+        <div>
+          <FieldLabel hint="Leave blank to use formulation default">Dose override</FieldLabel>
+          <input
+            type="text"
+            value={item.dose_override ?? ''}
+            onChange={e => handleItemFieldChange('dose_override', e.target.value)}
+            onBlur={e  => handleItemFieldBlur('dose_override', e.target.value || null)}
+            placeholder="e.g. 1 tablet twice daily for 5 days"
+            disabled={disabled}
+            dir="auto"
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px',
+              border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              fontSize: 13, fontFamily: 'var(--font-body)',
+              backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)',
+              outline: 'none',
+            }}
+          />
         </div>
-      )}
 
-      {alternatives.map((alt, idx) => (
-        <AlternativeRow
-          key={alt.id}
-          alt={alt}
-          idx={idx}
-          total={alternatives.length}
-          onMove={handleMove}
-          onDelete={handleDelete}
-          onDoseChange={handleDoseChange}
-          disabled={disabled}
-        />
-      ))}
+        {/* drug_note (EN) */}
+        <div>
+          <FieldLabel hint="English">Drug note</FieldLabel>
+          <input
+            type="text"
+            value={item.drug_note ?? ''}
+            onChange={e => handleItemFieldChange('drug_note', e.target.value)}
+            onBlur={e  => handleItemFieldBlur('drug_note', e.target.value || null)}
+            placeholder="e.g. Only if cramping present"
+            disabled={disabled}
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px',
+              border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              fontSize: 13, fontFamily: 'var(--font-body)',
+              backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)',
+              outline: 'none',
+            }}
+          />
+        </div>
 
-      <div style={{ marginTop: 'var(--space-2)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
-          <Plus size={13} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Add alternative
+        {/* drug_note_ar */}
+        <div>
+          <FieldLabel hint="Arabic (RTL)">Drug note — Arabic</FieldLabel>
+          <input
+            type="text"
+            value={item.drug_note_ar ?? ''}
+            onChange={e => handleItemFieldChange('drug_note_ar', e.target.value)}
+            onBlur={e  => handleItemFieldBlur('drug_note_ar', e.target.value || null)}
+            placeholder="ملاحظة بالعربي (اختياري)"
+            disabled={disabled}
+            dir="rtl"
+            style={{
+              width: '100%', boxSizing: 'border-box', padding: '7px 10px',
+              border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+              fontSize: 13, fontFamily: 'var(--font-body)',
+              backgroundColor: 'var(--color-surface)', color: 'var(--color-text-primary)',
+              outline: 'none', textAlign: 'right',
+            }}
+          />
+        </div>
+
+        {/* show_generic_link toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <button
+            onClick={handleShowGenericLinkToggle}
+            disabled={disabled}
+            title={showLink ? 'Drug name links to Drug Detail — click to disable' : 'Drug name is plain text — click to enable link'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
+              backgroundColor: showLink ? '#EFF6FF' : 'transparent',
+              color: showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+              fontSize: 12, fontWeight: 600, cursor: disabled ? 'default' : 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            {showLink ? <Link size={12} /> : <LinkOff size={12} />}
+            {showLink ? 'Drug link: ON' : 'Drug link: OFF'}
+          </button>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            {showLink ? 'Name taps navigate to Drug Detail screen' : 'Name shown as plain text'}
           </span>
         </div>
-        <BrandTypeahead onSelect={handleSelectBrand} disabled={adding || disabled} />
       </div>
+
+      {/* ── Alternatives section ── */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Brand alternatives
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            — shown as "or" options in the app
+          </span>
+        </div>
+
+        {alternatives.length === 0 && (
+          <div style={{
+            textAlign: 'center', fontSize: 13, color: 'var(--color-text-tertiary)',
+            padding: 'var(--space-3)', border: '1.5px dashed var(--color-border)',
+            borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-3)',
+          }}>
+            No alternatives yet. Search a brand below.
+          </div>
+        )}
+
+        {alternatives.map((alt, idx) => (
+          <AlternativeRow
+            key={alt.id}
+            alt={alt}
+            idx={idx}
+            total={alternatives.length}
+            onMove={handleMove}
+            onDelete={handleDelete}
+            onDoseChange={handleDoseChange}
+            disabled={disabled}
+          />
+        ))}
+
+        <div style={{ marginTop: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 4 }}>
+            <Plus size={13} style={{ color: 'var(--color-text-tertiary)', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              Add alternative
+            </span>
+          </div>
+          <BrandTypeahead onSelect={handleSelectBrand} disabled={adding || disabled} />
+        </div>
+      </div>
+
     </div>
   )
 }
