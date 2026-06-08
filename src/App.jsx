@@ -1,3 +1,4 @@
+================================================
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { DrugProvider, useDrugContext } from './context/DrugContext'
@@ -13,6 +14,7 @@ import { useSearch } from './hooks/useSearch'
 import { useFilter } from './hooks/useFilter'
 import { useStock } from './hooks/useStock'
 import { DRUG_CATEGORIES } from './config/categories'
+import { useDarkMode } from './hooks/useDarkMode'
 
 // ─── Public screens ───────────────────────────────────────────────────────────
 
@@ -240,6 +242,7 @@ function DrugLibraryScreen() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  useDarkMode()
   return (
     <BrowserRouter basename="/capsula">
       <FavouritesProvider>
@@ -305,3 +308,6 @@ function ComingSoon({ label, session }) {
     </div>
   )
 }
+
+
+

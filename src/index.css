@@ -1,6 +1,2 @@
-@import "./styles/tokens.css";
-@import "@fontsource/dm-sans";
-@import "@fontsource/dm-sans/500.css";
-@import "@fontsource/dm-sans/600.css";
-@import "@fontsource/dm-mono";
-@tailwind utilities;
+/* Single entry point — all styles, tokens, and Tailwind come from globals.css */
+@import "./styles/globals.css";

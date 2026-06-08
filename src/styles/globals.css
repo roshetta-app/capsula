@@ -1,0 +1,197 @@
+/* =============================================================================
+   Capsula — src/styles/globals.css
+   Phase 2A: Design system — Tailwind v4 @theme, tokens, dark mode, RTL
+   ============================================================================= */
+
+/* ─── Fonts ──────────────────────────────────────────────────────────────────── */
+@import "@fontsource/dm-sans";
+@import "@fontsource/dm-sans/500.css";
+@import "@fontsource/dm-sans/600.css";
+@import "@fontsource/dm-sans/700.css";
+@import "@fontsource/dm-mono";
+
+/* ─── Tailwind v4 ────────────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* ─── Tailwind v4 Theme — maps to CSS vars below ────────────────────────────── */
+@theme {
+  /* Brand */
+  --color-primary:       #2563EB;
+  --color-primary-light: #EFF4FF;
+  --color-primary-hover: #1D4ED8;
+  --color-primary-dark:  #1E3A8A;
+
+  --color-accent:        #0EA5E9;
+  --color-accent-light:  #BAE6FD;
+
+  /* Surfaces — light */
+  --color-bg:            #FAFAF9;
+  --color-surface:       #FFFFFF;
+  --color-surface-muted: #F9FAFB;
+  --color-border:        #E8E6E1;
+  --color-border-subtle: #F0EEE9;
+
+  /* Semantic */
+  --color-danger:        #DC2626;
+  --color-danger-light:  #FEE2E2;
+  --color-warning:       #D97706;
+  --color-warning-light: #FEF3C7;
+  --color-success:       #059669;
+  --color-success-light: #D1FAE5;
+
+  /* Text — light */
+  --color-ink:           #1A1916;
+  --color-ink-muted:     #6B7280;
+  --color-ink-faint:     #9E9B95;
+
+  /* Font families */
+  --font-sans:  "DM Sans", sans-serif;
+  --font-mono:  "DM Mono", monospace;
+
+  /* Border radius */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   16px;
+  --radius-card: 12px;
+  --radius-pill: 9999px;
+
+  /* Shadows */
+  --shadow-card:     0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-elevated: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-nav:      0 -1px 0 0 #E8E6E1;
+}
+
+/* ─── CSS custom properties — light mode (root) ──────────────────────────────── */
+:root {
+  /* Mapped from @theme so legacy inline styles using var() still work */
+  --color-bg:               #FAFAF9;
+  --color-surface:          #FFFFFF;
+  --color-surface-muted:    #F9FAFB;
+  --color-border:           #E8E6E1;
+  --color-border-subtle:    #F0EEE9;
+
+  --color-text-primary:     #1A1916;
+  --color-text-secondary:   #6B7280;
+  --color-text-tertiary:    #9E9B95;
+  --color-text-arabic:      #4A4845;
+
+  --color-accent:           #2563EB;
+  --color-accent-light:     #EFF4FF;
+  --color-accent-hover:     #1D4ED8;
+
+  --color-danger:           #DC2626;
+  --color-danger-light:     #FEE2E2;
+  --color-warning:          #D97706;
+  --color-warning-light:    #FEF3C7;
+  --color-success:          #059669;
+  --color-success-light:    #D1FAE5;
+
+  --color-instock:          #16A34A;
+  --color-instock-bg:       #F0FDF4;
+  --color-outstock:         #D1D5DB;
+  --color-outstock-bg:      #F9FAFB;
+
+  --font-display:           "DM Sans", sans-serif;
+  --font-body:              "DM Sans", sans-serif;
+  --font-arabic:            "Noto Sans Arabic", sans-serif;
+  --font-mono:              "DM Mono", monospace;
+
+  --radius-sm:              6px;
+  --radius-md:              10px;
+  --radius-lg:              16px;
+  --radius-full:            9999px;
+
+  --shadow-card:            0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-elevated:        0 4px 12px rgba(0,0,0,0.08);
+
+  --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
+  --space-4: 16px; --space-5: 20px;  --space-6: 24px;
+  --space-8: 32px; --space-10: 40px; --space-12: 48px;
+}
+
+/* ─── Dark mode overrides — activated by .dark on <html> ────────────────────── */
+.dark {
+  --color-bg:               #111827;
+  --color-surface:          #1F2937;
+  --color-surface-muted:    #111827;
+  --color-border:           #374151;
+  --color-border-subtle:    #1F2937;
+
+  --color-text-primary:     #F9FAFB;
+  --color-text-secondary:   #9CA3AF;
+  --color-text-tertiary:    #6B7280;
+  --color-text-arabic:      #D1D5DB;
+
+  --color-accent:           #3B82F6;
+  --color-accent-light:     #1E3A5F;
+  --color-accent-hover:     #60A5FA;
+
+  --color-danger:           #F87171;
+  --color-danger-light:     #450A0A;
+  --color-warning:          #FCD34D;
+  --color-warning-light:    #451A03;
+  --color-success:          #34D399;
+  --color-success-light:    #064E3B;
+
+  --color-instock:          #34D399;
+  --color-instock-bg:       #064E3B;
+  --color-outstock:         #4B5563;
+  --color-outstock-bg:      #1F2937;
+
+  --shadow-card:            0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  --shadow-elevated:        0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ─── Base styles ────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  font-family: var(--font-body);
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  /* Prevent flash of unstyled content during dark mode detection */
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background-color: var(--color-bg);
+  overscroll-behavior-y: none;
+}
+
+/* ─── RTL / Arabic support ───────────────────────────────────────────────────── */
+.rtl {
+  direction: rtl;
+  font-family: var(--font-arabic);
+}
+
+/* Arabic content in clinical/prescription views */
+.prose-ar {
+  direction: rtl;
+  font-family: var(--font-arabic);
+  line-height: 1.8;
+  color: var(--color-text-arabic);
+}
+
+/* ─── Shimmer animation (used in skeleton loaders) ───────────────────────────── */
+@keyframes shimmer {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+.shimmer {
+  animation: shimmer 1.4s ease-in-out infinite;
+  background-color: var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Safe area padding utility (PWA bottom nav) ─────────────────────────────── */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
