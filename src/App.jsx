@@ -12,7 +12,7 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
-import { ToastProvider } from './contexts/ToastContext'
+import { ToastProvider } from './context/ToastContext'
 
 export default function App() {
   return (
