@@ -1,5 +1,3 @@
-FILE: src/components/admin/GenericFormModal.jsx
-================================================
 /**
  * GenericFormModal.jsx — Phase 3E
  * Full create / edit modal for a generic (molecule) record.
