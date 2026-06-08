@@ -1,5 +1,3 @@
-FILE: src/pages/admin/FormulationDetailEditor.jsx
-================================================
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Save, AlertTriangle, Trash2 } from 'lucide-react'
@@ -466,6 +464,3 @@ const cancelBtn = {
   fontFamily: 'var(--font-body)',
   cursor: 'pointer',
 }
-
-
-
