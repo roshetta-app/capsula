@@ -7,6 +7,8 @@ import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
+import ShareCard from '../components/ui/ShareCard'
+import { shareConditionPrescription } from '../utils/sharing'
 
 const AGE_STYLES = {
   adult:     { bg: '#DBEAFE', color: '#1E40AF' },
@@ -29,9 +31,11 @@ export default function ConditionDetailScreen() {
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
 
-  const [activeTab, setActiveTab] = useState(0)
-  const touchStartX = useRef(null)
-  const touchStartY = useRef(null)
+  const [activeTab, setActiveTab]                   = useState(0)
+  const [activePrescriptionIdx, setActivePrescriptionIdx] = useState(0)
+  const touchStartX  = useRef(null)
+  const touchStartY  = useRef(null)
+  const shareCardRef = useRef(null)
 
   function handleTouchStart(e) {
     touchStartX.current = e.touches[0].clientX
@@ -59,6 +63,29 @@ export default function ConditionDetailScreen() {
       addRecentlyViewed({ id: condition.id, name: condition.name, slug: condition.slug })
     }
   }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ─── Build share card prescription snapshot ─────────────────────────────────
+
+  function buildSharePrescription() {
+    const rx = condition?.prescriptions?.[activePrescriptionIdx]
+    if (!rx) return null
+    return {
+      label: rx.label,
+      drugs: (rx.drugs ?? []).map(d => ({
+        brandName:     d.primaryBrand ?? d.brandName ?? d.name ?? '',
+        concentration: d.concentration ?? '',
+        form:          d.form ?? '',
+        dose:          d.dose_override ?? d.instruction ?? '',
+        note:          d.drug_note ?? '',
+      })),
+    }
+  }
+
+  function handleShare() {
+    shareConditionPrescription(condition, buildSharePrescription(), shareCardRef)
+  }
+
+  // ─── Loading / not found guards ─────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -92,7 +119,17 @@ export default function ConditionDetailScreen() {
         condition={condition}
         isFav={isFav}
         onFavToggle={() => toggleCondition(condition.id)}
+        onShare={handleShare}
       />
+
+      {/* Hidden ShareCard — off-screen, captured by html2canvas on share */}
+      <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
+        <ShareCard
+          ref={shareCardRef}
+          condition={{ name: condition.name, specialtyName: condition.specialtyName }}
+          prescription={buildSharePrescription()}
+        />
+      </div>
 
       {/* Tab strip — full-width background, content centred */}
       <div style={{
@@ -161,6 +198,7 @@ export default function ConditionDetailScreen() {
                 prescriptions={condition.prescriptions}
                 patientInstructions={condition.patientInstructions}
                 conditionId={condition.id}
+                onPrescriptionChange={setActivePrescriptionIdx}
               />
             </div>
           </div>
@@ -191,7 +229,7 @@ const pageStyle = {
 
 // ─── DetailHeader — full-width bg, content centred ────────────────────────────
 
-function DetailHeader({ onBack, condition, isFav, onFavToggle }) {
+function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
   const ageStyle = condition
     ? (AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' })
     : null
@@ -205,7 +243,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle }) {
       borderBottom: '1px solid var(--color-border)',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4)' }}>
-        {/* Top row: back button + star */}
+        {/* Top row: back button + action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 0 }}>
           <button
             onClick={onBack}
@@ -222,25 +260,48 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle }) {
             Back
           </button>
 
-          {/* Star favourite button */}
+          {/* Share + Star buttons */}
           {condition && (
-            <button
-              onClick={onFavToggle}
-              aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
-                transition: 'color 0.15s ease',
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              {/* Star SVG */}
-              <svg width="20" height="20" viewBox="0 0 24 24"
-                fill={isFav ? 'currentColor' : 'none'}
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-              </svg>
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+
+              {/* Share button */}
+              <button
+                onClick={onShare}
+                aria-label="Share prescription"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                  color: 'var(--color-text-tertiary)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </button>
+
+              {/* Star favourite button */}
+              <button
+                onClick={onFavToggle}
+                aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                  color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
+                  transition: 'color 0.15s ease',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill={isFav ? 'currentColor' : 'none'}
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
+
+            </div>
           )}
         </div>
 
@@ -280,6 +341,3 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle }) {
     </header>
   )
 }
-
-
-
