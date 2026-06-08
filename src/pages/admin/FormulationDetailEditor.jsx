@@ -70,17 +70,20 @@ export default function FormulationDetailEditor() {
         doses:    data.generics.textbook_doses  ?? [],
       })
       setFormulation({
-        concentration: data.concentration,
-        form:          data.form,
-        route:         data.route,
-        doses:         data.doses_structured ?? data.doses ?? [],
+        concentration:        data.concentration,
+        form:                 data.form,
+        route:                data.route,
+        doses:                data.doses_structured ?? data.doses ?? [],
+        default_dose_override: data.default_dose_override ?? null,
+        is_published:         data.is_published ?? true,
       })
       setBrands((data.brands ?? []).map(b => ({
         id:           b.id,
         name:         b.name,
         name_ar:      b.name_ar,
         manufacturer: b.manufacturer,
-        is_available: b.is_available,
+        source:       b.source ?? 'manual',
+        is_published: b.is_published ?? true,
       })))
       setLoading(false)
     }
@@ -112,10 +115,12 @@ export default function FormulationDetailEditor() {
     setSaving('formulation')
     setSaveError(null)
     const { error } = await updateFormulation(id, {
-      concentration:  formulation.concentration.trim(),
-      form:           formulation.form,
-      route:          formulation.route,
-      doses_structured: formulation.doses,
+      concentration:        formulation.concentration.trim(),
+      form:                 formulation.form,
+      route:                formulation.route,
+      doses_structured:     formulation.doses,
+      default_dose_override: formulation.default_dose_override || null,
+      is_published:         formulation.is_published ?? true,
     })
     setSaving(null)
     if (error) { setSaveError(`Formulation: ${error.message}`); return }
@@ -133,7 +138,8 @@ export default function FormulationDetailEditor() {
           name:         brand.name.trim(),
           name_ar:      brand.name_ar?.trim() || null,
           manufacturer: brand.manufacturer?.trim() || null,
-          is_available: brand.is_available,
+          source:       brand.source ?? 'manual',
+          is_published: brand.is_published ?? true,
         }
         if (brand.id) {
           const { error } = await updateBrand(brand.id, payload)
@@ -462,3 +468,4 @@ const cancelBtn = {
   fontFamily: 'var(--font-body)',
   cursor: 'pointer',
 }
+

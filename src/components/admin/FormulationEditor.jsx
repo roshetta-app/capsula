@@ -3,9 +3,10 @@ import DoseRowList from './DoseRowList'
 
 /**
  * FormulationEditor — edit fields on a formulation row.
+ * Phase 3F — added is_published toggle + default_dose_override field.
  *
  * Props:
- *   formulation  { concentration, form, route, doses }
+ *   formulation  { concentration, form, route, doses, default_dose_override, is_published }
  *   onChange     (patch) => void
  *   disabled     boolean
  */
@@ -72,6 +73,54 @@ export default function FormulationEditor({ formulation, onChange, disabled = fa
           disabled={disabled}
         />
       </Field>
+
+      {/* Default dose override note */}
+      <Field label="Dose override note" hint="Optional note shown below the dose table (italic, muted)">
+        <input
+          type="text"
+          value={formulation.default_dose_override ?? ''}
+          onChange={e => set('default_dose_override', e.target.value || null)}
+          placeholder="e.g. Reduce dose in renal impairment"
+          disabled={disabled}
+          style={inputStyle}
+        />
+      </Field>
+
+      {/* Published toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+        <label style={{ ...labelStyle, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Published
+        </label>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={formulation.is_published ?? true}
+          onClick={() => !disabled && set('is_published', !(formulation.is_published ?? true))}
+          disabled={disabled}
+          style={{
+            width: 42, height: 24,
+            borderRadius: 12,
+            border: 'none',
+            backgroundColor: (formulation.is_published ?? true) ? 'var(--color-accent)' : 'var(--color-border)',
+            position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
+            transition: 'background-color 0.2s',
+            flexShrink: 0,
+          }}
+        >
+          <span style={{
+            position: 'absolute',
+            top: 3, left: (formulation.is_published ?? true) ? 21 : 3,
+            width: 18, height: 18,
+            borderRadius: '50%',
+            backgroundColor: '#fff',
+            transition: 'left 0.2s',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+          }} />
+        </button>
+        <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          {(formulation.is_published ?? true) ? 'Visible in app' : 'Hidden (draft)'}
+        </span>
+      </div>
 
     </div>
   )

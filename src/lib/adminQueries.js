@@ -60,9 +60,19 @@ export async function fetchFormulationWithGeneric(formulationId) {
   const { data, error } = await supabase
     .from('formulations')
     .select(`
-      id, concentration, form, route, doses,
-      generics ( id, slug, name_en, name_ar, category, class, uses_legacy, warnings_legacy, textbook_doses ),
-      brands   ( id, name, name_ar, manufacturer, is_available )
+      id, concentration, form, route,
+      doses, doses_structured, default_dose_override, is_published,
+      generics (
+        id, slug, name_en, name_ar, category, class,
+        uses_legacy, warnings_legacy, textbook_doses, textbook_dose_notes,
+        uses_structured, mechanism_of_action, card_tagline,
+        side_effects_common, side_effects_serious,
+        pregnancy_category, breastfeeding_safety,
+        crosses_placenta, crosses_bbb,
+        contraindications, drug_interactions, dose_adjustments,
+        pharmacokinetics, is_published
+      ),
+      brands ( id, name, name_ar, manufacturer, source, is_published )
     `)
     .eq('id', formulationId)
     .single()
@@ -85,7 +95,8 @@ export async function updateFormulation(id, data) {
     .from('formulations')
     .update(data)
     .eq('id', id)
-  return { error }
+  if (error) return { error }
+  return touchAppMetadata('drugs_updated_at')
 }
 
 // ─── Brands — full CRUD (5.3) ─────────────────────────────────────────────────
