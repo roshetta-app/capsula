@@ -1,289 +1,467 @@
 /**
  * src/pages/DrugsScreen.jsx
- * Phase 2B — Navigation & Routing Overhaul
+ * Phase 2F — Drugs Screen rebuild.
  *
- * Extracted from App.jsx's inline DrugLibraryScreen.
- * Drug card taps now navigate to /drugs/:slug (new route from 2B)
- * instead of using local state to show DrugDetail.
+ * Layout:
+ *  1. Search bar (with filter icon)
+ *  2. Recently viewed drugs chips (horizontal scroll)
+ *  3. Category list — "All Drugs" row + one row per category
+ *     Tap row → DrugListView for that category
  *
- * The DrugDetail overlay pattern is removed. Drug detail lives at its
- * own route: /drugs/:slug  →  DrugDetailScreen.jsx
- *
- * NOTE: The install banner (PWA prompt) is preserved here and will move
- * to a dedicated PWA component in Phase 2K.
+ * When a search query is active → bypass category list, show flat filtered results.
+ * Filters from DrugFilterPanel applied on top of the current list.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Layout          from '../components/layout'
-import SearchBar       from '../components/SearchBar'
-import CategoryFilter  from '../components/CategoryFilter'
-import DrugCard        from '../components/DrugCard'
-import ManageStock     from '../components/ManageStock'
-import { useDrugContext }  from '../context/DrugContext'
-import { useSearch }       from '../hooks/useSearch'
-import { useFilter }       from '../hooks/useFilter'
-import { useStock }        from '../hooks/useStock'
+import Layout from '../components/layout'
+import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
+import { useDrugContext } from '../context/DrugContext'
+import { useSearch } from '../hooks/useSearch'
+import { useStock } from '../hooks/useStock'
 import { DRUG_CATEGORIES } from '../config/categories'
-import { ROUTES }          from '../router'
+import { getCategoryMeta } from '../constants/drugCategories'
+import { ROUTES } from '../router'
 
-// ─── Shimmer skeleton helpers ─────────────────────────────────────────────────
+const RECENT_KEY = 'capsula_recent_drugs'
+const MAX_RECENT = 5
 
-function shimmer(extra = {}) {
-  return {
-    backgroundColor: 'var(--color-border)',
-    borderRadius:    'var(--radius-sm)',
-    animation:       'shimmer 1.4s ease-in-out infinite',
-    ...extra,
+// ─── Recently viewed drugs (localStorage) ────────────────────────────────────
+
+function readRecentDrugs() {
+  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') } catch { return [] }
+}
+function addRecentDrug(drug) {
+  try {
+    const prev    = readRecentDrugs()
+    const filtered = prev.filter(d => d.id !== drug.id)
+    const next    = [{ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id }, ...filtered].slice(0, MAX_RECENT)
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
+  } catch { /* ignore */ }
+}
+
+// ─── applyFilters ─────────────────────────────────────────────────────────────
+
+function applyFilters(drugs, filters) {
+  if (!filters) return drugs
+  let result = drugs
+
+  // Form
+  if (!filters.forms.includes('all')) {
+    result = result.filter(d =>
+      d.formulations?.some(f => filters.forms.includes(f.form?.toLowerCase()))
+    )
   }
+
+  // Pregnancy
+  if (filters.pregnancySafe && !filters.pregnancyUnsafe) {
+    result = result.filter(d => ['A', 'B'].includes(d.pregnancyCategory))
+  } else if (filters.pregnancyUnsafe && !filters.pregnancySafe) {
+    result = result.filter(d => ['C', 'D', 'X'].includes(d.pregnancyCategory))
+  }
+
+  // Breastfeeding
+  if (filters.bfSafe && !filters.bfUnsafe) {
+    result = result.filter(d => d.breastfeedingSafety === 'safe')
+  } else if (filters.bfUnsafe && !filters.bfSafe) {
+    result = result.filter(d => ['caution', 'unsafe'].includes(d.breastfeedingSafety))
+  }
+
+  return result
 }
 
-// Inject the shimmer keyframe once (idempotent)
-if (typeof document !== 'undefined' && !document.getElementById('shimmer-style')) {
-  const style = document.createElement('style')
-  style.id = 'shimmer-style'
-  style.textContent = `
-    @keyframes shimmer {
-      0%   { opacity: 1; }
-      50%  { opacity: 0.4; }
-      100% { opacity: 1; }
-    }
-  `
-  document.head.appendChild(style)
-}
-
-function SkeletonCard() {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border:          '1px solid var(--color-border)',
-      borderRadius:    'var(--radius-lg)',
-      padding:         'var(--space-3) var(--space-4)',
-      marginBottom:    'var(--space-2)',
-      boxShadow:       'var(--shadow-card)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-        <div style={shimmer({ width: 80, height: 18, borderRadius: 'var(--radius-full)' })} />
-        <div style={shimmer({ width: 8, height: 8, borderRadius: '50%' })} />
-      </div>
-      <div style={shimmer({ width: '60%', height: 18, marginBottom: 'var(--space-1)' })} />
-      <div style={shimmer({ width: '40%', height: 14 })} />
-    </div>
-  )
-}
-
-// ─── PWA install banner ───────────────────────────────────────────────────────
-
-function InstallBanner({ onInstall, onDismiss }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-accent-light)',
-      border:          '1px solid var(--color-accent)',
-      borderRadius:    'var(--radius-md)',
-      padding:         'var(--space-3) var(--space-4)',
-      marginTop:       'var(--space-4)',
-      marginBottom:    'var(--space-2)',
-      display:         'flex',
-      justifyContent:  'space-between',
-      alignItems:      'center',
-      gap:             'var(--space-3)',
-    }}>
-      <span style={{ fontSize: 13, color: 'var(--color-accent)', fontWeight: 500 }}>
-        Install Capsula on your home screen
-      </span>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', flexShrink: 0 }}>
-        <button onClick={onInstall} style={{
-          padding:         '6px 14px',
-          borderRadius:    'var(--radius-sm)',
-          fontSize:        13,
-          fontWeight:      600,
-          cursor:          'pointer',
-          border:          'none',
-          backgroundColor: 'var(--color-accent)',
-          color:           'white',
-          fontFamily:      'var(--font-body)',
-        }}>
-          Install
-        </button>
-        <button onClick={onDismiss} style={{
-          padding:         '6px 14px',
-          borderRadius:    'var(--radius-sm)',
-          fontSize:        13,
-          fontWeight:      500,
-          cursor:          'pointer',
-          border:          '1px solid var(--color-accent)',
-          backgroundColor: 'transparent',
-          color:           'var(--color-accent)',
-          fontFamily:      'var(--font-body)',
-        }}>
-          Not now
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── DrugsScreen ─────────────────────────────────────────────────────────────
+// ─── DrugsScreen ──────────────────────────────────────────────────────────────
 
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { drugs, loading } = useDrugContext()
-  const [showManageStock, setShowManageStock] = useState(false)
-  const [installPrompt,   setInstallPrompt]   = useState(null)
-  const [showInstallBanner, setShowInstallBanner] = useState(false)
+  const { query, setQuery, results: searchResults } = useSearch(drugs)
+  const { stockMap, toggleStock } = useStock(drugs)
 
-  // PWA install prompt — attach once
+  const [activeCategory, setActiveCategory] = useState(null) // null = category list
+  const [filterOpen,     setFilterOpen]     = useState(false)
+  const [activeFilters,  setActiveFilters]  = useState(null)
+  const [recentDrugs,    setRecentDrugs]    = useState(() => readRecentDrugs())
+
+  // Refresh recent list when navigating back
   useEffect(() => {
-    function handleBeforeInstall(e) {
-      e.preventDefault()
-      setInstallPrompt(e)
-      setShowInstallBanner(true)
-    }
-    window.addEventListener('beforeinstallprompt', handleBeforeInstall)
-    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall)
+    setRecentDrugs(readRecentDrugs())
   }, [])
 
-  const handleInstall = () => {
-    if (!installPrompt) return
-    installPrompt.prompt()
-    installPrompt.userChoice.then(() => {
-      setInstallPrompt(null)
-      setShowInstallBanner(false)
-    })
-  }
-
-  const { stockMap, toggleStock, setAllStock } = useStock(drugs)
-  const { query, setQuery, results: searchResults } = useSearch(drugs)
-  const { activeCategory, setActiveCategory, filter } = useFilter()
-
-  const presentCategories = DRUG_CATEGORIES
-    .filter(c => drugs.some(d => d.category === c.value))
-    .map(c => c.value)
-
-  const filtered = filter(searchResults).slice().sort((a, b) => {
-    const aIn = stockMap[a.id] ? 0 : 1
-    const bIn = stockMap[b.id] ? 0 : 1
-    if (aIn !== bIn) return aIn - bIn
-    return a.genericName.localeCompare(b.genericName)
-  })
-
-  // ── Navigate to drug detail screen (new in Phase 2B) ──────────────────────
-  // Drug cards now navigate to /drugs/:slug instead of showing an overlay.
-  // The slug is on drug.slug (added in Phase 1B formulations migration).
-  // Fallback to drug.id if slug is not yet populated.
   function handleDrugTap(drug) {
-    const identifier = drug.slug || drug.id
-    navigate(ROUTES.DRUG_DETAIL(identifier))
+    addRecentDrug(drug)
+    setRecentDrugs(readRecentDrugs())
+    navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
   }
 
-  // ── Manage Stock view ─────────────────────────────────────────────────────
-  if (showManageStock) {
-    return (
-      <Layout>
-        <ManageStock
-          drugs={drugs}
-          stockMap={stockMap}
-          onToggle={toggleStock}
-          onSetAll={setAllStock}
-          onBack={() => setShowManageStock(false)}
-        />
-      </Layout>
-    )
+  function handleApplyFilters(filters) {
+    // Check if anything is actually active
+    const hasActive = !filters.forms.includes('all') || filters.pregnancySafe || filters.pregnancyUnsafe || filters.bfSafe || filters.bfUnsafe
+    setActiveFilters(hasActive ? filters : null)
   }
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
-  if (loading && drugs.length === 0) {
+  const hasQuery = query.trim().length > 0
+  const hasFilters = !!activeFilters
+
+  // ── Search results view ───────────────────────────────────────────────────
+  if (hasQuery || (activeCategory !== null)) {
+    const base = hasQuery
+      ? searchResults
+      : drugs.filter(d => activeCategory === '__all' || d.category === activeCategory)
+
+    const displayed = applyFilters(base, activeFilters)
+      .slice()
+      .sort((a, b) => a.genericName.localeCompare(b.genericName))
+
     return (
       <Layout>
         <div style={{ paddingTop: 'var(--space-5)' }}>
-          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
-            {[80, 90, 70, 100, 75].map((w, i) => (
-              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-            ))}
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            onFilter={() => setFilterOpen(true)}
+            hasActiveFilters={hasFilters}
+          />
+
+          {/* Back to categories button (only when in a category, not searching) */}
+          {!hasQuery && activeCategory !== null && (
+            <button
+              onClick={() => setActiveCategory(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                fontFamily: 'var(--font-body)', padding: '4px 0',
+                marginBottom: 'var(--space-3)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              {activeCategory === '__all'
+                ? 'All Drugs'
+                : (DRUG_CATEGORIES.find(c => c.value === activeCategory)?.label ?? activeCategory)
+              }
+            </button>
+          )}
+
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
+            {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+            {query && ` for "${query}"`}
           </div>
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+
+          {displayed.length === 0 ? (
+            <EmptyState query={query} />
+          ) : (
+            displayed.map(drug => (
+              <DrugListRow
+                key={drug.id}
+                drug={drug}
+                isInStock={stockMap[drug.id] ?? true}
+                onTap={handleDrugTap}
+              />
+            ))
+          )}
         </div>
+
+        <DrugFilterPanel
+          isOpen={filterOpen}
+          onClose={() => setFilterOpen(false)}
+          onApply={handleApplyFilters}
+        />
       </Layout>
     )
   }
 
-  // ── Main view ─────────────────────────────────────────────────────────────
+  // ── Category list view ────────────────────────────────────────────────────
+  const categoriesWithCounts = DRUG_CATEGORIES
+    .map(cat => ({
+      ...cat,
+      count: drugs.filter(d => d.category === cat.value).length,
+    }))
+    .filter(c => c.count > 0)
+
   return (
     <Layout>
       <div style={{ paddingTop: 'var(--space-5)' }}>
-
-        {showInstallBanner && (
-          <InstallBanner
-            onInstall={handleInstall}
-            onDismiss={() => setShowInstallBanner(false)}
-          />
-        )}
-
-        <SearchBar value={query} onChange={setQuery} />
-
-        <CategoryFilter
-          categories={presentCategories}
-          active={activeCategory}
-          onSelect={setActiveCategory}
+        <SearchBar
+          value={query}
+          onChange={setQuery}
+          onFilter={() => setFilterOpen(true)}
+          hasActiveFilters={hasFilters}
         />
 
-        {/* Result count + manage stock */}
-        <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          marginBottom:   'var(--space-3)',
-        }}>
-          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-            {filtered.length} drug{filtered.length !== 1 ? 's' : ''}
-            {query && ` for "${query}"`}
+        {/* Recently viewed chips */}
+        {recentDrugs.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+            overflowX: 'auto', paddingBottom: 'var(--space-1)',
+            marginBottom: 'var(--space-3)',
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+              flexShrink: 0, paddingRight: 'var(--space-1)',
+            }}>
+              Recent
+            </span>
+            {recentDrugs.map(d => (
+              <button
+                key={d.id}
+                onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
+                style={{
+                  flexShrink: 0, padding: '5px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  border: '1.5px solid var(--color-border)',
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-secondary)',
+                  fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {d.name}
+              </button>
+            ))}
           </div>
-          <button
-            onClick={() => setShowManageStock(true)}
-            style={{
-              background:   'none',
-              border:       '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)',
-              padding:      '4px 12px',
-              fontSize:     12,
-              fontWeight:   500,
-              color:        'var(--color-text-secondary)',
-              cursor:       'pointer',
-              fontFamily:   'var(--font-body)',
-            }}
-          >
-            Manage Stock
-          </button>
-        </div>
-
-        {/* Drug list */}
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-            <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-            <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
-              No drugs found{query ? ` for "${query}"` : ''}
-            </div>
-            <div style={{ fontSize: 13 }}>Try searching by brand name or Arabic name</div>
-          </div>
-        ) : (
-          filtered.map(drug => (
-            <DrugCard
-              key={drug.id}
-              drug={drug}
-              isInStock={stockMap[drug.id]}
-              onTap={handleDrugTap}
-            />
-          ))
         )}
 
+        {/* Loading skeleton */}
+        {loading && drugs.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{
+                height: 64,
+                backgroundColor: 'var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                animation: 'shimmer 1.4s ease-in-out infinite',
+              }} />
+            ))}
+          </div>
+        )}
+
+        {/* "All Drugs" row */}
+        {!loading && (
+          <>
+            <CategoryRow
+              label="All Drugs"
+              count={drugs.length}
+              icon="fa-pills"
+              color="#F3F4F6"
+              textColor="#374151"
+              onTap={() => setActiveCategory('__all')}
+            />
+
+            {/* Category rows */}
+            {categoriesWithCounts.map(cat => {
+              const meta = getCategoryMeta(cat.value)
+              return (
+                <CategoryRow
+                  key={cat.value}
+                  label={cat.label}
+                  count={cat.count}
+                  icon={meta.icon}
+                  color={meta.color}
+                  textColor={meta.textColor}
+                  onTap={() => setActiveCategory(cat.value)}
+                />
+              )
+            })}
+          </>
+        )}
       </div>
+
+      <DrugFilterPanel
+        isOpen={filterOpen}
+        onClose={() => setFilterOpen(false)}
+        onApply={handleApplyFilters}
+      />
     </Layout>
+  )
+}
+
+// ─── CategoryRow ──────────────────────────────────────────────────────────────
+
+function CategoryRow({ label, count, icon, color, textColor, onTap }) {
+  return (
+    <div
+      onClick={onTap}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-3) var(--space-4)',
+        marginBottom: 'var(--space-2)',
+        cursor: 'pointer',
+        boxShadow: 'var(--shadow-card)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {/* Icon in tinted circle */}
+      <div style={{
+        width: 40, height: 40, borderRadius: '50%',
+        backgroundColor: color,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+      }}>
+        <i className={`fa-solid ${icon}`} style={{ color: textColor, fontSize: 16 }} />
+      </div>
+
+      {/* Name + count */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+          {label}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
+          {count} drug{count !== 1 ? 's' : ''}
+        </div>
+      </div>
+
+      {/* Chevron */}
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </div>
+  )
+}
+
+// ─── DrugListRow ──────────────────────────────────────────────────────────────
+
+function DrugListRow({ drug, isInStock, onTap }) {
+  const brandNames = drug.brands?.map(b => b.name) ?? []
+  const meta = getCategoryMeta(drug.category)
+
+  return (
+    <div
+      onClick={() => onTap(drug)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-3) var(--space-4)',
+        marginBottom: 'var(--space-2)',
+        cursor: 'pointer',
+        opacity: isInStock ? 1 : 0.55,
+        boxShadow: 'var(--shadow-card)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {/* Stock dot */}
+      <div style={{
+        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+        backgroundColor: isInStock ? 'var(--color-instock, #10B981)' : 'var(--color-outstock, #9CA3AF)',
+      }} />
+
+      {/* Name + brands */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+          {drug.genericName}
+        </div>
+        {brandNames.length > 0 && (
+          <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 500, marginTop: 1, lineHeight: 1.3 }}>
+            {brandNames.slice(0, 4).join(' · ')}{brandNames.length > 4 ? ' …' : ''}
+          </div>
+        )}
+      </div>
+
+      {/* Category pill */}
+      <span style={{
+        fontSize: 11, fontWeight: 500, flexShrink: 0,
+        backgroundColor: meta.color, color: meta.textColor,
+        borderRadius: 'var(--radius-full)', padding: '2px 8px',
+        letterSpacing: '0.03em',
+      }}>
+        {DRUG_CATEGORIES.find(c => c.value === drug.category)?.label ?? drug.category}
+      </span>
+    </div>
+  )
+}
+
+// ─── SearchBar ────────────────────────────────────────────────────────────────
+
+function SearchBar({ value, onChange, onFilter, hasActiveFilters }) {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', alignItems: 'center' }}>
+      <div style={{ flex: 1, position: 'relative' }}>
+        <svg
+          width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+          style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+        >
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="Search drugs..."
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            paddingLeft: 36, paddingRight: value ? 36 : 12,
+            height: 44, borderRadius: 'var(--radius-full)',
+            border: '1.5px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface)',
+            fontSize: 14, color: 'var(--color-text-primary)',
+            fontFamily: 'var(--font-body)', outline: 'none',
+          }}
+        />
+        {value && (
+          <button
+            onClick={() => onChange('')}
+            style={{
+              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              color: 'var(--color-text-tertiary)', lineHeight: 1,
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Filter icon button */}
+      <button
+        onClick={onFilter}
+        style={{
+          width: 44, height: 44, borderRadius: 'var(--radius-full)',
+          border: hasActiveFilters ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+          backgroundColor: hasActiveFilters ? 'var(--color-accent)' : 'var(--color-surface)',
+          color: hasActiveFilters ? '#fff' : 'var(--color-text-secondary)',
+          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0, WebkitTapHighlightColor: 'transparent', outline: 'none',
+        }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" y1="6" x2="20" y2="6"/>
+          <line x1="8" y1="12" x2="16" y2="12"/>
+          <line x1="11" y1="18" x2="13" y2="18"/>
+        </svg>
+      </button>
+    </div>
+  )
+}
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+function EmptyState({ query }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
+        No drugs found{query ? ` for "${query}"` : ''}
+      </div>
+      <div style={{ fontSize: 13 }}>Try searching by generic name or brand name</div>
+    </div>
   )
 }

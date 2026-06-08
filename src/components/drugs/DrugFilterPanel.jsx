@@ -1,0 +1,203 @@
+import { useState } from 'react'
+
+/**
+ * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
+ *
+ * Phase 2F spec:
+ *  - Slides up from bottom
+ *  - Sections: Form/Route, Pregnancy (Safe/Unsafe), Breastfeeding (Safe/Unsafe)
+ *  - Clear All + Apply Filters buttons
+ *  - Filters do NOT persist between sessions
+ *
+ * Props:
+ *   isOpen    boolean
+ *   onClose   () => void
+ *   onApply   (filters) => void   filters: { forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
+ */
+
+const FORM_OPTIONS = [
+  { value: 'all',         label: 'All' },
+  { value: 'tablet',      label: 'Tab / Cap' },
+  { value: 'capsule',     label: 'Capsule' },
+  { value: 'syrup',       label: 'Syrup / Drops' },
+  { value: 'injection',   label: 'Injection' },
+  { value: 'suppository', label: 'Suppository' },
+  { value: 'sachet',      label: 'Sachet' },
+  { value: 'inhaler',     label: 'Inhaled' },
+  { value: 'cream',       label: 'Topical' },
+  { value: 'other',       label: 'Other' },
+]
+
+const EMPTY = {
+  forms:          ['all'],
+  pregnancySafe:  false,
+  pregnancyUnsafe: false,
+  bfSafe:         false,
+  bfUnsafe:       false,
+}
+
+export default function DrugFilterPanel({ isOpen, onClose, onApply }) {
+  const [filters, setFilters] = useState(EMPTY)
+
+  if (!isOpen) return null
+
+  function toggleForm(val) {
+    setFilters(prev => {
+      if (val === 'all') return { ...prev, forms: ['all'] }
+      const without = prev.forms.filter(f => f !== 'all' && f !== val)
+      const next = prev.forms.includes(val) ? without : [...without, val]
+      return { ...prev, forms: next.length ? next : ['all'] }
+    })
+  }
+
+  function toggle(key) {
+    setFilters(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
+  function handleClear() {
+    setFilters(EMPTY)
+  }
+
+  function handleApply() {
+    onApply(filters)
+    onClose()
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 80,
+          backgroundColor: 'rgba(0,0,0,0.4)',
+        }}
+      />
+
+      {/* Sheet */}
+      <div style={{
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        zIndex: 90,
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: '16px 16px 0 0',
+        padding: 'var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom))',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
+      }}>
+        {/* Handle */}
+        <div style={{
+          width: 36, height: 4, borderRadius: 2,
+          backgroundColor: 'var(--color-border)',
+          margin: '0 auto var(--space-4)',
+        }} />
+
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-4)' }}>
+          Filter Drugs
+        </div>
+
+        {/* Form / Route */}
+        <FilterSection label="Form / Route">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            {FORM_OPTIONS.map(opt => {
+              const active = filters.forms.includes(opt.value)
+              return (
+                <ToggleChip key={opt.value} label={opt.label} active={active} onToggle={() => toggleForm(opt.value)} />
+              )
+            })}
+          </div>
+        </FilterSection>
+
+        {/* Pregnancy */}
+        <FilterSection label="Pregnancy">
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <ToggleChip label="Safe (Cat A/B)" active={filters.pregnancySafe} onToggle={() => toggle('pregnancySafe')} />
+            <ToggleChip label="Unsafe (Cat C/D/X)" active={filters.pregnancyUnsafe} onToggle={() => toggle('pregnancyUnsafe')} />
+          </div>
+        </FilterSection>
+
+        {/* Breastfeeding */}
+        <FilterSection label="Breastfeeding">
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <ToggleChip label="Safe" active={filters.bfSafe} onToggle={() => toggle('bfSafe')} />
+            <ToggleChip label="Unsafe / Caution" active={filters.bfUnsafe} onToggle={() => toggle('bfUnsafe')} />
+          </div>
+        </FilterSection>
+
+        {/* Buttons */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
+          <button
+            onClick={handleClear}
+            style={{
+              flex: 1, padding: '12px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 14, fontWeight: 600,
+              cursor: 'pointer',
+              border: '1.5px solid #DC2626',
+              backgroundColor: 'transparent',
+              color: '#DC2626',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Clear All
+          </button>
+          <button
+            onClick={handleApply}
+            style={{
+              flex: 1, padding: '12px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 14, fontWeight: 600,
+              cursor: 'pointer',
+              border: 'none',
+              backgroundColor: 'var(--color-accent)',
+              color: '#fff',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Apply Filters
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function FilterSection({ label, children }) {
+  return (
+    <div style={{ marginBottom: 'var(--space-4)' }}>
+      <div style={{
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+        marginBottom: 'var(--space-2)',
+      }}>
+        {label}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function ToggleChip({ label, active, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        padding: '6px 14px',
+        borderRadius: 'var(--radius-full)',
+        fontSize: 13, fontWeight: active ? 600 : 400,
+        cursor: 'pointer',
+        border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+        color: active ? '#fff' : 'var(--color-text-secondary)',
+        fontFamily: 'var(--font-body)',
+        transition: 'all 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+        outline: 'none',
+      }}
+    >
+      {label}
+    </button>
+  )
+}
