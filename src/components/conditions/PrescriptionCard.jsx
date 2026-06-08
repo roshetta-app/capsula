@@ -6,6 +6,8 @@ import NoteRow from './NoteRow'
  * PrescriptionCard — renders all items for one prescription.
  * Items are pre-sorted by sort_order from the data layer.
  *
+ * Phase 2D: drug items get a number badge (sequential across drug-type items only).
+ *
  * Props:
  *   items  PrescriptionItem[]
  */
@@ -23,6 +25,8 @@ export default function PrescriptionCard({ items }) {
     )
   }
 
+  let drugIndex = 0
+
   return (
     <div style={{
       backgroundColor: 'var(--color-surface)',
@@ -36,7 +40,18 @@ export default function PrescriptionCard({ items }) {
     }}>
       {items.map(item => {
         if (item.type === 'drug') {
-          return <DrugRow key={item.id} alternatives={item.alternatives} />
+          drugIndex += 1
+          return (
+            <DrugRow
+              key={item.id}
+              index={drugIndex}
+              alternatives={item.alternatives}
+              doseOverride={item.doseOverride}
+              drugNote={item.drugNote}
+              drugNoteAr={item.drugNoteAr}
+              showGenericLink={item.showGenericLink ?? true}
+            />
+          )
         }
         if (item.type === 'text') {
           return <TextRow key={item.id} content={item.content} />

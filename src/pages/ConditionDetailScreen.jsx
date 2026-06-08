@@ -1,7 +1,10 @@
-import { useState, useRef } from 'react'
+================================================
+import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
+import { useFavouritesContext } from '../context/FavouritesContext'
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -18,12 +21,14 @@ function ageLabel(group) {
   return 'Adult'
 }
 
-const TABS = ['Prescriptions', 'Clinical Data']
+const TABS = ['Rx', 'Clinical']
 
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
   const { conditions, loading } = useConditionContext()
+  const { isConditionFavourited, toggleCondition } = useFavouritesContext()
+  const { addRecentlyViewed } = useRecentlyViewed()
 
   const [activeTab, setActiveTab] = useState(0)
   const touchStartX = useRef(null)
@@ -46,6 +51,16 @@ export default function ConditionDetailScreen() {
     touchStartY.current = null
   }
 
+  // Add to recently viewed once condition is resolved
+  const condition = conditions.find(c => c.slug === slug)
+  const isFav = condition ? isConditionFavourited(condition.id) : false
+
+  useEffect(() => {
+    if (condition) {
+      addRecentlyViewed({ id: condition.id, name: condition.name, slug: condition.slug })
+    }
+  }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading) {
     return (
       <div style={pageStyle}>
@@ -57,8 +72,6 @@ export default function ConditionDetailScreen() {
       </div>
     )
   }
-
-  const condition = conditions.find(c => c.slug === slug)
 
   if (!condition) {
     return (
@@ -75,7 +88,12 @@ export default function ConditionDetailScreen() {
 
   return (
     <div style={pageStyle}>
-      <DetailHeader onBack={() => navigate(-1)} condition={condition} />
+      <DetailHeader
+        onBack={() => navigate(-1)}
+        condition={condition}
+        isFav={isFav}
+        onFavToggle={() => toggleCondition(condition.id)}
+      />
 
       {/* Tab strip — full-width background, content centred */}
       <div style={{
@@ -143,6 +161,7 @@ export default function ConditionDetailScreen() {
               <PrescriptionsTab
                 prescriptions={condition.prescriptions}
                 patientInstructions={condition.patientInstructions}
+                conditionId={condition.id}
               />
             </div>
           </div>
@@ -173,7 +192,7 @@ const pageStyle = {
 
 // ─── DetailHeader — full-width bg, content centred ────────────────────────────
 
-function DetailHeader({ onBack, condition }) {
+function DetailHeader({ onBack, condition, isFav, onFavToggle }) {
   const ageStyle = condition
     ? (AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' })
     : null
@@ -187,7 +206,8 @@ function DetailHeader({ onBack, condition }) {
       borderBottom: '1px solid var(--color-border)',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: condition ? 'var(--space-2)' : 0 }}>
+        {/* Top row: back button + star */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 0 }}>
           <button
             onClick={onBack}
             aria-label="Back"
@@ -202,6 +222,27 @@ function DetailHeader({ onBack, condition }) {
             <ArrowLeft size={16} strokeWidth={2} />
             Back
           </button>
+
+          {/* Star favourite button */}
+          {condition && (
+            <button
+              onClick={onFavToggle}
+              aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
+                transition: 'color 0.15s ease',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              {/* Star SVG */}
+              <svg width="20" height="20" viewBox="0 0 24 24"
+                fill={isFav ? 'currentColor' : 'none'}
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+              </svg>
+            </button>
+          )}
         </div>
 
         {condition && (
@@ -240,3 +281,6 @@ function DetailHeader({ onBack, condition }) {
     </header>
   )
 }
+
+
+

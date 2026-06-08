@@ -1,14 +1,24 @@
 import { useState } from 'react'
 import PrescriptionCard from './PrescriptionCard'
+import PrescriptionPills from './PrescriptionPills'
+import PersonalNotes from './PersonalNotes'
 
 /**
- * PrescriptionsTab — prescription label pills + active card + patient instructions.
+ * PrescriptionsTab — prescription label pills + active card +
+ *                    patient instructions + personal notes + disclaimer.
+ *
+ * Phase 2D spec:
+ *  - Uses PrescriptionPills (new, compact, swipe-blocked)
+ *  - Uses PrescriptionCard (updated — numbered drug slots, dose logic)
+ *  - PersonalNotes: tap-to-edit, localStorage-persisted
+ *  - Medical disclaimer fixed at bottom
  *
  * Props:
  *   prescriptions        PrescriptionFull[]
  *   patientInstructions  string | null
+ *   conditionId          string   — for PersonalNotes localStorage key
  */
-export default function PrescriptionsTab({ prescriptions, patientInstructions }) {
+export default function PrescriptionsTab({ prescriptions, patientInstructions, conditionId }) {
   const [activeIndex, setActiveIndex] = useState(0)
 
   if (!prescriptions?.length) {
@@ -28,63 +38,28 @@ export default function PrescriptionsTab({ prescriptions, patientInstructions })
     )
   }
 
-  const active = prescriptions[activeIndex] ?? prescriptions[0]
+  const active = prescriptions[Math.min(activeIndex, prescriptions.length - 1)]
 
   return (
     <div>
-      {/* Prescription label pills — horizontal scroll */}
+      {/* Prescription label pills — only shown when >1 prescription */}
       {prescriptions.length > 1 && (
-        <div style={{
-          display: 'flex',
-          gap: 'var(--space-2)',
-          overflowX: 'auto',
-          paddingBottom: 'var(--space-2)',
-          marginBottom: 'var(--space-4)',
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none',
-        }}>
-          {prescriptions.map((rx, i) => {
-            const isActive = i === activeIndex
-            return (
-              <button
-                key={rx.id}
-                onClick={() => setActiveIndex(i)}
-                style={{
-                  flexShrink: 0,
-                  padding: '6px 16px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  fontFamily: 'var(--font-body)',
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease',
-                  border: isActive
-                    ? '1.5px solid var(--color-accent)'
-                    : '1.5px solid var(--color-border)',
-                  backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-                  color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {rx.label}
-              </button>
-            )
-          })}
-        </div>
+        <PrescriptionPills
+          prescriptions={prescriptions}
+          activeIndex={activeIndex}
+          onSelect={setActiveIndex}
+        />
       )}
 
       {/* Active prescription card */}
       <PrescriptionCard items={active.items} />
 
-      {/* Patient instructions — only if non-empty */}
+      {/* Patient instructions */}
       {patientInstructions && (
         <div style={{ marginTop: 'var(--space-5)' }}>
           <div style={{
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.1em',
-            textTransform: 'uppercase',
-            color: 'var(--color-text-tertiary)',
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
             marginBottom: 'var(--space-3)',
           }}>
             Patient Instructions
@@ -92,10 +67,8 @@ export default function PrescriptionsTab({ prescriptions, patientInstructions })
           <div
             dir="auto"
             style={{
-              fontSize: 14,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.7,
-              whiteSpace: 'pre-line',
+              fontSize: 14, color: 'var(--color-text-primary)',
+              lineHeight: 1.7, whiteSpace: 'pre-line',
               backgroundColor: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-lg)',
@@ -107,6 +80,22 @@ export default function PrescriptionsTab({ prescriptions, patientInstructions })
           </div>
         </div>
       )}
+
+      {/* Personal Notes */}
+      {conditionId && <PersonalNotes conditionId={conditionId} />}
+
+      {/* Medical Disclaimer */}
+      <div style={{
+        marginTop: 'var(--space-6)',
+        fontSize: 11,
+        color: 'var(--color-text-tertiary)',
+        fontStyle: 'italic',
+        lineHeight: 1.6,
+        textAlign: 'center',
+        padding: '0 var(--space-2)',
+      }}>
+        Clinical reference only. Verify doses before prescribing. Individual patient factors apply. Not a substitute for clinical judgment.
+      </div>
     </div>
   )
 }
