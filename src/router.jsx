@@ -24,7 +24,8 @@ import AdminLogin              from './pages/admin/AdminLogin'
 import AdminDashboard          from './pages/admin/AdminDashboard'
 import DrugCMS                 from './pages/admin/DrugCMS'
 import AddDrugFlow             from './pages/admin/AddDrugFlow'
-import FormulationDetailEditor from './pages/admin/FormulationDetailEditor'
+import FormulationDetailEditor  from './pages/admin/FormulationDetailEditor'
+import GenericFormulationsPage  from './pages/admin/GenericFormulationsPage'
 import ConditionsCMS           from './pages/admin/ConditionsCMS'
 import ConditionEditor         from './components/admin/ConditionEditor'
 
@@ -48,6 +49,7 @@ export const ROUTES = {
   ADMIN_DRUGS:          '/admin/drugs',
   ADMIN_DRUGS_NEW:      '/admin/drugs/new',
   ADMIN_DRUGS_EDIT:     (id) => `/admin/drugs/${id}`,
+  ADMIN_DRUGS_GENERIC:  (genericId) => `/admin/drugs/generic/${genericId}`,
   ADMIN_CONDITIONS:     '/admin/conditions',
   ADMIN_CONDITIONS_NEW: '/admin/conditions/new',
   ADMIN_CONDITIONS_EDIT:(id) => `/admin/conditions/${id}`,
@@ -87,6 +89,9 @@ export default function AppRoutes() {
       <Route path="/admin/drugs/new"
         element={<AuthGuard><AddDrugFlow /></AuthGuard>}
       />
+      <Route path="/admin/drugs/generic/:genericId"
+        element={<AuthGuard><GenericFormulationsPage /></AuthGuard>}
+      />
       <Route path="/admin/drugs/:id"
         element={<AuthGuard><FormulationDetailEditor /></AuthGuard>}
       />
@@ -103,3 +108,5 @@ export default function AppRoutes() {
     </Routes>
   )
 }
+
+

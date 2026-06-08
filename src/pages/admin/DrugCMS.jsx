@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, Search, X, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import GenericFormModal from '../../components/admin/GenericFormModal'
@@ -278,9 +278,24 @@ export default function DrugCMS() {
                       </div>
                     </div>
 
-                    {/* Formulation count */}
-                    <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                      {g.formulationCount}
+                    {/* Formulation count — click to manage formulations */}
+                    <div style={{ textAlign: 'center' }}>
+                      <button
+                        onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
+                        title="Manage formulations"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 13, fontWeight: 500,
+                          color: 'var(--color-accent)',
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          padding: '2px 4px', borderRadius: 'var(--radius-sm)',
+                          fontFamily: 'var(--font-body)',
+                          textDecoration: 'underline', textUnderlineOffset: 2,
+                        }}
+                      >
+                        <Layers size={12} />
+                        {g.formulationCount}
+                      </button>
                     </div>
 
                     {/* Publish toggle */}
