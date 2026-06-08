@@ -1,3 +1,4 @@
+/**
  * Phase 2I — Search shared components: swap to ui/SearchBar + ui/AutocompleteDropdown.
  *
  * Layout (top to bottom):
