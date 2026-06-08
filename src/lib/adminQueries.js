@@ -61,7 +61,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
     .from('formulations')
     .select(`
       id, concentration, form, route, doses,
-      generics ( id, slug, name_en, name_ar, category, class, uses_legacy, uses_structured, warnings_legacy, doses_structured ),
+      generics ( id, slug, name_en, name_ar, category, class, uses_legacy, warnings_legacy, textbook_doses ),
       brands   ( id, name, name_ar, manufacturer, in_stock, is_available )
     `)
     .eq('id', formulationId)

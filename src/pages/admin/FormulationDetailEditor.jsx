@@ -1,3 +1,5 @@
+FILE: src/pages/admin/FormulationDetailEditor.jsx
+================================================
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { ChevronLeft, Save, AlertTriangle, Trash2 } from 'lucide-react'
@@ -65,15 +67,15 @@ export default function FormulationDetailEditor() {
         name_ar:  data.generics.name_ar,
         category: data.generics.category,
         class:    data.generics.class,
-        uses:     data.generics.uses     ?? [],
-        warnings: data.generics.warnings ?? [],
-        doses:    data.generics.doses    ?? [],
+        uses:     data.generics.uses_legacy     ?? [],
+        warnings: data.generics.warnings_legacy ?? [],
+        doses:    data.generics.textbook_doses  ?? [],
       })
       setFormulation({
         concentration: data.concentration,
         form:          data.form,
         route:         data.route,
-        doses:         data.doses ?? [],
+        doses:         data.doses_structured ?? data.doses ?? [],
       })
       setBrands((data.brands ?? []).map(b => ({
         id:           b.id,
@@ -94,13 +96,13 @@ export default function FormulationDetailEditor() {
     setSaving('generic')
     setSaveError(null)
     const { error } = await updateGeneric(genericId, {
-      name_en:  generic.name_en.trim(),
-      name_ar:  generic.name_ar?.trim() || null,
-      category: generic.category,
-      class:    generic.class?.trim() || null,
-      uses:     generic.uses,
-      warnings: generic.warnings,
-      doses:    generic.doses,
+      name_en:         generic.name_en.trim(),
+      name_ar:         generic.name_ar?.trim() || null,
+      category:        generic.category,
+      class:           generic.class?.trim() || null,
+      uses_legacy:     generic.uses,
+      warnings_legacy: generic.warnings,
+      textbook_doses:  generic.doses,
     })
     setSaving(null)
     if (error) { setSaveError(`Generic: ${error.message}`); return }
@@ -113,10 +115,10 @@ export default function FormulationDetailEditor() {
     setSaving('formulation')
     setSaveError(null)
     const { error } = await updateFormulation(id, {
-      concentration: formulation.concentration.trim(),
-      form:          formulation.form,
-      route:         formulation.route,
-      doses:         formulation.doses,
+      concentration:  formulation.concentration.trim(),
+      form:           formulation.form,
+      route:          formulation.route,
+      doses_structured: formulation.doses,
     })
     setSaving(null)
     if (error) { setSaveError(`Formulation: ${error.message}`); return }
@@ -464,3 +466,6 @@ const cancelBtn = {
   fontFamily: 'var(--font-body)',
   cursor: 'pointer',
 }
+
+
+

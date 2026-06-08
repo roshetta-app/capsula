@@ -8,14 +8,17 @@
  *   - "Add New" now opens ConditionFormModal instead of navigating away
  *   - Edit still navigates to /admin/conditions/:id (full editor)
  *   - useToast for all success/error feedback
+ *   - FIX: uses fetchAllConditions (no is_published filter) so drafts appear
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, ChevronLeft } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import { deleteCondition, toggleConditionPublished } from '../../lib/adminQueries'
+import { fetchAllConditions } from '../../lib/queries'
+import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import ConditionFormModal from './ConditionFormModal'
 
@@ -46,8 +49,27 @@ function AgeGroupBadge({ group }) {
 
 export default function ConditionsCMS() {
   const navigate = useNavigate()
-  const { conditions, specialties, loading, refresh } = useConditionContext()
+  // useConditionContext still used for specialties list + public cache refresh
+  const { specialties, refresh: refreshPublicCache } = useConditionContext()
   const { toast } = useToast()
+
+  // ── Admin condition list (all, including drafts) ───────────────────────────
+  const [conditions, setConditions] = useState([])
+  const [loadingList, setLoadingList] = useState(true)
+
+  async function loadAll() {
+    setLoadingList(true)
+    try {
+      const data = await fetchAllConditions(supabase)
+      setConditions(data)
+    } catch (err) {
+      toast.error(err.message ?? 'Failed to load conditions')
+    } finally {
+      setLoadingList(false)
+    }
+  }
+
+  useEffect(() => { loadAll() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [query,           setQuery]           = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('all')
@@ -85,7 +107,8 @@ export default function ConditionsCMS() {
     } else {
       toast.success(`"${deleteTarget.name}" deleted`)
       setDeleteTarget(null)
-      await refresh()
+      await loadAll()
+      await refreshPublicCache()
     }
   }
 
@@ -103,6 +126,7 @@ export default function ConditionsCMS() {
       toast.error('Failed to update publish status')
     } else {
       toast.success(next ? `"${condition.name}" published` : `"${condition.name}" unpublished`)
+      await refreshPublicCache()
     }
   }
 
@@ -221,11 +245,11 @@ export default function ConditionsCMS() {
           fontSize: 12, color: 'var(--color-text-tertiary)',
           fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
         }}>
-          {loading ? 'Loading…' : `${filtered.length} condition${filtered.length !== 1 ? 's' : ''}`}
+          {loadingList ? 'Loading…' : `${filtered.length} condition${filtered.length !== 1 ? 's' : ''}`}
         </div>
 
         {/* List */}
-        {!loading && filtered.length === 0 ? (
+        {!loadingList && filtered.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
             color: 'var(--color-text-tertiary)', fontSize: 14,
@@ -270,7 +294,7 @@ export default function ConditionsCMS() {
       <ConditionFormModal
         isOpen={formOpen}
         onClose={() => setFormOpen(false)}
-        onSaved={async () => { await refresh() }}
+        onSaved={async () => { await loadAll(); await refreshPublicCache() }}
         condition={null}
         specialties={specialties}
       />

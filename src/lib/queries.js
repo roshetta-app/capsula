@@ -10,6 +10,7 @@
  *   - Added slug on formulations (added in 1B)
  *   - Added icon_name, color_hex on specialties (added in 1E)
  *   - fetchConditions picks up new clinical fields from 1D
+ *   - fetchAllConditions (no is_published filter) added for admin CMS
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -116,42 +117,34 @@ export async function fetchMetadataTimestamps(supabase) {
 // ─── Conditions queries ───────────────────────────────────────────────────────
 
 /**
- * Fetch all published conditions with full nested data.
- *
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @returns {Promise<ConditionFull[]>}
+ * Shared select + mapper for conditions queries.
+ * Used by both fetchConditions (public) and fetchAllConditions (admin).
  */
-export async function fetchConditions(supabase) {
-  const { data, error } = await supabase
-    .from('conditions')
-    .select(`
-      id, name, slug, age_group, card_tagline,
-      definition, icd10_code, epidemiology,
-      when_to_refer, prognosis,
-      differential_diagnosis, red_flags,
-      clinical_picture, history_questions, examination, investigations,
-      patient_instructions, clinical_blocks, is_published,
-      specialties ( id, name_en, slug, icon_name, color_hex, sort_order ),
-      condition_images ( id, url, caption, sort_order ),
-      prescriptions (
-        id, label, sort_order,
-        prescription_items (
-          id, type, content, sort_order,
-          dose_override, drug_note, drug_note_ar, show_generic_link,
-          prescription_drug_alternatives (
-            id, dose_instruction, sort_order,
-            brands ( id, name, name_ar, is_published,
-              formulations ( id, slug, concentration, form, route )
-            )
-          )
+const CONDITIONS_SELECT = `
+  id, name, slug, age_group, card_tagline,
+  definition, icd10_code, epidemiology,
+  when_to_refer, prognosis,
+  differential_diagnosis, red_flags,
+  clinical_picture, history_questions, examination, investigations,
+  patient_instructions, clinical_blocks, is_published,
+  specialties ( id, name_en, slug, icon_name, color_hex, sort_order ),
+  condition_images ( id, url, caption, sort_order ),
+  prescriptions (
+    id, label, sort_order,
+    prescription_items (
+      id, type, content, sort_order,
+      dose_override, drug_note, drug_note_ar, show_generic_link,
+      prescription_drug_alternatives (
+        id, dose_instruction, sort_order,
+        brands ( id, name, name_ar, is_published,
+          formulations ( id, slug, concentration, form, route )
         )
       )
-    `)
-    .eq('is_published', true)
-    .order('name')
+    )
+  )
+`
 
-  if (error) throw error
-
+function mapConditions(data) {
   return data.map(c => ({
     id:                   c.id,
     specialtyId:          c.specialties?.id,
@@ -169,6 +162,7 @@ export async function fetchConditions(supabase) {
     epidemiology:         c.epidemiology,
     whenToRefer:          c.when_to_refer,
     prognosis:            c.prognosis,
+    isPublished:          c.is_published ?? true,
     differentialDiagnosis: c.differential_diagnosis ?? [],
     redFlags:             c.red_flags               ?? [],
     clinicalBlocks:       c.clinical_blocks         ?? [],
@@ -213,4 +207,38 @@ export async function fetchConditions(supabase) {
           })),
       })),
   }))
+}
+
+/**
+ * Fetch all PUBLISHED conditions — used by public app via useConditions hook.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<ConditionFull[]>}
+ */
+export async function fetchConditions(supabase) {
+  const { data, error } = await supabase
+    .from('conditions')
+    .select(CONDITIONS_SELECT)
+    .eq('is_published', true)
+    .order('name')
+
+  if (error) throw error
+  return mapConditions(data)
+}
+
+/**
+ * Fetch ALL conditions (published + drafts) — used by admin CMS only.
+ * Requires an authenticated Supabase session with admin privileges.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<ConditionFull[]>}
+ */
+export async function fetchAllConditions(supabase) {
+  const { data, error } = await supabase
+    .from('conditions')
+    .select(CONDITIONS_SELECT)
+    .order('name')
+
+  if (error) throw error
+  return mapConditions(data)
 }
