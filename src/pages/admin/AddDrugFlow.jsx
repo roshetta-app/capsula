@@ -78,15 +78,16 @@ export default function AddDrugFlow() {
 
     try {
       // 1. Insert generic — generate slug from name_en
-      const slug = generic.name_en.trim()
+      const slugBase = generic.name_en.trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
+      const slug = slugBase || `generic-${Date.now()}`
 
       const { data: newGeneric, error: gErr } = await insertGeneric({
         slug,
         name_en:  generic.name_en.trim(),
-        name_ar:  generic.name_ar?.trim() || null,
+        name_ar:  generic.name_ar?.trim() || '',
         category: generic.category,
         class:    generic.class?.trim()   || null,
         uses:     generic.uses,
@@ -314,3 +315,5 @@ function primaryBtn(disabled) {
     transition: 'background-color 0.15s ease',
   }
 }
+
+
