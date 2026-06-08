@@ -12,6 +12,7 @@
  *           insertPrescriptionItem, updatePrescriptionItem, deletePrescriptionItem,
  *           insertDrugAlternative, updateDrugAlternative, deleteDrugAlternative,
  *           reorderItems, fetchPrescriptionsForCondition, searchBrandsForTypeahead
+ *   3B  — toggleConditionPublished, touchAppMetadata
  */
 
 import { supabase } from './supabase'
@@ -246,7 +247,6 @@ export async function fetchPrescriptionsForCondition(conditionId) {
 
   if (error) return { data: null, error }
 
-  // Normalise nested structure
   const normalised = data.map(p => ({
     ...p,
     prescription_items: (p.prescription_items ?? [])
@@ -315,7 +315,6 @@ export async function deletePrescriptionItem(id) {
 
 /**
  * Batch update sort_order for a list of items.
- * Works on any table that has id + sort_order columns.
  * @param {string} table — 'prescriptions' | 'prescription_items' | 'prescription_drug_alternatives'
  * @param {{ id: string, sort_order: number }[]} items
  */
@@ -357,7 +356,6 @@ export async function deleteDrugAlternative(id) {
 
 /**
  * Typeahead search for brands by name.
- * Returns brand + formulation + generic info needed by DrugRowEditor.
  * @param {string} query — partial brand name
  */
 export async function searchBrandsForTypeahead(query) {
@@ -374,4 +372,35 @@ export async function searchBrandsForTypeahead(query) {
     .limit(20)
 
   return { data: data ?? [], error }
+}
+
+// ─── Conditions — publish toggle (3B) ────────────────────────────────────────
+
+/**
+ * Toggle is_published on a condition and invalidate the app cache.
+ */
+export async function toggleConditionPublished(id, isPublished) {
+  const { error } = await supabase
+    .from('conditions')
+    .update({ is_published: isPublished })
+    .eq('id', id)
+  if (error) return { error }
+  return touchAppMetadata('conditions_updated_at')
+}
+
+// ─── Cache invalidation (3B+) ────────────────────────────────────────────────
+
+/**
+ * Bump a timestamp column on app_metadata so every client's cache TTL expires.
+ * column — e.g. 'conditions_updated_at' | 'drugs_updated_at'
+ *
+ * Assumes a single-row app_metadata table with id = 'singleton'.
+ * Silently succeeds even if the table/column doesn't exist yet.
+ */
+export async function touchAppMetadata(column) {
+  const { error } = await supabase
+    .from('app_metadata')
+    .update({ [column]: new Date().toISOString() })
+    .eq('id', 'singleton')
+  return { error: error ?? null }
 }

@@ -1,15 +1,23 @@
 /**
- * ConditionsCMS — /admin/conditions
+ * src/pages/admin/ConditionsCMS.jsx
+ * Phase 3B — Conditions Editor
  *
- * Specialty filter pills + search + condition list with edit/delete per row.
- * "+ Add New Condition" navigates to /admin/conditions/new.
+ * Changes from previous version:
+ *   - Replaced inline DeleteDialog with ConfirmModal (3A component)
+ *   - Added is_published toggle per row (immediate Supabase update)
+ *   - "Add New" now opens ConditionFormModal instead of navigating away
+ *   - Edit still navigates to /admin/conditions/:id (full editor)
+ *   - useToast for all success/error feedback
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, AlertTriangle, ChevronLeft } from 'lucide-react'
+import { Plus, Edit2, Trash2, ChevronLeft } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
-import { deleteCondition } from '../../lib/adminQueries'
+import { useToast } from '../../context/ToastContext'
+import { deleteCondition, toggleConditionPublished } from '../../lib/adminQueries'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import ConditionFormModal from './ConditionFormModal'
 
 // ─── Age group badge ──────────────────────────────────────────────────────────
 
@@ -34,87 +42,27 @@ function AgeGroupBadge({ group }) {
   )
 }
 
-// ─── Delete confirm dialog ────────────────────────────────────────────────────
-
-function DeleteDialog({ condition, onConfirm, onCancel, deleting, error }) {
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 200,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      padding: 'var(--space-4)',
-    }}>
-      <div style={{
-        backgroundColor: 'var(--color-surface)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-5)',
-        maxWidth: 400, width: '100%',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-      }}>
-        <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' }}>
-          Delete condition?
-        </div>
-        <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-4)', lineHeight: 1.5 }}>
-          This will permanently delete <strong>{condition.name}</strong> including all its prescriptions and images. This cannot be undone.
-        </div>
-
-        {error && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
-            backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-            borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
-            marginBottom: 'var(--space-4)', fontSize: 13, color: '#DC2626',
-          }}>
-            <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
-          <button
-            onClick={onCancel}
-            disabled={deleting}
-            style={{
-              padding: '8px 18px', borderRadius: 'var(--radius-md)',
-              fontSize: 14, fontWeight: 500, cursor: 'pointer',
-              border: '1px solid var(--color-border)',
-              backgroundColor: 'transparent', color: 'var(--color-text-secondary)',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={deleting}
-            style={{
-              padding: '8px 18px', borderRadius: 'var(--radius-md)',
-              fontSize: 14, fontWeight: 600, cursor: deleting ? 'default' : 'pointer',
-              border: 'none', backgroundColor: '#DC2626', color: '#fff',
-              fontFamily: 'var(--font-body)', opacity: deleting ? 0.7 : 1,
-            }}
-          >
-            {deleting ? 'Deleting…' : 'Delete'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ConditionsCMS() {
   const navigate = useNavigate()
   const { conditions, specialties, loading, refresh } = useConditionContext()
+  const { toast } = useToast()
 
   const [query,           setQuery]           = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('all')
-  const [deleteTarget,    setDeleteTarget]    = useState(null)   // condition object
-  const [deleting,        setDeleting]        = useState(false)
-  const [deleteError,     setDeleteError]     = useState(null)
 
-  // ─── Filter ──────────────────────────────────────────────────────────────
+  // Delete confirm modal
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting,     setDeleting]     = useState(false)
+
+  // New condition modal
+  const [formOpen, setFormOpen] = useState(false)
+
+  // Optimistic publish overrides — { [conditionId]: boolean }
+  const [publishedOverrides, setPublishedOverrides] = useState({})
+
+  // ─── Filter ────────────────────────────────────────────────────────────────
 
   const filtered = conditions.filter(c => {
     const matchesSpecialty = activeSpecialty === 'all' || c.specialtyId === activeSpecialty
@@ -125,24 +73,40 @@ export default function ConditionsCMS() {
     return matchesSpecialty && matchesQuery
   })
 
-  // ─── Delete ───────────────────────────────────────────────────────────────
+  // ─── Delete ────────────────────────────────────────────────────────────────
 
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    setDeleteError(null)
     const { error } = await deleteCondition(deleteTarget.id)
+    setDeleting(false)
     if (error) {
-      setDeleteError(error.message ?? 'Delete failed')
-      setDeleting(false)
+      toast.error(error.message ?? 'Delete failed')
     } else {
-      await refresh()
+      toast.success(`"${deleteTarget.name}" deleted`)
       setDeleteTarget(null)
-      setDeleting(false)
+      await refresh()
     }
   }
 
-  // ─── Render ──────────────────────────────────────────────────────────────
+  // ─── Publish toggle ────────────────────────────────────────────────────────
+
+  async function handleTogglePublished(condition) {
+    const current = publishedOverrides[condition.id] ?? condition.isPublished ?? true
+    const next    = !current
+    // Optimistic update
+    setPublishedOverrides(prev => ({ ...prev, [condition.id]: next }))
+    const { error } = await toggleConditionPublished(condition.id, next)
+    if (error) {
+      // Revert
+      setPublishedOverrides(prev => ({ ...prev, [condition.id]: current }))
+      toast.error('Failed to update publish status')
+    } else {
+      toast.success(next ? `"${condition.name}" published` : `"${condition.name}" unpublished`)
+    }
+  }
+
+  // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={{
@@ -183,7 +147,7 @@ export default function ConditionsCMS() {
           </div>
 
           <button
-            onClick={() => navigate('/admin/conditions/new')}
+            onClick={() => setFormOpen(true)}
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
               padding: '7px 14px', borderRadius: 'var(--radius-md)',
@@ -201,7 +165,7 @@ export default function ConditionsCMS() {
       <main style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-4) var(--space-4) var(--space-12)' }}>
 
         {/* Search */}
-        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           <input
             type="search"
             placeholder="Search conditions…"
@@ -270,46 +234,80 @@ export default function ConditionsCMS() {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            {filtered.map(condition => (
-              <ConditionRow
-                key={condition.id}
-                condition={condition}
-                onEdit={() => navigate(`/admin/conditions/${condition.id}`)}
-                onDelete={() => { setDeleteError(null); setDeleteTarget(condition) }}
-              />
-            ))}
+            {filtered.map(condition => {
+              const isPublished = publishedOverrides[condition.id] ?? condition.isPublished ?? true
+              return (
+                <ConditionRow
+                  key={condition.id}
+                  condition={condition}
+                  isPublished={isPublished}
+                  onEdit={() => navigate(`/admin/conditions/${condition.id}`)}
+                  onDelete={() => setDeleteTarget(condition)}
+                  onTogglePublished={() => handleTogglePublished(condition)}
+                />
+              )
+            })}
           </div>
         )}
       </main>
 
-      {/* Delete dialog */}
-      {deleteTarget && (
-        <DeleteDialog
-          condition={deleteTarget}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteTarget(null)}
-          deleting={deleting}
-          error={deleteError}
-        />
-      )}
+      {/* Delete confirm modal (3A) */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="Delete condition?"
+        message={
+          deleteTarget
+            ? `This will permanently delete "${deleteTarget.name}" including all its prescriptions and images. This cannot be undone.`
+            : ''
+        }
+        confirmLabel={deleting ? 'Deleting…' : 'Delete'}
+        confirmVariant="danger"
+      />
+
+      {/* New condition modal (3B) */}
+      <ConditionFormModal
+        isOpen={formOpen}
+        onClose={() => setFormOpen(false)}
+        onSaved={async () => { await refresh() }}
+        condition={null}
+        specialties={specialties}
+      />
     </div>
   )
 }
 
 // ─── Condition row ────────────────────────────────────────────────────────────
 
-function ConditionRow({ condition, onEdit, onDelete }) {
+function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublished }) {
   const rxCount = condition.prescriptions?.length ?? 0
 
   return (
     <div style={{
       backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
+      border: `1px solid ${isPublished ? 'var(--color-border)' : 'var(--color-border-subtle)'}`,
       borderRadius: 'var(--radius-lg)',
       padding: 'var(--space-3) var(--space-4)',
       boxShadow: 'var(--shadow-card)',
       display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+      opacity: isPublished ? 1 : 0.65,
     }}>
+      {/* Publish toggle */}
+      <button
+        onClick={onTogglePublished}
+        title={isPublished ? 'Published — click to unpublish' : 'Draft — click to publish'}
+        style={{
+          flexShrink: 0,
+          width: 10, height: 10,
+          borderRadius: '50%',
+          border: 'none',
+          backgroundColor: isPublished ? 'var(--color-success)' : 'var(--color-border)',
+          cursor: 'pointer',
+          padding: 0,
+        }}
+      />
+
       {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
@@ -317,8 +315,21 @@ function ConditionRow({ condition, onEdit, onDelete }) {
           color: 'var(--color-text-primary)',
           marginBottom: 'var(--space-1)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
         }}>
           {condition.name}
+          {!isPublished && (
+            <span style={{
+              fontSize: 10, fontWeight: 600, letterSpacing: '0.05em',
+              color: 'var(--color-text-tertiary)',
+              backgroundColor: 'var(--color-bg)',
+              border: '1px solid var(--color-border)',
+              padding: '1px 6px', borderRadius: 'var(--radius-full)',
+              textTransform: 'uppercase',
+            }}>
+              Draft
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           {condition.specialtyName && (
