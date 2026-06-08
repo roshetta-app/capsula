@@ -1,10 +1,9 @@
 /**
  * src/App.jsx
- * Phase 2J addition: wrapped AppRoutes with OnboardingGate
+ * Phase 3A addition: wrapped with ToastProvider (global toast system for CMS)
  *
- * OnboardingGate checks localStorage('capsula_onboarded').
- * First launch → shows OnboardingScreen (3-card swipe).
- * All subsequent launches → transparent pass-through, zero overhead.
+ * Provider order (outermost → innermost):
+ *   BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → OnboardingGate → AppRoutes
  */
 
 import { BrowserRouter } from 'react-router-dom'
@@ -13,19 +12,22 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
+import { ToastProvider } from './contexts/ToastContext'
 
 export default function App() {
   return (
     <BrowserRouter basename="/capsula">
-      <ConditionProvider>
-        <DrugProvider>
-          <FavouritesProvider>
-            <OnboardingGate>
-              <AppRoutes />
-            </OnboardingGate>
-          </FavouritesProvider>
-        </DrugProvider>
-      </ConditionProvider>
+      <ToastProvider>
+        <ConditionProvider>
+          <DrugProvider>
+            <FavouritesProvider>
+              <OnboardingGate>
+                <AppRoutes />
+              </OnboardingGate>
+            </FavouritesProvider>
+          </DrugProvider>
+        </ConditionProvider>
+      </ToastProvider>
     </BrowserRouter>
   )
 }
