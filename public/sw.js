@@ -11,6 +11,10 @@
  *   3. On activate: delete all old caches, claim all tabs, send 'RELOAD' message
  *   4. main.jsx receives 'RELOAD' → calls location.reload()
  *   Result: the tab reloads itself automatically within seconds of a deploy.
+ *
+ * Phase 2K addition:
+ *   - Offline fallback responses include header X-Served-From: cache
+ *     so the app can confirm it is in offline/cached mode.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -55,6 +59,23 @@ self.addEventListener('activate', event => {
   )
 })
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Clones a cached Response and injects the X-Served-From: cache header.
+ * This lets the app detect it is receiving a cached offline fallback.
+ */
+function withCacheHeader(response) {
+  if (!response) return response
+  const headers = new Headers(response.headers)
+  headers.set('X-Served-From', 'cache')
+  return new Response(response.body, {
+    status:     response.status,
+    statusText: response.statusText,
+    headers,
+  })
+}
+
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
 self.addEventListener('fetch', event => {
@@ -66,7 +87,7 @@ self.addEventListener('fetch', event => {
 
   // ── Navigation requests (HTML) → network-first ──────────────────────────
   // Always try the network first so index.html is never stale.
-  // Falls back to cache only when offline.
+  // Falls back to cache only when offline — served with X-Served-From: cache.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -75,7 +96,11 @@ self.addEventListener('fetch', event => {
           caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
           return response
         })
-        .catch(() => caches.match('/capsula/index.html'))
+        .catch(() =>
+          caches.match('/capsula/index.html').then(cached =>
+            cached ? withCacheHeader(cached) : cached
+          )
+        )
     )
     return
   }
@@ -84,6 +109,7 @@ self.addEventListener('fetch', event => {
   // Vite fingerprints every asset filename on build, so a new deploy produces
   // new filenames. The old hashed files are never re-requested, which means
   // cache-first is safe and fast here.
+  // Falls back to network fetch; if that also fails → serve cache with header.
   if (
     url.pathname.startsWith('/capsula/assets/') ||
     url.pathname.startsWith('/capsula/icons/')  ||
@@ -92,11 +118,17 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       caches.match(request).then(cached => {
         if (cached) return cached
-        return fetch(request).then(response => {
-          const clone = response.clone()
-          caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
-          return response
-        })
+        return fetch(request)
+          .then(response => {
+            const clone = response.clone()
+            caches.open(STATIC_CACHE).then(cache => cache.put(request, clone))
+            return response
+          })
+          .catch(() =>
+            caches.match(request).then(fallback =>
+              fallback ? withCacheHeader(fallback) : fallback
+            )
+          )
       })
     )
     return

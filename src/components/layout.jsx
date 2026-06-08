@@ -1,4 +1,5 @@
 import BottomNav from './BottomNav'
+import OfflineBanner from './ui/OfflineBanner'
 
 export default function Layout({ children }) {
   return (
@@ -8,6 +9,9 @@ export default function Layout({ children }) {
       fontFamily: 'var(--font-body)',
       color: 'var(--color-text-primary)',
     }}>
+      {/* Offline banner — sits above sticky header, only visible when offline */}
+      <OfflineBanner />
+
       {/* Sticky top header — full-width background, content centred */}
       <header style={{
         position: 'sticky',
