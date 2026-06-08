@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
+import { updateBrand } from '../../lib/adminQueries'
+import { useToast } from '../../context/ToastContext'
 
 /**
  * BrandEditor — manage brands for a formulation.
- * Phase 3F — removed in_stock, added source dropdown + is_published toggle per masterplan 3G spec.
+ * Phase 3G — immediate is_published toggle per masterplan 3G spec.
+ *             Added formulationLabel prop to show inherited concentration + form.
  *
  * Props:
- *   brands    { id?, name, name_ar, manufacturer, source, is_published }[]
- *   onChange  (brands) => void
- *   onDelete  (brandId) => void   — called for existing brands being removed
- *   disabled  boolean
+ *   brands          { id?, name, name_ar, manufacturer, source, is_published }[]
+ *   onChange        (brands) => void
+ *   onDelete        (brandId) => void   — called for existing brands being removed
+ *   disabled        boolean
+ *   formulationLabel string | null      — e.g. "500mg · Tablet" shown as read-only header
  */
 
 const SOURCE_OPTIONS = [
@@ -18,14 +22,22 @@ const SOURCE_OPTIONS = [
   { value: 'pharmacy-review', label: 'Pharmacy review' },
 ]
 
-export default function BrandEditor({ brands = [], onChange, onDelete, disabled = false }) {
+export default function BrandEditor({
+  brands = [],
+  onChange,
+  onDelete,
+  disabled = false,
+  formulationLabel = null,
+}) {
+  const { toast } = useToast()
 
   const [newName,   setNewName]   = useState('')
   const [newNameAr, setNewNameAr] = useState('')
   const [newMfr,    setNewMfr]    = useState('')
   const [newSource, setNewSource] = useState('manual')
+  const [toggling,  setToggling]  = useState(null) // brandId being toggled
 
-  function updateBrand(idx, field, value) {
+  function updateLocal(idx, field, value) {
     onChange(brands.map((b, i) => i === idx ? { ...b, [field]: value } : b))
   }
 
@@ -35,6 +47,32 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
       onDelete(brand.id)
     } else {
       onChange(brands.filter((_, i) => i !== idx))
+    }
+  }
+
+  /**
+   * Immediately persist is_published for existing brands (those with an id).
+   * New (unsaved) brands just toggle locally — they'll be saved on the save button.
+   */
+  async function togglePublished(idx) {
+    const brand    = brands[idx]
+    const newValue = !(brand.is_published ?? true)
+
+    // Optimistic local update
+    updateLocal(idx, 'is_published', newValue)
+
+    if (!brand.id) return // new brand — no DB row yet
+
+    setToggling(brand.id)
+    const { error } = await updateBrand(brand.id, { is_published: newValue })
+    setToggling(null)
+
+    if (error) {
+      // Revert
+      updateLocal(idx, 'is_published', !newValue)
+      toast.error(`Could not update publish status: ${error.message}`)
+    } else {
+      toast.success(newValue ? 'Brand published' : 'Brand set to draft')
     }
   }
 
@@ -58,6 +96,30 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+
+      {/* Inherited formulation label — display only */}
+      {formulationLabel && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          padding: 'var(--space-2) var(--space-3)',
+          backgroundColor: 'var(--color-bg)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-sm)',
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            Formulation
+          </span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            {formulationLabel}
+          </span>
+          <span style={{
+            marginLeft: 'auto', fontSize: 10, color: 'var(--color-text-tertiary)',
+            fontStyle: 'italic',
+          }}>
+            inherited · not editable here
+          </span>
+        </div>
+      )}
 
       {/* Existing brand rows */}
       {brands.map((brand, idx) => (
@@ -93,7 +155,7 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               <input
                 type="text"
                 value={brand.name}
-                onChange={e => updateBrand(idx, 'name', e.target.value)}
+                onChange={e => updateLocal(idx, 'name', e.target.value)}
                 disabled={disabled}
                 placeholder="Brand name"
                 required
@@ -105,7 +167,7 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               <input
                 type="text"
                 value={brand.name_ar ?? ''}
-                onChange={e => updateBrand(idx, 'name_ar', e.target.value || null)}
+                onChange={e => updateLocal(idx, 'name_ar', e.target.value || null)}
                 disabled={disabled}
                 placeholder="اسم العلامة التجارية"
                 dir="rtl"
@@ -121,7 +183,7 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               <input
                 type="text"
                 value={brand.manufacturer ?? ''}
-                onChange={e => updateBrand(idx, 'manufacturer', e.target.value || null)}
+                onChange={e => updateLocal(idx, 'manufacturer', e.target.value || null)}
                 disabled={disabled}
                 placeholder="Optional"
                 style={inputStyle}
@@ -132,7 +194,7 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               <SmallLabel>Source</SmallLabel>
               <select
                 value={brand.source ?? 'manual'}
-                onChange={e => updateBrand(idx, 'source', e.target.value)}
+                onChange={e => updateLocal(idx, 'source', e.target.value)}
                 disabled={disabled}
                 style={inputStyle}
               >
@@ -149,16 +211,19 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               type="button"
               role="switch"
               aria-checked={brand.is_published ?? true}
-              onClick={() => !disabled && updateBrand(idx, 'is_published', !(brand.is_published ?? true))}
-              disabled={disabled}
+              onClick={() => !disabled && !toggling && togglePublished(idx)}
+              disabled={disabled || toggling === brand.id}
+              title={(brand.is_published ?? true) ? 'Click to unpublish' : 'Click to publish'}
               style={{
                 width: 36, height: 20,
                 borderRadius: 10,
                 border: 'none',
                 backgroundColor: (brand.is_published ?? true) ? 'var(--color-accent)' : 'var(--color-border)',
-                position: 'relative', cursor: disabled ? 'not-allowed' : 'pointer',
+                position: 'relative',
+                cursor: (disabled || toggling === brand.id) ? 'not-allowed' : 'pointer',
                 transition: 'background-color 0.2s',
                 flexShrink: 0,
+                opacity: toggling === brand.id ? 0.6 : 1,
               }}
             >
               <span style={{
@@ -172,7 +237,10 @@ export default function BrandEditor({ brands = [], onChange, onDelete, disabled 
               }} />
             </button>
             <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', flex: 1 }}>
-              {(brand.is_published ?? true) ? 'Published' : 'Draft'}
+              {toggling === brand.id
+                ? 'Saving…'
+                : (brand.is_published ?? true) ? 'Published' : 'Draft'
+              }
             </span>
 
             {!disabled && (

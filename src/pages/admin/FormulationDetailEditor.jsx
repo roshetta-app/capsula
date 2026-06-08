@@ -249,6 +249,11 @@ export default function FormulationDetailEditor() {
       >
         <BrandEditor
           brands={brands.filter(b => !b._deleted)}
+          formulationLabel={
+            formulation
+              ? [formulation.concentration, formulation.form].filter(Boolean).join(' · ')
+              : null
+          }
           onChange={updated => {
             // Merge: keep _deleted flags, replace rest
             const deletedOld = brands.filter(b => b._deleted)
@@ -468,4 +473,3 @@ const cancelBtn = {
   fontFamily: 'var(--font-body)',
   cursor: 'pointer',
 }
-
