@@ -9,7 +9,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Plus, Trash2, ChevronUp, ChevronDown, Link, LinkOff } from 'lucide-react'
+import { Plus, Trash2, ChevronUp, ChevronDown, Link, Unlink } from 'lucide-react'
 import {
   searchBrandsForTypeahead,
   insertDrugAlternative,
@@ -383,7 +383,7 @@ export default function DrugRowEditor({ item, onChange, disabled }) {
               fontFamily: 'var(--font-body)',
             }}
           >
-            {showLink ? <Link size={12} /> : <LinkOff size={12} />}
+            {showLink ? <Link size={12} /> : <Unlink size={12} />}
             {showLink ? 'Drug link: ON' : 'Drug link: OFF'}
           </button>
           <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
