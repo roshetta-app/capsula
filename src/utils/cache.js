@@ -1,58 +1,112 @@
-const CACHE_KEY = 'capsula_cache'
-
 /**
- * Read the full cache synchronously.
- * Returns null if nothing cached yet.
+ * cache.js — localStorage cache with timestamp invalidation + 7-day TTL
  *
- * Shape: { drugs: { data, updatedAt }, conditions: { data, updatedAt } }
+ * Two slices: 'drugs' and 'conditions'
+ * Each slice: { data: [], fetchedAt: ISO string, version: string }
+ *
+ * Invalidation logic (called from useDrugs / useConditions):
+ *   1. Fetch app_metadata timestamp from Supabase (one lightweight request)
+ *   2. If timestamp differs from cached version → re-fetch
+ *   3. If timestamp matches BUT fetchedAt is older than 7 days → re-fetch
+ *   4. If both match and within TTL → use cached data, no network request
  */
-export function readCache() {
+
+import { CACHE_KEYS, CACHE_TTL_MS } from '../constants/cache'
+
+// ─── Internal helpers ─────────────────────────────────────────────────────────
+
+function readAll() {
   try {
-    const raw = localStorage.getItem(CACHE_KEY)
-    return raw ? JSON.parse(raw) : null
+    const drugs      = localStorage.getItem(CACHE_KEYS.DRUGS)
+    const conditions = localStorage.getItem(CACHE_KEYS.CONDITIONS)
+    return {
+      drugs:      drugs      ? JSON.parse(drugs)      : null,
+      conditions: conditions ? JSON.parse(conditions) : null,
+    }
   } catch {
-    return null
+    return { drugs: null, conditions: null }
   }
 }
 
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 /**
- * Write one slice of the cache without touching the other.
+ * Write a cache slice.
  * @param {'drugs'|'conditions'} key
- * @param {Array}  data
- * @param {string} updatedAt — ISO timestamp from app_metadata
+ * @param {Array}  data        — the full fetched dataset
+ * @param {string} version     — ISO timestamp from app_metadata
  */
-export function writeCache(key, data, updatedAt) {
+export function writeCache(key, data, version) {
   try {
-    const existing = readCache() || {}
-    const next = { ...existing, [key]: { data, updatedAt } }
-    localStorage.setItem(CACHE_KEY, JSON.stringify(next))
+    const cacheKey = key === 'drugs' ? CACHE_KEYS.DRUGS : CACHE_KEYS.CONDITIONS
+    localStorage.setItem(cacheKey, JSON.stringify({
+      data,
+      version,
+      fetchedAt: new Date().toISOString(),
+    }))
   } catch {
     // localStorage full or unavailable — fail silently
   }
 }
 
 /**
- * Return the cached updatedAt string for a given slice, or null.
+ * Read the cached data array for a given slice, or null.
  * @param {'drugs'|'conditions'} key
  */
-export function getCacheTimestamp(key) {
+export function getCacheData(key) {
   try {
-    const cache = readCache()
-    return cache?.[key]?.updatedAt ?? null
+    const cacheKey = key === 'drugs' ? CACHE_KEYS.DRUGS : CACHE_KEYS.CONDITIONS
+    const raw = localStorage.getItem(cacheKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed?.data ?? null
   } catch {
     return null
   }
 }
 
 /**
- * Return the cached data array for a given slice, or null.
+ * Return the cached version string (app_metadata timestamp) for a slice, or null.
  * @param {'drugs'|'conditions'} key
  */
-export function getCacheData(key) {
+export function getCacheTimestamp(key) {
   try {
-    const cache = readCache()
-    return cache?.[key]?.data ?? null
+    const cacheKey = key === 'drugs' ? CACHE_KEYS.DRUGS : CACHE_KEYS.CONDITIONS
+    const raw = localStorage.getItem(cacheKey)
+    if (!raw) return null
+    return JSON.parse(raw)?.version ?? null
   } catch {
     return null
+  }
+}
+
+/**
+ * Returns true if the cache slice is older than CACHE_TTL_MS (7 days),
+ * regardless of version. Forces a re-fetch even if version matches.
+ * @param {'drugs'|'conditions'} key
+ */
+export function isCacheExpired(key) {
+  try {
+    const cacheKey = key === 'drugs' ? CACHE_KEYS.DRUGS : CACHE_KEYS.CONDITIONS
+    const raw = localStorage.getItem(cacheKey)
+    if (!raw) return true
+    const { fetchedAt } = JSON.parse(raw)
+    if (!fetchedAt) return true
+    return (Date.now() - new Date(fetchedAt).getTime()) > CACHE_TTL_MS
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Clear one or both cache slices.
+ * @param {'drugs'|'conditions'|'all'} key
+ */
+export function clearCache(key = 'all') {
+  try {
+    if (key === 'all' || key === 'drugs')      localStorage.removeItem(CACHE_KEYS.DRUGS)
+    if (key === 'all' || key === 'conditions') localStorage.removeItem(CACHE_KEYS.CONDITIONS)
+  } catch {
+    // fail silently
   }
 }
