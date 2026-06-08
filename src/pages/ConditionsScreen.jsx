@@ -1,6 +1,4 @@
-/**
- * src/pages/ConditionsScreen.jsx
- * Phase 2C — Conditions Screen
+ * Phase 2I — Search shared components: swap to ui/SearchBar + ui/AutocompleteDropdown.
  *
  * Layout (top to bottom):
  *   1. Search bar (with autocomplete dropdown)
@@ -16,10 +14,10 @@
  *   ConditionCard        — rebuilt card (no bookmark, no age, has tagline + chevron)
  */
 
-import { useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/layout'
-import SearchBar from '../components/SearchBar'
+import SearchBar from '../components/ui/SearchBar'
+import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import ConditionCard from '../components/ConditionCard'
 import SpecialtyFilterPills from '../components/conditions/SpecialtyFilterPills'
 import RecentlyViewedChips  from '../components/conditions/RecentlyViewedChips'
@@ -56,74 +54,6 @@ function SkeletonCard() {
         <div style={shimmer({ width: 60, height: 10, marginBottom: 6 })} />
         <div style={shimmer({ width: '60%', height: 15 })} />
       </div>
-    </div>
-  )
-}
-
-// ─── Autocomplete dropdown ────────────────────────────────────────────────────
-
-function AutocompleteDropdown({ suggestions, onSelect, onDismiss }) {
-  const ref = useRef(null)
-
-  // Close on outside tap
-  useEffect(() => {
-    function handleClick(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        onDismiss()
-      }
-    }
-    document.addEventListener('mousedown', handleClick)
-    document.addEventListener('touchstart', handleClick)
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-      document.removeEventListener('touchstart', handleClick)
-    }
-  }, [onDismiss])
-
-  if (!suggestions || suggestions.length === 0) return null
-
-  return (
-    <div
-      ref={ref}
-      style={{
-        position:        'absolute',
-        top:             '100%',
-        left:            0,
-        right:           0,
-        zIndex:          200,
-        backgroundColor: 'var(--color-surface)',
-        border:          '1px solid var(--color-border)',
-        borderRadius:    'var(--radius-lg)',
-        boxShadow:       'var(--shadow-elevated)',
-        overflow:        'hidden',
-        marginTop:       4,
-      }}
-    >
-      {suggestions.map((s, i) => (
-        <button
-          key={s.id}
-          onClick={() => onSelect(s)}
-          style={{
-            width:           '100%',
-            display:         'flex',
-            alignItems:      'center',
-            padding:         '10px var(--space-4)',
-            background:      'none',
-            border:          'none',
-            borderTop:       i > 0 ? '1px solid var(--color-border)' : 'none',
-            cursor:          'pointer',
-            fontFamily:      'var(--font-body)',
-            fontSize:        14,
-            color:           'var(--color-text-primary)',
-            textAlign:       'left',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg)'}
-          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
-        >
-          {s.name}
-        </button>
-      ))}
     </div>
   )
 }
@@ -253,3 +183,7 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
+
+
+================================================

@@ -1,23 +1,22 @@
 /**
  * src/pages/DrugsScreen.jsx
- * Phase 2F — Drugs Screen rebuild.
+ * Phase 2I — adds fuzzy search + autocomplete dropdown.
  *
- * Layout:
- *  1. Search bar (with filter icon)
- *  2. Recently viewed drugs chips (horizontal scroll)
- *  3. Category list — "All Drugs" row + one row per category
- *     Tap row → DrugListView for that category
- *
- * When a search query is active → bypass category list, show flat filtered results.
- * Filters from DrugFilterPanel applied on top of the current list.
+ * Changes from 2F:
+ *  - useSearch (simple includes) → useDrugSearch (Fuse.js fuzzy, gap logging)
+ *  - Inline SearchBar → shared src/components/ui/SearchBar
+ *  - AutocompleteDropdown added below search bar in results view
+ *  - Autocomplete: tap suggestion → navigate directly to /drugs/:slug
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/layout'
 import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
+import SearchBar from '../components/ui/SearchBar'
+import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import { useDrugContext } from '../context/DrugContext'
-import { useSearch } from '../hooks/useSearch'
+import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useStock } from '../hooks/useStock'
 import { DRUG_CATEGORIES } from '../config/categories'
 import { getCategoryMeta } from '../constants/drugCategories'
@@ -75,7 +74,14 @@ function applyFilters(drugs, filters) {
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { drugs, loading } = useDrugContext()
-  const { query, setQuery, results: searchResults } = useSearch(drugs)
+  const {
+    query,
+    setQuery,
+    results:         searchResults,
+    suggestions,
+    showSuggestions,
+    clearSuggestions,
+  } = useDrugSearch(drugs)
   const { stockMap, toggleStock } = useStock(drugs)
 
   const [activeCategory, setActiveCategory] = useState(null) // null = category list
@@ -100,6 +106,12 @@ export default function DrugsScreen() {
     setActiveFilters(hasActive ? filters : null)
   }
 
+  function handleSuggestionSelect(suggestion) {
+    clearSuggestions()
+    setQuery('')
+    navigate(ROUTES.DRUG_DETAIL(suggestion.slug || suggestion.id))
+  }
+
   const hasQuery = query.trim().length > 0
   const hasFilters = !!activeFilters
 
@@ -116,12 +128,26 @@ export default function DrugsScreen() {
     return (
       <Layout>
         <div style={{ paddingTop: 'var(--space-5)' }}>
+        {/* Search bar + autocomplete */}
+        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
           <SearchBar
             value={query}
-            onChange={setQuery}
+            onChange={(val) => {
+              setQuery(val)
+              if (!val) clearSuggestions()
+            }}
+            placeholder="Search drugs…"
             onFilter={() => setFilterOpen(true)}
             hasActiveFilters={hasFilters}
           />
+          {showSuggestions && (
+            <AutocompleteDropdown
+              suggestions={suggestions}
+              onSelect={handleSuggestionSelect}
+              onDismiss={clearSuggestions}
+            />
+          )}
+        </div>
 
           {/* Back to categories button (only when in a category, not searching) */}
           {!hasQuery && activeCategory !== null && (
@@ -187,7 +213,11 @@ export default function DrugsScreen() {
       <div style={{ paddingTop: 'var(--space-5)' }}>
         <SearchBar
           value={query}
-          onChange={setQuery}
+          onChange={(val) => {
+            setQuery(val)
+            if (!val) clearSuggestions()
+          }}
+          placeholder="Search drugs…"
           onFilter={() => setFilterOpen(true)}
           hasActiveFilters={hasFilters}
         />
@@ -382,72 +412,6 @@ function DrugListRow({ drug, isInStock, onTap }) {
   )
 }
 
-// ─── SearchBar ────────────────────────────────────────────────────────────────
-
-function SearchBar({ value, onChange, onFilter, hasActiveFilters }) {
-  return (
-    <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', alignItems: 'center' }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <svg
-          width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-          style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
-        >
-          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        <input
-          type="text"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder="Search drugs..."
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            paddingLeft: 36, paddingRight: value ? 36 : 12,
-            height: 44, borderRadius: 'var(--radius-full)',
-            border: '1.5px solid var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            fontSize: 14, color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-body)', outline: 'none',
-          }}
-        />
-        {value && (
-          <button
-            onClick={() => onChange('')}
-            style={{
-              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-              color: 'var(--color-text-tertiary)', lineHeight: 1,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {/* Filter icon button */}
-      <button
-        onClick={onFilter}
-        style={{
-          width: 44, height: 44, borderRadius: 'var(--radius-full)',
-          border: hasActiveFilters ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-          backgroundColor: hasActiveFilters ? 'var(--color-accent)' : 'var(--color-surface)',
-          color: hasActiveFilters ? '#fff' : 'var(--color-text-secondary)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0, WebkitTapHighlightColor: 'transparent', outline: 'none',
-        }}
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="4" y1="6" x2="20" y2="6"/>
-          <line x1="8" y1="12" x2="16" y2="12"/>
-          <line x1="11" y1="18" x2="13" y2="18"/>
-        </svg>
-      </button>
-    </div>
-  )
-}
-
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
 function EmptyState({ query }) {
@@ -465,3 +429,7 @@ function EmptyState({ query }) {
     </div>
   )
 }
+
+
+
+================================================

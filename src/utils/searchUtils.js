@@ -1,21 +1,17 @@
 /**
  * src/utils/searchUtils.js
- * Phase 2C — Conditions Screen
+ * Phase 2I — adds drug fuzzy search on top of existing condition search.
  *
- * Fuse.js fuzzy search helpers for conditions (and later drugs).
- *
- * Install: npm install fuse.js
- *
- * Config locked in masterplan:
- *   keys      = name_en, specialty.name_en, card_tagline
- *   threshold = 0.35  (tolerates ~2 character typos)
- *   minMatchCharLength = 2
- *   includeScore = true
+ * Drug search keys (masterplan spec):
+ *   genericName       weight 0.5
+ *   category          weight 0.2
+ *   concentration+form weight 0.2  (via virtual field — search brands array too)
+ *   brands[].name     weight 0.1
  */
 
 import Fuse from 'fuse.js'
 
-// ─── Conditions fuzzy search ──────────────────────────────────────────────────
+// ─── Conditions fuzzy search (unchanged from 2C) ──────────────────────────────
 
 const CONDITION_FUSE_OPTIONS = {
   keys: [
@@ -26,48 +22,79 @@ const CONDITION_FUSE_OPTIONS = {
   threshold:          0.35,
   minMatchCharLength: 2,
   includeScore:       true,
-  ignoreLocation:     true,   // match anywhere in the string, not just the start
+  ignoreLocation:     true,
 }
 
-/**
- * Build a Fuse instance for a conditions array.
- * Call this once when conditions load, then reuse.
- *
- * @param {object[]} conditions
- * @returns {Fuse}
- */
 export function buildConditionIndex(conditions) {
   return new Fuse(conditions, CONDITION_FUSE_OPTIONS)
 }
 
-/**
- * Run a fuzzy search against a pre-built Fuse index.
- * Returns results sorted by score (best match first).
- *
- * @param {Fuse}   fuseIndex
- * @param {string} query
- * @returns {object[]}  — original condition objects, sorted by relevance
- */
 export function fuzzySearchConditions(fuseIndex, query) {
-  if (!query || query.trim().length < 2) return null  // null = show all
+  if (!query || query.trim().length < 2) return null
   const results = fuseIndex.search(query.trim())
   return results.map(r => r.item)
 }
 
-/**
- * Get top N autocomplete suggestions from a fuzzy search.
- *
- * @param {Fuse}   fuseIndex
- * @param {string} query
- * @param {number} limit   default 5
- * @returns {{ id, name, slug }[]}
- */
 export function getAutocompleteSuggestions(fuseIndex, query, limit = 5) {
   if (!query || query.trim().length < 2) return []
   const results = fuseIndex.search(query.trim(), { limit })
   return results.map(r => ({
     id:   r.item.id,
     name: r.item.name,
+    slug: r.item.slug,
+  }))
+}
+
+// ─── Drugs fuzzy search (new in 2I) ──────────────────────────────────────────
+
+const DRUG_FUSE_OPTIONS = {
+  keys: [
+    { name: 'genericName',    weight: 0.5  },
+    { name: 'category',       weight: 0.2  },
+    { name: 'concentration',  weight: 0.1  },
+    { name: 'form',           weight: 0.1  },
+    { name: 'brands.name',    weight: 0.1  },
+  ],
+  threshold:          0.35,
+  minMatchCharLength: 2,
+  includeScore:       true,
+  ignoreLocation:     true,
+}
+
+/**
+ * Build a Fuse index for a drugs array.
+ * @param {object[]} drugs — flat drug objects from DrugContext
+ * @returns {Fuse}
+ */
+export function buildDrugIndex(drugs) {
+  return new Fuse(drugs, DRUG_FUSE_OPTIONS)
+}
+
+/**
+ * Run fuzzy drug search. Returns null when query is too short (= show all).
+ * @param {Fuse}   fuseIndex
+ * @param {string} query
+ * @returns {object[]|null}
+ */
+export function fuzzySearchDrugs(fuseIndex, query) {
+  if (!query || query.trim().length < 2) return null
+  const results = fuseIndex.search(query.trim())
+  return results.map(r => r.item)
+}
+
+/**
+ * Top-N autocomplete suggestions for drugs.
+ * @param {Fuse}   fuseIndex
+ * @param {string} query
+ * @param {number} limit
+ * @returns {{ id, name, slug }[]}
+ */
+export function getDrugAutocompleteSuggestions(fuseIndex, query, limit = 5) {
+  if (!query || query.trim().length < 2) return []
+  const results = fuseIndex.search(query.trim(), { limit })
+  return results.map(r => ({
+    id:   r.item.id,
+    name: r.item.genericName,
     slug: r.item.slug,
   }))
 }
