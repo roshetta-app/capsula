@@ -18,6 +18,7 @@ import {
   insertConditionImage,
   deleteConditionImage,
   uploadConditionImage,
+  touchAppMetadata,
 } from '../../lib/adminQueries'
 import PrescriptionBuilder    from '../../components/admin/PrescriptionBuilder'
 import ClinicalBlocksEditor  from '../../components/admin/ClinicalBlocksEditor'
@@ -421,14 +422,23 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_CONDITION = {
-  name:                '',
-  specialty_id:        '',
-  age_group:           'adult',
-  clinical_picture:    '',
-  history_questions:   [],
-  examination:         [],
-  investigations:      [],
-  patient_instructions: '',
+  name:                  '',
+  specialty_id:          '',
+  age_group:             'adult',
+  is_published:          false,
+  card_tagline:          '',
+  definition:            '',
+  icd10_code:            '',
+  epidemiology:          '',
+  differential_diagnosis: [],
+  red_flags:             [],
+  when_to_refer:         '',
+  prognosis:             '',
+  clinical_picture:      '',
+  history_questions:     [],
+  examination:           [],
+  investigations:        [],
+  patient_instructions:  '',
 }
 
 const AGE_GROUP_OPTIONS = [
@@ -443,9 +453,10 @@ export default function ConditionEditor() {
   const navigate         = useNavigate()
   const { specialties, refresh } = useConditionContext()
 
-  const [form,     setForm]     = useState(EMPTY_CONDITION)
-  const [images,   setImages]   = useState([])
-  const [loading,  setLoading]  = useState(isEdit)
+  const [form,         setForm]         = useState(EMPTY_CONDITION)
+  const [images,       setImages]       = useState([])
+  const [initialBlocks, setInitialBlocks] = useState([])
+  const [loading,      setLoading]      = useState(isEdit)
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState(null)
   const [success,  setSuccess]  = useState(false)
@@ -465,15 +476,30 @@ export default function ConditionEditor() {
       }
 
       setForm({
-        name:                 data.name              ?? '',
-        specialty_id:         data.specialty_id      ?? '',
-        age_group:            data.age_group         ?? 'adult',
-        clinical_picture:     data.clinical_picture  ?? '',
-        history_questions:    data.history_questions ?? [],
-        examination:          data.examination       ?? [],
-        investigations:       data.investigations    ?? [],
-        patient_instructions: data.patient_instructions ?? '',
+        name:                   data.name                    ?? '',
+        specialty_id:           data.specialty_id            ?? '',
+        age_group:              data.age_group               ?? 'adult',
+        is_published:           data.is_published            ?? false,
+        card_tagline:           data.card_tagline            ?? '',
+        definition:             data.definition              ?? '',
+        icd10_code:             data.icd10_code              ?? '',
+        epidemiology:           data.epidemiology            ?? '',
+        differential_diagnosis: data.differential_diagnosis  ?? [],
+        red_flags:              data.red_flags               ?? [],
+        when_to_refer:          data.when_to_refer           ?? '',
+        prognosis:              data.prognosis               ?? '',
+        clinical_picture:       data.clinical_picture        ?? '',
+        history_questions:      data.history_questions       ?? [],
+        examination:            data.examination             ?? [],
+        investigations:         data.investigations          ?? [],
+        patient_instructions:   data.patient_instructions    ?? '',
       })
+
+      setInitialBlocks(
+        (data.clinical_blocks ?? [])
+          .slice()
+          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      )
 
       setImages(
         (data.condition_images ?? [])
@@ -510,15 +536,24 @@ export default function ConditionEditor() {
       .replace(/^-|-$/g, '')
 
     const payload = {
-      name:                 form.name.trim(),
+      name:                   form.name.trim(),
       slug,
-      specialty_id:         form.specialty_id,
-      age_group:            form.age_group,
-      clinical_picture:     form.clinical_picture.trim() || null,
-      history_questions:    form.history_questions,
-      examination:          form.examination,
-      investigations:       form.investigations,
-      patient_instructions: form.patient_instructions.trim() || null,
+      specialty_id:           form.specialty_id,
+      age_group:              form.age_group,
+      is_published:           form.is_published,
+      card_tagline:           form.card_tagline.trim()   || null,
+      definition:             form.definition.trim()     || null,
+      icd10_code:             form.icd10_code.trim()     || null,
+      epidemiology:           form.epidemiology.trim()   || null,
+      differential_diagnosis: form.differential_diagnosis,
+      red_flags:              form.red_flags,
+      when_to_refer:          form.when_to_refer.trim()  || null,
+      prognosis:              form.prognosis.trim()       || null,
+      clinical_picture:       form.clinical_picture.trim() || null,
+      history_questions:      form.history_questions,
+      examination:            form.examination,
+      investigations:         form.investigations,
+      patient_instructions:   form.patient_instructions.trim() || null,
     }
 
     let saveErr
@@ -536,6 +571,7 @@ export default function ConditionEditor() {
       return
     }
 
+    await touchAppMetadata('conditions_updated_at')
     await refresh()
     setSuccess(true)
     setSaving(false)
@@ -692,6 +728,16 @@ export default function ConditionEditor() {
               />
             </div>
 
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Card tagline</FieldLabel>
+              <TextInput
+                value={form.card_tagline}
+                onChange={v => patch('card_tagline', v)}
+                placeholder="Short italic subtitle on the card (optional)"
+                disabled={saving}
+              />
+            </div>
+
             <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{ flex: 1 }}>
                 <FieldLabel required>Specialty</FieldLabel>
@@ -710,6 +756,42 @@ export default function ConditionEditor() {
                   options={AGE_GROUP_OPTIONS}
                   disabled={saving}
                 />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', alignItems: 'center' }}>
+              <div style={{ flex: 1 }}>
+                <FieldLabel>ICD-10 code</FieldLabel>
+                <TextInput
+                  value={form.icd10_code}
+                  onChange={v => patch('icd10_code', v)}
+                  placeholder="e.g. K25"
+                  disabled={saving}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                <FieldLabel>Published</FieldLabel>
+                <button
+                  type="button"
+                  onClick={() => patch('is_published', !form.is_published)}
+                  disabled={saving}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+                    padding: '9px 14px',
+                    border: '1.5px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: form.is_published ? '#D1FAE5' : 'var(--color-surface)',
+                    color: form.is_published ? '#065F46' : 'var(--color-text-secondary)',
+                    fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: 500,
+                    cursor: saving ? 'default' : 'pointer',
+                  }}
+                >
+                  <span style={{
+                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
+                    backgroundColor: form.is_published ? '#10B981' : 'var(--color-border)',
+                  }} />
+                  {form.is_published ? 'Published' : 'Draft'}
+                </button>
               </div>
             </div>
 
@@ -768,6 +850,70 @@ export default function ConditionEditor() {
               />
             </div>
 
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Definition</FieldLabel>
+              <Textarea
+                value={form.definition}
+                onChange={v => patch('definition', v)}
+                placeholder="Brief definition shown at top of clinical data tab…"
+                disabled={saving}
+                rows={3}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Epidemiology</FieldLabel>
+              <Textarea
+                value={form.epidemiology}
+                onChange={v => patch('epidemiology', v)}
+                placeholder="Epidemiology notes…"
+                disabled={saving}
+                rows={2}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Red flags</FieldLabel>
+              <TagInput
+                tags={form.red_flags}
+                onChange={v => patch('red_flags', v)}
+                placeholder="Add red flag, press Enter"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Differential diagnosis</FieldLabel>
+              <TagInput
+                tags={form.differential_diagnosis}
+                onChange={v => patch('differential_diagnosis', v)}
+                placeholder="Add diagnosis, press Enter"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>When to refer</FieldLabel>
+              <Textarea
+                value={form.when_to_refer}
+                onChange={v => patch('when_to_refer', v)}
+                placeholder="Referral criteria…"
+                disabled={saving}
+                rows={2}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Prognosis</FieldLabel>
+              <Textarea
+                value={form.prognosis}
+                onChange={v => patch('prognosis', v)}
+                placeholder="Prognosis notes…"
+                disabled={saving}
+                rows={2}
+              />
+            </div>
+
             {/* ── Images ───────────────────────────────────────────────────── */}
 
             <SectionTitle>Images</SectionTitle>
@@ -787,8 +933,8 @@ export default function ConditionEditor() {
         {activeTab === 'blocks' && isEdit && (
           <ClinicalBlocksEditor
             conditionId={id}
-            initialBlocks={[]}
-            onSaved={() => {}}
+            initialBlocks={initialBlocks}
+            onSaved={setInitialBlocks}
           />
         )}
         {activeTab === 'blocks' && !isEdit && (
@@ -815,3 +961,7 @@ export default function ConditionEditor() {
 }
 
 
+
+
+
+================================================

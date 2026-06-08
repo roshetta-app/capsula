@@ -165,9 +165,11 @@ export async function fetchConditionForEdit(id) {
   const { data, error } = await supabase
     .from('conditions')
     .select(`
-      id, name, slug, age_group,
+      id, name, slug, age_group, is_published,
+      card_tagline, definition, icd10_code, epidemiology,
+      differential_diagnosis, red_flags, when_to_refer, prognosis,
       clinical_picture, history_questions, examination, investigations,
-      patient_instructions,
+      patient_instructions, clinical_blocks,
       specialty_id,
       specialties ( id, name_en, slug ),
       condition_images ( id, url, caption, sort_order ),
