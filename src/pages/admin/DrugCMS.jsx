@@ -3,11 +3,12 @@
  * /admin/drugs
  *
  * Lists all generics (published + drafts) in a table with:
- *   - Columns: Name | Category | Formulations | Published | Last Updated | Actions
+ *   - Columns: Name | Category | Formulations | Published | Actions
  *   - Published toggle (immediate update + ConfirmModal for unpublish)
- *   - Edit → opens GenericFormModal
+ *   - Edit (pencil) → navigates to DrugEditor (/admin/drugs/generic/:id)
  *   - Delete → ConfirmModal
- *   - "+ Add New" → opens GenericFormModal in create mode
+ *   - "Forms" count → navigates to DrugEditor
+ *   - "+ Add New" → navigates to AddDrugFlow (/admin/drugs/new)
  *   - Search (name_en, name_ar) + category filter pills
  */
 
@@ -16,7 +17,6 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import ConfirmModal from '../../components/admin/ConfirmModal'
-import GenericFormModal from '../../components/admin/GenericFormModal'
 import {
   fetchAllGenerics,
   toggleGenericPublished,
@@ -43,11 +43,9 @@ export default function DrugCMS() {
   const [query,           setQuery]           = useState('')
   const [activeCategory,  setActiveCategory]  = useState(null)
 
-  // Modal state
-  const [editTarget,   setEditTarget]   = useState(null)   // generic object or 'new'
-  const [confirmUnpub, setConfirmUnpub] = useState(null)   // generic to unpublish
-  const [confirmDel,   setConfirmDel]   = useState(null)   // generic to delete
-  const [actionId,     setActionId]     = useState(null)   // id being acted on (spinner)
+  const [confirmUnpub, setConfirmUnpub] = useState(null)
+  const [confirmDel,   setConfirmDel]   = useState(null)
+  const [actionId,     setActionId]     = useState(null)
 
   // ── Load ────────────────────────────────────────────────────────────────────
   async function load() {
@@ -85,11 +83,9 @@ export default function DrugCMS() {
   async function handlePublishToggle(generic) {
     const toPublish = !generic.is_published
     if (!toPublish) {
-      // Unpublishing: show confirm first
       setConfirmUnpub(generic)
       return
     }
-    // Publishing immediately
     setActionId(generic.id)
     const { error } = await toggleGenericPublished(generic.id, true)
     setActionId(null)
@@ -121,22 +117,10 @@ export default function DrugCMS() {
     toast.success('Generic deleted')
   }
 
-  // ── Edit saved ──────────────────────────────────────────────────────────────
-  function handleSaved(saved) {
-    setEditTarget(null)
-    if (editTarget === 'new') {
-      // Reload to get proper formulation counts etc.
-      load()
-    } else {
-      setGenerics(prev => prev.map(g => g.id === saved.id ? { ...g, ...saved } : g))
-    }
-    toast.success('Saved')
-  }
-
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <AdminShell onAdd={() => setEditTarget('new')}>
+    <AdminShell onAdd={() => navigate('/admin/drugs/new')}>
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
@@ -225,7 +209,6 @@ export default function DrugCMS() {
             <span style={thStyle}>Generic</span>
             <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
             <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
-            <span style={{ ...thStyle, display: 'none' }}>Updated</span>
             <span style={thStyle}>Actions</span>
           </div>
 
@@ -278,11 +261,11 @@ export default function DrugCMS() {
                       </div>
                     </div>
 
-                    {/* Formulation count — click to manage formulations */}
+                    {/* Formulation count — click to open DrugEditor */}
                     <div style={{ textAlign: 'center' }}>
                       <button
                         onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
-                        title="Manage formulations"
+                        title="Edit formulations & brands"
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
                           fontSize: 13, fontWeight: 500,
@@ -319,9 +302,9 @@ export default function DrugCMS() {
                     {/* Actions */}
                     <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
                       <button
-                        onClick={() => setEditTarget(g)}
+                        onClick={() => navigate(`/admin/drugs/generic/${g.id}`)}
                         aria-label="Edit"
-                        title="Edit"
+                        title="Edit generic, formulations & brands"
                         style={iconBtnStyle}
                       >
                         <Edit2 size={14} />
@@ -340,17 +323,6 @@ export default function DrugCMS() {
               })
           }
         </div>
-      )}
-
-      {/* ── Modals ── */}
-
-      {/* Edit / Create */}
-      {editTarget && (
-        <GenericFormModal
-          generic={editTarget === 'new' ? null : editTarget}
-          onClose={() => setEditTarget(null)}
-          onSaved={handleSaved}
-        />
       )}
 
       {/* Confirm unpublish */}
