@@ -61,7 +61,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
     .from('formulations')
     .select(`
       id, concentration, form, route, doses,
-      generics ( id, slug, name_en, name_ar, category, class, uses, warnings, doses ),
+      generics ( id, slug, name_en, name_ar, category, class, uses_legacy, uses_structured, warnings_legacy, doses_structured ),
       brands   ( id, name, name_ar, manufacturer, in_stock, is_available )
     `)
     .eq('id', formulationId)
@@ -169,7 +169,7 @@ export async function fetchConditionForEdit(id) {
       clinical_picture, history_questions, examination, investigations,
       patient_instructions,
       specialty_id,
-      specialties ( id, name, slug ),
+      specialties ( id, name_en, slug ),
       condition_images ( id, url, caption, sort_order ),
       prescriptions ( id, label, sort_order )
     `)
@@ -402,6 +402,6 @@ export async function touchAppMetadata(column) {
   const { error } = await supabase
     .from('app_metadata')
     .update({ [column]: new Date().toISOString() })
-    .eq('id', 'singleton')
+    .eq('id', 1)
   return { error: error ?? null }
 }
