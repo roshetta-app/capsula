@@ -19,7 +19,8 @@ import {
   deleteConditionImage,
   uploadConditionImage,
 } from '../../lib/adminQueries'
-import PrescriptionBuilder from '../../components/admin/PrescriptionBuilder'
+import PrescriptionBuilder    from '../../components/admin/PrescriptionBuilder'
+import ClinicalBlocksEditor  from '../../components/admin/ClinicalBlocksEditor'
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
@@ -448,6 +449,7 @@ export default function ConditionEditor() {
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState(null)
   const [success,  setSuccess]  = useState(false)
+  const [activeTab, setActiveTab] = useState('details') // 'details' | 'blocks' | 'prescriptions'
 
   // ─── Load existing condition (edit mode) ──────────────────────────────────
 
@@ -636,117 +638,176 @@ export default function ConditionEditor() {
           </div>
         )}
 
-        {/* ── Identity ───────────────────────────────────────────────────── */}
-
-        <SectionTitle>Identity</SectionTitle>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel required>Condition name</FieldLabel>
-          <TextInput
-            value={form.name}
-            onChange={v => patch('name', v)}
-            placeholder="e.g. Peptic Ulcer Disease"
-            disabled={saving}
-          />
+        {/* ── Tab bar ──────────────────────────────────────────────────────── */}
+        <div style={{
+          display: 'flex',
+          borderBottom: '2px solid var(--color-border)',
+          marginBottom: 'var(--space-5)',
+        }}>
+          {[
+            { key: 'details',       label: 'Details' },
+            { key: 'blocks',        label: 'Clinical Blocks' },
+            { key: 'prescriptions', label: 'Prescriptions' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              style={{
+                padding: 'var(--space-2) var(--space-4)',
+                border: 'none',
+                backgroundColor: 'transparent',
+                fontSize: 14, fontWeight: 600,
+                fontFamily: 'var(--font-body)',
+                cursor: 'pointer',
+                color: activeTab === tab.key
+                  ? 'var(--color-accent)'
+                  : 'var(--color-text-tertiary)',
+                borderBottom: activeTab === tab.key
+                  ? '2px solid var(--color-accent)'
+                  : '2px solid transparent',
+                marginBottom: -2,
+                transition: 'color 0.15s',
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-          <div style={{ flex: 1 }}>
-            <FieldLabel required>Specialty</FieldLabel>
-            <Select
-              value={form.specialty_id}
-              onChange={v => patch('specialty_id', v)}
-              options={specialtyOptions}
-              disabled={saving}
-            />
+        {/* ── Details tab ──────────────────────────────────────────────────── */}
+        {activeTab === 'details' && (
+          <div>
+
+            {/* ── Identity ─────────────────────────────────────────────────── */}
+
+            <SectionTitle>Identity</SectionTitle>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel required>Condition name</FieldLabel>
+              <TextInput
+                value={form.name}
+                onChange={v => patch('name', v)}
+                placeholder="e.g. Peptic Ulcer Disease"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+              <div style={{ flex: 1 }}>
+                <FieldLabel required>Specialty</FieldLabel>
+                <Select
+                  value={form.specialty_id}
+                  onChange={v => patch('specialty_id', v)}
+                  options={specialtyOptions}
+                  disabled={saving}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <FieldLabel required>Age group</FieldLabel>
+                <Select
+                  value={form.age_group}
+                  onChange={v => patch('age_group', v)}
+                  options={AGE_GROUP_OPTIONS}
+                  disabled={saving}
+                />
+              </div>
+            </div>
+
+            {/* ── Clinical data ─────────────────────────────────────────────── */}
+
+            <SectionTitle>Clinical Data</SectionTitle>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Clinical picture</FieldLabel>
+              <Textarea
+                value={form.clinical_picture}
+                onChange={v => patch('clinical_picture', v)}
+                placeholder="Describe the typical clinical presentation…"
+                disabled={saving}
+                rows={4}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>History questions</FieldLabel>
+              <TagInput
+                tags={form.history_questions}
+                onChange={v => patch('history_questions', v)}
+                placeholder="Type question, press Enter"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Examination findings</FieldLabel>
+              <TagInput
+                tags={form.examination}
+                onChange={v => patch('examination', v)}
+                placeholder="Type finding, press Enter"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Investigations</FieldLabel>
+              <InvestigationList
+                items={form.investigations}
+                onChange={v => patch('investigations', v)}
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Patient instructions</FieldLabel>
+              <Textarea
+                value={form.patient_instructions}
+                onChange={v => patch('patient_instructions', v)}
+                placeholder="Instructions for the patient…"
+                disabled={saving}
+                rows={3}
+              />
+            </div>
+
+            {/* ── Images ───────────────────────────────────────────────────── */}
+
+            <SectionTitle>Images</SectionTitle>
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <ImageManager
+                images={images}
+                conditionId={isEdit ? id : null}
+                onChange={setImages}
+                disabled={saving}
+              />
+            </div>
+
           </div>
-          <div style={{ flex: 1 }}>
-            <FieldLabel required>Age group</FieldLabel>
-            <Select
-              value={form.age_group}
-              onChange={v => patch('age_group', v)}
-              options={AGE_GROUP_OPTIONS}
-              disabled={saving}
-            />
+        )}
+
+        {/* ── Clinical Blocks tab ──────────────────────────────────────────── */}
+        {activeTab === 'blocks' && isEdit && (
+          <ClinicalBlocksEditor
+            conditionId={id}
+            initialBlocks={[]}
+            onSaved={() => {}}
+          />
+        )}
+        {activeTab === 'blocks' && !isEdit && (
+          <div style={{
+            padding: 'var(--space-6)', textAlign: 'center',
+            color: 'var(--color-text-tertiary)', fontSize: 13,
+            border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-lg)',
+          }}>
+            Save the condition first to manage clinical blocks.
           </div>
-        </div>
+        )}
 
-        {/* ── Clinical data ──────────────────────────────────────────────── */}
-
-        <SectionTitle>Clinical Data</SectionTitle>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel>Clinical picture</FieldLabel>
-          <Textarea
-            value={form.clinical_picture}
-            onChange={v => patch('clinical_picture', v)}
-            placeholder="Describe the typical clinical presentation…"
-            disabled={saving}
-            rows={4}
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel>History questions</FieldLabel>
-          <TagInput
-            tags={form.history_questions}
-            onChange={v => patch('history_questions', v)}
-            placeholder="Type question, press Enter"
-            disabled={saving}
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel>Examination findings</FieldLabel>
-          <TagInput
-            tags={form.examination}
-            onChange={v => patch('examination', v)}
-            placeholder="Type finding, press Enter"
-            disabled={saving}
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel>Investigations</FieldLabel>
-          <InvestigationList
-            items={form.investigations}
-            onChange={v => patch('investigations', v)}
-            disabled={saving}
-          />
-        </div>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <FieldLabel>Patient instructions</FieldLabel>
-          <Textarea
-            value={form.patient_instructions}
-            onChange={v => patch('patient_instructions', v)}
-            placeholder="Instructions for the patient…"
-            disabled={saving}
-            rows={3}
-          />
-        </div>
-
-        {/* ── Images ─────────────────────────────────────────────────────── */}
-
-        <SectionTitle>Images</SectionTitle>
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <ImageManager
-            images={images}
-            conditionId={isEdit ? id : null}
-            onChange={setImages}
-            disabled={saving}
-          />
-        </div>
-
-        {/* ── Prescriptions (5.5) ────────────────────────────────────────── */}
-
-        <SectionTitle>Prescriptions</SectionTitle>
-        <div style={{ marginBottom: 'var(--space-4)' }}>
+        {/* ── Prescriptions tab ────────────────────────────────────────────── */}
+        {activeTab === 'prescriptions' && (
           <PrescriptionBuilder
             conditionId={isEdit ? id : null}
             disabled={saving}
           />
-        </div>
+        )}
 
       </main>
     </div>
