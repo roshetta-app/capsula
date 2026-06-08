@@ -142,10 +142,12 @@ export default function GenericFormModal({ generic, onClose, onSaved }) {
     // Slug is required (NOT NULL). Generate on create; never overwrite on edit
     // (changing the slug would break existing /drugs/:slug URLs).
     if (!isEdit) {
-      payload.slug = form.name_en.trim()
+      const base = form.name_en.trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
+      // Fallback if name_en is all non-ASCII (e.g. Arabic only) — base will be empty.
+      payload.slug = base || `generic-${Date.now()}`
     }
 
     let result
@@ -741,4 +743,6 @@ const removeBtnStyle = {
   flexShrink: 0,
   marginTop: 6,
 }
+
+
 
