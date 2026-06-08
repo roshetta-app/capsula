@@ -1,106 +1,142 @@
-import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, ChevronDown, ChevronRight, Search, X, AlertTriangle } from 'lucide-react'
-import { useDrugContext } from '../../context/DrugContext'
-import { DRUG_CATEGORIES } from '../../config/categories'
-import { deleteFormulation } from '../../lib/adminQueries'
-import BrandStockRow from '../../components/admin/BrandStockRow'
-
 /**
- * DrugCMS — /admin/drugs
+ * DrugCMS.jsx — Phase 3E rebuild
+ * /admin/drugs
  *
- * Lists all formulations grouped by generic name.
- * Features:
- *   - Search: generic name, Arabic name, brand names
- *   - Category filter pills
- *   - Expandable brand rows per formulation (shows BrandStockRow per brand)
- *   - Edit (→ /admin/drugs/:id) + Delete per formulation
- *   - Delete: inline confirm → deleteFormulation → remove from local state
- *   - "+ Add New" → /admin/drugs/new
+ * Lists all generics (published + drafts) in a table with:
+ *   - Columns: Name | Category | Formulations | Published | Last Updated | Actions
+ *   - Published toggle (immediate update + ConfirmModal for unpublish)
+ *   - Edit → opens GenericFormModal
+ *   - Delete → ConfirmModal
+ *   - "+ Add New" → opens GenericFormModal in create mode
+ *   - Search (name_en, name_ar) + category filter pills
  */
+
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus, Edit2, Trash2, Search, X, AlertTriangle } from 'lucide-react'
+import { useToast } from '../../context/ToastContext'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import GenericFormModal from '../../components/admin/GenericFormModal'
+import {
+  fetchAllGenerics,
+  toggleGenericPublished,
+  deleteGeneric,
+} from '../../lib/adminQueries'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
 export default function DrugCMS() {
-  const navigate           = useNavigate()
-  const { drugs, loading } = useDrugContext()
+  const navigate    = useNavigate()
+  const { toast }   = useToast()
+
+  const [generics,     setGenerics]     = useState([])
+  const [loading,      setLoading]      = useState(true)
+  const [loadError,    setLoadError]    = useState(null)
 
   const [query,           setQuery]           = useState('')
   const [activeCategory,  setActiveCategory]  = useState(null)
-  const [expandedIds,     setExpandedIds]     = useState(new Set())
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null)  // formulation id pending delete
-  const [deletingId,      setDeletingId]      = useState(null)  // formulation id being deleted
-  const [deleteError,     setDeleteError]     = useState(null)
 
-  // Local override map for brand stock toggles so UI reflects optimistic changes
-  // Shape: { [brandId]: { in_stock, is_available } }
-  const [brandOverrides, setBrandOverrides] = useState({})
+  // Modal state
+  const [editTarget,   setEditTarget]   = useState(null)   // generic object or 'new'
+  const [confirmUnpub, setConfirmUnpub] = useState(null)   // generic to unpublish
+  const [confirmDel,   setConfirmDel]   = useState(null)   // generic to delete
+  const [actionId,     setActionId]     = useState(null)   // id being acted on (spinner)
 
-  // ─── Derive present categories from loaded drugs ────────────────────────────
-  const presentCategories = useMemo(() => {
-    const cats = new Set(drugs.map(d => d.category))
-    return DRUG_CATEGORIES.filter(c => cats.has(c.value))
-  }, [drugs])
+  // ── Load ────────────────────────────────────────────────────────────────────
+  async function load() {
+    setLoading(true)
+    setLoadError(null)
+    const { data, error } = await fetchAllGenerics()
+    setLoading(false)
+    if (error) { setLoadError(error.message); return }
+    setGenerics(data)
+  }
 
-  // ─── Filter + search ────────────────────────────────────────────────────────
+  useEffect(() => { load() }, [])
+
+  // ── Derived category list ───────────────────────────────────────────────────
+  const categories = useMemo(() => {
+    const cats = [...new Set(generics.map(g => g.category).filter(Boolean))].sort()
+    return cats
+  }, [generics])
+
+  // ── Filter ──────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
-    let list = drugs
-    if (activeCategory) list = list.filter(d => d.category === activeCategory)
+    let list = generics
+    if (activeCategory) list = list.filter(g => g.category === activeCategory)
     if (query.trim()) {
       const q = query.toLowerCase()
-      list = list.filter(d =>
-        d.genericName.toLowerCase().includes(q) ||
-        (d.arabicName && d.arabicName.includes(query)) ||
-        d.brands?.some(b => b.name.toLowerCase().includes(q))
+      list = list.filter(g =>
+        g.name_en?.toLowerCase().includes(q) ||
+        (g.name_ar && g.name_ar.includes(query))
       )
     }
-    return list.slice().sort((a, b) => a.genericName.localeCompare(b.genericName))
-  }, [drugs, query, activeCategory])
+    return list
+  }, [generics, query, activeCategory])
 
-  // ─── Expand / collapse ──────────────────────────────────────────────────────
-  function toggleExpand(id) {
-    setExpandedIds(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  // ─── Brand optimistic update handler ───────────────────────────────────────
-  function handleBrandUpdate(brandId, field, value) {
-    setBrandOverrides(prev => ({
-      ...prev,
-      [brandId]: { ...(prev[brandId] ?? {}), [field]: value },
-    }))
-  }
-
-  // ─── Delete flow ────────────────────────────────────────────────────────────
-  async function handleDelete(id) {
-    setDeleteError(null)
-    setDeletingId(id)
-    const { error } = await deleteFormulation(id)
-    setDeletingId(null)
-    setConfirmDeleteId(null)
-    if (error) {
-      setDeleteError(`Delete failed: ${error.message}`)
+  // ── Publish toggle ──────────────────────────────────────────────────────────
+  async function handlePublishToggle(generic) {
+    const toPublish = !generic.is_published
+    if (!toPublish) {
+      // Unpublishing: show confirm first
+      setConfirmUnpub(generic)
       return
     }
-    // DrugContext will refetch on next metadata check; for immediate UI feedback
-    // we rely on the drug list updating from the context refresh.
-    // If needed, a manual refetch can be added here.
+    // Publishing immediately
+    setActionId(generic.id)
+    const { error } = await toggleGenericPublished(generic.id, true)
+    setActionId(null)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    setGenerics(prev => prev.map(g => g.id === generic.id ? { ...g, is_published: true } : g))
+    toast.success('Generic published')
   }
 
-  // ─── Merge brand overrides into drug.brands ─────────────────────────────────
-  function resolvedBrands(drug) {
-    return (drug.brands ?? []).map(b => ({
-      ...b,
-      ...(brandOverrides[b.id] ?? {}),
-    }))
+  async function confirmUnpublish() {
+    const g = confirmUnpub
+    setConfirmUnpub(null)
+    setActionId(g.id)
+    const { error } = await toggleGenericPublished(g.id, false)
+    setActionId(null)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    setGenerics(prev => prev.map(x => x.id === g.id ? { ...x, is_published: false } : x))
+    toast.success('Generic unpublished')
   }
 
-  if (loading && drugs.length === 0) {
-    return <AdminShell onAdd={() => navigate('/admin/drugs/new')}><LoadingSkeleton /></AdminShell>
+  // ── Delete ──────────────────────────────────────────────────────────────────
+  async function handleDelete() {
+    const g = confirmDel
+    setConfirmDel(null)
+    setActionId(g.id)
+    const { error } = await deleteGeneric(g.id)
+    setActionId(null)
+    if (error) { toast.error(`Delete failed: ${error.message}`); return }
+    setGenerics(prev => prev.filter(x => x.id !== g.id))
+    toast.success('Generic deleted')
   }
+
+  // ── Edit saved ──────────────────────────────────────────────────────────────
+  function handleSaved(saved) {
+    setEditTarget(null)
+    if (editTarget === 'new') {
+      // Reload to get proper formulation counts etc.
+      load()
+    } else {
+      setGenerics(prev => prev.map(g => g.id === saved.id ? { ...g, ...saved } : g))
+    }
+    toast.success('Saved')
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <AdminShell onAdd={() => navigate('/admin/drugs/new')}>
+    <AdminShell onAdd={() => setEditTarget('new')}>
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
@@ -113,7 +149,7 @@ export default function DrugCMS() {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Search drug or brand…"
+          placeholder="Search generic name…"
           style={searchInputStyle}
         />
         {query && (
@@ -123,66 +159,57 @@ export default function DrugCMS() {
         )}
       </div>
 
-      {/* Category filter pills */}
-      <div style={{
-        display: 'flex', gap: 'var(--space-2)',
-        overflowX: 'auto', paddingBottom: 'var(--space-2)',
-        marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
-      }}>
-        {[{ value: null, label: 'All' }, ...presentCategories].map(cat => {
-          const active = activeCategory === cat.value
-          return (
-            <button
-              key={cat.value ?? 'all'}
-              onClick={() => setActiveCategory(cat.value)}
-              style={{
-                flexShrink: 0,
-                padding: '5px 14px',
-                borderRadius: 'var(--radius-full)',
-                fontSize: 12,
-                fontWeight: active ? 600 : 400,
-                fontFamily: 'var(--font-body)',
-                cursor: 'pointer',
-                border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
-                color: active ? '#fff' : 'var(--color-text-secondary)',
-                transition: 'all 0.15s ease',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {cat.label ?? cat.value}
-            </button>
-          )
-        })}
-      </div>
+      {/* Category pills */}
+      {categories.length > 0 && (
+        <div style={{
+          display: 'flex', gap: 'var(--space-2)',
+          overflowX: 'auto', paddingBottom: 'var(--space-2)',
+          marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
+        }}>
+          {[{ value: null, label: 'All' }, ...categories.map(c => ({ value: c, label: c }))].map(cat => {
+            const active = activeCategory === cat.value
+            return (
+              <button
+                key={cat.value ?? 'all'}
+                onClick={() => setActiveCategory(cat.value)}
+                style={{
+                  flexShrink: 0,
+                  padding: '5px 14px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: 12,
+                  fontWeight: active ? 600 : 400,
+                  fontFamily: 'var(--font-body)',
+                  cursor: 'pointer',
+                  border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+                  backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
+                  color: active ? '#fff' : 'var(--color-text-secondary)',
+                  transition: 'all 0.15s ease',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {cat.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
-      {/* Results count */}
+      {/* Count */}
       <div style={{
         fontSize: 12, color: 'var(--color-text-tertiary)',
         fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
       }}>
-        {filtered.length} formulation{filtered.length !== 1 ? 's' : ''}
+        {loading ? 'Loading…' : `${filtered.length} generic${filtered.length !== 1 ? 's' : ''}`}
         {query && ` for "${query}"`}
       </div>
 
-      {/* Delete error banner */}
-      {deleteError && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-          backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-          borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
-          marginBottom: 'var(--space-3)', fontSize: 13, color: '#DC2626',
-        }}>
-          <AlertTriangle size={15} style={{ flexShrink: 0 }} />
-          {deleteError}
-          <button onClick={() => setDeleteError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
-            <X size={14} />
-          </button>
-        </div>
+      {/* Load error */}
+      {loadError && (
+        <ErrorBanner message={loadError} onDismiss={() => setLoadError(null)} />
       )}
 
-      {/* Drug list */}
-      {filtered.length === 0 ? (
+      {/* Table */}
+      {!loading && filtered.length === 0 ? (
         <EmptyState query={query} />
       ) : (
         <div style={{
@@ -192,169 +219,151 @@ export default function DrugCMS() {
           overflow: 'hidden',
           boxShadow: 'var(--shadow-card)',
         }}>
-          {filtered.map((drug, idx) => {
-            const isLast     = idx === filtered.length - 1
-            const isExpanded = expandedIds.has(drug.id)
-            const brands     = resolvedBrands(drug)
-            const inStockCount = brands.filter(b => b.in_stock).length
-            const isPendingDelete = confirmDeleteId === drug.id
-            const isDeleting     = deletingId === drug.id
 
-            return (
-              <div
-                key={drug.id}
-                style={{ borderBottom: isLast ? 'none' : '1px solid var(--color-border-subtle)' }}
-              >
-                {/* ── Formulation row ── */}
-                <div style={{
-                  display: 'flex', alignItems: 'center',
-                  padding: 'var(--space-3) var(--space-4)',
-                  gap: 'var(--space-3)',
-                  opacity: isDeleting ? 0.4 : 1,
-                  transition: 'opacity 0.2s ease',
-                }}>
+          {/* Header row */}
+          <div style={theadStyle}>
+            <span style={thStyle}>Generic</span>
+            <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
+            <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
+            <span style={{ ...thStyle, display: 'none' }}>Updated</span>
+            <span style={thStyle}>Actions</span>
+          </div>
 
-                  {/* Expand toggle */}
-                  <button
-                    onClick={() => toggleExpand(drug.id)}
-                    aria-label={isExpanded ? 'Collapse' : 'Expand'}
+          {loading
+            ? [1,2,3,4].map(i => <SkeletonRow key={i} />)
+            : filtered.map((g, idx) => {
+                const isLast   = idx === filtered.length - 1
+                const isActing = actionId === g.id
+
+                return (
+                  <div
+                    key={g.id}
                     style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--color-text-tertiary)', padding: 0,
-                      display: 'flex', alignItems: 'center', flexShrink: 0,
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px',
+                      alignItems: 'center',
+                      padding: 'var(--space-3) var(--space-4)',
+                      gap: 'var(--space-3)',
+                      borderBottom: isLast ? 'none' : '1px solid var(--color-border-subtle)',
+                      opacity: isActing ? 0.5 : 1,
+                      transition: 'opacity 0.15s ease',
+                      backgroundColor: g.is_published ? 'transparent' : 'var(--color-bg)',
                     }}
                   >
-                    {isExpanded
-                      ? <ChevronDown size={16} />
-                      : <ChevronRight size={16} />
-                    }
-                  </button>
-
-                  {/* Drug info */}
-                  <div
-                    style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}
-                    onClick={() => toggleExpand(drug.id)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                      <span style={{
-                        fontSize: 14, fontWeight: 600,
-                        color: 'var(--color-text-primary)',
-                      }}>
-                        {drug.genericName}
-                      </span>
-                      <span style={{
-                        fontSize: 12, color: 'var(--color-text-tertiary)',
-                        fontFamily: 'var(--font-mono)',
-                      }}>
-                        {drug.concentration} · {drug.form} · {drug.route}
-                      </span>
+                    {/* Name + meta */}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                        <span style={{
+                          fontSize: 14, fontWeight: 600,
+                          color: g.is_published ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                        }}>
+                          {g.name_en}
+                        </span>
+                        {!g.is_published && (
+                          <span style={draftBadgeStyle}>Draft</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                        {g.category && (
+                          <span style={catChipStyle}>{g.category}</span>
+                        )}
+                        {g.name_ar && (
+                          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', direction: 'rtl' }}>
+                            {g.name_ar}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                          {formatDate(g.updated_at)}
+                        </span>
+                      </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 3, flexWrap: 'wrap' }}>
-                      {/* Category chip */}
-                      <span style={{
-                        fontSize: 10, fontWeight: 500,
-                        textTransform: 'uppercase', letterSpacing: '0.04em',
-                        color: 'var(--color-text-tertiary)',
-                        backgroundColor: 'var(--color-bg)',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-full)',
-                        padding: '1px 7px',
-                      }}>
-                        {DRUG_CATEGORIES.find(c => c.value === drug.category)?.label ?? drug.category}
-                      </span>
-
-                      {/* Brand count + in-stock badge */}
-                      <span style={{
-                        fontSize: 12, color: 'var(--color-text-tertiary)',
-                      }}>
-                        {brands.length} brand{brands.length !== 1 ? 's' : ''}
-                      </span>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600,
-                        color: inStockCount > 0 ? 'var(--color-instock)' : '#DC2626',
-                        backgroundColor: inStockCount > 0 ? 'var(--color-instock-bg)' : '#FEF2F2',
-                        borderRadius: 'var(--radius-full)',
-                        padding: '1px 8px',
-                      }}>
-                        {inStockCount}/{brands.length} in stock
-                      </span>
+                    {/* Formulation count */}
+                    <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+                      {g.formulationCount}
                     </div>
-                  </div>
 
-                  {/* Edit button */}
-                  <button
-                    onClick={() => navigate(`/admin/drugs/${drug.id}`)}
-                    aria-label="Edit"
-                    style={iconBtnStyle}
-                    title="Edit"
-                  >
-                    <Edit2 size={15} />
-                  </button>
-
-                  {/* Delete button / confirm inline */}
-                  {isPendingDelete ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: '#DC2626', whiteSpace: 'nowrap' }}>Delete?</span>
+                    {/* Publish toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
                       <button
-                        onClick={() => handleDelete(drug.id)}
-                        disabled={isDeleting}
+                        onClick={() => !isActing && handlePublishToggle(g)}
+                        disabled={isActing}
+                        aria-label={g.is_published ? 'Unpublish' : 'Publish'}
+                        title={g.is_published ? 'Click to unpublish' : 'Click to publish'}
                         style={{
-                          ...iconBtnStyle,
-                          color: '#DC2626',
-                          borderColor: '#FECACA',
-                          backgroundColor: '#FEF2F2',
+                          ...toggleBtnStyle,
+                          backgroundColor: g.is_published ? '#D1FAE5' : 'var(--color-bg)',
+                          color: g.is_published ? '#065F46' : 'var(--color-text-tertiary)',
+                          border: `1px solid ${g.is_published ? '#6EE7B7' : 'var(--color-border)'}`,
                         }}
                       >
-                        {isDeleting ? '…' : 'Yes'}
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        style={iconBtnStyle}
-                      >
-                        No
+                        {g.is_published ? '● Live' : '○ Draft'}
                       </button>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDeleteId(drug.id)}
-                      aria-label="Delete"
-                      style={{ ...iconBtnStyle, color: 'var(--color-text-tertiary)' }}
-                      title="Delete"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
-                </div>
 
-                {/* ── Expanded brand rows ── */}
-                {isExpanded && (
-                  <div>
-                    {brands.length === 0 ? (
-                      <div style={{
-                        padding: 'var(--space-2) var(--space-4) var(--space-2) var(--space-8)',
-                        fontSize: 13, color: 'var(--color-text-tertiary)',
-                        borderTop: '1px solid var(--color-border-subtle)',
-                        backgroundColor: 'var(--color-bg)',
-                      }}>
-                        No brands
-                      </div>
-                    ) : (
-                      brands.map(brand => (
-                        <BrandStockRow
-                          key={brand.id}
-                          brand={brand}
-                          onUpdate={handleBrandUpdate}
-                        />
-                      ))
-                    )}
+                    {/* Actions */}
+                    <div style={{ display: 'flex', gap: 'var(--space-1)', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setEditTarget(g)}
+                        aria-label="Edit"
+                        title="Edit"
+                        style={iconBtnStyle}
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        onClick={() => setConfirmDel(g)}
+                        aria-label="Delete"
+                        title="Delete"
+                        style={{ ...iconBtnStyle, color: '#DC2626' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-            )
-          })}
+                )
+              })
+          }
         </div>
       )}
+
+      {/* ── Modals ── */}
+
+      {/* Edit / Create */}
+      {editTarget && (
+        <GenericFormModal
+          generic={editTarget === 'new' ? null : editTarget}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {/* Confirm unpublish */}
+      {confirmUnpub && (
+        <ConfirmModal
+          isOpen
+          title="Unpublish generic?"
+          message={`"${confirmUnpub.name_en}" will be hidden from the app. You can republish it at any time.`}
+          confirmLabel="Unpublish"
+          danger
+          onConfirm={confirmUnpublish}
+          onCancel={() => setConfirmUnpub(null)}
+        />
+      )}
+
+      {/* Confirm delete */}
+      {confirmDel && (
+        <ConfirmModal
+          isOpen
+          title="Delete generic?"
+          message={`Delete "${confirmDel.name_en}"? This will also delete all formulations and brands under it. This cannot be undone.`}
+          confirmLabel="Delete"
+          danger
+          onConfirm={handleDelete}
+          onCancel={() => setConfirmDel(null)}
+        />
+      )}
+
     </AdminShell>
   )
 }
@@ -365,12 +374,7 @@ function AdminShell({ children, onAdd }) {
   const navigate = useNavigate()
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
-      fontFamily: 'var(--font-body)',
-    }}>
-      {/* Header */}
+    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
       <header style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: 'var(--space-3) var(--space-4)',
@@ -385,7 +389,7 @@ function AdminShell({ children, onAdd }) {
               background: 'none', border: 'none', cursor: 'pointer',
               color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
               fontFamily: 'var(--font-body)', padding: '4px 0',
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              display: 'flex', alignItems: 'center',
             }}
           >
             ‹ Admin
@@ -396,75 +400,134 @@ function AdminShell({ children, onAdd }) {
           </span>
         </div>
 
-        <button
-          onClick={onAdd}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            borderRadius: 'var(--radius-sm)',
-            border: 'none',
-            backgroundColor: 'var(--color-accent)',
-            color: '#fff',
-            fontSize: 13, fontWeight: 600,
-            fontFamily: 'var(--font-body)',
-            cursor: 'pointer',
-          }}
-        >
+        <button onClick={onAdd} style={primaryBtnStyle}>
           <Plus size={15} />
-          Add New
+          Add Generic
         </button>
       </header>
 
-      {/* Content */}
-      <main style={{
-        maxWidth: 680, margin: '0 auto',
-        padding: 'var(--space-5) var(--space-4) var(--space-12)',
-      }}>
+      <main style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
         {children}
       </main>
     </div>
   )
 }
 
-// ─── Loading skeleton ─────────────────────────────────────────────────────────
+// ─── Small components ─────────────────────────────────────────────────────────
 
-function LoadingSkeleton() {
+function ErrorBanner({ message, onDismiss }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-      {[1, 2, 3, 4].map(i => (
-        <div key={i} style={{
-          height: 64,
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          animation: 'shimmer 1.4s ease-in-out infinite',
-        }} />
-      ))}
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+      backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+      borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
+      marginBottom: 'var(--space-3)', fontSize: 13, color: '#DC2626',
+    }}>
+      <AlertTriangle size={15} style={{ flexShrink: 0 }} />
+      {message}
+      <button onClick={onDismiss} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
+        <X size={14} />
+      </button>
     </div>
   )
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
-
 function EmptyState({ query }) {
   return (
-    <div style={{
-      textAlign: 'center',
-      padding: 'var(--space-12) var(--space-4)',
-      color: 'var(--color-text-tertiary)',
-    }}>
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
         <Search size={32} />
       </div>
       <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
-        No drugs found{query ? ` for "${query}"` : ''}
+        No generics found{query ? ` for "${query}"` : ''}
       </div>
-      <div style={{ fontSize: 13 }}>Try a different search or category</div>
+      <div style={{ fontSize: 13 }}>Try a different search or category filter</div>
     </div>
   )
 }
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
+function SkeletonRow() {
+  return (
+    <div style={{
+      height: 56,
+      borderBottom: '1px solid var(--color-border-subtle)',
+      backgroundColor: 'var(--color-surface)',
+      animation: 'shimmer 1.4s ease-in-out infinite',
+    }} />
+  )
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const theadStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0,1fr) 64px 90px 80px',
+  gap: 'var(--space-3)',
+  padding: 'var(--space-2) var(--space-4)',
+  backgroundColor: 'var(--color-bg)',
+  borderBottom: '1px solid var(--color-border)',
+}
+
+const thStyle = {
+  fontSize: 11,
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.06em',
+  color: 'var(--color-text-tertiary)',
+}
+
+const catChipStyle = {
+  fontSize: 10, fontWeight: 500,
+  textTransform: 'uppercase', letterSpacing: '0.04em',
+  color: 'var(--color-text-tertiary)',
+  backgroundColor: 'var(--color-bg)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-full)',
+  padding: '1px 7px',
+}
+
+const draftBadgeStyle = {
+  fontSize: 10, fontWeight: 600,
+  textTransform: 'uppercase', letterSpacing: '0.05em',
+  color: 'var(--color-text-tertiary)',
+  backgroundColor: 'var(--color-bg)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-full)',
+  padding: '1px 7px',
+}
+
+const toggleBtnStyle = {
+  padding: '3px 10px',
+  borderRadius: 'var(--radius-full)',
+  fontSize: 11,
+  fontWeight: 600,
+  fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+  transition: 'all 0.15s ease',
+}
+
+const iconBtnStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  width: 30, height: 30,
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-secondary)',
+  cursor: 'pointer',
+}
+
+const primaryBtnStyle = {
+  display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+  padding: 'var(--space-2) var(--space-3)',
+  borderRadius: 'var(--radius-sm)',
+  border: 'none',
+  backgroundColor: 'var(--color-accent)',
+  color: '#fff',
+  fontSize: 13, fontWeight: 600,
+  fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
+}
 
 const searchInputStyle = {
   width: '100%',
@@ -481,32 +544,9 @@ const searchInputStyle = {
 }
 
 const clearBtnStyle = {
-  position: 'absolute',
-  right: 'var(--space-3)',
-  top: '50%',
+  position: 'absolute', right: 'var(--space-3)', top: '50%',
   transform: 'translateY(-50%)',
-  background: 'none',
-  border: 'none',
-  cursor: 'pointer',
+  background: 'none', border: 'none', cursor: 'pointer',
   color: 'var(--color-text-tertiary)',
-  display: 'flex',
-  alignItems: 'center',
-  padding: 0,
-}
-
-const iconBtnStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: 'var(--space-1) var(--space-2)',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
-  backgroundColor: 'var(--color-surface)',
-  color: 'var(--color-text-secondary)',
-  cursor: 'pointer',
-  fontSize: 12,
-  fontFamily: 'var(--font-body)',
-  fontWeight: 500,
-  flexShrink: 0,
-  minWidth: 30,
+  display: 'flex', alignItems: 'center', padding: 0,
 }

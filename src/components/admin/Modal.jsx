@@ -1,175 +1,126 @@
 /**
  * src/components/admin/Modal.jsx
- * Phase 3A — Base modal component. Replaces all inline overlays in CMS.
+ * Phase 3A — CMS Foundation
+ *
+ * Generic slide-up / overlay modal.
  *
  * Props:
  *   isOpen    boolean
  *   onClose   () => void
- *   title     string
+ *   title     string          — shown in header
+ *   size      'sm' | 'md' | 'lg'  (default 'md')
  *   children  ReactNode
- *   size      'sm' | 'md' | 'lg' | 'xl'  (default 'md')
  */
 
 import { useEffect, useRef } from 'react'
+import { X } from 'lucide-react'
 
-const SIZE_MAP = {
-  sm: 400,
-  md: 560,
-  lg: 720,
-  xl: 960,
-}
+const WIDTHS = { sm: 400, md: 560, lg: 760 }
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }) {
-  const panelRef = useRef(null)
+export default function Modal({ isOpen, onClose, title, size = 'md', children }) {
+  const overlayRef = useRef(null)
 
-  // ── Escape key ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isOpen) return
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  // ── Focus trap ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!isOpen || !panelRef.current) return
-    const focusable = panelRef.current.querySelectorAll(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-    )
-    const first = focusable[0]
-    const last  = focusable[focusable.length - 1]
-
-    function trapTab(e) {
-      if (e.key !== 'Tab') return
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last?.focus() }
-      } else {
-        if (document.activeElement === last)  { e.preventDefault(); first?.focus() }
-      }
-    }
-
-    document.addEventListener('keydown', trapTab)
-    first?.focus()
-    return () => document.removeEventListener('keydown', trapTab)
-  }, [isOpen])
-
-  // ── Body scroll lock ────────────────────────────────────────────────────────
+  // Lock body scroll while open
   useEffect(() => {
     if (isOpen) {
+      const prev = document.body.style.overflow
       document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+      return () => { document.body.style.overflow = prev }
     }
-    return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  // Close on Escape
+  useEffect(() => {
+    if (!isOpen) return
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [isOpen, onClose])
 
   if (!isOpen) return null
 
+  const width = WIDTHS[size] ?? WIDTHS.md
+
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
+      ref={overlayRef}
+      onClick={e => { if (e.target === overlayRef.current) onClose() }}
       style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 'var(--space-4)',
+        position:        'fixed',
+        inset:           0,
+        zIndex:          1000,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        padding:         'var(--space-4)',
+        overflowY:       'auto',
       }}
     >
-      {/* Backdrop */}
       <div
-        onClick={onClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          animation: 'modal-fade-in 150ms ease',
-        }}
-      />
-
-      {/* Panel */}
-      <div
-        ref={panelRef}
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: SIZE_MAP[size] ?? SIZE_MAP.md,
-          maxHeight: 'calc(100dvh - var(--space-8))',
-          display: 'flex',
-          flexDirection: 'column',
+          width:           '100%',
+          maxWidth:        width,
           backgroundColor: 'var(--color-surface)',
-          borderRadius: 'var(--radius-lg)',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
-          border: '1px solid var(--color-border)',
-          animation: 'modal-scale-in 150ms ease',
-          overflow: 'hidden',
+          borderRadius:    'var(--radius-lg)',
+          boxShadow:       '0 24px 64px rgba(0,0,0,0.18)',
+          display:         'flex',
+          flexDirection:   'column',
+          maxHeight:       'calc(100dvh - 48px)',
+          overflow:        'hidden',
+          fontFamily:      'var(--font-body)',
         }}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: 'var(--space-4) var(--space-5)',
-          borderBottom: '1px solid var(--color-border)',
-          flexShrink: 0,
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'space-between',
+          padding:         'var(--space-4) var(--space-5)',
+          borderBottom:    '1px solid var(--color-border)',
+          flexShrink:      0,
         }}>
-          <h2
-            id="modal-title"
-            style={{
-              margin: 0,
-              fontSize: 17,
-              fontWeight: 700,
-              fontFamily: 'var(--font-body)',
-              color: 'var(--color-text-primary)',
-              letterSpacing: '-0.01em',
-            }}
-          >
+          <span style={{
+            fontSize:   16,
+            fontWeight: 700,
+            color:      'var(--color-text-primary)',
+            fontFamily: 'var(--font-body)',
+          }}>
             {title}
-          </h2>
+          </span>
           <button
             onClick={onClose}
             aria-label="Close modal"
             style={{
-              width: 32,
-              height: 32,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              background:  'none',
+              border:      'none',
+              cursor:      'pointer',
+              color:       'var(--color-text-tertiary)',
+              display:     'flex',
+              alignItems:  'center',
+              padding:     4,
               borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              background: 'transparent',
-              color: 'var(--color-text-tertiary)',
-              cursor: 'pointer',
-              fontSize: 20,
-              lineHeight: 1,
-              fontFamily: 'var(--font-body)',
+              transition:  'color 0.15s',
             }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-text-primary)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-tertiary)' }}
           >
-            ×
+            <X size={18} />
           </button>
         </div>
 
-        {/* Body — scrollable */}
+        {/* ── Body ── */}
         <div style={{
-          flex: 1,
           overflowY: 'auto',
-          padding: 'var(--space-5)',
+          padding:   'var(--space-5)',
+          flex:      1,
         }}>
           {children}
         </div>
       </div>
-
-      <style>{`
-        @keyframes modal-fade-in  { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes modal-scale-in { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
-      `}</style>
     </div>
   )
 }

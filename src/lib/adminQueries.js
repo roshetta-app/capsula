@@ -391,6 +391,65 @@ export async function toggleConditionPublished(id, isPublished) {
   return touchAppMetadata('conditions_updated_at')
 }
 
+// ─── Generics — publish toggle + list (3E) ───────────────────────────────────
+
+/**
+ * Fetch all generics (published + draft) for the admin CMS list.
+ * Returns one row per generic with formulation count.
+ */
+export async function fetchAllGenerics() {
+  const { data, error } = await supabase
+    .from('generics')
+    .select(`
+      id, name_en, name_ar, category, class,
+      is_published, updated_at,
+      mechanism_of_action,
+      uses_legacy, uses_structured,
+      warnings_legacy,
+      side_effects_common, side_effects_serious,
+      pregnancy_category, breastfeeding_safety,
+      crosses_placenta, crosses_bbb,
+      contraindications, drug_interactions, dose_adjustments,
+      pharmacokinetics, textbook_doses, textbook_dose_notes,
+      card_tagline,
+      formulations ( id )
+    `)
+    .order('name_en')
+
+  if (error) return { data: null, error }
+
+  const mapped = data.map(g => ({
+    ...g,
+    formulationCount: (g.formulations ?? []).length,
+  }))
+
+  return { data: mapped, error: null }
+}
+
+/**
+ * Toggle is_published on a generic and invalidate the drugs cache.
+ */
+export async function toggleGenericPublished(id, isPublished) {
+  const { error } = await supabase
+    .from('generics')
+    .update({ is_published: isPublished })
+    .eq('id', id)
+  if (error) return { error }
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Delete a generic (cascades to formulations + brands via DB constraints).
+ */
+export async function deleteGeneric(id) {
+  const { error } = await supabase
+    .from('generics')
+    .delete()
+    .eq('id', id)
+  if (error) return { error }
+  return touchAppMetadata('drugs_updated_at')
+}
+
 // ─── Cache invalidation (3B+) ────────────────────────────────────────────────
 
 /**
