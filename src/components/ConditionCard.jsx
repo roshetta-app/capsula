@@ -1,3 +1,20 @@
+/**
+ * src/components/ConditionCard.jsx
+ * Phase 2C — Conditions Screen
+ *
+ * Rebuilt to masterplan spec:
+ *   REMOVED: favourite/bookmark button, age group badge, clinical picture preview
+ *   ADDED:   card_tagline (optional italic line), chevron right
+ *   KEPT:    specialty icon in tinted circle (left), condition name (bold), specialty name (muted)
+ *
+ * Card height: ~72px with no tagline, ~88px with tagline.
+ * Favourite star moved to ConditionDetailScreen header (Phase 2D).
+ *
+ * Props:
+ *   condition  — ConditionFull object from context
+ *   onTap      — optional (condition) => void  (falls back to navigate)
+ */
+
 import { useNavigate } from 'react-router-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
@@ -14,9 +31,8 @@ import {
   faNotesMedical,
   faFlask,
   faSyringe,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons'
-import { Bookmark, BookmarkCheck } from 'lucide-react'
-import { useFavouritesContext } from '../context/FavouritesContext'
 
 // ─── Specialty → FA icon map ──────────────────────────────────────────────────
 
@@ -44,39 +60,13 @@ function specialtyIcon(slug) {
   return SPECIALTY_ICONS[slug] ?? faStethoscope
 }
 
-// ─── Age group badge colours ──────────────────────────────────────────────────
-
-const AGE_STYLES = {
-  adult:     { bg: '#DBEAFE', color: '#1E40AF' },
-  pediatric: { bg: '#D1FAE5', color: '#065F46' },
-  both:      { bg: '#EDE9FE', color: '#5B21B6' },
-}
-
-function ageLabel(group) {
-  if (group === 'pediatric') return 'Pediatric'
-  if (group === 'both')      return 'All ages'
-  return 'Adult'
-}
-
 // ─── ConditionCard ────────────────────────────────────────────────────────────
 
-/**
- * ConditionCard — clickable card for a single condition.
- *
- * Props:
- *   condition  ConditionFull
- *   onTap      (condition) => void   — called on card tap (navigate to detail)
- */
 export default function ConditionCard({ condition, onTap }) {
   const navigate = useNavigate()
-  const { isConditionFavourited, toggleCondition } = useFavouritesContext()
-  const isFavourited = isConditionFavourited(condition.id)
-
-  const ageStyle = AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' }
   const icon     = specialtyIcon(condition.specialtySlug)
 
-  function handleTap(e) {
-    e.stopPropagation()
+  function handleTap() {
     if (onTap) {
       onTap(condition)
     } else {
@@ -84,146 +74,105 @@ export default function ConditionCard({ condition, onTap }) {
     }
   }
 
-  function handleBookmark(e) {
-    e.stopPropagation()
-    toggleCondition(condition.id)
-  }
-
   return (
     <div
       onClick={handleTap}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && handleTap()}
       style={{
         backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-3) var(--space-4)',
-        marginBottom: 'var(--space-2)',
-        cursor: 'pointer',
-        boxShadow: 'var(--shadow-card)',
-        transition: 'box-shadow 0.15s ease, transform 0.1s ease',
-        display: 'flex',
-        gap: 'var(--space-3)',
-        alignItems: 'flex-start',
+        border:          '1px solid var(--color-border)',
+        borderRadius:    'var(--radius-lg)',
+        padding:         '12px var(--space-4)',
+        marginBottom:    'var(--space-2)',
+        cursor:          'pointer',
+        boxShadow:       'var(--shadow-card)',
+        display:         'flex',
+        alignItems:      'center',
+        gap:             'var(--space-3)',
+        transition:      'box-shadow 0.15s ease',
+        outline:         'none',
+        WebkitTapHighlightColor: 'transparent',
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = 'var(--shadow-elevated)'
-        e.currentTarget.style.transform = 'translateY(-1px)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = 'var(--shadow-card)'
-        e.currentTarget.style.transform = 'translateY(0)'
-      }}
+      onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-elevated)'}
+      onMouseLeave={e => e.currentTarget.style.boxShadow = 'var(--shadow-card)'}
     >
-      {/* Specialty icon column */}
+
+      {/* Left: specialty icon in tinted circle */}
       <div style={{
-        width: 36, height: 36, flexShrink: 0,
-        borderRadius: 'var(--radius-md)',
+        width:           36,
+        height:          36,
+        flexShrink:      0,
+        borderRadius:    'var(--radius-md)',
         backgroundColor: 'var(--color-accent-light)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        marginTop: 2,
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
       }}>
         <FontAwesomeIcon
           icon={icon}
-          style={{ fontSize: 16, color: 'var(--color-accent)' }}
+          style={{ fontSize: 15, color: 'var(--color-accent)' }}
         />
       </div>
 
-      {/* Content column */}
+      {/* Middle: text content */}
       <div style={{ flex: 1, minWidth: 0 }}>
 
-        {/* Top row: specialty chip + age badge + bookmark */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: 'var(--space-1)',
-          gap: 'var(--space-2)',
-        }}>
-          {condition.specialtyName && (
-            <span style={{
-              fontSize: 11,
-              fontWeight: 500,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              color: 'var(--color-text-tertiary)',
-              backgroundColor: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              padding: '2px 8px',
-              borderRadius: 'var(--radius-full)',
-              flexShrink: 0,
-            }}>
-              {condition.specialtyName}
-            </span>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginLeft: 'auto' }}>
-            {condition.ageGroup && (
-              <span style={{
-                fontSize: 11,
-                fontWeight: 500,
-                backgroundColor: ageStyle.bg,
-                color: ageStyle.color,
-                padding: '2px 8px',
-                borderRadius: 'var(--radius-full)',
-                flexShrink: 0,
-              }}>
-                {ageLabel(condition.ageGroup)}
-              </span>
-            )}
-
-            {/* Bookmark button */}
-            <button
-              onClick={handleBookmark}
-              aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
-              style={{
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                color: isFavourited ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                transition: 'color 0.15s ease',
-                flexShrink: 0,
-              }}
-            >
-              {isFavourited
-                ? <BookmarkCheck size={16} />
-                : <Bookmark size={16} />
-              }
-            </button>
+        {/* Specialty name — small, muted */}
+        {condition.specialtyName && (
+          <div style={{
+            fontSize:   11,
+            fontWeight: 500,
+            color:      'var(--color-text-tertiary)',
+            marginBottom: 2,
+            textTransform: 'uppercase',
+            letterSpacing: '0.04em',
+          }}>
+            {condition.specialtyName}
           </div>
-        </div>
+        )}
 
-        {/* Condition name */}
+        {/* Condition name — bold */}
         <div style={{
-          fontSize: 16,
+          fontSize:   15,
           fontWeight: 600,
-          color: 'var(--color-text-primary)',
+          color:      'var(--color-text-primary)',
           lineHeight: 1.3,
-          marginBottom: 'var(--space-1)',
+          overflow:   'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
         }}>
           {condition.name}
         </div>
 
-        {/* Clinical picture preview */}
-        {condition.clinicalPicture && (
-          <div
-            dir="auto"
-            style={{
-              fontSize: 13,
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.4,
-              overflow: 'hidden',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-            }}
-          >
-            {condition.clinicalPicture}
+        {/* Optional tagline — italic, muted. Renders nothing if null/empty. */}
+        {condition.card_tagline && (
+          <div style={{
+            fontSize:    12,
+            fontStyle:   'italic',
+            color:       'var(--color-text-tertiary)',
+            marginTop:   3,
+            overflow:    'hidden',
+            whiteSpace:  'nowrap',
+            textOverflow: 'ellipsis',
+          }}>
+            {condition.card_tagline}
           </div>
         )}
       </div>
+
+      {/* Right: chevron */}
+      <FontAwesomeIcon
+        icon={faChevronRight}
+        style={{
+          fontSize:   12,
+          color:      'var(--color-text-tertiary)',
+          flexShrink: 0,
+          opacity:    0.5,
+        }}
+      />
+
     </div>
   )
 }

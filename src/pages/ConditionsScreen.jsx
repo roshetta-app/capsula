@@ -1,17 +1,40 @@
+/**
+ * src/pages/ConditionsScreen.jsx
+ * Phase 2C — Conditions Screen
+ *
+ * Layout (top to bottom):
+ *   1. Search bar (with autocomplete dropdown)
+ *   2. Recently viewed chips row (hidden if empty)
+ *   3. Specialty filter pills
+ *   4. Condition cards list
+ *
+ * Uses:
+ *   useConditionSearch  — fuzzy search + autocomplete + gap logging
+ *   useRecentlyViewed   — last 5 viewed conditions from localStorage
+ *   SpecialtyFilterPills — extracted specialty filter component
+ *   RecentlyViewedChips  — recently viewed row
+ *   ConditionCard        — rebuilt card (no bookmark, no age, has tagline + chevron)
+ */
+
+import { useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useConditionContext } from '../context/ConditionContext'
-import { useConditionSearch } from '../hooks/useConditionSearch'
 import Layout from '../components/layout'
 import SearchBar from '../components/SearchBar'
 import ConditionCard from '../components/ConditionCard'
+import SpecialtyFilterPills from '../components/conditions/SpecialtyFilterPills'
+import RecentlyViewedChips  from '../components/conditions/RecentlyViewedChips'
+import { useConditionContext }  from '../context/ConditionContext'
+import { useConditionSearch }  from '../hooks/useConditionSearch'
+import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
+import { ROUTES } from '../router'
 
-// ─── Skeleton helpers (same shimmer used in App.jsx) ─────────────────────────
+// ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
 function shimmer(extra = {}) {
   return {
     backgroundColor: 'var(--color-border)',
-    borderRadius: 'var(--radius-sm)',
-    animation: 'shimmer 1.4s ease-in-out infinite',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
     ...extra,
   }
 }
@@ -20,129 +43,200 @@ function SkeletonCard() {
   return (
     <div style={{
       backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-3) var(--space-4)',
-      marginBottom: 'var(--space-2)',
-      boxShadow: 'var(--shadow-card)',
+      border:          '1px solid var(--color-border)',
+      borderRadius:    'var(--radius-lg)',
+      padding:         '12px var(--space-4)',
+      marginBottom:    'var(--space-2)',
+      display:         'flex',
+      alignItems:      'center',
+      gap:             'var(--space-3)',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-        <div style={shimmer({ width: 80, height: 18, borderRadius: 'var(--radius-full)' })} />
-        <div style={shimmer({ width: 50, height: 18, borderRadius: 'var(--radius-full)' })} />
+      <div style={shimmer({ width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0 })} />
+      <div style={{ flex: 1 }}>
+        <div style={shimmer({ width: 60, height: 10, marginBottom: 6 })} />
+        <div style={shimmer({ width: '60%', height: 15 })} />
       </div>
-      <div style={shimmer({ width: '60%', height: 18, marginBottom: 'var(--space-1)' })} />
-      <div style={shimmer({ width: '80%', height: 14 })} />
+    </div>
+  )
+}
+
+// ─── Autocomplete dropdown ────────────────────────────────────────────────────
+
+function AutocompleteDropdown({ suggestions, onSelect, onDismiss }) {
+  const ref = useRef(null)
+
+  // Close on outside tap
+  useEffect(() => {
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        onDismiss()
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    document.addEventListener('touchstart', handleClick)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+      document.removeEventListener('touchstart', handleClick)
+    }
+  }, [onDismiss])
+
+  if (!suggestions || suggestions.length === 0) return null
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position:        'absolute',
+        top:             '100%',
+        left:            0,
+        right:           0,
+        zIndex:          200,
+        backgroundColor: 'var(--color-surface)',
+        border:          '1px solid var(--color-border)',
+        borderRadius:    'var(--radius-lg)',
+        boxShadow:       'var(--shadow-elevated)',
+        overflow:        'hidden',
+        marginTop:       4,
+      }}
+    >
+      {suggestions.map((s, i) => (
+        <button
+          key={s.id}
+          onClick={() => onSelect(s)}
+          style={{
+            width:           '100%',
+            display:         'flex',
+            alignItems:      'center',
+            padding:         '10px var(--space-4)',
+            background:      'none',
+            border:          'none',
+            borderTop:       i > 0 ? '1px solid var(--color-border)' : 'none',
+            cursor:          'pointer',
+            fontFamily:      'var(--font-body)',
+            fontSize:        14,
+            color:           'var(--color-text-primary)',
+            textAlign:       'left',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          {s.name}
+        </button>
+      ))}
     </div>
   )
 }
 
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
-/**
- * ConditionsScreen — primary screen at /.
- *
- * Consumes ConditionContext and useConditionSearch.
- * Renders SearchBar + specialty filter pills + ConditionCard list.
- * Tapping a card navigates to /conditions/:slug (ConditionDetailScreen, Session 4.2).
- */
 export default function ConditionsScreen() {
-  const { conditions, specialties, loading } = useConditionContext()
-  const { query, setQuery, activeSpecialty, setActiveSpecialty, results } = useConditionSearch(conditions)
   const navigate = useNavigate()
+  const { conditions, specialties, loading } = useConditionContext()
+  const { recentlyViewed } = useRecentlyViewed()
 
-  // ─── Cold start skeleton ───────────────────────────────────────────────────
+  const {
+    query,
+    setQuery,
+    activeSpecialty,
+    setActiveSpecialty,
+    results,
+    suggestions,
+    showSuggestions,
+    clearSuggestions,
+  } = useConditionSearch(conditions)
 
+  // ── Autocomplete: navigate to selected suggestion ─────────────────────────
+  function handleSuggestionSelect(suggestion) {
+    clearSuggestions()
+    setQuery('')
+    navigate(ROUTES.CONDITION_DETAIL(suggestion.slug))
+  }
+
+  // ── Card tap ──────────────────────────────────────────────────────────────
+  function handleCardTap(condition) {
+    navigate(ROUTES.CONDITION_DETAIL(condition.slug))
+  }
+
+  // ── Cold start skeleton ───────────────────────────────────────────────────
   if (loading && conditions.length === 0) {
     return (
       <Layout>
         <div style={{ paddingTop: 'var(--space-5)' }}>
           <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', overflow: 'hidden' }}>
-            {[80, 100, 70, 90].map((w, i) => (
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', overflow: 'hidden' }}>
+            {[80, 100, 70, 90, 110].map((w, i) => (
               <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
             ))}
           </div>
-          {[1, 2, 3].map(i => <SkeletonCard key={i} />)}
+          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
         </div>
       </Layout>
     )
   }
 
-  // ─── Main render ──────────────────────────────────────────────────────────
-
+  // ── Main render ───────────────────────────────────────────────────────────
   return (
     <Layout>
       <div style={{ paddingTop: 'var(--space-5)' }}>
 
-        {/* Search */}
-        <SearchBar value={query} onChange={setQuery} placeholder="Search conditions…" />
+        {/* 1. Search bar + autocomplete dropdown */}
+        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+          <SearchBar
+            value={query}
+            onChange={(val) => {
+              setQuery(val)
+              if (!val) clearSuggestions()
+            }}
+            placeholder="Search conditions…"
+          />
+          {showSuggestions && (
+            <AutocompleteDropdown
+              suggestions={suggestions}
+              onSelect={handleSuggestionSelect}
+              onDismiss={clearSuggestions}
+            />
+          )}
+        </div>
 
-        {/* Specialty filter pills */}
-        {specialties.length > 0 && (
-          <div style={{
-            display: 'flex',
-            gap: 'var(--space-2)',
-            overflowX: 'auto',
-            paddingBottom: 'var(--space-2)',
-            marginBottom: 'var(--space-4)',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}>
-            {['all', ...specialties.map(s => s.id)].map(id => {
-              const isActive = activeSpecialty === id
-              const label = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name
-              return (
-                <button
-                  key={id}
-                  onClick={() => setActiveSpecialty(id)}
-                  style={{
-                    flexShrink: 0,
-                    padding: '6px 14px',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: 13,
-                    fontWeight: isActive ? 600 : 400,
-                    fontFamily: 'var(--font-body)',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                    border: isActive ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                    backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
-                    color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
-                  }}
-                >
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        )}
+        {/* 2. Recently viewed chips (hidden if empty) */}
+        <RecentlyViewedChips recentlyViewed={recentlyViewed} />
 
-        {/* Count */}
+        {/* 3. Specialty filter pills */}
+        <SpecialtyFilterPills
+          specialties={specialties}
+          activeSpecialty={activeSpecialty}
+          onSelect={setActiveSpecialty}
+        />
+
+        {/* Result count */}
         <div style={{
-          fontSize: 12,
-          color: 'var(--color-text-tertiary)',
-          fontFamily: 'var(--font-mono)',
+          fontSize:     12,
+          color:        'var(--color-text-tertiary)',
+          fontFamily:   'var(--font-mono)',
           marginBottom: 'var(--space-3)',
         }}>
           {results.length} condition{results.length !== 1 ? 's' : ''}
-          {query && ' for "' + query + '"'}
+          {query && ` for "${query}"`}
         </div>
 
-        {/* List */}
+        {/* 4. Condition cards list */}
         {results.length === 0 ? (
           <div style={{
             textAlign: 'center',
-            padding: 'var(--space-12) var(--space-4)',
-            color: 'var(--color-text-tertiary)',
+            padding:   'var(--space-12) var(--space-4)',
+            color:     'var(--color-text-tertiary)',
           }}>
             <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.5"
+                strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <path d="m21 21-4.35-4.35" />
               </svg>
             </div>
             <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
-              No conditions found
-              {query && ` for "${query}"`}
+              No conditions found{query && ` for "${query}"`}
             </div>
           </div>
         ) : (
@@ -150,10 +244,11 @@ export default function ConditionsScreen() {
             <ConditionCard
               key={condition.id}
               condition={condition}
-              onTap={(c) => navigate(`/conditions/${c.slug}`)}
+              onTap={handleCardTap}
             />
           ))
         )}
+
       </div>
     </Layout>
   )

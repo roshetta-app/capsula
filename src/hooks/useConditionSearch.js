@@ -1,53 +1,98 @@
-import { useState, useEffect, useCallback } from 'react'
-
 /**
- * useConditionSearch — search + specialty filter for ConditionFull[].
+ * src/hooks/useConditionSearch.js
+ * Phase 2C — Conditions Screen
  *
- * Searches: condition name + specialtyName
- * Filter:   activeSpecialty (specialty id or 'all')
- * Debounce: 150ms
+ * Upgraded from simple .includes() to Fuse.js fuzzy search.
  *
  * Exposes:
- *   query           — string
- *   setQuery        — setter
- *   activeSpecialty — string ('all' | specialty id)
- *   setActiveSpecialty
- *   results         — ConditionFull[]
+ *   query                — current search string
+ *   setQuery             — setter
+ *   activeSpecialty      — 'all' | specialty id
+ *   setActiveSpecialty   — setter
+ *   results              — filtered + fuzzy-matched ConditionFull[]
+ *   suggestions          — top 5 autocomplete matches [{ id, name, slug }]
+ *   showSuggestions      — boolean, true when dropdown should be visible
+ *   clearSuggestions     — call this when user taps outside or picks a suggestion
  */
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { buildConditionIndex, fuzzySearchConditions, getAutocompleteSuggestions } from '../utils/searchUtils'
+import { logSearchGap } from '../analytics/searchGaps'
+
 export function useConditionSearch(conditions) {
   const [query,           setQuery]           = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('all')
   const [results,         setResults]         = useState(conditions)
+  const [suggestions,     setSuggestions]     = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const search = useCallback((q, specialty) => {
-    let filtered = conditions
+  // Build Fuse index when conditions load or change (cache refresh)
+  const fuseRef = useRef(null)
+  useEffect(() => {
+    fuseRef.current = buildConditionIndex(conditions)
+    // Re-run search with new index
+    runSearch(query, activeSpecialty)
+  }, [conditions]) // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Specialty filter
+  const runSearch = useCallback((q, specialty) => {
+    if (!fuseRef.current) return
+
+    // Step 1: specialty filter
+    let pool = conditions
     if (specialty !== 'all') {
-      filtered = filtered.filter(c => c.specialtyId === specialty)
+      pool = conditions.filter(c => c.specialtyId === specialty)
     }
 
-    // Text search
-    if (q.trim()) {
-      const lower = q.toLowerCase()
-      filtered = filtered.filter(c =>
-        c.name?.toLowerCase().includes(lower) ||
-        c.specialtyName?.toLowerCase().includes(lower)
-      )
+    // Step 2: fuzzy text search
+    let matched
+    if (q.trim().length >= 2) {
+      // Search within specialty-filtered pool
+      const Fuse = fuseRef.current.constructor
+      const { buildConditionIndex: build, fuzzySearchConditions: search } =
+        // Re-import helpers to search a sub-pool
+        require('../utils/searchUtils')
+      const subIndex = build(pool)
+      matched = search(subIndex, q) ?? pool
+    } else {
+      matched = pool
     }
 
-    setResults(filtered)
+    setResults(matched)
+
+    // Log zero-result gaps (debounced — only after user pauses)
+    if (q.trim().length >= 2 && matched.length === 0) {
+      logSearchGap(q, 'conditions')
+    }
+
+    // Autocomplete suggestions (always from full conditions, not filtered pool)
+    if (q.trim().length >= 2) {
+      const sug = getAutocompleteSuggestions(fuseRef.current, q)
+      setSuggestions(sug)
+      setShowSuggestions(sug.length > 0)
+    } else {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
   }, [conditions])
 
+  // Debounce: 150ms
   useEffect(() => {
-    const timer = setTimeout(() => search(query, activeSpecialty), 150)
+    const timer = setTimeout(() => runSearch(query, activeSpecialty), 150)
     return () => clearTimeout(timer)
-  }, [query, activeSpecialty, search])
+  }, [query, activeSpecialty, runSearch])
 
-  // Reset when conditions list changes (cache refresh)
-  useEffect(() => {
-    setResults(conditions)
-  }, [conditions])
+  function clearSuggestions() {
+    setShowSuggestions(false)
+  }
 
-  return { query, setQuery, activeSpecialty, setActiveSpecialty, results }
+  return {
+    query,
+    setQuery,
+    activeSpecialty,
+    setActiveSpecialty,
+    results,
+    suggestions,
+    showSuggestions,
+    clearSuggestions,
+  }
 }
