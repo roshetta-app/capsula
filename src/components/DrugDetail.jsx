@@ -87,7 +87,7 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
   // FlatDrug field names
   const brandNames      = drug.brands?.map(b => b.name) ?? []
   const textbookDoses   = drug.textbookDoses  ?? []   // [{ group, instruction }] — textbook reference
-  const practicalDoses  = drug.practicalDoses ?? []   // [{ group, instruction }] — patient-friendly
+  const practicalDoses  = drug.doses ?? []            // [{ group, instruction }] — from formulation
 
   // Prefer practicalDoses for display; fall back to textbookDoses
   const dosesToShow = practicalDoses.length > 0 ? practicalDoses : textbookDoses
@@ -229,7 +229,7 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
                   lineHeight: 1.4,
                 }}>
                   <span style={{ position: 'absolute', left: 0, color: 'var(--color-accent)', fontWeight: 700 }}>·</span>
-                  {use}
+                  {typeof use === 'string' ? use : use.use_name}
                 </li>
               ))}
             </ul>
@@ -288,3 +288,6 @@ export default function DrugDetail({ drug, isInStock, onBack, onToggleStock }) {
     </div>
   )
 }
+
+
+
