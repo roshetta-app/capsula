@@ -154,6 +154,7 @@ export async function fetchSpecialtiesForCMS() {
     .from('specialties')
     .select('id, name_en, slug, icon_name, color_hex, sort_order, is_active')
     .eq('is_active', true)
+    .neq('id', '00000000-0000-0000-0000-000000000001')
     .order('sort_order', { ascending: true })
   return { data: data ?? [], error }
 }
@@ -167,7 +168,7 @@ export async function fetchAllSpecialties() {
     .select(`
       id, name_en, name_ar, slug, icon_name, color_hex,
       sort_order, is_active, created_at,
-      conditions!conditions_specialty_id_fkey ( id )
+      conditions!conditions_specialty_id_fkey ( id, name )
     `)
     .order('sort_order', { ascending: true })
 
@@ -176,6 +177,7 @@ export async function fetchAllSpecialties() {
   const mapped = data.map(s => ({
     ...s,
     conditionCount: (s.conditions ?? []).length,
+    conditionNames: (s.conditions ?? []).map(c => c.name).sort(),
     conditions: undefined,
   }))
 
@@ -560,3 +562,4 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
+

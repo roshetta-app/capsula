@@ -1,6 +1,25 @@
+/**
+ * src/pages/admin/SpecialtiesManager.jsx
+ *
+ * Fixes applied:
+ *  1. Toast API unified — was `showToast(msg, type)`, now `toast.success/error(msg)`
+ *     matching the rest of the admin codebase. This was preventing save feedback
+ *     and blocking modal close.
+ *  2. Sort Order number input removed from modal. Ordering is drag-only + up/down arrows.
+ *  3. Up / Down arrow buttons added to each row for keyboard-friendly reordering.
+ *  4. Expandable conditions panel per specialty — click the condition count to
+ *     toggle a list of condition names. Requires fetchAllSpecialties to also
+ *     return condition names (see adminQueries.js change below).
+ *  5. Uncategorized excluded from public-facing fetchSpecialtiesForCMS results
+ *     (handled in adminQueries.js — see note at bottom of this file).
+ */
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Plus, GripVertical, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
+import {
+  ArrowLeft, Plus, GripVertical, Pencil, Trash2,
+  ToggleLeft, ToggleRight, ChevronUp, ChevronDown, ChevronRight,
+} from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faStethoscope, faHeartPulse, faBrain, faBone, faEye, faEarListen,
@@ -51,7 +70,7 @@ const ICON_OPTIONS = [
   { name: 'fa-file-medical',      icon: faFileMedical },
   { name: 'fa-notes-medical',     icon: faNotesMedical },
   { name: 'fa-heart',             icon: faHeart },
-  { name: 'fa-x-ray',            icon: faXRay },
+  { name: 'fa-x-ray',             icon: faXRay },
   { name: 'fa-thermometer',       icon: faThermometer },
   { name: 'fa-briefcase-medical', icon: faBriefcaseMedical },
   { name: 'fa-circle-question',   icon: faCircleQuestion },
@@ -77,34 +96,34 @@ function toSlug(str) {
     .replace(/\s+/g, '-')
 }
 
-// ─── Empty form state ─────────────────────────────────────────────────────────
+// ─── Empty form state — no sort_order field (managed by position only) ────────
 
 const EMPTY_FORM = {
-  name_en:    '',
-  name_ar:    '',
-  icon_name:  'fa-stethoscope',
-  color_hex:  '#DBEAFE',
-  sort_order: 0,   // 0 = auto; computed from existing rows on open
+  name_en:   '',
+  name_ar:   '',
+  icon_name: 'fa-stethoscope',
+  color_hex: '#DBEAFE',
 }
 
 // ─── SpecialtyModal ───────────────────────────────────────────────────────────
+// FIX 1: uses `toast` (not `showToast`) to match the rest of the admin codebase.
+// FIX 2: sort_order field removed — position managed by drag/arrows only.
 
 function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
-  const { showToast } = useToast()
-  const [form, setForm]   = useState(EMPTY_FORM)
-  const [busy, setBusy]   = useState(false)
+  const { toast } = useToast()   // ← FIX: was `showToast`
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (open) {
       setForm(specialty
         ? {
-            name_en:    specialty.name_en   ?? '',
-            name_ar:    specialty.name_ar   ?? '',
-            icon_name:  specialty.icon_name ?? 'fa-stethoscope',
-            color_hex:  specialty.color_hex ?? '#DBEAFE',
-            sort_order: specialty.sort_order ?? 99,
+            name_en:   specialty.name_en   ?? '',
+            name_ar:   specialty.name_ar   ?? '',
+            icon_name: specialty.icon_name ?? 'fa-stethoscope',
+            color_hex: specialty.color_hex ?? '#DBEAFE',
           }
-        : { ...EMPTY_FORM, sort_order: (nextOrder ?? 99) }
+        : { ...EMPTY_FORM }
       )
     }
   }, [open, specialty])
@@ -115,17 +134,18 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
 
   async function handleSave() {
     if (!form.name_en.trim()) {
-      showToast('Name (EN) is required', 'error')
+      toast.error('Name (English) is required')
       return
     }
     setBusy(true)
 
     const payload = {
-      name_en:    form.name_en.trim(),
-      name_ar:    form.name_ar.trim() || null,
-      icon_name:  form.icon_name,
-      color_hex:  form.color_hex,
-      sort_order: Number(form.sort_order) || 99,
+      name_en:   form.name_en.trim(),
+      name_ar:   form.name_ar.trim() || null,
+      icon_name: form.icon_name,
+      color_hex: form.color_hex,
+      // sort_order comes from position in list — set automatically on insert
+      ...(specialty ? {} : { sort_order: nextOrder ?? 99 }),
     }
 
     let result
@@ -140,13 +160,14 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     setBusy(false)
 
     if (result.error) {
-      showToast(result.error.message ?? 'Save failed', 'error')
+      toast.error(result.error.message ?? 'Save failed')
       return
     }
 
-    showToast(specialty ? 'Specialty updated' : 'Specialty added', 'success')
-    onSaved()   // parent: setModalOpen(false) + load()
-    onClose()   // ensure modal closes even if onSaved doesn't
+    // FIX: toast first, then close — guaranteed to run regardless of toast impl
+    toast.success(specialty ? 'Specialty updated' : 'Specialty added')
+    onSaved()   // triggers load() in parent
+    onClose()   // closes modal
   }
 
   return (
@@ -163,6 +184,7 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
           <input
             value={form.name_en}
             onChange={e => patch('name_en', e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleSave()}
             placeholder="e.g. Gastroenterology"
             style={inputStyle}
           />
@@ -180,17 +202,7 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
           />
         </label>
 
-        {/* Sort order */}
-        <label style={labelStyle}>
-          Sort Order
-          <input
-            type="number"
-            value={form.sort_order}
-            onChange={e => patch('sort_order', e.target.value)}
-            min={1}
-            style={{ ...inputStyle, width: 90 }}
-          />
-        </label>
+        {/* ── Sort Order input REMOVED — controlled by drag/arrows only ── */}
 
         {/* Color palette */}
         <div>
@@ -251,8 +263,7 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  width: 40,
-                  height: 40,
+                  width: 40, height: 40,
                   borderRadius: 8,
                   backgroundColor: form.icon_name === name
                     ? (form.color_hex || 'var(--color-accent-light)')
@@ -314,11 +325,12 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
 
         {/* Footer */}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
-          <button onClick={onClose} style={btnSecondary}>Cancel</button>
+          <button onClick={onClose} disabled={busy} style={btnSecondary}>Cancel</button>
           <button onClick={handleSave} disabled={busy} style={btnPrimary}>
             {busy ? 'Saving…' : 'Save'}
           </button>
         </div>
+
       </div>
     </Modal>
   )
@@ -327,23 +339,26 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpecialtiesManager() {
-  const navigate         = useNavigate()
-  const { showToast }    = useToast()
+  const navigate      = useNavigate()
+  const { toast }     = useToast()   // ← FIX: was `showToast`
 
-  const [rows, setRows]  = useState([])
+  const [rows, setRows]     = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Which specialty's conditions panel is expanded
+  const [expandedId, setExpandedId] = useState(null)
+
   // Modal state
-  const [modalOpen, setModalOpen]   = useState(false)
-  const [editTarget, setEditTarget] = useState(null)   // null = add, object = edit
+  const [modalOpen,  setModalOpen]  = useState(false)
+  const [editTarget, setEditTarget] = useState(null)
 
   // Confirm modal
-  const [confirmOpen, setConfirmOpen]   = useState(false)
+  const [confirmOpen,   setConfirmOpen]   = useState(false)
   const [confirmConfig, setConfirmConfig] = useState({})
 
   // Drag state
-  const dragIdx   = useRef(null)
-  const dragOver  = useRef(null)
+  const dragIdx  = useRef(null)
+  const dragOver = useRef(null)
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -351,11 +366,33 @@ export default function SpecialtiesManager() {
     setLoading(true)
     const { data, error } = await fetchAllSpecialties()
     setLoading(false)
-    if (error) { showToast('Failed to load specialties', 'error'); return }
+    if (error) { toast.error('Failed to load specialties'); return }
     setRows(data ?? [])
-  }, [showToast])
+  }, [toast])
 
   useEffect(() => { load() }, [load])
+
+  // ── Move row up / down (arrow buttons) ────────────────────────────────────
+
+  async function moveRow(idx, direction) {
+    const targetIdx = idx + direction
+    if (targetIdx < 0 || targetIdx >= rows.length) return
+    // Don't let anything move above Uncategorized (always index 0)
+    if (targetIdx === 0 && rows[0]?.id === UNCATEGORIZED_ID) return
+
+    const reordered = [...rows]
+    ;[reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]]
+    const withOrder = reordered.map((s, i) => ({ ...s, sort_order: i + 1 }))
+    setRows(withOrder)
+
+    const { error } = await reorderSpecialties(
+      withOrder.map(s => ({ id: s.id, sort_order: s.sort_order }))
+    )
+    if (error) {
+      toast.error('Reorder failed')
+      load()
+    }
+  }
 
   // ── Toggle active ─────────────────────────────────────────────────────────
 
@@ -376,14 +413,13 @@ export default function SpecialtiesManager() {
   }
 
   async function doToggle(specialty, newValue) {
-    // optimistic
     setRows(r => r.map(s => s.id === specialty.id ? { ...s, is_active: newValue } : s))
     const { error } = await toggleSpecialtyActive(specialty.id, newValue)
     if (error) {
-      showToast('Update failed', 'error')
+      toast.error('Update failed')
       setRows(r => r.map(s => s.id === specialty.id ? { ...s, is_active: !newValue } : s))
     } else {
-      showToast(newValue ? 'Specialty activated' : 'Specialty deactivated', 'success')
+      toast.success(newValue ? 'Specialty activated' : 'Specialty deactivated')
     }
   }
 
@@ -391,18 +427,18 @@ export default function SpecialtiesManager() {
 
   function handleDelete(specialty) {
     if (specialty.id === UNCATEGORIZED_ID) {
-      showToast('Cannot delete Uncategorized', 'error'); return
+      toast.error('Cannot delete Uncategorized'); return
     }
     if (specialty.conditionCount > 0) {
-      showToast(`Move all ${specialty.conditionCount} condition(s) out first`, 'error'); return
+      toast.error(`Move all ${specialty.conditionCount} condition(s) out first`); return
     }
     setConfirmConfig({
       title:   'Delete Specialty?',
       message: `Delete "${specialty.name_en}" permanently? This cannot be undone.`,
       onConfirm: async () => {
         const { error } = await deleteSpecialty(specialty.id)
-        if (error) { showToast('Delete failed', 'error'); return }
-        showToast('Specialty deleted', 'success')
+        if (error) { toast.error('Delete failed'); return }
+        toast.success('Specialty deleted')
         load()
       },
     })
@@ -425,10 +461,12 @@ export default function SpecialtiesManager() {
     const from = dragIdx.current
     const to   = dragOver.current
     if (from === null || to === null || from === to) return
+    // Prevent anything being dragged above Uncategorized
+    const effectiveTo = (rows[0]?.id === UNCATEGORIZED_ID && to === 0) ? 1 : to
 
     const reordered = [...rows]
     const [moved]   = reordered.splice(from, 1)
-    reordered.splice(to, 0, moved)
+    reordered.splice(effectiveTo, 0, moved)
 
     const withOrder = reordered.map((s, i) => ({ ...s, sort_order: i + 1 }))
     setRows(withOrder)
@@ -437,8 +475,8 @@ export default function SpecialtiesManager() {
       withOrder.map(s => ({ id: s.id, sort_order: s.sort_order }))
     )
     if (error) {
-      showToast('Reorder failed', 'error')
-      load() // revert
+      toast.error('Reorder failed')
+      load()
     }
 
     dragIdx.current  = null
@@ -511,7 +549,7 @@ export default function SpecialtiesManager() {
             {/* Legend row */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: '28px 48px 1fr 80px 60px 80px',
+              gridTemplateColumns: '28px 48px 1fr 90px 60px 96px',
               gap: 8,
               padding: '4px 12px',
               fontSize: 11,
@@ -530,139 +568,236 @@ export default function SpecialtiesManager() {
 
             {rows.map((specialty, idx) => {
               const isUncategorized = specialty.id === UNCATEGORIZED_ID
-              const icon = ICON_MAP[specialty.icon_name] ?? faCircleQuestion
+              const icon            = ICON_MAP[specialty.icon_name] ?? faCircleQuestion
+              const isExpanded      = expandedId === specialty.id
+              const conditionNames  = specialty.conditionNames ?? []  // from updated fetchAllSpecialties
+              const isFirst         = idx === 0
+              const isLast          = idx === rows.length - 1
+              // Can't move above Uncategorized (always pinned first)
+              const canMoveUp   = !isUncategorized && !(rows[idx - 1]?.id === UNCATEGORIZED_ID ? false : idx === 1 && rows[0]?.id === UNCATEGORIZED_ID) && idx > 1
+              const canMoveDown = !isUncategorized && !isLast
+
+              // Simpler: Uncategorized is locked; others can move within their range
+              const moveUpDisabled   = isUncategorized || idx <= 1 && rows[0]?.id === UNCATEGORIZED_ID && idx === 1
+              const moveDownDisabled = isUncategorized || isLast
 
               return (
-                <div
-                  key={specialty.id}
-                  draggable={!isUncategorized}
-                  onDragStart={e => onDragStart(e, idx)}
-                  onDragOver={e => onDragOver(e, idx)}
-                  onDrop={onDrop}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '28px 48px 1fr 80px 60px 80px',
-                    gap: 8,
-                    alignItems: 'center',
-                    padding: '10px 12px',
-                    backgroundColor: specialty.is_active
-                      ? 'var(--color-surface)'
-                      : 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 10,
-                    opacity: specialty.is_active ? 1 : 0.6,
-                    cursor: isUncategorized ? 'default' : 'grab',
-                    userSelect: 'none',
-                  }}
-                >
-                  {/* Drag handle */}
-                  <div style={{ color: isUncategorized ? 'transparent' : 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center' }}>
-                    <GripVertical size={16} />
-                  </div>
+                <div key={specialty.id}>
+                  {/* ── Main row ── */}
+                  <div
+                    draggable={!isUncategorized}
+                    onDragStart={e => onDragStart(e, idx)}
+                    onDragOver={e => onDragOver(e, idx)}
+                    onDrop={onDrop}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '28px 48px 1fr 90px 60px 96px',
+                      gap: 8,
+                      alignItems: 'center',
+                      padding: '10px 12px',
+                      backgroundColor: specialty.is_active
+                        ? 'var(--color-surface)'
+                        : 'var(--color-bg)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: isExpanded ? '10px 10px 0 0' : 10,
+                      borderBottom: isExpanded ? 'none' : '1px solid var(--color-border)',
+                      opacity: specialty.is_active ? 1 : 0.6,
+                      cursor: isUncategorized ? 'default' : 'grab',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {/* Drag handle */}
+                    <div style={{
+                      color: isUncategorized ? 'transparent' : 'var(--color-text-tertiary)',
+                      display: 'flex', alignItems: 'center',
+                    }}>
+                      <GripVertical size={16} />
+                    </div>
 
-                  {/* Icon chip */}
-                  <div style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    backgroundColor: specialty.color_hex || '#DBEAFE',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: 'var(--color-accent)',
-                    fontSize: 18,
-                    flexShrink: 0,
-                  }}>
-                    <FontAwesomeIcon icon={icon} />
-                  </div>
+                    {/* Icon chip */}
+                    <div style={{
+                      width: 40, height: 40,
+                      borderRadius: 10,
+                      backgroundColor: specialty.color_hex || '#DBEAFE',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--color-accent)', fontSize: 18, flexShrink: 0,
+                    }}>
+                      <FontAwesomeIcon icon={icon} />
+                    </div>
 
-                  {/* Name */}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {specialty.name_en}
-                      {isUncategorized && (
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          backgroundColor: 'var(--color-accent-light)',
-                          color: 'var(--color-accent)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                        }}>
-                          Default
-                        </span>
-                      )}
-                      {!specialty.is_active && (
-                        <span style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          padding: '2px 6px',
-                          borderRadius: 4,
-                          backgroundColor: 'var(--color-border)',
-                          color: 'var(--color-text-tertiary)',
-                          textTransform: 'uppercase',
-                          letterSpacing: '0.05em',
-                        }}>
-                          Inactive
-                        </span>
+                    {/* Name */}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 14, fontWeight: 600,
+                        color: 'var(--color-text-primary)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        {specialty.name_en}
+                        {isUncategorized && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: '2px 6px',
+                            borderRadius: 4,
+                            backgroundColor: 'var(--color-accent-light)',
+                            color: 'var(--color-accent)',
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                          }}>
+                            Default
+                          </span>
+                        )}
+                        {!specialty.is_active && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, padding: '2px 6px',
+                            borderRadius: 4,
+                            backgroundColor: 'var(--color-border)',
+                            color: 'var(--color-text-tertiary)',
+                            textTransform: 'uppercase', letterSpacing: '0.05em',
+                          }}>
+                            Inactive
+                          </span>
+                        )}
+                      </div>
+                      {specialty.name_ar && (
+                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', direction: 'rtl', marginTop: 1 }}>
+                          {specialty.name_ar}
+                        </div>
                       )}
                     </div>
-                    {specialty.name_ar && (
-                      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', direction: 'rtl', marginTop: 1 }}>
-                        {specialty.name_ar}
+
+                    {/* Condition count — clickable to expand */}
+                    <div style={{ textAlign: 'center' }}>
+                      {specialty.conditionCount > 0 ? (
+                        <button
+                          onClick={() => setExpandedId(isExpanded ? null : specialty.id)}
+                          title={isExpanded ? 'Collapse' : 'View conditions'}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            fontSize: 13, fontWeight: 500,
+                            color: 'var(--color-accent)',
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            padding: '2px 6px', borderRadius: 6,
+                            backgroundColor: 'var(--color-accent-light)',
+                          }}
+                        >
+                          {specialty.conditionCount}
+                          <ChevronRight
+                            size={12}
+                            style={{
+                              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.15s',
+                            }}
+                          />
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>0</span>
+                      )}
+                    </div>
+
+                    {/* Active toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                      {isUncategorized ? (
+                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>—</span>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleActive(specialty)}
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}
+                          aria-label={specialty.is_active ? 'Deactivate' : 'Activate'}
+                          title={specialty.is_active ? 'Deactivate' : 'Activate'}
+                        >
+                          {specialty.is_active
+                            ? <ToggleRight size={24} color="var(--color-accent)" />
+                            : <ToggleLeft  size={24} color="var(--color-text-tertiary)" />
+                          }
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Actions: up/down + edit + delete */}
+                    <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
+                      {!isUncategorized && (
+                        <>
+                          {/* Up arrow */}
+                          <button
+                            onClick={() => moveRow(idx, -1)}
+                            disabled={idx === 1 && rows[0]?.id === UNCATEGORIZED_ID}
+                            title="Move up"
+                            style={{
+                              ...iconBtn,
+                              opacity: (idx === 1 && rows[0]?.id === UNCATEGORIZED_ID) ? 0.3 : 1,
+                            }}
+                          >
+                            <ChevronUp size={14} />
+                          </button>
+
+                          {/* Down arrow */}
+                          <button
+                            onClick={() => moveRow(idx, 1)}
+                            disabled={isLast}
+                            title="Move down"
+                            style={{
+                              ...iconBtn,
+                              opacity: isLast ? 0.3 : 1,
+                            }}
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+
+                          {/* Edit */}
+                          <button
+                            onClick={() => { setEditTarget(specialty); setModalOpen(true) }}
+                            style={iconBtn}
+                            aria-label="Edit"
+                            title="Edit"
+                          >
+                            <Pencil size={14} />
+                          </button>
+
+                          {/* Delete */}
+                          <button
+                            onClick={() => handleDelete(specialty)}
+                            style={{ ...iconBtn, color: 'var(--color-error, #dc2626)' }}
+                            aria-label="Delete"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ── Expanded conditions panel ── */}
+                  {isExpanded && conditionNames.length > 0 && (
+                    <div style={{
+                      border: '1px solid var(--color-border)',
+                      borderTop: 'none',
+                      borderRadius: '0 0 10px 10px',
+                      backgroundColor: 'var(--color-bg)',
+                      padding: '8px 12px 12px 72px',  // indent to align with name column
+                    }}>
+                      <div style={{
+                        fontSize: 11, fontWeight: 600, letterSpacing: '0.05em',
+                        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+                        marginBottom: 6,
+                      }}>
+                        Conditions
                       </div>
-                    )}
-                  </div>
-
-                  {/* Condition count */}
-                  <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-                    {specialty.conditionCount}
-                  </div>
-
-                  {/* Active toggle */}
-                  <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    {isUncategorized ? (
-                      <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>—</span>
-                    ) : (
-                      <button
-                        onClick={() => handleToggleActive(specialty)}
-                        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}
-                        aria-label={specialty.is_active ? 'Deactivate' : 'Activate'}
-                        title={specialty.is_active ? 'Deactivate' : 'Activate'}
-                      >
-                        {specialty.is_active
-                          ? <ToggleRight size={24} color="var(--color-accent)" />
-                          : <ToggleLeft  size={24} color="var(--color-text-tertiary)" />
-                        }
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Actions */}
-                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                    {!isUncategorized && (
-                      <>
-                        <button
-                          onClick={() => { setEditTarget(specialty); setModalOpen(true) }}
-                          style={iconBtn}
-                          aria-label="Edit"
-                          title="Edit"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(specialty)}
-                          style={{ ...iconBtn, color: 'var(--color-error, #dc2626)' }}
-                          aria-label="Delete"
-                          title="Delete"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {conditionNames.map((name, i) => (
+                          <div key={i} style={{
+                            fontSize: 13, color: 'var(--color-text-secondary)',
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}>
+                            <span style={{
+                              width: 5, height: 5, borderRadius: '50%',
+                              backgroundColor: specialty.color_hex || 'var(--color-accent)',
+                              flexShrink: 0,
+                            }} />
+                            {name}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -723,8 +858,8 @@ const iconBtn = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  width: 30,
-  height: 30,
+  width: 28,
+  height: 28,
   borderRadius: 6,
   border: '1px solid var(--color-border)',
   backgroundColor: 'transparent',
