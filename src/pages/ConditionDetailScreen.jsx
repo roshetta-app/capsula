@@ -9,7 +9,6 @@ import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
 import ShareCard from '../components/ui/ShareCard'
 import { shareConditionPrescription } from '../utils/sharing'
-import { carouselSwipeActive } from '../components/conditions/ImageCarousel'
 
 const AGE_STYLES = {
   adult:     { bg: '#DBEAFE', color: '#1E40AF' },
@@ -34,49 +33,28 @@ export default function ConditionDetailScreen() {
 
   const [activeTab, setActiveTab]                   = useState(0)
   const [activePrescriptionIdx, setActivePrescriptionIdx] = useState(0)
-  const swipeViewportRef = useRef(null)
-  const shareCardRef     = useRef(null)
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+  const shareCardRef = useRef(null)
 
-  // Tab-swipe uses native listeners so the carousel's native stopPropagation works.
-  useEffect(() => {
-    const el = swipeViewportRef.current
-    if (!el) return
+  function handleTouchStart(e) {
+    // Ignore if touch started inside the image carousel
+    if (e.target.closest('[data-carousel]')) return
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
 
-    let startX = null
-    let startY = null
-
-    function onStart(e) {
-      startX = e.touches[0].clientX
-      startY = e.touches[0].clientY
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    touchStartX.current = null
+    touchStartY.current = null
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) setActiveTab(t => Math.min(TABS.length - 1, t + 1))
+      else        setActiveTab(t => Math.max(0, t - 1))
     }
-
-    // onMove just exists so the carousel can stopPropagation on it.
-    // We don't do anything here — decision is at touchend.
-    function onMove() {}
-
-    function onEnd(e) {
-      if (startX === null) return
-      const dx = e.changedTouches[0].clientX - startX
-      const dy = e.changedTouches[0].clientY - startY
-      startX = null; startY = null
-      // A carousel claimed this gesture — don't switch tabs
-      if (carouselSwipeActive.current) return
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-        if (dx < 0) setActiveTab(t => Math.min(TABS.length - 1, t + 1))
-        else        setActiveTab(t => Math.max(0, t - 1))
-      }
-    }
-
-    el.addEventListener('touchstart', onStart, { passive: true })
-    el.addEventListener('touchmove',  onMove,  { passive: true })
-    el.addEventListener('touchend',   onEnd,   { passive: true })
-
-    return () => {
-      el.removeEventListener('touchstart', onStart)
-      el.removeEventListener('touchmove',  onMove)
-      el.removeEventListener('touchend',   onEnd)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   // Add to recently viewed once condition is resolved
   const condition = conditions.find(c => c.slug === slug)
@@ -204,7 +182,8 @@ export default function ConditionDetailScreen() {
         it never causes a horizontal scrollbar on the page.
       */}
       <div
-        ref={swipeViewportRef}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
         style={{ overflow: 'hidden' }}
       >
         <div style={{
@@ -365,4 +344,5 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
   )
 }
 
+``
 ``
