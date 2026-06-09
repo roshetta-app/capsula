@@ -30,9 +30,10 @@ export default function DrugDetailScreen() {
   const drug = drugs.find(d => d.slug === slug || d.id === slug)
 
   // Phase 3J — log drug view for analytics once drug is resolved
+  // FIX: flat drug object uses `genericName`, not `name_en` or `name`
   useEffect(() => {
     if (drug) {
-      logUsageEvent('drug_view', drug.id, drug.name_en ?? drug.name ?? slug)
+      logUsageEvent('drug_view', drug.genericId ?? drug.id, drug.genericName ?? slug)
     }
   }, [drug?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
