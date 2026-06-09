@@ -321,97 +321,96 @@ function Lightbox({ images, activeIndex, onClose, onGo }) {
 // ─── ImageCarousel ────────────────────────────────────────────────────────────
 
 export default function ImageCarousel({ images = [] }) {
-  const [index,      setIndex]      = useState(0)
+  const [index,        setIndex]    = useState(0)
   const [lightboxOpen, setLightbox] = useState(false)
+  const [dragOffset,   setDragOffset]   = useState(0)
+  const [isAnimating,  setIsAnimating]  = useState(false)
 
-  // Touch state for the inline carousel strip
-  const swipe = useRef({
+  const slideRef = useRef(null)   // ref on the touch div
+  const swipe    = useRef({
     startX: 0, startY: 0,
-    locked: null,          // 'h' | 'v' | null — direction lock
+    locked: null,   // 'h' | 'v' | null
     dragging: false,
-    dragX: 0,              // live drag offset (px)
+    dragX: 0,
+    indexAtStart: 0,
   })
-  const [dragOffset, setDragOffset] = useState(0)
-  const [isAnimating, setIsAnimating] = useState(false)
+
+  // Keep a stable ref to current index so native listeners can read it
+  const indexRef       = useRef(index)
+  const imagesLenRef   = useRef(images.length)
+  useEffect(() => { indexRef.current = index },        [index])
+  useEffect(() => { imagesLenRef.current = images.length }, [images.length])
 
   const goTo = useCallback((i) => {
-    const clamped = Math.max(0, Math.min(images.length - 1, i))
-    setIndex(clamped)
+    setIndex(Math.max(0, Math.min(images.length - 1, i)))
   }, [images.length])
 
   const openAt = useCallback((i) => {
-    setIndex(i)
-    setLightbox(true)
+    setIndex(i); setLightbox(true)
+  }, [])
+
+  // Native non-passive touchmove so stopPropagation actually blocks parent listeners
+  useEffect(() => {
+    const el = slideRef.current
+    if (!el) return
+
+    function handleMove(e) {
+      const s  = swipe.current
+      const dx = e.touches[0].clientX - s.startX
+      const dy = e.touches[0].clientY - s.startY
+
+      if (s.locked === null) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+        s.locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
+      }
+
+      if (s.locked === 'v') return  // let scroll through
+
+      // Horizontal — block parent (tab switcher)
+      e.preventDefault()
+      e.stopPropagation()
+
+      s.dragging = true
+      s.dragX    = dx
+
+      const atLeft  = indexRef.current === 0
+      const atRight = indexRef.current === imagesLenRef.current - 1
+      let offset = dx
+      if ((atLeft && dx > 0) || (atRight && dx < 0)) offset = dx / 3
+      setDragOffset(offset)
+    }
+
+    el.addEventListener('touchmove', handleMove, { passive: false })
+    return () => el.removeEventListener('touchmove', handleMove)
   }, [])
 
   if (!images.length) return null
 
   const current = images[index]
 
-  // ── Inline carousel touch handlers ─────────────────────────────────────────
-
   function onTouchStart(e) {
     const s = swipe.current
-    s.startX  = e.touches[0].clientX
-    s.startY  = e.touches[0].clientY
-    s.locked  = null
-    s.dragging = false
-    s.dragX   = 0
+    s.startX       = e.touches[0].clientX
+    s.startY       = e.touches[0].clientY
+    s.locked       = null
+    s.dragging     = false
+    s.dragX        = 0
+    s.indexAtStart = index
     setDragOffset(0)
-  }
-
-  function onTouchMove(e) {
-    const s  = swipe.current
-    const dx = e.touches[0].clientX - s.startX
-    const dy = e.touches[0].clientY - s.startY
-
-    // Direction lock — decide on first 6 px of movement
-    if (s.locked === null) {
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-      s.locked = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v'
-    }
-
-    if (s.locked === 'v') return // let page scroll through
-
-    // Horizontal — consume event so tab-switcher can't intercept
-    e.preventDefault()
-    e.stopPropagation()
-
-    s.dragging = true
-    s.dragX    = dx
-
-    // Rubber-band at edges
-    const atLeft  = index === 0
-    const atRight = index === images.length - 1
-    let offset = dx
-    if ((atLeft && dx > 0) || (atRight && dx < 0)) {
-      offset = dx / 3  // rubber-band resistance
-    }
-    setDragOffset(offset)
   }
 
   function onTouchEnd(e) {
     const s = swipe.current
     if (!s.dragging) {
-      // Was a tap — open lightbox
-      if (s.locked === null || (Math.abs(s.dragX) < 8)) {
-        openAt(index)
-      }
+      // Tap → open lightbox
+      if (s.locked === null || Math.abs(s.dragX) < 8) openAt(index)
       setDragOffset(0)
       return
     }
 
-    // We handled a horizontal swipe — stop it reaching the tab switcher
-    e.stopPropagation()
-
     setIsAnimating(true)
-    const threshold = 50  // px needed to commit a slide
-
-    if (s.dragX < -threshold && index < images.length - 1) {
-      setIndex(i => i + 1)
-    } else if (s.dragX > threshold && index > 0) {
-      setIndex(i => i - 1)
-    }
+    if (s.dragX < -50 && index < images.length - 1) setIndex(i => i + 1)
+    else if (s.dragX > 50 && index > 0)             setIndex(i => i - 1)
 
     setDragOffset(0)
     setTimeout(() => setIsAnimating(false), 300)
@@ -426,9 +425,9 @@ export default function ImageCarousel({ images = [] }) {
 
         {/* Slide container */}
         <div
+          ref={slideRef}
           data-carousel
           onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
           style={{
             borderRadius: 'var(--radius-lg)',

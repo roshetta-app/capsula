@@ -33,43 +33,51 @@ export default function ConditionDetailScreen() {
 
   const [activeTab, setActiveTab]                   = useState(0)
   const [activePrescriptionIdx, setActivePrescriptionIdx] = useState(0)
-  const touchStartX   = useRef(null)
-  const touchStartY   = useRef(null)
-  const touchIgnored  = useRef(false)   // true when a child (carousel) claimed the gesture
-  const shareCardRef  = useRef(null)
+  const swipeViewportRef = useRef(null)
+  const shareCardRef     = useRef(null)
 
-  function handleTouchStart(e) {
-    // If the touch started inside a carousel, mark as ignored so tab-swipe won't fire
-    touchIgnored.current = !!e.target.closest('[data-carousel]')
-    if (touchIgnored.current) return
-    touchStartX.current = e.touches[0].clientX
-    touchStartY.current = e.touches[0].clientY
-  }
+  // Tab-swipe uses native listeners (not React synthetic) so that a child
+  // carousel's native e.stopPropagation() on touchmove actually blocks us.
+  useEffect(() => {
+    const el = swipeViewportRef.current
+    if (!el) return
 
-  function handleTouchMove(e) {
-    // If a child carousel is handling this gesture, cancel our recording
-    if (e.target.closest('[data-carousel]')) {
-      touchIgnored.current = true
-      touchStartX.current  = null
-      touchStartY.current  = null
-    }
-  }
+    let startX    = null
+    let startY    = null
+    let committed = false
 
-  function handleTouchEnd(e) {
-    if (touchIgnored.current || touchStartX.current === null) {
-      touchIgnored.current = false
-      return
+    function onStart(e) {
+      startX    = e.touches[0].clientX
+      startY    = e.touches[0].clientY
+      committed = false
     }
-    const dx = e.changedTouches[0].clientX - touchStartX.current
-    const dy = e.changedTouches[0].clientY - touchStartY.current
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx < 0 && activeTab < TABS.length - 1) setActiveTab(t => t + 1)
-      if (dx > 0 && activeTab > 0)               setActiveTab(t => t - 1)
+
+    function onMove(e) {
+      if (startX === null || committed) return
+      const dx = e.touches[0].clientX - startX
+      const dy = e.touches[0].clientY - startY
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
+      committed = true
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+        if (dx < 0) setActiveTab(t => Math.min(TABS.length - 1, t + 1))
+        else        setActiveTab(t => Math.max(0, t - 1))
+      }
     }
-    touchStartX.current  = null
-    touchStartY.current  = null
-    touchIgnored.current = false
-  }
+
+    function onEnd() {
+      startX = null; startY = null; committed = false
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove',  onMove,  { passive: true })
+    el.addEventListener('touchend',   onEnd,   { passive: true })
+
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove',  onMove)
+      el.removeEventListener('touchend',   onEnd)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Add to recently viewed once condition is resolved
   const condition = conditions.find(c => c.slug === slug)
@@ -197,9 +205,7 @@ export default function ConditionDetailScreen() {
         it never causes a horizontal scrollbar on the page.
       */}
       <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        ref={swipeViewportRef}
         style={{ overflow: 'hidden' }}
       >
         <div style={{
