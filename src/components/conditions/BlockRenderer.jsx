@@ -43,13 +43,13 @@ export default function BlockRenderer({ block, images = [] }) {
       return <NoteBlock label={content?.label} text={content?.text} />
 
     case 'image_gallery': {
-      const galleryImages = (content?.image_ids ?? [])
-        .map(id => images.find(img => img.id === id))
-        .filter(Boolean)
-      if (!galleryImages.length) return null
+      // All images belong to the condition — render them all.
+      // image_ids in block content is not used; ImageManager writes directly
+      // to condition_images table and the query fetches them all.
+      if (!images.length) return null
       return (
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          <ImageCarousel images={galleryImages} />
+          <ImageCarousel images={images} />
         </div>
       )
     }
