@@ -1,7 +1,0 @@
-# Supabase — public (safe to use in client)
-VITE_SUPABASE_URL=https://szzsqjpmcqsmvkvncgln.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6enNxanBtY3FzbXZrdm5jZ2xuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODU0MjcsImV4cCI6MjA5NjI2MTQyN30.OkSXQ_yul-PblXAU7Y6M8PdXomzGX58vaT-NPq396Kc
-
-# Supabase — service role (seed script only — NEVER commit this to git)
-# Get from: Supabase Dashboard → Project Settings → API → service_role key
-SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6enNxanBtY3FzbXZrdm5jZ2xuIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MDY4NTQyNywiZXhwIjoyMDk2MjYxNDI3fQ.o2eN04_6YfLBA0NUhNZlVgpRsKG4yRP6UHS75s-ewXE
