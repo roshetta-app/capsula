@@ -150,17 +150,9 @@ function SpecialtyModal({ open, specialty, onClose, onSaved }) {
 
   return (
     <Modal
-      open={open}
+      isOpen={open}
       title={specialty ? 'Edit Specialty' : 'Add Specialty'}
       onClose={onClose}
-      footer={
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={btnSecondary}>Cancel</button>
-          <button onClick={handleSave} disabled={busy} style={btnPrimary}>
-            {busy ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
@@ -317,6 +309,14 @@ function SpecialtyModal({ open, specialty, onClose, onSaved }) {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', paddingTop: 8 }}>
+          <button onClick={onClose} style={btnSecondary}>Cancel</button>
+          <button onClick={handleSave} disabled={busy} style={btnPrimary}>
+            {busy ? 'Saving…' : 'Save'}
+          </button>
         </div>
       </div>
     </Modal>
@@ -678,11 +678,11 @@ export default function SpecialtiesManager() {
       />
 
       <ConfirmModal
-        open={confirmOpen}
+        isOpen={confirmOpen}
         title={confirmConfig.title}
         message={confirmConfig.message}
         onConfirm={() => { setConfirmOpen(false); confirmConfig.onConfirm?.() }}
-        onCancel={() => setConfirmOpen(false)}
+        onClose={() => setConfirmOpen(false)}
       />
     </div>
   )
