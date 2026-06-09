@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import BlockRenderer from './BlockRenderer'
+import ImageGallery from './ImageGallery'
 
 /**
  * ClinicalDataTab — Phase 2E rebuild.
@@ -154,8 +155,7 @@ export default function ClinicalDataTab({ condition }) {
 
             {images.length > 0 && (
               <Section title={`Images (${images.length})`} sectionKey="images" collapsed={collapsed.images} onToggle={toggle}>
-                {/* Legacy ImageGallery — keep existing component intact */}
-                <LegacyImageGallery images={images} />
+                <ImageGallery images={images} />
               </Section>
             )}
           </>
@@ -218,26 +218,6 @@ function BulletList({ items }) {
       ))}
     </ul>
   )
-}
-
-// ─── LegacyImageGallery — thin wrapper so we don't delete old ImageGallery ───
-
-function LegacyImageGallery({ images }) {
-  // Dynamically import the old component to avoid circular issues.
-  // Use a simple inline carousel if ImageGallery isn't available.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ImageGallery = require('./ImageGallery').default
-    return <ImageGallery images={images} />
-  } catch {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {images.map(img => (
-          <img key={img.id} src={img.url} alt={img.caption || ''} style={{ width: '100%', borderRadius: 'var(--radius-md)', objectFit: 'cover' }} />
-        ))}
-      </div>
-    )
-  }
 }
 
 // ─── Section — collapsible wrapper (legacy path only) ────────────────────────
