@@ -19,7 +19,7 @@ const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
  *   specialties — Specialty[]  (unique, sorted by name, Uncategorized excluded)
  *   loading     — true only on cold start
  *   error       — string | null
- *   refresh     — () => void
+ *   refresh     — () => void  (force re-fetch, e.g. after CMS save)
  */
 export function useConditions() {
   const cached = getCacheData('conditions')
@@ -28,10 +28,14 @@ export function useConditions() {
   const [loading,    setLoading]    = useState(!cached)
   const [error,      setError]      = useState(null)
 
+  // Fetch fresh data from DB, update state, write cache.
+  // Fetches metadata FIRST so the version we store matches what triggered the fetch.
   async function fetchAndCache() {
     try {
-      const fresh = await fetchConditions(supabase)
-      const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      const [fresh, { conditionsUpdatedAt }] = await Promise.all([
+        fetchConditions(supabase),
+        fetchMetadataTimestamps(supabase),
+      ])
       setConditions(fresh)
       writeCache('conditions', fresh, conditionsUpdatedAt)
     } catch (err) {
@@ -45,34 +49,38 @@ export function useConditions() {
     async function init() {
       const cachedTs = getCacheTimestamp('conditions')
 
-      // Cold start
+      // Cold start — no cache at all
       if (!cachedTs) {
         await fetchAndCache()
         return
       }
 
-      // TTL expired
+      // TTL expired (>7 days) — re-fetch regardless of version
       if (isCacheExpired('conditions')) {
         await fetchAndCache()
         return
       }
 
-      // Silently check server version
+      // Silently check server version against cached version
       try {
         const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (conditionsUpdatedAt !== cachedTs) {
           await fetchAndCache()
+        } else {
+          // Cache is fresh — ensure loading is false
+          setLoading(false)
         }
       } catch {
-        // Keep cached data on network error
+        // Network error — keep cached data, don't crash
+        setLoading(false)
       }
     }
 
     init()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []  )
+  }, [])
 
-  // FIX 1: Exclude Uncategorized from the pills — derived from conditions, sorted by name
+  // Exclude Uncategorized from specialty pills — derived from conditions, sorted by name
   const specialties = useMemo(() => {
     const seen = new Map()
     for (const c of conditions) {
@@ -89,7 +97,7 @@ export function useConditions() {
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [conditions])
 
-  // FIX 2: Strip Uncategorized specialty label from conditions so cards show no tag
+  // Strip Uncategorized specialty label from conditions so cards show no tag
   const conditionsDisplay = useMemo(() =>
     conditions.map(c =>
       c.specialtyId === UNCATEGORIZED_ID
