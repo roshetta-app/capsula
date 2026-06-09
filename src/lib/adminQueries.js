@@ -147,19 +147,6 @@ export async function updateSpecialty(id, data) {
 
 /**
  * Fetch all ACTIVE specialties for CMS dropdowns (condition form, filter pills).
- * Returns id + name_en so it never depends on conditions existing yet.
- */
-export async function fetchSpecialtiesForCMS() {
-  const { data, error } = await supabase
-    .from('specialties')
-    .select('id, name_en, slug, icon_name, color_hex, sort_order, is_active')
-    .eq('is_active', true)
-    .order('sort_order', { ascending: true })
-  return { data: data ?? [], error }
-}
-
-/**
- * Fetch all ACTIVE specialties for CMS dropdowns (condition form, filter pills).
  * Returns rows from the specialties table directly — never depends on conditions existing.
  */
 export async function fetchSpecialtiesForCMS() {

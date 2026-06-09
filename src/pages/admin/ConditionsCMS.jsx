@@ -412,7 +412,3 @@ function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublis
     </div>
   )
 }
-
-
-
-================================================
