@@ -2,6 +2,7 @@
  * src/router.jsx
  * Phase 2B — Navigation & Routing Overhaul
  * Phase 3J — Added /admin/analytics route
+ * Phase 3K — Added /admin/crash-logs and /admin/notifications routes
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -30,12 +31,10 @@ import ConditionsCMS        from './pages/admin/ConditionsCMS'
 import ConditionEditor      from './components/admin/ConditionEditor'
 import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
 import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
+import CrashLogs            from './pages/admin/CrashLogs'
+import NotificationsPanel   from './pages/admin/NotificationsPanel'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
-//
-// Use these constants everywhere instead of hardcoded strings.
-// Example:  navigate(ROUTES.CONDITION_DETAIL('upper-respiratory-tract-infection'))
-//           navigate(ROUTES.DRUG_DETAIL('amoxicillin-500mg-capsule'))
 
 export const ROUTES = {
   // Public
@@ -46,16 +45,18 @@ export const ROUTES = {
   FAVOURITES:        '/favourites',
 
   // Admin
-  ADMIN_LOGIN:          '/admin/login',
-  ADMIN:                '/admin',
-  ADMIN_DRUGS:          '/admin/drugs',
-  ADMIN_DRUGS_NEW:      '/admin/drugs/new',
-  ADMIN_DRUGS_GENERIC:  (genericId) => `/admin/drugs/generic/${genericId}`,
-  ADMIN_CONDITIONS:     '/admin/conditions',
-  ADMIN_CONDITIONS_NEW: '/admin/conditions/new',
-  ADMIN_CONDITIONS_EDIT:(id) => `/admin/conditions/${id}`,
-  ADMIN_SPECIALTIES:    '/admin/specialties',
-  ADMIN_ANALYTICS:      '/admin/analytics',
+  ADMIN_LOGIN:            '/admin/login',
+  ADMIN:                  '/admin',
+  ADMIN_DRUGS:            '/admin/drugs',
+  ADMIN_DRUGS_NEW:        '/admin/drugs/new',
+  ADMIN_DRUGS_GENERIC:    (genericId) => `/admin/drugs/generic/${genericId}`,
+  ADMIN_CONDITIONS:       '/admin/conditions',
+  ADMIN_CONDITIONS_NEW:   '/admin/conditions/new',
+  ADMIN_CONDITIONS_EDIT:  (id) => `/admin/conditions/${id}`,
+  ADMIN_SPECIALTIES:      '/admin/specialties',
+  ADMIN_ANALYTICS:        '/admin/analytics',
+  ADMIN_CRASH_LOGS:       '/admin/crash-logs',
+  ADMIN_NOTIFICATIONS:    '/admin/notifications',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -66,7 +67,6 @@ export default function AppRoutes() {
 
       {/* ── Public routes ────────────────────────────────────────────────── */}
 
-      {/* Default: redirect "/" to "/conditions" */}
       <Route path="/"                    element={<ConditionsScreen />} />
       <Route path="/conditions"          element={<ConditionsScreen />} />
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
@@ -86,12 +86,9 @@ export default function AppRoutes() {
       <Route path="/admin/drugs"
         element={<AuthGuard><DrugCMS /></AuthGuard>}
       />
-      {/* NOTE: /new must come before /generic/:genericId so React Router
-          doesn't treat "new" as a genericId */}
       <Route path="/admin/drugs/new"
         element={<AuthGuard><AddDrugFlow /></AuthGuard>}
       />
-      {/* Unified drug editor — generic + all formulations + brands in one place */}
       <Route path="/admin/drugs/generic/:genericId"
         element={<AuthGuard><DrugEditor /></AuthGuard>}
       />
@@ -109,6 +106,12 @@ export default function AppRoutes() {
       />
       <Route path="/admin/analytics"
         element={<AuthGuard><AnalyticsDashboard /></AuthGuard>}
+      />
+      <Route path="/admin/crash-logs"
+        element={<AuthGuard><CrashLogs /></AuthGuard>}
+      />
+      <Route path="/admin/notifications"
+        element={<AuthGuard><NotificationsPanel /></AuthGuard>}
       />
 
     </Routes>

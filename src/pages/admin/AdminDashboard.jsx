@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCapsules, faNotesMedical, faStethoscope, faChartBar } from '@fortawesome/free-solid-svg-icons'
+import { faCapsules, faNotesMedical, faStethoscope, faChartBar, faBug, faBell } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
 /**
@@ -11,6 +11,8 @@ import { useAuth } from '../../hooks/useAuth'
  *            Conditions   → /admin/conditions
  *            Specialties  → /admin/specialties   (added 3H)
  *            Analytics    → /admin/analytics     (added 3J)
+ *            Crash Logs   → /admin/crash-logs    (added 3K)
+ *            Notifications→ /admin/notifications (added 3K)
  */
 
 const NAV_CARDS = [
@@ -37,6 +39,18 @@ const NAV_CARDS = [
     label:   'Analytics',
     sub:     'Content health, search gaps, usage',
     faIcon:  faChartBar,
+  },
+  {
+    path:    '/admin/crash-logs',
+    label:   'Crash Logs',
+    sub:     'View uncaught app errors',
+    faIcon:  faBug,
+  },
+  {
+    path:    '/admin/notifications',
+    label:   'Notifications',
+    sub:     'Broadcast push notifications to users',
+    faIcon:  faBell,
   },
 ]
 
