@@ -11,7 +11,7 @@ import ImageCarousel from './ImageCarousel'
  *   management        → plain text, header "Management"
  *   differential      → list of condition names, header "Differential Diagnosis"
  *   note              → yellow-tinted NB box, optional label
- *   image_gallery     → ImageCarousel component
+ *   image_gallery     → ImageGallery component (thumbnail strip + portal lightbox)
  *
  * Props:
  *   block   { id, type, position, content }
@@ -44,11 +44,12 @@ export default function BlockRenderer({ block, images = [] }) {
 
     case 'image_gallery': {
       // All images belong to the condition — render them all.
-      // image_ids in block content is not used; ImageManager writes directly
-      // to condition_images table and the query fetches them all.
+      // Uses ImageGallery (thumbnail strip + portal lightbox with pinch-zoom,
+      // double-tap, swipe). Portal rendering prevents swipe conflict with tab nav.
       if (!images.length) return null
       return (
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={{ ...blockWrap }}>
+          <SectionTitle>Images</SectionTitle>
           <ImageCarousel images={images} />
         </div>
       )
