@@ -383,10 +383,11 @@ export default function DrugInfoSections({ drug }) {
             gap:                 'var(--space-3)',
           }}>
             {[
-              { key: 'onset',     label: 'Onset' },
-              { key: 'peak',      label: 'Peak' },
-              { key: 'duration',  label: 'Duration' },
-              { key: 'half_life', label: 'Half-life' },
+              { key: 'onset',           label: 'Onset' },
+              { key: 'peak',            label: 'Peak' },
+              { key: 'duration',        label: 'Duration' },
+              { key: 'half_life',       label: 'Half-life' },
+              { key: 'bioavailability', label: 'Bioavailability' },
             ].map(({ key, label }) =>
               pharmacokinetics[key] ? (
                 <div key={key} style={{

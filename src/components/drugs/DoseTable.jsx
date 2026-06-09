@@ -40,43 +40,39 @@ function DoseRowLine({ row, i }) {
       style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
     >
       <td style={{
-        padding:    'var(--space-2) var(--space-3) var(--space-2) 0',
-        fontSize:   13,
-        fontWeight: 600,
-        color:      'var(--color-text-secondary)',
-        whiteSpace: 'nowrap',
+        padding:       'var(--space-2) var(--space-3) var(--space-2) 0',
+        fontSize:      13,
+        fontWeight:    600,
+        color:         'var(--color-text-secondary)',
+        whiteSpace:    'nowrap',
         verticalAlign: 'top',
-        width:      90,
+        width:         90,
       }}>
         {formatWho(row.who ?? row.group)}
       </td>
       <td style={{
-        padding:    'var(--space-2) var(--space-3)',
-        fontSize:   14,
-        color:      'var(--color-text-primary)',
-        fontFamily: 'var(--font-mono)',
-        lineHeight: 1.5,
+        padding:       'var(--space-2) 0',
+        fontSize:      14,
+        color:         'var(--color-text-primary)',
+        fontFamily:    'var(--font-mono)',
+        lineHeight:    1.5,
         verticalAlign: 'top',
       }}>
         {row.instruction}
-      </td>
-      <td style={{
-        padding:    'var(--space-2) 0 var(--space-2) var(--space-2)',
-        verticalAlign: 'top',
-        whiteSpace: 'nowrap',
-      }}>
         {row.max_dose && (
-          <span style={{
-            display:         'inline-block',
-            fontSize:        11,
-            fontWeight:      600,
-            color:           '#B91C1C',
-            backgroundColor: '#FEE2E2',
-            borderRadius:    'var(--radius-sm)',
-            padding:         '2px 6px',
-          }}>
-            max {row.max_dose}
-          </span>
+          <div style={{ marginTop: 4 }}>
+            <span style={{
+              display:         'inline-block',
+              fontSize:        11,
+              fontWeight:      600,
+              color:           '#B91C1C',
+              backgroundColor: '#FEE2E2',
+              borderRadius:    'var(--radius-sm)',
+              padding:         '2px 6px',
+            }}>
+              max {row.max_dose}
+            </span>
+          </div>
         )}
       </td>
     </tr>
