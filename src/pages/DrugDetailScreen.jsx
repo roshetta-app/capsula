@@ -1,26 +1,22 @@
 /**
  * src/pages/DrugDetailScreen.jsx
  * Phase 2G — Drug Detail Screen (full rebuild)
+ * Phase 3J — added logUsageEvent on mount for analytics
  *
  * Route: /drugs/:slug
- * Replaces the Phase 2B stub with the full-featured detail screen.
- *
- * Layout (top → bottom):
- *   1. DrugHeader    — name, concentration·form, category badge, back + star
- *   2. DoseTable     — practical doses + collapsible reference dose
- *   3. BrandsList    — Egyptian brands with per-brand stock dot
- *   4. DrugInfoSections — mechanism, uses, side effects, pregnancy, etc.
  */
 
-import { useParams, useNavigate }   from 'react-router-dom'
-import Layout                        from '../components/layout'
-import DrugHeader                    from '../components/drugs/DrugHeader'
-import DoseTable                     from '../components/drugs/DoseTable'
-import BrandsList                    from '../components/drugs/BrandsList'
-import DrugInfoSections              from '../components/drugs/DrugInfoSections'
-import { useDrugContext }            from '../context/DrugContext'
-import { useStock }                  from '../hooks/useStock'
-import { useFavouritesContext }      from '../context/FavouritesContext'
+import { useEffect }                    from 'react'
+import { useParams, useNavigate }        from 'react-router-dom'
+import Layout                            from '../components/layout'
+import DrugHeader                        from '../components/drugs/DrugHeader'
+import DoseTable                         from '../components/drugs/DoseTable'
+import BrandsList                        from '../components/drugs/BrandsList'
+import DrugInfoSections                  from '../components/drugs/DrugInfoSections'
+import { useDrugContext }                from '../context/DrugContext'
+import { useStock }                      from '../hooks/useStock'
+import { useFavouritesContext }          from '../context/FavouritesContext'
+import { logUsageEvent }                 from '../analytics/usageEvents'
 
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
@@ -32,6 +28,13 @@ export default function DrugDetailScreen() {
 
   // Match by formulation slug first, fall back to id
   const drug = drugs.find(d => d.slug === slug || d.id === slug)
+
+  // Phase 3J — log drug view for analytics once drug is resolved
+  useEffect(() => {
+    if (drug) {
+      logUsageEvent('drug_view', drug.id, drug.name_en ?? drug.name ?? slug)
+    }
+  }, [drug?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading && !drug) {
@@ -96,8 +99,6 @@ export default function DrugDetailScreen() {
   }
 
   // ── Per-brand stock toggle ─────────────────────────────────────────────────
-  // stockMap keys by any id; brand ids work the same as formulation ids.
-  // Default: in stock (true) unless explicitly set to false.
   const brandStockMap = {}
   drug.brands?.forEach(b => {
     brandStockMap[b.id] = stockMap[b.id] !== false
