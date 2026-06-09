@@ -1,6 +1,7 @@
 /**
  * src/router.jsx
  * Phase 2B — Navigation & Routing Overhaul
+ * Phase 3J — Added /admin/analytics route
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -19,15 +20,16 @@ import FavouritesScreen      from './pages/FavouritesScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
-import AuthGuard       from './components/admin/AuthGuard'
-import AdminLogin      from './pages/admin/AdminLogin'
-import AdminDashboard  from './pages/admin/AdminDashboard'
-import DrugCMS         from './pages/admin/DrugCMS'
-import AddDrugFlow     from './pages/admin/AddDrugFlow'
-import DrugEditor      from './pages/admin/DrugEditor'
-import ConditionsCMS   from './pages/admin/ConditionsCMS'
+import AuthGuard            from './components/admin/AuthGuard'
+import AdminLogin           from './pages/admin/AdminLogin'
+import AdminDashboard       from './pages/admin/AdminDashboard'
+import DrugCMS              from './pages/admin/DrugCMS'
+import AddDrugFlow          from './pages/admin/AddDrugFlow'
+import DrugEditor           from './pages/admin/DrugEditor'
+import ConditionsCMS        from './pages/admin/ConditionsCMS'
 import ConditionEditor      from './components/admin/ConditionEditor'
 import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
+import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 //
@@ -53,6 +55,7 @@ export const ROUTES = {
   ADMIN_CONDITIONS_NEW: '/admin/conditions/new',
   ADMIN_CONDITIONS_EDIT:(id) => `/admin/conditions/${id}`,
   ADMIN_SPECIALTIES:    '/admin/specialties',
+  ADMIN_ANALYTICS:      '/admin/analytics',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -103,6 +106,9 @@ export default function AppRoutes() {
       />
       <Route path="/admin/specialties"
         element={<AuthGuard><SpecialtiesManager /></AuthGuard>}
+      />
+      <Route path="/admin/analytics"
+        element={<AuthGuard><AnalyticsDashboard /></AuthGuard>}
       />
 
     </Routes>
