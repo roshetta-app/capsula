@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import { fetchConditions, fetchMetadataTimestamps } from '../lib/queries'
 import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../utils/cache'
 
+const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
+
 /**
  * useConditions — cache-first conditions data hook.
  *
@@ -13,8 +15,8 @@ import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../
  *   4. Cold start (no cache) → show loading, fetch, render, cache
  *
  * Exposes:
- *   conditions  — ConditionFull[]
- *   specialties — Specialty[]  (unique, sorted by name, derived from conditions)
+ *   conditions  — ConditionFull[] (Uncategorized specialty label stripped)
+ *   specialties — Specialty[]  (unique, sorted by name, Uncategorized excluded)
  *   loading     — true only on cold start
  *   error       — string | null
  *   refresh     — () => void
@@ -70,11 +72,11 @@ export function useConditions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []  )
 
-  // Derive unique specialties from conditions — stable reference via useMemo
+  // FIX 1: Exclude Uncategorized from the pills — derived from conditions, sorted by name
   const specialties = useMemo(() => {
     const seen = new Map()
     for (const c of conditions) {
-      if (c.specialtyId && !seen.has(c.specialtyId)) {
+      if (c.specialtyId && c.specialtyId !== UNCATEGORIZED_ID && !seen.has(c.specialtyId)) {
         seen.set(c.specialtyId, {
           id:       c.specialtyId,
           name:     c.specialtyName,
@@ -87,5 +89,14 @@ export function useConditions() {
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
   }, [conditions])
 
-  return { conditions, specialties, loading, error, refresh: fetchAndCache }
+  // FIX 2: Strip Uncategorized specialty label from conditions so cards show no tag
+  const conditionsDisplay = useMemo(() =>
+    conditions.map(c =>
+      c.specialtyId === UNCATEGORIZED_ID
+        ? { ...c, specialtyId: null, specialtyName: null, specialtySlug: null }
+        : c
+    ),
+  [conditions])
+
+  return { conditions: conditionsDisplay, specialties, loading, error, refresh: fetchAndCache }
 }
