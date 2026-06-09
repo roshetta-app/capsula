@@ -402,15 +402,9 @@ export default function ImageCarousel({ images = [] }) {
 
   function onTouchEnd(e) {
     const s = swipe.current
-    const endX = e.changedTouches[0].clientX
-    const endY = e.changedTouches[0].clientY
-    const totalMoved = Math.sqrt(
-      Math.pow(endX - s.startX, 2) + Math.pow(endY - s.startY, 2)
-    )
-
     if (!s.dragging) {
-      // Only open lightbox if it was a genuine tap (barely moved)
-      if (totalMoved < 10) openAt(index)
+      // Tap → open lightbox
+      if (s.locked === null || Math.abs(s.dragX) < 8) openAt(index)
       setDragOffset(0)
       return
     }
