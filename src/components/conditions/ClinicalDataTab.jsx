@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import BlockRenderer from './BlockRenderer'
+import ImageGallery from './ImageGallery'
 
 /**
  * ClinicalDataTab — Phase 2E rebuild.
@@ -35,9 +36,9 @@ export default function ClinicalDataTab({ condition }) {
     images           = [],
   } = condition
 
-  const hasBlocks  = clinicalBlocks.length > 0
-  const hasLegacy  = clinicalPicture || historyQuestions.length || examination.length || investigations.length || images.length
-  const hasBottom  = epidemiology || prognosis || whenToRefer
+  const hasBlocks   = clinicalBlocks.length > 0
+  const hasLegacy   = clinicalPicture || historyQuestions.length || examination.length || investigations.length || images.length
+  const hasBottom   = epidemiology || prognosis || whenToRefer
   const hasAnything = definition || hasBlocks || hasLegacy || hasBottom
 
   if (!hasAnything) {
@@ -49,13 +50,11 @@ export default function ClinicalDataTab({ condition }) {
     )
   }
 
-  // Sort blocks by position
   const sortedBlocks = [...clinicalBlocks].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
 
   return (
     <div style={{ position: 'relative' }}>
 
-      {/* ICD-10 badge — top right */}
       {icd10Code && (
         <div style={{
           position: 'absolute', top: 0, right: 0,
@@ -76,7 +75,7 @@ export default function ClinicalDataTab({ condition }) {
         paddingTop: icd10Code ? 'var(--space-8)' : 0,
       }}>
 
-        {/* 1 — Definition box (always first if present) */}
+        {/* 1 — Definition */}
         {definition && (
           <div style={{
             backgroundColor: 'var(--color-accent-light, #EFF6FF)',
@@ -91,10 +90,7 @@ export default function ClinicalDataTab({ condition }) {
             }}>
               Definition
             </div>
-            <p dir="auto" style={{
-              margin: 0, fontSize: 14, lineHeight: 1.75,
-              color: 'var(--color-text-primary)',
-            }}>
+            <p dir="auto" style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: 'var(--color-text-primary)' }}>
               {definition}
             </p>
           </div>
@@ -105,7 +101,7 @@ export default function ClinicalDataTab({ condition }) {
           <BlockRenderer key={block.id} block={block} images={images} />
         ))}
 
-        {/* 3 — Legacy fallback (old CMS path, shown only when no blocks) */}
+        {/* 3 — Legacy fallback */}
         {!hasBlocks && hasLegacy && (
           <>
             {clinicalPicture && (
@@ -115,19 +111,16 @@ export default function ClinicalDataTab({ condition }) {
                 </p>
               </Section>
             )}
-
             {historyQuestions.length > 0 && (
               <Section title="History Questions" sectionKey="history" collapsed={collapsed.history} onToggle={toggle}>
                 <BulletList items={historyQuestions} />
               </Section>
             )}
-
             {examination.length > 0 && (
               <Section title="Examination" sectionKey="examination" collapsed={collapsed.examination} onToggle={toggle}>
                 <BulletList items={examination} />
               </Section>
             )}
-
             {investigations.length > 0 && (
               <Section title="Investigations" sectionKey="investigations" collapsed={collapsed.investigations} onToggle={toggle}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -151,33 +144,23 @@ export default function ClinicalDataTab({ condition }) {
                 </div>
               </Section>
             )}
-
             {images.length > 0 && (
               <Section title={`Images (${images.length})`} sectionKey="images" collapsed={collapsed.images} onToggle={toggle}>
-                {/* Legacy ImageGallery — keep existing component intact */}
-                <LegacyImageGallery images={images} />
+                <ImageGallery images={images} />
               </Section>
             )}
           </>
         )}
 
         {/* 4 — Bottom fields */}
-        {epidemiology && (
-          <PlainSection title="Epidemiology" text={epidemiology} />
-        )}
-        {prognosis && (
-          <PlainSection title="Prognosis" text={prognosis} />
-        )}
-        {whenToRefer && (
-          <PlainSection title="When to Refer" text={whenToRefer} />
-        )}
+        {epidemiology && <PlainSection title="Epidemiology" text={epidemiology} />}
+        {prognosis     && <PlainSection title="Prognosis"    text={prognosis} />}
+        {whenToRefer   && <PlainSection title="When to Refer" text={whenToRefer} />}
 
       </div>
     </div>
   )
 }
-
-// ─── PlainSection — for bottom fields ────────────────────────────────────────
 
 function PlainSection({ title, text }) {
   return (
@@ -188,24 +171,15 @@ function PlainSection({ title, text }) {
       padding: 'var(--space-3) var(--space-4)',
       boxShadow: 'var(--shadow-card)',
     }}>
-      <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-        marginBottom: 'var(--space-2)',
-      }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
         {title}
       </div>
-      <p dir="auto" style={{
-        margin: 0, fontSize: 14, lineHeight: 1.75,
-        color: 'var(--color-text-primary)', whiteSpace: 'pre-line',
-      }}>
+      <p dir="auto" style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: 'var(--color-text-primary)', whiteSpace: 'pre-line' }}>
         {text}
       </p>
     </div>
   )
 }
-
-// ─── BulletList — legacy bullet list ─────────────────────────────────────────
 
 function BulletList({ items }) {
   return (
@@ -219,28 +193,6 @@ function BulletList({ items }) {
     </ul>
   )
 }
-
-// ─── LegacyImageGallery — thin wrapper so we don't delete old ImageGallery ───
-
-function LegacyImageGallery({ images }) {
-  // Dynamically import the old component to avoid circular issues.
-  // Use a simple inline carousel if ImageGallery isn't available.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const ImageGallery = require('./ImageGallery').default
-    return <ImageGallery images={images} />
-  } catch {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {images.map(img => (
-          <img key={img.id} src={img.url} alt={img.caption || ''} style={{ width: '100%', borderRadius: 'var(--radius-md)', objectFit: 'cover' }} />
-        ))}
-      </div>
-    )
-  }
-}
-
-// ─── Section — collapsible wrapper (legacy path only) ────────────────────────
 
 function Section({ title, sectionKey, collapsed, onToggle, children }) {
   return (
