@@ -26,7 +26,8 @@ import DrugCMS         from './pages/admin/DrugCMS'
 import AddDrugFlow     from './pages/admin/AddDrugFlow'
 import DrugEditor      from './pages/admin/DrugEditor'
 import ConditionsCMS   from './pages/admin/ConditionsCMS'
-import ConditionEditor from './components/admin/ConditionEditor'
+import ConditionEditor      from './components/admin/ConditionEditor'
+import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 //
@@ -51,6 +52,7 @@ export const ROUTES = {
   ADMIN_CONDITIONS:     '/admin/conditions',
   ADMIN_CONDITIONS_NEW: '/admin/conditions/new',
   ADMIN_CONDITIONS_EDIT:(id) => `/admin/conditions/${id}`,
+  ADMIN_SPECIALTIES:    '/admin/specialties',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -98,6 +100,9 @@ export default function AppRoutes() {
       />
       <Route path="/admin/conditions/:id"
         element={<AuthGuard><ConditionEditor /></AuthGuard>}
+      />
+      <Route path="/admin/specialties"
+        element={<AuthGuard><SpecialtiesManager /></AuthGuard>}
       />
 
     </Routes>
