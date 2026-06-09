@@ -37,15 +37,31 @@ export default function ConditionDetailScreen() {
   const touchStartY = useRef(null)
   const shareCardRef = useRef(null)
 
+  // Simple, original tab-swipe logic.
+  // The carousel cancels this via touchCancelledByCarousel ref.
+  const touchCancelledByCarousel = useRef(false)
+
   function handleTouchStart(e) {
-    // Ignore if touch started inside the image carousel
-    if (e.target.closest('[data-carousel]')) return
+    touchCancelledByCarousel.current = false
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
   }
 
+  function handleTouchMove(e) {
+    // If we're moving inside a carousel, cancel the tab swipe
+    if (e.target.closest('[data-carousel]')) {
+      touchCancelledByCarousel.current = true
+    }
+  }
+
   function handleTouchEnd(e) {
-    if (touchStartX.current === null) return
+    const cancelled = touchCancelledByCarousel.current
+    touchCancelledByCarousel.current = false
+    if (touchStartX.current === null || cancelled) {
+      touchStartX.current = null
+      touchStartY.current = null
+      return
+    }
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
     touchStartX.current = null
@@ -183,6 +199,7 @@ export default function ConditionDetailScreen() {
       */}
       <div
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{ overflow: 'hidden' }}
       >
@@ -344,5 +361,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
   )
 }
 
+``
 ``
 ``
