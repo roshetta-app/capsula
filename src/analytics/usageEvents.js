@@ -26,13 +26,12 @@ import { supabase } from '../lib/supabase'
  * @param {string|null} entityName — Name snapshot at time of event
  */
 export async function logUsageEvent(eventType, entityId = null, entityName = null) {
-  try {
-    await supabase.from('usage_events').insert({
-      event_type:  eventType,
-      entity_id:   entityId,
-      entity_name: entityName,
-    })
-  } catch {
-    // Analytics must never crash the app — fail silently
+  const { error } = await supabase.from('usage_events').insert({
+    event_type:  eventType,
+    entity_id:   entityId,
+    entity_name: entityName,
+  })
+  if (error) {
+    console.error('[Analytics] logUsageEvent failed:', error.message, error.details, error.hint, { eventType, entityId, entityName })
   }
 }

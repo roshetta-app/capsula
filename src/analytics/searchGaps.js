@@ -21,12 +21,11 @@ import { supabase } from '../lib/supabase'
  */
 export async function logSearchGap(term, context) {
   if (!term || term.trim().length < 2) return
-  try {
-    await supabase.from('search_gaps').insert({
-      term:    term.trim().toLowerCase(),
-      context,
-    })
-  } catch {
-    // Analytics must never crash the app — fail silently
+  const { error } = await supabase.from('search_gaps').insert({
+    term:    term.trim().toLowerCase(),
+    context,
+  })
+  if (error) {
+    console.error('[Analytics] logSearchGap failed:', error.message, error.details, error.hint, { term, context })
   }
 }
