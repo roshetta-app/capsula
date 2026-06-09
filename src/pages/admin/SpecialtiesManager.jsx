@@ -84,12 +84,12 @@ const EMPTY_FORM = {
   name_ar:    '',
   icon_name:  'fa-stethoscope',
   color_hex:  '#DBEAFE',
-  sort_order: 99,
+  sort_order: 0,   // 0 = auto; computed from existing rows on open
 }
 
 // ─── SpecialtyModal ───────────────────────────────────────────────────────────
 
-function SpecialtyModal({ open, specialty, onClose, onSaved }) {
+function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
   const { showToast } = useToast()
   const [form, setForm]   = useState(EMPTY_FORM)
   const [busy, setBusy]   = useState(false)
@@ -104,7 +104,7 @@ function SpecialtyModal({ open, specialty, onClose, onSaved }) {
             color_hex:  specialty.color_hex ?? '#DBEAFE',
             sort_order: specialty.sort_order ?? 99,
           }
-        : EMPTY_FORM
+        : { ...EMPTY_FORM, sort_order: (nextOrder ?? 99) }
       )
     }
   }, [open, specialty])
@@ -145,7 +145,8 @@ function SpecialtyModal({ open, specialty, onClose, onSaved }) {
     }
 
     showToast(specialty ? 'Specialty updated' : 'Specialty added', 'success')
-    onSaved()
+    onSaved()   // parent: setModalOpen(false) + load()
+    onClose()   // ensure modal closes even if onSaved doesn't
   }
 
   return (
@@ -675,6 +676,7 @@ export default function SpecialtiesManager() {
         specialty={editTarget}
         onClose={() => setModalOpen(false)}
         onSaved={() => { setModalOpen(false); load() }}
+        nextOrder={rows.length > 0 ? Math.max(...rows.map(r => r.sort_order ?? 0)) + 1 : 1}
       />
 
       <ConfirmModal
@@ -760,3 +762,7 @@ const inputStyle = {
   width: '100%',
   boxSizing: 'border-box',
 }
+
+
+
+================================================

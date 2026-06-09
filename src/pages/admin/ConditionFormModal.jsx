@@ -153,7 +153,7 @@ export default function ConditionFormModal({ isOpen, onClose, onSaved, condition
           >
             <option value="">— Uncategorized —</option>
             {specialties.map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>{s.name_en}</option>
             ))}
           </select>
         </Field>
@@ -322,3 +322,7 @@ function saveBtnStyle(isDirty, saving) {
     transition: 'box-shadow 0.2s',
   }
 }
+
+
+
+================================================

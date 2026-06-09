@@ -146,6 +146,32 @@ export async function updateSpecialty(id, data) {
 }
 
 /**
+ * Fetch all ACTIVE specialties for CMS dropdowns (condition form, filter pills).
+ * Returns id + name_en so it never depends on conditions existing yet.
+ */
+export async function fetchSpecialtiesForCMS() {
+  const { data, error } = await supabase
+    .from('specialties')
+    .select('id, name_en, slug, icon_name, color_hex, sort_order, is_active')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  return { data: data ?? [], error }
+}
+
+/**
+ * Fetch all ACTIVE specialties for CMS dropdowns (condition form, filter pills).
+ * Returns rows from the specialties table directly — never depends on conditions existing.
+ */
+export async function fetchSpecialtiesForCMS() {
+  const { data, error } = await supabase
+    .from('specialties')
+    .select('id, name_en, slug, icon_name, color_hex, sort_order, is_active')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  return { data: data ?? [], error }
+}
+
+/**
  * Fetch all specialties with condition counts for the admin manager.
  */
 export async function fetchAllSpecialties() {
@@ -171,9 +197,17 @@ export async function fetchAllSpecialties() {
 
 /**
  * Toggle is_active on a specialty.
- * When deactivating, the DB trigger re-assigns conditions to Uncategorized.
+ * Deactivating: moves all its conditions to Uncategorized (stores original id).
+ * Activating:   restores conditions that were previously moved from this specialty.
  */
 export async function toggleSpecialtyActive(id, isActive) {
+  // Move conditions before flipping the flag
+  if (!isActive) {
+    await supabase.rpc('deactivate_specialty_conditions', { p_specialty_id: id })
+  } else {
+    await supabase.rpc('restore_conditions_to_specialty', { p_specialty_id: id })
+  }
+
   const { error } = await supabase
     .from('specialties')
     .update({ is_active: isActive })

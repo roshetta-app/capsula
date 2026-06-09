@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, ChevronLeft } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
-import { deleteCondition, toggleConditionPublished } from '../../lib/adminQueries'
+import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } from '../../lib/adminQueries'
 import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
@@ -49,8 +49,16 @@ function AgeGroupBadge({ group }) {
 
 export default function ConditionsCMS() {
   const navigate = useNavigate()
-  // useConditionContext still used for specialties list + public cache refresh
-  const { specialties, refresh: refreshPublicCache } = useConditionContext()
+  // useConditionContext for public cache refresh only
+  const { refresh: refreshPublicCache } = useConditionContext()
+
+  // Specialties loaded directly from DB so empty specialties (no conditions yet) still appear
+  const [specialties, setSpecialties] = useState([])
+  useEffect(() => {
+    fetchSpecialtiesForCMS().then(({ data }) => {
+      if (data) setSpecialties(data)
+    })
+  }, [])
   const { toast } = useToast()
 
   // ── Admin condition list (all, including drafts) ───────────────────────────
@@ -217,7 +225,7 @@ export default function ConditionsCMS() {
           }}>
             {['all', ...specialties.map(s => s.id)].map(id => {
               const isActive = activeSpecialty === id
-              const label    = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name
+              const label    = id === 'all' ? 'All' : specialties.find(s => s.id === id)?.name_en
               return (
                 <button
                   key={id}
@@ -404,3 +412,7 @@ function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublis
     </div>
   )
 }
+
+
+
+================================================
