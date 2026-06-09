@@ -32,3 +32,4 @@ src/components/StockManager.jsx
 
 # Supabase local dev (if used later)
 supabase/.temp/
+.env 
