@@ -147,7 +147,7 @@ export default function ConditionCard({ condition, onTap }) {
         </div>
 
         {/* Optional tagline — italic, muted. Renders nothing if null/empty. */}
-        {condition.card_tagline && (
+        {condition.cardTagline && (
           <div style={{
             fontSize:    12,
             fontStyle:   'italic',
@@ -157,7 +157,7 @@ export default function ConditionCard({ condition, onTap }) {
             whiteSpace:  'nowrap',
             textOverflow: 'ellipsis',
           }}>
-            {condition.card_tagline}
+            {condition.cardTagline}
           </div>
         )}
       </div>
@@ -176,3 +176,8 @@ export default function ConditionCard({ condition, onTap }) {
     </div>
   )
 }
+
+```
+
+`src\components\conditions\SpecialtyFilterPills.jsx`:
+
