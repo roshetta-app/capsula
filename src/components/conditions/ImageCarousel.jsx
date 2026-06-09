@@ -17,6 +17,10 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 
+// Module-level flag: set true when the carousel claims a horizontal gesture.
+// ConditionDetailScreen reads this on touchend to know it should bail.
+export const carouselSwipeActive = { current: false }
+
 // ─── Lightbox (portal) ───────────────────────────────────────────────────────
 // Identical to ImageGallery's Lightbox so fullscreen behaviour is consistent.
 
@@ -369,6 +373,7 @@ export default function ImageCarousel({ images = [] }) {
       // Horizontal — block parent (tab switcher)
       e.preventDefault()
       e.stopPropagation()
+      carouselSwipeActive.current = true  // tell tab switcher to ignore touchend
 
       s.dragging = true
       s.dragX    = dx
@@ -380,8 +385,16 @@ export default function ImageCarousel({ images = [] }) {
       setDragOffset(offset)
     }
 
+    function handleEnd() {
+      carouselSwipeActive.current = false
+    }
+
     el.addEventListener('touchmove', handleMove, { passive: false })
-    return () => el.removeEventListener('touchmove', handleMove)
+    el.addEventListener('touchend',  handleEnd,  { passive: true })
+    return () => {
+      el.removeEventListener('touchmove', handleMove)
+      el.removeEventListener('touchend',  handleEnd)
+    }
   }, [])
 
   if (!images.length) return null

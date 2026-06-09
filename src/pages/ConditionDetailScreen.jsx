@@ -9,6 +9,7 @@ import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
 import ShareCard from '../components/ui/ShareCard'
 import { shareConditionPrescription } from '../utils/sharing'
+import { carouselSwipeActive } from '../components/conditions/ImageCarousel'
 
 const AGE_STYLES = {
   adult:     { bg: '#DBEAFE', color: '#1E40AF' },
@@ -36,36 +37,34 @@ export default function ConditionDetailScreen() {
   const swipeViewportRef = useRef(null)
   const shareCardRef     = useRef(null)
 
-  // Tab-swipe uses native listeners (not React synthetic) so that a child
-  // carousel's native e.stopPropagation() on touchmove actually blocks us.
+  // Tab-swipe uses native listeners so the carousel's native stopPropagation works.
   useEffect(() => {
     const el = swipeViewportRef.current
     if (!el) return
 
-    let startX    = null
-    let startY    = null
-    let committed = false
+    let startX = null
+    let startY = null
 
     function onStart(e) {
-      startX    = e.touches[0].clientX
-      startY    = e.touches[0].clientY
-      committed = false
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
     }
 
-    function onMove(e) {
-      if (startX === null || committed) return
-      const dx = e.touches[0].clientX - startX
-      const dy = e.touches[0].clientY - startY
-      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return
-      committed = true
+    // onMove just exists so the carousel can stopPropagation on it.
+    // We don't do anything here — decision is at touchend.
+    function onMove() {}
+
+    function onEnd(e) {
+      if (startX === null) return
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      startX = null; startY = null
+      // A carousel claimed this gesture — don't switch tabs
+      if (carouselSwipeActive.current) return
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
         if (dx < 0) setActiveTab(t => Math.min(TABS.length - 1, t + 1))
         else        setActiveTab(t => Math.max(0, t - 1))
       }
-    }
-
-    function onEnd() {
-      startX = null; startY = null; committed = false
     }
 
     el.addEventListener('touchstart', onStart, { passive: true })
