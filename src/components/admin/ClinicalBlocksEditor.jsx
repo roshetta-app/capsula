@@ -1,3 +1,5 @@
+
+
 /**
  * src/components/admin/ClinicalBlocksEditor.jsx
  * Phase 3C — Clinical Blocks Editor
@@ -23,6 +25,7 @@ import { useToast }   from '../../context/ToastContext'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { supabase }   from '../../lib/supabase'
 import { touchAppMetadata } from '../../lib/adminQueries'
+import ImageManager   from '../../pages/admin/ImageManager'
 
 // ─── Block type definitions ───────────────────────────────────────────────────
 
@@ -182,6 +185,7 @@ export default function ClinicalBlocksEditor({ conditionId, initialBlocks = [], 
             key={block.id}
             block={block}
             idx={idx}
+            conditionId={conditionId}
             isEditing={editingId === block.id}
             onEdit={() => setEditingId(id => id === block.id ? null : block.id)}
             onDelete={() => setDeleteTarget(block.id)}
@@ -247,7 +251,7 @@ export default function ClinicalBlocksEditor({ conditionId, initialBlocks = [], 
 
 // ─── BlockCard ────────────────────────────────────────────────────────────────
 
-function BlockCard({ block, idx, isEditing, onEdit, onDelete, onChange, onDragStart, onDragEnter, onDragEnd }) {
+function BlockCard({ block, idx, conditionId, isEditing, onEdit, onDelete, onChange, onDragStart, onDragEnter, onDragEnd }) {
   const def = BLOCK_TYPES.find(b => b.type === block.type) ?? { label: block.type, icon: '📄', kind: 'text' }
 
   const preview = getPreview(block)
@@ -313,7 +317,7 @@ function BlockCard({ block, idx, isEditing, onEdit, onDelete, onChange, onDragSt
       {/* Inline editor */}
       {isEditing && (
         <div style={{ padding: 'var(--space-3)' }}>
-          <BlockEditor block={block} onChange={onChange} />
+          <BlockEditor block={block} onChange={onChange} conditionId={conditionId} />
         </div>
       )}
     </div>
@@ -322,7 +326,7 @@ function BlockCard({ block, idx, isEditing, onEdit, onDelete, onChange, onDragSt
 
 // ─── BlockEditor — switches on kind ──────────────────────────────────────────
 
-function BlockEditor({ block, onChange }) {
+function BlockEditor({ block, onChange, conditionId }) {
   const def = BLOCK_TYPES.find(b => b.type === block.type) ?? { kind: 'text' }
   const c   = block.content ?? {}
 
@@ -376,21 +380,7 @@ function BlockEditor({ block, onChange }) {
 
     case 'gallery':
       return (
-        <div style={{
-          padding: 'var(--space-3)',
-          backgroundColor: 'var(--color-bg)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px dashed var(--color-border)',
-          fontSize: 13, color: 'var(--color-text-tertiary)', textAlign: 'center',
-        }}>
-          🖼️ Image gallery block<br />
-          <span style={{ fontSize: 12, opacity: 0.7 }}>
-            Manage images via the <strong>Image Gallery</strong> tab (Phase 3I).
-          </span>
-          <div style={{ marginTop: 'var(--space-2)', fontSize: 12 }}>
-            {(c.image_ids ?? []).length} image{(c.image_ids ?? []).length !== 1 ? 's' : ''} linked
-          </div>
-        </div>
+        <ImageManager conditionId={conditionId} />
       )
 
     default:
@@ -508,3 +498,4 @@ function saveBtnStyle(isDirty, saving) {
     transition: 'box-shadow 0.2s, opacity 0.2s',
   }
 }
+
