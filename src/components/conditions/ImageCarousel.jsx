@@ -321,14 +321,18 @@ export default function ImageCarousel({ images = [] }) {
             cursor: 'zoom-in',
             backgroundColor: 'var(--color-bg)',
             border: '1px solid var(--color-border)',
+            height: 260,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <img
             src={current.url}
             alt={current.caption || ''}
             style={{
-              width: '100%',
-              maxHeight: 280,
+              maxWidth: '100%',
+              maxHeight: '100%',
               objectFit: 'contain',
               display: 'block',
               pointerEvents: 'none',
