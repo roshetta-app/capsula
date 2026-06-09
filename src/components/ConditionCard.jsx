@@ -177,7 +177,3 @@ export default function ConditionCard({ condition, onTap }) {
   )
 }
 
-```
-
-`src\components\conditions\SpecialtyFilterPills.jsx`:
-
