@@ -33,25 +33,42 @@ export default function ConditionDetailScreen() {
 
   const [activeTab, setActiveTab]                   = useState(0)
   const [activePrescriptionIdx, setActivePrescriptionIdx] = useState(0)
-  const touchStartX  = useRef(null)
-  const touchStartY  = useRef(null)
-  const shareCardRef = useRef(null)
+  const touchStartX   = useRef(null)
+  const touchStartY   = useRef(null)
+  const touchIgnored  = useRef(false)   // true when a child (carousel) claimed the gesture
+  const shareCardRef  = useRef(null)
 
   function handleTouchStart(e) {
+    // If the touch started inside a carousel, mark as ignored so tab-swipe won't fire
+    touchIgnored.current = !!e.target.closest('[data-carousel]')
+    if (touchIgnored.current) return
     touchStartX.current = e.touches[0].clientX
     touchStartY.current = e.touches[0].clientY
   }
 
+  function handleTouchMove(e) {
+    // If a child carousel is handling this gesture, cancel our recording
+    if (e.target.closest('[data-carousel]')) {
+      touchIgnored.current = true
+      touchStartX.current  = null
+      touchStartY.current  = null
+    }
+  }
+
   function handleTouchEnd(e) {
-    if (touchStartX.current === null) return
+    if (touchIgnored.current || touchStartX.current === null) {
+      touchIgnored.current = false
+      return
+    }
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
       if (dx < 0 && activeTab < TABS.length - 1) setActiveTab(t => t + 1)
       if (dx > 0 && activeTab > 0)               setActiveTab(t => t - 1)
     }
-    touchStartX.current = null
-    touchStartY.current = null
+    touchStartX.current  = null
+    touchStartY.current  = null
+    touchIgnored.current = false
   }
 
   // Add to recently viewed once condition is resolved
@@ -181,6 +198,7 @@ export default function ConditionDetailScreen() {
       */}
       <div
         onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{ overflow: 'hidden' }}
       >
@@ -341,3 +359,5 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
     </header>
   )
 }
+
+``

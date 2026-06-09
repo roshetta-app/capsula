@@ -401,6 +401,9 @@ export default function ImageCarousel({ images = [] }) {
       return
     }
 
+    // We handled a horizontal swipe — stop it reaching the tab switcher
+    e.stopPropagation()
+
     setIsAnimating(true)
     const threshold = 50  // px needed to commit a slide
 
@@ -423,6 +426,7 @@ export default function ImageCarousel({ images = [] }) {
 
         {/* Slide container */}
         <div
+          data-carousel
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
