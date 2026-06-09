@@ -1,14 +1,12 @@
 /**
  * src/pages/admin/ConditionsCMS.jsx
- * Phase 3B — Conditions Editor
  *
  * Changes from previous version:
- *   - Replaced inline DeleteDialog with ConfirmModal (3A component)
- *   - Added is_published toggle per row (immediate Supabase update)
- *   - "Add New" now opens ConditionFormModal instead of navigating away
- *   - Edit still navigates to /admin/conditions/:id (full editor)
- *   - useToast for all success/error feedback
- *   - FIX: uses fetchAllConditions (no is_published filter) so drafts appear
+ *  - "Add New" now navigates to /admin/conditions/new (ConditionEditor, create mode)
+ *    instead of opening ConditionFormModal. This gives a single unified editor for
+ *    both creating and editing conditions — no duplicate forms.
+ *  - ConditionFormModal import removed entirely.
+ *  - Specialties still fetched via fetchSpecialtiesForCMS() for the filter pills.
  */
 
 import { useState, useEffect } from 'react'
@@ -20,7 +18,6 @@ import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } fro
 import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
-import ConditionFormModal from './ConditionFormModal'
 
 // ─── Age group badge ──────────────────────────────────────────────────────────
 
@@ -49,21 +46,20 @@ function AgeGroupBadge({ group }) {
 
 export default function ConditionsCMS() {
   const navigate = useNavigate()
-  // useConditionContext for public cache refresh only
   const { refresh: refreshPublicCache } = useConditionContext()
+  const { toast } = useToast()
 
-  // Specialties loaded directly from DB so empty specialties (no conditions yet) still appear
+  // Specialties for filter pills — fetched directly so empty ones still appear
   const [specialties, setSpecialties] = useState([])
   useEffect(() => {
     fetchSpecialtiesForCMS().then(({ data }) => {
       if (data) setSpecialties(data)
     })
   }, [])
-  const { toast } = useToast()
 
   // ── Admin condition list (all, including drafts) ───────────────────────────
-  const [conditions, setConditions] = useState([])
-  const [loadingList, setLoadingList] = useState(true)
+  const [conditions,   setConditions]   = useState([])
+  const [loadingList,  setLoadingList]  = useState(true)
 
   async function loadAll() {
     setLoadingList(true)
@@ -85,9 +81,6 @@ export default function ConditionsCMS() {
   // Delete confirm modal
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting,     setDeleting]     = useState(false)
-
-  // New condition modal
-  const [formOpen, setFormOpen] = useState(false)
 
   // Optimistic publish overrides — { [conditionId]: boolean }
   const [publishedOverrides, setPublishedOverrides] = useState({})
@@ -125,11 +118,9 @@ export default function ConditionsCMS() {
   async function handleTogglePublished(condition) {
     const current = publishedOverrides[condition.id] ?? condition.isPublished ?? true
     const next    = !current
-    // Optimistic update
     setPublishedOverrides(prev => ({ ...prev, [condition.id]: next }))
     const { error } = await toggleConditionPublished(condition.id, next)
     if (error) {
-      // Revert
       setPublishedOverrides(prev => ({ ...prev, [condition.id]: current }))
       toast.error('Failed to update publish status')
     } else {
@@ -178,8 +169,9 @@ export default function ConditionsCMS() {
             </span>
           </div>
 
+          {/* FIX: navigate to full editor instead of opening ConditionFormModal */}
           <button
-            onClick={() => setFormOpen(true)}
+            onClick={() => navigate('/admin/conditions/new')}
             style={{
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
               padding: '7px 14px', borderRadius: 'var(--radius-md)',
@@ -262,7 +254,7 @@ export default function ConditionsCMS() {
             textAlign: 'center', padding: 'var(--space-12) var(--space-4)',
             color: 'var(--color-text-tertiary)', fontSize: 14,
           }}>
-            {query ? `No conditions matching "${query}"` : 'No conditions yet. Add one above.'}
+            {query ? `No conditions matching "${query}"` : 'No conditions yet. Click "Add New" to create one.'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -283,7 +275,7 @@ export default function ConditionsCMS() {
         )}
       </main>
 
-      {/* Delete confirm modal (3A) */}
+      {/* Delete confirm modal */}
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
@@ -296,15 +288,6 @@ export default function ConditionsCMS() {
         }
         confirmLabel={deleting ? 'Deleting…' : 'Delete'}
         confirmVariant="danger"
-      />
-
-      {/* New condition modal (3B) */}
-      <ConditionFormModal
-        isOpen={formOpen}
-        onClose={() => setFormOpen(false)}
-        onSaved={async () => { await loadAll(); await refreshPublicCache() }}
-        condition={null}
-        specialties={specialties}
       />
     </div>
   )
@@ -325,7 +308,7 @@ function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublis
       display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
       opacity: isPublished ? 1 : 0.65,
     }}>
-      {/* Publish toggle */}
+      {/* Publish toggle dot */}
       <button
         onClick={onTogglePublished}
         title={isPublished ? 'Published — click to unpublish' : 'Draft — click to publish'}

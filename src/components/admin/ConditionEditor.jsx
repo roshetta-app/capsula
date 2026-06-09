@@ -1,14 +1,16 @@
 /**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
- * Create or edit a condition's metadata (no prescriptions yet — Session 5.5).
- * Uses ConditionContext for specialties list.
- * Calls insertCondition / updateCondition + image management from adminQueries.
+ * Fixes applied:
+ *  1. Specialties fetched directly via fetchSpecialtiesForCMS() — no longer derived
+ *     from ConditionContext (which had wrong field name: .name_en vs .name).
+ *  2. Inline "＋ New specialty" mini-modal so admins never leave this page.
+ *  3. ConditionFormModal eliminated — ConditionsCMS "Add New" now routes here.
  */
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Plus, Trash2, AlertTriangle, CheckCircle, Upload, Image as ImageIcon } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, AlertTriangle, CheckCircle, Upload, Image as ImageIcon, X } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import TagInput from '../../components/admin/TagInput'
 import {
@@ -19,6 +21,8 @@ import {
   deleteConditionImage,
   uploadConditionImage,
   touchAppMetadata,
+  fetchSpecialtiesForCMS,   // ← NEW: direct fetch, correct field names
+  insertSpecialty,          // ← NEW: create specialty inline
 } from '../../lib/adminQueries'
 import PrescriptionBuilder    from '../../components/admin/PrescriptionBuilder'
 import ClinicalBlocksEditor  from '../../components/admin/ClinicalBlocksEditor'
@@ -351,7 +355,6 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
       {/* Upload controls */}
       {canManage && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {/* File upload */}
           <label style={{
             display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
             padding: '8px 14px', borderRadius: 'var(--radius-md)', width: 'fit-content',
@@ -368,7 +371,6 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
             />
           </label>
 
-          {/* URL input */}
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <input
               type="url"
@@ -419,6 +421,143 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
   )
 }
 
+// ─── Quick-create specialty mini-modal ────────────────────────────────────────
+// Lets admins add a new specialty without leaving the condition editor.
+
+function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
+  const [name, setName] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err,  setErr]  = useState(null)
+
+  useEffect(() => {
+    if (isOpen) { setName(''); setErr(null) }
+  }, [isOpen])
+
+  async function handleCreate() {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    setBusy(true)
+    setErr(null)
+
+    const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const { data, error } = await insertSpecialty({
+      name_en:    trimmed,
+      slug,
+      icon_name:  'fa-stethoscope',
+      color_hex:  '#DBEAFE',
+      sort_order: 99,
+      is_active:  true,
+    })
+
+    setBusy(false)
+    if (error) { setErr(error.message ?? 'Failed to create specialty'); return }
+
+    // data is { id, slug } from insertSpecialty's .select('id, slug')
+    onCreated({ id: data.id, name_en: trimmed, slug: data.slug })
+    onClose()
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 200,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      padding: 'var(--space-4)',
+    }}>
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-5)',
+        width: '100%', maxWidth: 380,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+            New Specialty
+          </span>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-tertiary)', padding: 4 }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Input */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <FieldLabel required>Name</FieldLabel>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            placeholder="e.g. Gastroenterology"
+            autoFocus
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '9px 12px',
+              border: '1.5px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 14, fontFamily: 'var(--font-body)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-primary)',
+              outline: 'none',
+            }}
+          />
+          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6, fontFamily: 'var(--font-body)' }}>
+            Icon and color can be customised later in Specialties Manager.
+          </p>
+        </div>
+
+        {err && (
+          <div style={{
+            fontSize: 13, color: '#DC2626', marginBottom: 'var(--space-3)',
+            backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+            borderRadius: 'var(--radius-md)', padding: '8px 12px',
+            fontFamily: 'var(--font-body)',
+          }}>
+            {err}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+          <button
+            onClick={onClose}
+            disabled={busy}
+            style={{
+              padding: '8px 16px', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'transparent', color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleCreate}
+            disabled={!name.trim() || busy}
+            style={{
+              padding: '8px 16px', borderRadius: 'var(--radius-md)',
+              border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff',
+              fontSize: 13, fontWeight: 600,
+              cursor: !name.trim() || busy ? 'default' : 'pointer',
+              opacity: !name.trim() || busy ? 0.6 : 1,
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            {busy ? 'Creating…' : 'Create Specialty'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_CONDITION = {
@@ -448,19 +587,37 @@ const AGE_GROUP_OPTIONS = [
 ]
 
 export default function ConditionEditor() {
-  const { id }           = useParams()
-  const isEdit           = Boolean(id)
-  const navigate         = useNavigate()
-  const { specialties, refresh } = useConditionContext()
+  const { id }    = useParams()
+  const isEdit    = Boolean(id)
+  const navigate  = useNavigate()
 
-  const [form,         setForm]         = useState(EMPTY_CONDITION)
-  const [images,       setImages]       = useState([])
-  const [initialBlocks, setInitialBlocks] = useState([])
-  const [loading,      setLoading]      = useState(isEdit)
-  const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState(null)
-  const [success,  setSuccess]  = useState(false)
-  const [activeTab, setActiveTab] = useState('details') // 'details' | 'blocks' | 'prescriptions'
+  // ── FIX: fetch specialties directly — context only used for public cache refresh
+  const { refresh } = useConditionContext()
+  const [specialties,     setSpecialties]     = useState([])
+  const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
+  const [newSpecialtyOpen, setNewSpecialtyOpen] = useState(false)
+
+  useEffect(() => {
+    fetchSpecialtiesForCMS().then(({ data }) => {
+      setSpecialties(data ?? [])
+      setSpecialtiesLoading(false)
+    })
+  }, [])
+
+  // Called when a new specialty is created from the mini-modal
+  function handleSpecialtyCreated(newSpecialty) {
+    setSpecialties(prev => [...prev, newSpecialty])
+    patch('specialty_id', newSpecialty.id)
+  }
+
+  const [form,           setForm]           = useState(EMPTY_CONDITION)
+  const [images,         setImages]         = useState([])
+  const [initialBlocks,  setInitialBlocks]  = useState([])
+  const [loading,        setLoading]        = useState(isEdit)
+  const [saving,         setSaving]         = useState(false)
+  const [error,          setError]          = useState(null)
+  const [success,        setSuccess]        = useState(false)
+  const [activeTab,      setActiveTab]      = useState('details')
 
   // ─── Load existing condition (edit mode) ──────────────────────────────────
 
@@ -582,10 +739,11 @@ export default function ConditionEditor() {
   }
 
   // ─── Specialty options ─────────────────────────────────────────────────────
+  // FIX: use name_en (correct field from fetchSpecialtiesForCMS) not name
 
   const specialtyOptions = [
-    { value: '', label: 'Select specialty…' },
-    ...specialties.map(s => ({ value: s.id, label: s.name })),
+    { value: '', label: specialtiesLoading ? 'Loading…' : 'Select specialty…' },
+    ...specialties.map(s => ({ value: s.id, label: s.name_en })),
   ]
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -738,14 +896,32 @@ export default function ConditionEditor() {
               />
             </div>
 
+            {/* ── Specialty row: dropdown + inline "New" button ─────────── */}
             <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
               <div style={{ flex: 1 }}>
-                <FieldLabel required>Specialty</FieldLabel>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
+                  <FieldLabel required>Specialty</FieldLabel>
+                  <button
+                    onClick={() => setNewSpecialtyOpen(true)}
+                    disabled={saving}
+                    title="Create a new specialty"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 3,
+                      fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
+                      background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
+                      fontFamily: 'var(--font-body)', padding: '2px 0',
+                      opacity: saving ? 0.5 : 1,
+                    }}
+                  >
+                    <Plus size={13} />
+                    New
+                  </button>
+                </div>
                 <Select
                   value={form.specialty_id}
                   onChange={v => patch('specialty_id', v)}
                   options={specialtyOptions}
-                  disabled={saving}
+                  disabled={saving || specialtiesLoading}
                 />
               </div>
               <div style={{ flex: 1 }}>
@@ -771,49 +947,50 @@ export default function ConditionEditor() {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                 <FieldLabel>Published</FieldLabel>
-                <button
-                  type="button"
-                  onClick={() => patch('is_published', !form.is_published)}
-                  disabled={saving}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                    padding: '9px 14px',
-                    border: '1.5px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: form.is_published ? '#D1FAE5' : 'var(--color-surface)',
-                    color: form.is_published ? '#065F46' : 'var(--color-text-secondary)',
-                    fontSize: 14, fontFamily: 'var(--font-body)', fontWeight: 500,
-                    cursor: saving ? 'default' : 'pointer',
-                  }}
-                >
-                  <span style={{
-                    width: 10, height: 10, borderRadius: '50%', flexShrink: 0,
-                    backgroundColor: form.is_published ? '#10B981' : 'var(--color-border)',
-                  }} />
-                  {form.is_published ? 'Published' : 'Draft'}
-                </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: saving ? 'default' : 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={form.is_published}
+                    onChange={e => patch('is_published', e.target.checked)}
+                    disabled={saving}
+                    style={{ width: 16, height: 16, accentColor: 'var(--color-accent)' }}
+                  />
+                  <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+                    {form.is_published ? 'Visible in app' : 'Draft'}
+                  </span>
+                </label>
               </div>
             </div>
 
-            {/* ── Clinical data ─────────────────────────────────────────────── */}
+            {/* ── Clinical data ─────────────────────────────────────────── */}
 
-            <SectionTitle>Clinical Data</SectionTitle>
+            <SectionTitle>Clinical data</SectionTitle>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Definition</FieldLabel>
+              <Textarea
+                value={form.definition}
+                onChange={v => patch('definition', v)}
+                placeholder="Brief clinical definition…"
+                disabled={saving}
+                rows={3}
+              />
+            </div>
 
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <FieldLabel>Clinical picture</FieldLabel>
               <Textarea
                 value={form.clinical_picture}
                 onChange={v => patch('clinical_picture', v)}
-                placeholder="Describe the typical clinical presentation…"
+                placeholder="Describe the clinical presentation…"
                 disabled={saving}
-                rows={4}
               />
             </div>
 
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <FieldLabel>History questions</FieldLabel>
               <TagInput
-                tags={form.history_questions}
+                value={form.history_questions}
                 onChange={v => patch('history_questions', v)}
                 placeholder="Type question, press Enter"
                 disabled={saving}
@@ -823,7 +1000,7 @@ export default function ConditionEditor() {
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <FieldLabel>Examination findings</FieldLabel>
               <TagInput
-                tags={form.examination}
+                value={form.examination}
                 onChange={v => patch('examination', v)}
                 placeholder="Type finding, press Enter"
                 disabled={saving}
@@ -846,48 +1023,40 @@ export default function ConditionEditor() {
                 onChange={v => patch('patient_instructions', v)}
                 placeholder="Instructions for the patient…"
                 disabled={saving}
-                rows={3}
               />
             </div>
 
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <FieldLabel>Definition</FieldLabel>
-              <Textarea
-                value={form.definition}
-                onChange={v => patch('definition', v)}
-                placeholder="Brief definition shown at top of clinical data tab…"
-                disabled={saving}
-                rows={3}
-              />
-            </div>
+            {/* ── Epidemiology & differentials ──────────────────────────── */}
+
+            <SectionTitle>Epidemiology &amp; differentials</SectionTitle>
 
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <FieldLabel>Epidemiology</FieldLabel>
               <Textarea
                 value={form.epidemiology}
                 onChange={v => patch('epidemiology', v)}
-                placeholder="Epidemiology notes…"
+                placeholder="Prevalence, incidence, demographics…"
                 disabled={saving}
-                rows={2}
-              />
-            </div>
-
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <FieldLabel>Red flags</FieldLabel>
-              <TagInput
-                tags={form.red_flags}
-                onChange={v => patch('red_flags', v)}
-                placeholder="Add red flag, press Enter"
-                disabled={saving}
+                rows={3}
               />
             </div>
 
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <FieldLabel>Differential diagnosis</FieldLabel>
               <TagInput
-                tags={form.differential_diagnosis}
+                value={form.differential_diagnosis}
                 onChange={v => patch('differential_diagnosis', v)}
-                placeholder="Add diagnosis, press Enter"
+                placeholder="Type diagnosis, press Enter"
+                disabled={saving}
+              />
+            </div>
+
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <FieldLabel>Red flags</FieldLabel>
+              <TagInput
+                value={form.red_flags}
+                onChange={v => patch('red_flags', v)}
+                placeholder="Type red flag, press Enter"
                 disabled={saving}
               />
             </div>
@@ -908,54 +1077,47 @@ export default function ConditionEditor() {
               <Textarea
                 value={form.prognosis}
                 onChange={v => patch('prognosis', v)}
-                placeholder="Prognosis notes…"
+                placeholder="Expected outcomes, prognosis notes…"
                 disabled={saving}
                 rows={2}
               />
             </div>
 
-            {/* ── Images ───────────────────────────────────────────────────── */}
+            {/* ── Images ────────────────────────────────────────────────── */}
 
             <SectionTitle>Images</SectionTitle>
-            <div style={{ marginBottom: 'var(--space-4)' }}>
-              <ImageManager
-                images={images}
-                conditionId={isEdit ? id : null}
-                onChange={setImages}
-                disabled={saving}
-              />
-            </div>
+            <ImageManager
+              images={images}
+              conditionId={id ?? null}
+              onChange={setImages}
+              disabled={saving}
+            />
 
           </div>
         )}
 
-        {/* ── Clinical Blocks tab ──────────────────────────────────────────── */}
-        {activeTab === 'blocks' && isEdit && (
+        {/* ── Clinical Blocks tab ───────────────────────────────────────────── */}
+        {activeTab === 'blocks' && (
           <ClinicalBlocksEditor
-            conditionId={id}
+            conditionId={id ?? null}
             initialBlocks={initialBlocks}
-            onSaved={setInitialBlocks}
           />
-        )}
-        {activeTab === 'blocks' && !isEdit && (
-          <div style={{
-            padding: 'var(--space-6)', textAlign: 'center',
-            color: 'var(--color-text-tertiary)', fontSize: 13,
-            border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-lg)',
-          }}>
-            Save the condition first to manage clinical blocks.
-          </div>
         )}
 
-        {/* ── Prescriptions tab ────────────────────────────────────────────── */}
+        {/* ── Prescriptions tab ─────────────────────────────────────────────── */}
         {activeTab === 'prescriptions' && (
-          <PrescriptionBuilder
-            conditionId={isEdit ? id : null}
-            disabled={saving}
-          />
+          <PrescriptionBuilder conditionId={id ?? null} />
         )}
 
       </main>
+
+      {/* ── Inline specialty creator ──────────────────────────────────────────── */}
+      <NewSpecialtyModal
+        isOpen={newSpecialtyOpen}
+        onClose={() => setNewSpecialtyOpen(false)}
+        onCreated={handleSpecialtyCreated}
+      />
+
     </div>
   )
 }
