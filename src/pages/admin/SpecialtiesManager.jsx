@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, GripVertical, Pencil, Trash2, ToggleLeft, ToggleRight 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faStethoscope, faHeartPulse, faBrain, faBone, faEye, faEarListen,
-  faTooth, faLungs, faKidneySolid, faDroplet, faSyringe, faBaby,
+  faTooth, faLungs, faKidney, faDroplet, faSyringe, faBaby,
   faPersonPregnant, faVirus, faBacteria, faPills, faFlask,
   faMicroscope, faRadiation, faScissors, faUserDoctor, faWheelchair,
   faHospital, faFileMedical, faNotesMedical, faHeart, faXRay,
@@ -33,7 +33,7 @@ const ICON_OPTIONS = [
   { name: 'fa-ear-listen',        icon: faEarListen },
   { name: 'fa-tooth',             icon: faTooth },
   { name: 'fa-lungs',             icon: faLungs },
-  { name: 'fa-kidney-solid',      icon: faKidneySolid },
+  { name: 'fa-kidney',            icon: faKidney },
   { name: 'fa-droplet',           icon: faDroplet },
   { name: 'fa-syringe',           icon: faSyringe },
   { name: 'fa-baby',              icon: faBaby },
