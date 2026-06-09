@@ -265,7 +265,7 @@ export async function fetchConditionForEdit(id) {
       clinical_picture, history_questions, examination, investigations,
       patient_instructions, clinical_blocks,
       specialty_id,
-      specialties ( id, name_en, slug ),
+      specialties!conditions_specialty_id_fkey ( id, name_en, slug ),
       condition_images ( id, url, caption, sort_order ),
       prescriptions ( id, label, sort_order )
     `)
