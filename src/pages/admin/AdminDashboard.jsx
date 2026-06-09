@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCapsules, faNotesMedical } from '@fortawesome/free-solid-svg-icons'
+import { faCapsules, faNotesMedical, faStethoscope } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
 /**
  * AdminDashboard — /admin
  *
- * Two nav cards: Drug Library → /admin/drugs, Conditions → /admin/conditions
- * Sign out button (Lucide LogOut) top-right → signOut → /admin/login
+ * Nav cards: Drug Library → /admin/drugs
+ *            Conditions   → /admin/conditions
+ *            Specialties  → /admin/specialties   (added 3H)
  */
 
 const NAV_CARDS = [
@@ -23,6 +24,12 @@ const NAV_CARDS = [
     label:   'Conditions',
     sub:     'Manage clinical cards & prescriptions',
     faIcon:  faNotesMedical,
+  },
+  {
+    path:    '/admin/specialties',
+    label:   'Specialties',
+    sub:     'Manage specialty list, icons & order',
+    faIcon:  faStethoscope,
   },
 ]
 

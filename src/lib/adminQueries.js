@@ -126,7 +126,7 @@ export async function deleteBrand(id) {
   return { error }
 }
 
-// ─── Specialties (5.4) ───────────────────────────────────────────────────────
+// ─── Specialties (5.4 + 3H) ──────────────────────────────────────────────────
 
 export async function insertSpecialty(data) {
   const { data: row, error } = await supabase
@@ -143,6 +143,68 @@ export async function updateSpecialty(id, data) {
     .update(data)
     .eq('id', id)
   return { error }
+}
+
+/**
+ * Fetch all specialties with condition counts for the admin manager.
+ */
+export async function fetchAllSpecialties() {
+  const { data, error } = await supabase
+    .from('specialties')
+    .select(`
+      id, name_en, name_ar, slug, icon_name, color_hex,
+      sort_order, is_active, created_at,
+      conditions ( id )
+    `)
+    .order('sort_order', { ascending: true })
+
+  if (error) return { data: null, error }
+
+  const mapped = data.map(s => ({
+    ...s,
+    conditionCount: (s.conditions ?? []).length,
+    conditions: undefined,
+  }))
+
+  return { data: mapped, error: null }
+}
+
+/**
+ * Toggle is_active on a specialty.
+ * When deactivating, the DB trigger re-assigns conditions to Uncategorized.
+ */
+export async function toggleSpecialtyActive(id, isActive) {
+  const { error } = await supabase
+    .from('specialties')
+    .update({ is_active: isActive })
+    .eq('id', id)
+  if (error) return { error }
+  return touchAppMetadata('conditions_updated_at')
+}
+
+/**
+ * Delete a specialty. Only safe when conditionCount === 0 and not Uncategorized.
+ */
+export async function deleteSpecialty(id) {
+  const { error } = await supabase
+    .from('specialties')
+    .delete()
+    .eq('id', id)
+  if (error) return { error }
+  return touchAppMetadata('conditions_updated_at')
+}
+
+/**
+ * Batch-update sort_order for reordering specialties via drag-and-drop.
+ * @param {{ id: string, sort_order: number }[]} items
+ */
+export async function reorderSpecialties(items) {
+  const updates = items.map(({ id, sort_order }) =>
+    supabase.from('specialties').update({ sort_order }).eq('id', id)
+  )
+  const results = await Promise.all(updates)
+  const firstError = results.find(r => r.error)?.error ?? null
+  return { error: firstError }
 }
 
 // ─── Conditions (5.4) ────────────────────────────────────────────────────────
