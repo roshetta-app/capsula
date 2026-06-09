@@ -9,6 +9,7 @@ import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
 import ShareCard from '../components/ui/ShareCard'
 import { shareConditionPrescription } from '../utils/sharing'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 const AGE_STYLES = {
   adult:     { bg: '#DBEAFE', color: '#1E40AF' },
@@ -61,6 +62,7 @@ export default function ConditionDetailScreen() {
   useEffect(() => {
     if (condition) {
       addRecentlyViewed({ id: condition.id, name: condition.name, slug: condition.slug })
+      logUsageEvent('condition_view', condition.id, condition.name)
     }
   }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -173,12 +175,6 @@ export default function ConditionDetailScreen() {
         </div>
       </div>
 
-      {/*
-        Swipeable viewport.
-        overflow:hidden clips the off-screen panel.
-        The inner 200%-wide row is fine because THIS element has overflow:hidden —
-        it never causes a horizontal scrollbar on the page.
-      */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -218,7 +214,7 @@ export default function ConditionDetailScreen() {
   )
 }
 
-// ─── Shared page style — same bg, no box ──────────────────────────────────────
+// ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
   minHeight: '100dvh',
@@ -227,7 +223,7 @@ const pageStyle = {
   color: 'var(--color-text-primary)',
 }
 
-// ─── DetailHeader — full-width bg, content centred ────────────────────────────
+// ─── DetailHeader ─────────────────────────────────────────────────────────────
 
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
   const ageStyle = condition
@@ -243,7 +239,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
       borderBottom: '1px solid var(--color-border)',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4)' }}>
-        {/* Top row: back button + action buttons */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 0 }}>
           <button
             onClick={onBack}
@@ -260,11 +255,9 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
             Back
           </button>
 
-          {/* Share + Star buttons */}
           {condition && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
 
-              {/* Share button */}
               <button
                 onClick={onShare}
                 aria-label="Share prescription"
@@ -283,7 +276,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
                 </svg>
               </button>
 
-              {/* Star favourite button */}
               <button
                 onClick={onFavToggle}
                 aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
