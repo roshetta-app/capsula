@@ -439,7 +439,7 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
     setBusy(true)
     setErr(null)
 
-    const slug = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    const slug = toSlug(trimmed)
     const { data, error } = await insertSpecialty({
       name_en:    trimmed,
       slug,
@@ -558,7 +558,32 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
   )
 }
 
-// ─── Main ─────────────────────────────────────────────────────────────────────
+// // ─── Slug helper ──────────────────────────────────────────────────────────────
+//
+// Converts a condition name to a URL-safe slug.
+// For purely non-Latin names (Arabic, etc.) the standard regex strips
+// everything and produces an empty slug which breaks routing.
+// This helper falls back to a short random suffix so the slug is
+// always non-empty and URL-safe.
+//
+// Examples:
+//   "Fungal Infection"  -> "fungal-infection"
+//   Arabic-only name   -> "cond-x4k9"
+//   Mixed "Tinea"      -> "tinea"
+
+function toSlug(name) {
+  const latin = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+  if (latin.length >= 2) return latin
+
+  const suffix = Math.random().toString(36).slice(2, 6)
+  return `cond-${suffix}`
+}
+
+─── Main ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_CONDITION = {
   name:                  '',
@@ -687,10 +712,7 @@ export default function ConditionEditor() {
     setError(null)
     setSaving(true)
 
-    const slug = form.name.trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
+    const slug = toSlug(form.name.trim())
 
     const payload = {
       name:                   form.name.trim(),
