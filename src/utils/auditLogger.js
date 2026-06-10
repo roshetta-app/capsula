@@ -32,15 +32,18 @@ import { supabase } from '../lib/supabase'
  */
 export async function logAudit(action, tableName, recordId, recordName = null, changes = null) {
   try {
-    await supabase.from('audit_log').insert({
+    const { error } = await supabase.from('audit_log').insert({
       action,
       table_name:  tableName,
       record_id:   recordId,
       record_name: recordName ?? null,
       changes:     changes    ?? null,
     })
+    if (error) {
+      // Log visibly so we can diagnose — never thrown to caller
+      console.error('[auditLogger] Insert failed:', error.message, { action, tableName, recordId })
+    }
   } catch (err) {
-    // Never let audit failures surface to the user
-    console.warn('[auditLogger] Failed to write audit log:', err)
+    console.error('[auditLogger] Unexpected error:', err)
   }
 }
