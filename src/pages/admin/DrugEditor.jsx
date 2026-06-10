@@ -1,22 +1,5 @@
 /**
  * DrugEditor.jsx — /admin/drugs/generic/:genericId
- *
- * Unified editor: one page to manage a generic's info, all its formulations,
- * and each formulation's brands — no more bouncing between 3 separate screens.
- *
- * Layout:
- *   ┌─ Header: Drug Library › {genericName}  [Save Generic] ─────────────────┐
- *   │                                                                          │
- *   │  ▾ Generic info          (collapsible, open by default)                 │
- *   │                                                                          │
- *   │  ▾ 500mg · Capsule · Oral          [● Live]  [Save]  [✕]               │
- *   │      FormulationEditor + BrandEditor inline                              │
- *   │                                                                          │
- *   │  ▾ 250mg/5ml · Syrup · Oral        [○ Draft] [Save]  [✕]               │
- *   │      ...                                                                 │
- *   │                                                                          │
- *   │  [+ Add Formulation]                                                     │
- *   └──────────────────────────────────────────────────────────────────────────┘
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -39,17 +22,7 @@ import {
   touchAppMetadata,
 } from '../../lib/adminQueries'
 import { supabase } from '../../lib/supabase'
-
-// ─── Empty states ─────────────────────────────────────────────────────────────
-
-const EMPTY_FORMULATION = {
-  concentration: '',
-  form: '',
-  route: '',
-  doses: [],
-  default_dose_override: null,
-  is_published: true,
-}
+import { logAudit, getRecordChanges } from '../../utils/auditLogger'
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -65,16 +38,20 @@ export default function DrugEditor() {
 
   // ── Data ────────────────────────────────────────────────────────────────────
   const [generic,       setGeneric]       = useState(null)
-  const [formulations,  setFormulations]  = useState([])  // each has .brands[]
+  const [formulations,  setFormulations]  = useState([])
+
+  // Baseline copies for diff logging
+  const [initialGeneric, setInitialGeneric] = useState(null)
+  const [initialFormulations, setInitialFormulations] = useState([])
 
   // ── UI ──────────────────────────────────────────────────────────────────────
   const [genericOpen,   setGenericOpen]   = useState(true)
-  const [openFormId,    setOpenFormId]    = useState(null)  // which formulation is expanded
+  const [openFormId,    setOpenFormId]    = useState(null)
   const [savingGeneric, setSavingGeneric] = useState(false)
   const [savedGeneric,  setSavedGeneric]  = useState(false)
   const [savingFormId,  setSavingFormId]  = useState(null)
   const [savedFormId,   setSavedFormId]   = useState(null)
-  const [confirmDel,    setConfirmDel]    = useState(null)  // formulation to delete
+  const [confirmDel,    setConfirmDel]    = useState(null)
   const [deleting,      setDeleting]      = useState(false)
   const [globalError,   setGlobalError]   = useState(null)
   const [addingForm,    setAddingForm]    = useState(false)
@@ -102,6 +79,7 @@ export default function DrugEditor() {
 
     if (gErr) { setFetchErr(gErr.message); setLoading(false); return }
     setGeneric(gData)
+    setInitialGeneric(JSON.parse(JSON.stringify(gData))) // Deep copy for baseline logging
 
     const { data: fData, error: fErr } = await supabase
       .from('formulations')
@@ -115,11 +93,14 @@ export default function DrugEditor() {
 
     if (fErr) { setFetchErr(fErr.message); setLoading(false); return }
 
-    setFormulations(fData.map(f => ({
+    const mappedF = fData.map(f => ({
       ...f,
       doses: f.doses_structured ?? f.doses ?? [],
       brands: (f.brands ?? []).map(b => ({ ...b })),
-    })))
+    }))
+
+    setFormulations(mappedF)
+    setInitialFormulations(JSON.parse(JSON.stringify(mappedF))) // Deep copy for baseline logging
 
     setLoading(false)
   }, [genericId])
@@ -156,11 +137,20 @@ export default function DrugEditor() {
     })
     setSavingGeneric(false)
     if (error) { setGlobalError(`Generic: ${error.message}`); return }
+
+    // Log generic log diffs
+    const diffs = getRecordChanges(initialGeneric, generic)
+    if (diffs) {
+      await logAudit('update', 'generics', genericId, generic.name_en, diffs)
+    }
+
     setSavedGeneric(true)
     setTimeout(() => setSavedGeneric(false), 2500)
     await touchAppMetadata('drugs_updated_at')
     await refresh()
     toast.success('Generic saved')
+    // Set current as new baseline
+    setInitialGeneric(JSON.parse(JSON.stringify(generic)))
   }
 
   // ── Save formulation ────────────────────────────────────────────────────────
@@ -179,16 +169,27 @@ export default function DrugEditor() {
     })
     if (fErr) { setGlobalError(`Formulation: ${fErr.message}`); setSavingFormId(null); return }
 
-    // 2. Sync brands: upsert existing, insert new, delete marked
+    // Formulation log check
+    const baseF = initialFormulations.find(x => x.id === f.id)
+    const fDiffs = getRecordChanges(baseF, f, ['updated_at', 'created_at', 'brands'])
+    if (fDiffs) {
+      await logAudit('update', 'formulations', f.id, `${generic.name_en} (${f.concentration} ${f.form})`, fDiffs)
+    }
+
+    // 2. Sync brands
     try {
       for (const brand of f.brands) {
         if (brand._deleted) {
           if (brand.id) {
             const { error } = await deleteBrand(brand.id)
             if (error) throw new Error(`Delete brand: ${error.message}`)
+
+            // Log brand delete
+            await logAudit('delete', 'brands', brand.id, brand.name, brand)
           }
           continue
         }
+        
         const payload = {
           name:         brand.name.trim(),
           name_ar:      brand.name_ar?.trim() || null,
@@ -196,12 +197,26 @@ export default function DrugEditor() {
           source:       brand.source ?? 'manual',
           is_published: brand.is_published ?? true,
         }
+
         if (brand.id) {
           const { error } = await updateBrand(brand.id, payload)
           if (error) throw new Error(`Update brand "${brand.name}": ${error.message}`)
+
+          // Log brand update
+          const baseB = baseF?.brands?.find(b => b.id === brand.id)
+          const bDiffs = getRecordChanges(baseB, brand)
+          if (bDiffs) {
+            await logAudit('update', 'brands', brand.id, brand.name, bDiffs)
+          }
         } else {
-          const { error } = await insertBrand({ ...payload, formulation_id: f.id })
+          // brand is new
+          const { data: bRow, error } = await insertBrand({ ...payload, formulation_id: f.id })
           if (error) throw new Error(`Insert brand "${brand.name}": ${error.message}`)
+
+          // Log brand create
+          if (bRow?.id) {
+            await logAudit('create', 'brands', bRow.id, brand.name, payload)
+          }
         }
       }
     } catch (err) {
@@ -215,7 +230,7 @@ export default function DrugEditor() {
     setTimeout(() => setSavedFormId(null), 2500)
     await refresh()
     toast.success('Formulation saved')
-    // Reload brands to pick up new IDs
+    // Reload to refresh visual baselines
     load()
   }
 
@@ -243,6 +258,11 @@ export default function DrugEditor() {
     setAddingForm(false)
     if (error) { setGlobalError(`Add formulation: ${error.message}`); return }
 
+    // Log formulation create
+    if (newF?.id) {
+      await logAudit('create', 'formulations', newF.id, `${generic?.name_en || 'Generic'} (New Formulation)`, { generic_id: genericId })
+    }
+
     // Reload and open the new formulation
     await load()
     setOpenFormId(newF.id)
@@ -257,6 +277,10 @@ export default function DrugEditor() {
     const { error } = await deleteFormulation(f.id)
     setDeleting(false)
     if (error) { setGlobalError(`Delete: ${error.message}`); return }
+
+    // Log formulation delete
+    await logAudit('delete', 'formulations', f.id, `${generic.name_en} (${f.concentration} ${f.form})`, f)
+
     setFormulations(prev => prev.filter(x => x.id !== f.id))
     if (openFormId === f.id) setOpenFormId(null)
     await refresh()
@@ -517,7 +541,7 @@ function SectionCard({ title, badge, badgeLive, open, onToggle, children, saveSl
       boxShadow: 'var(--shadow-card)',
       marginBottom: 'var(--space-3)',
     }}>
-      {/* Header row — clickable to toggle */}
+      {/* Header row */}
       <div
         onClick={onToggle}
         style={{
@@ -550,7 +574,6 @@ function SectionCard({ title, badge, badgeLive, open, onToggle, children, saveSl
             {badge}
           </span>
         )}
-        {/* Stop propagation on action buttons so clicks don't toggle */}
         {deleteSlot && (
           <span onClick={e => e.stopPropagation()}>
             {deleteSlot}

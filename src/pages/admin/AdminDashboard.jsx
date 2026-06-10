@@ -1,18 +1,11 @@
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCapsules, faNotesMedical, faStethoscope, faChartBar, faBug, faBell } from '@fortawesome/free-solid-svg-icons'
+import { faCapsules, faNotesMedical, faStethoscope, faChartBar, faBug, faBell, faHistory } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
 /**
  * AdminDashboard — /admin
- *
- * Nav cards: Drug Library → /admin/drugs
- *            Conditions   → /admin/conditions
- *            Specialties  → /admin/specialties   (added 3H)
- *            Analytics    → /admin/analytics     (added 3J)
- *            Crash Logs   → /admin/crash-logs    (added 3K)
- *            Notifications→ /admin/notifications (added 3K)
  */
 
 const NAV_CARDS = [
@@ -39,6 +32,12 @@ const NAV_CARDS = [
     label:   'Analytics',
     sub:     'Content health, search gaps, usage',
     faIcon:  faChartBar,
+  },
+  {
+    path:    '/admin/logs',
+    label:   'Audit Logs',
+    sub:     'Track historical state mutations & publish trail',
+    faIcon:  faHistory,
   },
   {
     path:    '/admin/crash-logs',
@@ -142,7 +141,7 @@ export default function AdminDashboard() {
               display: 'flex',
               alignItems: 'center',
               gap: 'var(--space-4)',
-              padding: 'var(--space-4) var(--space-4)',
+              padding: 'var(--space-4) var(--space-3)',
               backgroundColor: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 'var(--radius-lg)',
@@ -156,8 +155,8 @@ export default function AdminDashboard() {
           >
             {/* Icon */}
             <div style={{
-              width: 48,
-              height: 48,
+              width: 44,
+              height: 44,
               borderRadius: 'var(--radius-md)',
               backgroundColor: 'var(--color-accent-light)',
               display: 'flex',
@@ -166,13 +165,13 @@ export default function AdminDashboard() {
               flexShrink: 0,
               color: 'var(--color-accent)',
             }}>
-              <FontAwesomeIcon icon={card.faIcon} style={{ width: 22, height: 22 }} />
+              <FontAwesomeIcon icon={card.faIcon} style={{ width: 18, height: 18 }} />
             </div>
 
             {/* Text */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: 600,
                 color: 'var(--color-text-primary)',
                 marginBottom: 3,
@@ -180,7 +179,7 @@ export default function AdminDashboard() {
                 {card.label}
               </div>
               <div style={{
-                fontSize: 13,
+                fontSize: 12,
                 color: 'var(--color-text-tertiary)',
                 lineHeight: 1.4,
               }}>
@@ -189,7 +188,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Chevron */}
-            <ChevronRight size={18} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+            <ChevronRight size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
           </button>
         ))}
       </main>

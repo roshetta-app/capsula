@@ -21,11 +21,12 @@ import {
   deleteConditionImage,
   uploadConditionImage,
   touchAppMetadata,
-  fetchSpecialtiesForCMS,   // ← NEW: direct fetch, correct field names
-  insertSpecialty,          // ← NEW: create specialty inline
+  fetchSpecialtiesForCMS,
+  insertSpecialty,
 } from '../../lib/adminQueries'
 import PrescriptionBuilder    from '../../components/admin/PrescriptionBuilder'
 import ClinicalBlocksEditor  from '../../components/admin/ClinicalBlocksEditor'
+import { logAudit, getRecordChanges } from '../../utils/auditLogger'
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
@@ -422,7 +423,6 @@ function ImageManager({ images, conditionId, onChange, disabled }) {
 }
 
 // ─── Quick-create specialty mini-modal ────────────────────────────────────────
-// Lets admins add a new specialty without leaving the condition editor.
 
 function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
   const [name, setName] = useState('')
@@ -452,7 +452,7 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
     setBusy(false)
     if (error) { setErr(error.message ?? 'Failed to create specialty'); return }
 
-    // data is { id, slug } from insertSpecialty's .select('id, slug')
+    // data is { id, slug }...
     onCreated({ id: data.id, name_en: trimmed, slug: data.slug })
     onClose()
   }
@@ -591,11 +591,13 @@ export default function ConditionEditor() {
   const isEdit    = Boolean(id)
   const navigate  = useNavigate()
 
-  // ── FIX: fetch specialties directly — context only used for public cache refresh
   const { refresh } = useConditionContext()
   const [specialties,     setSpecialties]     = useState([])
   const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
   const [newSpecialtyOpen, setNewSpecialtyOpen] = useState(false)
+
+  // Maintain initial database state to compare differences on save
+  const [initialFormDbState, setInitialFormDbState] = useState(null)
 
   useEffect(() => {
     fetchSpecialtiesForCMS().then(({ data }) => {
@@ -604,7 +606,6 @@ export default function ConditionEditor() {
     })
   }, [])
 
-  // Called when a new specialty is created from the mini-modal
   function handleSpecialtyCreated(newSpecialty) {
     setSpecialties(prev => [...prev, newSpecialty])
     patch('specialty_id', newSpecialty.id)
@@ -619,7 +620,7 @@ export default function ConditionEditor() {
   const [success,        setSuccess]        = useState(false)
   const [activeTab,      setActiveTab]      = useState('details')
 
-  // ─── Load existing condition (edit mode) ──────────────────────────────────
+  // ─── Load existing condition ──────────────────────────────────────────────
 
   useEffect(() => {
     if (!isEdit) return
@@ -632,7 +633,7 @@ export default function ConditionEditor() {
         return
       }
 
-      setForm({
+      const loadedState = {
         name:                   data.name                    ?? '',
         specialty_id:           data.specialty_id            ?? '',
         age_group:              data.age_group               ?? 'adult',
@@ -650,7 +651,10 @@ export default function ConditionEditor() {
         examination:            data.examination             ?? [],
         investigations:         data.investigations          ?? [],
         patient_instructions:   data.patient_instructions    ?? '',
-      })
+      }
+
+      setForm(loadedState)
+      setInitialFormDbState(loadedState)
 
       setInitialBlocks(
         (data.clinical_blocks ?? [])
@@ -669,13 +673,9 @@ export default function ConditionEditor() {
     load()
   }, [id, isEdit])
 
-  // ─── Patch helper ─────────────────────────────────────────────────────────
-
   function patch(field, value) {
     setForm(f => ({ ...f, [field]: value }))
   }
-
-  // ─── Validation ───────────────────────────────────────────────────────────
 
   function isValid() {
     return form.name.trim() && form.specialty_id && form.age_group
@@ -714,12 +714,25 @@ export default function ConditionEditor() {
     }
 
     let saveErr
+    let createdId
+
     if (isEdit) {
       const { error } = await updateCondition(id, payload)
       saveErr = error
+      if (!saveErr) {
+        // Compare with baseline db state for clean audit diffs
+        const diffs = getRecordChanges(initialFormDbState, form)
+        if (diffs) {
+          await logAudit('update', 'conditions', id, form.name, diffs)
+        }
+      }
     } else {
-      const { error } = await insertCondition(payload)
+      const { data, error } = await insertCondition(payload)
       saveErr = error
+      if (data?.id) createdId = data.id
+      if (!saveErr && createdId) {
+        await logAudit('create', 'conditions', createdId, form.name, payload)
+      }
     }
 
     if (saveErr) {
@@ -738,15 +751,10 @@ export default function ConditionEditor() {
     }, 800)
   }
 
-  // ─── Specialty options ─────────────────────────────────────────────────────
-  // FIX: use name_en (correct field from fetchSpecialtiesForCMS) not name
-
   const specialtyOptions = [
     { value: '', label: specialtiesLoading ? 'Loading…' : 'Select specialty…' },
     ...specialties.map(s => ({ value: s.id, label: s.name_en })),
   ]
-
-  // ─── Render ──────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -1111,7 +1119,6 @@ export default function ConditionEditor() {
 
       </main>
 
-      {/* ── Inline specialty creator ──────────────────────────────────────────── */}
       <NewSpecialtyModal
         isOpen={newSpecialtyOpen}
         onClose={() => setNewSpecialtyOpen(false)}
