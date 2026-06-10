@@ -1,6 +1,15 @@
 /**
- * DrugCMS.jsx — Phase 3E rebuild 
+ * DrugCMS.jsx — Phase 3E rebuild
  * /admin/drugs
+ *
+ * Lists all generics (published + drafts) in a table with:
+ *   - Columns: Name | Category | Formulations | Published | Actions
+ *   - Published toggle (immediate update + ConfirmModal for unpublish)
+ *   - Edit (pencil) → navigates to DrugEditor (/admin/drugs/generic/:id)
+ *   - Delete → ConfirmModal
+ *   - "Forms" count → navigates to DrugEditor
+ *   - "+ Add New" → navigates to AddDrugFlow (/admin/drugs/new)
+ *   - Search (name_en, name_ar) + category filter pills
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -13,7 +22,6 @@ import {
   toggleGenericPublished,
   deleteGeneric,
 } from '../../lib/adminQueries'
-import { logAudit } from '../../utils/auditLogger'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,9 +92,6 @@ export default function DrugCMS() {
     if (error) { toast.error(`Failed: ${error.message}`); return }
     setGenerics(prev => prev.map(g => g.id === generic.id ? { ...g, is_published: true } : g))
     toast.success('Generic published')
-
-    // Log Audit Trail
-    await logAudit('publish', 'generics', generic.id, generic.name_en, { is_published: [false, true] })
   }
 
   async function confirmUnpublish() {
@@ -98,9 +103,6 @@ export default function DrugCMS() {
     if (error) { toast.error(`Failed: ${error.message}`); return }
     setGenerics(prev => prev.map(x => x.id === g.id ? { ...x, is_published: false } : x))
     toast.success('Generic unpublished')
-
-    // Log Audit Trail
-    await logAudit('unpublish', 'generics', g.id, g.name_en, { is_published: [true, false] })
   }
 
   // ── Delete ──────────────────────────────────────────────────────────────────
@@ -113,9 +115,6 @@ export default function DrugCMS() {
     if (error) { toast.error(`Delete failed: ${error.message}`); return }
     setGenerics(prev => prev.filter(x => x.id !== g.id))
     toast.success('Generic deleted')
-
-    // Log Audit Trail
-    await logAudit('delete', 'generics', g.id, g.name_en, g)
   }
 
   // ─────────────────────────────────────────────────────────────────────────────

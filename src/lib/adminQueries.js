@@ -12,7 +12,7 @@
  *           insertPrescriptionItem, updatePrescriptionItem, deletePrescriptionItem,
  *           insertDrugAlternative, updateDrugAlternative, deleteDrugAlternative,
  *           reorderItems, fetchPrescriptionsForCondition, searchBrandsForTypeahead
- *   3B  — toggleConditionPublished, touchAppMetadata, fetchAuditLogs
+ *   3B  — toggleConditionPublished, touchAppMetadata
  */
 
 import { supabase } from './supabase'
@@ -562,20 +562,4 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
-
-// ─── Audit Logs (3B) ─────────────────────────────────────────────────────────
-
-/**
- * Fetch the 100 most-recent audit log entries for the admin AuditLogs page.
- * The payload column is aliased to "changes" to match AuditLogs.jsx field access.
- */
-export async function fetchAuditLogs() {
-  const { data, error } = await supabase
-    .from('audit_logs')
-    .select('id, action, table_name, record_id, record_name, payload as changes, created_at')
-    .order('created_at', { ascending: false })
-    .limit(100)
-  return { data: data ?? [], error }
-}
-
 

@@ -1,6 +1,11 @@
 /**
  * src/router.jsx
+ * Phase 2B — Navigation & Routing Overhaul
+ * Phase 3J — Added /admin/analytics route
+ * Phase 3K — Added /admin/crash-logs and /admin/notifications routes
+ *
  * Single source of truth for all app routes.
+ * Import ROUTES for programmatic navigation (useNavigate, Link).
  * AppRoutes renders the <Routes> tree — drop it inside <BrowserRouter>.
  */
 
@@ -28,7 +33,6 @@ import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
 import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
 import CrashLogs            from './pages/admin/CrashLogs'
 import NotificationsPanel   from './pages/admin/NotificationsPanel'
-import AuditLogs            from './pages/admin/AuditLogs'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
@@ -53,7 +57,6 @@ export const ROUTES = {
   ADMIN_ANALYTICS:        '/admin/analytics',
   ADMIN_CRASH_LOGS:       '/admin/crash-logs',
   ADMIN_NOTIFICATIONS:    '/admin/notifications',
-  ADMIN_AUDIT_LOGS:       '/admin/logs',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -109,9 +112,6 @@ export default function AppRoutes() {
       />
       <Route path="/admin/notifications"
         element={<AuthGuard><NotificationsPanel /></AuthGuard>}
-      />
-      <Route path="/admin/logs"
-        element={<AuthGuard><AuditLogs /></AuthGuard>}
       />
 
     </Routes>

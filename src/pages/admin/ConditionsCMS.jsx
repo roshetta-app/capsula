@@ -1,5 +1,12 @@
 /**
  * src/pages/admin/ConditionsCMS.jsx
+ *
+ * Changes from previous version:
+ *  - "Add New" now navigates to /admin/conditions/new (ConditionEditor, create mode)
+ *    instead of opening ConditionFormModal. This gives a single unified editor for
+ *    both creating and editing conditions — no duplicate forms.
+ *  - ConditionFormModal import removed entirely.
+ *  - Specialties still fetched via fetchSpecialtiesForCMS() for the filter pills.
  */
 
 import { useState, useEffect } from 'react'
@@ -11,7 +18,6 @@ import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } fro
 import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
-import { logAudit } from '../../utils/auditLogger'
 
 // ─── Age group badge ──────────────────────────────────────────────────────────
 
@@ -101,10 +107,6 @@ export default function ConditionsCMS() {
       toast.error(error.message ?? 'Delete failed')
     } else {
       toast.success(`"${deleteTarget.name}" deleted`)
-      
-      // Log Audit Trail
-      await logAudit('delete', 'conditions', deleteTarget.id, deleteTarget.name, deleteTarget)
-
       setDeleteTarget(null)
       await loadAll()
       await refreshPublicCache()
@@ -123,11 +125,6 @@ export default function ConditionsCMS() {
       toast.error('Failed to update publish status')
     } else {
       toast.success(next ? `"${condition.name}" published` : `"${condition.name}" unpublished`)
-      
-      // Log Audit Trail
-      const action = next ? 'publish' : 'unpublish'
-      await logAudit(action, 'conditions', condition.id, condition.name, { is_published: [current, next] })
-
       await refreshPublicCache()
     }
   }
@@ -172,6 +169,7 @@ export default function ConditionsCMS() {
             </span>
           </div>
 
+          {/* FIX: navigate to full editor instead of opening ConditionFormModal */}
           <button
             onClick={() => navigate('/admin/conditions/new')}
             style={{
