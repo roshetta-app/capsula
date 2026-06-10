@@ -13,9 +13,13 @@
  *           insertDrugAlternative, updateDrugAlternative, deleteDrugAlternative,
  *           reorderItems, fetchPrescriptionsForCondition, searchBrandsForTypeahead
  *   3B  — toggleConditionPublished, touchAppMetadata
+ *   3E  — fetchAllGenerics, toggleGenericPublished, deleteGeneric
+ *   3L  — logAudit calls added to all write operations
+ *         toggleFormulationPublished, toggleBrandPublished (new)
  */
 
-import { supabase } from './supabase'
+import { supabase }  from './supabase'
+import { logAudit }  from '../utils/auditLogger'
 
 // ─── Brands — stock toggles (5.2) ────────────────────────────────────────────
 
@@ -34,6 +38,7 @@ export async function deleteFormulation(id) {
     .from('formulations')
     .delete()
     .eq('id', id)
+  if (!error) await logAudit('delete', 'formulations', id)
   return { error }
 }
 
@@ -45,6 +50,7 @@ export async function insertGeneric(data) {
     .insert(data)
     .select('id, slug')
     .single()
+  if (!error && row) await logAudit('create', 'generics', row.id, data.name_en, data)
   return { data: row, error }
 }
 
@@ -53,6 +59,7 @@ export async function updateGeneric(id, data) {
     .from('generics')
     .update(data)
     .eq('id', id)
+  if (!error) await logAudit('update', 'generics', id, data.name_en ?? null, data)
   return { error }
 }
 
@@ -87,6 +94,7 @@ export async function insertFormulation(data) {
     .insert(data)
     .select('id')
     .single()
+  if (!error && row) await logAudit('create', 'formulations', row.id, null, data)
   return { data: row, error }
 }
 
@@ -96,6 +104,7 @@ export async function updateFormulation(id, data) {
     .update(data)
     .eq('id', id)
   if (error) return { error }
+  await logAudit('update', 'formulations', id, null, data)
   return touchAppMetadata('drugs_updated_at')
 }
 
@@ -107,6 +116,7 @@ export async function insertBrand(data) {
     .insert(data)
     .select('id')
     .single()
+  if (!error && row) await logAudit('create', 'brands', row.id, data.name ?? null, data)
   return { data: row, error }
 }
 
@@ -115,6 +125,7 @@ export async function updateBrand(id, data) {
     .from('brands')
     .update(data)
     .eq('id', id)
+  if (!error) await logAudit('update', 'brands', id, data.name ?? null, data)
   return { error }
 }
 
@@ -123,6 +134,7 @@ export async function deleteBrand(id) {
     .from('brands')
     .delete()
     .eq('id', id)
+  if (!error) await logAudit('delete', 'brands', id)
   return { error }
 }
 
@@ -134,6 +146,7 @@ export async function insertSpecialty(data) {
     .insert(data)
     .select('id, slug')
     .single()
+  if (!error && row) await logAudit('create', 'specialties', row.id, data.name_en ?? null, data)
   return { data: row, error }
 }
 
@@ -142,6 +155,7 @@ export async function updateSpecialty(id, data) {
     .from('specialties')
     .update(data)
     .eq('id', id)
+  if (!error) await logAudit('update', 'specialties', id, data.name_en ?? null, data)
   return { error }
 }
 
@@ -189,7 +203,7 @@ export async function fetchAllSpecialties() {
  * Deactivating: moves all its conditions to Uncategorized (stores original id).
  * Activating:   restores conditions that were previously moved from this specialty.
  */
-export async function toggleSpecialtyActive(id, isActive) {
+export async function toggleSpecialtyActive(id, isActive, name = null) {
   // Move conditions before flipping the flag
   if (!isActive) {
     await supabase.rpc('deactivate_specialty_conditions', { p_specialty_id: id })
@@ -202,18 +216,20 @@ export async function toggleSpecialtyActive(id, isActive) {
     .update({ is_active: isActive })
     .eq('id', id)
   if (error) return { error }
+  await logAudit(isActive ? 'publish' : 'unpublish', 'specialties', id, name)
   return touchAppMetadata('conditions_updated_at')
 }
 
 /**
  * Delete a specialty. Only safe when conditionCount === 0 and not Uncategorized.
  */
-export async function deleteSpecialty(id) {
+export async function deleteSpecialty(id, name = null) {
   const { error } = await supabase
     .from('specialties')
     .delete()
     .eq('id', id)
   if (error) return { error }
+  await logAudit('delete', 'specialties', id, name)
   return touchAppMetadata('conditions_updated_at')
 }
 
@@ -238,6 +254,7 @@ export async function insertCondition(data) {
     .insert(data)
     .select('id, slug')
     .single()
+  if (!error && row) await logAudit('create', 'conditions', row.id, data.name ?? null, data)
   return { data: row, error }
 }
 
@@ -246,14 +263,16 @@ export async function updateCondition(id, data) {
     .from('conditions')
     .update(data)
     .eq('id', id)
+  if (!error) await logAudit('update', 'conditions', id, data.name ?? null, data)
   return { error }
 }
 
-export async function deleteCondition(id) {
+export async function deleteCondition(id, name = null) {
   const { error } = await supabase
     .from('conditions')
     .delete()
     .eq('id', id)
+  if (!error) await logAudit('delete', 'conditions', id, name)
   return { error }
 }
 
@@ -261,28 +280,25 @@ export async function fetchConditionForEdit(id) {
   const { data, error } = await supabase
     .from('conditions')
     .select(`
-      id, name, slug, age_group, is_published,
-      card_tagline, definition, icd10_code, epidemiology,
-      differential_diagnosis, red_flags, when_to_refer, prognosis,
+      id, name, slug, age_group, card_tagline,
+      definition, icd10_code, epidemiology,
+      when_to_refer, prognosis,
+      differential_diagnosis, red_flags,
       clinical_picture, history_questions, examination, investigations,
-      patient_instructions, clinical_blocks,
+      patient_instructions, clinical_blocks, is_published,
       specialty_id,
-      specialties!conditions_specialty_id_fkey ( id, name_en, slug ),
-      condition_images ( id, url, caption, sort_order ),
-      prescriptions ( id, label, sort_order )
+      condition_images ( id, url, caption, sort_order )
     `)
     .eq('id', id)
     .single()
   return { data, error }
 }
 
-// ─── Condition images (5.4) ──────────────────────────────────────────────────
-
 export async function insertConditionImage(data) {
   const { data: row, error } = await supabase
     .from('condition_images')
     .insert(data)
-    .select('id')
+    .select('id, url, caption, sort_order')
     .single()
   return { data: row, error }
 }
@@ -366,6 +382,7 @@ export async function insertPrescription(data) {
     .insert(data)
     .select('id, label, sort_order')
     .single()
+  if (!error && row) await logAudit('create', 'prescriptions', row.id, row.label ?? null, data)
   return { data: row, error }
 }
 
@@ -374,14 +391,16 @@ export async function updatePrescription(id, data) {
     .from('prescriptions')
     .update(data)
     .eq('id', id)
+  if (!error) await logAudit('update', 'prescriptions', id, data.label ?? null, data)
   return { error }
 }
 
-export async function deletePrescription(id) {
+export async function deletePrescription(id, label = null) {
   const { error } = await supabase
     .from('prescriptions')
     .delete()
     .eq('id', id)
+  if (!error) await logAudit('delete', 'prescriptions', id, label)
   return { error }
 }
 
@@ -478,12 +497,13 @@ export async function searchBrandsForTypeahead(query) {
 /**
  * Toggle is_published on a condition and invalidate the app cache.
  */
-export async function toggleConditionPublished(id, isPublished) {
+export async function toggleConditionPublished(id, isPublished, name = null) {
   const { error } = await supabase
     .from('conditions')
     .update({ is_published: isPublished })
     .eq('id', id)
   if (error) return { error }
+  await logAudit(isPublished ? 'publish' : 'unpublish', 'conditions', id, name)
   return touchAppMetadata('conditions_updated_at')
 }
 
@@ -525,24 +545,56 @@ export async function fetchAllGenerics() {
 /**
  * Toggle is_published on a generic and invalidate the drugs cache.
  */
-export async function toggleGenericPublished(id, isPublished) {
+export async function toggleGenericPublished(id, isPublished, name = null) {
   const { error } = await supabase
     .from('generics')
     .update({ is_published: isPublished })
     .eq('id', id)
   if (error) return { error }
+  await logAudit(isPublished ? 'publish' : 'unpublish', 'generics', id, name)
   return touchAppMetadata('drugs_updated_at')
 }
 
 /**
  * Delete a generic (cascades to formulations + brands via DB constraints).
  */
-export async function deleteGeneric(id) {
+export async function deleteGeneric(id, name = null) {
   const { error } = await supabase
     .from('generics')
     .delete()
     .eq('id', id)
   if (error) return { error }
+  await logAudit('delete', 'generics', id, name)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+// ─── Formulations — publish toggle (3L) ──────────────────────────────────────
+
+/**
+ * Toggle is_published on a formulation and invalidate the drugs cache.
+ */
+export async function toggleFormulationPublished(id, isPublished) {
+  const { error } = await supabase
+    .from('formulations')
+    .update({ is_published: isPublished })
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit(isPublished ? 'publish' : 'unpublish', 'formulations', id)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+// ─── Brands — publish toggle (3L) ────────────────────────────────────────────
+
+/**
+ * Toggle is_published on a brand and invalidate the drugs cache.
+ */
+export async function toggleBrandPublished(id, isPublished, name = null) {
+  const { error } = await supabase
+    .from('brands')
+    .update({ is_published: isPublished })
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit(isPublished ? 'publish' : 'unpublish', 'brands', id, name)
   return touchAppMetadata('drugs_updated_at')
 }
 
@@ -562,4 +614,3 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
-

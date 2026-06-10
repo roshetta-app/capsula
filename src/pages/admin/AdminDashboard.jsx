@@ -1,7 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCapsules, faNotesMedical, faStethoscope, faChartBar, faBug, faBell } from '@fortawesome/free-solid-svg-icons'
+import {
+  faCapsules, faNotesMedical, faStethoscope,
+  faChartBar, faBug, faBell, faClipboardList,
+} from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
 /**
@@ -13,44 +16,51 @@ import { useAuth } from '../../hooks/useAuth'
  *            Analytics    → /admin/analytics     (added 3J)
  *            Crash Logs   → /admin/crash-logs    (added 3K)
  *            Notifications→ /admin/notifications (added 3K)
+ *            Audit Log    → /admin/audit-log     (added 3L)
  */
 
 const NAV_CARDS = [
   {
-    path:    '/admin/drugs',
-    label:   'Drug Library',
-    sub:     'Manage generics, formulations & stock',
-    faIcon:  faCapsules,
+    path:   '/admin/drugs',
+    label:  'Drug Library',
+    sub:    'Manage generics, formulations & stock',
+    faIcon: faCapsules,
   },
   {
-    path:    '/admin/conditions',
-    label:   'Conditions',
-    sub:     'Manage clinical cards & prescriptions',
-    faIcon:  faNotesMedical,
+    path:   '/admin/conditions',
+    label:  'Conditions',
+    sub:    'Manage clinical cards & prescriptions',
+    faIcon: faNotesMedical,
   },
   {
-    path:    '/admin/specialties',
-    label:   'Specialties',
-    sub:     'Manage specialty list, icons & order',
-    faIcon:  faStethoscope,
+    path:   '/admin/specialties',
+    label:  'Specialties',
+    sub:    'Manage specialty list, icons & order',
+    faIcon: faStethoscope,
   },
   {
-    path:    '/admin/analytics',
-    label:   'Analytics',
-    sub:     'Content health, search gaps, usage',
-    faIcon:  faChartBar,
+    path:   '/admin/analytics',
+    label:  'Analytics',
+    sub:    'Content health, search gaps, usage',
+    faIcon: faChartBar,
   },
   {
-    path:    '/admin/crash-logs',
-    label:   'Crash Logs',
-    sub:     'View uncaught app errors',
-    faIcon:  faBug,
+    path:   '/admin/crash-logs',
+    label:  'Crash Logs',
+    sub:    'View uncaught app errors',
+    faIcon: faBug,
   },
   {
-    path:    '/admin/notifications',
-    label:   'Notifications',
-    sub:     'Broadcast push notifications to users',
-    faIcon:  faBell,
+    path:   '/admin/notifications',
+    label:  'Notifications',
+    sub:    'Broadcast push notifications to users',
+    faIcon: faBell,
+  },
+  {
+    path:   '/admin/audit-log',
+    label:  'Audit Log',
+    sub:    'History of all admin create, edit & publish actions',
+    faIcon: faClipboardList,
   },
 ]
 
