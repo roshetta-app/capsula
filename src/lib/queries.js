@@ -40,13 +40,12 @@ export async function fetchFlatDrugs(supabase) {
       brands ( id, name, name_ar, manufacturer, source, is_available, is_published )
     `)
     .eq('is_published', true)
-    .eq('generics.is_published', true)
     .order('name_en', { referencedTable: 'generics' })
 
   if (error) throw error
 
   return data
-    .filter(f => f.generics?.is_published !== false)
+    .filter(f => f.generics?.is_published === true)
     .map(f => ({
       id:                   f.id,
       slug:                 f.slug,
