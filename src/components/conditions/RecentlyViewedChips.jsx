@@ -2,11 +2,9 @@
  * src/components/conditions/RecentlyViewedChips.jsx
  * Phase 2C — Conditions Screen
  *
- * Horizontal scrollable row of recently viewed condition chips.
- * Hidden entirely when the list is empty.
- *
- * Shows a "RECENT" label prefix, then one pill per condition.
- * Tapping a chip navigates to /conditions/:slug.
+ * Horizontal scrollable row of recently viewed conditions.
+ * Styled as plain text links (no pill border/background) so they read as
+ * history, not filters — visually distinct from SpecialtyFilterPills.
  *
  * Props:
  *   recentlyViewed  — [{ id, name, slug }]  from useRecentlyViewed()
@@ -24,14 +22,15 @@ export default function RecentlyViewedChips({ recentlyViewed }) {
     <div style={{
       display:    'flex',
       alignItems: 'center',
-      gap:        'var(--space-2)',
+      gap:        0,
       overflowX:  'auto',
       paddingBottom: 'var(--space-1)',
       marginBottom:  'var(--space-3)',
-      scrollbarWidth:    'none',
-      msOverflowStyle:   'none',
+      scrollbarWidth:          'none',
+      msOverflowStyle:         'none',
       WebkitOverflowScrolling: 'touch',
     }}>
+
       {/* "RECENT" prefix label */}
       <span style={{
         fontSize:      10,
@@ -40,43 +39,50 @@ export default function RecentlyViewedChips({ recentlyViewed }) {
         textTransform: 'uppercase',
         color:         'var(--color-text-tertiary)',
         flexShrink:    0,
-        paddingRight:  'var(--space-1)',
+        marginRight:   'var(--space-2)',
+        whiteSpace:    'nowrap',
       }}>
         Recent
       </span>
 
-      {/* Chips */}
-      {recentlyViewed.map(condition => (
-        <button
-          key={condition.id}
-          onClick={() => navigate(ROUTES.CONDITION_DETAIL(condition.slug))}
-          style={{
-            flexShrink:      0,
-            padding:         '5px 12px',
-            borderRadius:    'var(--radius-full)',
-            fontSize:        12,
-            fontWeight:      500,
-            fontFamily:      'var(--font-body)',
-            cursor:          'pointer',
-            whiteSpace:      'nowrap',
-            border:          '1.5px solid var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            color:           'var(--color-text-secondary)',
-            transition:      'border-color 0.15s ease, color 0.15s ease',
-            outline:         'none',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = 'var(--color-accent)'
-            e.currentTarget.style.color       = 'var(--color-accent)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--color-border)'
-            e.currentTarget.style.color       = 'var(--color-text-secondary)'
-          }}
-        >
-          {condition.name}
-        </button>
+      {/* Plain text links separated by · */}
+      {recentlyViewed.map((condition, i) => (
+        <span key={condition.id} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {i > 0 && (
+            <span style={{
+              color:      'var(--color-border)',
+              fontSize:   12,
+              margin:     '0 6px',
+              userSelect: 'none',
+              flexShrink: 0,
+            }}>
+              ·
+            </span>
+          )}
+          <button
+            onClick={() => navigate(ROUTES.CONDITION_DETAIL(condition.slug))}
+            style={{
+              flexShrink:      0,
+              padding:         '2px 0',
+              border:          'none',
+              background:      'none',
+              fontSize:        12,
+              fontWeight:      400,
+              fontFamily:      'var(--font-body)',
+              color:           'var(--color-text-secondary)',
+              cursor:          'pointer',
+              whiteSpace:      'nowrap',
+              outline:         'none',
+              WebkitTapHighlightColor: 'transparent',
+              textDecoration:  'none',
+              transition:      'color 0.15s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-accent)' }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
+          >
+            {condition.name}
+          </button>
+        </span>
       ))}
     </div>
   )
