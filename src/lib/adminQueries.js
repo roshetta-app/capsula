@@ -146,8 +146,10 @@ export async function insertSpecialty(data) {
     .insert(data)
     .select('id, slug')
     .single()
-  if (!error && row) await logAudit('create', 'specialties', row.id, data.name_en ?? null, data)
-  return { data: row, error }
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'specialties', row.id, data.name_en ?? null, data)
+  await touchAppMetadata('conditions_updated_at')
+  return { data: row, error: null }
 }
 
 export async function updateSpecialty(id, data) {
@@ -155,8 +157,9 @@ export async function updateSpecialty(id, data) {
     .from('specialties')
     .update(data)
     .eq('id', id)
-  if (!error) await logAudit('update', 'specialties', id, data.name_en ?? null, data)
-  return { error }
+  if (error) return { error }
+  await logAudit('update', 'specialties', id, data.name_en ?? null, data)
+  return touchAppMetadata('conditions_updated_at')
 }
 
 /**
@@ -614,3 +617,4 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
+
