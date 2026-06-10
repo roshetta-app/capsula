@@ -1,14 +1,16 @@
 /**
  * src/screens/OnboardingScreen.jsx
  * Phase 2J — Onboarding
+ * Phase 3K — Added notifications permission slide (slide 4)
  *
  * Shown only on first launch (localStorage key: capsula_onboarded absent).
- * 3 swipeable cards. Dot indicators. Skip top-right. Next/Get Started bottom-right.
+ * 4 swipeable cards. Dot indicators. Skip top-right. Next/Get Started bottom-right.
  * Always light theme — no dark mode override.
  * On completion: sets capsula_onboarded = true, calls onDone() to unmount.
  */
 
 import { useState, useRef } from 'react'
+import { usePushSubscription } from '../hooks/usePushSubscription'
 
 // ─── Slide data ───────────────────────────────────────────────────────────────
 
@@ -48,22 +50,45 @@ const SLIDES = [
     headline: 'Your Personal Reference',
     body: 'Save favourites, add notes, manage your stock.',
   },
+  {
+    icon: (
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+        stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      </svg>
+    ),
+    headline: 'Stay Updated',
+    body: 'Get notified when new drugs or clinical updates are added.',
+    isNotifications: true,
+  },
 ]
 
 // ─── OnboardingScreen ─────────────────────────────────────────────────────────
 
 export default function OnboardingScreen({ onDone }) {
-  const [current, setCurrent]   = useState(0)
-  const touchStartX             = useRef(null)
+  const [current, setCurrent]         = useState(0)
+  const [notifDone, setNotifDone]     = useState(false)
+  const touchStartX                   = useRef(null)
+  const { subscribeToPush, loading }  = usePushSubscription()
 
   function complete() {
     localStorage.setItem('capsula_onboarded', 'true')
     onDone()
   }
 
-  function next() {
-    if (current < SLIDES.length - 1) setCurrent(c => c + 1)
-    else complete()
+  async function next() {
+    const slide = SLIDES[current]
+    if (current < SLIDES.length - 1) {
+      setCurrent(c => c + 1)
+    } else {
+      complete()
+    }
+  }
+
+  async function handleEnableNotifications() {
+    await subscribeToPush()
+    setNotifDone(true)
   }
 
   function handleTouchStart(e) {
@@ -80,11 +105,10 @@ export default function OnboardingScreen({ onDone }) {
     touchStartX.current = null
   }
 
-  const slide = SLIDES[current]
+  const slide  = SLIDES[current]
   const isLast = current === SLIDES.length - 1
 
   return (
-    /* Force light theme regardless of device setting */
     <div
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -165,6 +189,49 @@ export default function OnboardingScreen({ onDone }) {
             {slide.body}
           </p>
         </div>
+
+        {/* ── Notifications CTA (slide 4 only) ── */}
+        {slide.isNotifications && (
+          <button
+            onClick={notifDone ? undefined : handleEnableNotifications}
+            disabled={loading || notifDone}
+            style={{
+              backgroundColor: notifDone ? '#D1FAE5' : '#1E40AF',
+              color:           notifDone ? '#065F46' : '#FFFFFF',
+              border:          'none',
+              borderRadius:    999,
+              padding:         '12px 28px',
+              fontSize:        15,
+              fontWeight:      600,
+              fontFamily:      "'DM Sans', sans-serif",
+              cursor:          loading || notifDone ? 'default' : 'pointer',
+              display:         'flex',
+              alignItems:      'center',
+              gap:             8,
+              opacity:         loading ? 0.7 : 1,
+              transition:      'all 0.2s ease',
+            }}
+          >
+            {notifDone ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Notifications enabled
+              </>
+            ) : loading ? 'Enabling…' : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                Enable Notifications
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ── Dot indicators ── */}
