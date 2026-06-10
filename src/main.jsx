@@ -3,6 +3,29 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// ─── PWA install prompt capture ───────────────────────────────────────────────
+//
+// The browser fires `beforeinstallprompt` once, very early — before React mounts.
+// We must catch it here at the module level, stash it on window, and prevent
+// the default mini-infobar so we can surface our own UI in OnboardingScreen.
+//
+// OnboardingScreen reads window.__installPrompt and calls .prompt() when the
+// user taps "Install". If the event was never fired (already installed, iOS,
+// or browser doesn't support it) the install slide is skipped automatically.
+
+window.__installPrompt = null
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault()
+  window.__installPrompt = e
+  console.log('[PWA] Install prompt captured')
+})
+
+window.addEventListener('appinstalled', () => {
+  window.__installPrompt = null
+  console.log('[PWA] App installed')
+})
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
@@ -27,8 +50,6 @@ if ('serviceWorker' in navigator) {
         console.log('[SW] Registered:', registration.scope)
 
         // ── Trigger 1: controllerchange ────────────────────────────────────
-        // Fires on desktop when the new SW calls clients.claim() after activate.
-        // This is the most reliable desktop signal.
         let reloading = false
         navigator.serviceWorker.addEventListener('controllerchange', () => {
           if (reloading) return
@@ -38,7 +59,6 @@ if ('serviceWorker' in navigator) {
         })
 
         // ── Trigger 2: message from SW ─────────────────────────────────────
-        // Backup: SW sends { type: 'RELOAD' } during activate.
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data?.type === 'RELOAD') {
             if (reloading) return
@@ -49,8 +69,6 @@ if ('serviceWorker' in navigator) {
         })
 
         // ── Poll for updates every 60 s ────────────────────────────────────
-        // Forces the browser to check for a new sw.js even when the tab
-        // stays open a long time (desktop users rarely close tabs).
         setInterval(() => registration.update(), 60_000)
       })
       .catch(err => console.warn('[SW] Registration failed:', err))

@@ -2,20 +2,27 @@
  * src/screens/OnboardingScreen.jsx
  * Phase 2J — Onboarding
  * Phase 3K — Added notifications permission slide (slide 4)
+ * Phase 3M — Added PWA install slide (slide 5, shown only when prompt available)
  *
  * Shown only on first launch (localStorage key: capsula_onboarded absent).
- * 4 swipeable cards. Dot indicators. Skip top-right. Next/Get Started bottom-right.
+ * Swipeable cards. Dot indicators. Skip top-right. Next/Get Started bottom-right.
  * Always light theme — no dark mode override.
  * On completion: sets capsula_onboarded = true, calls onDone() to unmount.
+ *
+ * Install slide logic:
+ *   window.__installPrompt is set by main.jsx when `beforeinstallprompt` fires.
+ *   If it is null (already installed, iOS, or unsupported) the install slide is
+ *   filtered out at render time — the user never sees it.
  */
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { usePushSubscription } from '../hooks/usePushSubscription'
 
 // ─── Slide data ───────────────────────────────────────────────────────────────
 
-const SLIDES = [
+const ALL_SLIDES = [
   {
+    id: 'drugs',
     icon: (
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
         stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -29,6 +36,7 @@ const SLIDES = [
     body: 'Egyptian market drugs with doses, brands, and clinical information.',
   },
   {
+    id: 'conditions',
     icon: (
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
         stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -41,6 +49,7 @@ const SLIDES = [
     body: 'Prescriptions and clinical reference for GP practice.',
   },
   {
+    id: 'personal',
     icon: (
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
         stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -51,6 +60,7 @@ const SLIDES = [
     body: 'Save favourites, add notes, manage your stock.',
   },
   {
+    id: 'notifications',
     icon: (
       <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
         stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -62,6 +72,21 @@ const SLIDES = [
     body: 'Get notified when new drugs or clinical updates are added.',
     isNotifications: true,
   },
+  {
+    id: 'install',
+    icon: (
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none"
+        stroke="#1E40AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+        <line x1="12" y1="18" x2="12" y2="18.01" strokeWidth="2.5" strokeLinecap="round" />
+        <polyline points="8 11 12 15 16 11" />
+        <line x1="12" y1="7" x2="12" y2="15" />
+      </svg>
+    ),
+    headline: 'Install Capsula',
+    body: 'Add to your home screen for instant access — works offline, no app store needed.',
+    isInstall: true,
+  },
 ]
 
 // ─── OnboardingScreen ─────────────────────────────────────────────────────────
@@ -69,16 +94,25 @@ const SLIDES = [
 export default function OnboardingScreen({ onDone }) {
   const [current, setCurrent]         = useState(0)
   const [notifDone, setNotifDone]     = useState(false)
+  const [installDone, setInstallDone] = useState(false)
+  const [installBusy, setInstallBusy] = useState(false)
   const touchStartX                   = useRef(null)
   const { subscribeToPush, loading }  = usePushSubscription()
+
+  // Filter out the install slide if the prompt isn't available
+  const SLIDES = useMemo(
+    () => ALL_SLIDES.filter(s => !s.isInstall || !!window.__installPrompt),
+    // Re-evaluate once on mount — prompt availability won't change mid-session
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
   function complete() {
     localStorage.setItem('capsula_onboarded', 'true')
     onDone()
   }
 
-  async function next() {
-    const slide = SLIDES[current]
+  function next() {
     if (current < SLIDES.length - 1) {
       setCurrent(c => c + 1)
     } else {
@@ -89,6 +123,24 @@ export default function OnboardingScreen({ onDone }) {
   async function handleEnableNotifications() {
     await subscribeToPush()
     setNotifDone(true)
+  }
+
+  async function handleInstall() {
+    const prompt = window.__installPrompt
+    if (!prompt) { next(); return }
+
+    setInstallBusy(true)
+    try {
+      await prompt.prompt()
+      const { outcome } = await prompt.userChoice
+      console.log('[PWA] Install outcome:', outcome)
+      window.__installPrompt = null
+    } catch (err) {
+      console.warn('[PWA] Install prompt error:', err)
+    } finally {
+      setInstallBusy(false)
+      setInstallDone(true)
+    }
   }
 
   function handleTouchStart(e) {
@@ -190,7 +242,7 @@ export default function OnboardingScreen({ onDone }) {
           </p>
         </div>
 
-        {/* ── Notifications CTA (slide 4 only) ── */}
+        {/* ── Notifications CTA (notifications slide only) ── */}
         {slide.isNotifications && (
           <button
             onClick={notifDone ? undefined : handleEnableNotifications}
@@ -228,6 +280,50 @@ export default function OnboardingScreen({ onDone }) {
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
                 Enable Notifications
+              </>
+            )}
+          </button>
+        )}
+
+        {/* ── Install CTA (install slide only) ── */}
+        {slide.isInstall && (
+          <button
+            onClick={installDone ? next : handleInstall}
+            disabled={installBusy}
+            style={{
+              backgroundColor: installDone ? '#D1FAE5' : '#1E40AF',
+              color:           installDone ? '#065F46' : '#FFFFFF',
+              border:          'none',
+              borderRadius:    999,
+              padding:         '12px 28px',
+              fontSize:        15,
+              fontWeight:      600,
+              fontFamily:      "'DM Sans', sans-serif",
+              cursor:          installBusy ? 'default' : 'pointer',
+              display:         'flex',
+              alignItems:      'center',
+              gap:             8,
+              opacity:         installBusy ? 0.7 : 1,
+              transition:      'all 0.2s ease',
+            }}
+          >
+            {installDone ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Installed!
+              </>
+            ) : installBusy ? 'Installing…' : (
+              <>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+                  <polyline points="8 11 12 15 16 11" />
+                  <line x1="12" y1="7" x2="12" y2="15" />
+                </svg>
+                Add to Home Screen
               </>
             )}
           </button>
