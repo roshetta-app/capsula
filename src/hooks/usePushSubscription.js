@@ -42,7 +42,7 @@ export function usePushSubscription() {
 
       const reg = await navigator.serviceWorker.ready
 
-      // Check if already subscribed
+      // Check if already subscribed in browser
       let sub = await reg.pushManager.getSubscription()
       if (!sub) {
         sub = await reg.pushManager.subscribe({
@@ -51,12 +51,22 @@ export function usePushSubscription() {
         })
       }
 
-      // Save to Supabase
-      const { error: dbErr } = await supabase
-        .from('push_subscriptions')
-        .upsert({ subscription: sub.toJSON() }, { onConflict: 'subscription' })
+      const subJson = sub.toJSON()
 
-      if (dbErr) throw dbErr
+      // Check if endpoint already saved in DB to avoid duplicates
+      const { data: existing } = await supabase
+        .from('push_subscriptions')
+        .select('id')
+        .eq('subscription->>endpoint', subJson.endpoint)
+        .maybeSingle()
+
+      if (!existing) {
+        const { error: dbErr } = await supabase
+          .from('push_subscriptions')
+          .insert({ subscription: subJson })
+        if (dbErr) throw dbErr
+      }
+
       setSubscribed(true)
     } catch (e) {
       setError(e.message ?? 'Failed to subscribe')
