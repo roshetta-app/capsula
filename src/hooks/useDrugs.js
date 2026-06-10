@@ -10,9 +10,11 @@ import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../
  *   1. Read cache synchronously → render immediately (zero delay)
  *   2. Fetch app_metadata.drugs_updated_at from Supabase
  *   3. If timestamp differs OR cache is older than 7 days → re-fetch silently
- *   4. Cold start (no cache) → show loading, fetch, render, cache
+ *   4. Cold start (no cache, or cache contains empty array) → show loading, fetch, render, cache
  */
 export function useDrugs() {
+  // getCacheData returns null for missing OR empty-array caches,
+  // so an empty-poisoned cache is treated identically to a cold start.
   const cached = getCacheData('drugs')
 
   const [drugs,   setDrugs]   = useState(cached ?? [])
@@ -36,8 +38,8 @@ export function useDrugs() {
     async function init() {
       const cachedTs = getCacheTimestamp('drugs')
 
-      // Cold start — no cache at all
-      if (!cachedTs) {
+      // Cold start — no cache at all, or cache was poisoned with empty data
+      if (!cachedTs || !cached) {
         await fetchAndCache()
         return
       }

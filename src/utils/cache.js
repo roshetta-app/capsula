@@ -32,11 +32,16 @@ function readAll() {
 
 /**
  * Write a cache slice.
+ * Silently skips writing if data is empty — prevents poisoning the cache
+ * with an empty array that would block future re-fetches.
  * @param {'drugs'|'conditions'} key
  * @param {Array}  data        — the full fetched dataset
  * @param {string} version     — ISO timestamp from app_metadata
  */
 export function writeCache(key, data, version) {
+  // Guard: never persist an empty dataset
+  if (!Array.isArray(data) || data.length === 0) return
+
   try {
     const cacheKey = key === 'drugs' ? CACHE_KEYS.DRUGS : CACHE_KEYS.CONDITIONS
     localStorage.setItem(cacheKey, JSON.stringify({
@@ -51,6 +56,8 @@ export function writeCache(key, data, version) {
 
 /**
  * Read the cached data array for a given slice, or null.
+ * Returns null (not []) when the stored array is empty — callers treat
+ * an empty cache the same as no cache (cold start).
  * @param {'drugs'|'conditions'} key
  */
 export function getCacheData(key) {
@@ -59,7 +66,10 @@ export function getCacheData(key) {
     const raw = localStorage.getItem(cacheKey)
     if (!raw) return null
     const parsed = JSON.parse(raw)
-    return parsed?.data ?? null
+    const data = parsed?.data ?? null
+    // Treat an empty array as a cache miss so hooks trigger a fresh fetch
+    if (Array.isArray(data) && data.length === 0) return null
+    return data
   } catch {
     return null
   }
