@@ -103,8 +103,8 @@ async function sendPush(sub: { endpoint: string; keys: { p256dh: string; auth: s
   )
 
   // CEK and nonce
-  const cekBits   = await hkdf(prk, salt.buffer, enc.encode('Content-Encoding: aes128gcm\0\0\1'), 128)
-  const nonceBits = await hkdf(prk, salt.buffer, enc.encode('Content-Encoding: nonce\0\0\1'), 96)
+  const cekBits   = await hkdf(prk, salt.buffer, new Uint8Array([...enc.encode('Content-Encoding: aes128gcm'), 0, 0, 1]), 128)
+  const nonceBits = await hkdf(prk, salt.buffer, new Uint8Array([...enc.encode('Content-Encoding: nonce'), 0, 0, 1]), 96)
 
   const cek   = await crypto.subtle.importKey('raw', cekBits, 'AES-GCM', false, ['encrypt'])
   const nonce = new Uint8Array(nonceBits)
