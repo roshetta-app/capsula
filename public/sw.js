@@ -15,6 +15,10 @@
  * Phase 2K addition:
  *   - Offline fallback responses include header X-Served-From: cache
  *     so the app can confirm it is in offline/cached mode.
+ *
+ * Phase 3K addition:
+ *   - Push event handler: shows notification when push message received
+ *   - notificationclick handler: focuses/opens the app on tap
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -28,9 +32,7 @@ const URLS_TO_PRECACHE = [
 // ─── Install ──────────────────────────────────────────────────────────────────
 
 self.addEventListener('install', event => {
-  // Activate immediately — don't wait for old tabs to close
   self.skipWaiting()
-
   event.waitUntil(
     caches.open(STATIC_CACHE).then(cache => cache.addAll(URLS_TO_PRECACHE))
   )
@@ -40,7 +42,6 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    // 1. Delete all caches from previous versions
     caches.keys()
       .then(keys =>
         Promise.all(
@@ -49,9 +50,7 @@ self.addEventListener('activate', event => {
             .map(key => caches.delete(key))
         )
       )
-      // 2. Take control of all open tabs immediately
       .then(() => self.clients.claim())
-      // 3. Tell every open tab to reload so it picks up the new JS bundle
       .then(() => self.clients.matchAll({ type: 'window' }))
       .then(clients => {
         clients.forEach(client => client.postMessage({ type: 'RELOAD' }))
@@ -59,12 +58,47 @@ self.addEventListener('activate', event => {
   )
 })
 
+// ─── Push ─────────────────────────────────────────────────────────────────────
+
+self.addEventListener('push', event => {
+  let data = { title: 'Capsula', message: 'New update available', type: 'info' }
+
+  if (event.data) {
+    try { data = JSON.parse(event.data.text()) } catch { /* use defaults */ }
+  }
+
+  const options = {
+    body: data.message,
+    icon: '/capsula/icons/icon-192.png',
+    badge: '/capsula/icons/icon-192.png',
+    tag: 'capsula-notification',
+    renotify: true,
+    data: { url: '/capsula/' },
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  )
+})
+
+// ─── Notification click ───────────────────────────────────────────────────────
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close()
+  const target = event.notification.data?.url ?? '/capsula/'
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then(clients => {
+        const existing = clients.find(c => c.url.includes('/capsula/'))
+        if (existing) return existing.focus()
+        return self.clients.openWindow(target)
+      })
+  )
+})
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/**
- * Clones a cached Response and injects the X-Served-From: cache header.
- * This lets the app detect it is receiving a cached offline fallback.
- */
 function withCacheHeader(response) {
   if (!response) return response
   const headers = new Headers(response.headers)
@@ -82,12 +116,8 @@ self.addEventListener('fetch', event => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Only handle same-origin requests
   if (url.origin !== location.origin) return
 
-  // ── Navigation requests (HTML) → network-first ──────────────────────────
-  // Always try the network first so index.html is never stale.
-  // Falls back to cache only when offline — served with X-Served-From: cache.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -105,11 +135,6 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // ── Vite-hashed assets (JS, CSS) → cache-first ──────────────────────────
-  // Vite fingerprints every asset filename on build, so a new deploy produces
-  // new filenames. The old hashed files are never re-requested, which means
-  // cache-first is safe and fast here.
-  // Falls back to network fetch; if that also fails → serve cache with header.
   if (
     url.pathname.startsWith('/capsula/assets/') ||
     url.pathname.startsWith('/capsula/icons/')  ||
@@ -133,6 +158,4 @@ self.addEventListener('fetch', event => {
     )
     return
   }
-
-  // Everything else (Supabase API, etc.) → network only
 })
