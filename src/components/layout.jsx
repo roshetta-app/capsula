@@ -1,5 +1,6 @@
 import BottomNav from './BottomNav'
 import OfflineBanner from './ui/OfflineBanner'
+import NotificationsBanner from './ui/NotificationsBanner'
 
 export default function Layout({ children }) {
   return (
@@ -60,6 +61,9 @@ export default function Layout({ children }) {
           </span>
         </div>
       </header>
+
+      {/* Notifications banner — shown once to users who haven't subscribed */}
+      <NotificationsBanner />
 
       {/* Main content — centred, bottom pad for fixed BottomNav */}
       <main style={{
