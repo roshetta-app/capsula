@@ -2,6 +2,7 @@ import { useState } from 'react'
 import PrescriptionCard from './PrescriptionCard'
 import PrescriptionPills from './PrescriptionPills'
 import PersonalNotes from './PersonalNotes'
+import ImageCarousel from './ImageCarousel'
 
 /**
  * PrescriptionsTab — prescription label pills + active card +
@@ -17,8 +18,9 @@ import PersonalNotes from './PersonalNotes'
  *   prescriptions        PrescriptionFull[]
  *   patientInstructions  string | null
  *   conditionId          string   — for PersonalNotes localStorage key
+ *   images               { id, url, caption }[]  — condition images (optional)
  */
-export default function PrescriptionsTab({ prescriptions, patientInstructions, conditionId }) {
+export default function PrescriptionsTab({ prescriptions, patientInstructions, conditionId, images = [] }) {
   const [activeIndex, setActiveIndex] = useState(0)
 
   if (!prescriptions?.length) {
@@ -42,6 +44,13 @@ export default function PrescriptionsTab({ prescriptions, patientInstructions, c
 
   return (
     <div>
+      {/* Image carousel — shown only when condition has images */}
+      {images.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <ImageCarousel images={images} />
+        </div>
+      )}
+
       {/* Prescription label pills — only shown when >1 prescription */}
       {prescriptions.length > 1 && (
         <PrescriptionPills

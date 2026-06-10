@@ -195,6 +195,7 @@ export default function ConditionDetailScreen() {
                 patientInstructions={condition.patientInstructions}
                 conditionId={condition.id}
                 onPrescriptionChange={setActivePrescriptionIdx}
+                images={condition.images ?? []}
               />
             </div>
           </div>
@@ -333,3 +334,4 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
     </header>
   )
 }
+
