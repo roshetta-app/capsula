@@ -35,12 +35,11 @@ export default function NotificationsBanner() {
     dismiss()
   }
 
-  // Don't show if: not supported, already dismissed, already granted permission, or subscribed
+  // Don't show if: not supported, already dismissed, subscribed, or permission denied
   if (!supported) return null
   if (dismissed)  return null
   if (subscribed) return null
-  if (permission === 'granted') return null
-  if (permission === 'denied')  return null
+  if (permission === 'denied') return null
 
   return (
     <div
