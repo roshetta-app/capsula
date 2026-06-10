@@ -3,15 +3,14 @@
  *
  * Fixes applied:
  *  1. Toast API unified — was `showToast(msg, type)`, now `toast.success/error(msg)`
- *     matching the rest of the admin codebase. This was preventing save feedback
- *     and blocking modal close.
+ *     matching the rest of the admin codebase.
  *  2. Sort Order number input removed from modal. Ordering is drag-only + up/down arrows.
  *  3. Up / Down arrow buttons added to each row for keyboard-friendly reordering.
  *  4. Expandable conditions panel per specialty — click the condition count to
- *     toggle a list of condition names. Requires fetchAllSpecialties to also
- *     return condition names (see adminQueries.js change below).
- *  5. Uncategorized excluded from public-facing fetchSpecialtiesForCMS results
- *     (handled in adminQueries.js — see note at bottom of this file).
+ *     toggle a list of condition names.
+ *  5. Uncategorized excluded from public-facing fetchSpecialtiesForCMS results.
+ *  6. FontAwesome removed — icon_name now stores an emoji directly (e.g. "👶", "🧠").
+ *     Admin types any emoji in the Icon field. No icon library limits apply.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -20,15 +19,6 @@ import {
   ArrowLeft, Plus, GripVertical, Pencil, Trash2,
   ToggleLeft, ToggleRight, ChevronUp, ChevronDown, ChevronRight,
 } from 'lucide-react'
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import {
-  faStethoscope, faHeartPulse, faBrain, faBone, faEye, faEarListen,
-  faTooth, faLungs, faVial, faDroplet, faSyringe, faBaby,
-  faPersonPregnant, faVirus, faBacteria, faPills, faFlask,
-  faMicroscope, faRadiation, faScissors, faUserDoctor, faWheelchair,
-  faHospital, faFileMedical, faNotesMedical, faHeart, faXRay,
-  faThermometer, faBriefcaseMedical, faCircleQuestion,
-} from '@fortawesome/free-solid-svg-icons'
 import { useToast } from '../../context/ToastContext'
 import Modal from '../../components/admin/Modal'
 import ConfirmModal from '../../components/admin/ConfirmModal'
@@ -41,42 +31,14 @@ import {
   reorderSpecialties,
 } from '../../lib/adminQueries'
 
-// ─── Icon picker catalogue ────────────────────────────────────────────────────
+// ─── Suggested emoji quick-picks ─────────────────────────────────────────────
 
-const ICON_OPTIONS = [
-  { name: 'fa-stethoscope',       icon: faStethoscope },
-  { name: 'fa-heart-pulse',       icon: faHeartPulse },
-  { name: 'fa-brain',             icon: faBrain },
-  { name: 'fa-bone',              icon: faBone },
-  { name: 'fa-eye',               icon: faEye },
-  { name: 'fa-ear-listen',        icon: faEarListen },
-  { name: 'fa-tooth',             icon: faTooth },
-  { name: 'fa-lungs',             icon: faLungs },
-  { name: 'fa-vial',              icon: faVial },
-  { name: 'fa-droplet',           icon: faDroplet },
-  { name: 'fa-syringe',           icon: faSyringe },
-  { name: 'fa-baby',              icon: faBaby },
-  { name: 'fa-person-pregnant',   icon: faPersonPregnant },
-  { name: 'fa-virus',             icon: faVirus },
-  { name: 'fa-bacteria',          icon: faBacteria },
-  { name: 'fa-pills',             icon: faPills },
-  { name: 'fa-flask',             icon: faFlask },
-  { name: 'fa-microscope',        icon: faMicroscope },
-  { name: 'fa-radiation',         icon: faRadiation },
-  { name: 'fa-scissors',          icon: faScissors },
-  { name: 'fa-user-doctor',       icon: faUserDoctor },
-  { name: 'fa-wheelchair',        icon: faWheelchair },
-  { name: 'fa-hospital',          icon: faHospital },
-  { name: 'fa-file-medical',      icon: faFileMedical },
-  { name: 'fa-notes-medical',     icon: faNotesMedical },
-  { name: 'fa-heart',             icon: faHeart },
-  { name: 'fa-x-ray',             icon: faXRay },
-  { name: 'fa-thermometer',       icon: faThermometer },
-  { name: 'fa-briefcase-medical', icon: faBriefcaseMedical },
-  { name: 'fa-circle-question',   icon: faCircleQuestion },
+const EMOJI_SUGGESTIONS = [
+  '🩺', '🫀', '🧠', '🦴', '👁️', '👂', '🦷', '🫁',
+  '💉', '💊', '🧪', '🔬', '🧬', '👶', '🤰', '🦠',
+  '🩻', '🩹', '🏥', '⚕️', '🫶', '🩸', '🌡️', '♿',
+  '✂️', '☢️', '🧫', '👨‍⚕️', '❓',
 ]
-
-const ICON_MAP = Object.fromEntries(ICON_OPTIONS.map(o => [o.name, o.icon]))
 
 const PALETTE_COLORS = [
   '#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3',
@@ -96,21 +58,19 @@ function toSlug(str) {
     .replace(/\s+/g, '-')
 }
 
-// ─── Empty form state — no sort_order field (managed by position only) ────────
+// ─── Empty form state ─────────────────────────────────────────────────────────
 
 const EMPTY_FORM = {
   name_en:   '',
   name_ar:   '',
-  icon_name: 'fa-stethoscope',
+  icon_name: '🩺',
   color_hex: '#DBEAFE',
 }
 
 // ─── SpecialtyModal ───────────────────────────────────────────────────────────
-// FIX 1: uses `toast` (not `showToast`) to match the rest of the admin codebase.
-// FIX 2: sort_order field removed — position managed by drag/arrows only.
 
 function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
-  const { toast } = useToast()   // ← FIX: was `showToast`
+  const { toast } = useToast()
   const [form, setForm] = useState(EMPTY_FORM)
   const [busy, setBusy] = useState(false)
 
@@ -120,7 +80,7 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
         ? {
             name_en:   specialty.name_en   ?? '',
             name_ar:   specialty.name_ar   ?? '',
-            icon_name: specialty.icon_name ?? 'fa-stethoscope',
+            icon_name: specialty.icon_name ?? '🩺',
             color_hex: specialty.color_hex ?? '#DBEAFE',
           }
         : { ...EMPTY_FORM }
@@ -142,9 +102,8 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     const payload = {
       name_en:   form.name_en.trim(),
       name_ar:   form.name_ar.trim() || null,
-      icon_name: form.icon_name,
+      icon_name: form.icon_name || '🩺',
       color_hex: form.color_hex,
-      // sort_order comes from position in list — set automatically on insert
       ...(specialty ? {} : { sort_order: nextOrder ?? 99 }),
     }
 
@@ -164,10 +123,9 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
       return
     }
 
-    // FIX: toast first, then close — guaranteed to run regardless of toast impl
     toast.success(specialty ? 'Specialty updated' : 'Specialty added')
-    onSaved()   // triggers load() in parent
-    onClose()   // closes modal
+    onSaved()
+    onClose()
   }
 
   return (
@@ -201,8 +159,6 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
             style={inputStyle}
           />
         </label>
-
-        {/* ── Sort Order input REMOVED — controlled by drag/arrows only ── */}
 
         {/* Color palette */}
         <div>
@@ -240,47 +196,59 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
           </div>
         </div>
 
-        {/* Icon picker */}
+        {/* Emoji icon input */}
         <div>
-          <div style={labelText}>Icon</div>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(40px, 1fr))',
-            gap: 6,
-            marginTop: 6,
-            maxHeight: 180,
-            overflowY: 'auto',
-            border: '1px solid var(--color-border)',
-            borderRadius: 8,
-            padding: 8,
-          }}>
-            {ICON_OPTIONS.map(({ name, icon }) => (
-              <button
-                key={name}
-                title={name}
-                onClick={() => patch('icon_name', name)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 40, height: 40,
-                  borderRadius: 8,
-                  backgroundColor: form.icon_name === name
-                    ? (form.color_hex || 'var(--color-accent-light)')
-                    : 'transparent',
-                  border: form.icon_name === name
-                    ? '2px solid var(--color-accent)'
-                    : '1px solid transparent',
-                  color: form.icon_name === name
-                    ? 'var(--color-accent)'
-                    : 'var(--color-text-secondary)',
-                  cursor: 'pointer',
-                  fontSize: 16,
-                }}
-              >
-                <FontAwesomeIcon icon={icon} />
-              </button>
-            ))}
+          <div style={labelText}>Icon (Emoji)</div>
+          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+            {/* Text input */}
+            <input
+              value={form.icon_name}
+              onChange={e => patch('icon_name', e.target.value)}
+              placeholder="Type or paste any emoji, e.g. 🫀"
+              maxLength={8}
+              style={{
+                ...inputStyle,
+                fontSize: 20,
+                textAlign: 'center',
+                letterSpacing: 2,
+              }}
+            />
+
+            {/* Quick-pick chips */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 4,
+              padding: 8,
+              border: '1px solid var(--color-border)',
+              borderRadius: 8,
+              maxHeight: 130,
+              overflowY: 'auto',
+            }}>
+              {EMOJI_SUGGESTIONS.map(emoji => (
+                <button
+                  key={emoji}
+                  title={emoji}
+                  onClick={() => patch('icon_name', emoji)}
+                  style={{
+                    width: 36, height: 36,
+                    borderRadius: 8,
+                    fontSize: 18,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: form.icon_name === emoji
+                      ? '2px solid var(--color-accent)'
+                      : '1px solid transparent',
+                    backgroundColor: form.icon_name === emoji
+                      ? (form.color_hex || 'var(--color-accent-light)')
+                      : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -304,11 +272,10 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--color-accent)',
-              fontSize: 20,
+              fontSize: 22,
               flexShrink: 0,
             }}>
-              <FontAwesomeIcon icon={ICON_MAP[form.icon_name] ?? faStethoscope} />
+              {form.icon_name || '🩺'}
             </div>
             <div>
               <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text-primary)' }}>
@@ -340,23 +307,19 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
 
 export default function SpecialtiesManager() {
   const navigate      = useNavigate()
-  const { toast }     = useToast()   // ← FIX: was `showToast`
+  const { toast }     = useToast()
 
   const [rows, setRows]     = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Which specialty's conditions panel is expanded
   const [expandedId, setExpandedId] = useState(null)
 
-  // Modal state
   const [modalOpen,  setModalOpen]  = useState(false)
   const [editTarget, setEditTarget] = useState(null)
 
-  // Confirm modal
   const [confirmOpen,   setConfirmOpen]   = useState(false)
   const [confirmConfig, setConfirmConfig] = useState({})
 
-  // Drag state
   const dragIdx  = useRef(null)
   const dragOver = useRef(null)
 
@@ -372,12 +335,11 @@ export default function SpecialtiesManager() {
 
   useEffect(() => { load() }, [load])
 
-  // ── Move row up / down (arrow buttons) ────────────────────────────────────
+  // ── Move row up / down ────────────────────────────────────────────────────
 
   async function moveRow(idx, direction) {
     const targetIdx = idx + direction
     if (targetIdx < 0 || targetIdx >= rows.length) return
-    // Don't let anything move above Uncategorized (always index 0)
     if (targetIdx === 0 && rows[0]?.id === UNCATEGORIZED_ID) return
 
     const reordered = [...rows]
@@ -461,7 +423,6 @@ export default function SpecialtiesManager() {
     const from = dragIdx.current
     const to   = dragOver.current
     if (from === null || to === null || from === to) return
-    // Prevent anything being dragged above Uncategorized
     const effectiveTo = (rows[0]?.id === UNCATEGORIZED_ID && to === 0) ? 1 : to
 
     const reordered = [...rows]
@@ -568,18 +529,10 @@ export default function SpecialtiesManager() {
 
             {rows.map((specialty, idx) => {
               const isUncategorized = specialty.id === UNCATEGORIZED_ID
-              const icon            = ICON_MAP[specialty.icon_name] ?? faCircleQuestion
+              const emoji           = specialty.icon_name || '🩺'
               const isExpanded      = expandedId === specialty.id
-              const conditionNames  = specialty.conditionNames ?? []  // from updated fetchAllSpecialties
-              const isFirst         = idx === 0
+              const conditionNames  = specialty.conditionNames ?? []
               const isLast          = idx === rows.length - 1
-              // Can't move above Uncategorized (always pinned first)
-              const canMoveUp   = !isUncategorized && !(rows[idx - 1]?.id === UNCATEGORIZED_ID ? false : idx === 1 && rows[0]?.id === UNCATEGORIZED_ID) && idx > 1
-              const canMoveDown = !isUncategorized && !isLast
-
-              // Simpler: Uncategorized is locked; others can move within their range
-              const moveUpDisabled   = isUncategorized || idx <= 1 && rows[0]?.id === UNCATEGORIZED_ID && idx === 1
-              const moveDownDisabled = isUncategorized || isLast
 
               return (
                 <div key={specialty.id}>
@@ -614,15 +567,16 @@ export default function SpecialtiesManager() {
                       <GripVertical size={16} />
                     </div>
 
-                    {/* Icon chip */}
+                    {/* Emoji chip */}
                     <div style={{
                       width: 40, height: 40,
                       borderRadius: 10,
                       backgroundColor: specialty.color_hex || '#DBEAFE',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--color-accent)', fontSize: 18, flexShrink: 0,
+                      fontSize: 20, flexShrink: 0,
+                      userSelect: 'none',
                     }}>
-                      <FontAwesomeIcon icon={icon} />
+                      {emoji}
                     </div>
 
                     {/* Name */}
@@ -772,7 +726,7 @@ export default function SpecialtiesManager() {
                       borderTop: 'none',
                       borderRadius: '0 0 10px 10px',
                       backgroundColor: 'var(--color-bg)',
-                      padding: '8px 12px 12px 72px',  // indent to align with name column
+                      padding: '8px 12px 12px 72px',
                     }}>
                       <div style={{
                         fontSize: 11, fontWeight: 600, letterSpacing: '0.05em',
