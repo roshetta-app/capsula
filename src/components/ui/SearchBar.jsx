@@ -1,6 +1,7 @@
 /**
  * src/components/ui/SearchBar.jsx
  * Phase 2I — shared search bar used on ConditionsScreen and DrugsScreen.
+ * Phase 3  — updated default placeholder to "Search conditions or symptoms…"
  *
  * Props:
  *   value            string
@@ -15,16 +16,16 @@ import { Search, X, SlidersHorizontal } from 'lucide-react'
 export default function SearchBar({
   value,
   onChange,
-  placeholder = 'Search…',
+  placeholder = 'Search conditions or symptoms…',
   onFilter,
   hasActiveFilters = false,
 }) {
   return (
     <div style={{
-      display:       'flex',
-      gap:           'var(--space-2)',
-      alignItems:    'center',
-      marginBottom:  'var(--space-3)',
+      display:      'flex',
+      gap:          'var(--space-2)',
+      alignItems:   'center',
+      marginBottom: 'var(--space-3)',
     }}>
       {/* Input wrapper */}
       <div style={{ flex: 1, position: 'relative' }}>

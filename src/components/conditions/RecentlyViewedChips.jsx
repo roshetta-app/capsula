@@ -1,89 +1,90 @@
 /**
  * src/components/conditions/RecentlyViewedChips.jsx
- * Phase 2C — Conditions Screen
+ * Phase 3 — Conditions Screen Redesign
  *
- * Horizontal scrollable row of recently viewed conditions.
- * Styled as plain text links (no pill border/background) so they read as
- * history, not filters — visually distinct from SpecialtyFilterPills.
+ * Styled chips with clock icon, right-edge fade gradient,
+ * and hidden prop for suppression when search is active.
  *
  * Props:
- *   recentlyViewed  — [{ id, name, slug }]  from useRecentlyViewed()
+ *   recentlyViewed  [{ id, name, slug }]
+ *   hidden          boolean  — renders null when true (search active)
  */
-
+import { Clock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { ROUTES } from '../../router'
 
-export default function RecentlyViewedChips({ recentlyViewed }) {
+export default function RecentlyViewedChips({ recentlyViewed, hidden }) {
   const navigate = useNavigate()
 
-  if (!recentlyViewed || recentlyViewed.length === 0) return null
+  if (hidden || !recentlyViewed || recentlyViewed.length === 0) return null
 
   return (
-    <div style={{
-      display:    'flex',
-      alignItems: 'center',
-      gap:        0,
-      overflowX:  'auto',
-      paddingBottom: 'var(--space-1)',
-      marginBottom:  'var(--space-3)',
-      scrollbarWidth:          'none',
-      msOverflowStyle:         'none',
-      WebkitOverflowScrolling: 'touch',
-    }}>
-
-      {/* "RECENT" prefix label */}
-      <span style={{
+    <div style={{ marginBottom: 'var(--space-3)' }}>
+      {/* Section label — own line above chip row */}
+      <div style={{
         fontSize:      10,
-        fontWeight:    700,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
+        fontWeight:    500,
         color:         'var(--color-text-tertiary)',
-        flexShrink:    0,
-        marginRight:   'var(--space-2)',
-        whiteSpace:    'nowrap',
+        textTransform: 'uppercase',
+        letterSpacing: '0.06em',
+        marginBottom:  'var(--space-2)',
       }}>
         Recent
-      </span>
+      </div>
 
-      {/* Plain text links separated by · */}
-      {recentlyViewed.map((condition, i) => (
-        <span key={condition.id} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-          {i > 0 && (
-            <span style={{
-              color:      'var(--color-border)',
-              fontSize:   12,
-              margin:     '0 6px',
-              userSelect: 'none',
-              flexShrink: 0,
-            }}>
-              ·
-            </span>
-          )}
-          <button
-            onClick={() => navigate(ROUTES.CONDITION_DETAIL(condition.slug))}
-            style={{
-              flexShrink:      0,
-              padding:         '2px 0',
-              border:          'none',
-              background:      'none',
-              fontSize:        12,
-              fontWeight:      400,
-              fontFamily:      'var(--font-body)',
-              color:           'var(--color-text-secondary)',
-              cursor:          'pointer',
-              whiteSpace:      'nowrap',
-              outline:         'none',
-              WebkitTapHighlightColor: 'transparent',
-              textDecoration:  'none',
-              transition:      'color 0.15s ease',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--color-accent)' }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--color-text-secondary)' }}
-          >
-            {condition.name}
-          </button>
-        </span>
-      ))}
+      {/* Scrollable chip row + right-edge fade */}
+      <div style={{ position: 'relative' }}>
+        <div style={{
+          display:                 'flex',
+          gap:                     'var(--space-2)',
+          overflowX:               'auto',
+          scrollbarWidth:          'none',
+          msOverflowStyle:         'none',
+          WebkitOverflowScrolling: 'touch',
+          paddingBottom:           2,
+        }}>
+          {recentlyViewed.map(condition => (
+            <button
+              key={condition.id}
+              onClick={() => navigate(ROUTES.CONDITION_DETAIL(condition.slug))}
+              style={{
+                flexShrink:              0,
+                display:                 'flex',
+                alignItems:              'center',
+                gap:                     5,
+                padding:                 '5px 12px',
+                borderRadius:            'var(--radius-full)',
+                border:                  '1px solid var(--color-border)',
+                backgroundColor:         'var(--color-surface)',
+                fontSize:                12,
+                fontFamily:              'var(--font-body)',
+                color:                   'var(--color-text-secondary)',
+                cursor:                  'pointer',
+                whiteSpace:              'nowrap',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Clock size={11} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+              {condition.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Right-edge fade — hints more chips are off-screen */}
+        <div
+          aria-hidden="true"
+          style={{
+            position:      'absolute',
+            top:           0,
+            right:         0,
+            bottom:        0,
+            width:         40,
+            background:    'linear-gradient(to right, transparent, var(--color-bg))',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
     </div>
   )
 }
