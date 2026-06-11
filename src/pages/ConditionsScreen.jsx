@@ -3,10 +3,9 @@
  * Phase 5 — Conditions Screen Redesign
  *
  * Changes from Phase 4:
- *   - BrandRow replaced with ScreenHeader (logo + contextual headline)
- *   - Headline collapses when search is active
- *   - Tighter relational spacing between all header-area sections
- *   - SearchBar owns no bottom margin — spacing handled by section gaps
+ *   - Hero headline removed; logo row only
+ *   - Tighter relational spacing throughout header area
+ *   - SearchBar owns no bottom margin
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -50,7 +49,7 @@ function SkeletonCard() {
       display:      'flex',
       alignItems:   'center',
       gap:          'var(--space-3)',
-      padding:      '11px 0',
+      padding:      '8px 0',
       borderBottom: '0.5px solid var(--color-border-subtle)',
     }}>
       <div style={shimmer({ width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0 })} />
@@ -62,66 +61,43 @@ function SkeletonCard() {
   )
 }
 
-// ─── Screen header ────────────────────────────────────────────────────────────
-// Logo row + contextual headline. Headline collapses when search is active
-// to give the keyboard + results more vertical room.
+// ─── Logo row ─────────────────────────────────────────────────────────────────
 
-function ScreenHeader({ isSearching }) {
+function BrandRow() {
   return (
     <div style={{
+      display:       'flex',
+      alignItems:    'center',
+      gap:           'var(--space-2)',
       paddingTop:    'var(--space-4)',
-      paddingBottom: isSearching ? 'var(--space-3)' : 'var(--space-2)',
-      transition:    'padding-bottom 0.15s ease',
+      paddingBottom: 'var(--space-3)',
     }}>
-      {/* Logo row */}
       <div style={{
-        display:       'flex',
-        alignItems:    'center',
-        gap:           'var(--space-2)',
-        marginBottom:  isSearching ? 0 : 'var(--space-2)',
-        transition:    'margin-bottom 0.15s ease',
+        width:          26,
+        height:         26,
+        borderRadius:   'var(--radius-full)',
+        background:     'var(--color-accent)',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        flexShrink:     0,
       }}>
         <div style={{
-          width:          26,
-          height:         26,
-          borderRadius:   'var(--radius-full)',
-          background:     'var(--color-accent)',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          flexShrink:     0,
-        }}>
-          <div style={{
-            width:           9,
-            height:          9,
-            borderRadius:    'var(--radius-full)',
-            backgroundColor: 'white',
-            opacity:         0.9,
-          }} />
-        </div>
-        <span style={{
-          fontSize:      17,
-          fontWeight:    600,
-          color:         'var(--color-text-primary)',
-          letterSpacing: '-0.3px',
-        }}>
-          Capsula
-        </span>
+          width:           9,
+          height:          9,
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'white',
+          opacity:         0.9,
+        }} />
       </div>
-
-      {/* Headline — hidden while searching */}
-      {!isSearching && (
-        <h1 style={{
-          margin:        0,
-          fontSize:      26,
-          fontWeight:    700,
-          letterSpacing: '-0.5px',
-          lineHeight:    1.15,
-          color:         'var(--color-text-primary)',
-        }}>
-          What are you looking for?
-        </h1>
-      )}
+      <span style={{
+        fontSize:      17,
+        fontWeight:    600,
+        color:         'var(--color-text-primary)',
+        letterSpacing: '-0.3px',
+      }}>
+        Capsula
+      </span>
     </div>
   )
 }
@@ -148,7 +124,6 @@ export default function ConditionsScreen() {
     clearSuggestions,
   } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
-  // Search activates on first character — matches clinical app standard
   const isSearching   = query.length >= 1
   const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
   const totalCount    = conditions.length
@@ -174,30 +149,6 @@ export default function ConditionsScreen() {
     setActiveSpecialty('all')
   }
 
-  // ── Cold start skeleton ──────────────────────────────────────────────────────
-
-  if (loading && conditions.length === 0) {
-    return (
-      <Layout>
-        {/* Skeleton header */}
-        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <div style={shimmer({ width: 26, height: 26, borderRadius: 'var(--radius-full)' })} />
-            <div style={shimmer({ width: 70, height: 16 })} />
-          </div>
-          <div style={shimmer({ width: '75%', height: 28, borderRadius: 'var(--radius-md)' })} />
-        </div>
-        <div style={shimmer({ width: '100%', height: 48, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', overflow: 'hidden' }}>
-          {[60, 80, 60, 70, 90].map((w, i) => (
-            <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-          ))}
-        </div>
-        {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
-      </Layout>
-    )
-  }
-
   // ── List rendering ───────────────────────────────────────────────────────────
 
   function renderList() {
@@ -214,7 +165,6 @@ export default function ConditionsScreen() {
     }
 
     if (isSearching || sortMode === 'recent') {
-      // Flat list — no alphabet dividers
       return results.map(condition => (
         <ConditionCard
           key={condition.id}
@@ -225,7 +175,6 @@ export default function ConditionsScreen() {
       ))
     }
 
-    // A–Z browse — grouped with section dividers
     return alphabetGroup(results).map(({ letter, items }) => (
       <div key={letter}>
         <AlphabetSectionDivider letter={letter} />
@@ -241,13 +190,33 @@ export default function ConditionsScreen() {
     ))
   }
 
+  // ── Cold start skeleton ──────────────────────────────────────────────────────
+
+  if (loading && conditions.length === 0) {
+    return (
+      <Layout>
+        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div style={shimmer({ width: 26, height: 26, borderRadius: 'var(--radius-full)' })} />
+          <div style={shimmer({ width: 70, height: 16 })} />
+        </div>
+        <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
+          {[60, 80, 60, 70, 90].map((w, i) => (
+            <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+          ))}
+        </div>
+        {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
+      </Layout>
+    )
+  }
+
   // ── Main render ──────────────────────────────────────────────────────────────
 
   return (
     <Layout>
 
-      {/* 1. Screen header — logo + headline (headline hides when searching) */}
-      <ScreenHeader isSearching={isSearching} />
+      {/* 1. Logo row */}
+      <BrandRow />
 
       {/* 2. Search bar + autocomplete */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
@@ -281,7 +250,7 @@ export default function ConditionsScreen() {
         onMoreTap={() => setBottomSheetOpen(true)}
       />
 
-      {/* 5. Count + sort toggle row */}
+      {/* 5. Count + sort row — hairline above anchors list start */}
       <ConditionListHeader
         totalCount={totalCount}
         resultCount={resultCount}

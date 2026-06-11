@@ -21,10 +21,8 @@ export default function Layout({ children }) {
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
     }}>
-      {/* Offline banner — sits above header, only visible when offline */}
       <OfflineBanner />
 
-      {/* Sticky top header — suppressed on routes that own their own top section */}
       {!suppressHeader && (
         <header style={{
           position:        'sticky',
@@ -32,7 +30,7 @@ export default function Layout({ children }) {
           zIndex:          50,
           backgroundColor: 'var(--color-surface)',
           borderBottom:    '1px solid var(--color-border)',
-          padding:         'var(--space-3) var(--space-5)',
+          padding:         'var(--space-3) var(--space-6)',
           display:         'flex',
           alignItems:      'center',
         }}>
@@ -44,7 +42,6 @@ export default function Layout({ children }) {
             alignItems: 'center',
             gap:        'var(--space-2)',
           }}>
-            {/* Logo dot */}
             <div style={{
               width:           26,
               height:          26,
@@ -75,15 +72,13 @@ export default function Layout({ children }) {
         </header>
       )}
 
-      {/* Notifications banner */}
       <NotificationsBanner />
 
-      {/* Main content — centred, bottom pad for fixed BottomNav */}
-      {/* --space-5 (20px) side padding gives the content more breathing room */}
+      {/* --space-6 (24px) side padding — aligns content with BottomNav label edges */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
-        padding:  '0 var(--space-5) calc(var(--space-12) + 60px)',
+        padding:  '0 var(--space-6) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>

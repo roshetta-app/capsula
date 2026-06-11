@@ -17,10 +17,6 @@
 const FALLBACK_COLOR     = 'var(--color-accent)'
 const OVERFLOW_THRESHOLD = 5
 
-/**
- * Abbreviated display labels for known specialty slugs.
- * Falls back to specialty.name for anything not listed here.
- */
 const SHORT_LABELS = {
   pediatrics:     'Peds',
   ophthalmology:  'Opth',
@@ -70,14 +66,13 @@ export default function SpecialtyFilterPills({
       display:                 'flex',
       gap:                     'var(--space-2)',
       overflowX:               'auto',
-      paddingBottom:           'var(--space-2)',
-      marginBottom:            'var(--space-3)',
+      paddingBottom:           'var(--space-1)',
+      marginBottom:            'var(--space-1)',
       scrollbarWidth:          'none',
       msOverflowStyle:         'none',
       WebkitOverflowScrolling: 'touch',
     }}>
 
-      {/* "All" pill — always first */}
       <button
         onClick={() => onSelect('all')}
         style={pillStyle({ isActive: activeSpecialty === 'all', colorHex: null })}
@@ -85,7 +80,6 @@ export default function SpecialtyFilterPills({
         All
       </button>
 
-      {/* Visible specialty pills */}
       {visibleSpecialties.map(specialty => {
         const isActive   = activeSpecialty === specialty.id
         const colorHex   = specialty.colorHex ?? null
@@ -108,7 +102,6 @@ export default function SpecialtyFilterPills({
         )
       })}
 
-      {/* "More" chip — only when count meets or exceeds OVERFLOW_THRESHOLD */}
       {hasOverflow && (
         <button
           onClick={onMoreTap}

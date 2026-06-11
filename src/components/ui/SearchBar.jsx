@@ -2,7 +2,7 @@
  * src/components/ui/SearchBar.jsx
  * Phase 2I — shared search bar used on ConditionsScreen and DrugsScreen.
  * Phase 3  — updated default placeholder to "Search conditions or symptoms…"
- * Phase 5  — taller input (48px), stronger shadow, larger search icon
+ * Phase 5  — flat border-only style; accent ring on focus; no shadow
  *
  * Props:
  *   value            string
@@ -27,10 +27,9 @@ export default function SearchBar({
       gap:        'var(--space-2)',
       alignItems: 'center',
     }}>
-      {/* Input wrapper */}
       <div style={{ flex: 1, position: 'relative' }}>
         <Search
-          size={17}
+          size={16}
           style={{
             position:      'absolute',
             left:          'var(--space-4)',
@@ -48,9 +47,9 @@ export default function SearchBar({
           style={{
             width:           '100%',
             boxSizing:       'border-box',
-            paddingLeft:     42,
+            paddingLeft:     40,
             paddingRight:    value ? 40 : 16,
-            height:          48,
+            height:          46,
             borderRadius:    'var(--radius-full)',
             border:          '1.5px solid var(--color-border)',
             backgroundColor: 'var(--color-surface)',
@@ -58,17 +57,11 @@ export default function SearchBar({
             color:           'var(--color-text-primary)',
             fontFamily:      'var(--font-body)',
             outline:         'none',
-            boxShadow:       '0 2px 8px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)',
-            transition:      'border-color 0.15s ease, box-shadow 0.15s ease',
+            boxShadow:       'none',
+            transition:      'border-color 0.15s ease',
           }}
-          onFocus={e => {
-            e.target.style.borderColor = 'var(--color-accent)'
-            e.target.style.boxShadow   = '0 2px 12px rgba(0,0,0,0.10), 0 1px 3px rgba(0,0,0,0.06)'
-          }}
-          onBlur={e => {
-            e.target.style.borderColor = 'var(--color-border)'
-            e.target.style.boxShadow   = '0 2px 8px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)'
-          }}
+          onFocus={e => e.target.style.borderColor = 'var(--color-accent)'}
+          onBlur={e  => e.target.style.borderColor  = 'var(--color-border)'}
         />
         {value && (
           <button
@@ -93,14 +86,13 @@ export default function SearchBar({
         )}
       </div>
 
-      {/* Optional filter icon */}
       {onFilter && (
         <button
           onClick={onFilter}
           aria-label="Filter"
           style={{
-            width:           48,
-            height:          48,
+            width:           46,
+            height:          46,
             borderRadius:    'var(--radius-full)',
             border:          hasActiveFilters
               ? '1.5px solid var(--color-accent)'

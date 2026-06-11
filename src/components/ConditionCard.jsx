@@ -1,23 +1,15 @@
 /**
  * src/components/ConditionCard.jsx
  * Phase 3 — Conditions Screen Redesign
- *
- * Changes from previous version:
- *   REMOVED: border, box-shadow, borderRadius, marginBottom
- *   ADDED:   borderBottom '0.5px solid var(--color-border-subtle)' (divider-only rows)
- *   ADDED:   InlineStarButton at trailing edge
- *   ADDED:   highlight prop — name rendered via highlightMatch() with bold segments
- *   CHANGED: padding '12px var(--space-4)' → '11px 0'
- *   KEPT:    specialty icon bubble, specialty label, tagline, chevron, onTap
+ * Phase 5 — removed InlineStarButton; tighter row padding (8px vs 11px)
  *
  * Props:
- *   condition  ConditionFull — condition object from context
+ *   condition  ConditionFull
  *   onTap      (condition) => void  (optional — falls back to navigate)
  *   highlight  string  — current search query; empty string when not searching
  */
 
 import { useNavigate } from 'react-router-dom'
-import InlineStarButton from './conditions/InlineStarButton'
 import { highlightMatch } from '../utils/highlightMatch'
 
 // ─── Color helpers ────────────────────────────────────────────────────────────
@@ -90,7 +82,7 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         display:                 'flex',
         alignItems:              'center',
         gap:                     'var(--space-3)',
-        padding:                 '11px 0',
+        padding:                 '8px 0',
         borderBottom:            '0.5px solid var(--color-border-subtle)',
         cursor:                  'pointer',
         outline:                 'none',
@@ -130,7 +122,6 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
           </div>
         )}
 
-        {/* Name with optional bold highlight segments */}
         <div style={{
           fontSize:     15,
           fontWeight:   600,
@@ -162,13 +153,7 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         )}
       </div>
 
-      {/* Trailing: star — stopPropagation handled inside InlineStarButton */}
-      <InlineStarButton
-        conditionId={condition.id}
-        conditionName={condition.name}
-      />
-
-      {/* Trailing: chevron */}
+      {/* Trailing: chevron — sole action indicator */}
       <svg
         width="12" height="12" viewBox="0 0 24 24"
         fill="none" stroke="currentColor" strokeWidth="2.5"
