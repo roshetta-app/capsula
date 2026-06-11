@@ -1,20 +1,30 @@
 /**
  * src/hooks/useSortToggle.js
  *
- * Manages sort mode state for the Conditions screen.
- * Persists selection to localStorage so preference survives page reload.
+ * Manages sort mode for the conditions list.
+ * Modes: 'az' (default) | 'recent'
  *
- * Sort modes:
- *   'az'     — alphabetical A–Z (default)
- *   'recent' — recently viewed conditions float to top, remainder A–Z
+ * 'az'     — alphabetical A–Z (default, always)
+ * 'recent' — by recently viewed, conditions with no recency fallback to A–Z at bottom
  *
- * @returns {{ sortMode: 'az' | 'recent', toggleSort: () => void, setSortMode: (mode: 'az' | 'recent') => void }}
+ * Persists selection in localStorage under key 'capsula_conditions_sort'.
+ *
+ * Returns:
+ *   sortMode      — 'az' | 'recent'
+ *   cycleSortMode — function, toggles between the two modes
+ *   setSortMode   — function, sets mode directly (extra, retained from delivered)
+ *   SORT_LABELS   — { az: 'A – Z', recent: 'Recent first' }
  */
 
 import { useState, useCallback } from 'react'
 
 const STORAGE_KEY = 'capsula_conditions_sort'
 const VALID_MODES = ['az', 'recent']
+
+export const SORT_LABELS = {
+  az:     'A – Z',
+  recent: 'Recent first',
+}
 
 function readStoredMode() {
   try {
@@ -38,9 +48,9 @@ export function useSortToggle() {
     }
   }, [])
 
-  const toggleSort = useCallback(() => {
+  const cycleSortMode = useCallback(() => {
     setSortMode(sortMode === 'az' ? 'recent' : 'az')
   }, [sortMode, setSortMode])
 
-  return { sortMode, toggleSort, setSortMode }
+  return { sortMode, cycleSortMode, setSortMode, SORT_LABELS }
 }
