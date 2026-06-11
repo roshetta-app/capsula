@@ -1,13 +1,18 @@
 /**
  * src/hooks/useConditionSearch.js
  *
+ * Uses tiered search from searchUtils:
+ *   1 char  — prefix only
+ *   2 chars — prefix or word-start
+ *   3+ chars — full fuzzy
+ *
  * Exposes:
  *   query, setQuery, activeSpecialty, setActiveSpecialty,
  *   results, resultCount, suggestions, showSuggestions, clearSuggestions
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { buildConditionIndex, fuzzySearchConditions, getAutocompleteSuggestions } from '../utils/searchUtils'
+import { buildConditionIndex, searchConditions, getAutocompleteSuggestions } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
 function applySortMode(items, mode, recentIds) {
@@ -46,27 +51,25 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
       pool = conditions.filter(c => c.specialtyId === specialty)
     }
 
-    // Step 2: fuzzy search — activates on first character
-    let matched
-    if (q.trim().length >= 1) {
-      const subIndex = buildConditionIndex(pool)
-      matched = fuzzySearchConditions(subIndex, q) ?? pool
-    } else {
-      matched = pool
-    }
+    // Step 2: tiered search
+    // Build a sub-index from the pool for fuzzy tier (3+ chars)
+    const subIndex = buildConditionIndex(pool)
+    const matched  = searchConditions(subIndex, pool, q) ?? pool
 
     // Step 3: sort
     const sorted = applySortMode(matched, sortMode, recentlyViewedIds)
     setResults(sorted)
 
-    // Log zero-result gaps (only meaningful at 2+ chars)
-    if (q.trim().length >= 2 && matched.length === 0) {
+    // Log zero-result gaps (only meaningful at 3+ chars where fuzzy ran)
+    if (q.trim().length >= 3 && matched.length === 0) {
       logSearchGap(q, 'conditions')
     }
 
-    // Autocomplete suggestions — filtered to active specialty
+    // Autocomplete suggestions
     if (q.trim().length >= 1) {
-      const sug = getAutocompleteSuggestions(fuseRef.current, q, 5, specialty)
+      // Suggestions always search full conditions pool for discoverability,
+      // but filtered to active specialty when one is selected
+      const sug = getAutocompleteSuggestions(fuseRef.current, conditions, q, 5, specialty)
       setSuggestions(sug)
       setShowSuggestions(sug.length > 0)
     } else {
