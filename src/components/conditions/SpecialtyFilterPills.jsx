@@ -4,8 +4,8 @@
  *
  * Horizontal scrollable row of specialty filter pills.
  * "All" is always first. Each pill shows emoji icon + short label.
- * When specialties.length > OVERFLOW_THRESHOLD (8), chips beyond
- * index 7 are hidden and a "More" chip is appended.
+ * When specialties.length >= OVERFLOW_THRESHOLD (5), chips beyond
+ * index 4 are hidden and a "More" chip is appended.
  *
  * Props:
  *   specialties      [{ id, name, slug, iconName, colorHex }]
@@ -15,7 +15,7 @@
  */
 
 const FALLBACK_COLOR     = 'var(--color-accent)'
-const OVERFLOW_THRESHOLD = 8
+const OVERFLOW_THRESHOLD = 5
 
 /**
  * Abbreviated display labels for known specialty slugs.
@@ -60,7 +60,7 @@ export default function SpecialtyFilterPills({
 }) {
   if (!specialties || specialties.length === 0) return null
 
-  const hasOverflow        = specialties.length > OVERFLOW_THRESHOLD
+  const hasOverflow        = specialties.length >= OVERFLOW_THRESHOLD
   const visibleSpecialties = hasOverflow
     ? specialties.slice(0, OVERFLOW_THRESHOLD)
     : specialties
@@ -108,7 +108,7 @@ export default function SpecialtyFilterPills({
         )
       })}
 
-      {/* "More" chip — only when count exceeds OVERFLOW_THRESHOLD */}
+      {/* "More" chip — only when count meets or exceeds OVERFLOW_THRESHOLD */}
       {hasOverflow && (
         <button
           onClick={onMoreTap}
