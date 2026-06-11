@@ -1,6 +1,5 @@
 /**
  * src/hooks/useConditionSearch.js
- * Phase 2C — Conditions Screen
  *
  * Exposes:
  *   query, setQuery, activeSpecialty, setActiveSpecialty,
@@ -47,26 +46,26 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
       pool = conditions.filter(c => c.specialtyId === specialty)
     }
 
-    // Step 2: fuzzy text search within the specialty-filtered pool
+    // Step 2: fuzzy search — activates on first character
     let matched
-    if (q.trim().length >= 2) {
+    if (q.trim().length >= 1) {
       const subIndex = buildConditionIndex(pool)
       matched = fuzzySearchConditions(subIndex, q) ?? pool
     } else {
       matched = pool
     }
 
-    // Step 3: apply sort mode
+    // Step 3: sort
     const sorted = applySortMode(matched, sortMode, recentlyViewedIds)
     setResults(sorted)
 
-    // Log zero-result gaps
+    // Log zero-result gaps (only meaningful at 2+ chars)
     if (q.trim().length >= 2 && matched.length === 0) {
       logSearchGap(q, 'conditions')
     }
 
-    // Autocomplete suggestions — filtered to active specialty when one is selected
-    if (q.trim().length >= 2) {
+    // Autocomplete suggestions — filtered to active specialty
+    if (q.trim().length >= 1) {
       const sug = getAutocompleteSuggestions(fuseRef.current, q, 5, specialty)
       setSuggestions(sug)
       setShowSuggestions(sug.length > 0)

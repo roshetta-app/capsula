@@ -2,17 +2,10 @@
  * src/pages/ConditionsScreen.jsx
  * Phase 4 — Conditions Screen Redesign
  *
- * Layout (top to bottom):
- *   1. Brand row
- *   2. Search bar + autocomplete dropdown
- *   3. Recently viewed chips (hidden when search is active)
- *   4. Specialty filter pills (with overflow → bottom sheet)
- *   5. ConditionListHeader (count + sort toggle)
- *   6. Condition list:
- *      — Empty state
- *      — Searching: flat results with highlight
- *      — Browse A–Z: alphabetGroup(results) with AlphabetSectionDividers
- *      — Browse Recent: flat list in recency order, no dividers
+ * List rendering modes:
+ *   isSearching (query >= 1)  → flat list with highlight, no dividers
+ *   sortMode === 'recent'     → flat list in recency order, no dividers
+ *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
 import { useState } from 'react'
@@ -126,7 +119,8 @@ export default function ConditionsScreen() {
     clearSuggestions,
   } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
-  const isSearching   = query.length >= 2
+  // Search activates on first character — matches clinical app standard
+  const isSearching   = query.length >= 1
   const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
   const totalCount    = conditions.length
 
@@ -169,11 +163,6 @@ export default function ConditionsScreen() {
   }
 
   // ── List rendering ───────────────────────────────────────────────────────────
-  //
-  // Three modes:
-  //   1. isSearching       → flat list with highlight, no dividers
-  //   2. sortMode==='recent' → flat list in recency order, no dividers
-  //   3. sortMode==='az'   → grouped by letter with AlphabetSectionDividers
 
   function renderList() {
     if (resultCount === 0) {
