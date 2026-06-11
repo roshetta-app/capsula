@@ -11,15 +11,21 @@
 
 import Fuse from 'fuse.js'
 
-// ─── Conditions fuzzy search (unchanged from 2C) ──────────────────────────────
+// ─── Conditions fuzzy search ──────────────────────────────────────────────────
+//
+// Keys: name only (primary) + card_tagline (secondary).
+// specialtyName removed — it caused false matches (e.g. "com" → Pediatrics items).
+// Specialty filtering is handled by the activeSpecialty pill, not search.
+//
+// threshold 0.25 (was 0.35) — tighter to reduce noise like
+// "com" → "versicolor" or "vomiting" via loose character overlap.
 
 const CONDITION_FUSE_OPTIONS = {
   keys: [
-    { name: 'name',          weight: 0.6 },
-    { name: 'specialtyName', weight: 0.25 },
-    { name: 'card_tagline',  weight: 0.15 },
+    { name: 'name',         weight: 0.75 },
+    { name: 'card_tagline', weight: 0.25 },
   ],
-  threshold:          0.35,
+  threshold:          0.25,
   minMatchCharLength: 2,
   includeScore:       true,
   ignoreLocation:     true,
@@ -35,10 +41,25 @@ export function fuzzySearchConditions(fuseIndex, query) {
   return results.map(r => r.item)
 }
 
-export function getAutocompleteSuggestions(fuseIndex, query, limit = 5) {
+/**
+ * Top-N autocomplete suggestions.
+ * When activeSpecialty is provided (not 'all'), suggestions are filtered
+ * to only show conditions belonging to that specialty.
+ *
+ * @param {Fuse}   fuseIndex       — built from full conditions list
+ * @param {string} query
+ * @param {number} limit
+ * @param {string} activeSpecialty — 'all' | specialty id
+ * @returns {{ id, name, slug }[]}
+ */
+export function getAutocompleteSuggestions(fuseIndex, query, limit = 5, activeSpecialty = 'all') {
   if (!query || query.trim().length < 2) return []
-  const results = fuseIndex.search(query.trim(), { limit })
-  return results.map(r => ({
+  // Fetch more candidates when filtering by specialty so we have enough after the filter
+  const results = fuseIndex.search(query.trim(), { limit: activeSpecialty !== 'all' ? limit * 4 : limit })
+  const filtered = activeSpecialty !== 'all'
+    ? results.filter(r => r.item.specialtyId === activeSpecialty)
+    : results
+  return filtered.slice(0, limit).map(r => ({
     id:   r.item.id,
     name: r.item.name,
     slug: r.item.slug,
@@ -61,34 +82,16 @@ const DRUG_FUSE_OPTIONS = {
   ignoreLocation:     true,
 }
 
-/**
- * Build a Fuse index for a drugs array.
- * @param {object[]} drugs — flat drug objects from DrugContext
- * @returns {Fuse}
- */
 export function buildDrugIndex(drugs) {
   return new Fuse(drugs, DRUG_FUSE_OPTIONS)
 }
 
-/**
- * Run fuzzy drug search. Returns null when query is too short (= show all).
- * @param {Fuse}   fuseIndex
- * @param {string} query
- * @returns {object[]|null}
- */
 export function fuzzySearchDrugs(fuseIndex, query) {
   if (!query || query.trim().length < 2) return null
   const results = fuseIndex.search(query.trim())
   return results.map(r => r.item)
 }
 
-/**
- * Top-N autocomplete suggestions for drugs.
- * @param {Fuse}   fuseIndex
- * @param {string} query
- * @param {number} limit
- * @returns {{ id, name, slug }[]}
- */
 export function getDrugAutocompleteSuggestions(fuseIndex, query, limit = 5) {
   if (!query || query.trim().length < 2) return []
   const results = fuseIndex.search(query.trim(), { limit })

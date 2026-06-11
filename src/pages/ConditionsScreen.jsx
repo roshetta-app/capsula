@@ -2,19 +2,17 @@
  * src/pages/ConditionsScreen.jsx
  * Phase 4 — Conditions Screen Redesign
  *
- * Full rewrite wiring all redesigned components and hooks.
- *
  * Layout (top to bottom):
- *   1. Brand row (logo dot + "Capsula" wordmark) — owns the top section
- *      since layout.jsx suppresses the shared header on this route
+ *   1. Brand row
  *   2. Search bar + autocomplete dropdown
  *   3. Recently viewed chips (hidden when search is active)
  *   4. Specialty filter pills (with overflow → bottom sheet)
  *   5. ConditionListHeader (count + sort toggle)
  *   6. Condition list:
- *      — Empty state (ConditionsEmptyState)
- *      — Searching: flat results.map() with highlight={query}
- *      — Browsing:  alphabetGroup(results) with AlphabetSectionDividers
+ *      — Empty state
+ *      — Searching: flat results with highlight
+ *      — Browse A–Z: alphabetGroup(results) with AlphabetSectionDividers
+ *      — Browse Recent: flat list in recency order, no dividers
  */
 
 import { useState } from 'react'
@@ -65,26 +63,26 @@ function SkeletonCard() {
   )
 }
 
-// ─── Brand row — rendered here since shared header is suppressed ──────────────
+// ─── Brand row ────────────────────────────────────────────────────────────────
 
 function BrandRow() {
   return (
     <div style={{
-      display:        'flex',
-      alignItems:     'center',
-      gap:            'var(--space-2)',
-      paddingTop:     'var(--space-4)',
-      paddingBottom:  'var(--space-4)',
+      display:       'flex',
+      alignItems:    'center',
+      gap:           'var(--space-2)',
+      paddingTop:    'var(--space-4)',
+      paddingBottom: 'var(--space-4)',
     }}>
       <div style={{
-        width:           26,
-        height:          26,
-        borderRadius:    'var(--radius-full)',
-        background:      'var(--color-accent)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        flexShrink:      0,
+        width:          26,
+        height:         26,
+        borderRadius:   'var(--radius-full)',
+        background:     'var(--color-accent)',
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        flexShrink:     0,
       }}>
         <div style={{
           width:           9,
@@ -114,7 +112,6 @@ export default function ConditionsScreen() {
   const { recentlyViewed }                   = useRecentlyViewed()
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
 
-  // Bottom sheet state — opened by "More" chip in SpecialtyFilterPills
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
 
   const {
@@ -129,12 +126,11 @@ export default function ConditionsScreen() {
     clearSuggestions,
   } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
-  // Derived state
-  const isSearching    = query.length >= 2
-  const specialtyName  = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
-  const totalCount     = conditions.length
+  const isSearching   = query.length >= 2
+  const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
+  const totalCount    = conditions.length
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleSuggestionSelect(suggestion) {
     clearSuggestions()
@@ -155,7 +151,7 @@ export default function ConditionsScreen() {
     setActiveSpecialty('all')
   }
 
-  // ── Cold start skeleton ───────────────────────────────────────────────────
+  // ── Cold start skeleton ──────────────────────────────────────────────────────
 
   if (loading && conditions.length === 0) {
     return (
@@ -172,15 +168,62 @@ export default function ConditionsScreen() {
     )
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
+  // ── List rendering ───────────────────────────────────────────────────────────
+  //
+  // Three modes:
+  //   1. isSearching       → flat list with highlight, no dividers
+  //   2. sortMode==='recent' → flat list in recency order, no dividers
+  //   3. sortMode==='az'   → grouped by letter with AlphabetSectionDividers
+
+  function renderList() {
+    if (resultCount === 0) {
+      return (
+        <ConditionsEmptyState
+          query={query}
+          activeSpecialty={activeSpecialty}
+          specialtyName={specialtyName}
+          onClearSearch={handleClearSearch}
+          onClearFilter={handleClearFilter}
+        />
+      )
+    }
+
+    if (isSearching || sortMode === 'recent') {
+      // Flat list — no alphabet dividers
+      return results.map(condition => (
+        <ConditionCard
+          key={condition.id}
+          condition={condition}
+          onTap={handleCardTap}
+          highlight={isSearching ? query : ''}
+        />
+      ))
+    }
+
+    // A–Z browse — grouped with section dividers
+    return alphabetGroup(results).map(({ letter, items }) => (
+      <div key={letter}>
+        <AlphabetSectionDivider letter={letter} />
+        {items.map(condition => (
+          <ConditionCard
+            key={condition.id}
+            condition={condition}
+            onTap={handleCardTap}
+            highlight=""
+          />
+        ))}
+      </div>
+    ))
+  }
+
+  // ── Main render ──────────────────────────────────────────────────────────────
 
   return (
     <Layout>
 
-      {/* Brand row — screen owns this since shared header is suppressed */}
       <BrandRow />
 
-      {/* 1. Search bar + autocomplete dropdown */}
+      {/* 1. Search bar + autocomplete */}
       <div style={{ position: 'relative' }}>
         <SearchBar
           value={query}
@@ -198,7 +241,7 @@ export default function ConditionsScreen() {
         )}
       </div>
 
-      {/* 2. Recently viewed chips — hidden when search is active */}
+      {/* 2. Recently viewed chips — hidden when searching */}
       <RecentlyViewedChips
         recentlyViewed={recentlyViewed}
         hidden={isSearching}
@@ -225,49 +268,9 @@ export default function ConditionsScreen() {
       />
 
       {/* 5. Condition list */}
-      {resultCount === 0 ? (
+      {renderList()}
 
-        // Empty state
-        <ConditionsEmptyState
-          query={query}
-          activeSpecialty={activeSpecialty}
-          specialtyName={specialtyName}
-          onClearSearch={handleClearSearch}
-          onClearFilter={handleClearFilter}
-        />
-
-      ) : isSearching ? (
-
-        // Search results — flat list with highlight
-        results.map(condition => (
-          <ConditionCard
-            key={condition.id}
-            condition={condition}
-            onTap={handleCardTap}
-            highlight={query}
-          />
-        ))
-
-      ) : (
-
-        // Browse mode — grouped by alphabet with section dividers
-        alphabetGroup(results).map(({ letter, items }) => (
-          <div key={letter}>
-            <AlphabetSectionDivider letter={letter} />
-            {items.map(condition => (
-              <ConditionCard
-                key={condition.id}
-                condition={condition}
-                onTap={handleCardTap}
-                highlight=""
-              />
-            ))}
-          </div>
-        ))
-
-      )}
-
-      {/* Specialties bottom sheet — triggered by "More" chip */}
+      {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet
         specialties={specialties}
         activeSpecialty={activeSpecialty}
