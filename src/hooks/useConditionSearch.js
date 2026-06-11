@@ -72,15 +72,11 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
       pool = conditions.filter(c => c.specialtyId === specialty)
     }
 
-    // Step 2: fuzzy text search
+    // Step 2: fuzzy text search within the specialty-filtered pool
     let matched
     if (q.trim().length >= 2) {
-      // Search within specialty-filtered pool
-      const { buildConditionIndex: build, fuzzySearchConditions: search } =
-        // Re-import helpers to search a sub-pool
-        require('../utils/searchUtils')
-      const subIndex = build(pool)
-      matched = search(subIndex, q) ?? pool
+      const subIndex = buildConditionIndex(pool)
+      matched = fuzzySearchConditions(subIndex, q) ?? pool
     } else {
       matched = pool
     }

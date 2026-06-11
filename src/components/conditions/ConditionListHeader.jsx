@@ -35,6 +35,9 @@ export default function ConditionListHeader({
     countLabel = `${totalCount} condition${totalCount !== 1 ? 's' : ''}`
   }
 
+  // The toggle button shows what mode you will switch TO (not the current mode)
+  const nextMode = sortMode === 'az' ? 'recent' : 'az'
+
   return (
     <div style={{
       display:        'flex',
@@ -55,7 +58,7 @@ export default function ConditionListHeader({
       {!isSearching && (
         <button
           onClick={onSortToggle}
-          aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to change.`}
+          aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
           style={{
             display:                 'flex',
             alignItems:              'center',
@@ -72,7 +75,7 @@ export default function ConditionListHeader({
           }}
         >
           <ArrowUpDown size={13} strokeWidth={1.8} />
-          {SORT_LABELS[sortMode]}
+          {SORT_LABELS[nextMode]}
         </button>
       )}
     </div>
