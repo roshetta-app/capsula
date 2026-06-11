@@ -1,31 +1,40 @@
 /**
- * Phase 2I — Search shared components: swap to ui/SearchBar + ui/AutocompleteDropdown.
+ * src/pages/ConditionsScreen.jsx
+ * Phase 4 — Conditions Screen Redesign
+ *
+ * Full rewrite wiring all redesigned components and hooks.
  *
  * Layout (top to bottom):
- *   1. Search bar (with autocomplete dropdown)
- *   2. Recently viewed chips row (hidden if empty)
- *   3. Specialty filter pills
- *   4. Condition cards list
- *
- * Uses:
- *   useConditionSearch  — fuzzy search + autocomplete + gap logging
- *   useRecentlyViewed   — last 5 viewed conditions from localStorage
- *   SpecialtyFilterPills — extracted specialty filter component
- *   RecentlyViewedChips  — recently viewed row
- *   ConditionCard        — rebuilt card (no bookmark, no age, has tagline + chevron)
+ *   1. Brand row (logo dot + "Capsula" wordmark) — owns the top section
+ *      since layout.jsx suppresses the shared header on this route
+ *   2. Search bar + autocomplete dropdown
+ *   3. Recently viewed chips (hidden when search is active)
+ *   4. Specialty filter pills (with overflow → bottom sheet)
+ *   5. ConditionListHeader (count + sort toggle)
+ *   6. Condition list:
+ *      — Empty state (ConditionsEmptyState)
+ *      — Searching: flat results.map() with highlight={query}
+ *      — Browsing:  alphabetGroup(results) with AlphabetSectionDividers
  */
 
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import Layout from '../components/layout'
-import SearchBar from '../components/ui/SearchBar'
-import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
-import ConditionCard from '../components/ConditionCard'
-import SpecialtyFilterPills from '../components/conditions/SpecialtyFilterPills'
-import RecentlyViewedChips  from '../components/conditions/RecentlyViewedChips'
+import Layout                  from '../components/layout'
+import SearchBar               from '../components/ui/SearchBar'
+import AutocompleteDropdown    from '../components/ui/AutocompleteDropdown'
+import ConditionCard           from '../components/ConditionCard'
+import SpecialtyFilterPills    from '../components/conditions/SpecialtyFilterPills'
+import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
+import ConditionListHeader     from '../components/conditions/ConditionListHeader'
+import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDivider'
+import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
+import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
-import { ROUTES } from '../router'
+import { useSortToggle }       from '../hooks/useSortToggle'
+import { alphabetGroup }       from '../utils/alphabetGroup'
+import { ROUTES }              from '../router'
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -41,14 +50,11 @@ function shimmer(extra = {}) {
 function SkeletonCard() {
   return (
     <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border:          '1px solid var(--color-border)',
-      borderRadius:    'var(--radius-lg)',
-      padding:         '12px var(--space-4)',
-      marginBottom:    'var(--space-2)',
-      display:         'flex',
-      alignItems:      'center',
-      gap:             'var(--space-3)',
+      display:      'flex',
+      alignItems:   'center',
+      gap:          'var(--space-3)',
+      padding:      '11px 0',
+      borderBottom: '0.5px solid var(--color-border-subtle)',
     }}>
       <div style={shimmer({ width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0 })} />
       <div style={{ flex: 1 }}>
@@ -59,12 +65,57 @@ function SkeletonCard() {
   )
 }
 
+// ─── Brand row — rendered here since shared header is suppressed ──────────────
+
+function BrandRow() {
+  return (
+    <div style={{
+      display:        'flex',
+      alignItems:     'center',
+      gap:            'var(--space-2)',
+      paddingTop:     'var(--space-4)',
+      paddingBottom:  'var(--space-4)',
+    }}>
+      <div style={{
+        width:           26,
+        height:          26,
+        borderRadius:    'var(--radius-full)',
+        background:      'var(--color-accent)',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        flexShrink:      0,
+      }}>
+        <div style={{
+          width:           9,
+          height:          9,
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'white',
+          opacity:         0.9,
+        }} />
+      </div>
+      <span style={{
+        fontSize:      17,
+        fontWeight:    600,
+        color:         'var(--color-text-primary)',
+        letterSpacing: '-0.3px',
+      }}>
+        Capsula
+      </span>
+    </div>
+  )
+}
+
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
-  const { recentlyViewed } = useRecentlyViewed()
+  const { recentlyViewed }                   = useRecentlyViewed()
+  const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
+
+  // Bottom sheet state — opened by "More" chip in SpecialtyFilterPills
+  const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
 
   const {
     query,
@@ -72,118 +123,162 @@ export default function ConditionsScreen() {
     activeSpecialty,
     setActiveSpecialty,
     results,
+    resultCount,
     suggestions,
     showSuggestions,
     clearSuggestions,
-  } = useConditionSearch(conditions)
+  } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
-  // ── Autocomplete: navigate to selected suggestion ─────────────────────────
+  // Derived state
+  const isSearching    = query.length >= 2
+  const specialtyName  = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
+  const totalCount     = conditions.length
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
   function handleSuggestionSelect(suggestion) {
     clearSuggestions()
     setQuery('')
     navigate(ROUTES.CONDITION_DETAIL(suggestion.slug))
   }
 
-  // ── Card tap ──────────────────────────────────────────────────────────────
   function handleCardTap(condition) {
     navigate(ROUTES.CONDITION_DETAIL(condition.slug))
   }
 
+  function handleClearSearch() {
+    setQuery('')
+    clearSuggestions()
+  }
+
+  function handleClearFilter() {
+    setActiveSpecialty('all')
+  }
+
   // ── Cold start skeleton ───────────────────────────────────────────────────
+
   if (loading && conditions.length === 0) {
     return (
       <Layout>
-        <div style={{ paddingTop: 'var(--space-5)' }}>
-          <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', overflow: 'hidden' }}>
-            {[80, 100, 70, 90, 110].map((w, i) => (
-              <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-            ))}
-          </div>
-          {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+        <BrandRow />
+        <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', overflow: 'hidden' }}>
+          {[60, 80, 60, 70, 90].map((w, i) => (
+            <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+          ))}
         </div>
+        {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
       </Layout>
     )
   }
 
   // ── Main render ───────────────────────────────────────────────────────────
+
   return (
     <Layout>
-      <div style={{ paddingTop: 'var(--space-5)' }}>
 
-        {/* 1. Search bar + autocomplete dropdown */}
-        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-          <SearchBar
-            value={query}
-            onChange={(val) => {
-              setQuery(val)
-              if (!val) clearSuggestions()
-            }}
-            placeholder="Search conditions…"
+      {/* Brand row — screen owns this since shared header is suppressed */}
+      <BrandRow />
+
+      {/* 1. Search bar + autocomplete dropdown */}
+      <div style={{ position: 'relative' }}>
+        <SearchBar
+          value={query}
+          onChange={val => {
+            setQuery(val)
+            if (!val) clearSuggestions()
+          }}
+        />
+        {showSuggestions && (
+          <AutocompleteDropdown
+            suggestions={suggestions}
+            onSelect={handleSuggestionSelect}
+            onDismiss={clearSuggestions}
           />
-          {showSuggestions && (
-            <AutocompleteDropdown
-              suggestions={suggestions}
-              onSelect={handleSuggestionSelect}
-              onDismiss={clearSuggestions}
-            />
-          )}
-        </div>
+        )}
+      </div>
 
-        {/* 2. Recently viewed chips (hidden if empty) */}
-        <RecentlyViewedChips recentlyViewed={recentlyViewed} />
+      {/* 2. Recently viewed chips — hidden when search is active */}
+      <RecentlyViewedChips
+        recentlyViewed={recentlyViewed}
+        hidden={isSearching}
+      />
 
-        {/* 3. Specialty filter pills */}
-        <SpecialtyFilterPills
-          specialties={specialties}
+      {/* 3. Specialty filter pills */}
+      <SpecialtyFilterPills
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelect={setActiveSpecialty}
+        onMoreTap={() => setBottomSheetOpen(true)}
+      />
+
+      {/* 4. Count + sort toggle row */}
+      <ConditionListHeader
+        totalCount={totalCount}
+        resultCount={resultCount}
+        activeSpecialty={activeSpecialty}
+        specialtyName={specialtyName}
+        isSearching={isSearching}
+        sortMode={sortMode}
+        onSortToggle={cycleSortMode}
+        SORT_LABELS={SORT_LABELS}
+      />
+
+      {/* 5. Condition list */}
+      {resultCount === 0 ? (
+
+        // Empty state
+        <ConditionsEmptyState
+          query={query}
           activeSpecialty={activeSpecialty}
-          onSelect={setActiveSpecialty}
+          specialtyName={specialtyName}
+          onClearSearch={handleClearSearch}
+          onClearFilter={handleClearFilter}
         />
 
-        {/* Result count */}
-        <div style={{
-          fontSize:     12,
-          color:        'var(--color-text-tertiary)',
-          fontFamily:   'var(--font-mono)',
-          marginBottom: 'var(--space-3)',
-        }}>
-          {results.length} condition{results.length !== 1 ? 's' : ''}
-          {query && ` for "${query}"`}
-        </div>
+      ) : isSearching ? (
 
-        {/* 4. Condition cards list */}
-        {results.length === 0 ? (
-          <div style={{
-            textAlign: 'center',
-            padding:   'var(--space-12) var(--space-4)',
-            color:     'var(--color-text-tertiary)',
-          }}>
-            <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.5"
-                strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8" />
-                <path d="m21 21-4.35-4.35" />
-              </svg>
-            </div>
-            <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
-              No conditions found{query && ` for "${query}"`}
-            </div>
+        // Search results — flat list with highlight
+        results.map(condition => (
+          <ConditionCard
+            key={condition.id}
+            condition={condition}
+            onTap={handleCardTap}
+            highlight={query}
+          />
+        ))
+
+      ) : (
+
+        // Browse mode — grouped by alphabet with section dividers
+        alphabetGroup(results).map(({ letter, items }) => (
+          <div key={letter}>
+            <AlphabetSectionDivider letter={letter} />
+            {items.map(condition => (
+              <ConditionCard
+                key={condition.id}
+                condition={condition}
+                onTap={handleCardTap}
+                highlight=""
+              />
+            ))}
           </div>
-        ) : (
-          results.map(condition => (
-            <ConditionCard
-              key={condition.id}
-              condition={condition}
-              onTap={handleCardTap}
-            />
-          ))
-        )}
+        ))
 
-      </div>
+      )}
+
+      {/* Specialties bottom sheet — triggered by "More" chip */}
+      <SpecialtiesBottomSheet
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelect={id => {
+          setActiveSpecialty(id)
+          setBottomSheetOpen(false)
+        }}
+        onClose={() => setBottomSheetOpen(false)}
+        isOpen={bottomSheetOpen}
+      />
+
     </Layout>
   )
 }
-
-
-
