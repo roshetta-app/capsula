@@ -79,10 +79,11 @@ export default function Layout({ children }) {
       <NotificationsBanner />
 
       {/* Main content — centred, bottom pad for fixed BottomNav */}
+      {/* --space-5 (20px) side padding gives the content more breathing room */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
-        padding:  '0 var(--space-4) calc(var(--space-12) + 60px)',
+        padding:  '0 var(--space-5) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>

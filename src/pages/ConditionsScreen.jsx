@@ -1,6 +1,12 @@
 /**
  * src/pages/ConditionsScreen.jsx
- * Phase 4 — Conditions Screen Redesign
+ * Phase 5 — Conditions Screen Redesign
+ *
+ * Changes from Phase 4:
+ *   - BrandRow replaced with ScreenHeader (logo + contextual headline)
+ *   - Headline collapses when search is active
+ *   - Tighter relational spacing between all header-area sections
+ *   - SearchBar owns no bottom margin — spacing handled by section gaps
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -56,43 +62,66 @@ function SkeletonCard() {
   )
 }
 
-// ─── Brand row ────────────────────────────────────────────────────────────────
+// ─── Screen header ────────────────────────────────────────────────────────────
+// Logo row + contextual headline. Headline collapses when search is active
+// to give the keyboard + results more vertical room.
 
-function BrandRow() {
+function ScreenHeader({ isSearching }) {
   return (
     <div style={{
-      display:       'flex',
-      alignItems:    'center',
-      gap:           'var(--space-2)',
       paddingTop:    'var(--space-4)',
-      paddingBottom: 'var(--space-4)',
+      paddingBottom: isSearching ? 'var(--space-3)' : 'var(--space-2)',
+      transition:    'padding-bottom 0.15s ease',
     }}>
+      {/* Logo row */}
       <div style={{
-        width:          26,
-        height:         26,
-        borderRadius:   'var(--radius-full)',
-        background:     'var(--color-accent)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        flexShrink:     0,
+        display:       'flex',
+        alignItems:    'center',
+        gap:           'var(--space-2)',
+        marginBottom:  isSearching ? 0 : 'var(--space-2)',
+        transition:    'margin-bottom 0.15s ease',
       }}>
         <div style={{
-          width:           9,
-          height:          9,
-          borderRadius:    'var(--radius-full)',
-          backgroundColor: 'white',
-          opacity:         0.9,
-        }} />
+          width:          26,
+          height:         26,
+          borderRadius:   'var(--radius-full)',
+          background:     'var(--color-accent)',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          flexShrink:     0,
+        }}>
+          <div style={{
+            width:           9,
+            height:          9,
+            borderRadius:    'var(--radius-full)',
+            backgroundColor: 'white',
+            opacity:         0.9,
+          }} />
+        </div>
+        <span style={{
+          fontSize:      17,
+          fontWeight:    600,
+          color:         'var(--color-text-primary)',
+          letterSpacing: '-0.3px',
+        }}>
+          Capsula
+        </span>
       </div>
-      <span style={{
-        fontSize:      17,
-        fontWeight:    600,
-        color:         'var(--color-text-primary)',
-        letterSpacing: '-0.3px',
-      }}>
-        Capsula
-      </span>
+
+      {/* Headline — hidden while searching */}
+      {!isSearching && (
+        <h1 style={{
+          margin:        0,
+          fontSize:      26,
+          fontWeight:    700,
+          letterSpacing: '-0.5px',
+          lineHeight:    1.15,
+          color:         'var(--color-text-primary)',
+        }}>
+          What are you looking for?
+        </h1>
+      )}
     </div>
   )
 }
@@ -150,8 +179,15 @@ export default function ConditionsScreen() {
   if (loading && conditions.length === 0) {
     return (
       <Layout>
-        <BrandRow />
-        <div style={shimmer({ width: '100%', height: 44, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
+        {/* Skeleton header */}
+        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+            <div style={shimmer({ width: 26, height: 26, borderRadius: 'var(--radius-full)' })} />
+            <div style={shimmer({ width: 70, height: 16 })} />
+          </div>
+          <div style={shimmer({ width: '75%', height: 28, borderRadius: 'var(--radius-md)' })} />
+        </div>
+        <div style={shimmer({ width: '100%', height: 48, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)', overflow: 'hidden' }}>
           {[60, 80, 60, 70, 90].map((w, i) => (
             <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
@@ -210,10 +246,11 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      <BrandRow />
+      {/* 1. Screen header — logo + headline (headline hides when searching) */}
+      <ScreenHeader isSearching={isSearching} />
 
-      {/* 1. Search bar + autocomplete */}
-      <div style={{ position: 'relative' }}>
+      {/* 2. Search bar + autocomplete */}
+      <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
         <SearchBar
           value={query}
           onChange={val => {
@@ -230,13 +267,13 @@ export default function ConditionsScreen() {
         )}
       </div>
 
-      {/* 2. Recently viewed chips — hidden when searching */}
+      {/* 3. Recently viewed — compact inline row, hidden when searching */}
       <RecentlyViewedChips
         recentlyViewed={recentlyViewed}
         hidden={isSearching}
       />
 
-      {/* 3. Specialty filter pills */}
+      {/* 4. Specialty filter pills */}
       <SpecialtyFilterPills
         specialties={specialties}
         activeSpecialty={activeSpecialty}
@@ -244,7 +281,7 @@ export default function ConditionsScreen() {
         onMoreTap={() => setBottomSheetOpen(true)}
       />
 
-      {/* 4. Count + sort toggle row */}
+      {/* 5. Count + sort toggle row */}
       <ConditionListHeader
         totalCount={totalCount}
         resultCount={resultCount}
@@ -256,7 +293,7 @@ export default function ConditionsScreen() {
         SORT_LABELS={SORT_LABELS}
       />
 
-      {/* 5. Condition list */}
+      {/* 6. Condition list */}
       {renderList()}
 
       {/* Specialties bottom sheet */}
