@@ -9,7 +9,8 @@
  *   setQuery             — setter
  *   activeSpecialty      — 'all' | specialty id
  *   setActiveSpecialty   — setter
- *   results              — filtered + fuzzy-matched ConditionFull[]
+ *   results              — filtered + fuzzy-matched ConditionFull[], sorted per sortMode
+ *   resultCount          — results.length as a plain integer
  *   suggestions          — top 5 autocomplete matches [{ id, name, slug }]
  *   showSuggestions      — boolean, true when dropdown should be visible
  *   clearSuggestions     — call this when user taps outside or picks a suggestion
@@ -19,7 +20,35 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { buildConditionIndex, fuzzySearchConditions, getAutocompleteSuggestions } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
-export function useConditionSearch(conditions) {
+/**
+ * Sorts a ConditionFull[] according to the active sort mode.
+ * Not exported — internal to this module.
+ *
+ * @param {ConditionFull[]} items
+ * @param {'az'|'recent'} mode
+ * @param {string[]} recentIds  — ordered most-recent first
+ * @returns {ConditionFull[]}
+ */
+function applySortMode(items, mode, recentIds) {
+  if (mode === 'recent') {
+    return [...items].sort((a, b) => {
+      const ai = recentIds.indexOf(a.id)
+      const bi = recentIds.indexOf(b.id)
+      // Both in recent list: sort by recency position
+      if (ai !== -1 && bi !== -1) return ai - bi
+      // Only a is recent: a comes first
+      if (ai !== -1) return -1
+      // Only b is recent: b comes first
+      if (bi !== -1) return 1
+      // Neither recent: fall back to A–Z
+      return a.name.localeCompare(b.name)
+    })
+  }
+  // Default: A–Z
+  return [...items].sort((a, b) => a.name.localeCompare(b.name))
+}
+
+export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedIds = []) {
   const [query,           setQuery]           = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState('all')
   const [results,         setResults]         = useState(conditions)
@@ -47,7 +76,6 @@ export function useConditionSearch(conditions) {
     let matched
     if (q.trim().length >= 2) {
       // Search within specialty-filtered pool
-      const Fuse = fuseRef.current.constructor
       const { buildConditionIndex: build, fuzzySearchConditions: search } =
         // Re-import helpers to search a sub-pool
         require('../utils/searchUtils')
@@ -57,7 +85,9 @@ export function useConditionSearch(conditions) {
       matched = pool
     }
 
-    setResults(matched)
+    // Step 3: apply sort mode
+    const sorted = applySortMode(matched, sortMode, recentlyViewedIds)
+    setResults(sorted)
 
     // Log zero-result gaps (debounced — only after user pauses)
     if (q.trim().length >= 2 && matched.length === 0) {
@@ -73,13 +103,13 @@ export function useConditionSearch(conditions) {
       setSuggestions([])
       setShowSuggestions(false)
     }
-  }, [conditions])
+  }, [conditions, sortMode, recentlyViewedIds])
 
   // Debounce: 150ms
   useEffect(() => {
     const timer = setTimeout(() => runSearch(query, activeSpecialty), 150)
     return () => clearTimeout(timer)
-  }, [query, activeSpecialty, runSearch])
+  }, [query, activeSpecialty, sortMode, runSearch])
 
   function clearSuggestions() {
     setShowSuggestions(false)
@@ -91,6 +121,7 @@ export function useConditionSearch(conditions) {
     activeSpecialty,
     setActiveSpecialty,
     results,
+    resultCount: results.length,
     suggestions,
     showSuggestions,
     clearSuggestions,
