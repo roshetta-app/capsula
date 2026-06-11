@@ -16,7 +16,7 @@ const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
  *
  * Exposes:
  *   conditions  — ConditionFull[] (Uncategorized specialty label stripped)
- *   specialties — Specialty[]  (unique, sorted by name, Uncategorized excluded)
+ *   specialties — Specialty[]  (unique, sorted by admin sort_order, Uncategorized excluded)
  *   loading     — true only on cold start
  *   error       — string | null
  *   refresh     — () => void  (force re-fetch, e.g. after CMS save)
@@ -80,21 +80,24 @@ export function useConditions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Exclude Uncategorized from specialty pills — derived from conditions, sorted by name
+  // Exclude Uncategorized from specialty pills — sorted by admin sort_order, fallback to name
   const specialties = useMemo(() => {
     const seen = new Map()
     for (const c of conditions) {
       if (c.specialtyId && c.specialtyId !== UNCATEGORIZED_ID && !seen.has(c.specialtyId)) {
         seen.set(c.specialtyId, {
-          id:       c.specialtyId,
-          name:     c.specialtyName,
-          slug:     c.specialtySlug,
-          iconName: c.specialtyIcon,
-          colorHex: c.specialtyColor,
+          id:        c.specialtyId,
+          name:      c.specialtyName,
+          slug:      c.specialtySlug,
+          iconName:  c.specialtyIcon,
+          colorHex:  c.specialtyColor,
+          sortOrder: c.specialtySortOrder,
         })
       }
     }
-    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name))
+    return [...seen.values()].sort((a, b) =>
+      (a.sortOrder ?? 999) - (b.sortOrder ?? 999) || a.name.localeCompare(b.name)
+    )
   }, [conditions])
 
   // Strip Uncategorized specialty label from conditions so cards show no tag
