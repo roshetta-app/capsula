@@ -86,12 +86,19 @@ export function useConditions() {
     for (const c of conditions) {
       if (c.specialtyId && c.specialtyId !== UNCATEGORIZED_ID && !seen.has(c.specialtyId)) {
         seen.set(c.specialtyId, {
-          id:        c.specialtyId,
-          name:      c.specialtyName,
-          slug:      c.specialtySlug,
-          iconName:  c.specialtyIcon,
-          colorHex:  c.specialtyColor,
-          sortOrder: c.specialtySortOrder,
+          id:         c.specialtyId,
+          name:       c.specialtyName,
+          slug:       c.specialtySlug,
+          // Legacy hex fields (kept for any code that still reads them)
+          iconName:   c.specialtyIcon,
+          colorHex:   c.specialtyColor,
+          // Phase-6 token fields expected by SpecialtyFilterPills + SpecialtiesBottomSheet
+          iconType:   c.specialtyIconType,
+          iconValue:  c.specialtyIconType === 'custom'
+                        ? c.specialtyIconUrl
+                        : (c.specialtyIcon ?? 'Stethoscope'),
+          colorToken: c.specialtyColorToken,
+          sortOrder:  c.specialtySortOrder,
         })
       }
     }
