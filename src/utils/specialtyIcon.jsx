@@ -23,8 +23,6 @@ import {
 } from 'lucide-react'
 
 // ─── Curated icon map ─────────────────────────────────────────────────────────
-// Only icons that clearly represent a medical specialty are listed.
-// Admins pick from this list — no free-text entry.
 
 export const LUCIDE_ICON_OPTIONS = [
   { key: 'Stethoscope',     label: 'General / Adults',     Icon: Stethoscope     },
@@ -58,16 +56,15 @@ export const LUCIDE_ICON_OPTIONS = [
   { key: 'UserRound',       label: 'General Practitioner', Icon: UserRound       },
 ]
 
-// Fast lookup map: key → Icon component
 const ICON_MAP = Object.fromEntries(
   LUCIDE_ICON_OPTIONS.map(({ key, Icon }) => [key, Icon])
 )
 
 // ─── In-memory SVG cache ──────────────────────────────────────────────────────
-// Avoids re-fetching the same URL on every render / remount.
+
 const svgCache = new Map()
 
-// ─── InlineSvg — fetches + injects SVG markup with color tinting ──────────────
+// ─── InlineSvg ────────────────────────────────────────────────────────────────
 
 function InlineSvg({ url, size, color, style }) {
   const [markup, setMarkup] = useState(() => svgCache.get(url) ?? null)
@@ -86,14 +83,11 @@ function InlineSvg({ url, size, color, style }) {
         svgCache.set(url, text)
         setMarkup(text)
       })
-      .catch(() => {
-        // Silently fall back — outer component shows Stethoscope on null markup
-      })
+      .catch(() => {})
     return () => { cancelled = true }
   }, [url])
 
   if (!markup) {
-    // While loading, render a same-size transparent placeholder
     return (
       <span
         aria-hidden="true"
@@ -102,12 +96,6 @@ function InlineSvg({ url, size, color, style }) {
     )
   }
 
-  // Inject the SVG string into the DOM.
-  // Force width/height/color so the icon always matches Lucide sizing + tinting.
-  // We set `color` on the wrapper so SVGs that use `currentColor` for stroke/fill
-  // pick it up automatically. For SVGs with hard-coded stroke/fill values we also
-  // patch them via a CSS filter fallback isn't needed — admins are instructed to
-  // upload monochrome SVGs that use currentColor or inherit.
   return (
     <span
       aria-hidden="true"
@@ -116,51 +104,62 @@ function InlineSvg({ url, size, color, style }) {
         flexShrink: 0,
         width:      size,
         height:     size,
-        color,          // currentColor cascade into inline SVG stroke/fill
-        lineHeight: 0,  // kills ghost whitespace below the span
+        color,
+        lineHeight: 0,
         ...style,
       }}
-      // dangerouslySetInnerHTML is safe here: the SVG comes from our own
-      // Supabase Storage bucket (admin-only upload, SVG-mime enforced).
       dangerouslySetInnerHTML={{ __html: patchSvg(markup, size, color) }}
     />
   )
 }
 
 /**
- * Patch the raw SVG string so it:
- *  1. Fits exactly into the requested size box
- *  2. Inherits color via currentColor on stroke + fill where no explicit value
- *     was set — making monochrome SVGs respond to the `color` CSS prop.
+ * Patch a raw SVG string so it:
+ *  1. Fits the requested size (removes hard-coded w/h, relies on viewBox)
+ *  2. Replaces every real-world black colour variant with currentColor so the
+ *     parent `color` CSS prop tints stroke + fill correctly.
+ *
+ * Colour variants covered:
+ *   #000000  #000  #000000ff  black  rgb(0,0,0)  rgba(0,0,0,1)  rgba(0,0,0,.*)
+ *   Also handles stroke/fill with no value (SVG default = black) by injecting
+ *   currentColor explicitly on the <svg> root.
  */
 function patchSvg(raw, size, color) {
-  return raw
-    // Force width + height attributes
-    .replace(/<svg([^>]*)width="[^"]*"/, `<svg$1width="${size}"`)
-    .replace(/<svg([^>]*)height="[^"]*"/, `<svg$1height="${size}"`)
-    // If no width/height present at all, inject them after <svg
-    .replace(/^(<svg(?![^>]*width)[^>]*)>/, `$1 width="${size}" height="${size}">`)
-    // Replace hard-coded black stroke/fill with currentColor so CSS color applies
-    .replace(/stroke="#000000"/g,  'stroke="currentColor"')
-    .replace(/stroke="#000"/g,     'stroke="currentColor"')
-    .replace(/fill="#000000"/g,    'fill="currentColor"')
-    .replace(/fill="#000"/g,       'fill="currentColor"')
-    // Inject a top-level color style on the <svg> element itself
-    .replace(/<svg/, `<svg style="color:${color};display:block" `)
+  let svg = raw
+
+  // ── 1. Remove hard-coded width/height attributes from the <svg> tag so the
+  //       element scales to the wrapper <span> instead of overflowing it.
+  svg = svg.replace(/<svg([^>]*)\swidth="[^"]*"/, '<svg$1')
+  svg = svg.replace(/<svg([^>]*)\sheight="[^"]*"/, '<svg$1')
+
+  // ── 2. Replace every black colour variant with currentColor ──────────────
+  //   Attribute-level: stroke="..." fill="..."
+  const blackPattern =
+    /#000(?:000)?(?:[fF]{2})?|black|rgb\(0,\s*0,\s*0\)|rgba\(0,\s*0,\s*0,\s*(?:1|1\.0+|0?\.[0-9]+)\)/g
+
+  svg = svg
+    .replace(new RegExp(`(stroke=")(?:${blackPattern.source})(")`, 'gi'),
+      'stroke="currentColor"')
+    .replace(new RegExp(`(fill=")(?:${blackPattern.source})(")`, 'gi'),
+      'fill="currentColor"')
+    // style="... stroke:#000 ..." and style="... fill:#000 ..."
+    .replace(/stroke\s*:\s*(?:#000(?:000)?(?:[fF]{2})?|black|rgb\(0,0,0\))/gi,
+      'stroke:currentColor')
+    .replace(/fill\s*:\s*(?:#000(?:000)?(?:[fF]{2})?|black|rgb\(0,0,0\))/gi,
+      'fill:currentColor')
+
+  // ── 3. Inject size + color on the <svg> root so viewBox scales and
+  //       currentColor resolves correctly throughout the tree.
+  svg = svg.replace(
+    /<svg/,
+    `<svg width="${size}" height="${size}" style="display:block;color:${color}" `,
+  )
+
+  return svg
 }
 
 // ─── SpecialtyIcon component ──────────────────────────────────────────────────
 
-/**
- * Renders the correct icon for a specialty.
- *
- * Props:
- *   iconType  'lucide' | 'custom'  (defaults to 'lucide')
- *   iconValue string               — Lucide key OR Storage URL
- *   size      number               — px (default 18)
- *   color     string               — CSS color value for stroke/fill tinting
- *   style     object               — extra styles applied to wrapper
- */
 export function SpecialtyIcon({
   iconType  = 'lucide',
   iconValue = 'Stethoscope',
@@ -179,7 +178,6 @@ export function SpecialtyIcon({
     )
   }
 
-  // Lucide (default)
   const Icon = ICON_MAP[iconValue] ?? Stethoscope
   return (
     <Icon
