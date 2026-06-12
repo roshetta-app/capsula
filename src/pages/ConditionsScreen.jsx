@@ -2,10 +2,10 @@
  * src/pages/ConditionsScreen.jsx
  * Phase 5 — Conditions Screen Redesign
  *
- * Changes from Phase 4:
- *   - Hero headline removed; logo row only
- *   - Tighter relational spacing throughout header area
- *   - SearchBar owns no bottom margin
+ * Changes from previous:
+ *   - BrandRow: logo dot 26→32px, name 17→19px
+ *   - BrandRow: bold headline "What are you looking for?" added below logo row
+ *   - Headline collapses when search is active (isSearching) to reclaim space
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -61,43 +61,67 @@ function SkeletonCard() {
   )
 }
 
-// ─── Logo row ─────────────────────────────────────────────────────────────────
+// ─── Brand row + headline ─────────────────────────────────────────────────────
+// Logo and app name are the orientation anchor.
+// Headline "What are you looking for?" is the primary visual focal point —
+// large, bold, draws the eye down toward the search bar.
+// Both collapse gracefully when the user starts typing.
 
-function BrandRow() {
+function BrandRow({ isSearching }) {
   return (
     <div style={{
-      display:       'flex',
-      alignItems:    'center',
-      gap:           'var(--space-2)',
       paddingTop:    'var(--space-4)',
       paddingBottom: 'var(--space-3)',
     }}>
+      {/* Logo + name */}
       <div style={{
-        width:          26,
-        height:         26,
-        borderRadius:   'var(--radius-full)',
-        background:     'var(--color-accent)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        flexShrink:     0,
+        display:      'flex',
+        alignItems:   'center',
+        gap:          'var(--space-2)',
+        marginBottom: isSearching ? 0 : 'var(--space-2)',
+        transition:   'margin-bottom 0.15s ease',
       }}>
         <div style={{
-          width:           9,
-          height:          9,
-          borderRadius:    'var(--radius-full)',
-          backgroundColor: 'white',
-          opacity:         0.9,
-        }} />
+          width:          32,
+          height:         32,
+          borderRadius:   'var(--radius-full)',
+          background:     'var(--color-accent)',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          flexShrink:     0,
+        }}>
+          <div style={{
+            width:           11,
+            height:          11,
+            borderRadius:    'var(--radius-full)',
+            backgroundColor: 'white',
+            opacity:         0.9,
+          }} />
+        </div>
+        <span style={{
+          fontSize:      19,
+          fontWeight:    700,
+          color:         'var(--color-text-primary)',
+          letterSpacing: '-0.4px',
+        }}>
+          Capsula
+        </span>
       </div>
-      <span style={{
-        fontSize:      17,
-        fontWeight:    600,
-        color:         'var(--color-text-primary)',
-        letterSpacing: '-0.3px',
-      }}>
-        Capsula
-      </span>
+
+      {/* Headline — collapses while searching to reclaim vertical space */}
+      {!isSearching && (
+        <h1 style={{
+          margin:        0,
+          fontSize:      28,
+          fontWeight:    700,
+          letterSpacing: '-0.6px',
+          lineHeight:    1.15,
+          color:         'var(--color-text-primary)',
+        }}>
+          What are you<br />looking for?
+        </h1>
+      )}
     </div>
   )
 }
@@ -195,9 +219,15 @@ export default function ConditionsScreen() {
   if (loading && conditions.length === 0) {
     return (
       <Layout>
-        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <div style={shimmer({ width: 26, height: 26, borderRadius: 'var(--radius-full)' })} />
-          <div style={shimmer({ width: 70, height: 16 })} />
+        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+            <div style={shimmer({ width: 32, height: 32, borderRadius: 'var(--radius-full)' })} />
+            <div style={shimmer({ width: 80, height: 19 })} />
+          </div>
+          <div style={shimmer({ width: '72%', height: 28, borderRadius: 'var(--radius-sm)' })} />
+          <div style={{ marginTop: 6 }}>
+            <div style={shimmer({ width: '55%', height: 28, borderRadius: 'var(--radius-sm)' })} />
+          </div>
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
@@ -215,8 +245,8 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* 1. Logo row */}
-      <BrandRow />
+      {/* 1. Brand row + headline */}
+      <BrandRow isSearching={isSearching} />
 
       {/* 2. Search bar + autocomplete */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
