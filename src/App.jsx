@@ -15,8 +15,11 @@ import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
+import { useDarkMode } from './hooks/useDarkMode'
 
 export default function App() {
+  useDarkMode() // applies/removes .dark on <html> based on OS preference
+
   return (
     <ErrorBoundary>
       <BrowserRouter basename="/capsula">

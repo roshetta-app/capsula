@@ -58,19 +58,24 @@ const ICON_MAP = Object.fromEntries(
 )
 
 // ─── Dark-mode hook ───────────────────────────────────────────────────────────
-// Subscribes to OS colour-scheme changes so icons re-tint on toggle.
+// Reads the .dark class on <html> (applied by useDarkMode()) via MutationObserver.
+// This stays in sync with the CSS — not the raw OS preference — so token colors
+// and CSS variables always agree, even if dark mode is toggled programmatically.
 
 export function useIsDark() {
-  const mq = typeof window !== 'undefined'
-    ? window.matchMedia('(prefers-color-scheme: dark)')
-    : null
-  const [isDark, setIsDark] = useState(mq?.matches ?? false)
+  const [isDark, setIsDark] = useState(
+    () => typeof document !== 'undefined'
+      ? document.documentElement.classList.contains('dark')
+      : false
+  )
   useEffect(() => {
-    if (!mq) return
-    const handler = (e) => setIsDark(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [mq])
+    const root = document.documentElement
+    const observer = new MutationObserver(() => {
+      setIsDark(root.classList.contains('dark'))
+    })
+    observer.observe(root, { attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [])
   return isDark
 }
 
