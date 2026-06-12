@@ -6,6 +6,7 @@
  *   - AutocompleteDropdown removed; live list is the sole search UI
  *   - showSuggestions / clearSuggestions wiring removed
  *   - showList constant removed — list always visible
+ *   - Dark mode toggle added to BrandRow (top-right, sun/moon icon button)
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -28,6 +29,7 @@ import { useConditionContext }  from '../context/ConditionContext'
 import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
+import { useDarkMode }         from '../hooks/useDarkMode'
 import { alphabetGroup }       from '../utils/alphabetGroup'
 import { ROUTES }              from '../router'
 
@@ -60,9 +62,58 @@ function SkeletonCard() {
   )
 }
 
+// ─── Dark mode toggle button ──────────────────────────────────────────────────
+
+function DarkModeToggle({ isDark, onToggle }) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      style={{
+        width:                   36,
+        height:                  36,
+        borderRadius:            'var(--radius-full)',
+        border:                  '1.5px solid var(--color-border)',
+        backgroundColor:         'var(--color-surface)',
+        display:                 'flex',
+        alignItems:              'center',
+        justifyContent:          'center',
+        cursor:                  'pointer',
+        flexShrink:              0,
+        color:                   'var(--color-text-secondary)',
+        transition:              'background-color 0.15s ease, border-color 0.15s ease',
+        outline:                 'none',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {isDark ? (
+        /* Sun icon */
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="4"/>
+          <line x1="12" y1="2"  x2="12" y2="4"/>
+          <line x1="12" y1="20" x2="12" y2="22"/>
+          <line x1="4.22" y1="4.22"   x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="2"  y1="12" x2="4"  y2="12"/>
+          <line x1="20" y1="12" x2="22" y2="12"/>
+          <line x1="4.22" y1="19.78"  x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      ) : (
+        /* Moon icon */
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
-function BrandRow({ isSearching }) {
+function BrandRow({ isSearching, isDark, onToggleDark }) {
   return (
     <div style={{
       paddingTop:    'var(--space-4)',
@@ -75,6 +126,7 @@ function BrandRow({ isSearching }) {
         marginBottom: isSearching ? 0 : 'var(--space-2)',
         transition:   'margin-bottom 0.15s ease',
       }}>
+        {/* Logo + wordmark */}
         <div style={{
           width:          32,
           height:         32,
@@ -98,9 +150,13 @@ function BrandRow({ isSearching }) {
           fontWeight:    700,
           color:         'var(--color-text-primary)',
           letterSpacing: '-0.4px',
+          flex:          1,
         }}>
           Capsula
         </span>
+
+        {/* Dark mode toggle — top right */}
+        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
       </div>
 
       {!isSearching && (
@@ -126,6 +182,7 @@ export default function ConditionsScreen() {
   const { conditions, specialties, loading } = useConditionContext()
   const { recentlyViewed }                   = useRecentlyViewed()
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
+  const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
 
@@ -228,8 +285,12 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* 1. Brand row + headline */}
-      <BrandRow isSearching={isSearching} />
+      {/* 1. Brand row + headline + dark mode toggle */}
+      <BrandRow
+        isSearching={isSearching}
+        isDark={isDark}
+        onToggleDark={toggleDark}
+      />
 
       {/* 2. Search bar */}
       <div style={{ marginBottom: 'var(--space-2)' }}>
