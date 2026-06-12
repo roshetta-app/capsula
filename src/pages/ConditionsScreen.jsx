@@ -3,9 +3,9 @@
  * Phase 5 — Conditions Screen Redesign
  *
  * Changes from previous:
- *   - List is suppressed while autocomplete dropdown is visible (showSuggestions)
- *   - Dropdown = fast tap-and-go navigation (top 5, no scroll needed)
- *   - List = appears after dropdown dismissed or cleared, full filtered results
+ *   - AutocompleteDropdown removed; live list is the sole search UI
+ *   - showSuggestions / clearSuggestions wiring removed
+ *   - showList constant removed — list always visible
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -17,7 +17,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
-import AutocompleteDropdown    from '../components/ui/AutocompleteDropdown'
 import ConditionCard           from '../components/ConditionCard'
 import SpecialtyFilterPills    from '../components/conditions/SpecialtyFilterPills'
 import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
@@ -137,24 +136,13 @@ export default function ConditionsScreen() {
     setActiveSpecialty,
     results,
     resultCount,
-    suggestions,
-    showSuggestions,
-    clearSuggestions,
   } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
   const isSearching   = query.length >= 1
-  // List is visible when not showing the dropdown shortcut
-  const showList      = !showSuggestions
   const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
   const totalCount    = conditions.length
 
   // ── Handlers ────────────────────────────────────────────────────────────────
-
-  function handleSuggestionSelect(suggestion) {
-    clearSuggestions()
-    setQuery('')
-    navigate(ROUTES.CONDITION_DETAIL(suggestion.slug))
-  }
 
   function handleCardTap(condition) {
     navigate(ROUTES.CONDITION_DETAIL(condition.slug))
@@ -162,7 +150,6 @@ export default function ConditionsScreen() {
 
   function handleClearSearch() {
     setQuery('')
-    clearSuggestions()
   }
 
   function handleClearFilter() {
@@ -244,58 +231,42 @@ export default function ConditionsScreen() {
       {/* 1. Brand row + headline */}
       <BrandRow isSearching={isSearching} />
 
-      {/* 2. Search bar + autocomplete dropdown */}
-      <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
+      {/* 2. Search bar */}
+      <div style={{ marginBottom: 'var(--space-2)' }}>
         <SearchBar
           value={query}
-          onChange={val => {
-            setQuery(val)
-            if (!val) clearSuggestions()
-          }}
+          onChange={val => setQuery(val)}
         />
-        {/* Dropdown: fast tap-and-go shortcut — suppresses the list below while visible */}
-        {showSuggestions && (
-          <AutocompleteDropdown
-            suggestions={suggestions}
-            onSelect={handleSuggestionSelect}
-            onDismiss={clearSuggestions}
-          />
-        )}
       </div>
 
-      {/* 3–6: hidden while dropdown is open — reappears on dismiss or outside tap */}
-      {showList && (
-        <>
-          {/* 3. Recently viewed */}
-          <RecentlyViewedChips
-            recentlyViewed={recentlyViewed}
-            hidden={isSearching}
-          />
+      {/* 3. Recently viewed */}
+      <RecentlyViewedChips
+        recentlyViewed={recentlyViewed}
+        hidden={isSearching}
+      />
 
-          {/* 4. Specialty filter pills */}
-          <SpecialtyFilterPills
-            specialties={specialties}
-            activeSpecialty={activeSpecialty}
-            onSelect={setActiveSpecialty}
-            onMoreTap={() => setBottomSheetOpen(true)}
-          />
+      {/* 4. Specialty filter pills */}
+      <SpecialtyFilterPills
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelect={setActiveSpecialty}
+        onMoreTap={() => setBottomSheetOpen(true)}
+      />
 
-          {/* 5. Count + sort row */}
-          <ConditionListHeader
-            totalCount={totalCount}
-            resultCount={resultCount}
-            activeSpecialty={activeSpecialty}
-            specialtyName={specialtyName}
-            isSearching={isSearching}
-            sortMode={sortMode}
-            onSortToggle={cycleSortMode}
-            SORT_LABELS={SORT_LABELS}
-          />
+      {/* 5. Count + sort row */}
+      <ConditionListHeader
+        totalCount={totalCount}
+        resultCount={resultCount}
+        activeSpecialty={activeSpecialty}
+        specialtyName={specialtyName}
+        isSearching={isSearching}
+        sortMode={sortMode}
+        onSortToggle={cycleSortMode}
+        SORT_LABELS={SORT_LABELS}
+      />
 
-          {/* 6. Condition list */}
-          {renderList()}
-        </>
-      )}
+      {/* 6. Condition list */}
+      {renderList()}
 
       {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet
