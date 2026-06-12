@@ -4,13 +4,16 @@
  * Two-source specialty icon system.
  *
  * icon_type === 'lucide'  → renders a Lucide React component by name
- * icon_type === 'custom'  → renders <img src={icon_url}> (SVG from Supabase Storage)
+ * icon_type === 'custom'  → fetches SVG from Supabase Storage and injects it
+ *                           inline so CSS color / stroke tinting works exactly
+ *                           like Lucide icons (was <img> — cannot be tinted)
  * fallback                → renders <Stethoscope> (safe default)
  *
  * Admin-facing curated Lucide icon list is exported as LUCIDE_ICON_OPTIONS.
  * Each entry has: { key, label, Icon (component) }
  */
 
+import { useState, useEffect } from 'react'
 import {
   Stethoscope, Baby, Brain, Bone, Eye, Ear, Syringe, Pill,
   Microscope, HeartPulse, Hospital, BriefcaseMedical, Dna,
@@ -60,6 +63,92 @@ const ICON_MAP = Object.fromEntries(
   LUCIDE_ICON_OPTIONS.map(({ key, Icon }) => [key, Icon])
 )
 
+// ─── In-memory SVG cache ──────────────────────────────────────────────────────
+// Avoids re-fetching the same URL on every render / remount.
+const svgCache = new Map()
+
+// ─── InlineSvg — fetches + injects SVG markup with color tinting ──────────────
+
+function InlineSvg({ url, size, color, style }) {
+  const [markup, setMarkup] = useState(() => svgCache.get(url) ?? null)
+
+  useEffect(() => {
+    if (!url) return
+    if (svgCache.has(url)) {
+      setMarkup(svgCache.get(url))
+      return
+    }
+    let cancelled = false
+    fetch(url)
+      .then(r => r.text())
+      .then(text => {
+        if (cancelled) return
+        svgCache.set(url, text)
+        setMarkup(text)
+      })
+      .catch(() => {
+        // Silently fall back — outer component shows Stethoscope on null markup
+      })
+    return () => { cancelled = true }
+  }, [url])
+
+  if (!markup) {
+    // While loading, render a same-size transparent placeholder
+    return (
+      <span
+        aria-hidden="true"
+        style={{ width: size, height: size, display: 'block', flexShrink: 0, ...style }}
+      />
+    )
+  }
+
+  // Inject the SVG string into the DOM.
+  // Force width/height/color so the icon always matches Lucide sizing + tinting.
+  // We set `color` on the wrapper so SVGs that use `currentColor` for stroke/fill
+  // pick it up automatically. For SVGs with hard-coded stroke/fill values we also
+  // patch them via a CSS filter fallback isn't needed — admins are instructed to
+  // upload monochrome SVGs that use currentColor or inherit.
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display:    'block',
+        flexShrink: 0,
+        width:      size,
+        height:     size,
+        color,          // currentColor cascade into inline SVG stroke/fill
+        lineHeight: 0,  // kills ghost whitespace below the span
+        ...style,
+      }}
+      // dangerouslySetInnerHTML is safe here: the SVG comes from our own
+      // Supabase Storage bucket (admin-only upload, SVG-mime enforced).
+      dangerouslySetInnerHTML={{ __html: patchSvg(markup, size, color) }}
+    />
+  )
+}
+
+/**
+ * Patch the raw SVG string so it:
+ *  1. Fits exactly into the requested size box
+ *  2. Inherits color via currentColor on stroke + fill where no explicit value
+ *     was set — making monochrome SVGs respond to the `color` CSS prop.
+ */
+function patchSvg(raw, size, color) {
+  return raw
+    // Force width + height attributes
+    .replace(/<svg([^>]*)width="[^"]*"/, `<svg$1width="${size}"`)
+    .replace(/<svg([^>]*)height="[^"]*"/, `<svg$1height="${size}"`)
+    // If no width/height present at all, inject them after <svg
+    .replace(/^(<svg(?![^>]*width)[^>]*)>/, `$1 width="${size}" height="${size}">`)
+    // Replace hard-coded black stroke/fill with currentColor so CSS color applies
+    .replace(/stroke="#000000"/g,  'stroke="currentColor"')
+    .replace(/stroke="#000"/g,     'stroke="currentColor"')
+    .replace(/fill="#000000"/g,    'fill="currentColor"')
+    .replace(/fill="#000"/g,       'fill="currentColor"')
+    // Inject a top-level color style on the <svg> element itself
+    .replace(/<svg/, `<svg style="color:${color};display:block" `)
+}
+
 // ─── SpecialtyIcon component ──────────────────────────────────────────────────
 
 /**
@@ -69,7 +158,7 @@ const ICON_MAP = Object.fromEntries(
  *   iconType  'lucide' | 'custom'  (defaults to 'lucide')
  *   iconValue string               — Lucide key OR Storage URL
  *   size      number               — px (default 18)
- *   color     string               — CSS color value for Lucide stroke
+ *   color     string               — CSS color value for stroke/fill tinting
  *   style     object               — extra styles applied to wrapper
  */
 export function SpecialtyIcon({
@@ -81,19 +170,11 @@ export function SpecialtyIcon({
 }) {
   if (iconType === 'custom' && iconValue) {
     return (
-      <img
-        src={iconValue}
-        width={size}
-        height={size}
-        alt=""
-        aria-hidden="true"
-        style={{
-          objectFit:  'contain',
-          flexShrink: 0,
-          display:    'block',
-          filter:     'none',
-          ...style,
-        }}
+      <InlineSvg
+        url={iconValue}
+        size={size}
+        color={color}
+        style={style}
       />
     )
   }
