@@ -149,14 +149,18 @@ const svgCache = new Map()
 /**
  * Rewrite a raw SVG string so it:
  *  1. Fits exactly into `size` px (strips existing w/h, injects via attribute)
- *  2. Replaces every real-world black colour with currentColor so the parent
- *     `color` CSS prop tints stroke + fill correctly.
+ *  2. Replaces ANY hardcoded fill/stroke color (hex of any length, rgb()/rgba(),
+ *     or named colors — e.g. #000, #1D1D1B, #3B82F6, rgb(34,34,34), navy) with
+ *     currentColor, so the parent `color` CSS prop tints the icon correctly —
+ *     just like Lucide icons. 'none', 'transparent', 'currentColor', and
+ *     url(#...) paint-server references (gradients/patterns) are left alone.
+ *  3. If the root <svg> doesn't declare its own fill, adds fill="currentColor"
+ *     to it — covers icons whose paths rely on the SVG-spec default fill
+ *     (black) instead of an explicit attribute.
  *
- * Colour variants handled:
- *   #000  #000000  #000000ff  #000000FF
- *   black  Black  BLACK
- *   rgb(0,0,0)  rgba(0,0,0,1)  rgba(0,0,0,1.0)
- *   Same patterns inside style="stroke:..." / style="fill:..."
+ * This makes the system color-agnostic: whatever solid color an uploaded
+ * (monochrome) SVG was authored in, it gets normalized to currentColor and
+ * tinted by the specialty's color token.
  */
 function patchSvg(raw, size, color) {
   let s = raw
@@ -164,28 +168,36 @@ function patchSvg(raw, size, color) {
   s = s.replace(/(<svg[^>]*?)\s+width="[^"]*"/i,  '$1')
   s = s.replace(/(<svg[^>]*?)\s+height="[^"]*"/i, '$1')
 
-  const BLACK =
-    '#000(?:000(?:[fF]{2})?)?'   +
-    '|[Bb][Ll][Aa][Cc][Kk]'     +
-    '|rgb\\(0,\\s*0,\\s*0\\)'   +
-    '|rgba\\(0,\\s*0,\\s*0,\\s*1(?:\\.0*)?\\)'
+  // Any solid color value: hex (3-8 digits), rgb()/rgba(), or a bare named color.
+  const COLOR = '#[0-9a-fA-F]{3,8}|rgba?\\([^)]*\\)|[A-Za-z]+'
 
+  // Values that must NOT be rewritten — paint-server refs are matched separately.
+  const KEEP_AS_IS = /^(none|transparent|currentColor|inherit)$/i
+
+  // fill="..." / stroke="..." attributes
   s = s.replace(
-    new RegExp(`(\\bstroke=")(?:${BLACK})(")`, 'gi'),
-    '$1currentColor$2',
+    new RegExp(`\\b(fill|stroke)="(${COLOR})"`, 'g'),
+    (match, attr, value) => {
+      if (KEEP_AS_IS.test(value) || /^url\(/i.test(value)) return match
+      return `${attr}="currentColor"`
+    },
   )
+
+  // fill: ... / stroke: ... inside style="" attributes or <style> blocks
   s = s.replace(
-    new RegExp(`(\\bfill=")(?:${BLACK})(")`, 'gi'),
-    '$1currentColor$2',
+    new RegExp(`\\b(fill|stroke)\\s*:\\s*(${COLOR})`, 'g'),
+    (match, prop, value) => {
+      if (KEEP_AS_IS.test(value) || /^url\(/i.test(value)) return match
+      return `${prop}:currentColor`
+    },
   )
-  s = s.replace(
-    new RegExp(`(\\bstroke\\s*:\\s*)(?:${BLACK})`, 'gi'),
-    '$1currentColor',
-  )
-  s = s.replace(
-    new RegExp(`(\\bfill\\s*:\\s*)(?:${BLACK})`, 'gi'),
-    '$1currentColor',
-  )
+
+  // If the root <svg> has no fill of its own, give it one so paths that rely
+  // on the SVG-spec default fill (black) also inherit the theme color.
+  if (!/<svg[^>]*\bfill=/i.test(s)) {
+    s = s.replace(/<svg/i, '<svg fill="currentColor"')
+  }
+
   s = s.replace(
     /<svg/i,
     `<svg width="${size}" height="${size}" style="display:block;color:${color};overflow:hidden" `,
