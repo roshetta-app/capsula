@@ -8,6 +8,11 @@
  *  - icon_name column repurposed: stores Lucide key or 'Stethoscope' fallback
  *  - icon_type + icon_url + color_token new columns (migration 005)
  *  - Preview updated to render SpecialtyIcon + token background
+ *
+ * Fix (crash: "au is not a function or its return value is not iterable"):
+ *  - toast was in useCallback dep array → load() recreated every render →
+ *    useEffect re-fired every render → infinite fetch/setState loop →
+ *    React fiber crash. Fixed by storing toast in a ref and using [] dep array.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -553,6 +558,15 @@ export default function SpecialtiesManager() {
   const navigate      = useNavigate()
   const { toast }     = useToast()
 
+  // ── FIX: store toast in a ref so load() never needs it as a dep ──────────
+  // Previously toast was in useCallback's dep array. Because useToast() returns
+  // a new object reference on every render, load() was recreated every render,
+  // causing useEffect to re-fire every render → infinite setState loop →
+  // React fiber crash: "au is not a function or its return value is not iterable"
+  const toastRef = useRef(toast)
+  useEffect(() => { toastRef.current = toast }, [toast])
+  // ─────────────────────────────────────────────────────────────────────────
+
   const [rows, setRows]         = useState([])
   const [loading, setLoading]   = useState(true)
   const [expandedId, setExpandedId] = useState(null)
@@ -572,9 +586,9 @@ export default function SpecialtiesManager() {
     setLoading(true)
     const { data, error } = await fetchAllSpecialties()
     setLoading(false)
-    if (error) { toast.error('Failed to load specialties'); return }
+    if (error) { toastRef.current.error('Failed to load specialties'); return }
     setRows(data ?? [])
-  }, [toast])
+  }, [])  // ← empty dep array: load() is created once; toast accessed via ref
 
   useEffect(() => { load() }, [load])
 
