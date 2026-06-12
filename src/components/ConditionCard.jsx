@@ -14,13 +14,13 @@ import { useNavigate }    from 'react-router-dom'
 import { highlightMatch } from '../utils/highlightMatch'
 import { SpecialtyIcon }  from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
-import { useDarkMode }    from '../hooks/useDarkMode'
+
 
 // ─── ConditionCard ────────────────────────────────────────────────────────────
 
 export default function ConditionCard({ condition, onTap, highlight = '' }) {
   const navigate = useNavigate()
-  const [isDark] = useDarkMode()
+  const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
 
   const tokenKey  = condition.colorToken  || FALLBACK_TOKEN
   const iconType  = condition.iconType    || 'lucide'

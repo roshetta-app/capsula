@@ -16,7 +16,7 @@
 import { useEffect }                    from 'react'
 import { SpecialtyIcon }                from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-import { useDarkMode }                  from '../../hooks/useDarkMode'
+
 
 export default function SpecialtiesBottomSheet({
   specialties,
@@ -25,7 +25,7 @@ export default function SpecialtiesBottomSheet({
   onClose,
   isOpen,
 }) {
-  const [isDark] = useDarkMode()
+  const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
 
   useEffect(() => {
     if (!isOpen) return

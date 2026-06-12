@@ -17,7 +17,7 @@
 
 import { SpecialtyIcon }                  from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }   from '../../utils/specialtyTokens'
-import { useDarkMode }                    from '../../hooks/useDarkMode'
+
 
 const OVERFLOW_THRESHOLD = 5
 
@@ -34,7 +34,7 @@ export default function SpecialtyFilterPills({
   onSelect,
   onMoreTap,
 }) {
-  const [isDark] = useDarkMode()
+  const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
 
   if (!specialties || specialties.length === 0) return null
 
