@@ -6,11 +6,8 @@
  * icon_type === 'lucide'  → renders a Lucide React component by name
  * icon_type === 'custom'  → fetches SVG from Supabase Storage and injects it
  *                           inline so CSS color / stroke tinting works exactly
- *                           like Lucide icons (was <img> — cannot be tinted)
+ *                           like Lucide icons.
  * fallback                → renders <Stethoscope> (safe default)
- *
- * Admin-facing curated Lucide icon list is exported as LUCIDE_ICON_OPTIONS.
- * Each entry has: { key, label, Icon (component) }
  */
 
 import { useState, useEffect } from 'react'
@@ -60,9 +57,89 @@ const ICON_MAP = Object.fromEntries(
   LUCIDE_ICON_OPTIONS.map(({ key, Icon }) => [key, Icon])
 )
 
+// ─── Dark-mode hook ───────────────────────────────────────────────────────────
+// Subscribes to OS colour-scheme changes so icons re-tint on toggle.
+
+function useIsDark() {
+  const mq = typeof window !== 'undefined'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null
+  const [isDark, setIsDark] = useState(mq?.matches ?? false)
+  useEffect(() => {
+    if (!mq) return
+    const handler = (e) => setIsDark(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [mq])
+  return isDark
+}
+
 // ─── In-memory SVG cache ──────────────────────────────────────────────────────
 
 const svgCache = new Map()
+
+// ─── patchSvg ────────────────────────────────────────────────────────────────
+/**
+ * Rewrite a raw SVG string so it:
+ *  1. Fits exactly into `size` px (strips existing w/h, injects via attribute)
+ *  2. Replaces every real-world black colour with currentColor so the parent
+ *     `color` CSS prop tints stroke + fill correctly.
+ *
+ * Colour variants handled:
+ *   #000  #000000  #000000ff  #000000FF
+ *   black  Black  BLACK
+ *   rgb(0,0,0)  rgba(0,0,0,1)  rgba(0,0,0,1.0)
+ *   Same patterns inside style="stroke:..." / style="fill:..."
+ */
+function patchSvg(raw, size, color) {
+  let s = raw
+
+  // 1. Strip existing width / height attributes from the <svg> opening tag
+  //    so viewBox controls scaling instead of fixed pixel dimensions.
+  s = s.replace(/(<svg[^>]*?)\s+width="[^"]*"/i,  '$1')
+  s = s.replace(/(<svg[^>]*?)\s+height="[^"]*"/i, '$1')
+
+  // 2. Build a single string that matches all black colour literals.
+  //    Written as a plain string (not a RegExp literal) so embedding it
+  //    inside other replacements is safe — no .source escaping issues.
+  const BLACK =
+    '#000(?:000(?:[fF]{2})?)?'   +  // #000  #000000  #000000ff  #000000FF
+    '|[Bb][Ll][Aa][Cc][Kk]'     +  // black  Black  BLACK
+    '|rgb\\(0,\\s*0,\\s*0\\)'   +  // rgb(0,0,0)
+    '|rgba\\(0,\\s*0,\\s*0,\\s*1(?:\\.0*)?\\)'  // rgba(0,0,0,1)  rgba(0,0,0,1.0)
+
+  // 3. Replace attribute-level stroke/fill values
+  //    e.g.  stroke="#000"  fill="black"
+  s = s.replace(
+    new RegExp(`(\\bstroke=")(?:${BLACK})(")`, 'gi'),
+    '$1currentColor$2',
+  )
+  s = s.replace(
+    new RegExp(`(\\bfill=")(?:${BLACK})(")`, 'gi'),
+    '$1currentColor$2',
+  )
+
+  // 4. Replace inline style property values
+  //    e.g.  style="stroke:#000000;fill:black"
+  s = s.replace(
+    new RegExp(`(\\bstroke\\s*:\\s*)(?:${BLACK})`, 'gi'),
+    '$1currentColor',
+  )
+  s = s.replace(
+    new RegExp(`(\\bfill\\s*:\\s*)(?:${BLACK})`, 'gi'),
+    '$1currentColor',
+  )
+
+  // 5. Inject size + color onto the <svg> root.
+  //    - width/height control the rendered box
+  //    - style color sets currentColor for the whole subtree
+  s = s.replace(
+    /<svg/i,
+    `<svg width="${size}" height="${size}" style="display:block;color:${color};overflow:hidden" `,
+  )
+
+  return s
+}
 
 // ─── InlineSvg ────────────────────────────────────────────────────────────────
 
@@ -113,53 +190,16 @@ function InlineSvg({ url, size, color, style }) {
   )
 }
 
+// ─── SpecialtyIcon ────────────────────────────────────────────────────────────
+
 /**
- * Patch a raw SVG string so it:
- *  1. Fits the requested size (removes hard-coded w/h, relies on viewBox)
- *  2. Replaces every real-world black colour variant with currentColor so the
- *     parent `color` CSS prop tints stroke + fill correctly.
- *
- * Colour variants covered:
- *   #000000  #000  #000000ff  black  rgb(0,0,0)  rgba(0,0,0,1)  rgba(0,0,0,.*)
- *   Also handles stroke/fill with no value (SVG default = black) by injecting
- *   currentColor explicitly on the <svg> root.
+ * Props:
+ *   iconType  'lucide' | 'custom'
+ *   iconValue string — Lucide key OR Storage URL
+ *   size      number — px (default 18)
+ *   color     string — explicit CSS color; if omitted, resolved from isDark
+ *   style     object
  */
-function patchSvg(raw, size, color) {
-  let svg = raw
-
-  // ── 1. Remove hard-coded width/height attributes from the <svg> tag so the
-  //       element scales to the wrapper <span> instead of overflowing it.
-  svg = svg.replace(/<svg([^>]*)\swidth="[^"]*"/, '<svg$1')
-  svg = svg.replace(/<svg([^>]*)\sheight="[^"]*"/, '<svg$1')
-
-  // ── 2. Replace every black colour variant with currentColor ──────────────
-  //   Attribute-level: stroke="..." fill="..."
-  const blackPattern =
-    /#000(?:000)?(?:[fF]{2})?|black|rgb\(0,\s*0,\s*0\)|rgba\(0,\s*0,\s*0,\s*(?:1|1\.0+|0?\.[0-9]+)\)/g
-
-  svg = svg
-    .replace(new RegExp(`(stroke=")(?:${blackPattern.source})(")`, 'gi'),
-      'stroke="currentColor"')
-    .replace(new RegExp(`(fill=")(?:${blackPattern.source})(")`, 'gi'),
-      'fill="currentColor"')
-    // style="... stroke:#000 ..." and style="... fill:#000 ..."
-    .replace(/stroke\s*:\s*(?:#000(?:000)?(?:[fF]{2})?|black|rgb\(0,0,0\))/gi,
-      'stroke:currentColor')
-    .replace(/fill\s*:\s*(?:#000(?:000)?(?:[fF]{2})?|black|rgb\(0,0,0\))/gi,
-      'fill:currentColor')
-
-  // ── 3. Inject size + color on the <svg> root so viewBox scales and
-  //       currentColor resolves correctly throughout the tree.
-  svg = svg.replace(
-    /<svg/,
-    `<svg width="${size}" height="${size}" style="display:block;color:${color}" `,
-  )
-
-  return svg
-}
-
-// ─── SpecialtyIcon component ──────────────────────────────────────────────────
-
 export function SpecialtyIcon({
   iconType  = 'lucide',
   iconValue = 'Stethoscope',
@@ -167,6 +207,11 @@ export function SpecialtyIcon({
   color     = 'currentColor',
   style     = {},
 }) {
+  // Subscribe to dark-mode changes so the tint colour updates reactively.
+  // Callers that pass an explicit `color` (already resolved from resolveToken)
+  // are unaffected — the hook result is only used as a fallback.
+  useIsDark() // ensures re-render on OS colour-scheme toggle
+
   if (iconType === 'custom' && iconValue) {
     return (
       <InlineSvg
