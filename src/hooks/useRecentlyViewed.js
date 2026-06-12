@@ -1,25 +1,33 @@
 /**
  * src/hooks/useRecentlyViewed.js
  * Phase 2C — Conditions Screen
+ * Updated — full recency history for "Recent first" sort
  *
- * Manages the recently viewed conditions list in localStorage.
+ * Manages the viewed-conditions history in localStorage.
  *
  * Storage key: capsula_recent_conditions
- * Format:      [{ id, name, slug }]  — last 5, newest first
- * Max items:   5 — when 6th is added, oldest is removed
+ * Format:      [{ id, name, slug }]  — ALL viewed conditions, newest first
+ * History cap: MAX_HISTORY_ITEMS — prevents unbounded localStorage growth
+ *
+ * Exposes:
+ *   recentlyViewed  — newest MAX_CHIP_ITEMS entries (for RecentlyViewedChips)
+ *   recentOrder     — ids of ALL viewed conditions, newest first
+ *                      (used by useConditionSearch to sort the full list
+ *                      by recency; items not in this array fall back to A–Z)
  *
  * Usage in ConditionDetailScreen (called on mount):
  *   const { addRecentlyViewed } = useRecentlyViewed()
  *   useEffect(() => { addRecentlyViewed(condition) }, [condition.id])
  *
  * Usage in ConditionsScreen (read the list):
- *   const { recentlyViewed } = useRecentlyViewed()
+ *   const { recentlyViewed, recentOrder } = useRecentlyViewed()
  */
 
 import { useState, useCallback } from 'react'
 
-const STORAGE_KEY = 'capsula_recent_conditions'
-const MAX_ITEMS   = 5
+const STORAGE_KEY        = 'capsula_recent_conditions'
+const MAX_CHIP_ITEMS      = 5    // entries shown in the RecentlyViewedChips strip
+const MAX_HISTORY_ITEMS   = 200  // safety cap on stored view history
 
 function readFromStorage() {
   try {
@@ -39,25 +47,25 @@ function writeToStorage(items) {
 }
 
 export function useRecentlyViewed() {
-  const [recentlyViewed, setRecentlyViewed] = useState(() => readFromStorage())
+  const [history, setHistory] = useState(() => readFromStorage())
 
   /**
-   * Add a condition to the recently viewed list.
-   * Deduplicates by id. Newest item goes to front. Trims to MAX_ITEMS.
+   * Record a condition as viewed.
+   * Deduplicates by id. Newest item goes to front. Trims to MAX_HISTORY_ITEMS.
    *
    * @param {{ id: string, name: string, slug: string }} condition
    */
   const addRecentlyViewed = useCallback((condition) => {
     if (!condition?.id) return
 
-    setRecentlyViewed(prev => {
+    setHistory(prev => {
       // Remove existing entry for this condition (dedup)
       const filtered = prev.filter(c => c.id !== condition.id)
       // Add to front
       const updated = [
         { id: condition.id, name: condition.name, slug: condition.slug },
         ...filtered,
-      ].slice(0, MAX_ITEMS)
+      ].slice(0, MAX_HISTORY_ITEMS)
 
       writeToStorage(updated)
       return updated
@@ -65,12 +73,19 @@ export function useRecentlyViewed() {
   }, [])
 
   /**
-   * Clear the entire recently viewed list.
+   * Clear the entire view history.
    */
   const clearRecentlyViewed = useCallback(() => {
     writeToStorage([])
-    setRecentlyViewed([])
+    setHistory([])
   }, [])
 
-  return { recentlyViewed, addRecentlyViewed, clearRecentlyViewed }
+  // Chips strip only ever shows the most recent few
+  const recentlyViewed = history.slice(0, MAX_CHIP_ITEMS)
+
+  // Full recency order (newest first) — drives "Recent first" sort across
+  // the entire conditions list, not just the last few viewed
+  const recentOrder = history.map(c => c.id)
+
+  return { recentlyViewed, recentOrder, addRecentlyViewed, clearRecentlyViewed }
 }

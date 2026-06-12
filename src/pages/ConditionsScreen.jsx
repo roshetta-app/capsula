@@ -180,7 +180,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
-  const { recentlyViewed }                   = useRecentlyViewed()
+  const { recentlyViewed, recentOrder }      = useRecentlyViewed()
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
   const { isDark, toggleDark }               = useDarkMode()
 
@@ -193,7 +193,7 @@ export default function ConditionsScreen() {
     setActiveSpecialty,
     results,
     resultCount,
-  } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
+  } = useConditionSearch(conditions, sortMode, recentOrder)
 
   const isSearching   = query.length >= 1
   const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
@@ -300,10 +300,10 @@ export default function ConditionsScreen() {
         />
       </div>
 
-      {/* 3. Recently viewed */}
+      {/* 3. Recently viewed — temporarily hidden (set hidden={isSearching} to re-enable) */}
       <RecentlyViewedChips
         recentlyViewed={recentlyViewed}
-        hidden={isSearching}
+        hidden={true}
       />
 
       {/* 4. Specialty filter pills */}
