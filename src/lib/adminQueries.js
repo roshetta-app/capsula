@@ -169,7 +169,7 @@ export async function updateSpecialty(id, data) {
 export async function fetchSpecialtiesForCMS() {
   const { data, error } = await supabase
     .from('specialties')
-    .select('id, name_en, slug, icon_name, color_hex, sort_order, is_active')
+    .select('id, name_en, slug, icon_name, icon_type, icon_url, color_token, color_hex, sort_order, is_active')
     .eq('is_active', true)
     .neq('id', '00000000-0000-0000-0000-000000000001')
     .order('sort_order', { ascending: true })
@@ -183,7 +183,7 @@ export async function fetchAllSpecialties() {
   const { data, error } = await supabase
     .from('specialties')
     .select(`
-      id, name_en, name_ar, slug, icon_name, color_hex,
+      id, name_en, name_ar, slug, icon_name, icon_type, icon_url, color_token, color_hex,
       sort_order, is_active, created_at,
       conditions!conditions_specialty_id_fkey ( id, name )
     `)
@@ -327,6 +327,29 @@ export async function uploadConditionImage(file) {
 
   const { data } = supabase.storage
     .from('condition-images')
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, error: null }
+}
+
+// ─── Specialty icon upload (Phase 6) ─────────────────────────────────────────
+
+export async function uploadSpecialtyIcon(file) {
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.svg`
+  const path     = `public/${filename}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('specialty-icons')
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert:       false,
+      contentType:  'image/svg+xml',
+    })
+
+  if (uploadError) return { url: null, error: uploadError }
+
+  const { data } = supabase.storage
+    .from('specialty-icons')
     .getPublicUrl(path)
 
   return { url: data.publicUrl, error: null }
@@ -617,4 +640,5 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
+
 
