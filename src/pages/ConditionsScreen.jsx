@@ -3,9 +3,9 @@
  * Phase 5 — Conditions Screen Redesign
  *
  * Changes from previous:
- *   - BrandRow: logo dot 26→32px, name 17→19px
- *   - BrandRow: bold headline "What are you looking for?" added below logo row
- *   - Headline collapses when search is active (isSearching) to reclaim space
+ *   - List is suppressed while autocomplete dropdown is visible (showSuggestions)
+ *   - Dropdown = fast tap-and-go navigation (top 5, no scroll needed)
+ *   - List = appears after dropdown dismissed or cleared, full filtered results
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -62,10 +62,6 @@ function SkeletonCard() {
 }
 
 // ─── Brand row + headline ─────────────────────────────────────────────────────
-// Logo and app name are the orientation anchor.
-// Headline "What are you looking for?" is the primary visual focal point —
-// large, bold, draws the eye down toward the search bar.
-// Both collapse gracefully when the user starts typing.
 
 function BrandRow({ isSearching }) {
   return (
@@ -73,7 +69,6 @@ function BrandRow({ isSearching }) {
       paddingTop:    'var(--space-4)',
       paddingBottom: 'var(--space-3)',
     }}>
-      {/* Logo + name */}
       <div style={{
         display:      'flex',
         alignItems:   'center',
@@ -109,7 +104,6 @@ function BrandRow({ isSearching }) {
         </span>
       </div>
 
-      {/* Headline — collapses while searching to reclaim vertical space */}
       {!isSearching && (
         <h1 style={{
           margin:        0,
@@ -149,6 +143,8 @@ export default function ConditionsScreen() {
   } = useConditionSearch(conditions, sortMode, recentlyViewed.map(r => r.id))
 
   const isSearching   = query.length >= 1
+  // List is visible when not showing the dropdown shortcut
+  const showList      = !showSuggestions
   const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
   const totalCount    = conditions.length
 
@@ -248,7 +244,7 @@ export default function ConditionsScreen() {
       {/* 1. Brand row + headline */}
       <BrandRow isSearching={isSearching} />
 
-      {/* 2. Search bar + autocomplete */}
+      {/* 2. Search bar + autocomplete dropdown */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-2)' }}>
         <SearchBar
           value={query}
@@ -257,6 +253,7 @@ export default function ConditionsScreen() {
             if (!val) clearSuggestions()
           }}
         />
+        {/* Dropdown: fast tap-and-go shortcut — suppresses the list below while visible */}
         {showSuggestions && (
           <AutocompleteDropdown
             suggestions={suggestions}
@@ -266,34 +263,39 @@ export default function ConditionsScreen() {
         )}
       </div>
 
-      {/* 3. Recently viewed — compact inline row, hidden when searching */}
-      <RecentlyViewedChips
-        recentlyViewed={recentlyViewed}
-        hidden={isSearching}
-      />
+      {/* 3–6: hidden while dropdown is open — reappears on dismiss or outside tap */}
+      {showList && (
+        <>
+          {/* 3. Recently viewed */}
+          <RecentlyViewedChips
+            recentlyViewed={recentlyViewed}
+            hidden={isSearching}
+          />
 
-      {/* 4. Specialty filter pills */}
-      <SpecialtyFilterPills
-        specialties={specialties}
-        activeSpecialty={activeSpecialty}
-        onSelect={setActiveSpecialty}
-        onMoreTap={() => setBottomSheetOpen(true)}
-      />
+          {/* 4. Specialty filter pills */}
+          <SpecialtyFilterPills
+            specialties={specialties}
+            activeSpecialty={activeSpecialty}
+            onSelect={setActiveSpecialty}
+            onMoreTap={() => setBottomSheetOpen(true)}
+          />
 
-      {/* 5. Count + sort row — hairline above anchors list start */}
-      <ConditionListHeader
-        totalCount={totalCount}
-        resultCount={resultCount}
-        activeSpecialty={activeSpecialty}
-        specialtyName={specialtyName}
-        isSearching={isSearching}
-        sortMode={sortMode}
-        onSortToggle={cycleSortMode}
-        SORT_LABELS={SORT_LABELS}
-      />
+          {/* 5. Count + sort row */}
+          <ConditionListHeader
+            totalCount={totalCount}
+            resultCount={resultCount}
+            activeSpecialty={activeSpecialty}
+            specialtyName={specialtyName}
+            isSearching={isSearching}
+            sortMode={sortMode}
+            onSortToggle={cycleSortMode}
+            SORT_LABELS={SORT_LABELS}
+          />
 
-      {/* 6. Condition list */}
-      {renderList()}
+          {/* 6. Condition list */}
+          {renderList()}
+        </>
+      )}
 
       {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet
