@@ -3,6 +3,8 @@
  * Phase 3 — Conditions Screen Redesign
  * Phase 5 — removed InlineStarButton; tighter row padding (8px vs 11px)
  * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
+ * Phase 7 — divider stepped up from 0.5px border-subtle to 1px border for
+ *            clearer card separation without feeling heavy
  *
  * Props:
  *   condition  ConditionFull
@@ -49,8 +51,8 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         display:                 'flex',
         alignItems:              'center',
         gap:                     'var(--space-3)',
-        padding:                 '8px 0',
-        borderBottom:            '0.5px solid var(--color-border-subtle)',
+        padding:                 '10px 0',
+        borderBottom:            '1px solid var(--color-border)',
         cursor:                  'pointer',
         outline:                 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -135,4 +137,3 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
     </div>
   )
 }
-

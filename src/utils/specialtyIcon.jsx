@@ -8,49 +8,111 @@
  *                           inline so CSS color / stroke tinting works exactly
  *                           like Lucide icons.
  * fallback                → renders <Stethoscope> (safe default)
+ *
+ * Icon library: Lucide React (general) + Phosphor Icons (medical/clinical).
+ * Both are MIT licensed. Phosphor provides industry-standard medical glyphs
+ * (Heartbeat, Pulse, FirstAid, Tooth, Virus, Needle, Wheelchair, etc.)
+ * that Lucide lacks.
  */
 
 import { useState, useEffect } from 'react'
+
+// ─── Lucide (general purpose) ─────────────────────────────────────────────────
 import {
   Stethoscope, Baby, Brain, Bone, Eye, Ear, Syringe, Pill,
   Microscope, HeartPulse, Hospital, BriefcaseMedical, Dna,
   Activity, Scan, FlaskConical, Thermometer, Ambulance, Scissors,
-  UserRound, Baby as BabyIcon, Layers, Wind, Droplets, ShieldPlus,
+  UserRound, Layers, Wind, Droplets, ShieldPlus,
   Radiation, TestTube, Zap, Sun, Smile,
 } from 'lucide-react'
 
+// ─── Phosphor (medical / clinical) ───────────────────────────────────────────
+import {
+  Heartbeat,
+  Pulse,
+  FirstAid,
+  FirstAidKit,
+  Needle,
+  Tooth,
+  Virus,
+  Wheelchair,
+  ThermometerHot,
+  Flask,
+  Stethoscope  as PhStethoscope,
+  Syringe      as PhSyringe,
+  Pill         as PhPill,
+  Hospital     as PhHospital,
+  Microscope   as PhMicroscope,
+  Dna          as PhDna,
+  Scan         as PhScan,
+  Eye          as PhEye,
+  Ear          as PhEar,
+  Ambulance    as PhAmbulance,
+  Bone         as PhBone,
+  Brain        as PhBrain,
+  TestTube     as PhTestTube,
+} from '@phosphor-icons/react'
+
 // ─── Curated icon map ─────────────────────────────────────────────────────────
+//
+// Keys beginning with 'Ph' use Phosphor; all others use Lucide.
+// Existing keys are preserved so assigned specialties keep their icons.
+// New Phosphor entries are appended and clearly labelled.
 
 export const LUCIDE_ICON_OPTIONS = [
-  { key: 'Stethoscope',     label: 'General / Adults',     Icon: Stethoscope     },
-  { key: 'Baby',            label: 'Paediatrics',          Icon: Baby            },
-  { key: 'Brain',           label: 'Neurology / Psych',    Icon: Brain           },
-  { key: 'Bone',            label: 'Orthopaedics',         Icon: Bone            },
-  { key: 'Eye',             label: 'Ophthalmology',        Icon: Eye             },
-  { key: 'Ear',             label: 'ENT / Audiology',      Icon: Ear             },
-  { key: 'HeartPulse',      label: 'Cardiology',           Icon: HeartPulse      },
-  { key: 'Syringe',         label: 'Surgery / Injection',  Icon: Syringe         },
-  { key: 'Pill',            label: 'Pharmacology',         Icon: Pill            },
-  { key: 'Microscope',      label: 'Microbiology / Lab',   Icon: Microscope      },
-  { key: 'FlaskConical',    label: 'Biochemistry',         Icon: FlaskConical    },
-  { key: 'TestTube',        label: 'Pathology / Lab',      Icon: TestTube        },
-  { key: 'Dna',             label: 'Genetics',             Icon: Dna             },
-  { key: 'Scan',            label: 'Dermatology / Imaging',Icon: Scan            },
-  { key: 'Activity',        label: 'Physiotherapy',        Icon: Activity        },
-  { key: 'Thermometer',     label: 'Infectious Disease',   Icon: Thermometer     },
-  { key: 'Hospital',        label: 'Hospital / Inpatient', Icon: Hospital        },
-  { key: 'BriefcaseMedical',label: 'Emergency / First Aid',Icon: BriefcaseMedical},
-  { key: 'Ambulance',       label: 'Emergency Transport',  Icon: Ambulance       },
-  { key: 'Scissors',        label: 'Surgery / Procedures', Icon: Scissors        },
-  { key: 'Wind',            label: 'Pulmonology / Resp.',  Icon: Wind            },
-  { key: 'Droplets',        label: 'Haematology / Renal',  Icon: Droplets        },
-  { key: 'ShieldPlus',      label: 'Immunology / Allergy', Icon: ShieldPlus      },
-  { key: 'Radiation',       label: 'Oncology / Radiology', Icon: Radiation       },
-  { key: 'Zap',             label: 'Neurosurgery',         Icon: Zap             },
-  { key: 'Layers',          label: 'Multidisciplinary',    Icon: Layers          },
-  { key: 'Sun',             label: 'Dermatology (alt)',    Icon: Sun             },
-  { key: 'Smile',           label: 'Dental / Oral Health', Icon: Smile           },
-  { key: 'UserRound',       label: 'General Practitioner', Icon: UserRound       },
+  // ── Lucide — existing ─────────────────────────────────────────────────────
+  { key: 'Stethoscope',      label: 'General / Adults',           Icon: Stethoscope,     lib: 'lucide'   },
+  { key: 'Baby',             label: 'Paediatrics',                Icon: Baby,            lib: 'lucide'   },
+  { key: 'Brain',            label: 'Neurology / Psych',          Icon: Brain,           lib: 'lucide'   },
+  { key: 'Bone',             label: 'Orthopaedics',               Icon: Bone,            lib: 'lucide'   },
+  { key: 'Eye',              label: 'Ophthalmology',              Icon: Eye,             lib: 'lucide'   },
+  { key: 'Ear',              label: 'ENT / Audiology',            Icon: Ear,             lib: 'lucide'   },
+  { key: 'HeartPulse',       label: 'Cardiology',                 Icon: HeartPulse,      lib: 'lucide'   },
+  { key: 'Syringe',          label: 'Surgery / Injection',        Icon: Syringe,         lib: 'lucide'   },
+  { key: 'Pill',             label: 'Pharmacology',               Icon: Pill,            lib: 'lucide'   },
+  { key: 'Microscope',       label: 'Microbiology / Lab',         Icon: Microscope,      lib: 'lucide'   },
+  { key: 'FlaskConical',     label: 'Biochemistry',               Icon: FlaskConical,    lib: 'lucide'   },
+  { key: 'TestTube',         label: 'Pathology / Lab',            Icon: TestTube,        lib: 'lucide'   },
+  { key: 'Dna',              label: 'Genetics',                   Icon: Dna,             lib: 'lucide'   },
+  { key: 'Scan',             label: 'Dermatology / Imaging',      Icon: Scan,            lib: 'lucide'   },
+  { key: 'Activity',         label: 'Physiotherapy',              Icon: Activity,        lib: 'lucide'   },
+  { key: 'Thermometer',      label: 'Infectious Disease',         Icon: Thermometer,     lib: 'lucide'   },
+  { key: 'Hospital',         label: 'Hospital / Inpatient',       Icon: Hospital,        lib: 'lucide'   },
+  { key: 'BriefcaseMedical', label: 'Emergency / First Aid',      Icon: BriefcaseMedical,lib: 'lucide'   },
+  { key: 'Ambulance',        label: 'Emergency Transport',        Icon: Ambulance,       lib: 'lucide'   },
+  { key: 'Scissors',         label: 'Surgery / Procedures',       Icon: Scissors,        lib: 'lucide'   },
+  { key: 'Wind',             label: 'Pulmonology / Resp.',        Icon: Wind,            lib: 'lucide'   },
+  { key: 'Droplets',         label: 'Haematology / Renal',        Icon: Droplets,        lib: 'lucide'   },
+  { key: 'ShieldPlus',       label: 'Immunology / Allergy',       Icon: ShieldPlus,      lib: 'lucide'   },
+  { key: 'Radiation',        label: 'Oncology / Radiology',       Icon: Radiation,       lib: 'lucide'   },
+  { key: 'Zap',              label: 'Neurosurgery',               Icon: Zap,             lib: 'lucide'   },
+  { key: 'Layers',           label: 'Multidisciplinary',          Icon: Layers,          lib: 'lucide'   },
+  { key: 'Sun',              label: 'Dermatology (alt)',          Icon: Sun,             lib: 'lucide'   },
+  { key: 'Smile',            label: 'Dental / Oral Health',       Icon: Smile,           lib: 'lucide'   },
+  { key: 'UserRound',        label: 'General Practitioner',       Icon: UserRound,       lib: 'lucide'   },
+
+  // ── Phosphor — medical / clinical ─────────────────────────────────────────
+  { key: 'Ph:Heartbeat',     label: 'Cardiology (ECG)',           Icon: Heartbeat,       lib: 'phosphor' },
+  { key: 'Ph:Pulse',         label: 'Vital Signs / ICU',          Icon: Pulse,           lib: 'phosphor' },
+  { key: 'Ph:FirstAid',      label: 'First Aid / Wound Care',     Icon: FirstAid,        lib: 'phosphor' },
+  { key: 'Ph:FirstAidKit',   label: 'First Aid Kit',              Icon: FirstAidKit,     lib: 'phosphor' },
+  { key: 'Ph:Needle',        label: 'Vaccination / IV',           Icon: Needle,          lib: 'phosphor' },
+  { key: 'Ph:Tooth',         label: 'Dentistry / Oral Surgery',   Icon: Tooth,           lib: 'phosphor' },
+  { key: 'Ph:Virus',         label: 'Virology / Infection',       Icon: Virus,           lib: 'phosphor' },
+  { key: 'Ph:Wheelchair',    label: 'Rehabilitation / Disability',Icon: Wheelchair,      lib: 'phosphor' },
+  { key: 'Ph:ThermometerHot',label: 'Fever / Tropical Medicine',  Icon: ThermometerHot,  lib: 'phosphor' },
+  { key: 'Ph:Flask',         label: 'Laboratory / Research',      Icon: Flask,           lib: 'phosphor' },
+  { key: 'Ph:Stethoscope',   label: 'General (Phosphor style)',   Icon: PhStethoscope,   lib: 'phosphor' },
+  { key: 'Ph:Syringe',       label: 'Injection (Phosphor style)', Icon: PhSyringe,       lib: 'phosphor' },
+  { key: 'Ph:Pill',          label: 'Medication (Phosphor style)',Icon: PhPill,          lib: 'phosphor' },
+  { key: 'Ph:Hospital',      label: 'Hospital (Phosphor style)',  Icon: PhHospital,      lib: 'phosphor' },
+  { key: 'Ph:Microscope',    label: 'Lab (Phosphor style)',       Icon: PhMicroscope,    lib: 'phosphor' },
+  { key: 'Ph:Dna',           label: 'Genetics (Phosphor style)',  Icon: PhDna,           lib: 'phosphor' },
+  { key: 'Ph:Eye',           label: 'Ophthalmology (Phosphor)',   Icon: PhEye,           lib: 'phosphor' },
+  { key: 'Ph:Ear',           label: 'ENT (Phosphor style)',       Icon: PhEar,           lib: 'phosphor' },
+  { key: 'Ph:Ambulance',     label: 'Emergency (Phosphor style)', Icon: PhAmbulance,     lib: 'phosphor' },
+  { key: 'Ph:Bone',          label: 'Orthopaedics (Phosphor)',    Icon: PhBone,          lib: 'phosphor' },
+  { key: 'Ph:Brain',         label: 'Neurology (Phosphor style)', Icon: PhBrain,         lib: 'phosphor' },
 ]
 
 const ICON_MAP = Object.fromEntries(
@@ -99,22 +161,15 @@ const svgCache = new Map()
 function patchSvg(raw, size, color) {
   let s = raw
 
-  // 1. Strip existing width / height attributes from the <svg> opening tag
-  //    so viewBox controls scaling instead of fixed pixel dimensions.
   s = s.replace(/(<svg[^>]*?)\s+width="[^"]*"/i,  '$1')
   s = s.replace(/(<svg[^>]*?)\s+height="[^"]*"/i, '$1')
 
-  // 2. Build a single string that matches all black colour literals.
-  //    Written as a plain string (not a RegExp literal) so embedding it
-  //    inside other replacements is safe — no .source escaping issues.
   const BLACK =
-    '#000(?:000(?:[fF]{2})?)?'   +  // #000  #000000  #000000ff  #000000FF
-    '|[Bb][Ll][Aa][Cc][Kk]'     +  // black  Black  BLACK
-    '|rgb\\(0,\\s*0,\\s*0\\)'   +  // rgb(0,0,0)
-    '|rgba\\(0,\\s*0,\\s*0,\\s*1(?:\\.0*)?\\)'  // rgba(0,0,0,1)  rgba(0,0,0,1.0)
+    '#000(?:000(?:[fF]{2})?)?'   +
+    '|[Bb][Ll][Aa][Cc][Kk]'     +
+    '|rgb\\(0,\\s*0,\\s*0\\)'   +
+    '|rgba\\(0,\\s*0,\\s*0,\\s*1(?:\\.0*)?\\)'
 
-  // 3. Replace attribute-level stroke/fill values
-  //    e.g.  stroke="#000"  fill="black"
   s = s.replace(
     new RegExp(`(\\bstroke=")(?:${BLACK})(")`, 'gi'),
     '$1currentColor$2',
@@ -123,9 +178,6 @@ function patchSvg(raw, size, color) {
     new RegExp(`(\\bfill=")(?:${BLACK})(")`, 'gi'),
     '$1currentColor$2',
   )
-
-  // 4. Replace inline style property values
-  //    e.g.  style="stroke:#000000;fill:black"
   s = s.replace(
     new RegExp(`(\\bstroke\\s*:\\s*)(?:${BLACK})`, 'gi'),
     '$1currentColor',
@@ -134,10 +186,6 @@ function patchSvg(raw, size, color) {
     new RegExp(`(\\bfill\\s*:\\s*)(?:${BLACK})`, 'gi'),
     '$1currentColor',
   )
-
-  // 5. Inject size + color onto the <svg> root.
-  //    - width/height control the rendered box
-  //    - style color sets currentColor for the whole subtree
   s = s.replace(
     /<svg/i,
     `<svg width="${size}" height="${size}" style="display:block;color:${color};overflow:hidden" `,
@@ -200,7 +248,7 @@ function InlineSvg({ url, size, color, style }) {
 /**
  * Props:
  *   iconType  'lucide' | 'custom'
- *   iconValue string — Lucide key OR Storage URL
+ *   iconValue string — icon key (Lucide or Ph:* Phosphor) OR Storage URL
  *   size      number — px (default 18)
  *   color     string — explicit CSS color; if omitted, resolved from isDark
  *   style     object
@@ -212,10 +260,7 @@ export function SpecialtyIcon({
   color     = 'currentColor',
   style     = {},
 }) {
-  // Subscribe to dark-mode changes so the tint colour updates reactively.
-  // Callers that pass an explicit `color` (already resolved from resolveToken)
-  // are unaffected — the hook result is only used as a fallback.
-  useIsDark() // ensures re-render on OS colour-scheme toggle
+  useIsDark() // ensures re-render on dark-mode toggle
 
   if (iconType === 'custom' && iconValue) {
     return (
@@ -229,6 +274,21 @@ export function SpecialtyIcon({
   }
 
   const Icon = ICON_MAP[iconValue] ?? Stethoscope
+
+  // Phosphor icons use `weight` instead of strokeWidth
+  const isPhosphor = iconValue?.startsWith('Ph:')
+  if (isPhosphor) {
+    return (
+      <Icon
+        size={size}
+        color={color}
+        weight="regular"
+        aria-hidden="true"
+        style={{ flexShrink: 0, ...style }}
+      />
+    )
+  }
+
   return (
     <Icon
       size={size}
@@ -239,4 +299,3 @@ export function SpecialtyIcon({
     />
   )
 }
-
