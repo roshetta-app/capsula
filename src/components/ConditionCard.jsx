@@ -22,9 +22,11 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
   const navigate = useNavigate()
   const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
 
-  const tokenKey  = condition.colorToken  || FALLBACK_TOKEN
-  const iconType  = condition.iconType    || 'lucide'
-  const iconValue = condition.iconValue   || 'Stethoscope'
+  const tokenKey  = condition.specialtyColorToken || FALLBACK_TOKEN
+  const iconType  = condition.specialtyIconType   || 'lucide'
+  const iconValue = iconType === 'custom'
+    ? (condition.specialtyIconUrl  || '')
+    : (condition.specialtyIcon     || 'Stethoscope')
   const colors    = resolveToken(tokenKey, isDark)
 
   function handleTap() {
