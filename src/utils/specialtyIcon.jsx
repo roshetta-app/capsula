@@ -60,7 +60,7 @@ const ICON_MAP = Object.fromEntries(
 // ─── Dark-mode hook ───────────────────────────────────────────────────────────
 // Subscribes to OS colour-scheme changes so icons re-tint on toggle.
 
-function useIsDark() {
+export function useIsDark() {
   const mq = typeof window !== 'undefined'
     ? window.matchMedia('(prefers-color-scheme: dark)')
     : null
@@ -234,3 +234,4 @@ export function SpecialtyIcon({
     />
   )
 }
+

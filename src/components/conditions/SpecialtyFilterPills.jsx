@@ -15,7 +15,7 @@
  *   onMoreTap        () => void  — called when "More" chip is tapped
  */
 
-import { SpecialtyIcon }                  from '../../utils/specialtyIcon'
+import { SpecialtyIcon, useIsDark }        from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }   from '../../utils/specialtyTokens'
 
 
@@ -34,7 +34,7 @@ export default function SpecialtyFilterPills({
   onSelect,
   onMoreTap,
 }) {
-  const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  const isDark = useIsDark()
 
   if (!specialties || specialties.length === 0) return null
 
@@ -154,3 +154,4 @@ export default function SpecialtyFilterPills({
     </div>
   )
 }
+

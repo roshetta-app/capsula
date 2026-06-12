@@ -12,7 +12,7 @@
 
 import { useNavigate }    from 'react-router-dom'
 import { highlightMatch } from '../utils/highlightMatch'
-import { SpecialtyIcon }  from '../utils/specialtyIcon'
+import { SpecialtyIcon, useIsDark }  from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 
@@ -20,7 +20,7 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 export default function ConditionCard({ condition, onTap, highlight = '' }) {
   const navigate = useNavigate()
-  const isDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches ?? false
+  const isDark = useIsDark()
 
   const tokenKey  = condition.specialtyColorToken || FALLBACK_TOKEN
   const iconType  = condition.specialtyIconType   || 'lucide'
@@ -135,3 +135,4 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
     </div>
   )
 }
+
