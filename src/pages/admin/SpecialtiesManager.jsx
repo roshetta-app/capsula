@@ -1,16 +1,13 @@
 /**
  * src/pages/admin/SpecialtiesManager.jsx
  *
- * Fixes applied:
- *  1. Toast API unified — was `showToast(msg, type)`, now `toast.success/error(msg)`
- *     matching the rest of the admin codebase.
- *  2. Sort Order number input removed from modal. Ordering is drag-only + up/down arrows.
- *  3. Up / Down arrow buttons added to each row for keyboard-friendly reordering.
- *  4. Expandable conditions panel per specialty — click the condition count to
- *     toggle a list of condition names.
- *  5. Uncategorized excluded from public-facing fetchSpecialtiesForCMS results.
- *  6. FontAwesome removed — icon_name now stores an emoji directly (e.g. "👶", "🧠").
- *     Admin types any emoji in the Icon field. No icon library limits apply.
+ * Phase 6 changes:
+ *  - Emoji input + FontAwesome/emoji quick-picks → Lucide icon grid picker
+ *  - SVG upload tab for custom device icons (stored in specialty-icons bucket)
+ *  - Raw hex color picker → curated 14-token palette
+ *  - icon_name column repurposed: stores Lucide key or 'Stethoscope' fallback
+ *  - icon_type + icon_url + color_token new columns (migration 005)
+ *  - Preview updated to render SpecialtyIcon + token background
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -18,10 +15,13 @@ import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Plus, GripVertical, Pencil, Trash2,
   ToggleLeft, ToggleRight, ChevronUp, ChevronDown, ChevronRight,
+  Upload, Check,
 } from 'lucide-react'
-import { useToast } from '../../context/ToastContext'
-import Modal from '../../components/admin/Modal'
-import ConfirmModal from '../../components/admin/ConfirmModal'
+import { useToast }       from '../../context/ToastContext'
+import Modal              from '../../components/admin/Modal'
+import ConfirmModal       from '../../components/admin/ConfirmModal'
+import { SpecialtyIcon, LUCIDE_ICON_OPTIONS } from '../../utils/specialtyIcon'
+import { SPECIALTY_TOKENS, TOKEN_KEYS, resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 import {
   fetchAllSpecialties,
   insertSpecialty,
@@ -29,24 +29,21 @@ import {
   toggleSpecialtyActive,
   deleteSpecialty,
   reorderSpecialties,
+  uploadSpecialtyIcon,
 } from '../../lib/adminQueries'
 
-// ─── Suggested emoji quick-picks ─────────────────────────────────────────────
-
-const EMOJI_SUGGESTIONS = [
-  '🩺', '🫀', '🧠', '🦴', '👁️', '👂', '🦷', '🫁',
-  '💉', '💊', '🧪', '🔬', '🧬', '👶', '🤰', '🦠',
-  '🩻', '🩹', '🏥', '⚕️', '🫶', '🩸', '🌡️', '♿',
-  '✂️', '☢️', '🧫', '👨‍⚕️', '❓',
-]
-
-const PALETTE_COLORS = [
-  '#DBEAFE', '#D1FAE5', '#FEF3C7', '#FCE7F3',
-  '#EDE9FE', '#FEE2E2', '#E0F2FE', '#D1FAE5',
-  '#F3F4F6', '#FFF7ED',
-]
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
+
+const EMPTY_FORM = {
+  name_en:     '',
+  name_ar:     '',
+  icon_type:   'lucide',
+  icon_name:   'Stethoscope',   // Lucide key (stored in existing icon_name col)
+  icon_url:    null,            // custom SVG public URL
+  color_token: FALLBACK_TOKEN,
+}
 
 // ─── Slug helper ──────────────────────────────────────────────────────────────
 
@@ -58,13 +55,297 @@ function toSlug(str) {
     .replace(/\s+/g, '-')
 }
 
-// ─── Empty form state ─────────────────────────────────────────────────────────
+// ─── Token palette picker ─────────────────────────────────────────────────────
 
-const EMPTY_FORM = {
-  name_en:   '',
-  name_ar:   '',
-  icon_name: '🩺',
-  color_hex: '#DBEAFE',
+function TokenPalette({ value, onChange }) {
+  // Render in light mode colors so the admin always sees a consistent preview
+  return (
+    <div>
+      <div style={labelText}>Color</div>
+      <div style={{
+        display:   'grid',
+        gridTemplateColumns: 'repeat(7, 1fr)',
+        gap:       6,
+        marginTop: 8,
+      }}>
+        {TOKEN_KEYS.map(key => {
+          const t       = SPECIALTY_TOKENS[key].light
+          const active  = value === key
+          return (
+            <button
+              key={key}
+              title={SPECIALTY_TOKENS[key].label}
+              onClick={() => onChange(key)}
+              style={{
+                width:        36,
+                height:       36,
+                borderRadius: 8,
+                backgroundColor: t.bg,
+                border:       active
+                  ? `2.5px solid ${t.fg}`
+                  : '2px solid transparent',
+                cursor:       'pointer',
+                display:      'flex',
+                alignItems:   'center',
+                justifyContent: 'center',
+                outline:      'none',
+                position:     'relative',
+              }}
+            >
+              {/* Small fg dot so admin can see both bg and fg in the swatch */}
+              <div style={{
+                width:        12,
+                height:       12,
+                borderRadius: '50%',
+                backgroundColor: t.fg,
+              }} />
+              {active && (
+                <div style={{
+                  position:        'absolute',
+                  inset:           0,
+                  borderRadius:    6,
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'center',
+                }}>
+                  <Check size={14} color={t.fg} strokeWidth={3} />
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <div style={{
+        marginTop: 4,
+        fontSize:  11,
+        color:     'var(--color-text-tertiary)',
+      }}>
+        {SPECIALTY_TOKENS[value]?.label ?? 'Slate'} — tokens can be shared across specialties
+      </div>
+    </div>
+  )
+}
+
+// ─── Icon picker ──────────────────────────────────────────────────────────────
+
+function IconPicker({ iconType, iconName, iconUrl, onChangeLucide, onChangeCustom }) {
+  const [tab, setTab]       = useState(iconType === 'custom' ? 'custom' : 'lucide')
+  const [search, setSearch] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState(null)
+  const fileRef = useRef(null)
+  const { toast } = useToast()
+
+  const filtered = LUCIDE_ICON_OPTIONS.filter(o =>
+    search === '' ||
+    o.label.toLowerCase().includes(search.toLowerCase()) ||
+    o.key.toLowerCase().includes(search.toLowerCase())
+  )
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.type !== 'image/svg+xml') {
+      setUploadErr('Only SVG files are accepted.')
+      return
+    }
+    if (file.size > 30_000) {
+      setUploadErr('SVG must be under 30 KB.')
+      return
+    }
+    setUploadErr(null)
+    setUploading(true)
+    const { url, error } = await uploadSpecialtyIcon(file)
+    setUploading(false)
+    if (error) {
+      setUploadErr(error.message ?? 'Upload failed')
+      return
+    }
+    onChangeCustom(url)
+    toast.success('Icon uploaded')
+  }
+
+  return (
+    <div>
+      <div style={labelText}>Icon</div>
+
+      {/* Tab switcher */}
+      <div style={{
+        display:       'flex',
+        gap:           4,
+        marginTop:     8,
+        marginBottom:  10,
+        background:    'var(--color-surface-muted)',
+        borderRadius:  8,
+        padding:       3,
+      }}>
+        {['lucide', 'custom'].map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              flex:            1,
+              padding:         '5px 0',
+              borderRadius:    6,
+              border:          'none',
+              fontSize:        12,
+              fontWeight:      tab === t ? 600 : 400,
+              fontFamily:      'var(--font-body)',
+              cursor:          'pointer',
+              backgroundColor: tab === t ? 'var(--color-surface)' : 'transparent',
+              color:           tab === t ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+              boxShadow:       tab === t ? 'var(--shadow-card)' : 'none',
+              transition:      'all 0.12s ease',
+            }}
+          >
+            {t === 'lucide' ? 'Icon library' : 'Custom SVG'}
+          </button>
+        ))}
+      </div>
+
+      {/* Lucide tab */}
+      {tab === 'lucide' && (
+        <div>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search icons…"
+            style={{ ...inputStyle, marginBottom: 8 }}
+          />
+          <div style={{
+            display:      'grid',
+            gridTemplateColumns: 'repeat(5, 1fr)',
+            gap:          4,
+            maxHeight:    200,
+            overflowY:    'auto',
+            border:       '1px solid var(--color-border)',
+            borderRadius: 8,
+            padding:      6,
+          }}>
+            {filtered.map(({ key, label, Icon }) => {
+              const active = iconType === 'lucide' && iconName === key
+              return (
+                <button
+                  key={key}
+                  title={label}
+                  onClick={() => onChangeLucide(key)}
+                  style={{
+                    display:         'flex',
+                    flexDirection:   'column',
+                    alignItems:      'center',
+                    gap:             3,
+                    padding:         '8px 4px',
+                    borderRadius:    6,
+                    border:          active
+                      ? '1.5px solid var(--color-accent)'
+                      : '1.5px solid transparent',
+                    backgroundColor: active
+                      ? 'var(--color-accent-light)'
+                      : 'transparent',
+                    cursor:          'pointer',
+                    outline:         'none',
+                  }}
+                >
+                  <Icon
+                    size={20}
+                    color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'}
+                    strokeWidth={1.75}
+                  />
+                  <span style={{
+                    fontSize:  9,
+                    color:     active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    textAlign: 'center',
+                    lineHeight: 1.2,
+                    overflow:  'hidden',
+                    display:   '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                  }}>
+                    {label}
+                  </span>
+                </button>
+              )
+            })}
+            {filtered.length === 0 && (
+              <div style={{
+                gridColumn: '1 / -1',
+                padding:    '16px 0',
+                textAlign:  'center',
+                fontSize:   13,
+                color:      'var(--color-text-tertiary)',
+              }}>
+                No icons match "{search}"
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Custom SVG tab */}
+      {tab === 'custom' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".svg,image/svg+xml"
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {/* Current custom icon preview */}
+          {iconType === 'custom' && iconUrl && (
+            <div style={{
+              display:        'flex',
+              alignItems:     'center',
+              gap:            10,
+              padding:        '10px 12px',
+              borderRadius:   8,
+              border:         '1px solid var(--color-border)',
+              backgroundColor:'var(--color-surface-muted)',
+            }}>
+              <img src={iconUrl} width={28} height={28} alt="" style={{ objectFit: 'contain' }} />
+              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)', flex: 1 }}>
+                Custom SVG active
+              </span>
+            </div>
+          )}
+
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            style={{
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              gap:             6,
+              padding:         '10px',
+              borderRadius:    8,
+              border:          '1.5px dashed var(--color-border)',
+              backgroundColor: 'var(--color-surface-muted)',
+              color:           'var(--color-text-secondary)',
+              fontSize:        13,
+              fontFamily:      'var(--font-body)',
+              cursor:          uploading ? 'wait' : 'pointer',
+            }}
+          >
+            <Upload size={14} />
+            {uploading ? 'Uploading…' : 'Upload SVG from device'}
+          </button>
+
+          {uploadErr && (
+            <div style={{ fontSize: 12, color: 'var(--color-danger)' }}>
+              {uploadErr}
+            </div>
+          )}
+
+          <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
+            SVG only · max 30 KB · monochrome works best.<br />
+            The icon background color is still controlled by the token above.
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ─── SpecialtyModal ───────────────────────────────────────────────────────────
@@ -78,10 +359,12 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     if (open) {
       setForm(specialty
         ? {
-            name_en:   specialty.name_en   ?? '',
-            name_ar:   specialty.name_ar   ?? '',
-            icon_name: specialty.icon_name ?? '🩺',
-            color_hex: specialty.color_hex ?? '#DBEAFE',
+            name_en:     specialty.name_en     ?? '',
+            name_ar:     specialty.name_ar     ?? '',
+            icon_type:   specialty.icon_type   ?? 'lucide',
+            icon_name:   specialty.icon_name   ?? 'Stethoscope',
+            icon_url:    specialty.icon_url    ?? null,
+            color_token: specialty.color_token ?? FALLBACK_TOKEN,
           }
         : { ...EMPTY_FORM }
       )
@@ -92,6 +375,14 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     setForm(f => ({ ...f, [field]: value }))
   }
 
+  function handleLucideChange(key) {
+    setForm(f => ({ ...f, icon_type: 'lucide', icon_name: key, icon_url: null }))
+  }
+
+  function handleCustomChange(url) {
+    setForm(f => ({ ...f, icon_type: 'custom', icon_url: url }))
+  }
+
   async function handleSave() {
     if (!form.name_en.trim()) {
       toast.error('Name (English) is required')
@@ -100,10 +391,14 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     setBusy(true)
 
     const payload = {
-      name_en:   form.name_en.trim(),
-      name_ar:   form.name_ar.trim() || null,
-      icon_name: form.icon_name || '🩺',
-      color_hex: form.color_hex,
+      name_en:     form.name_en.trim(),
+      name_ar:     form.name_ar.trim() || null,
+      icon_name:   form.icon_type === 'lucide' ? form.icon_name : 'Stethoscope',
+      icon_type:   form.icon_type,
+      icon_url:    form.icon_type === 'custom' ? (form.icon_url ?? null) : null,
+      color_token: form.color_token,
+      // Keep color_hex in sync with token for any legacy readers
+      color_hex:   SPECIALTY_TOKENS[form.color_token]?.light.bg ?? '#F1F5F9',
       ...(specialty ? {} : { sort_order: nextOrder ?? 99 }),
     }
 
@@ -127,6 +422,9 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
     onSaved()
     onClose()
   }
+
+  // Resolve preview colors
+  const previewColors = resolveToken(form.color_token, false)
 
   return (
     <Modal
@@ -160,123 +458,54 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
           />
         </label>
 
-        {/* Color palette */}
-        <div>
-          <div style={labelText}>Icon Background Color</div>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
-            {PALETTE_COLORS.map(c => (
-              <button
-                key={c}
-                onClick={() => patch('color_hex', c)}
-                style={{
-                  width: 32, height: 32,
-                  borderRadius: 8,
-                  backgroundColor: c,
-                  border: form.color_hex === c
-                    ? '2px solid var(--color-accent)'
-                    : '2px solid transparent',
-                  cursor: 'pointer',
-                }}
-              />
-            ))}
-            {/* Custom hex input */}
-            <input
-              type="color"
-              value={form.color_hex}
-              onChange={e => patch('color_hex', e.target.value)}
-              title="Custom colour"
-              style={{
-                width: 32, height: 32,
-                padding: 2,
-                borderRadius: 8,
-                border: '1px solid var(--color-border)',
-                cursor: 'pointer',
-              }}
-            />
-          </div>
-        </div>
+        {/* Color token palette */}
+        <TokenPalette
+          value={form.color_token}
+          onChange={v => patch('color_token', v)}
+        />
 
-        {/* Emoji icon input */}
-        <div>
-          <div style={labelText}>Icon (Emoji)</div>
-          <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Icon picker */}
+        <IconPicker
+          iconType={form.icon_type}
+          iconName={form.icon_name}
+          iconUrl={form.icon_url}
+          onChangeLucide={handleLucideChange}
+          onChangeCustom={handleCustomChange}
+        />
 
-            {/* Text input */}
-            <input
-              value={form.icon_name}
-              onChange={e => patch('icon_name', e.target.value)}
-              placeholder="Type or paste any emoji, e.g. 🫀"
-              maxLength={8}
-              style={{
-                ...inputStyle,
-                fontSize: 20,
-                textAlign: 'center',
-                letterSpacing: 2,
-              }}
-            />
-
-            {/* Quick-pick chips */}
-            <div style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: 4,
-              padding: 8,
-              border: '1px solid var(--color-border)',
-              borderRadius: 8,
-              maxHeight: 130,
-              overflowY: 'auto',
-            }}>
-              {EMOJI_SUGGESTIONS.map(emoji => (
-                <button
-                  key={emoji}
-                  title={emoji}
-                  onClick={() => patch('icon_name', emoji)}
-                  style={{
-                    width: 36, height: 36,
-                    borderRadius: 8,
-                    fontSize: 18,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    border: form.icon_name === emoji
-                      ? '2px solid var(--color-accent)'
-                      : '1px solid transparent',
-                    backgroundColor: form.icon_name === emoji
-                      ? (form.color_hex || 'var(--color-accent-light)')
-                      : 'transparent',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Preview */}
+        {/* Live preview */}
         <div>
           <div style={labelText}>Preview</div>
           <div style={{
-            marginTop: 6,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
-            padding: '12px 16px',
-            border: '1px solid var(--color-border)',
-            borderRadius: 10,
+            marginTop:       8,
+            display:         'flex',
+            alignItems:      'center',
+            gap:             12,
+            padding:         '12px 16px',
+            border:          '1px solid var(--color-border)',
+            borderRadius:    10,
             backgroundColor: 'var(--color-bg)',
           }}>
+            {/* Bubble */}
             <div style={{
-              width: 44, height: 44,
-              borderRadius: 12,
-              backgroundColor: form.color_hex || '#DBEAFE',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 22,
-              flexShrink: 0,
+              width:           44,
+              height:          44,
+              borderRadius:    12,
+              backgroundColor: previewColors.bg,
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+              boxShadow:       'inset 0 0 0 1px rgba(0,0,0,0.06)',
             }}>
-              {form.icon_name || '🩺'}
+              <SpecialtyIcon
+                iconType={form.icon_type}
+                iconValue={form.icon_type === 'custom' ? (form.icon_url ?? '') : form.icon_name}
+                size={22}
+                color={previewColors.fg}
+              />
             </div>
+            {/* Text */}
             <div>
               <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text-primary)' }}>
                 {form.name_en || 'Specialty Name'}
@@ -286,6 +515,21 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
                   {form.name_ar}
                 </div>
               )}
+              {/* Token label */}
+              <div style={{
+                display:         'inline-flex',
+                alignItems:      'center',
+                gap:             4,
+                marginTop:       4,
+                padding:         '2px 8px',
+                borderRadius:    'var(--radius-full)',
+                backgroundColor: previewColors.bg,
+                fontSize:        11,
+                fontWeight:      500,
+                color:           previewColors.fg,
+              }}>
+                {SPECIALTY_TOKENS[form.color_token]?.label ?? 'Slate'}
+              </div>
             </div>
           </div>
         </div>
@@ -309,9 +553,8 @@ export default function SpecialtiesManager() {
   const navigate      = useNavigate()
   const { toast }     = useToast()
 
-  const [rows, setRows]     = useState([])
-  const [loading, setLoading] = useState(true)
-
+  const [rows, setRows]         = useState([])
+  const [loading, setLoading]   = useState(true)
   const [expandedId, setExpandedId] = useState(null)
 
   const [modalOpen,  setModalOpen]  = useState(false)
@@ -350,10 +593,7 @@ export default function SpecialtiesManager() {
     const { error } = await reorderSpecialties(
       withOrder.map(s => ({ id: s.id, sort_order: s.sort_order }))
     )
-    if (error) {
-      toast.error('Reorder failed')
-      load()
-    }
+    if (error) { toast.error('Reorder failed'); load() }
   }
 
   // ── Toggle active ─────────────────────────────────────────────────────────
@@ -368,404 +608,294 @@ export default function SpecialtiesManager() {
         onConfirm: () => doToggle(specialty, false),
       })
       setConfirmOpen(true)
-      return
+    } else {
+      doToggle(specialty, !specialty.is_active)
     }
-
-    doToggle(specialty, !specialty.is_active)
   }
 
-  async function doToggle(specialty, newValue) {
-    setRows(r => r.map(s => s.id === specialty.id ? { ...s, is_active: newValue } : s))
-    const { error } = await toggleSpecialtyActive(specialty.id, newValue)
-    if (error) {
-      toast.error('Update failed')
-      setRows(r => r.map(s => s.id === specialty.id ? { ...s, is_active: !newValue } : s))
-    } else {
-      toast.success(newValue ? 'Specialty activated' : 'Specialty deactivated')
-    }
+  async function doToggle(specialty, isActive) {
+    const { error } = await toggleSpecialtyActive(specialty.id, isActive, specialty.name_en)
+    if (error) { toast.error(error.message ?? 'Toggle failed'); return }
+    toast.success(isActive ? 'Specialty activated' : 'Specialty deactivated')
+    load()
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────
 
   function handleDelete(specialty) {
-    if (specialty.id === UNCATEGORIZED_ID) {
-      toast.error('Cannot delete Uncategorized'); return
-    }
     if (specialty.conditionCount > 0) {
-      toast.error(`Move all ${specialty.conditionCount} condition(s) out first`); return
+      toast.error(`Cannot delete — ${specialty.conditionCount} condition(s) still assigned.`)
+      return
     }
     setConfirmConfig({
       title:   'Delete Specialty?',
-      message: `Delete "${specialty.name_en}" permanently? This cannot be undone.`,
-      onConfirm: async () => {
-        const { error } = await deleteSpecialty(specialty.id)
-        if (error) { toast.error('Delete failed'); return }
-        toast.success('Specialty deleted')
-        load()
-      },
+      message: `"${specialty.name_en}" will be permanently removed. This cannot be undone.`,
+      onConfirm: () => doDelete(specialty),
     })
     setConfirmOpen(true)
   }
 
-  // ── Drag to reorder ───────────────────────────────────────────────────────
-
-  function onDragStart(e, idx) {
-    dragIdx.current = idx
-    e.dataTransfer.effectAllowed = 'move'
+  async function doDelete(specialty) {
+    const { error } = await deleteSpecialty(specialty.id, specialty.name_en)
+    if (error) { toast.error(error.message ?? 'Delete failed'); return }
+    toast.success('Specialty deleted')
+    load()
   }
 
-  function onDragOver(e, idx) {
-    e.preventDefault()
-    dragOver.current = idx
-  }
+  // ── Drag-and-drop ─────────────────────────────────────────────────────────
 
-  async function onDrop() {
+  function onDragStart(idx) { dragIdx.current = idx }
+  function onDragEnter(idx) { dragOver.current = idx }
+
+  async function onDragEnd() {
     const from = dragIdx.current
     const to   = dragOver.current
-    if (from === null || to === null || from === to) return
-    const effectiveTo = (rows[0]?.id === UNCATEGORIZED_ID && to === 0) ? 1 : to
-
+    if (from === null || to === null || from === to) {
+      dragIdx.current = dragOver.current = null
+      return
+    }
+    if (to === 0 && rows[0]?.id === UNCATEGORIZED_ID) {
+      dragIdx.current = dragOver.current = null
+      return
+    }
     const reordered = [...rows]
     const [moved]   = reordered.splice(from, 1)
-    reordered.splice(effectiveTo, 0, moved)
-
+    reordered.splice(to, 0, moved)
     const withOrder = reordered.map((s, i) => ({ ...s, sort_order: i + 1 }))
     setRows(withOrder)
+    dragIdx.current = dragOver.current = null
 
     const { error } = await reorderSpecialties(
       withOrder.map(s => ({ id: s.id, sort_order: s.sort_order }))
     )
-    if (error) {
-      toast.error('Reorder failed')
-      load()
-    }
-
-    dragIdx.current  = null
-    dragOver.current = null
+    if (error) { toast.error('Reorder failed'); load() }
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const nextOrder = rows.length + 1
 
   return (
     <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
-      display: 'flex',
-      flexDirection: 'column',
+      maxWidth:  680,
+      margin:    '0 auto',
+      padding:   'var(--space-4)',
+      fontFamily:'var(--font-body)',
     }}>
-
       {/* Header */}
-      <header style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: 'var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky',
-        top: 0,
-        zIndex: 10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <button onClick={() => navigate('/admin')} style={iconBtn} aria-label="Back">
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-              Specialties
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-              {rows.length} specialt{rows.length === 1 ? 'y' : 'ies'}
-            </div>
-          </div>
-        </div>
-
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--space-5)' }}>
+        <button onClick={() => navigate('/admin')} style={iconBtn}>
+          <ArrowLeft size={16} />
+        </button>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          Specialties
+        </h1>
         <button
           onClick={() => { setEditTarget(null); setModalOpen(true) }}
-          style={btnPrimary}
+          style={{ ...btnPrimary, marginLeft: 'auto' }}
         >
-          <Plus size={15} />
-          Add Specialty
+          <Plus size={14} /> Add
         </button>
-      </header>
+      </div>
 
-      {/* Body */}
-      <main style={{ flex: 1, padding: 'var(--space-4)', maxWidth: 720, width: '100%', margin: '0 auto' }}>
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)' }}>
+          Loading…
+        </div>
+      )}
 
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            Loading…
-          </div>
-        )}
+      {!loading && rows.map((specialty, idx) => {
+        const isUncategorized = specialty.id === UNCATEGORIZED_ID
+        const isExpanded      = expandedId === specialty.id
+        const tokenKey        = specialty.color_token ?? FALLBACK_TOKEN
+        const colors          = resolveToken(tokenKey, false)
 
-        {!loading && rows.length === 0 && (
-          <div style={{ textAlign: 'center', padding: 48, color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            No specialties found. Add one to get started.
-          </div>
-        )}
-
-        {!loading && rows.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-            {/* Legend row */}
+        return (
+          <div
+            key={specialty.id}
+            draggable={!isUncategorized}
+            onDragStart={() => !isUncategorized && onDragStart(idx)}
+            onDragEnter={() => onDragEnter(idx)}
+            onDragEnd={onDragEnd}
+            onDragOver={e => e.preventDefault()}
+            style={{
+              display:         'flex',
+              flexDirection:   'column',
+              border:          '1px solid var(--color-border)',
+              borderRadius:    10,
+              marginBottom:    8,
+              backgroundColor: 'var(--color-surface)',
+              opacity:         specialty.is_active ? 1 : 0.55,
+            }}
+          >
+            {/* Row */}
             <div style={{
-              display: 'grid',
-              gridTemplateColumns: '28px 48px 1fr 90px 60px 96px',
-              gap: 8,
-              padding: '4px 12px',
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'var(--color-text-tertiary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
+              display:    'flex',
+              alignItems: 'center',
+              gap:        8,
+              padding:    '10px 12px',
             }}>
-              <span />
-              <span />
-              <span>Name</span>
-              <span style={{ textAlign: 'center' }}>Conditions</span>
-              <span style={{ textAlign: 'center' }}>Active</span>
-              <span />
+              {/* Drag handle */}
+              {!isUncategorized && (
+                <GripVertical
+                  size={16}
+                  color="var(--color-text-tertiary)"
+                  style={{ cursor: 'grab', flexShrink: 0 }}
+                />
+              )}
+
+              {/* Icon bubble */}
+              <div style={{
+                width:           36,
+                height:          36,
+                flexShrink:      0,
+                borderRadius:    8,
+                backgroundColor: colors.bg,
+                display:         'flex',
+                alignItems:      'center',
+                justifyContent:  'center',
+              }}>
+                <SpecialtyIcon
+                  iconType={specialty.icon_type   ?? 'lucide'}
+                  iconValue={specialty.icon_type === 'custom'
+                    ? (specialty.icon_url ?? '')
+                    : (specialty.icon_name ?? 'Stethoscope')}
+                  size={18}
+                  color={colors.fg}
+                />
+              </div>
+
+              {/* Name */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{
+                  fontWeight:   600,
+                  fontSize:     14,
+                  color:        'var(--color-text-primary)',
+                  overflow:     'hidden',
+                  whiteSpace:   'nowrap',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {specialty.name_en}
+                </div>
+                {specialty.name_ar && (
+                  <div style={{
+                    fontSize:  12,
+                    color:     'var(--color-text-tertiary)',
+                    direction: 'rtl',
+                  }}>
+                    {specialty.name_ar}
+                  </div>
+                )}
+              </div>
+
+              {/* Condition count badge — tappable to expand */}
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : specialty.id)}
+                style={{
+                  padding:         '2px 8px',
+                  borderRadius:    'var(--radius-full)',
+                  border:          '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-surface-muted)',
+                  fontSize:        11,
+                  color:           'var(--color-text-secondary)',
+                  cursor:          'pointer',
+                  display:         'flex',
+                  alignItems:      'center',
+                  gap:             3,
+                }}
+              >
+                {specialty.conditionCount ?? 0}
+                <ChevronRight
+                  size={10}
+                  style={{
+                    transition: 'transform 0.15s',
+                    transform:  isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                />
+              </button>
+
+              {/* Up / Down */}
+              {!isUncategorized && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <button onClick={() => moveRow(idx, -1)} style={iconBtn} title="Move up">
+                    <ChevronUp size={12} />
+                  </button>
+                  <button onClick={() => moveRow(idx, +1)} style={iconBtn} title="Move down">
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+              )}
+
+              {/* Toggle active */}
+              {!isUncategorized && (
+                <button
+                  onClick={() => handleToggleActive(specialty)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                  title={specialty.is_active ? 'Deactivate' : 'Activate'}
+                >
+                  {specialty.is_active
+                    ? <ToggleRight size={22} color="var(--color-success)" />
+                    : <ToggleLeft  size={22} color="var(--color-text-tertiary)" />}
+                </button>
+              )}
+
+              {/* Edit */}
+              {!isUncategorized && (
+                <button
+                  onClick={() => { setEditTarget(specialty); setModalOpen(true) }}
+                  style={iconBtn}
+                  title="Edit"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
+
+              {/* Delete */}
+              {!isUncategorized && (
+                <button
+                  onClick={() => handleDelete(specialty)}
+                  style={{ ...iconBtn, color: 'var(--color-danger)' }}
+                  title="Delete"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
             </div>
 
-            {rows.map((specialty, idx) => {
-              const isUncategorized = specialty.id === UNCATEGORIZED_ID
-              const emoji           = specialty.icon_name || '🩺'
-              const isExpanded      = expandedId === specialty.id
-              const conditionNames  = specialty.conditionNames ?? []
-              const isLast          = idx === rows.length - 1
-
-              return (
-                <div key={specialty.id}>
-                  {/* ── Main row ── */}
-                  <div
-                    draggable={!isUncategorized}
-                    onDragStart={e => onDragStart(e, idx)}
-                    onDragOver={e => onDragOver(e, idx)}
-                    onDrop={onDrop}
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '28px 48px 1fr 90px 60px 96px',
-                      gap: 8,
-                      alignItems: 'center',
-                      padding: '10px 12px',
-                      backgroundColor: specialty.is_active
-                        ? 'var(--color-surface)'
-                        : 'var(--color-bg)',
-                      border: '1px solid var(--color-border)',
-                      borderRadius: isExpanded ? '10px 10px 0 0' : 10,
-                      borderBottom: isExpanded ? 'none' : '1px solid var(--color-border)',
-                      opacity: specialty.is_active ? 1 : 0.6,
-                      cursor: isUncategorized ? 'default' : 'grab',
-                      userSelect: 'none',
-                    }}
-                  >
-                    {/* Drag handle */}
-                    <div style={{
-                      color: isUncategorized ? 'transparent' : 'var(--color-text-tertiary)',
-                      display: 'flex', alignItems: 'center',
-                    }}>
-                      <GripVertical size={16} />
-                    </div>
-
-                    {/* Emoji chip */}
-                    <div style={{
-                      width: 40, height: 40,
-                      borderRadius: 10,
-                      backgroundColor: specialty.color_hex || '#DBEAFE',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 20, flexShrink: 0,
-                      userSelect: 'none',
-                    }}>
-                      {emoji}
-                    </div>
-
-                    {/* Name */}
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 14, fontWeight: 600,
-                        color: 'var(--color-text-primary)',
-                        display: 'flex', alignItems: 'center', gap: 6,
-                      }}>
-                        {specialty.name_en}
-                        {isUncategorized && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, padding: '2px 6px',
-                            borderRadius: 4,
-                            backgroundColor: 'var(--color-accent-light)',
-                            color: 'var(--color-accent)',
-                            textTransform: 'uppercase', letterSpacing: '0.05em',
-                          }}>
-                            Default
-                          </span>
-                        )}
-                        {!specialty.is_active && (
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, padding: '2px 6px',
-                            borderRadius: 4,
-                            backgroundColor: 'var(--color-border)',
-                            color: 'var(--color-text-tertiary)',
-                            textTransform: 'uppercase', letterSpacing: '0.05em',
-                          }}>
-                            Inactive
-                          </span>
-                        )}
-                      </div>
-                      {specialty.name_ar && (
-                        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', direction: 'rtl', marginTop: 1 }}>
-                          {specialty.name_ar}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Condition count — clickable to expand */}
-                    <div style={{ textAlign: 'center' }}>
-                      {specialty.conditionCount > 0 ? (
-                        <button
-                          onClick={() => setExpandedId(isExpanded ? null : specialty.id)}
-                          title={isExpanded ? 'Collapse' : 'View conditions'}
-                          style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            fontSize: 13, fontWeight: 500,
-                            color: 'var(--color-accent)',
-                            background: 'none', border: 'none', cursor: 'pointer',
-                            padding: '2px 6px', borderRadius: 6,
-                            backgroundColor: 'var(--color-accent-light)',
-                          }}
-                        >
-                          {specialty.conditionCount}
-                          <ChevronRight
-                            size={12}
-                            style={{
-                              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
-                              transition: 'transform 0.15s',
-                            }}
-                          />
-                        </button>
-                      ) : (
-                        <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>0</span>
-                      )}
-                    </div>
-
-                    {/* Active toggle */}
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      {isUncategorized ? (
-                        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>—</span>
-                      ) : (
-                        <button
-                          onClick={() => handleToggleActive(specialty)}
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}
-                          aria-label={specialty.is_active ? 'Deactivate' : 'Activate'}
-                          title={specialty.is_active ? 'Deactivate' : 'Activate'}
-                        >
-                          {specialty.is_active
-                            ? <ToggleRight size={24} color="var(--color-accent)" />
-                            : <ToggleLeft  size={24} color="var(--color-text-tertiary)" />
-                          }
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Actions: up/down + edit + delete */}
-                    <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end', alignItems: 'center' }}>
-                      {!isUncategorized && (
-                        <>
-                          {/* Up arrow */}
-                          <button
-                            onClick={() => moveRow(idx, -1)}
-                            disabled={idx === 1 && rows[0]?.id === UNCATEGORIZED_ID}
-                            title="Move up"
-                            style={{
-                              ...iconBtn,
-                              opacity: (idx === 1 && rows[0]?.id === UNCATEGORIZED_ID) ? 0.3 : 1,
-                            }}
-                          >
-                            <ChevronUp size={14} />
-                          </button>
-
-                          {/* Down arrow */}
-                          <button
-                            onClick={() => moveRow(idx, 1)}
-                            disabled={isLast}
-                            title="Move down"
-                            style={{
-                              ...iconBtn,
-                              opacity: isLast ? 0.3 : 1,
-                            }}
-                          >
-                            <ChevronDown size={14} />
-                          </button>
-
-                          {/* Edit */}
-                          <button
-                            onClick={() => { setEditTarget(specialty); setModalOpen(true) }}
-                            style={iconBtn}
-                            aria-label="Edit"
-                            title="Edit"
-                          >
-                            <Pencil size={14} />
-                          </button>
-
-                          {/* Delete */}
-                          <button
-                            onClick={() => handleDelete(specialty)}
-                            style={{ ...iconBtn, color: 'var(--color-error, #dc2626)' }}
-                            aria-label="Delete"
-                            title="Delete"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* ── Expanded conditions panel ── */}
-                  {isExpanded && conditionNames.length > 0 && (
-                    <div style={{
-                      border: '1px solid var(--color-border)',
-                      borderTop: 'none',
-                      borderRadius: '0 0 10px 10px',
-                      backgroundColor: 'var(--color-bg)',
-                      padding: '8px 12px 12px 72px',
-                    }}>
-                      <div style={{
-                        fontSize: 11, fontWeight: 600, letterSpacing: '0.05em',
-                        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-                        marginBottom: 6,
-                      }}>
-                        Conditions
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        {conditionNames.map((name, i) => (
-                          <div key={i} style={{
-                            fontSize: 13, color: 'var(--color-text-secondary)',
-                            display: 'flex', alignItems: 'center', gap: 6,
-                          }}>
-                            <span style={{
-                              width: 5, height: 5, borderRadius: '50%',
-                              backgroundColor: specialty.color_hex || 'var(--color-accent)',
-                              flexShrink: 0,
-                            }} />
-                            {name}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            {/* Expandable conditions list */}
+            {isExpanded && specialty.conditionNames?.length > 0 && (
+              <div style={{
+                borderTop:       '1px solid var(--color-border-subtle)',
+                padding:         '8px 12px 10px',
+                display:         'flex',
+                flexWrap:        'wrap',
+                gap:             4,
+              }}>
+                {specialty.conditionNames.map(name => (
+                  <span key={name} style={{
+                    padding:         '2px 8px',
+                    borderRadius:    'var(--radius-full)',
+                    backgroundColor: 'var(--color-surface-muted)',
+                    border:          '1px solid var(--color-border-subtle)',
+                    fontSize:        11,
+                    color:           'var(--color-text-secondary)',
+                  }}>
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </main>
+        )
+      })}
 
-      {/* Modals */}
+      {/* Add/Edit modal */}
       <SpecialtyModal
         open={modalOpen}
         specialty={editTarget}
-        onClose={() => setModalOpen(false)}
-        onSaved={() => { setModalOpen(false); load() }}
-        nextOrder={rows.length > 0 ? Math.max(...rows.map(r => r.sort_order ?? 0)) + 1 : 1}
+        nextOrder={nextOrder}
+        onClose={() => { setModalOpen(false); setEditTarget(null) }}
+        onSaved={load}
       />
 
       <ConfirmModal
@@ -782,72 +912,72 @@ export default function SpecialtiesManager() {
 // ─── Shared micro styles ──────────────────────────────────────────────────────
 
 const btnPrimary = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  padding: '8px 14px',
-  borderRadius: 'var(--radius-sm)',
-  border: 'none',
+  display:         'flex',
+  alignItems:      'center',
+  gap:             6,
+  padding:         '8px 14px',
+  borderRadius:    'var(--radius-sm)',
+  border:          'none',
   backgroundColor: 'var(--color-accent)',
-  color: '#fff',
-  fontSize: 13,
-  fontWeight: 600,
-  fontFamily: 'var(--font-body)',
-  cursor: 'pointer',
+  color:           '#fff',
+  fontSize:        13,
+  fontWeight:      600,
+  fontFamily:      'var(--font-body)',
+  cursor:          'pointer',
 }
 
 const btnSecondary = {
-  padding: '8px 14px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
+  padding:         '8px 14px',
+  borderRadius:    'var(--radius-sm)',
+  border:          '1px solid var(--color-border)',
   backgroundColor: 'transparent',
-  color: 'var(--color-text-secondary)',
-  fontSize: 13,
-  fontWeight: 500,
-  fontFamily: 'var(--font-body)',
-  cursor: 'pointer',
+  color:           'var(--color-text-secondary)',
+  fontSize:        13,
+  fontWeight:      500,
+  fontFamily:      'var(--font-body)',
+  cursor:          'pointer',
 }
 
 const iconBtn = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 28,
-  height: 28,
-  borderRadius: 6,
-  border: '1px solid var(--color-border)',
+  display:         'flex',
+  alignItems:      'center',
+  justifyContent:  'center',
+  width:           28,
+  height:          28,
+  borderRadius:    6,
+  border:          '1px solid var(--color-border)',
   backgroundColor: 'transparent',
-  color: 'var(--color-text-secondary)',
-  cursor: 'pointer',
-  padding: 0,
+  color:           'var(--color-text-secondary)',
+  cursor:          'pointer',
+  padding:         0,
 }
 
 const labelStyle = {
-  display: 'flex',
+  display:       'flex',
   flexDirection: 'column',
-  gap: 6,
-  fontSize: 13,
-  fontWeight: 600,
-  color: 'var(--color-text-secondary)',
-  fontFamily: 'var(--font-body)',
+  gap:           6,
+  fontSize:      13,
+  fontWeight:    600,
+  color:         'var(--color-text-secondary)',
+  fontFamily:    'var(--font-body)',
 }
 
 const labelText = {
-  fontSize: 13,
+  fontSize:   13,
   fontWeight: 600,
-  color: 'var(--color-text-secondary)',
+  color:      'var(--color-text-secondary)',
   fontFamily: 'var(--font-body)',
 }
 
 const inputStyle = {
-  padding: '8px 10px',
-  borderRadius: 'var(--radius-sm)',
-  border: '1px solid var(--color-border)',
+  padding:         '8px 10px',
+  borderRadius:    'var(--radius-sm)',
+  border:          '1px solid var(--color-border)',
   backgroundColor: 'var(--color-bg)',
-  color: 'var(--color-text-primary)',
-  fontSize: 14,
-  fontFamily: 'var(--font-body)',
-  outline: 'none',
-  width: '100%',
-  boxSizing: 'border-box',
+  color:           'var(--color-text-primary)',
+  fontSize:        14,
+  fontFamily:      'var(--font-body)',
+  outline:         'none',
+  width:           '100%',
+  boxSizing:       'border-box',
 }

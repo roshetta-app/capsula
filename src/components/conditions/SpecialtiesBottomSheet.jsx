@@ -1,20 +1,22 @@
 /**
  * src/components/conditions/SpecialtiesBottomSheet.jsx
+ * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  *
  * Bottom sheet showing all specialties in a grid.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
  *
  * Props:
- *   specialties      [{ id, name, iconName, colorHex }]
+ *   specialties      [{ id, name, iconType, iconValue, colorToken }]
  *   activeSpecialty  string  — 'all' | id
  *   onSelect         (id) => void
  *   onClose          () => void
  *   isOpen           boolean
  */
 
-import { useEffect } from 'react'
-
-const FALLBACK_ICON = '🩺'
+import { useEffect }                    from 'react'
+import { SpecialtyIcon }                from '../../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+import { useDarkMode }                  from '../../hooks/useDarkMode'
 
 export default function SpecialtiesBottomSheet({
   specialties,
@@ -23,6 +25,8 @@ export default function SpecialtiesBottomSheet({
   onClose,
   isOpen,
 }) {
+  const [isDark] = useDarkMode()
+
   useEffect(() => {
     if (!isOpen) return
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -105,7 +109,9 @@ export default function SpecialtiesBottomSheet({
             fontSize:     15,
             fontFamily:   'var(--font-body)',
             fontWeight:   activeSpecialty === 'all' ? 600 : 400,
-            color:        activeSpecialty === 'all' ? 'var(--color-accent)' : 'var(--color-text-primary)',
+            color:        activeSpecialty === 'all'
+              ? 'var(--color-accent)'
+              : 'var(--color-text-primary)',
             cursor:       'pointer',
           }}
         >
@@ -121,6 +127,9 @@ export default function SpecialtiesBottomSheet({
         }}>
           {specialties.map(s => {
             const isActive = activeSpecialty === s.id
+            const tokenKey = s.colorToken ?? FALLBACK_TOKEN
+            const colors   = resolveToken(tokenKey, isDark)
+
             return (
               <button
                 key={s.id}
@@ -132,16 +141,16 @@ export default function SpecialtiesBottomSheet({
                   padding:                 '10px 12px',
                   borderRadius:            'var(--radius-md)',
                   border:                  isActive
-                    ? `1.5px solid ${s.colorHex ?? 'var(--color-accent)'}`
+                    ? `1.5px solid ${colors.pill}`
                     : '1px solid var(--color-border)',
                   backgroundColor:         isActive
-                    ? (s.colorHex ? `${s.colorHex}18` : 'var(--color-accent-light)')
+                    ? colors.bg
                     : 'var(--color-surface)',
                   fontSize:                13,
                   fontFamily:              'var(--font-body)',
                   fontWeight:              isActive ? 600 : 400,
                   color:                   isActive
-                    ? (s.colorHex ?? 'var(--color-accent)')
+                    ? colors.fg
                     : 'var(--color-text-primary)',
                   cursor:                  'pointer',
                   textAlign:               'left',
@@ -149,9 +158,23 @@ export default function SpecialtiesBottomSheet({
                   outline:                 'none',
                 }}
               >
-                <span style={{ fontSize: 16, userSelect: 'none' }}>
-                  {s.iconName ?? FALLBACK_ICON}
-                </span>
+                <div style={{
+                  width:           32,
+                  height:          32,
+                  flexShrink:      0,
+                  borderRadius:    'var(--radius-sm)',
+                  backgroundColor: colors.bg,
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'center',
+                }}>
+                  <SpecialtyIcon
+                    iconType={s.iconType   ?? 'lucide'}
+                    iconValue={s.iconValue ?? 'Stethoscope'}
+                    size={16}
+                    color={colors.fg}
+                  />
+                </div>
                 {s.name}
               </button>
             )

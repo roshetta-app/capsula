@@ -2,6 +2,7 @@
  * src/components/ConditionCard.jsx
  * Phase 3 — Conditions Screen Redesign
  * Phase 5 — removed InlineStarButton; tighter row padding (8px vs 11px)
+ * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  *
  * Props:
  *   condition  ConditionFull
@@ -9,58 +10,22 @@
  *   highlight  string  — current search query; empty string when not searching
  */
 
-import { useNavigate } from 'react-router-dom'
+import { useNavigate }    from 'react-router-dom'
 import { highlightMatch } from '../utils/highlightMatch'
-
-// ─── Color helpers ────────────────────────────────────────────────────────────
-
-function parseHex(hex) {
-  if (!hex || typeof hex !== 'string') return null
-  const h = hex.replace('#', '')
-  if (h.length === 3) {
-    return {
-      r: parseInt(h[0] + h[0], 16),
-      g: parseInt(h[1] + h[1], 16),
-      b: parseInt(h[2] + h[2], 16),
-    }
-  }
-  if (h.length === 6) {
-    return {
-      r: parseInt(h.slice(0, 2), 16),
-      g: parseInt(h.slice(2, 4), 16),
-      b: parseInt(h.slice(4, 6), 16),
-    }
-  }
-  return null
-}
-
-function luminance({ r, g, b }) {
-  const s = [r, g, b].map(v => {
-    const c = v / 255
-    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
-  })
-  return 0.2126 * s[0] + 0.7152 * s[1] + 0.0722 * s[2]
-}
-
-function iconColorFor(hex) {
-  const rgb = parseHex(hex)
-  if (!rgb) return 'var(--color-accent)'
-  if (luminance(rgb) > 0.4) {
-    return `rgb(${Math.round(rgb.r * 0.35)},${Math.round(rgb.g * 0.35)},${Math.round(rgb.b * 0.35)})`
-  }
-  return '#ffffff'
-}
+import { SpecialtyIcon }  from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
+import { useDarkMode }    from '../hooks/useDarkMode'
 
 // ─── ConditionCard ────────────────────────────────────────────────────────────
 
-const FALLBACK_ICON  = '🩺'
-const FALLBACK_COLOR = 'var(--color-accent-light)'
-
 export default function ConditionCard({ condition, onTap, highlight = '' }) {
   const navigate = useNavigate()
+  const [isDark] = useDarkMode()
 
-  const icon     = condition.specialtyIcon  || FALLBACK_ICON
-  const bubbleBg = condition.specialtyColor || FALLBACK_COLOR
+  const tokenKey  = condition.colorToken  || FALLBACK_TOKEN
+  const iconType  = condition.iconType    || 'lucide'
+  const iconValue = condition.iconValue   || 'Stethoscope'
+  const colors    = resolveToken(tokenKey, isDark)
 
   function handleTap() {
     if (onTap) {
@@ -96,15 +61,18 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         height:          36,
         flexShrink:      0,
         borderRadius:    'var(--radius-md)',
-        backgroundColor: bubbleBg,
+        backgroundColor: colors.bg,
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
         boxShadow:       'inset 0 0 0 1px rgba(0,0,0,0.06)',
       }}>
-        <span style={{ fontSize: 17, lineHeight: 1, userSelect: 'none' }}>
-          {icon}
-        </span>
+        <SpecialtyIcon
+          iconType={iconType}
+          iconValue={iconValue}
+          size={18}
+          color={colors.fg}
+        />
       </div>
 
       {/* Middle: text content */}
@@ -153,7 +121,7 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         )}
       </div>
 
-      {/* Trailing: chevron — sole action indicator */}
+      {/* Trailing: chevron */}
       <svg
         width="12" height="12" viewBox="0 0 24 24"
         fill="none" stroke="currentColor" strokeWidth="2.5"
