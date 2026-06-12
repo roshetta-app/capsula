@@ -2,11 +2,10 @@ import { useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import OfflineBanner from './ui/OfflineBanner'
 import NotificationsBanner from './ui/NotificationsBanner'
+import { useVisualViewport } from '../hooks/useVisualViewport'
 
 /**
  * Routes that render their own top section and suppress the shared header.
- * The Conditions screen owns its brand row + search + recent chips so it
- * can control scroll behaviour and collapse states independently.
  */
 const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions']
 
@@ -14,9 +13,13 @@ export default function Layout({ children }) {
   const { pathname } = useLocation()
   const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname)
 
+  // Tracks visual viewport (shrinks when keyboard opens) and sets
+  // --viewport-height on :root so the layout never scrolls behind the keyboard.
+  useVisualViewport()
+
   return (
     <div style={{
-      minHeight:       '100dvh',
+      minHeight:       'var(--viewport-height, 100dvh)',
       backgroundColor: 'var(--color-bg)',
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
@@ -74,7 +77,8 @@ export default function Layout({ children }) {
 
       <NotificationsBanner />
 
-      {/* --space-6 (24px) side padding — aligns content with BottomNav label edges */}
+      {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
+          keyboard height is handled by --viewport-height on the outer div. */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
