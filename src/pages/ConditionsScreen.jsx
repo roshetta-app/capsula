@@ -240,7 +240,23 @@ export default function ConditionsScreen() {
   }, [])
 
   function handleBackToTop() {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const start    = window.scrollY
+    if (start === 0) return
+
+    const duration = 350 // ms — constant regardless of scroll distance
+    const startTime = performance.now()
+
+    // easeOutCubic — fast start, gentle landing
+    const ease = t => 1 - Math.pow(1 - t, 3)
+
+    function step(now) {
+      const elapsed  = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      window.scrollTo(0, start * (1 - ease(progress)))
+      if (progress < 1) requestAnimationFrame(step)
+    }
+
+    requestAnimationFrame(step)
   }
 
   const {
