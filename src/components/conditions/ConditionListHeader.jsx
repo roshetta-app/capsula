@@ -4,11 +4,17 @@
  * Count + sort toggle row.
  * Hairline top border anchors the transition from controls to list.
  *
+ * - While searching: shows a result count ("N results"), left-aligned.
+ *   No sort toggle during search (results are always relevance-ordered).
+ * - Otherwise: shows only the sort toggle, right-aligned. The total/filtered
+ *   condition count isn't surfaced here — the active specialty pill already
+ *   communicates the current filter.
+ *
  * Props:
- *   totalCount       number
+ *   totalCount       number   (currently unused — kept for caller compatibility)
  *   resultCount      number
- *   activeSpecialty  string  — 'all' | specialty id
- *   specialtyName    string
+ *   activeSpecialty  string  — 'all' | specialty id  (currently unused — kept for caller compatibility)
+ *   specialtyName    string  (currently unused — kept for caller compatibility)
  *   isSearching      boolean
  *   sortMode         string  — 'az' | 'recent'
  *   onSortToggle     function
@@ -26,35 +32,26 @@ export default function ConditionListHeader({
   onSortToggle,
   SORT_LABELS,
 }) {
-  let countLabel
-  if (isSearching) {
-    countLabel = `${resultCount} result${resultCount !== 1 ? 's' : ''}`
-  } else if (activeSpecialty !== 'all') {
-    countLabel = `Showing ${resultCount} of ${totalCount} — ${specialtyName}`
-  } else {
-    countLabel = `${totalCount} condition${totalCount !== 1 ? 's' : ''}`
-  }
-
   const nextMode = sortMode === 'az' ? 'recent' : 'az'
 
   return (
     <div style={{
       display:        'flex',
       alignItems:     'center',
-      justifyContent: 'space-between',
+      justifyContent: isSearching ? 'flex-start' : 'flex-end',
       borderTop:      '0.5px solid var(--color-border-subtle)',
       padding:        '6px 0 4px',
       marginBottom:   0,
     }}>
-      <span style={{
-        fontSize:   12,
-        color:      'var(--color-text-tertiary)',
-        fontFamily: 'var(--font-mono)',
-      }}>
-        {countLabel}
-      </span>
-
-      {!isSearching && (
+      {isSearching ? (
+        <span style={{
+          fontSize:   12,
+          color:      'var(--color-text-tertiary)',
+          fontFamily: 'var(--font-mono)',
+        }}>
+          {resultCount} result{resultCount !== 1 ? 's' : ''}
+        </span>
+      ) : (
         <button
           onClick={onSortToggle}
           aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
