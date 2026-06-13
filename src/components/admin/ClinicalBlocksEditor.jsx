@@ -38,6 +38,7 @@ const BLOCK_TYPES = [
   { type: 'differential',     label: 'Differential Dx',  icon: '🔀', kind: 'list' },
   { type: 'note',             label: 'Note / NB',        icon: '📝', kind: 'note' },
   { type: 'image_gallery',    label: 'Image Gallery',    icon: '🖼️', kind: 'gallery' },
+  { type: 'prescription',     label: 'Prescription',     icon: '💉', kind: 'prescription' },
 ]
 
 function emptyContent(type) {
@@ -47,6 +48,7 @@ function emptyContent(type) {
     case 'list':    return { items: [] }
     case 'note':    return { text: '', label: '' }
     case 'gallery': return { image_ids: [] }
+    case 'prescription': return { intro: '', sections: [], footer: '' }
     default:        return {}
   }
 }
@@ -383,6 +385,11 @@ function BlockEditor({ block, onChange, conditionId }) {
         <ImageManager conditionId={conditionId} />
       )
 
+    case 'prescription':
+      return (
+        <PrescriptionEditor content={c} onChange={onChange} />
+      )
+
     default:
       return (
         <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>
@@ -404,6 +411,13 @@ function getPreview(block) {
       return [c.label, c.text].filter(Boolean).join(': ').slice(0, 80)
     case 'image_gallery':
       return `${(c.image_ids ?? []).length} image(s)`
+    case 'prescription': {
+      const parts = []
+      if (c.intro) parts.push(c.intro.slice(0, 40))
+      const drugCount = (c.sections ?? []).reduce((n, s) => n + (s.drugs?.length ?? 0), 0)
+      if (drugCount) parts.push(`${drugCount} drug(s)`)
+      return parts.join(' · ') || ''
+    }
     default:
       return (c.text ?? '').slice(0, 80)
   }
@@ -436,6 +450,243 @@ function IconBtn({ icon, onClick, title, variant = 'default' }) {
       {icon}
     </button>
   )
+}
+
+// ─── PrescriptionEditor ───────────────────────────────────────────────────────
+//
+// Manages the prescription block content inline in the CMS.
+// Sections can be of three kinds:
+//   'bullets' — a list of bullet points (e.g. use of antibiotics rationale)
+//   'drugs'   — a list of drug name + dosage pairs separated by OR
+//   'text'    — a plain prose paragraph (e.g. drug choice summary)
+//
+// The editor lets you add/remove sections and add/remove items within each.
+
+function PrescriptionEditor({ content, onChange }) {
+  const c = content ?? {}
+  const sections = c.sections ?? []
+
+  function updateField(field, value) {
+    onChange({ ...c, [field]: value })
+  }
+
+  function addSection(kind) {
+    const newSection = kind === 'drugs'
+      ? { label: '', kind: 'drugs',   drugs: [{ name: '', dose: '' }] }
+      : kind === 'bullets'
+      ? { label: '', kind: 'bullets', items: [''] }
+      : { label: '', kind: 'text',   text: '' }
+    onChange({ ...c, sections: [...sections, newSection] })
+  }
+
+  function updateSection(idx, section) {
+    const next = sections.map((s, i) => i === idx ? section : s)
+    onChange({ ...c, sections: next })
+  }
+
+  function removeSection(idx) {
+    onChange({ ...c, sections: sections.filter((_, i) => i !== idx) })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+
+      {/* Intro */}
+      <div>
+        <div style={sectionLabelStyle}>Opening statement (optional)</div>
+        <textarea
+          value={c.intro ?? ''}
+          onChange={e => updateField('intro', e.target.value)}
+          placeholder="e.g. Self-limited condition that normally resolves within 1 week…"
+          dir="auto"
+          rows={2}
+          style={textareaStyle}
+        />
+      </div>
+
+      {/* Sections */}
+      {sections.map((section, si) => (
+        <div key={si} style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-2) var(--space-3)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+        }}>
+          {/* Section header row */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.06em',
+              textTransform: 'uppercase', color: 'var(--color-accent)',
+              backgroundColor: 'var(--color-accent-light)',
+              padding: '2px 8px', borderRadius: 'var(--radius-full)', flexShrink: 0,
+            }}>
+              {section.kind === 'drugs' ? '💊 Drugs' : section.kind === 'bullets' ? '• Bullets' : '¶ Text'}
+            </span>
+            <button
+              type="button"
+              onClick={() => removeSection(si)}
+              style={{
+                marginLeft: 'auto', border: 'none', background: 'none',
+                color: 'var(--color-danger)', cursor: 'pointer', fontSize: 12,
+              }}
+            >
+              Remove section
+            </button>
+          </div>
+
+          {/* Section label */}
+          <input
+            type="text"
+            value={section.label ?? ''}
+            onChange={e => updateSection(si, { ...section, label: e.target.value })}
+            placeholder="Section heading (optional, e.g. Use of antibiotics)"
+            style={inputStyle}
+          />
+
+          {/* Bullet items */}
+          {section.kind === 'bullets' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {(section.items ?? []).map((item, ii) => (
+                <div key={ii} style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="text"
+                    value={item}
+                    dir="auto"
+                    onChange={e => {
+                      const items = section.items.map((v, j) => j === ii ? e.target.value : v)
+                      updateSection(si, { ...section, items })
+                    }}
+                    placeholder={`Item ${ii + 1}…`}
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => updateSection(si, { ...section, items: section.items.filter((_, j) => j !== ii) })}
+                    style={{ border: 'none', background: 'none', color: 'var(--color-danger)', cursor: 'pointer', fontSize: 13 }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => updateSection(si, { ...section, items: [...(section.items ?? []), ''] })}
+                style={ghostBtnStyle}
+              >
+                + Add item
+              </button>
+            </div>
+          )}
+
+          {/* Drug entries */}
+          {section.kind === 'drugs' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {(section.drugs ?? []).map((drug, di) => (
+                <div key={di}>
+                  {di > 0 && (
+                    <div style={{
+                      textAlign: 'center', fontSize: 11, fontWeight: 700,
+                      color: 'var(--color-text-tertiary)', letterSpacing: '0.08em',
+                      margin: '4px 0 8px',
+                    }}>
+                      — OR —
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input
+                        type="text"
+                        value={drug.name}
+                        dir="auto"
+                        onChange={e => {
+                          const drugs = section.drugs.map((d, j) => j === di ? { ...d, name: e.target.value } : d)
+                          updateSection(si, { ...section, drugs })
+                        }}
+                        placeholder="Drug name & strength (e.g. Syp. Co-Amoxiclave 312.50mg/5ml)"
+                        style={{ ...inputStyle, flex: 1, fontWeight: 600 }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => updateSection(si, { ...section, drugs: section.drugs.filter((_, j) => j !== di) })}
+                        style={{ border: 'none', background: 'none', color: 'var(--color-danger)', cursor: 'pointer', fontSize: 13 }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={drug.dose}
+                      dir="auto"
+                      onChange={e => {
+                        const drugs = section.drugs.map((d, j) => j === di ? { ...d, dose: e.target.value } : d)
+                        updateSection(si, { ...section, drugs })
+                      }}
+                      placeholder="Dosage (e.g. 10mg/kg/day x TDS x 10 days)"
+                      style={{ ...inputStyle, color: 'var(--color-text-secondary)', fontSize: 13 }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => updateSection(si, { ...section, drugs: [...(section.drugs ?? []), { name: '', dose: '' }] })}
+                style={ghostBtnStyle}
+              >
+                + Add OR option
+              </button>
+            </div>
+          )}
+
+          {/* Plain text */}
+          {section.kind === 'text' && (
+            <textarea
+              value={section.text ?? ''}
+              onChange={e => updateSection(si, { ...section, text: e.target.value })}
+              placeholder="Plain text (e.g. Drug of choice: Penicillin, Co-Amoxiclave…)"
+              dir="auto"
+              rows={3}
+              style={textareaStyle}
+            />
+          )}
+        </div>
+      ))}
+
+      {/* Add section buttons */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" onClick={() => addSection('bullets')} style={ghostBtnStyle}>+ Bullet list</button>
+        <button type="button" onClick={() => addSection('drugs')}   style={ghostBtnStyle}>+ Drug group</button>
+        <button type="button" onClick={() => addSection('text')}    style={ghostBtnStyle}>+ Text section</button>
+      </div>
+
+      {/* Footer */}
+      <div>
+        <div style={sectionLabelStyle}>Closing line (optional, e.g. Duration of treatment)</div>
+        <input
+          type="text"
+          value={c.footer ?? ''}
+          onChange={e => updateField('footer', e.target.value)}
+          placeholder="e.g. Duration of treatment: 5 – 10 days"
+          style={inputStyle}
+        />
+      </div>
+    </div>
+  )
+}
+
+const sectionLabelStyle = {
+  fontSize: 12, color: 'var(--color-text-tertiary)',
+  marginBottom: 'var(--space-1)', fontWeight: 500,
+}
+
+const ghostBtnStyle = {
+  display: 'inline-flex', alignItems: 'center',
+  padding: '6px 12px',
+  border: '1px dashed var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  backgroundColor: 'transparent',
+  color: 'var(--color-text-secondary)',
+  fontSize: 13, fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
 }
 
 // ─── Style constants ──────────────────────────────────────────────────────────
@@ -497,5 +748,283 @@ function saveBtnStyle(isDirty, saving) {
     boxShadow: isDirty ? '0 0 0 3px rgba(37,99,235,0.25)' : 'none',
     transition: 'box-shadow 0.2s, opacity 0.2s',
   }
+}
+
+
+```
+
+`src\components\admin\NoteRowEditor.jsx`:
+
+/**
+ * NoteRowEditor — edits a prescription_items row of type='note'.
+ * Saves on blur. Visually distinct with an accent left border.
+ *
+ * Props:
+ *   item      PrescriptionItem
+ *   onChange  (updatedItem) => void
+ *   disabled  boolean
+ */
+
+import { updatePrescriptionItem } from '../../lib/adminQueries'
+
+export default function NoteRowEditor({ item, onChange, disabled }) {
+  async function handleBlur(e) {
+    const content = e.target.value
+    onChange({ ...item, content })
+    await updatePrescriptionItem(item.id, { content })
+  }
+
+  return (
+    <div style={{
+      borderLeft: '3px solid var(--color-accent)',
+      paddingLeft: 'var(--space-3)',
+      backgroundColor: 'var(--color-bg)',
+      borderRadius: '0 var(--radius-md) var(--radius-md) 0',
+    }}>
+      <textarea
+        defaultValue={item.content ?? ''}
+        onBlur={handleBlur}
+        placeholder="Clinical note or warning (e.g. Avoid in renal impairment)…"
+        rows={2}
+        dir="auto"
+        disabled={disabled}
+        style={{
+          width: '100%', boxSizing: 'border-box', padding: '8px 12px',
+          border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+          fontSize: 13, fontFamily: 'var(--font-body)',
+          backgroundColor: '#FFFBEB', color: '#92400E',
+          resize: 'vertical', outline: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
+```
+
+`src\components\admin\TextRowEditor.jsx`:
+
+/**
+ * TextRowEditor — edits a prescription_items row of type='text'.
+ * Saves on blur.
+ *
+ * Props:
+ *   item      PrescriptionItem
+ *   onChange  (updatedItem) => void
+ *   disabled  boolean
+ */
+
+import { updatePrescriptionItem } from '../../lib/adminQueries'
+
+export default function TextRowEditor({ item, onChange, disabled }) {
+  async function handleBlur(e) {
+    const content = e.target.value
+    onChange({ ...item, content })
+    await updatePrescriptionItem(item.id, { content })
+  }
+
+  return (
+    <textarea
+      defaultValue={item.content ?? ''}
+      onBlur={handleBlur}
+      placeholder="Free text line (e.g. Rest, plenty of fluids, avoid NSAIDs)…"
+      rows={2}
+      dir="auto"
+      disabled={disabled}
+      style={{
+        width: '100%', boxSizing: 'border-box', padding: '8px 12px',
+        border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+        fontSize: 13, fontFamily: 'var(--font-body)',
+        backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
+        resize: 'vertical', outline: 'none',
+      }}
+    />
+  )
+}
+
+```
+
+`src\components\conditions\BlockRenderer.jsx`:
+
+import ImageCarousel from './ImageCarousel'
+
+/**
+ * BlockRenderer — renders a single clinical block based on its type.
+ *
+ * Phase 2E spec block types:
+ *   clinical_picture  → plain text, header "Clinical Picture"
+ *   examination       → plain text, header "Examination"
+ *   red_flags         → list with red left border, header "Red Flags ⚠️"
+ *   investigations    → plain text/list, header "Investigations"
+ *   management        → plain text, header "Management"
+ *   differential      → list of condition names, header "Differential Diagnosis"
+ *   note              → yellow-tinted NB box, optional label
+ *   image_gallery     → ImageGallery component (thumbnail strip + portal lightbox)
+ *
+ * Props:
+ *   block   { id, type, position, content }
+ *   images  condition images array (for image_gallery blocks)
+ */
+export default function BlockRenderer({ block, images = [] }) {
+  const { type, content } = block
+
+  switch (type) {
+    case 'clinical_picture':
+      return <TextBlock title="Clinical Picture" text={content?.text} />
+
+    case 'examination':
+      return <TextBlock title="Examination" text={content?.text} />
+
+    case 'investigations':
+      return <TextBlock title="Investigations" text={content?.text} />
+
+    case 'management':
+      return <TextBlock title="Management" text={content?.text} />
+
+    case 'red_flags':
+      return <RedFlagsBlock items={content?.items ?? []} />
+
+    case 'differential':
+      return <ListBlock title="Differential Diagnosis" items={content?.items ?? []} />
+
+    case 'note':
+      return <NoteBlock label={content?.label} text={content?.text} />
+
+    case 'image_gallery': {
+      // All images belong to the condition — render them all.
+      // Uses ImageGallery (thumbnail strip + portal lightbox with pinch-zoom,
+      // double-tap, swipe). Portal rendering prevents swipe conflict with tab nav.
+      if (!images.length) return null
+      return (
+        <div style={{ ...blockWrap }}>
+          <SectionTitle>Images</SectionTitle>
+          <ImageCarousel images={images} />
+        </div>
+      )
+    }
+
+    default:
+      return null
+  }
+}
+
+// ─── TextBlock ────────────────────────────────────────────────────────────────
+
+function TextBlock({ title, text }) {
+  if (!text) return null
+  return (
+    <div style={blockWrap}>
+      <SectionTitle>{title}</SectionTitle>
+      <p dir="auto" style={{
+        margin: 0, fontSize: 14, lineHeight: 1.75,
+        color: 'var(--color-text-primary)', whiteSpace: 'pre-line',
+      }}>
+        {text}
+      </p>
+    </div>
+  )
+}
+
+// ─── RedFlagsBlock ────────────────────────────────────────────────────────────
+
+function RedFlagsBlock({ items }) {
+  if (!items.length) return null
+  return (
+    <div style={{
+      ...blockWrap,
+      borderLeft: '3px solid #DC2626',
+      backgroundColor: '#FEF2F2',
+    }}>
+      <SectionTitle style={{ color: '#DC2626' }}>Red Flags ⚠️</SectionTitle>
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        {items.map((item, i) => (
+          <li key={i} dir="auto" style={{
+            fontSize: 14, lineHeight: 1.5,
+            color: '#991B1B',
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
+          }}>
+            <span style={{ color: '#DC2626', fontWeight: 700, flexShrink: 0, marginTop: 1 }}>•</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ─── ListBlock ────────────────────────────────────────────────────────────────
+
+function ListBlock({ title, items }) {
+  if (!items.length) return null
+  return (
+    <div style={blockWrap}>
+      <SectionTitle>{title}</SectionTitle>
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        {items.map((item, i) => (
+          <li key={i} dir="auto" style={{
+            fontSize: 14, lineHeight: 1.5,
+            color: 'var(--color-text-primary)',
+            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
+          }}>
+            <span style={{ color: 'var(--color-accent)', fontWeight: 700, flexShrink: 0, marginTop: 1 }}>·</span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ─── NoteBlock ────────────────────────────────────────────────────────────────
+
+function NoteBlock({ label, text }) {
+  if (!text) return null
+  return (
+    <div style={{
+      ...blockWrap,
+      backgroundColor: '#FFFBEB',
+      borderLeft: '3px solid #D97706',
+    }}>
+      {label && (
+        <div style={{
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
+          textTransform: 'uppercase', color: '#92400E',
+          marginBottom: 'var(--space-1)',
+        }}>
+          {label}
+        </div>
+      )}
+      <p dir="auto" style={{
+        margin: 0, fontSize: 14, lineHeight: 1.7,
+        color: '#78350F', whiteSpace: 'pre-line',
+      }}>
+        {text}
+      </p>
+    </div>
+  )
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+const blockWrap = {
+  backgroundColor: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-lg)',
+  padding: 'var(--space-3) var(--space-4)',
+  boxShadow: 'var(--shadow-card)',
+  marginBottom: 'var(--space-3)',
+}
+
+function SectionTitle({ children, style = {} }) {
+  return (
+    <div style={{
+      fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+      textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+      marginBottom: 'var(--space-2)',
+      ...style,
+    }}>
+      {children}
+    </div>
+  )
 }
 
