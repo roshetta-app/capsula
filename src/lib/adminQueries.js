@@ -17,6 +17,7 @@
  *   3E  — fetchAllGenerics, toggleGenericPublished, deleteGeneric
  *   3.8 — fetchConditionForEdit updated (condition_blocks join), saveConditionBlocks (new)
  *         toggleFormulationPublished, toggleBrandPublished (new)
+ *   3.10 — fetchAllTags, fetchTagsForCondition, syncConditionTags (new)
  */
 
 import { supabase }  from './supabase'
@@ -695,6 +696,74 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
+
+// ─── Tags (3.10) ─────────────────────────────────────────────────────────────
+
+/**
+ * Fetch all tag names from the tags table (for autocomplete in ConditionEditor).
+ * Returns string[] sorted alphabetically.
+ */
+export async function fetchAllTags() {
+  const { data, error } = await supabase
+    .from('tags')
+    .select('name')
+    .order('name')
+  return { data: (data ?? []).map(t => t.name), error }
+}
+
+/**
+ * Fetch tag names currently assigned to a condition.
+ * Returns string[].
+ */
+export async function fetchTagsForCondition(conditionId) {
+  const { data, error } = await supabase
+    .from('condition_tags')
+    .select('tags ( name )')
+    .eq('condition_id', conditionId)
+  if (error) return { data: [], error }
+  const names = (data ?? []).map(row => row.tags?.name).filter(Boolean)
+  return { data: names, error: null }
+}
+
+/**
+ * Sync a condition's tags to match the given array of tag names.
+ * - Upserts any new tag records by name.
+ * - Replaces condition_tags rows (delete all, insert selected).
+ *
+ * @param {string}   conditionId
+ * @param {string[]} tagNames
+ */
+export async function syncConditionTags(conditionId, tagNames) {
+  // 1. Wipe existing condition_tags
+  const { error: deleteErr } = await supabase
+    .from('condition_tags')
+    .delete()
+    .eq('condition_id', conditionId)
+  if (deleteErr) return { error: deleteErr }
+
+  if (!tagNames || tagNames.length === 0) return { error: null }
+
+  // 2. Upsert tag names → get back ids
+  const { data: tagRows, error: upsertErr } = await supabase
+    .from('tags')
+    .upsert(
+      tagNames.map(name => ({ name })),
+      { onConflict: 'name', ignoreDuplicates: false }
+    )
+    .select('id, name')
+  if (upsertErr) return { error: upsertErr }
+
+  // 3. Insert condition_tags rows
+  const rows = (tagRows ?? []).map(t => ({ condition_id: conditionId, tag_id: t.id }))
+  if (rows.length === 0) return { error: null }
+
+  const { error: insertErr } = await supabase
+    .from('condition_tags')
+    .insert(rows)
+  return { error: insertErr ?? null }
+}
+
+
 
 
 
