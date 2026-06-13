@@ -14,8 +14,9 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowUp } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -175,6 +176,46 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
   )
 }
 
+// ─── Back-to-top floating button ───────────────────────────────────────────────
+
+const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
+
+function BackToTopButton({ visible, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label="Back to top"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
+      style={{
+        position:                'fixed',
+        right:                   'var(--space-4)',
+        bottom:                  'calc(76px + env(safe-area-inset-bottom))',
+        width:                   44,
+        height:                  44,
+        borderRadius:            'var(--radius-full)',
+        border:                  '1px solid var(--color-border)',
+        backgroundColor:         'var(--color-surface)',
+        color:                   'var(--color-text-secondary)',
+        boxShadow:               'var(--shadow-elevated)',
+        display:                 'flex',
+        alignItems:              'center',
+        justifyContent:          'center',
+        cursor:                  'pointer',
+        zIndex:                  60,
+        opacity:                 visible ? 1 : 0,
+        transform:               visible ? 'translateY(0)' : 'translateY(8px)',
+        pointerEvents:           visible ? 'auto' : 'none',
+        transition:              'opacity 0.2s ease, transform 0.2s ease',
+        outline:                 'none',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <ArrowUp size={18} strokeWidth={2} />
+    </button>
+  )
+}
+
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
 export default function ConditionsScreen() {
@@ -185,6 +226,22 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
+  const [showBackToTop, setShowBackToTop]     = useState(false)
+
+  // ── Back-to-top visibility ───────────────────────────────────────────────────
+
+  useEffect(() => {
+    function onScroll() {
+      setShowBackToTop(window.scrollY > BACK_TO_TOP_THRESHOLD)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  function handleBackToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   const {
     query,
@@ -328,6 +385,9 @@ export default function ConditionsScreen() {
 
       {/* 6. Condition list */}
       {renderList()}
+
+      {/* Back to top */}
+      <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet
