@@ -6,9 +6,10 @@
  *
  * - While searching: shows a result count ("N results"), left-aligned.
  *   No sort toggle during search (results are always relevance-ordered).
- * - Otherwise: shows only the sort toggle, right-aligned. The total/filtered
- *   condition count isn't surfaced here — the active specialty pill already
- *   communicates the current filter.
+ * - Otherwise: shows the sort toggle right-aligned. When `firstLetter` is
+ *   provided (A–Z mode only), the letter is shown left-aligned on the same
+ *   row — so the alphabet divider and the sort toggle share one line instead
+ *   of stacking as two separate rows.
  *
  * Props:
  *   totalCount       number   (currently unused — kept for caller compatibility)
@@ -19,6 +20,7 @@
  *   sortMode         string  — 'az' | 'recent'
  *   onSortToggle     function
  *   SORT_LABELS      object  — { az: 'A – Z', recent: 'Recent first' }
+ *   firstLetter      string | undefined  — when provided, rendered left-aligned beside the sort toggle
  */
 import { ArrowUpDown } from 'lucide-react'
 
@@ -31,6 +33,7 @@ export default function ConditionListHeader({
   sortMode,
   onSortToggle,
   SORT_LABELS,
+  firstLetter,
 }) {
   const nextMode = sortMode === 'az' ? 'recent' : 'az'
 
@@ -38,11 +41,12 @@ export default function ConditionListHeader({
     <div style={{
       display:        'flex',
       alignItems:     'center',
-      justifyContent: isSearching ? 'flex-start' : 'flex-end',
+      justifyContent: 'space-between',
       borderTop:      '0.5px solid var(--color-border-subtle)',
       padding:        '6px 0 4px',
       marginBottom:   0,
     }}>
+      {/* Left side */}
       {isSearching ? (
         <span style={{
           fontSize:   12,
@@ -51,7 +55,25 @@ export default function ConditionListHeader({
         }}>
           {resultCount} result{resultCount !== 1 ? 's' : ''}
         </span>
+      ) : firstLetter ? (
+        <span
+          aria-label={`Section ${firstLetter}`}
+          style={{
+            fontSize:      11,
+            fontWeight:    500,
+            color:         'var(--color-text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+          }}
+        >
+          {firstLetter}
+        </span>
       ) : (
+        <span /> /* spacer so sort toggle stays right-aligned */
+      )}
+
+      {/* Right side — sort toggle (hidden while searching) */}
+      {!isSearching && (
         <button
           onClick={onSortToggle}
           aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}

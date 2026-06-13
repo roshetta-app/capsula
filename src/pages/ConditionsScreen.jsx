@@ -1,3 +1,5 @@
+
+```jsx
 /**
  * src/pages/ConditionsScreen.jsx
  * Phase 5 — Conditions Screen Redesign
@@ -312,9 +314,10 @@ export default function ConditionsScreen() {
       ))
     }
 
-    return alphabetGroup(results).map(({ letter, items }) => (
+    return alphabetGroup(results).map(({ letter, items }, index) => (
       <div key={letter}>
-        <AlphabetSectionDivider letter={letter} />
+        {/* Skip the first divider — it's rendered inline with the sort toggle in ConditionListHeader */}
+        {index > 0 && <AlphabetSectionDivider letter={letter} />}
         {items.map(condition => (
           <ConditionCard
             key={condition.id}
@@ -387,7 +390,7 @@ export default function ConditionsScreen() {
         onMoreTap={() => setBottomSheetOpen(true)}
       />
 
-      {/* 5. Count + sort row */}
+      {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
       <ConditionListHeader
         totalCount={totalCount}
         resultCount={resultCount}
@@ -397,6 +400,11 @@ export default function ConditionsScreen() {
         sortMode={sortMode}
         onSortToggle={cycleSortMode}
         SORT_LABELS={SORT_LABELS}
+        firstLetter={
+          !isSearching && sortMode === 'az' && resultCount > 0
+            ? alphabetGroup(results)[0]?.letter
+            : undefined
+        }
       />
 
       {/* 6. Condition list */}
@@ -420,3 +428,4 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
