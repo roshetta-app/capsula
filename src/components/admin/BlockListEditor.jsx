@@ -1,24 +1,28 @@
 /**
  * BlockListEditor — src/components/admin/BlockListEditor.jsx
  *
- * Phase 3.2: Block-list container with Clinical/Rx sub-tab split.
+ * Phase 3.2 + 3.7: Block-list container with Clinical/Rx sub-tab split and wired editors.
  *
  * Props:
  *   blocks   {Array}    — current blocks array (from parent state)
  *   onChange {Function} — (newBlocks) => void   called on every mutation
  *   disabled {Boolean}  — disables all controls during parent save
  *
- * Block editors (ImageGalleryEditor, FreeTextPostEditor, etc.) are wired in
- * Phase 3.7. This step delivers the container shell with:
+ * Block editors (ImageGalleryEditor, FreeTextPostEditor, NoteCalloutEditor,
+ * PrescriptionSheetEditor) are wired via internal renderEditor() switch. This file delivers:
  *   - Clinical / Rx sub-tab switcher
  *   - Add Block dropdown (context-aware per active sub-tab)
  *   - Block card frame (header with human name + colored chip + ↑ ↓ 🗑)
- *   - Editor slot placeholder (renders nothing until 3.7)
- *   - Stable internal ordering helpers used by Phase 3.7+ editors
+ *   - Editor slot (all four block editors wired)
+ *   - Stable internal ordering helpers
  */
 
 import { useState } from 'react'
 import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
+import ImageGalleryEditor    from './blocks/ImageGalleryEditor'
+import FreeTextPostEditor    from './blocks/FreeTextPostEditor'
+import NoteCalloutEditor     from './blocks/NoteCalloutEditor'
+import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -143,14 +147,14 @@ function BlockCard({ block, index, total, onMoveUp, onMoveDown, onDelete, disabl
         </button>
       </div>
 
-      {/* Editor slot — populated in Phase 3.7 */}
+      {/* Editor */}
       <div style={{ padding: 'var(--space-4)' }}>
         {children ?? (
           <div style={{
             fontSize: 13, color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-body)',
           }}>
-            Editor coming in Phase 3.3–3.6d…
+            Editor not available for this block type.
           </div>
         )}
       </div>
@@ -322,10 +326,8 @@ function EmptyState({ activeTab }) {
  * @param {Object[]} blocks   — full array of block objects (all tabs mixed)
  * @param {Function} onChange — (nextBlocks) => void
  * @param {Boolean}  disabled — freeze all controls
- * @param {Function} [renderBlockEditor] — (block, patchBlock) => ReactNode
- *   Optional slot injected in Phase 3.7. When absent, shows placeholder text.
  */
-export default function BlockListEditor({ blocks = [], onChange, disabled = false, renderBlockEditor }) {
+export default function BlockListEditor({ blocks = [], onChange, disabled = false }) {
   const [activeTab, setActiveTab] = useState('clinical')
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -374,6 +376,52 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     onChange(next.map((b, i) => ({ ...b, order_index: i })))
   }
 
+  // ── Block editor renderer ──────────────────────────────────────────────────
+
+  /**
+   * Renders the correct editor for a given block.
+   *
+   * ImageGalleryEditor + FreeTextPostEditor accept { data, onChange(dataPatch) }.
+   * NoteCalloutEditor + PrescriptionSheetEditor accept { block, onChange(fullData) }.
+   * patchData is the patchBlockData-bound helper that merges a data patch.
+   */
+  function renderEditor(block, patchData) {
+    switch (block.block_type) {
+      case 'image_gallery':
+        return (
+          <ImageGalleryEditor
+            data={block.data}
+            onChange={patchData}
+            disabled={disabled}
+          />
+        )
+      case 'free_text_post':
+        return (
+          <FreeTextPostEditor
+            data={block.data}
+            onChange={patchData}
+            disabled={disabled}
+          />
+        )
+      case 'note_callout':
+        return (
+          <NoteCalloutEditor
+            block={block}
+            onChange={patchData}
+          />
+        )
+      case 'prescription_sheet':
+        return (
+          <PrescriptionSheetEditor
+            block={block}
+            onChange={patchData}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
   // ── Derive visible list ────────────────────────────────────────────────────
 
   // Each item: { block, globalIndex } so we can address mutations on full array
@@ -411,9 +459,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
             }}
             onDelete={() => deleteBlock(globalIndex)}
           >
-            {renderBlockEditor
-              ? renderBlockEditor(block, (patch) => patchBlockData(globalIndex, patch))
-              : null}
+            {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
           </BlockCard>
         ))
       )}
@@ -425,3 +471,4 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
+
