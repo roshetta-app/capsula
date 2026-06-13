@@ -346,6 +346,43 @@ export async function saveConditionBlocks(conditionId, blocks) {
   return touchAppMetadata('conditions_updated_at')
 }
 
+// ─── Condition image upload (used by ImageGalleryEditor) ─────────────────────
+
+export async function insertConditionImage(data) {
+  const { data: row, error } = await supabase
+    .from('condition_images')
+    .insert(data)
+    .select('id, url, caption, sort_order')
+    .single()
+  return { data: row, error }
+}
+
+export async function deleteConditionImage(id) {
+  const { error } = await supabase
+    .from('condition_images')
+    .delete()
+    .eq('id', id)
+  return { error }
+}
+
+export async function uploadConditionImage(file) {
+  const ext      = file.name.split('.').pop()
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const path     = `public/${filename}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('condition-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+
+  if (uploadError) return { url: null, error: uploadError }
+
+  const { data } = supabase.storage
+    .from('condition-images')
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, error: null }
+}
+
 // ─── Specialty icon upload (Phase 6) ─────────────────────────────────────────
 
 export async function uploadSpecialtyIcon(file) {
