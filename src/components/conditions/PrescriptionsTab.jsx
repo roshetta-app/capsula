@@ -1,94 +1,84 @@
 import { useState } from 'react'
-import PrescriptionCard from './PrescriptionCard'
+import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
+import NoteCallout from '../ui/NoteCallout'
 import PersonalNotes from './PersonalNotes'
-import ImageCarousel from './ImageCarousel'
+import { getRxBlocks } from '../../utils/blockFilters'
 
 /**
- * PrescriptionsTab — prescription label pills + active card +
- *                    patient instructions + personal notes + disclaimer.
+ * PrescriptionsTab — Rx tab container (Phase 2.8).
  *
- * Phase 2D spec:
- *  - Uses PrescriptionPills (new, compact, swipe-blocked)
- *  - Uses PrescriptionCard (updated — numbered drug slots, dose logic)
- *  - PersonalNotes: tap-to-edit, localStorage-persisted
- *  - Medical disclaimer fixed at bottom
+ * Calls getRxBlocks() (2.2) to get prescription_sheet blocks + any
+ * rx-context note_callout blocks, sorted by orderIndex.
+ *
+ *  - 0 prescription_sheet blocks → empty state (2.10): "No prescription
+ *    available for this condition." Any rx-context notes and Personal
+ *    Notes still render below, independent of the empty message.
+ *  - 1 prescription_sheet block → rendered directly via PrescriptionSheetBlock,
+ *    no label/sub-tabs shown (per Section 2.6).
+ *  - 2+ prescription_sheet blocks → PrescriptionPills sub-tabs (labeled by
+ *    data.label), first selected by default; selected sheet rendered via
+ *    PrescriptionSheetBlock (per Section 2.6).
+ *
+ * rx-context note_callout blocks (data.context === 'rx') render via
+ * NoteCallout below the sheet(s), in orderIndex order.
+ *
+ * Images and old fixed-field `patientInstructions` are NOT handled here —
+ * images live exclusively in the Clinical Data tab (Section 2.4), and
+ * patientInstructions is part of the old fixed-field model being replaced
+ * by the unified block model (content migrated into free_text_post blocks
+ * in Phase 1.3, rendered via the Clinical Data tab).
+ *
+ * PersonalNotes and the medical disclaimer are preserved unchanged (per 0.3
+ * findings — wire in as-is, do not modify internal logic).
  *
  * Props:
- *   prescriptions        PrescriptionFull[]
- *   patientInstructions  string | null
- *   conditionId          string   — for PersonalNotes localStorage key
- *   images               { id, url, caption }[]  — condition images (optional)
+ *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
+ *   conditionId  string   — for PersonalNotes localStorage key
  */
-export default function PrescriptionsTab({ prescriptions, patientInstructions, conditionId, images = [] }) {
+export default function PrescriptionsTab({ blocks, conditionId }) {
   const [activeIndex, setActiveIndex] = useState(0)
 
-  if (!prescriptions?.length) {
-    return (
-      <div style={{
-        textAlign: 'center',
-        padding: 'var(--space-12) var(--space-4)',
-        color: 'var(--color-text-tertiary)',
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 'var(--space-2)' }}>
-          No prescriptions added yet
-        </div>
-        <div style={{ fontSize: 12 }}>
-          Add prescriptions via the admin CMS
-        </div>
-      </div>
-    )
-  }
+  const rxBlocks = getRxBlocks(blocks)
+  const sheets = rxBlocks.filter(b => b.blockType === 'prescription_sheet')
+  const rxNotes = rxBlocks.filter(b => b.blockType === 'note_callout')
 
-  const active = prescriptions[Math.min(activeIndex, prescriptions.length - 1)]
+  const active = sheets[Math.min(activeIndex, sheets.length - 1)]
 
   return (
     <div>
-      {/* Image carousel — shown only when condition has images */}
-      {images.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <ImageCarousel images={images} />
-        </div>
-      )}
-
-      {/* Prescription label pills — only shown when >1 prescription */}
-      {prescriptions.length > 1 && (
-        <PrescriptionPills
-          prescriptions={prescriptions}
-          activeIndex={activeIndex}
-          onSelect={setActiveIndex}
-        />
-      )}
-
-      {/* Active prescription card */}
-      <PrescriptionCard items={active.items} />
-
-      {/* Patient instructions */}
-      {patientInstructions && (
-        <div style={{ marginTop: 'var(--space-5)' }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
-            textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-            marginBottom: 'var(--space-3)',
-          }}>
-            Patient Instructions
-          </div>
-          <div
-            dir="auto"
-            style={{
-              fontSize: 14, color: 'var(--color-text-primary)',
-              lineHeight: 1.7, whiteSpace: 'pre-line',
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-4)',
-              boxShadow: 'var(--shadow-card)',
-            }}
-          >
-            {patientInstructions}
+      {sheets.length === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: 'var(--space-12) var(--space-4)',
+          color: 'var(--color-text-tertiary)',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>
+            No prescription available for this condition.
           </div>
         </div>
+      ) : (
+        <>
+          {/* Sub-tab pills — only shown when 2+ sheets (Section 2.6) */}
+          {sheets.length > 1 && (
+            <PrescriptionPills
+              prescriptions={sheets.map(b => ({ id: b.id, label: b.data?.label }))}
+              activeIndex={activeIndex}
+              onSelect={setActiveIndex}
+            />
+          )}
+
+          {/* Active sheet */}
+          <PrescriptionSheetBlock sheet={active?.data} />
+        </>
       )}
+
+      {/* Rx-context note_callout blocks */}
+      {rxNotes.map(b => (
+        <div key={b.id} style={{ marginTop: 'var(--space-3)' }}>
+          <NoteCallout text={b.data?.text} flavor={b.data?.flavor} />
+        </div>
+      ))}
 
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
