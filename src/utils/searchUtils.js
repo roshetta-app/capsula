@@ -17,8 +17,9 @@ import Fuse from 'fuse.js'
 
 const CONDITION_FUSE_OPTIONS = {
   keys: [
-    { name: 'name',         weight: 0.75 },
-    { name: 'card_tagline', weight: 0.25 },
+    { name: 'name',         weight: 0.70 },
+    { name: 'card_tagline', weight: 0.15 },
+    { name: 'tags',         weight: 0.15 },
   ],
   threshold:          0.25,
   minMatchCharLength: 3,
