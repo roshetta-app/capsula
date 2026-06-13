@@ -22,6 +22,19 @@
 import { supabase }  from './supabase'
 import { logAudit }  from '../utils/auditLogger'
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+// Converts a tag name to a URL-safe slug.
+// Falls back to a short random suffix for non-Latin names so slug is never empty.
+function tagNameToSlug(name) {
+  const latin = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+  if (latin.length >= 2) return latin
+  return `tag-${Math.random().toString(36).slice(2, 6)}`
+}
+
 // ─── Brands — stock toggles (5.2) ────────────────────────────────────────────
 
 export async function updateBrandStock(id, field, value) {
@@ -739,10 +752,12 @@ export async function syncConditionTags(conditionId, tagNames) {
   if (!tagNames || tagNames.length === 0) return { error: null }
 
   // 2. Upsert tag names → get back ids
+  // slug is NOT NULL in the tags table, so we must supply it.
+  // On conflict (name already exists) the slug is left unchanged.
   const { data: tagRows, error: upsertErr } = await supabase
     .from('tags')
     .upsert(
-      tagNames.map(name => ({ name })),
+      tagNames.map(name => ({ name, slug: tagNameToSlug(name) })),
       { onConflict: 'name', ignoreDuplicates: false }
     )
     .select('id, name')
