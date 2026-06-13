@@ -1,3 +1,4 @@
+
 /**
  * adminQueries.js — Supabase write operations for the admin CMS.
  *
@@ -14,7 +15,7 @@
  *           reorderItems, fetchPrescriptionsForCondition, searchBrandsForTypeahead
  *   3B  — toggleConditionPublished, touchAppMetadata
  *   3E  — fetchAllGenerics, toggleGenericPublished, deleteGeneric
- *   3L  — logAudit calls added to all write operations
+ *   3.8 — fetchConditionForEdit updated (condition_blocks join), saveConditionBlocks (new)
  *         toggleFormulationPublished, toggleBrandPublished (new)
  */
 
@@ -290,11 +291,65 @@ export async function fetchConditionForEdit(id) {
       clinical_picture, history_questions, examination, investigations,
       patient_instructions, clinical_blocks, is_published,
       specialty_id,
-      condition_images ( id, url, caption, sort_order )
+      condition_images ( id, url, caption, sort_order ),
+      condition_blocks ( id, block_type, order_index, data )
     `)
     .eq('id', id)
     .single()
   return { data, error }
+}
+
+/**
+ * Replace all condition_blocks for a condition (delete + insert).
+ * Strips UI-only sentinel keys (_isNew, _formulationMeta) from row data before persisting.
+ * Bumps app_metadata.conditions_updated_at on success.
+ *
+ * @param {string}   conditionId
+ * @param {Object[]} blocks — array of block objects from BlockListEditor state
+ */
+export async function saveConditionBlocks(conditionId, blocks) {
+  // 1. Delete all existing blocks for this condition
+  const { error: deleteErr } = await supabase
+    .from('condition_blocks')
+    .delete()
+    .eq('condition_id', conditionId)
+
+  if (deleteErr) return { error: deleteErr }
+
+  // 2. Nothing to insert — still bump metadata so cache invalidates
+  if (!blocks || blocks.length === 0) {
+    return touchAppMetadata('conditions_updated_at')
+  }
+
+  // 3. Strip UI-only sentinel keys from each block's data
+  function cleanData(blockType, rawData) {
+    if (!rawData) return rawData
+    if (blockType === 'prescription_sheet') {
+      const cleanRows = (rawData.rows ?? []).map(row => {
+        // eslint-disable-next-line no-unused-vars
+        const { _isNew, _formulationMeta, ...cleanRow } = row
+        return cleanRow
+      })
+      return { ...rawData, rows: cleanRows }
+    }
+    return rawData
+  }
+
+  const rows = blocks.map((block, i) => ({
+    condition_id: conditionId,
+    block_type:   block.block_type,
+    order_index:  block.order_index ?? i,
+    data:         cleanData(block.block_type, block.data),
+  }))
+
+  const { error: insertErr } = await supabase
+    .from('condition_blocks')
+    .insert(rows)
+
+  if (insertErr) return { error: insertErr }
+
+  await logAudit('update', 'condition_blocks', conditionId, null, { blockCount: rows.length })
+  return touchAppMetadata('conditions_updated_at')
 }
 
 export async function insertConditionImage(data) {
@@ -640,5 +695,7 @@ export async function touchAppMetadata(column) {
     .eq('id', 1)
   return { error: error ?? null }
 }
+
+
 
 

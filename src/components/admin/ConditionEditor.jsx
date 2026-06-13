@@ -1,3 +1,4 @@
+
 /**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
@@ -10,9 +11,11 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Plus, Trash2, AlertTriangle, CheckCircle, Upload, Image as ImageIcon, X } from 'lucide-react'
+import { ChevronLeft, Plus, Trash2, AlertTriangle, Upload, Image as ImageIcon, X } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
+import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
+import BlockListEditor from '../../components/admin/BlockListEditor'
 import {
   insertCondition,
   updateCondition,
@@ -20,12 +23,10 @@ import {
   insertConditionImage,
   deleteConditionImage,
   uploadConditionImage,
-  touchAppMetadata,
-  fetchSpecialtiesForCMS,   // ← NEW: direct fetch, correct field names
-  insertSpecialty,          // ← NEW: create specialty inline
+  saveConditionBlocks,
+  fetchSpecialtiesForCMS,
+  insertSpecialty,
 } from '../../lib/adminQueries'
-import PrescriptionBuilder    from '../../components/admin/PrescriptionBuilder'
-import ClinicalBlocksEditor  from '../../components/admin/ClinicalBlocksEditor'
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
@@ -618,6 +619,7 @@ export default function ConditionEditor() {
 
   // ── FIX: fetch specialties directly — context only used for public cache refresh
   const { refresh } = useConditionContext()
+  const { toast }   = useToast()
   const [specialties,     setSpecialties]     = useState([])
   const [specialtiesLoading, setSpecialtiesLoading] = useState(true)
   const [newSpecialtyOpen, setNewSpecialtyOpen] = useState(false)
@@ -636,13 +638,11 @@ export default function ConditionEditor() {
   }
 
   const [form,           setForm]           = useState(EMPTY_CONDITION)
+  const [blocks,         setBlocks]         = useState([])
   const [images,         setImages]         = useState([])
-  const [initialBlocks,  setInitialBlocks]  = useState([])
   const [loading,        setLoading]        = useState(isEdit)
   const [saving,         setSaving]         = useState(false)
   const [error,          setError]          = useState(null)
-  const [success,        setSuccess]        = useState(false)
-  const [activeTab,      setActiveTab]      = useState('details')
 
   // ─── Load existing condition (edit mode) ──────────────────────────────────
 
@@ -677,10 +677,10 @@ export default function ConditionEditor() {
         patient_instructions:   data.patient_instructions    ?? '',
       })
 
-      setInitialBlocks(
-        (data.clinical_blocks ?? [])
+      setBlocks(
+        (data.condition_blocks ?? [])
           .slice()
-          .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+          .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
       )
 
       setImages(
@@ -720,14 +720,14 @@ export default function ConditionEditor() {
       specialty_id:           form.specialty_id,
       age_group:              form.age_group,
       is_published:           form.is_published,
-      card_tagline:           form.card_tagline.trim()   || null,
-      definition:             form.definition.trim()     || null,
-      icd10_code:             form.icd10_code.trim()     || null,
-      epidemiology:           form.epidemiology.trim()   || null,
+      card_tagline:           form.card_tagline.trim()     || null,
+      definition:             form.definition.trim()       || null,
+      icd10_code:             form.icd10_code.trim()       || null,
+      epidemiology:           form.epidemiology.trim()     || null,
       differential_diagnosis: form.differential_diagnosis,
       red_flags:              form.red_flags,
-      when_to_refer:          form.when_to_refer.trim()  || null,
-      prognosis:              form.prognosis.trim()       || null,
+      when_to_refer:          form.when_to_refer.trim()    || null,
+      prognosis:              form.prognosis.trim()        || null,
       clinical_picture:       form.clinical_picture.trim() || null,
       history_questions:      form.history_questions,
       examination:            form.examination,
@@ -735,29 +735,41 @@ export default function ConditionEditor() {
       patient_instructions:   form.patient_instructions.trim() || null,
     }
 
-    let saveErr
+    let conditionId = id   // undefined for new conditions
+
     if (isEdit) {
       const { error } = await updateCondition(id, payload)
-      saveErr = error
+      if (error) {
+        setError(error.message ?? 'Save failed')
+        setSaving(false)
+        return
+      }
     } else {
-      const { error } = await insertCondition(payload)
-      saveErr = error
+      const { data: newRow, error } = await insertCondition(payload)
+      if (error || !newRow) {
+        setError(error?.message ?? 'Save failed')
+        setSaving(false)
+        return
+      }
+      conditionId = newRow.id
     }
 
-    if (saveErr) {
-      setError(saveErr.message ?? 'Save failed')
+    // Save blocks (delete + insert) — always runs, even if blocks is empty
+    const { error: blocksErr } = await saveConditionBlocks(conditionId, blocks)
+    if (blocksErr) {
+      setError(blocksErr.message ?? 'Condition saved but blocks failed to save')
       setSaving(false)
       return
     }
 
-    await touchAppMetadata('conditions_updated_at')
     await refresh()
-    setSuccess(true)
     setSaving(false)
+    toast.success('Condition saved')
 
-    setTimeout(() => {
-      navigate('/admin/conditions')
-    }, 800)
+    // For new conditions, redirect to edit URL so subsequent saves work correctly
+    if (!isEdit && conditionId) {
+      navigate(`/admin/conditions/${conditionId}`, { replace: true })
+    }
   }
 
   // ─── Specialty options ─────────────────────────────────────────────────────
@@ -822,19 +834,18 @@ export default function ConditionEditor() {
 
           <button
             onClick={handleSave}
-            disabled={!isValid() || saving || success}
+            disabled={!isValid() || saving}
             style={{
               padding: '7px 18px', borderRadius: 'var(--radius-md)',
-              fontSize: 13, fontWeight: 600, cursor: !isValid() || saving || success ? 'default' : 'pointer',
+              fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',
               border: 'none',
-              backgroundColor: success ? 'var(--color-instock)' : 'var(--color-accent)',
+              backgroundColor: 'var(--color-accent)',
               color: '#fff', fontFamily: 'var(--font-body)',
               opacity: !isValid() || saving ? 0.6 : 1,
               display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              transition: 'background-color 0.2s ease',
             }}
           >
-            {success ? <><CheckCircle size={14} /> Saved</> : saving ? 'Saving…' : 'Save'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </header>
@@ -854,45 +865,9 @@ export default function ConditionEditor() {
           </div>
         )}
 
-        {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-        <div style={{
-          display: 'flex',
-          borderBottom: '2px solid var(--color-border)',
-          marginBottom: 'var(--space-5)',
-        }}>
-          {[
-            { key: 'details',       label: 'Details' },
-            { key: 'blocks',        label: 'Clinical Blocks' },
-            { key: 'prescriptions', label: 'Prescriptions' },
-          ].map(tab => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              style={{
-                padding: 'var(--space-2) var(--space-4)',
-                border: 'none',
-                backgroundColor: 'transparent',
-                fontSize: 14, fontWeight: 600,
-                fontFamily: 'var(--font-body)',
-                cursor: 'pointer',
-                color: activeTab === tab.key
-                  ? 'var(--color-accent)'
-                  : 'var(--color-text-tertiary)',
-                borderBottom: activeTab === tab.key
-                  ? '2px solid var(--color-accent)'
-                  : '2px solid transparent',
-                marginBottom: -2,
-                transition: 'color 0.15s',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
 
-        {/* ── Details tab ──────────────────────────────────────────────────── */}
-        {activeTab === 'details' && (
-          <div>
+        {/* ── Details ──────────────────────────────────────────────────────── */}
+        <div>
 
             {/* ── Identity ─────────────────────────────────────────────────── */}
 
@@ -1116,20 +1091,16 @@ export default function ConditionEditor() {
             />
 
           </div>
-        )}
 
-        {/* ── Clinical Blocks tab ───────────────────────────────────────────── */}
-        {activeTab === 'blocks' && (
-          <ClinicalBlocksEditor
-            conditionId={id ?? null}
-            initialBlocks={initialBlocks}
+        {/* ── Blocks (Clinical + Rx) ───────────────────────────────────────── */}
+        <div style={{ marginTop: 'var(--space-6)' }}>
+          <SectionTitle>Content Blocks</SectionTitle>
+          <BlockListEditor
+            blocks={blocks}
+            onChange={setBlocks}
+            disabled={saving}
           />
-        )}
-
-        {/* ── Prescriptions tab ─────────────────────────────────────────────── */}
-        {activeTab === 'prescriptions' && (
-          <PrescriptionBuilder conditionId={id ?? null} />
-        )}
+        </div>
 
       </main>
 
@@ -1143,3 +1114,5 @@ export default function ConditionEditor() {
     </div>
   )
 }
+
+
