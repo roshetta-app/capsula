@@ -32,8 +32,7 @@ export default function ConditionDetailScreen() {
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
 
-  const [activeTab, setActiveTab]                   = useState(0)
-  const [activePrescriptionIdx, setActivePrescriptionIdx] = useState(0)
+  const [activeTab, setActiveTab] = useState(0)
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
   const shareCardRef = useRef(null)
@@ -67,9 +66,11 @@ export default function ConditionDetailScreen() {
   }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Build share card prescription snapshot ─────────────────────────────────
+  // NOTE: buildSharePrescription reads condition.prescriptions (old shape).
+  // Sharing is broken until Phase 5.1 — left unchanged intentionally.
 
   function buildSharePrescription() {
-    const rx = condition?.prescriptions?.[activePrescriptionIdx]
+    const rx = condition?.prescriptions?.[0]
     if (!rx) return null
     return {
       label: rx.label,
@@ -191,11 +192,8 @@ export default function ConditionDetailScreen() {
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
             <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-5) var(--space-4)', paddingBottom: 'calc(var(--space-12) + 60px)' }}>
               <PrescriptionsTab
-                prescriptions={condition.prescriptions}
-                patientInstructions={condition.patientInstructions}
+                blocks={condition.blocks ?? []}
                 conditionId={condition.id}
-                onPrescriptionChange={setActivePrescriptionIdx}
-                images={condition.images ?? []}
               />
             </div>
           </div>
@@ -203,7 +201,7 @@ export default function ConditionDetailScreen() {
           {/* Panel 1 — Clinical Data */}
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
             <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-5) var(--space-4)', paddingBottom: 'calc(var(--space-12) + 60px)' }}>
-              <ClinicalDataTab condition={condition} />
+              <ClinicalDataTab blocks={condition.blocks ?? []} />
             </div>
           </div>
 
@@ -334,4 +332,3 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
     </header>
   )
 }
-
