@@ -7,8 +7,7 @@
  *   5.3 — insertGeneric, updateGeneric, insertFormulation, updateFormulation,
  *           insertBrand, updateBrand, deleteBrand, fetchFormulationWithGeneric
  *   5.4 — insertSpecialty, updateSpecialty, insertCondition, updateCondition,
- *           deleteCondition, insertConditionImage, deleteConditionImage,
- *           uploadConditionImage, fetchConditionForEdit
+ *           deleteCondition, fetchConditionForEdit
  *   5.5 — insertPrescription, updatePrescription, deletePrescription,
  *           insertPrescriptionItem, updatePrescriptionItem, deletePrescriptionItem,
  *           insertDrugAlternative, updateDrugAlternative, deleteDrugAlternative,
@@ -286,13 +285,7 @@ export async function fetchConditionForEdit(id) {
     .from('conditions')
     .select(`
       id, name, slug, age_group, card_tagline,
-      definition, icd10_code, epidemiology,
-      when_to_refer, prognosis,
-      differential_diagnosis, red_flags,
-      clinical_picture, history_questions, examination, investigations,
-      patient_instructions, clinical_blocks, is_published,
-      specialty_id,
-      condition_images ( id, url, caption, sort_order ),
+      icd10_code, is_published, specialty_id,
       condition_blocks ( id, block_type, order_index, data )
     `)
     .eq('id', id)
@@ -351,41 +344,6 @@ export async function saveConditionBlocks(conditionId, blocks) {
 
   await logAudit('update', 'condition_blocks', conditionId, null, { blockCount: rows.length })
   return touchAppMetadata('conditions_updated_at')
-}
-
-export async function insertConditionImage(data) {
-  const { data: row, error } = await supabase
-    .from('condition_images')
-    .insert(data)
-    .select('id, url, caption, sort_order')
-    .single()
-  return { data: row, error }
-}
-
-export async function deleteConditionImage(id) {
-  const { error } = await supabase
-    .from('condition_images')
-    .delete()
-    .eq('id', id)
-  return { error }
-}
-
-export async function uploadConditionImage(file) {
-  const ext      = file.name.split('.').pop()
-  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-  const path     = `public/${filename}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('condition-images')
-    .upload(path, file, { cacheControl: '3600', upsert: false })
-
-  if (uploadError) return { url: null, error: uploadError }
-
-  const { data } = supabase.storage
-    .from('condition-images')
-    .getPublicUrl(path)
-
-  return { url: data.publicUrl, error: null }
 }
 
 // ─── Specialty icon upload (Phase 6) ─────────────────────────────────────────
@@ -762,9 +720,3 @@ export async function syncConditionTags(conditionId, tagNames) {
     .insert(rows)
   return { error: insertErr ?? null }
 }
-
-
-
-
-
-
