@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- Critical for mobile display -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Theme color (browser chrome color on Android) -->
+    <meta name="theme-color" content="#FAFAF9" />
+
+    <!-- iOS specific -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Capsula" />
+    <link rel="apple-touch-icon" href="/capsula/icons/icon-192.png" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/capsula/manifest.json" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/capsula/icons/icon.svg" />
+
+    <title>Capsula</title>
+
+    <!--
+      GitHub Pages SPA redirect — decode script.
+      Companion to public/404.html.
+      Runs before React boots: reads sessionStorage set by 404.html,
+      restores the original path via history.replaceState so React Router
+      sees the correct URL on mount.
+    -->
+    <script>
+      (function() {
+        var redirect = sessionStorage.getItem('gh_pages_redirect');
+        if (redirect) {
+          sessionStorage.removeItem('gh_pages_redirect');
+          try {
+            var data = JSON.parse(redirect);
+            var url = window.location.protocol + '//' + window.location.host +
+                      '/capsula' + data.path +
+                      (data.query ? '?' + data.query : '') +
+                      (data.hash  ? '#' + data.hash  : '');
+            window.history.replaceState(null, null, url);
+          } catch(e) {}
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/capsula/assets/index-CrBodGdb.js"></script>
+    <link rel="stylesheet" crossorigin href="/capsula/assets/index-DdkuyMLD.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

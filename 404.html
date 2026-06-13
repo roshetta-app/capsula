@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Capsula</title>
+  <script>
+    /**
+     * GitHub Pages SPA redirect — 404.html
+     *
+     * When GH Pages gets a request for /capsula/drugs or /capsula/favourites,
+     * it finds no physical file and serves this 404.html instead.
+     *
+     * This script encodes the full path into a query string and redirects
+     * to the root /capsula/ so the React app loads, then the companion
+     * script in index.html decodes it and restores the original URL via
+     * history.replaceState — all before React renders.
+     *
+     * The '1' in sessionStorage tells index.html to restore the path.
+     * The path segment count (1) matches the depth of the GitHub Pages
+     * subdirectory (/capsula/ = 1 segment).
+     */
+    var l = window.location;
+    var segmentCount = 1; // number of path segments in the GH Pages subdirectory
+    var path = l.pathname.slice(1).split('/').slice(segmentCount).join('/');
+    var query = l.search.slice(1);
+    var hash = l.hash.slice(1);
+
+    sessionStorage.setItem(
+      'gh_pages_redirect',
+      JSON.stringify({
+        path: path ? '/' + path : '/',
+        query: query,
+        hash: hash,
+      })
+    );
+
+    l.replace(
+      l.protocol + '//' + l.hostname +
+      (l.port ? ':' + l.port : '') +
+      l.pathname.split('/').slice(0, 1 + segmentCount).join('/') + '/?p=1'
+    );
+  </script>
+</head>
+<body>
+  <!-- Redirecting to Capsula... -->
+</body>
+</html>
