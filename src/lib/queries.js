@@ -140,7 +140,9 @@ const CONDITIONS_SELECT = `
         )
       )
     )
-  )
+  ),
+  condition_blocks ( id, block_type, order_index, data, created_at, updated_at ),
+  condition_tags ( tags ( name ) )
 `
 
 function mapConditions(data) {
@@ -177,6 +179,14 @@ function mapConditions(data) {
     images: (c.condition_images ?? [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(img => ({ id: img.id, url: img.url, caption: img.caption })),
+    // New unified block-based content (Phase 2.1) — sorted by order_index
+    blocks: (c.condition_blocks ?? [])
+      .sort((a, b) => a.order_index - b.order_index)
+      .map(b => ({ id: b.id, blockType: b.block_type, orderIndex: b.order_index, data: b.data })),
+    // Tags for search (Phase 2.1 / 2.9)
+    tags: (c.condition_tags ?? [])
+      .map(ct => ct.tags?.name)
+      .filter(Boolean),
     prescriptions: (c.prescriptions ?? [])
       .sort((a, b) => a.sort_order - b.sort_order)
       .map(rx => ({
