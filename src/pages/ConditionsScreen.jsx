@@ -1,5 +1,3 @@
-
-```jsx
 /**
  * src/pages/ConditionsScreen.jsx
  * Phase 5 — Conditions Screen Redesign
