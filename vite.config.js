@@ -33,6 +33,7 @@ function swBuildStampPlugin() {
       const swSrc  = path.resolve(__dirname, 'public/sw.js')
       const swDest = path.resolve(__dirname, 'dist/sw.js')
       if (!fs.existsSync(swSrc)) return
+      fs.mkdirSync(path.dirname(swDest), { recursive: true })
       const content = fs.readFileSync(swSrc, 'utf8')
         .replace(/__BUILD_SHA__/g, stamp)
       fs.writeFileSync(swDest, content, 'utf8')
