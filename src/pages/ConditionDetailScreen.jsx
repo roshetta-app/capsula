@@ -23,7 +23,10 @@ function ageLabel(group) {
   return 'Adult'
 }
 
-const TABS = ['Rx', 'Clinical']
+const TABS = [
+  { label: 'Treatment', icon: 'ti-pill' },
+  { label: 'Clinical',  icon: 'ti-stethoscope' },
+]
 
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
@@ -136,9 +139,10 @@ export default function ConditionDetailScreen() {
 
       {/* ─── Tab strip ───────────────────────────────────────────────────────────
           Phase 1.1:
-          - No borderBottom on this container — header's border is the divider
-          - Buttons use inline underline <span> (text-width only), not border-bottom
-          - Font 15px, padding 12px top/bottom
+          - No borderBottom on container — header's 1px border is the sole divider
+          - Each button: icon (ti-*) + label span + underline span (text-width)
+          - fontSize 15px, paddingTop/Bottom 12px, gap 3px
+          - Underline: height 2px, width 28px, borderRadius 1px, text-width only
       */}
       <div style={{
         position: 'sticky',
@@ -151,7 +155,7 @@ export default function ConditionDetailScreen() {
           margin: '0 auto',
           display: 'flex',
         }}>
-          {TABS.map((label, i) => {
+          {TABS.map(({ label, icon }, i) => {
             const isActive = activeTab === i
             return (
               <button
@@ -164,28 +168,38 @@ export default function ConditionDetailScreen() {
                   paddingLeft: 'var(--space-4)',
                   paddingRight: 'var(--space-4)',
                   fontSize: 15,
-                  fontWeight: isActive ? 600 : 400,
                   fontFamily: 'var(--font-body)',
                   border: 'none',
                   background: 'none',
                   cursor: 'pointer',
-                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
                   transition: 'color 0.15s ease',
                   WebkitTapHighlightColor: 'transparent',
                   outline: 'none',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 0,
+                  gap: 3,
                 }}
               >
-                <span>{label}</span>
-                {/* Text-width underline — inline block so it hugs the text */}
+                <i
+                  className={`ti ${icon}`}
+                  style={{
+                    fontSize: 16,
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                  }}
+                />
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: isActive ? 500 : 400,
+                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                }}>
+                  {label}
+                </span>
+                {/* Text-width underline — fixed 28px, not full button width */}
                 <span style={{
                   display: 'inline-block',
                   height: 2,
-                  width: '100%',
-                  marginTop: 4,
+                  width: 28,
                   borderRadius: 1,
                   backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
                   transition: 'background-color 0.15s ease',
