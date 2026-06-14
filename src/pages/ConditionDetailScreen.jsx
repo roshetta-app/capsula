@@ -220,10 +220,10 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4) 0' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--space-4) 0' }}>
 
         {/* Top row: back + actions */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 6 : 'var(--space-2)' }}>
           <button
             onClick={onBack}
             aria-label="Back"
@@ -281,11 +281,11 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
 
         {/* Condition title + tags */}
         {condition && (
-          <div style={{ marginBottom: 'var(--space-3)' }}>
+          <div style={{ marginBottom: 6 }}>
             <h1 style={{
               fontSize: 18, fontWeight: 700,
               color: 'var(--color-text-primary)',
-              margin: '0 0 var(--space-2) 0',
+              margin: '0 0 5px 0',
               lineHeight: 1.25, letterSpacing: '-0.2px',
             }}>
               {condition.name}
@@ -313,44 +313,43 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           </div>
         )}
 
-        {/* ─── Tab strip — inside header, no border needed, header border is the divider */}
-        <div style={{ display: 'flex' }}>
+        {/* ─── Tab strip — inside header, icon inline before label, underline below */}
+        <div style={{ display: 'flex', marginTop: 'var(--space-2)' }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
             const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
             return (
-              <button
-                key={label}
-                onClick={() => setActiveTab(i)}
-                style={{
-                  flex: 1,
-                  paddingTop: 10,
-                  paddingBottom: 0,
-                  paddingLeft: 'var(--space-2)',
-                  paddingRight: 'var(--space-2)',
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  transition: 'color 0.15s ease',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 4,
-                  color,
-                }}
-              >
-                {renderIcon(color)}
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  color,
-                  letterSpacing: isActive ? '-0.1px' : 0,
-                }}>
-                  {label}
-                </span>
-                {/* Underline — sits flush at header bottom edge */}
+              <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <button
+                  onClick={() => setActiveTab(i)}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingTop: 6,
+                    paddingBottom: 8,
+                    paddingLeft: 'var(--space-2)',
+                    paddingRight: 'var(--space-2)',
+                    border: 'none',
+                    background: 'none',
+                    cursor: 'pointer',
+                    transition: 'color 0.15s ease',
+                    WebkitTapHighlightColor: 'transparent',
+                    outline: 'none',
+                    color,
+                  }}
+                >
+                  {renderIcon(color)}
+                  <span style={{
+                    fontSize: 14,
+                    fontWeight: isActive ? 600 : 400,
+                    color,
+                  }}>
+                    {label}
+                  </span>
+                </button>
+                {/* Underline — sibling below the button row, centered */}
                 <span style={{
                   display: 'block',
                   height: 2,
@@ -359,7 +358,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
                   transition: 'background-color 0.15s ease',
                 }} />
-              </button>
+              </div>
             )
           })}
         </div>
