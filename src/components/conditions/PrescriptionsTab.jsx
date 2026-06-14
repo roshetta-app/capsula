@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ShieldCheck } from 'lucide-react'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import NoteCallout from '../ui/NoteCallout'
@@ -23,14 +24,7 @@ import { getRxBlocks } from '../../utils/blockFilters'
  * rx-context note_callout blocks (data.context === 'rx') render via
  * NoteCallout below the sheet(s), in orderIndex order.
  *
- * Images and old fixed-field `patientInstructions` are NOT handled here —
- * images live exclusively in the Clinical Data tab (Section 2.4), and
- * patientInstructions is part of the old fixed-field model being replaced
- * by the unified block model (content migrated into free_text_post blocks
- * in Phase 1.3, rendered via the Clinical Data tab).
- *
- * PersonalNotes and the medical disclaimer are preserved unchanged (per 0.3
- * findings — wire in as-is, do not modify internal logic).
+ * PersonalNotes and the medical disclaimer are preserved (Step 3.1 / 3.2).
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -46,7 +40,7 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
   const active = sheets[Math.min(activeIndex, sheets.length - 1)]
 
   return (
-    <div>
+    <div style={{ padding: 0 }}>
       {sheets.length === 0 ? (
         <div style={{
           textAlign: 'center',
@@ -75,25 +69,27 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
 
       {/* Rx-context note_callout blocks */}
       {rxNotes.map(b => (
-        <div key={b.id} style={{ marginTop: 'var(--space-3)' }}>
-          <NoteCallout text={b.data?.text} flavor={b.data?.flavor} />
-        </div>
+        <NoteCallout key={b.id} text={b.data?.text} flavor={b.data?.flavor} />
       ))}
 
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Medical Disclaimer */}
+      {/* Medical Disclaimer — Step 3.2 */}
       <div style={{
         marginTop: 'var(--space-6)',
-        fontSize: 11,
-        color: 'var(--color-text-tertiary)',
-        fontStyle: 'italic',
-        lineHeight: 1.6,
-        textAlign: 'center',
-        padding: '0 var(--space-2)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
       }}>
-        Clinical reference only. Verify doses before prescribing. Individual patient factors apply. Not a substitute for clinical judgment.
+        <ShieldCheck size={12} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+        <span style={{
+          fontSize: 11,
+          color: 'var(--color-text-tertiary)',
+          fontWeight: 400,
+        }}>
+          Verify doses before prescribing. Individual patient factors apply.
+        </span>
       </div>
     </div>
   )

@@ -25,8 +25,10 @@ export default function ClinicalDataTab({ blocks }) {
   if (clinicalBlocks.length === 0) {
     return (
       <div style={{
+        padding: 0,
         textAlign: 'center',
-        padding: 'var(--space-12) var(--space-4)',
+        paddingTop: 'var(--space-12)',
+        paddingBottom: 'var(--space-12)',
         color: 'var(--color-text-tertiary)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 500 }}>
@@ -37,7 +39,7 @@ export default function ClinicalDataTab({ blocks }) {
   }
 
   return (
-    <div>
+    <div style={{ padding: 0 }}>
       {clinicalBlocks.map(block => (
         <BlockRenderer key={block.id} block={block} />
       ))}

@@ -9,7 +9,7 @@ import NoteCallout from '../ui/NoteCallout'
  *   drug_library  — { formulation_id, dose_override?, note_en?, note_ar?, drug_link_enabled }
  *                    looked up against useDrugs() formulation list (id = formulation UUID)
  *   drug_freetext — { drug_name, dose_text }
- *   note          — { text, flavor? } — rendered via NoteCallout (2.6) in compact mode
+ *   note          — { text, flavor? } — rendered via NoteCallout in flat inline row style
  *
  * Label/sub-tab logic for multiple sheets lives in 2.8 (parent component).
  * Empty `rows: []` renders nothing (per 3.3).
@@ -27,8 +27,10 @@ export default function PrescriptionSheetBlock({ sheet }) {
   let drugIndex = 0
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+    <div>
       {rows.map((row, i) => {
+        const isLast = i === rows.length - 1
+
         switch (row.row_type) {
           case 'drug_library': {
             drugIndex += 1
@@ -40,16 +42,31 @@ export default function PrescriptionSheetBlock({ sheet }) {
                 row={row}
                 formulation={formulation}
                 navigate={navigate}
+                isLast={isLast}
               />
             )
           }
 
           case 'drug_freetext':
             drugIndex += 1
-            return <DrugFreetextRow key={i} index={drugIndex} row={row} />
+            return (
+              <DrugFreetextRow
+                key={i}
+                index={drugIndex}
+                row={row}
+                isLast={isLast}
+              />
+            )
 
           case 'note':
-            return <NoteCallout key={i} text={row.text} flavor={row.flavor} />
+            return (
+              <NoteCallout
+                key={i}
+                text={row.text}
+                flavor={row.flavor}
+                isLast={isLast}
+              />
+            )
 
           default:
             if (process.env.NODE_ENV !== 'production') {
@@ -64,7 +81,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
 // ─── DrugLibraryRow ───────────────────────────────────────────────────────────
 
-function DrugLibraryRow({ index, row, formulation, navigate }) {
+function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
   if (!formulation) {
     if (process.env.NODE_ENV !== 'production') {
       console.warn(`[PrescriptionSheetBlock] No formulation found for formulation_id: "${row.formulation_id}"`)
@@ -80,21 +97,93 @@ function DrugLibraryRow({ index, row, formulation, navigate }) {
   const rest = brands.slice(1)
 
   return (
-    <div style={rowWrap}>
+    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {primary ? (
-          <BrandLine
-            brand={primary}
-            concentration={formulation.concentration}
-            form={formulation.form}
-            dose={dose}
-            linkEnabled={linkEnabled}
-            slug={formulation.slug}
-            navigate={navigate}
-          />
+          <>
+            {/* Brand name + generic inline */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+              {linkEnabled && formulation.slug ? (
+                <button
+                  onClick={() => navigate(`/drugs/${formulation.slug}`)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: 'pointer', textAlign: 'left',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 14, fontWeight: 600,
+                    color: 'var(--color-accent)',
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {primary.name}
+                </button>
+              ) : (
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+                  {primary.name}
+                </span>
+              )}
+              {formulation.genericName && (
+                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-secondary)' }}>
+                  ({formulation.genericName})
+                </span>
+              )}
+            </div>
+
+            {/* Dose line */}
+            {dose && (
+              <div dir="auto" style={{
+                fontSize: 13, fontWeight: 400,
+                color: 'var(--color-text-secondary)',
+                marginTop: 3, lineHeight: 1.5,
+                unicodeBidi: 'plaintext',
+              }}>
+                {dose}
+              </div>
+            )}
+
+            {/* Concentration + form */}
+            {(formulation.concentration || formulation.form) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 3, flexWrap: 'wrap' }}>
+                {formulation.concentration && (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{formulation.concentration}</span>
+                )}
+                {formulation.form && (
+                  <span style={{
+                    fontSize: 11, fontWeight: 500,
+                    backgroundColor: 'var(--color-bg)',
+                    border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-tertiary)',
+                    borderRadius: 'var(--radius-full)',
+                    padding: '1px 7px',
+                  }}>
+                    {formulation.form}
+                  </span>
+                )}
+              </div>
+            )}
+          </>
         ) : (
-          <NameLine name={formulation.genericName} dose={dose} />
+          /* No brands — show generic name + dose inline */
+          <>
+            <div dir="auto" style={{
+              fontSize: 14, fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              lineHeight: 1.3, unicodeBidi: 'plaintext',
+            }}>
+              {formulation.genericName}
+            </div>
+            {dose && (
+              <div dir="auto" style={{
+                fontSize: 13, fontWeight: 400,
+                color: 'var(--color-text-secondary)',
+                marginTop: 3, lineHeight: 1.5,
+                unicodeBidi: 'plaintext',
+              }}>
+                {dose}
+              </div>
+            )}
+          </>
         )}
 
         {/* English / Arabic notes */}
@@ -120,15 +209,31 @@ function DrugLibraryRow({ index, row, formulation, navigate }) {
         {rest.map(brand => (
           <div key={brand.id}>
             <OrDivider />
-            <BrandLine
-              brand={brand}
-              concentration={formulation.concentration}
-              form={formulation.form}
-              dose={null}
-              linkEnabled={linkEnabled}
-              slug={formulation.slug}
-              navigate={navigate}
-            />
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+              {linkEnabled && formulation.slug ? (
+                <button
+                  onClick={() => navigate(`/drugs/${formulation.slug}`)}
+                  style={{
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: 'pointer', textAlign: 'left',
+                    fontFamily: 'var(--font-body)',
+                    fontSize: 14, fontWeight: 600,
+                    color: 'var(--color-accent)', lineHeight: 1.3,
+                  }}
+                >
+                  {brand.name}
+                </button>
+              ) : (
+                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+                  {brand.name}
+                </span>
+              )}
+              {brand.nameAr && (
+                <span dir="rtl" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
+                  {brand.nameAr}
+                </span>
+              )}
+            </div>
           </div>
         ))}
 
@@ -170,12 +275,28 @@ function DrugLibraryRow({ index, row, formulation, navigate }) {
 
 // ─── DrugFreetextRow ──────────────────────────────────────────────────────────
 
-function DrugFreetextRow({ index, row }) {
+function DrugFreetextRow({ index, row, isLast }) {
   return (
-    <div style={rowWrap}>
+    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <NameLine name={row.drug_name} dose={row.dose_text} />
+        <div dir="auto" style={{
+          fontSize: 14, fontWeight: 600,
+          color: 'var(--color-text-primary)',
+          lineHeight: 1.3, unicodeBidi: 'plaintext',
+        }}>
+          {row.drug_name}
+        </div>
+        {row.dose_text && (
+          <div dir="auto" style={{
+            fontSize: 13, fontWeight: 400,
+            color: 'var(--color-text-secondary)',
+            marginTop: 3, lineHeight: 1.5,
+            unicodeBidi: 'plaintext',
+          }}>
+            {row.dose_text}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -186,10 +307,10 @@ function DrugFreetextRow({ index, row }) {
 function NumberBadge({ index }) {
   return (
     <div style={{
-      width: 24, height: 24, borderRadius: '50%',
+      width: 22, height: 22, borderRadius: '50%',
       backgroundColor: 'var(--color-accent)',
       color: '#fff',
-      fontSize: 12, fontWeight: 700,
+      fontSize: 11, fontWeight: 600,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       flexShrink: 0, marginTop: 2,
     }}>
@@ -213,101 +334,9 @@ function OrDivider() {
   )
 }
 
-/** Card-style brand line (drug_library), modeled on the old DrugRow's AltRow. */
-function BrandLine({ brand, concentration, form, dose, linkEnabled, slug, navigate }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-md)',
-      padding: 'var(--space-2) var(--space-3)',
-    }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {linkEnabled && slug ? (
-          <button
-            onClick={() => navigate(`/drugs/${slug}`)}
-            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-body)' }}
-          >
-            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-accent)', lineHeight: 1.3 }}>
-              {brand.name}
-            </span>
-          </button>
-        ) : (
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-            {brand.name}
-          </div>
-        )}
-
-        {(concentration || form) && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 3, flexWrap: 'wrap' }}>
-            {concentration && (
-              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{concentration}</span>
-            )}
-            {form && (
-              <span style={{
-                fontSize: 11, fontWeight: 500,
-                backgroundColor: 'var(--color-bg)',
-                border: '1px solid var(--color-border)',
-                color: 'var(--color-text-tertiary)',
-                borderRadius: 'var(--radius-full)',
-                padding: '1px 7px',
-              }}>
-                {form}
-              </span>
-            )}
-          </div>
-        )}
-
-        {brand.nameAr && (
-          <div dir="rtl" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2, lineHeight: 1.4 }}>
-            {brand.nameAr}
-          </div>
-        )}
-      </div>
-
-      {dose ? (
-        <div dir="auto" style={{
-          marginTop: 'var(--space-2)',
-          fontSize: 13, fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          lineHeight: 1.5,
-          fontFamily: 'var(--font-body)',
-        }}>
-          {dose}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-/** Plain name + dose line (drug_freetext, or drug_library with no brands). */
-function NameLine({ name, dose }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-md)',
-      padding: 'var(--space-2) var(--space-3)',
-    }}>
-      <div dir="auto" style={{ fontSize: 14, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-        {name}
-      </div>
-      {dose ? (
-        <div dir="auto" style={{
-          marginTop: 'var(--space-2)',
-          fontSize: 13, fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          lineHeight: 1.5,
-        }}>
-          {dose}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 'var(--space-3)',
+  padding: '12px 0',
 }
