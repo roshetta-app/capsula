@@ -1,13 +1,18 @@
 /**
- * PrescriptionPills — horizontal scrollable prescription label pills.
+ * PrescriptionPills — segmented control for selecting between prescription sheets.
  *
- * Phase 2D spec:
- *  - Compact 6px top/bottom padding
- *  - Active: filled primary. Inactive: outline/ghost.
- *  - Touch events stopped so pill-area scroll doesn't trigger tab swipe.
+ * Phase 1.2 spec:
+ *  - Single pill-shaped container housing all options (not loose separate pills)
+ *  - Container background: color-border-subtle (very light gray)
+ *  - Active option: filled color-accent, white text, border-radius 999px, 0.2s ease transition
+ *  - Inactive option: transparent background, color-text-secondary text
+ *  - Internal padding per option: 6px 16px
+ *  - Container padding: 3px all sides (inset appearance)
+ *  - Only rendered when sheets.length >= 2 (enforced by parent PrescriptionsTab)
+ *  - Touch events stopped so horizontal scroll doesn't trigger tab swipe
  *
  * Props:
- *   prescriptions   PrescriptionFull[]
+ *   prescriptions   { id, label }[]
  *   activeIndex     number
  *   onSelect        (index: number) => void
  */
@@ -16,19 +21,20 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
 
   return (
     <div
-      // Block swipe-to-switch-tabs while scrolling pills horizontally
+      // Block swipe-to-switch-tabs while interacting with segmented control
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
       style={{
-        display: 'flex',
-        gap: 'var(--space-2)',
-        overflowX: 'auto',
-        paddingTop: 6,
-        paddingBottom: 6,
+        display: 'inline-flex',
+        backgroundColor: 'var(--color-border-subtle)',
+        borderRadius: 999,
+        padding: 3,
         marginBottom: 'var(--space-4)',
+        overflowX: 'auto',
         scrollbarWidth: 'none',
         msOverflowStyle: 'none',
         WebkitOverflowScrolling: 'touch',
+        maxWidth: '100%',
       }}
     >
       {prescriptions.map((rx, i) => {
@@ -40,15 +46,13 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
             style={{
               flexShrink: 0,
               padding: '6px 16px',
-              borderRadius: 'var(--radius-full)',
+              borderRadius: 999,
               fontSize: 13,
               fontWeight: isActive ? 600 : 400,
               fontFamily: 'var(--font-body)',
               cursor: 'pointer',
-              transition: 'all 0.15s ease',
-              border: isActive
-                ? '1.5px solid var(--color-accent)'
-                : '1.5px solid var(--color-border)',
+              border: 'none',
+              transition: 'background-color 0.2s ease, color 0.2s ease',
               backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
               whiteSpace: 'nowrap',

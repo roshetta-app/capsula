@@ -134,13 +134,17 @@ export default function ConditionDetailScreen() {
         />
       </div>
 
-      {/* Tab strip — full-width background, content centred */}
+      {/* ─── Tab strip ───────────────────────────────────────────────────────────
+          Phase 1.1:
+          - No borderBottom on this container — header's border is the divider
+          - Buttons use inline underline <span> (text-width only), not border-bottom
+          - Font 15px, padding 12px top/bottom
+      */}
       <div style={{
         position: 'sticky',
         top: 57,
         zIndex: 40,
         backgroundColor: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
       }}>
         <div style={{
           maxWidth: 680,
@@ -155,21 +159,37 @@ export default function ConditionDetailScreen() {
                 onClick={() => setActiveTab(i)}
                 style={{
                   flex: 1,
-                  padding: 'var(--space-3) var(--space-4)',
-                  fontSize: 14,
+                  paddingTop: 12,
+                  paddingBottom: 12,
+                  paddingLeft: 'var(--space-4)',
+                  paddingRight: 'var(--space-4)',
+                  fontSize: 15,
                   fontWeight: isActive ? 600 : 400,
                   fontFamily: 'var(--font-body)',
                   border: 'none',
                   background: 'none',
                   cursor: 'pointer',
                   color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                  borderBottom: isActive ? '2px solid var(--color-accent)' : '2px solid transparent',
-                  transition: 'color 0.15s ease, border-color 0.15s ease',
+                  transition: 'color 0.15s ease',
                   WebkitTapHighlightColor: 'transparent',
                   outline: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 0,
                 }}
               >
-                {label}
+                <span>{label}</span>
+                {/* Text-width underline — inline block so it hugs the text */}
+                <span style={{
+                  display: 'inline-block',
+                  height: 2,
+                  width: '100%',
+                  marginTop: 4,
+                  borderRadius: 1,
+                  backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+                  transition: 'background-color 0.15s ease',
+                }} />
               </button>
             )
           })}
