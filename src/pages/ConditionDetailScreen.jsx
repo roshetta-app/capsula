@@ -23,9 +23,35 @@ function ageLabel(group) {
   return 'Adult'
 }
 
+// ─── Tab icon SVGs (inline — no icon lib needed) ──────────────────────────────
+
+/** Pill icon for Treatment tab */
+function IconPill({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10.5 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v7.5" />
+      <circle cx="17" cy="17" r="5" />
+      <path d="m14.5 19.5 5-5" />
+    </svg>
+  )
+}
+
+/** Stethoscope icon for Clinical tab */
+function IconStethoscope({ color }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
+      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
+      <circle cx="20" cy="10" r="2" />
+    </svg>
+  )
+}
+
 const TABS = [
-  { label: 'Treatment', icon: 'ti-pill' },
-  { label: 'Clinical',  icon: 'ti-stethoscope' },
+  { label: 'Treatment', renderIcon: (color) => <IconPill color={color} /> },
+  { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
 export default function ConditionDetailScreen() {
@@ -57,7 +83,6 @@ export default function ConditionDetailScreen() {
     touchStartY.current = null
   }
 
-  // Add to recently viewed once condition is resolved
   const condition = conditions.find(c => c.slug === slug)
   const isFav = condition ? isConditionFavourited(condition.id) : false
 
@@ -67,10 +92,6 @@ export default function ConditionDetailScreen() {
       logUsageEvent('condition_view', condition.id, condition.name)
     }
   }, [condition?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ─── Build share card prescription snapshot ─────────────────────────────────
-  // NOTE: buildSharePrescription reads condition.prescriptions (old shape).
-  // Sharing is broken until Phase 5.1 — left unchanged intentionally.
 
   function buildSharePrescription() {
     const rx = condition?.prescriptions?.[0]
@@ -91,12 +112,10 @@ export default function ConditionDetailScreen() {
     shareConditionPrescription(condition, buildSharePrescription(), shareCardRef)
   }
 
-  // ─── Loading / not found guards ─────────────────────────────────────────────
-
   if (loading) {
     return (
       <div style={pageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} />
+        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
           Loading…
         </div>
@@ -108,7 +127,7 @@ export default function ConditionDetailScreen() {
   if (!condition) {
     return (
       <div style={pageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} />
+        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
           <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any condition in the database.</div>
@@ -120,94 +139,24 @@ export default function ConditionDetailScreen() {
 
   return (
     <div style={pageStyle}>
+      {/* ─── Header + Tab strip — one combined sticky block, one border at bottom */}
       <DetailHeader
         onBack={() => navigate(-1)}
         condition={condition}
         isFav={isFav}
         onFavToggle={() => toggleCondition(condition.id)}
         onShare={handleShare}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
       />
 
-      {/* Hidden ShareCard — off-screen, captured by html2canvas on share */}
+      {/* Hidden ShareCard */}
       <div style={{ position: 'fixed', top: -9999, left: -9999, zIndex: -1, pointerEvents: 'none' }}>
         <ShareCard
           ref={shareCardRef}
           condition={{ name: condition.name, specialtyName: condition.specialtyName }}
           prescription={buildSharePrescription()}
         />
-      </div>
-
-      {/* ─── Tab strip ───────────────────────────────────────────────────────────
-          Phase 1.1:
-          - No borderBottom on container — header's 1px border is the sole divider
-          - Each button: icon (ti-*) + label span + underline span (text-width)
-          - fontSize 15px, paddingTop/Bottom 12px, gap 3px
-          - Underline: height 2px, width 28px, borderRadius 1px, text-width only
-      */}
-      <div style={{
-        position: 'sticky',
-        top: 57,
-        zIndex: 40,
-        backgroundColor: 'var(--color-surface)',
-      }}>
-        <div style={{
-          maxWidth: 680,
-          margin: '0 auto',
-          display: 'flex',
-        }}>
-          {TABS.map(({ label, icon }, i) => {
-            const isActive = activeTab === i
-            return (
-              <button
-                key={label}
-                onClick={() => setActiveTab(i)}
-                style={{
-                  flex: 1,
-                  paddingTop: 12,
-                  paddingBottom: 12,
-                  paddingLeft: 'var(--space-4)',
-                  paddingRight: 'var(--space-4)',
-                  fontSize: 15,
-                  fontFamily: 'var(--font-body)',
-                  border: 'none',
-                  background: 'none',
-                  cursor: 'pointer',
-                  transition: 'color 0.15s ease',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 3,
-                }}
-              >
-                <i
-                  className={`ti ${icon}`}
-                  style={{
-                    fontSize: 16,
-                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                  }}
-                />
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: isActive ? 500 : 400,
-                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                }}>
-                  {label}
-                </span>
-                {/* Text-width underline — fixed 28px, not full button width */}
-                <span style={{
-                  display: 'inline-block',
-                  height: 2,
-                  width: 28,
-                  borderRadius: 1,
-                  backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
-                  transition: 'background-color 0.15s ease',
-                }} />
-              </button>
-            )
-          })}
-        </div>
       </div>
 
       <div
@@ -256,9 +205,9 @@ const pageStyle = {
   color: 'var(--color-text-primary)',
 }
 
-// ─── DetailHeader ─────────────────────────────────────────────────────────────
+// ─── DetailHeader — includes tab strip, one sticky block, one bottom border ───
 
-function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
+function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
   const ageStyle = condition
     ? (AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' })
     : null
@@ -271,8 +220,10 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 0 }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--space-4) 0' }}>
+
+        {/* Top row: back + actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 'var(--space-2)' : 'var(--space-3)' }}>
           <button
             onClick={onBack}
             aria-label="Back"
@@ -290,7 +241,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
 
           {condition && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-
               <button
                 onClick={onShare}
                 aria-label="Share prescription"
@@ -325,13 +275,13 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
               </button>
-
             </div>
           )}
         </div>
 
+        {/* Condition title + tags */}
         {condition && (
-          <div>
+          <div style={{ marginBottom: 'var(--space-3)' }}>
             <h1 style={{
               fontSize: 18, fontWeight: 700,
               color: 'var(--color-text-primary)',
@@ -362,6 +312,58 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare }) {
             </div>
           </div>
         )}
+
+        {/* ─── Tab strip — inside header, no border needed, header border is the divider */}
+        <div style={{ display: 'flex' }}>
+          {TABS.map(({ label, renderIcon }, i) => {
+            const isActive = activeTab === i
+            const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
+            return (
+              <button
+                key={label}
+                onClick={() => setActiveTab(i)}
+                style={{
+                  flex: 1,
+                  paddingTop: 10,
+                  paddingBottom: 0,
+                  paddingLeft: 'var(--space-2)',
+                  paddingRight: 'var(--space-2)',
+                  border: 'none',
+                  background: 'none',
+                  cursor: 'pointer',
+                  transition: 'color 0.15s ease',
+                  WebkitTapHighlightColor: 'transparent',
+                  outline: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  color,
+                }}
+              >
+                {renderIcon(color)}
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  color,
+                  letterSpacing: isActive ? '-0.1px' : 0,
+                }}>
+                  {label}
+                </span>
+                {/* Underline — sits flush at header bottom edge */}
+                <span style={{
+                  display: 'block',
+                  height: 2,
+                  width: 32,
+                  borderRadius: 1,
+                  backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+                  transition: 'background-color 0.15s ease',
+                }} />
+              </button>
+            )
+          })}
+        </div>
+
       </div>
     </header>
   )
