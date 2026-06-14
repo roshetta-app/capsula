@@ -1,15 +1,21 @@
 /**
- * ImageCarousel — horizontal swipeable image carousel.
+ * ImageCarousel — full-bleed swipeable image carousel (Phase 4.2).
  *
- * - Swipe left/right changes image. e.stopPropagation() on touchstart blocks
- *   the parent tab switcher from ever seeing carousel touches.
- * - Tap image → opens Lightbox (portal, full pinch/zoom/swipe/double-tap).
- * - Dot indicators + caption below.
+ * Layout:
+ *   - Full-bleed: negative horizontal margins break out of panel padding
+ *   - 4:3 aspect ratio via padding-top trick; image absolutely fills container
+ *   - object-fit: cover, object-position: center
+ *   - No border, no radius, no shadow
+ *   - Order: image → dots → caption
+ *
+ * Interaction:
+ *   - Swipe threshold: 50px
+ *   - Tap (< 8px movement) → opens Lightbox
+ *   - e.stopPropagation() on touchstart blocks parent tab-switcher
  *
  * Props:
  *   images  { id, url, caption }[]
  */
-
 import { useState, useRef, useCallback } from 'react'
 import Lightbox from '../ui/Lightbox'
 
@@ -26,7 +32,6 @@ export default function ImageCarousel({ images = [] }) {
   const current = images[index]
 
   function onTouchStart(e) {
-    // stopPropagation prevents the parent tab-switcher from ever seeing this touch
     e.stopPropagation()
     touchStartX.current = e.touches[0].clientX
   }
@@ -38,77 +43,99 @@ export default function ImageCarousel({ images = [] }) {
     const absDx = Math.abs(dx)
     touchStartX.current = null
 
-    if (absDx > 40) {
-      // Swipe — change image, do NOT open lightbox
+    if (absDx >= 50) {
+      // Swipe — change image
       if (dx < 0 && index < images.length - 1) setIndex(i => i + 1)
       if (dx > 0 && index > 0)                 setIndex(i => i - 1)
     } else if (absDx < 8) {
-      // Tap (barely moved) — open lightbox
+      // Tap — open lightbox
       openAt(index)
     }
   }
 
   return (
     <>
-      <div style={{ userSelect: 'none' }}>
-        {/* Image — touch handlers here block tab swipe */}
+      <div
+        style={{
+          marginLeft:  'calc(-1 * var(--space-4))',
+          marginRight: 'calc(-1 * var(--space-4))',
+          userSelect: 'none',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        {/* 4:3 aspect-ratio image container */}
         <div
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           style={{
-            borderRadius: 'var(--radius-lg)',
+            position: 'relative',
+            width: '100%',
+            paddingTop: '75%', // 4:3
             overflow: 'hidden',
             cursor: 'zoom-in',
             backgroundColor: 'var(--color-bg)',
-            border: '1px solid var(--color-border)',
-            height: 260,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
           }}
         >
           <img
             src={current.url}
             alt={current.caption || ''}
             style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
-              objectFit: 'contain',
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
               display: 'block',
               pointerEvents: 'none',
             }}
           />
         </div>
 
-        {/* Caption */}
-        {current.caption && (
-          <div style={{
-            fontSize: 12, color: 'var(--color-text-tertiary)',
-            textAlign: 'center', marginTop: 'var(--space-1)',
-            lineHeight: 1.4, padding: '0 var(--space-2)',
-          }}>
-            {current.caption}
-          </div>
-        )}
-
         {/* Dot indicators */}
         {images.length > 1 && (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 'var(--space-2)' }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: 6,
+            marginTop: 10,
+          }}>
             {images.map((_, i) => (
               <button
                 key={i}
                 onClick={() => goTo(i)}
                 aria-label={`Image ${i + 1}`}
                 style={{
-                  width: i === index ? 18 : 6, height: 6,
-                  borderRadius: 3, border: 'none', padding: 0,
+                  width:  i === index ? 8 : 6,
+                  height: i === index ? 8 : 6,
+                  borderRadius: '50%',
+                  border: 'none',
+                  padding: 0,
                   cursor: 'pointer',
-                  backgroundColor: i === index ? 'var(--color-accent)' : 'var(--color-border)',
-                  transition: 'width 0.2s ease, background-color 0.2s ease',
-                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                  backgroundColor: i === index
+                    ? 'var(--color-accent)'
+                    : 'var(--color-border)',
+                  transition: 'width 0.2s ease, height 0.2s ease, background-color 0.2s ease',
+                  WebkitTapHighlightColor: 'transparent',
+                  outline: 'none',
                 }}
               />
             ))}
+          </div>
+        )}
+
+        {/* Caption — below dots, re-applies side padding */}
+        {current.caption && (
+          <div style={{
+            padding: '0 var(--space-4)',
+            marginTop: 6,
+            fontSize: 13,
+            color: 'var(--color-text-secondary)',
+            fontWeight: 400,
+            lineHeight: 1.5,
+            textAlign: 'left',
+          }}>
+            {current.caption}
           </div>
         )}
       </div>

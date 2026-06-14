@@ -12,11 +12,11 @@
 /**
  * Returns the ordered list of blocks to render in the Clinical Data tab.
  *
- * Algorithm (Section 2.3):
- *   1. image_gallery blocks — ALL go first, sorted by orderIndex among themselves.
- *   2. All other clinical block types (free_text_post, note_callout with context≠'rx',
- *      rich_text_section, list_section, differential_dx, table) — sorted by orderIndex.
- *   3. Concatenate galleries + others.
+ * Algorithm (Phase 4.2 update — Step 4.2):
+ *   All clinical block types (including image_gallery) sorted purely by
+ *   orderIndex. The previous sort-first override for image_gallery blocks
+ *   has been removed — CMS editors control gallery position via block
+ *   drag-reorder.
  *
  * Filters out:
  *   - prescription_sheet blocks (belong to Rx tab)
@@ -30,13 +30,8 @@
 export function getClinicalDataBlocks(allBlocks) {
   if (!allBlocks?.length) return []
 
-  // image_gallery blocks — filter out empty ones, sort by orderIndex
-  const galleries = allBlocks
-    .filter(b => b.blockType === 'image_gallery' && b.data?.images?.length > 0)
-    .sort((a, b) => a.orderIndex - b.orderIndex)
-
-  // All other clinical types — excludes prescription_sheet and rx-context note_callouts
   const CLINICAL_TYPES = new Set([
+    'image_gallery',
     'free_text_post',
     'note_callout',
     'rich_text_section',
@@ -45,9 +40,11 @@ export function getClinicalDataBlocks(allBlocks) {
     'table',
   ])
 
-  const others = allBlocks
+  return allBlocks
     .filter(b => {
       if (!CLINICAL_TYPES.has(b.blockType)) return false
+      // image_gallery with no images has no content (Section 3.1)
+      if (b.blockType === 'image_gallery' && !b.data?.images?.length) return false
       // note_callout with context 'rx' belongs to Rx tab (Section 2.8)
       if (b.blockType === 'note_callout' && b.data?.context === 'rx') return false
       // free_text_post with empty markdown has no content (Section 3.2)
@@ -55,8 +52,6 @@ export function getClinicalDataBlocks(allBlocks) {
       return true
     })
     .sort((a, b) => a.orderIndex - b.orderIndex)
-
-  return [...galleries, ...others]
 }
 
 /**
