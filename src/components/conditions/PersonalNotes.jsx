@@ -4,13 +4,15 @@ import { useState, useRef, useEffect, useCallback } from 'react'
  * PersonalNotes — personal note for a condition (Phase 3.1).
  *
  * Design changes:
- *   - Section container now has a muted surface background + subtle shadow
- *     so it reads as a distinct input card rather than a flat text block.
- *   - Textarea border is a full 1px border-subtle; on focus it upgrades to
- *     accent without any JS jank (kept the inline handler).
- *   - Reduced top margin so the spacing above PersonalNotes matches the
- *     overall rhythm of the screen (was --space-6, now --space-4).
- *   - Pencil icon next to label is slightly bolder.
+ *   - Removed card-within-card look (muted background + shadow wrapper).
+ *     Now uses a simple top hairline to separate from the prescription content,
+ *     matching the ambient/flat rhythm of the rest of the Rx tab.
+ *   - Label uses a small left-accent bar (3px colored rule) for visual anchoring
+ *     instead of an uppercase micro-label, giving it a more editorial feel.
+ *   - Textarea is completely borderless by default — only the bottom rule shows.
+ *     On focus a subtle left accent border appears (no box-shadow, no full border).
+ *   - "Saved" indicator moves inline next to the label (right side), not below textarea.
+ *   - Placeholder softened so the area reads as ambient/inviting rather than form-like.
  *
  * Props:
  *   conditionId  string
@@ -25,10 +27,9 @@ export default function PersonalNotes({ conditionId }) {
   // savedVisible: null | 'in' | 'out'
   const [savedVisible, setSavedVisible] = useState(null)
 
-  const debounceRef  = useRef(null)
-  const fadeOutRef   = useRef(null)
+  const debounceRef = useRef(null)
+  const fadeOutRef  = useRef(null)
 
-  // Cleanup timers on unmount
   useEffect(() => () => {
     clearTimeout(debounceRef.current)
     clearTimeout(fadeOutRef.current)
@@ -43,7 +44,6 @@ export default function PersonalNotes({ conditionId }) {
   function handleChange(e) {
     const next = e.target.value
     setValue(next)
-
     clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       try { localStorage.setItem(storageKey, next) } catch { /* ignore */ }
@@ -62,84 +62,75 @@ export default function PersonalNotes({ conditionId }) {
       borderTop: '0.5px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Card wrapper — gives the note area visual weight as an input zone */}
+      {/* Label row */}
       <div style={{
-        backgroundColor: 'var(--color-surface-muted)',
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 'var(--radius-md)',
-        padding: '10px 12px 8px',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 8,
       }}>
-        {/* Section label */}
+        {/* Left accent bar */}
         <div style={{
-          fontSize: 10,
+          width: 3,
+          height: 14,
+          borderRadius: 2,
+          backgroundColor: 'var(--color-accent)',
+          opacity: 0.5,
+          flexShrink: 0,
+        }} />
+        <span style={{
+          fontSize: 12,
           fontWeight: 600,
-          letterSpacing: '0.07em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 6,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
+          color: 'var(--color-text-secondary)',
+          letterSpacing: '0.01em',
         }}>
-          Personal Note
-          <svg
-            width="11" height="11" viewBox="0 0 24 24"
-            fill="none" stroke="currentColor"
-            strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-            style={{ opacity: 0.55 }}
-          >
-            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-          </svg>
-        </div>
-
-        {/* Textarea */}
-        <textarea
-          value={value}
-          onChange={handleChange}
-          placeholder="Add your personal note for this condition..."
-          style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            fontSize: 14,
-            color: 'var(--color-text-primary)',
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-sm)',
-            padding: '9px 11px',
-            fontFamily: 'var(--font-body)',
-            lineHeight: 1.6,
-            resize: 'none',
-            outline: 'none',
-            minHeight: 76,
-            display: 'block',
-            transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-          }}
-          onFocus={e => {
-            e.target.style.borderColor = 'var(--color-accent)'
-            e.target.style.boxShadow = '0 0 0 2px var(--color-accent-light)'
-          }}
-          onBlur={e => {
-            e.target.style.borderColor = 'var(--color-border)'
-            e.target.style.boxShadow = 'none'
-          }}
-        />
-
-        {/* Autosave indicator */}
-        <div style={{
-          textAlign: 'right',
-          marginTop: 3,
+          My notes
+        </span>
+        {/* Autosave indicator — inline, right-aligned */}
+        <span style={{
+          marginLeft: 'auto',
           fontSize: 11,
           color: 'var(--color-text-tertiary)',
           opacity: savedOpacity,
           transition: savedVisible === 'in'
             ? 'opacity 0.2s ease'
             : 'opacity 0.4s ease',
-          height: 14,
         }}>
           Saved
-        </div>
+        </span>
       </div>
+
+      {/* Ambient textarea — borderless, bottom-rule only */}
+      <textarea
+        value={value}
+        onChange={handleChange}
+        placeholder="Jot down anything useful for this condition…"
+        rows={3}
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          fontSize: 14,
+          color: 'var(--color-text-primary)',
+          backgroundColor: 'transparent',
+          border: 'none',
+          borderBottom: '1px solid var(--color-border-subtle)',
+          borderRadius: 0,
+          padding: '4px 0 8px',
+          fontFamily: 'var(--font-body)',
+          lineHeight: 1.65,
+          resize: 'none',
+          outline: 'none',
+          minHeight: 64,
+          display: 'block',
+          transition: 'border-color 0.15s ease',
+        }}
+        onFocus={e => {
+          e.target.style.borderColor = 'var(--color-accent)'
+        }}
+        onBlur={e => {
+          e.target.style.borderColor = 'var(--color-border-subtle)'
+        }}
+      />
     </div>
   )
 }
