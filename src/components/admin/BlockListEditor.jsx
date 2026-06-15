@@ -28,12 +28,36 @@ import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Human labels and chip colors per block type (Section 3.1 Findings [LOCKED])
-const BLOCK_META = {
-  image_gallery:     { label: 'Image Gallery',     chipColor: '#7C3AED', chipBg: '#EDE9FE' },
-  free_text_post:    { label: 'Text Post',          chipColor: '#1D4ED8', chipBg: '#DBEAFE' },
-  note_callout:      { label: 'Note',               chipColor: '#B45309', chipBg: '#FEF3C7' },
-  prescription_sheet:{ label: 'Prescription Sheet', chipColor: '#047857', chipBg: '#D1FAE5' },
+// Phase 4 (Step 4.1): Context-aware labels so the card header always names the destination tab.
+// Format: "Tab — Role". `default` is the fallback for block types with no context field
+// (e.g. prescription_sheet) or legacy blocks that pre-date the context field.
+const BLOCK_LABELS = {
+  image_gallery: {
+    clinical: 'Clinical — Image Gallery',
+    rx:       'Rx — Image Gallery',
+    default:  'Image Gallery',
+  },
+  free_text_post: {
+    clinical: 'Clinical — Text Post',
+    rx:       'Rx — Text Post',
+    default:  'Text Post',
+  },
+  note_callout: {
+    clinical: 'Clinical — Note',
+    rx:       'Rx — Note',
+    default:  'Note',
+  },
+  prescription_sheet: {
+    default: 'Prescription Sheet', // always Rx — label is self-evident
+  },
+}
+
+// Chip colors remain per block_type (context does not affect colour)
+const BLOCK_CHIP_COLORS = {
+  image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE' },
+  free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE' },
+  note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7' },
+  prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5' },
 }
 
 // Add-block options per sub-tab
@@ -89,22 +113,25 @@ function defaultData(blockType, context) {
 
 // ─── Block type chip ──────────────────────────────────────────────────────────
 
-function BlockChip({ blockType }) {
-  const meta = BLOCK_META[blockType] ?? { label: blockType, chipColor: '#6B7280', chipBg: '#F3F4F6' }
+// Phase 4 (Step 4.2): accepts `context` so the label reflects the destination tab.
+function BlockChip({ blockType, context }) {
+  const labels = BLOCK_LABELS[blockType] ?? {}
+  const label  = (context && labels[context]) ?? labels.default ?? blockType
+  const colors = BLOCK_CHIP_COLORS[blockType] ?? { chipColor: '#6B7280', chipBg: '#F3F4F6' }
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
       fontSize: 11, fontWeight: 700, letterSpacing: '0.05em',
       textTransform: 'uppercase',
-      color: meta.chipColor,
-      backgroundColor: meta.chipBg,
-      border: `1px solid ${meta.chipColor}33`,
+      color: colors.chipColor,
+      backgroundColor: colors.chipBg,
+      border: `1px solid ${colors.chipColor}33`,
       padding: '2px 8px',
       borderRadius: 'var(--radius-full)',
       fontFamily: 'var(--font-body)',
       flexShrink: 0,
     }}>
-      {meta.label}
+      {label}
     </span>
   )
 }
@@ -127,7 +154,8 @@ function BlockCard({ block, index, total, onMoveUp, onMoveDown, onDelete, disabl
         borderBottom: '1px solid var(--color-border)',
         backgroundColor: 'var(--color-bg)',
       }}>
-        <BlockChip blockType={block.block_type} />
+        {/* Phase 4 (Step 4.3): context passed so label names the destination tab */}
+        <BlockChip blockType={block.block_type} context={block.data?.context} />
 
         {/* Spacer */}
         <div style={{ flex: 1 }} />
@@ -754,3 +782,4 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
+
