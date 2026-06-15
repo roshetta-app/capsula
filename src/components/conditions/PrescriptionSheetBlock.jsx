@@ -11,8 +11,14 @@ import NoteCallout from '../ui/NoteCallout'
  *   drug_freetext — { drug_name, dose_text }
  *   note          — { text, flavor? } — rendered via NoteCallout in flat inline row style
  *
- * Label/sub-tab logic for multiple sheets lives in 2.8 (parent component).
- * Empty `rows: []` renders nothing (per 3.3).
+ * Design changes:
+ *   - NumberBadge: replaced filled blue circle with a clean outlined square badge.
+ *     The badge top is aligned with the first text line via alignItems: 'flex-start'
+ *     and a small marginTop offset to optically sit on the cap-height of the drug name.
+ *   - Dose: boosted to color-text-primary at reduced opacity so it reads clearly but
+ *     stays visually subordinate to the drug name (fontWeight 500, color secondary+).
+ *   - Drug-level notes (note_en / note_ar): no longer italic/grey/small — now
+ *     rendered as a mild inline callout with a small dot prefix at full secondary color.
  *
  * Props:
  *   sheet  { label, rows: [...] }  — block.data of a prescription_sheet block
@@ -111,7 +117,7 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
                     background: 'none', border: 'none', padding: 0,
                     cursor: 'pointer', textAlign: 'left',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 14, fontWeight: 600,
+                    fontSize: 15, fontWeight: 600,
                     color: 'var(--color-accent)',
                     lineHeight: 1.3,
                   }}
@@ -119,7 +125,7 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
                   {primary.name}
                 </button>
               ) : (
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
                   {primary.name}
                 </span>
               )}
@@ -130,12 +136,15 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
               )}
             </div>
 
-            {/* Dose line */}
+            {/* Dose line — boosted contrast */}
             {dose && (
               <div dir="auto" style={{
-                fontSize: 13, fontWeight: 400,
-                color: 'var(--color-text-secondary)',
-                marginTop: 3, lineHeight: 1.5,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--color-text-primary)',
+                opacity: 0.72,
+                marginTop: 3,
+                lineHeight: 1.5,
                 unicodeBidi: 'plaintext',
               }}>
                 {dose}
@@ -167,7 +176,7 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
           /* No brands — show generic name + dose inline */
           <>
             <div dir="auto" style={{
-              fontSize: 14, fontWeight: 600,
+              fontSize: 15, fontWeight: 600,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3, unicodeBidi: 'plaintext',
             }}>
@@ -175,9 +184,12 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
             </div>
             {dose && (
               <div dir="auto" style={{
-                fontSize: 13, fontWeight: 400,
-                color: 'var(--color-text-secondary)',
-                marginTop: 3, lineHeight: 1.5,
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'var(--color-text-primary)',
+                opacity: 0.72,
+                marginTop: 3,
+                lineHeight: 1.5,
                 unicodeBidi: 'plaintext',
               }}>
                 {dose}
@@ -186,20 +198,34 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
           </>
         )}
 
-        {/* English / Arabic notes */}
+        {/* Drug-level notes — no longer italic/tertiary; use a readable inline style */}
         {(row.note_en || row.note_ar) && (
-          <div style={{ marginTop: 'var(--space-1)' }}>
+          <div style={{ marginTop: 5 }}>
             {row.note_en && (
-              <div style={{ fontSize: 12, fontStyle: 'italic', color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-                {row.note_en}
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 5,
+                fontSize: 12.5,
+                fontStyle: 'normal',
+                fontWeight: 400,
+                color: 'var(--color-text-secondary)',
+                lineHeight: 1.5,
+              }}>
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
+                <span>{row.note_en}</span>
               </div>
             )}
             {row.note_ar && (
               <div dir="rtl" style={{
-                fontSize: 12, fontStyle: 'italic', color: 'var(--color-text-tertiary)',
-                lineHeight: 1.5, marginTop: row.note_en ? 2 : 0,
+                display: 'flex', alignItems: 'flex-start', gap: 5,
+                fontSize: 12.5,
+                fontStyle: 'normal',
+                fontWeight: 400,
+                color: 'var(--color-text-secondary)',
+                lineHeight: 1.5,
+                marginTop: row.note_en ? 2 : 0,
               }}>
-                {row.note_ar}
+                <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
+                <span>{row.note_ar}</span>
               </div>
             )}
           </div>
@@ -217,14 +243,14 @@ function DrugLibraryRow({ index, row, formulation, navigate, isLast }) {
                     background: 'none', border: 'none', padding: 0,
                     cursor: 'pointer', textAlign: 'left',
                     fontFamily: 'var(--font-body)',
-                    fontSize: 14, fontWeight: 600,
+                    fontSize: 15, fontWeight: 600,
                     color: 'var(--color-accent)', lineHeight: 1.3,
                   }}
                 >
                   {brand.name}
                 </button>
               ) : (
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
                   {brand.name}
                 </span>
               )}
@@ -281,7 +307,7 @@ function DrugFreetextRow({ index, row, isLast }) {
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div dir="auto" style={{
-          fontSize: 14, fontWeight: 600,
+          fontSize: 15, fontWeight: 600,
           color: 'var(--color-text-primary)',
           lineHeight: 1.3, unicodeBidi: 'plaintext',
         }}>
@@ -289,9 +315,12 @@ function DrugFreetextRow({ index, row, isLast }) {
         </div>
         {row.dose_text && (
           <div dir="auto" style={{
-            fontSize: 13, fontWeight: 400,
-            color: 'var(--color-text-secondary)',
-            marginTop: 3, lineHeight: 1.5,
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'var(--color-text-primary)',
+            opacity: 0.72,
+            marginTop: 3,
+            lineHeight: 1.5,
             unicodeBidi: 'plaintext',
           }}>
             {row.dose_text}
@@ -304,15 +333,29 @@ function DrugFreetextRow({ index, row, isLast }) {
 
 // ─── Shared sub-pieces ──────────────────────────────────────────────────────
 
+/**
+ * NumberBadge — clean outlined square with rounded corners.
+ *
+ * Replaces the filled blue circle which felt heavy and didn't align well.
+ * Uses a border + accent color on the number itself — lighter, more typographic.
+ * marginTop: 1 keeps the badge optically aligned with the cap-height of the drug name.
+ */
 function NumberBadge({ index }) {
   return (
     <div style={{
-      width: 22, height: 22, borderRadius: '50%',
-      backgroundColor: 'var(--color-accent)',
-      color: '#fff',
-      fontSize: 11, fontWeight: 600,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, marginTop: 2,
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      border: '1.5px solid var(--color-accent)',
+      backgroundColor: 'var(--color-accent-light)',
+      color: 'var(--color-accent)',
+      fontSize: 11,
+      fontWeight: 700,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+      marginTop: 1,
     }}>
       {index}
     </div>
@@ -338,5 +381,5 @@ const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 'var(--space-3)',
-  padding: '12px 0',
+  padding: '11px 0',
 }

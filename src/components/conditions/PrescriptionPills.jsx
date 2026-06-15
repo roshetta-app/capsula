@@ -3,17 +3,12 @@ import { useState, useEffect, useRef } from 'react'
 /**
  * PrescriptionPills — dropdown selector for choosing between prescription sheets.
  *
- * Phase 1.2 (fixed):
- *  - Inline SVG icons only — no Tabler/FontAwesome classes
- *  - Uses real CSS vars: --color-border, --color-border-subtle (not -secondary/-tertiary)
- *  - Outside-click closes the dropdown via useEffect document listener
- *  - z-index on dropdown list to prevent being occluded
- *  - Only rendered when sheets.length >= 2 (enforced by parent PrescriptionsTab)
- *
- * Props:
- *   prescriptions   { id, label }[]
- *   activeIndex     number
- *   onSelect        (index: number) => void
+ * Fixes:
+ *  - Closed state: bottom border was missing because `borderBottom: open ? 'none' : undefined`
+ *    resolves to `undefined` (no style), which browser inherits as the shorthand border's bottom.
+ *    Fixed by always setting an explicit borderBottom value.
+ *  - Removed marginBottom so the gap between dropdown and first sheet row is controlled
+ *    by the sheet itself (tighter layout).
  */
 
 // ─── Inline SVG icons ─────────────────────────────────────────────────────────
@@ -102,7 +97,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      style={{ marginBottom: 'var(--space-4)', position: 'relative' }}
+      // Reduced bottom margin — sheet rows pick up from here with less gap
+      style={{ marginBottom: 'var(--space-3)', position: 'relative' }}
     >
       {/* Micro-label */}
       <div style={{
@@ -126,9 +122,12 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '11px 14px',
-          border: `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          // Always set all four border sides explicitly so closed state has a bottom border
+          borderTop:    `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          borderLeft:   `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          borderRight:  `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          borderBottom: open ? 'none' : `1.5px solid var(--color-border)`,
           borderRadius: open ? '10px 10px 0 0' : '10px',
-          borderBottom: open ? 'none' : undefined,
           background: 'var(--color-surface)',
           cursor: 'pointer',
           fontFamily: 'var(--font-body)',

@@ -11,28 +11,16 @@ import ShareCard from '../components/ui/ShareCard'
 import { shareConditionPrescription } from '../utils/sharing'
 import { logUsageEvent } from '../analytics/usageEvents'
 
-const AGE_STYLES = {
-  adult:     { bg: '#DBEAFE', color: '#1E40AF' },
-  pediatric: { bg: '#D1FAE5', color: '#065F46' },
-  both:      { bg: '#EDE9FE', color: '#5B21B6' },
-}
+// ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
-function ageLabel(group) {
-  if (group === 'pediatric') return 'Pediatric'
-  if (group === 'both')      return 'All ages'
-  return 'Adult'
-}
-
-// ─── Tab icon SVGs (inline — no icon lib needed) ──────────────────────────────
-
-/** Pill icon for Treatment tab */
-function IconPill({ color }) {
+/** Rx icon for Treatment tab */
+function IconRx({ color }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10.5 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v7.5" />
-      <circle cx="17" cy="17" r="5" />
-      <path d="m14.5 19.5 5-5" />
+      {/* R shape */}
+      <path d="M6 20V4h5a4 4 0 0 1 0 8H6" />
+      <path d="M13 12l5 8" />
     </svg>
   )
 }
@@ -50,7 +38,7 @@ function IconStethoscope({ color }) {
 }
 
 const TABS = [
-  { label: 'Treatment', renderIcon: (color) => <IconPill color={color} /> },
+  { label: 'Treatment', renderIcon: (color) => <IconRx color={color} /> },
   { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
@@ -205,13 +193,9 @@ const pageStyle = {
   color: 'var(--color-text-primary)',
 }
 
-// ─── DetailHeader — includes tab strip, one sticky block, one bottom border ───
+// ─── DetailHeader ─────────────────────────────────────────────────────────────
 
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
-  const ageStyle = condition
-    ? (AGE_STYLES[condition.ageGroup] ?? { bg: '#F3F4F6', color: '#374151' })
-    : null
-
   return (
     <header style={{
       position: 'sticky',
@@ -279,47 +263,59 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           )}
         </div>
 
-        {/* Condition title + tags */}
+        {/* Condition title block — specialty eyebrow above title, no age pill */}
         {condition && (
-          <div style={{ marginBottom: 6 }}>
-            <h1 style={{
-              fontSize: 18, fontWeight: 700,
-              color: 'var(--color-text-primary)',
-              margin: '0 0 5px 0',
-              lineHeight: 1.25, letterSpacing: '-0.2px',
-            }}>
-              {condition.name}
-            </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-              {condition.specialtyName && (
+          <div style={{ marginBottom: 4 }}>
+            {/* Specialty eyebrow — icon + name, dim, small */}
+            {condition.specialtyName && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                marginBottom: 4,
+              }}>
+                {/* Small specialty dot/line accent */}
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+                  stroke="var(--color-text-tertiary)" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
                 <span style={{
-                  fontSize: 11, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase',
-                  color: 'var(--color-text-tertiary)', backgroundColor: 'var(--color-bg)',
-                  border: '1px solid var(--color-border)', padding: '2px 8px', borderRadius: 'var(--radius-full)',
+                  fontSize: 11,
+                  fontWeight: 500,
+                  letterSpacing: '0.03em',
+                  color: 'var(--color-text-tertiary)',
+                  lineHeight: 1,
                 }}>
                   {condition.specialtyName}
                 </span>
-              )}
-              {condition.ageGroup && (
-                <span style={{
-                  fontSize: 11, fontWeight: 500,
-                  backgroundColor: ageStyle.bg, color: ageStyle.color,
-                  padding: '2px 8px', borderRadius: 'var(--radius-full)',
-                }}>
-                  {ageLabel(condition.ageGroup)}
-                </span>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Condition title — prominent */}
+            <h1 style={{
+              fontSize: 21,
+              fontWeight: 700,
+              color: 'var(--color-text-primary)',
+              margin: '0 0 6px 0',
+              lineHeight: 1.2,
+              letterSpacing: '-0.3px',
+            }}>
+              {condition.name}
+            </h1>
           </div>
         )}
 
-        {/* ─── Tab strip — inside header, icon inline before label, underline below */}
-        <div style={{ display: 'flex', marginTop: 'var(--space-2)' }}>
+        {/* ─── Tab strip ─────────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex' }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
             const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
             return (
-              <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <div
+                key={label}
+                style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+              >
                 <button
                   onClick={() => setActiveTab(i)}
                   style={{
@@ -327,10 +323,12 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    paddingTop: 6,
-                    paddingBottom: 8,
+                    paddingTop: 8,
+                    paddingBottom: 10,
                     paddingLeft: 'var(--space-2)',
                     paddingRight: 'var(--space-2)',
+                    width: '100%',
+                    justifyContent: 'center',
                     border: 'none',
                     background: 'none',
                     cursor: 'pointer',
@@ -349,12 +347,12 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     {label}
                   </span>
                 </button>
-                {/* Underline — sibling below the button row, centered */}
+                {/* Underline — full width of the tab cell, flush edge-to-edge */}
                 <span style={{
                   display: 'block',
                   height: 2,
-                  width: 32,
-                  borderRadius: 1,
+                  width: '100%',
+                  borderRadius: '1px 1px 0 0',
                   backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
                   transition: 'background-color 0.15s ease',
                 }} />

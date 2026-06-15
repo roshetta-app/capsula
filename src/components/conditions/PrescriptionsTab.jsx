@@ -9,22 +9,12 @@ import { getRxBlocks } from '../../utils/blockFilters'
 /**
  * PrescriptionsTab — Rx tab container (Phase 2.8).
  *
- * Calls getRxBlocks() (2.2) to get prescription_sheet blocks + any
- * rx-context note_callout blocks, sorted by orderIndex.
- *
- *  - 0 prescription_sheet blocks → empty state (2.10): "No prescription
- *    available for this condition." Any rx-context notes and Personal
- *    Notes still render below, independent of the empty message.
- *  - 1 prescription_sheet block → rendered directly via PrescriptionSheetBlock,
- *    no label/sub-tabs shown (per Section 2.6).
- *  - 2+ prescription_sheet blocks → PrescriptionPills sub-tabs (labeled by
- *    data.label), first selected by default; selected sheet rendered via
- *    PrescriptionSheetBlock (per Section 2.6).
- *
- * rx-context note_callout blocks (data.context === 'rx') render via
- * NoteCallout below the sheet(s), in orderIndex order.
- *
- * PersonalNotes and the medical disclaimer are preserved (Step 3.1 / 3.2).
+ * Design changes:
+ *   - rx-context note_callout blocks that sit OUTSIDE the sheet now have a
+ *     clear visual separator above them (dashed divider + dim label) so the
+ *     user understands they are not part of the active prescription sheet.
+ *   - PersonalNotes section spacing tightened to match overall screen rhythm.
+ *   - Medical disclaimer margin reduced to match.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -67,17 +57,51 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
         </>
       )}
 
-      {/* Rx-context note_callout blocks */}
-      {rxNotes.map(b => (
-        <NoteCallout key={b.id} text={b.data?.text} flavor={b.data?.flavor} />
-      ))}
+      {/* ── Rx-context note_callout blocks ──────────────────────────────────
+          These exist outside the sheet and persist regardless of which sheet
+          is selected. A separator makes clear they are not part of the sheet.
+      ──────────────────────────────────────────────────────────────────────── */}
+      {rxNotes.length > 0 && (
+        <>
+          {/* Dashed separator with label */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--space-2)',
+            margin: 'var(--space-3) 0 var(--space-2)',
+          }}>
+            <div style={{
+              flex: 1,
+              borderTop: '1px dashed var(--color-border)',
+            }} />
+            <span style={{
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.07em',
+              textTransform: 'uppercase',
+              color: 'var(--color-text-tertiary)',
+              whiteSpace: 'nowrap',
+            }}>
+              General notes
+            </span>
+            <div style={{
+              flex: 1,
+              borderTop: '1px dashed var(--color-border)',
+            }} />
+          </div>
+
+          {rxNotes.map(b => (
+            <NoteCallout key={b.id} text={b.data?.text} flavor={b.data?.flavor} />
+          ))}
+        </>
+      )}
 
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Medical Disclaimer — Step 3.2 */}
+      {/* Medical Disclaimer */}
       <div style={{
-        marginTop: 'var(--space-6)',
+        marginTop: 'var(--space-4)',
         display: 'flex',
         alignItems: 'center',
         gap: 6,
