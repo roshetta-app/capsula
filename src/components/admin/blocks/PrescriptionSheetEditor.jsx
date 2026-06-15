@@ -10,6 +10,7 @@
  *       | { row_type: "drug_library",  formulation_id, _formulationMeta?, dose_override, note_en, note_ar, drug_link_enabled }
  *       | { row_type: "drug_freetext", drug_name, dose_text }
  *       | { row_type: "note",          text, flavor? }
+ *       | { row_type: "free_text",     markdown }
  *     >
  *   }
  *
@@ -27,6 +28,7 @@
  *   DrugLibraryRowEditor  — src/components/admin/blocks/rows/DrugLibraryRowEditor.jsx
  *   DrugFreetextRowEditor — src/components/admin/blocks/rows/DrugFreetextRowEditor.jsx
  *   NoteRowEditor         — src/components/admin/blocks/rows/NoteRowEditor.jsx
+ *   FreeTextPostEditor    — src/components/admin/blocks/FreeTextPostEditor.jsx  (reused inline)
  */
 
 import { useState } from 'react'
@@ -34,13 +36,15 @@ import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
 import DrugLibraryRowEditor  from './rows/DrugLibraryRowEditor'
 import DrugFreetextRowEditor from './rows/DrugFreetextRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
+import FreeTextPostEditor    from './FreeTextPostEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROW_TYPE_LABELS = {
-  drug_library:  { label: 'Drug (library)', color: '#6366f1' },
+  drug_library:  { label: 'Drug (library)',   color: '#6366f1' },
   drug_freetext: { label: 'Drug (free text)', color: '#0ea5e9' },
-  note:          { label: 'Note', color: '#f59e0b' },
+  note:          { label: 'Note',             color: '#f59e0b' },
+  free_text:     { label: 'Text Block',       color: '#1D4ED8' },
 }
 
 // ─── Row type chip ─────────────────────────────────────────────────────────────
@@ -80,6 +84,10 @@ function rowSummary(row) {
   if (row.row_type === 'note') {
     return row.text || 'Empty note'
   }
+  if (row.row_type === 'free_text') {
+    const md = row.markdown ?? ''
+    return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
+  }
   return ''
 }
 
@@ -111,7 +119,7 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
           userSelect: 'none',
         }}
       >
-        {/* Drag handle / index */}
+        {/* Index */}
         <span style={{
           fontSize: 11, color: 'var(--color-text-tertiary)',
           fontWeight: 600, minWidth: 18, textAlign: 'center',
@@ -170,6 +178,12 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
           {row.row_type === 'drug_library'  && <DrugLibraryRowEditor  row={row} onChange={handleEditorChange} />}
           {row.row_type === 'drug_freetext' && <DrugFreetextRowEditor row={row} onChange={handleEditorChange} />}
           {row.row_type === 'note'          && <NoteRowEditor         row={row} onChange={handleEditorChange} />}
+          {row.row_type === 'free_text'     && (
+            <FreeTextPostEditor
+              data={{ markdown: row.markdown ?? '' }}
+              onChange={patch => handleEditorChange({ ...row, markdown: patch.markdown })}
+            />
+          )}
         </div>
       )}
     </div>
@@ -278,6 +292,10 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
     addRow({ row_type: 'note', text: '', flavor: 'info' })
   }
 
+  function addFreeText() {
+    addRow({ row_type: 'free_text', markdown: '' })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
@@ -323,7 +341,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
             border: '1.5px dashed var(--color-border)',
             borderRadius: 'var(--radius-md)',
           }}>
-            No rows yet — add a drug or note below.
+            No rows yet — add a drug, note, or text block below.
           </div>
         ) : (
           rows.map((row, idx) => (
@@ -357,8 +375,14 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
           color="#f59e0b"
           onClick={addNote}
         />
+        <AddRowButton
+          label="Text Block"
+          color="#1D4ED8"
+          onClick={addFreeText}
+        />
       </div>
 
     </div>
   )
-}
+          }
+        
