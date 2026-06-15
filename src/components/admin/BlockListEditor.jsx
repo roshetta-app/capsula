@@ -1,27 +1,29 @@
 /**
  * BlockListEditor — src/components/admin/BlockListEditor.jsx
  *
- * Phase 3.2 + 3.7: Block-list container with Clinical/Rx sub-tab split and wired editors.
+ * Phase 1 + 2 + 3: Block-list container with Clinical/Rx sub-tab split and wired editors.
  *
  * Props:
  *   blocks   {Array}    — current blocks array (from parent state)
  *   onChange {Function} — (newBlocks) => void   called on every mutation
  *   disabled {Boolean}  — disables all controls during parent save
  *
- * Block editors (ImageGalleryEditor, FreeTextPostEditor, NoteCalloutEditor,
- * PrescriptionSheetEditor) are wired via internal renderEditor() switch. This file delivers:
- *   - Clinical / Rx sub-tab switcher
- *   - Add Block dropdown (context-aware per active sub-tab)
- *   - Block card frame (header with human name + colored chip + ↑ ↓ 🗑)
- *   - Editor slot (all four block editors wired)
- *   - Stable internal ordering helpers
+ * Phase 3 changes:
+ *   - Rx tab now shows SheetPickerBar + ActiveSheetEditor instead of stacked BlockCards
+ *     for prescription_sheet blocks. Non-sheet Rx blocks (notes, text posts, galleries)
+ *     still use BlockCard and appear in a separate "Rx-level blocks" section below.
+ *   - activeSheetIndex state added to track which sheet is selected in the picker.
+ *   - AddBlockButton accepts an optional `options` prop override (Step 3.6) so the
+ *     Rx tab can exclude prescription_sheet from the dropdown — sheets are added via
+ *     the "+ Add Sheet" pill in SheetPickerBar instead.
+ *   - EmptyState handles a new 'rx-sheets' case for when no sheets exist yet.
  */
 
 import { useState } from 'react'
 import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
-import ImageGalleryEditor    from './blocks/ImageGalleryEditor'
-import FreeTextPostEditor    from './blocks/FreeTextPostEditor'
-import NoteCalloutEditor     from './blocks/NoteCalloutEditor'
+import ImageGalleryEditor      from './blocks/ImageGalleryEditor'
+import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
+import NoteCalloutEditor       from './blocks/NoteCalloutEditor'
 import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -40,12 +42,12 @@ const CLINICAL_BLOCK_OPTIONS = [
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
 ]
-// Phase 2 (Step 2.3): image_gallery and free_text_post added to Rx options
+// Phase 2 (Step 2.3): image_gallery and free_text_post added to Rx options.
+// Phase 3 (Step 3.6): prescription_sheet removed — sheets added via SheetPickerBar.
 const RX_BLOCK_OPTIONS = [
-  { value: 'prescription_sheet', label: '+ Prescription Sheet' },
-  { value: 'image_gallery',      label: '+ Image Gallery'      },
-  { value: 'free_text_post',     label: '+ Text Post'          },
-  { value: 'note_callout',       label: '+ Note'               },
+  { value: 'image_gallery',  label: '+ Image Gallery' },
+  { value: 'free_text_post', label: '+ Text Post'     },
+  { value: 'note_callout',   label: '+ Note'          },
 ]
 
 // Which block types belong to each sub-tab
@@ -228,11 +230,154 @@ function SubTabBar({ active, onChange }) {
   )
 }
 
+// ─── Phase 3: SheetPickerBar ──────────────────────────────────────────────────
+
+/**
+ * SheetPickerBar — CMS-side sheet switcher for the Rx sub-tab. (Step 3.3)
+ *
+ * Mirrors the mental model of the app's PrescriptionPills component so the admin
+ * edits sheets in the same one-at-a-time mental model the user sees them in.
+ *
+ * Props:
+ *   sheets       — array of { globalIndex, block } for prescription_sheet blocks only
+ *   activeIndex  — which sheet is selected (index into sheets array)
+ *   onSelect     — (localIndex) => void
+ *   onAdd        — () => void — triggers addBlock('prescription_sheet') in parent
+ *   disabled     — freeze controls during parent save
+ */
+function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
+  return (
+    <div style={{
+      display: 'flex',
+      gap: 'var(--space-2)',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      marginBottom: 'var(--space-4)',
+    }}>
+      {sheets.map((item, localIndex) => {
+        const isActive = localIndex === activeIndex
+        return (
+          <button
+            key={item.globalIndex}
+            onClick={() => onSelect(localIndex)}
+            disabled={disabled}
+            style={{
+              padding: '5px 14px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 400,
+              fontFamily: 'var(--font-body)',
+              cursor: disabled ? 'default' : 'pointer',
+              border: isActive
+                ? '1.5px solid var(--color-accent)'
+                : '1px solid var(--color-border)',
+              backgroundColor: isActive
+                ? 'var(--color-accent)'
+                : 'var(--color-surface)',
+              color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {item.block.data?.label || `Sheet ${localIndex + 1}`}
+          </button>
+        )
+      })}
+
+      {/* "+ Add Sheet" pill */}
+      <button
+        onClick={onAdd}
+        disabled={disabled}
+        style={{
+          padding: '5px 14px',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 13,
+          fontWeight: 400,
+          fontFamily: 'var(--font-body)',
+          cursor: disabled ? 'default' : 'pointer',
+          border: '1.5px dashed var(--color-border)',
+          backgroundColor: 'transparent',
+          color: 'var(--color-text-secondary)',
+          opacity: disabled ? 0.4 : 1,
+          transition: 'all 0.15s ease',
+        }}
+      >
+        + Add Sheet
+      </button>
+    </div>
+  )
+}
+
+// ─── Phase 3: ActiveSheetEditor ───────────────────────────────────────────────
+
+/**
+ * ActiveSheetEditor — wrapper shown below the SheetPickerBar. (Step 3.4)
+ *
+ * Adds a "Remove sheet" danger button in a header bar above PrescriptionSheetEditor.
+ * PrescriptionSheetEditor is unchanged — it owns the label input and all row editing.
+ *
+ * Props:
+ *   block       — the active prescription_sheet block object
+ *   onPatchData — (dataPatch) => void — bound to patchBlockData(globalIndex, ...)
+ *   onDelete    — () => void
+ *   disabled    — freeze controls during parent save
+ */
+function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
+  return (
+    <div style={{
+      border: '1.5px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)',
+      overflow: 'hidden',
+      backgroundColor: 'var(--color-surface)',
+    }}>
+      {/* Action bar — Remove sheet button */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        padding: 'var(--space-2) var(--space-4)',
+        borderBottom: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-bg)',
+      }}>
+        <button
+          onClick={onDelete}
+          disabled={disabled}
+          aria-label="Remove this sheet"
+          style={{
+            fontSize: 12,
+            fontFamily: 'var(--font-body)',
+            fontWeight: 600,
+            color: '#DC2626',
+            backgroundColor: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: 'var(--radius-md)',
+            padding: '5px 12px',
+            cursor: disabled ? 'default' : 'pointer',
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          Remove sheet
+        </button>
+      </div>
+
+      {/* Row editor — PrescriptionSheetEditor owns label input + rows */}
+      <div style={{ padding: 'var(--space-4)' }}>
+        <PrescriptionSheetEditor
+          block={block}
+          onChange={onPatchData}
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Add Block dropdown ───────────────────────────────────────────────────────
 
-function AddBlockButton({ activeTab, onAdd, disabled }) {
+// Phase 3 (Step 3.6): accepts an optional `options` prop override so the Rx tab
+// can pass a filtered list excluding prescription_sheet.
+function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }) {
   const [open, setOpen] = useState(false)
-  const options = activeTab === 'clinical' ? CLINICAL_BLOCK_OPTIONS : RX_BLOCK_OPTIONS
+  const options = optionsOverride ?? (activeTab === 'clinical' ? CLINICAL_BLOCK_OPTIONS : RX_BLOCK_OPTIONS)
 
   function handleSelect(blockType) {
     setOpen(false)
@@ -308,10 +453,13 @@ function AddBlockButton({ activeTab, onAdd, disabled }) {
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
+// Phase 3 (Step 3.7): added 'rx-sheets' case for when there are no sheets yet.
 function EmptyState({ activeTab }) {
   const msg = activeTab === 'clinical'
     ? 'No clinical blocks yet. Use "Add Block" to add an Image Gallery, Text Post, or Note.'
-    : 'No Rx blocks yet. Use "Add Block" to add a Prescription Sheet, Image Gallery, Text Post, or Note.'
+    : activeTab === 'rx-sheets'
+    ? 'No prescription sheets yet. Use "+ Add Sheet" to create the first one.'
+    : 'No Rx-level blocks yet. Use "Add Block" to add a Text Post, Image Gallery, or Note.'
   return (
     <div style={{
       textAlign: 'center',
@@ -339,6 +487,14 @@ function EmptyState({ activeTab }) {
  */
 export default function BlockListEditor({ blocks = [], onChange, disabled = false }) {
   const [activeTab, setActiveTab] = useState('clinical')
+  // Phase 3 (Step 3.2): tracks which prescription sheet is active in the CMS picker
+  const [activeSheetIndex, setActiveSheetIndex] = useState(0)
+
+  // Reset sheet picker index when leaving the Rx tab (Step 3.2)
+  function handleTabChange(tab) {
+    setActiveTab(tab)
+    if (tab !== 'rx') setActiveSheetIndex(0)
+  }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -405,10 +561,8 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
   /**
    * Renders the correct editor for a given block.
-   *
-   * ImageGalleryEditor + FreeTextPostEditor accept { data, onChange(dataPatch) }.
-   * NoteCalloutEditor + PrescriptionSheetEditor accept { block, onChange(fullData) }.
-   * patchData is the patchBlockData-bound helper that merges a data patch.
+   * Used by the Clinical tab and the Rx "other blocks" section.
+   * Prescription sheets use ActiveSheetEditor instead (Phase 3).
    */
   function renderEditor(block, patchData) {
     switch (block.block_type) {
@@ -454,45 +608,149 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     .map((block, globalIndex) => ({ block, globalIndex }))
     .filter(({ block }) => activeTab === 'clinical' ? isClinicalBlock(block) : isRxBlock(block))
 
+  // ── Phase 3: Rx tab split — sheets vs other Rx blocks ─────────────────────
+
+  const sheetItems   = visibleItems.filter(({ block }) => block.block_type === 'prescription_sheet')
+  const otherRxItems = visibleItems.filter(({ block }) => block.block_type !== 'prescription_sheet')
+
+  // Clamp active index whenever the sheet count changes (e.g. after a delete)
+  const clampedSheetIndex = Math.min(activeSheetIndex, Math.max(0, sheetItems.length - 1))
+  const activeSheetItem   = sheetItems[clampedSheetIndex]
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ fontFamily: 'var(--font-body)' }}>
-      {/* Sub-tab switcher */}
-      <SubTabBar active={activeTab} onChange={setActiveTab} />
+      {/* Sub-tab switcher — now calls handleTabChange to reset sheet index */}
+      <SubTabBar active={activeTab} onChange={handleTabChange} />
 
-      {/* Block list */}
-      {visibleItems.length === 0 ? (
-        <EmptyState activeTab={activeTab} />
+      {activeTab === 'rx' ? (
+        // ── Rx tab — Phase 3 layout ──────────────────────────────────────────
+        <>
+          {/* ── Prescription Sheets section ───────────────────────────────── */}
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <div style={{
+              fontSize: 11,
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: 'var(--color-text-tertiary)',
+              marginBottom: 'var(--space-2)',
+            }}>
+              Prescription Sheets
+            </div>
+
+            <SheetPickerBar
+              sheets={sheetItems}
+              activeIndex={clampedSheetIndex}
+              onSelect={setActiveSheetIndex}
+              onAdd={() => {
+                addBlock('prescription_sheet')
+                // Select the newly added sheet — it lands at the end
+                setActiveSheetIndex(sheetItems.length)
+              }}
+              disabled={disabled}
+            />
+
+            {sheetItems.length === 0 ? (
+              <EmptyState activeTab="rx-sheets" />
+            ) : (
+              <ActiveSheetEditor
+                block={activeSheetItem.block}
+                onPatchData={(patch) => patchBlockData(activeSheetItem.globalIndex, patch)}
+                onDelete={() => {
+                  deleteBlock(activeSheetItem.globalIndex)
+                  setActiveSheetIndex(Math.max(0, clampedSheetIndex - 1))
+                }}
+                disabled={disabled}
+              />
+            )}
+          </div>
+
+          {/* ── Other Rx blocks (notes, text posts, image galleries) ───────── */}
+          {otherRxItems.length > 0 && (
+            <div style={{ marginTop: 'var(--space-5)' }}>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--color-text-tertiary)',
+                marginBottom: 'var(--space-3)',
+                paddingTop: 'var(--space-4)',
+                borderTop: '1px dashed var(--color-border)',
+              }}>
+                Rx-level blocks (shown below all sheets in app)
+              </div>
+              {otherRxItems.map(({ block, globalIndex }, localIndex) => (
+                <BlockCard
+                  key={globalIndex}
+                  block={block}
+                  index={localIndex}
+                  total={otherRxItems.length}
+                  disabled={disabled}
+                  onMoveUp={() => {
+                    if (localIndex === 0) return
+                    const prevGlobal = otherRxItems[localIndex - 1].globalIndex
+                    swapBlocks(globalIndex, prevGlobal)
+                  }}
+                  onMoveDown={() => {
+                    if (localIndex === otherRxItems.length - 1) return
+                    const nextGlobal = otherRxItems[localIndex + 1].globalIndex
+                    swapBlocks(globalIndex, nextGlobal)
+                  }}
+                  onDelete={() => deleteBlock(globalIndex)}
+                >
+                  {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
+                </BlockCard>
+              ))}
+            </div>
+          )}
+
+          {/* Add Block button — prescription_sheet excluded (added via picker above) */}
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <AddBlockButton
+              activeTab={activeTab}
+              onAdd={addBlock}
+              disabled={disabled}
+              options={RX_BLOCK_OPTIONS}
+            />
+          </div>
+        </>
       ) : (
-        visibleItems.map(({ block, globalIndex }, localIndex) => (
-          <BlockCard
-            key={globalIndex}        // stable within render; phase 3.7 can use block._key
-            block={block}
-            index={localIndex}
-            total={visibleItems.length}
-            disabled={disabled}
-            onMoveUp={() => {
-              if (localIndex === 0) return
-              const prevGlobal = visibleItems[localIndex - 1].globalIndex
-              swapBlocks(globalIndex, prevGlobal)
-            }}
-            onMoveDown={() => {
-              if (localIndex === visibleItems.length - 1) return
-              const nextGlobal = visibleItems[localIndex + 1].globalIndex
-              swapBlocks(globalIndex, nextGlobal)
-            }}
-            onDelete={() => deleteBlock(globalIndex)}
-          >
-            {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
-          </BlockCard>
-        ))
+        // ── Clinical tab — unchanged layout ──────────────────────────────────
+        <>
+          {visibleItems.length === 0 ? (
+            <EmptyState activeTab={activeTab} />
+          ) : (
+            visibleItems.map(({ block, globalIndex }, localIndex) => (
+              <BlockCard
+                key={globalIndex}
+                block={block}
+                index={localIndex}
+                total={visibleItems.length}
+                disabled={disabled}
+                onMoveUp={() => {
+                  if (localIndex === 0) return
+                  const prevGlobal = visibleItems[localIndex - 1].globalIndex
+                  swapBlocks(globalIndex, prevGlobal)
+                }}
+                onMoveDown={() => {
+                  if (localIndex === visibleItems.length - 1) return
+                  const nextGlobal = visibleItems[localIndex + 1].globalIndex
+                  swapBlocks(globalIndex, nextGlobal)
+                }}
+                onDelete={() => deleteBlock(globalIndex)}
+              >
+                {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
+              </BlockCard>
+            ))
+          )}
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <AddBlockButton activeTab={activeTab} onAdd={addBlock} disabled={disabled} />
+          </div>
+        </>
       )}
-
-      {/* Add Block button */}
-      <div style={{ marginTop: 'var(--space-3)' }}>
-        <AddBlockButton activeTab={activeTab} onAdd={addBlock} disabled={disabled} />
-      </div>
     </div>
   )
 }
