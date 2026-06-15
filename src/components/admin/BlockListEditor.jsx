@@ -1,25 +1,25 @@
 /**
  * BlockListEditor — src/components/admin/BlockListEditor.jsx
  *
- * Phase 1 + 2 + 3: Block-list container with Clinical/Rx sub-tab split and wired editors.
+ * Visual Redesign — Decisions 1, 2, 3
  *
- * Props:
- *   blocks   {Array}    — current blocks array (from parent state)
- *   onChange {Function} — (newBlocks) => void   called on every mutation
- *   disabled {Boolean}  — disables all controls during parent save
+ * Decision 1: Each BlockCard gets a colored left border (4px) and faint tinted
+ *             header derived from BLOCK_CHIP_COLORS. Body stays neutral.
  *
- * Phase 3 changes:
- *   - Rx tab now shows SheetPickerBar + ActiveSheetEditor instead of stacked BlockCards
- *     for prescription_sheet blocks. Non-sheet Rx blocks (notes, text posts, galleries)
- *     still use BlockCard and appear in a separate "Rx-level blocks" section below.
- *   - activeSheetIndex state added to track which sheet is selected in the picker.
- *   - AddBlockButton accepts an optional `options` prop override (Step 3.6) so the
- *     Rx tab can exclude prescription_sheet from the dropdown — sheets are added via
- *     the "+ Add Sheet" pill in SheetPickerBar instead.
- *   - EmptyState handles a new 'rx-sheets' case for when no sheets exist yet.
+ * Decision 2: All BlockCards collapse by default. Collapsed state shows: colored
+ *             header + chip + one-line preview + controls + expand chevron.
+ *             Clicking the header or chevron expands. New blocks (_isNew flag)
+ *             open expanded automatically. Multiple cards may be open at once.
+ *
+ * Decision 3: A SummaryBar sits above each block list, showing the ordered map
+ *             of block types (Note → Text → Images → …) with no counts.
+ *             Each chip scrolls to that block and expands it.
+ *             Bar updates live as blocks change.
+ *
+ * All other logic (tab routing, mutations, sheet picker) is unchanged.
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ChevronUp, ChevronDown, Trash2, Plus } from 'lucide-react'
 import ImageGalleryEditor      from './blocks/ImageGalleryEditor'
 import FreeTextPostEditor      from './blocks/FreeTextPostEditor'
@@ -28,9 +28,6 @@ import PrescriptionSheetEditor from './blocks/PrescriptionSheetEditor'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-// Phase 4 (Step 4.1): Context-aware labels so the card header always names the destination tab.
-// Format: "Tab — Role". `default` is the fallback for block types with no context field
-// (e.g. prescription_sheet) or legacy blocks that pre-date the context field.
 const BLOCK_LABELS = {
   image_gallery: {
     clinical: 'Clinical — Image Gallery',
@@ -48,36 +45,31 @@ const BLOCK_LABELS = {
     default:  'Note',
   },
   prescription_sheet: {
-    default: 'Prescription Sheet', // always Rx — label is self-evident
+    default: 'Prescription Sheet',
   },
 }
 
-// Chip colors remain per block_type (context does not affect colour)
+// Decision 1: borderColor + headerTint added alongside existing chip colors
 const BLOCK_CHIP_COLORS = {
-  image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE' },
-  free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE' },
-  note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7' },
-  prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5' },
+  image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE', borderColor: '#7C3AED', headerTint: '#F5F3FF' },
+  free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE', borderColor: '#1D4ED8', headerTint: '#EFF6FF' },
+  note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7', borderColor: '#B45309', headerTint: '#FFFBEB' },
+  prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5', borderColor: '#047857', headerTint: '#F0FDF4' },
 }
 
-// Add-block options per sub-tab
+const FALLBACK_COLORS = { chipColor: '#6B7280', chipBg: '#F3F4F6', borderColor: '#E8E6E1', headerTint: 'var(--color-bg)' }
+
 const CLINICAL_BLOCK_OPTIONS = [
   { value: 'image_gallery',  label: '+ Image Gallery' },
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
 ]
-// Phase 2 (Step 2.3): image_gallery and free_text_post added to Rx options.
-// Phase 3 (Step 3.6): prescription_sheet removed — sheets added via SheetPickerBar.
 const RX_BLOCK_OPTIONS = [
   { value: 'image_gallery',  label: '+ Image Gallery' },
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
 ]
 
-// Which block types belong to each sub-tab
-// Phase 2 (Step 2.2): image_gallery now context-aware instead of hardcoded Clinical.
-// Backward-compat: existing galleries with no context field have context === undefined,
-// which is !== 'rx', so they continue to appear in Clinical. No migration needed.
 function isClinicalBlock(block) {
   if (block.block_type === 'image_gallery'  && block.data?.context !== 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context !== 'rx') return true
@@ -86,38 +78,58 @@ function isClinicalBlock(block) {
 }
 function isRxBlock(block) {
   if (block.block_type === 'prescription_sheet') return true
-  // image_gallery: Rx only when context === 'rx' (Phase 2, Step 2.2)
   if (block.block_type === 'image_gallery'  && block.data?.context === 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context === 'rx') return true
   if (block.block_type === 'note_callout'   && block.data?.context === 'rx') return true
   return false
 }
 
-// ─── Default data shapes per block type ──────────────────────────────────────
-
 function defaultData(blockType, context) {
   switch (blockType) {
-    case 'image_gallery':
-      // Phase 2 (Step 2.1): context now stored so Rx galleries route correctly
-      return { images: [], context: context ?? 'clinical' }
-    case 'free_text_post':
-      return { markdown: '', context: context ?? 'clinical' }
-    case 'note_callout':
-      return { text: '', flavor: 'info', context: context ?? 'clinical' }
-    case 'prescription_sheet':
-      return { label: 'Standard', rows: [] }
+    case 'image_gallery':      return { images: [], context: context ?? 'clinical' }
+    case 'free_text_post':     return { markdown: '', context: context ?? 'clinical' }
+    case 'note_callout':       return { text: '', flavor: 'info', context: context ?? 'clinical' }
+    case 'prescription_sheet': return { label: 'Standard', rows: [] }
+    default:                   return {}
+  }
+}
+
+// ─── Decision 2: content preview per block type ───────────────────────────────
+
+function getBlockPreview(block) {
+  const { block_type, data } = block
+  switch (block_type) {
+    case 'note_callout': {
+      const t = data?.text?.trim()
+      if (!t) return 'Empty note'
+      return t.length > 60 ? t.slice(0, 60) + '…' : t
+    }
+    case 'free_text_post': {
+      const md = data?.markdown?.trim()
+      if (!md) return 'Empty text post'
+      const plain = md.replace(/[#*_`>\-]/g, '').replace(/\n/g, ' ').trim()
+      return plain.length > 60 ? plain.slice(0, 60) + '…' : plain || 'Empty text post'
+    }
+    case 'image_gallery': {
+      const n = data?.images?.length ?? 0
+      return n === 0 ? 'No images yet' : `${n} image${n !== 1 ? 's' : ''}`
+    }
+    case 'prescription_sheet': {
+      const label = data?.label?.trim() || 'Sheet'
+      const n = data?.rows?.length ?? 0
+      return `${label} · ${n} row${n !== 1 ? 's' : ''}`
+    }
     default:
-      return {}
+      return ''
   }
 }
 
 // ─── Block type chip ──────────────────────────────────────────────────────────
 
-// Phase 4 (Step 4.2): accepts `context` so the label reflects the destination tab.
 function BlockChip({ blockType, context }) {
   const labels = BLOCK_LABELS[blockType] ?? {}
   const label  = (context && labels[context]) ?? labels.default ?? blockType
-  const colors = BLOCK_CHIP_COLORS[blockType] ?? { chipColor: '#6B7280', chipBg: '#F3F4F6' }
+  const colors = BLOCK_CHIP_COLORS[blockType] ?? FALLBACK_COLORS
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center',
@@ -136,68 +148,123 @@ function BlockChip({ blockType, context }) {
   )
 }
 
-// ─── Block card shell ─────────────────────────────────────────────────────────
+// ─── Decision 1 + 2: BlockCard ────────────────────────────────────────────────
 
-function BlockCard({ block, index, total, onMoveUp, onMoveDown, onDelete, disabled, children }) {
+/**
+ * BlockCard
+ *
+ * New props vs. original:
+ *   defaultExpanded {Boolean} — open on first render (true for newly added blocks)
+ *   domRef          {ref}     — forwarded so SummaryBar can scrollIntoView
+ *   onRegisterExpand {fn}     — called once with the expand() fn for SummaryBar
+ */
+function BlockCard({
+  block, index, total, onMoveUp, onMoveDown, onDelete, disabled,
+  defaultExpanded = false, domRef, onRegisterExpand, children,
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
+
+  // Register expand fn with SummaryBar registry (Decision 3)
+  useEffect(() => {
+    if (onRegisterExpand) onRegisterExpand(() => setExpanded(true))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function toggle() { setExpanded(v => !v) }
+
   return (
-    <div style={{
-      border: '1.5px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
-      backgroundColor: 'var(--color-surface)',
-      overflow: 'hidden',
-      marginBottom: 'var(--space-3)',
-    }}>
-      {/* Card header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        padding: 'var(--space-2) var(--space-3)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-bg)',
-      }}>
-        {/* Phase 4 (Step 4.3): context passed so label names the destination tab */}
+    <div
+      ref={domRef}
+      style={{
+        // Decision 1: colored left border + neutral outer border
+        border: '1.5px solid var(--color-border)',
+        borderLeft: `4px solid ${colors.borderColor}`,
+        borderRadius: 'var(--radius-lg)',
+        backgroundColor: 'var(--color-surface)',
+        overflow: 'hidden',
+        marginBottom: 'var(--space-3)',
+        scrollMarginTop: 80,
+      }}
+    >
+      {/* Decision 1: tinted header; Decision 2: click-to-toggle */}
+      <div
+        onClick={toggle}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+          padding: 'var(--space-2) var(--space-3)',
+          borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
+          backgroundColor: colors.headerTint,
+          cursor: 'pointer',
+          userSelect: 'none',
+        }}
+      >
         <BlockChip blockType={block.block_type} context={block.data?.context} />
 
-        {/* Spacer */}
-        <div style={{ flex: 1 }} />
-
-        {/* ↑ ↓ 🗑 controls */}
-        <button
-          onClick={onMoveUp}
-          disabled={disabled || index === 0}
-          aria-label="Move block up"
-          style={iconBtnStyle({ disabled: disabled || index === 0 })}
-        >
-          <ChevronUp size={15} />
-        </button>
-        <button
-          onClick={onMoveDown}
-          disabled={disabled || index === total - 1}
-          aria-label="Move block down"
-          style={iconBtnStyle({ disabled: disabled || index === total - 1 })}
-        >
-          <ChevronDown size={15} />
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={disabled}
-          aria-label="Delete block"
-          style={iconBtnStyle({ disabled, danger: true })}
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
-
-      {/* Editor */}
-      <div style={{ padding: 'var(--space-4)' }}>
-        {children ?? (
-          <div style={{
-            fontSize: 13, color: 'var(--color-text-tertiary)',
+        {/* Decision 2: collapsed preview text */}
+        {!expanded && (
+          <span style={{
+            fontSize: 12,
+            color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-body)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            flex: 1,
           }}>
-            Editor not available for this block type.
-          </div>
+            {getBlockPreview(block)}
+          </span>
         )}
+
+        {expanded && <div style={{ flex: 1 }} />}
+
+        {/* Controls — stop propagation so they don't toggle the card */}
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+        >
+          <button
+            onClick={onMoveUp}
+            disabled={disabled || index === 0}
+            aria-label="Move block up"
+            style={iconBtnStyle({ disabled: disabled || index === 0 })}
+          >
+            <ChevronUp size={15} />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={disabled || index === total - 1}
+            aria-label="Move block down"
+            style={iconBtnStyle({ disabled: disabled || index === total - 1 })}
+          >
+            <ChevronDown size={15} />
+          </button>
+          <button
+            onClick={onDelete}
+            disabled={disabled}
+            aria-label="Delete block"
+            style={iconBtnStyle({ disabled, danger: true })}
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+
+        {/* Expand chevron */}
+        <div style={{ color: 'var(--color-text-tertiary)', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </div>
       </div>
+
+      {/* Editor body — only mounted when expanded */}
+      {expanded && (
+        <div style={{ padding: 'var(--space-4)' }}>
+          {children ?? (
+            <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+              Editor not available for this block type.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -217,6 +284,89 @@ function iconBtnStyle({ disabled, danger } = {}) {
   }
 }
 
+// ─── Decision 3: SummaryBar ───────────────────────────────────────────────────
+
+/**
+ * SummaryBar
+ *
+ * Shows the ordered sequence of block types: Note → Text → Images → Note
+ * No counts — just the positional map.
+ *
+ * Props:
+ *   items      — array of { block, globalIndex }
+ *   expandRefs — Map<globalIndex, { domRef: RefObject, expand: () => void }>
+ */
+function SummaryBar({ items, expandRefs }) {
+  if (!items || items.length === 0) return null
+
+  function shortLabel(block) {
+    switch (block.block_type) {
+      case 'note_callout':       return 'Note'
+      case 'free_text_post':     return 'Text'
+      case 'image_gallery':      return 'Images'
+      case 'prescription_sheet': return block.data?.label || 'Sheet'
+      default:                   return block.block_type
+    }
+  }
+
+  function handleTap(globalIndex) {
+    const entry = expandRefs?.get(globalIndex)
+    if (!entry) return
+    entry.expand()
+    // Small delay so expand state propagates before we scroll
+    setTimeout(() => {
+      entry.domRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 40)
+  }
+
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 4,
+      flexWrap: 'wrap',
+      padding: '6px 10px',
+      marginBottom: 'var(--space-3)',
+      backgroundColor: 'var(--color-bg)',
+      border: '1px solid var(--color-border-subtle)',
+      borderRadius: 'var(--radius-md)',
+    }}>
+      {items.map(({ block, globalIndex }, i) => {
+        const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
+        return (
+          <span key={globalIndex} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {i > 0 && (
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', userSelect: 'none' }}>
+                →
+              </span>
+            )}
+            <button
+              onClick={() => handleTap(globalIndex)}
+              style={{
+                display: 'inline-flex', alignItems: 'center',
+                fontSize: 11, fontWeight: 600,
+                letterSpacing: '0.03em',
+                color: colors.chipColor,
+                backgroundColor: colors.chipBg,
+                border: `1px solid ${colors.chipColor}44`,
+                padding: '2px 8px',
+                borderRadius: 'var(--radius-full)',
+                fontFamily: 'var(--font-body)',
+                cursor: 'pointer',
+                transition: 'opacity 0.12s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '0.7' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+            >
+              {shortLabel(block)}
+            </button>
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
 // ─── Sub-tab pill bar ─────────────────────────────────────────────────────────
 
 function SubTabBar({ active, onChange }) {
@@ -232,7 +382,6 @@ function SubTabBar({ active, onChange }) {
     }}>
       {['clinical', 'rx'].map(tab => {
         const isActive = active === tab
-        const label = tab === 'clinical' ? 'Clinical' : 'Rx'
         return (
           <button
             key={tab}
@@ -250,7 +399,7 @@ function SubTabBar({ active, onChange }) {
               transition: 'all 0.15s ease',
             }}
           >
-            {label}
+            {tab === 'clinical' ? 'Clinical' : 'Rx'}
           </button>
         )
       })}
@@ -260,19 +409,6 @@ function SubTabBar({ active, onChange }) {
 
 // ─── Phase 3: SheetPickerBar ──────────────────────────────────────────────────
 
-/**
- * SheetPickerBar — CMS-side sheet switcher for the Rx sub-tab. (Step 3.3)
- *
- * Mirrors the mental model of the app's PrescriptionPills component so the admin
- * edits sheets in the same one-at-a-time mental model the user sees them in.
- *
- * Props:
- *   sheets       — array of { globalIndex, block } for prescription_sheet blocks only
- *   activeIndex  — which sheet is selected (index into sheets array)
- *   onSelect     — (localIndex) => void
- *   onAdd        — () => void — triggers addBlock('prescription_sheet') in parent
- *   disabled     — freeze controls during parent save
- */
 function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
   return (
     <div style={{
@@ -299,9 +435,7 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
               border: isActive
                 ? '1.5px solid var(--color-accent)'
                 : '1px solid var(--color-border)',
-              backgroundColor: isActive
-                ? 'var(--color-accent)'
-                : 'var(--color-surface)',
+              backgroundColor: isActive ? 'var(--color-accent)' : 'var(--color-surface)',
               color: isActive ? '#ffffff' : 'var(--color-text-secondary)',
               transition: 'all 0.15s ease',
             }}
@@ -311,15 +445,13 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
         )
       })}
 
-      {/* "+ Add Sheet" pill */}
       <button
         onClick={onAdd}
         disabled={disabled}
         style={{
           padding: '5px 14px',
           borderRadius: 'var(--radius-md)',
-          fontSize: 13,
-          fontWeight: 400,
+          fontSize: 13, fontWeight: 400,
           fontFamily: 'var(--font-body)',
           cursor: disabled ? 'default' : 'pointer',
           border: '1.5px dashed var(--color-border)',
@@ -337,34 +469,24 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
 
 // ─── Phase 3: ActiveSheetEditor ───────────────────────────────────────────────
 
-/**
- * ActiveSheetEditor — wrapper shown below the SheetPickerBar. (Step 3.4)
- *
- * Adds a "Remove sheet" danger button in a header bar above PrescriptionSheetEditor.
- * PrescriptionSheetEditor is unchanged — it owns the label input and all row editing.
- *
- * Props:
- *   block       — the active prescription_sheet block object
- *   onPatchData — (dataPatch) => void — bound to patchBlockData(globalIndex, ...)
- *   onDelete    — () => void
- *   disabled    — freeze controls during parent save
- */
 function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
+  const colors = BLOCK_CHIP_COLORS.prescription_sheet
   return (
     <div style={{
       border: '1.5px solid var(--color-border)',
+      borderLeft: `4px solid ${colors.borderColor}`,
       borderRadius: 'var(--radius-lg)',
       overflow: 'hidden',
       backgroundColor: 'var(--color-surface)',
     }}>
-      {/* Action bar — Remove sheet button */}
+      {/* Action bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'flex-end',
         padding: 'var(--space-2) var(--space-4)',
         borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-bg)',
+        backgroundColor: colors.headerTint,
       }}>
         <button
           onClick={onDelete}
@@ -387,7 +509,6 @@ function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
         </button>
       </div>
 
-      {/* Row editor — PrescriptionSheetEditor owns label input + rows */}
       <div style={{ padding: 'var(--space-4)' }}>
         <PrescriptionSheetEditor
           block={block}
@@ -401,8 +522,6 @@ function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
 
 // ─── Add Block dropdown ───────────────────────────────────────────────────────
 
-// Phase 3 (Step 3.6): accepts an optional `options` prop override so the Rx tab
-// can pass a filtered list excluding prescription_sheet.
 function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }) {
   const [open, setOpen] = useState(false)
   const options = optionsOverride ?? (activeTab === 'clinical' ? CLINICAL_BLOCK_OPTIONS : RX_BLOCK_OPTIONS)
@@ -436,7 +555,6 @@ function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }
 
       {open && (
         <>
-          {/* Backdrop to close on outside click */}
           <div
             onClick={() => setOpen(false)}
             style={{ position: 'fixed', inset: 0, zIndex: 49 }}
@@ -481,7 +599,6 @@ function AddBlockButton({ activeTab, onAdd, disabled, options: optionsOverride }
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
-// Phase 3 (Step 3.7): added 'rx-sheets' case for when there are no sheets yet.
 function EmptyState({ activeTab }) {
   const msg = activeTab === 'clinical'
     ? 'No clinical blocks yet. Use "Add Block" to add an Image Gallery, Text Post, or Note.'
@@ -504,44 +621,82 @@ function EmptyState({ activeTab }) {
   )
 }
 
+// ─── BlockCardList — renders a list of BlockCards with SummaryBar ──────────────
+//
+// Extracted to keep the main component clean.
+// Manages the expandRefs Map for Decision 3 SummaryBar navigation.
+
+function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, renderEditor }) {
+  // expandRefs: Map<globalIndex, { domRef: { current: Element }, expand: () => void }>
+  // We use a ref so the Map instance is stable across renders.
+  const expandRefsRef = useRef(new Map())
+  const expandRefs = expandRefsRef.current
+
+  // Clean up stale entries whenever items change
+  useEffect(() => {
+    const currentKeys = new Set(items.map(i => i.globalIndex))
+    for (const key of expandRefs.keys()) {
+      if (!currentKeys.has(key)) expandRefs.delete(key)
+    }
+  }, [items, expandRefs])
+
+  return (
+    <>
+      <SummaryBar items={items} expandRefs={expandRefs} />
+
+      {items.map(({ block, globalIndex }, localIndex) => {
+        // Ensure entry exists in the registry before the card mounts
+        if (!expandRefs.has(globalIndex)) {
+          expandRefs.set(globalIndex, { domRef: { current: null }, expand: () => {} })
+        }
+        const entry = expandRefs.get(globalIndex)
+
+        return (
+          <BlockCard
+            key={globalIndex}
+            block={block}
+            index={localIndex}
+            total={items.length}
+            disabled={disabled}
+            defaultExpanded={block._isNew === true}
+            // Pass a stable callback ref for the DOM node
+            domRef={(el) => { entry.domRef = { current: el } }}
+            // Let the card register its expand fn with us
+            onRegisterExpand={(expandFn) => { entry.expand = expandFn }}
+            onMoveUp={() => onMoveUp(localIndex)}
+            onMoveDown={() => onMoveDown(localIndex)}
+            onDelete={() => onDelete(globalIndex)}
+          >
+            {renderEditor(block, globalIndex)}
+          </BlockCard>
+        )
+      })}
+    </>
+  )
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-/**
- * BlockListEditor
- *
- * @param {Object[]} blocks   — full array of block objects (all tabs mixed)
- * @param {Function} onChange — (nextBlocks) => void
- * @param {Boolean}  disabled — freeze all controls
- */
 export default function BlockListEditor({ blocks = [], onChange, disabled = false }) {
   const [activeTab, setActiveTab] = useState('clinical')
-  // Phase 3 (Step 3.2): tracks which prescription sheet is active in the CMS picker
   const [activeSheetIndex, setActiveSheetIndex] = useState(0)
 
-  // Reset sheet picker index when leaving the Rx tab (Step 3.2)
   function handleTabChange(tab) {
     setActiveTab(tab)
     if (tab !== 'rx') setActiveSheetIndex(0)
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
 
-  /** Replace the block at the given index with a patched version. */
   function patchBlock(globalIndex, patch) {
-    const next = blocks.map((b, i) => i === globalIndex ? { ...b, ...patch } : b)
-    onChange(next)
+    onChange(blocks.map((b, i) => i === globalIndex ? { ...b, ...patch } : b))
   }
 
-  /** Patch only the data sub-object of a block. */
-  // Block types whose `context` field must never be silently dropped by a partial patch.
   const CONTEXT_SENSITIVE_TYPES = ['free_text_post', 'note_callout', 'image_gallery']
 
   function patchBlockData(globalIndex, dataPatch) {
     const block  = blocks[globalIndex]
     const merged = { ...block.data, ...dataPatch }
-
-    // Re-inject the original context if the block type is context-sensitive
-    // and the patch didn't explicitly carry a new context value.
     if (
       CONTEXT_SENSITIVE_TYPES.includes(block.block_type) &&
       block.data?.context &&
@@ -549,99 +704,58 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     ) {
       merged.context = block.data.context
     }
-
     patchBlock(globalIndex, { data: merged })
   }
 
-  /** Add a new block at the end (order_index computed as max + 1). */
   function addBlock(blockType) {
     const maxOrder = blocks.reduce((m, b) => Math.max(m, b.order_index ?? 0), -1)
     const context  = activeTab === 'rx' ? 'rx' : 'clinical'
-    const newBlock = {
-      // No id — parent assigns a temp key or lets Supabase generate on save
+    onChange([...blocks, {
       block_type:  blockType,
       order_index: maxOrder + 1,
       data:        defaultData(blockType, context),
-      _isNew:      true,   // sentinel for parent save logic
-    }
-    onChange([...blocks, newBlock])
+      _isNew:      true,
+    }])
   }
 
-  /** Delete block by its position in the full blocks array. */
   function deleteBlock(globalIndex) {
     onChange(blocks.filter((_, i) => i !== globalIndex))
   }
 
-  /**
-   * Swap two blocks in the GLOBAL array.
-   * Both global indices are passed so Clinical and Rx lists each do their own
-   * relative moves without disturbing the other tab's blocks.
-   */
   function swapBlocks(indexA, indexB) {
     if (indexA < 0 || indexB >= blocks.length) return
     const next = [...blocks]
     ;[next[indexA], next[indexB]] = [next[indexB], next[indexA]]
-    // Re-sync order_index to position so save is simple
     onChange(next.map((b, i) => ({ ...b, order_index: i })))
   }
 
-  // ── Block editor renderer ──────────────────────────────────────────────────
+  // ── Editor renderer ────────────────────────────────────────────────────────
 
-  /**
-   * Renders the correct editor for a given block.
-   * Used by the Clinical tab and the Rx "other blocks" section.
-   * Prescription sheets use ActiveSheetEditor instead (Phase 3).
-   */
-  function renderEditor(block, patchData) {
+  function renderEditor(block, globalIndex) {
+    const patchData = (patch) => patchBlockData(globalIndex, patch)
     switch (block.block_type) {
       case 'image_gallery':
-        return (
-          <ImageGalleryEditor
-            data={block.data}
-            onChange={patchData}
-            disabled={disabled}
-          />
-        )
+        return <ImageGalleryEditor data={block.data} onChange={patchData} disabled={disabled} />
       case 'free_text_post':
-        return (
-          <FreeTextPostEditor
-            data={block.data}
-            onChange={patchData}
-            disabled={disabled}
-          />
-        )
+        return <FreeTextPostEditor data={block.data} onChange={patchData} disabled={disabled} />
       case 'note_callout':
-        return (
-          <NoteCalloutEditor
-            block={block}
-            onChange={patchData}
-          />
-        )
+        return <NoteCalloutEditor block={block} onChange={patchData} />
       case 'prescription_sheet':
-        return (
-          <PrescriptionSheetEditor
-            block={block}
-            onChange={patchData}
-          />
-        )
+        return <PrescriptionSheetEditor block={block} onChange={patchData} />
       default:
         return null
     }
   }
 
-  // ── Derive visible list ────────────────────────────────────────────────────
+  // ── Derived lists ──────────────────────────────────────────────────────────
 
-  // Each item: { block, globalIndex } so we can address mutations on full array
   const visibleItems = blocks
     .map((block, globalIndex) => ({ block, globalIndex }))
     .filter(({ block }) => activeTab === 'clinical' ? isClinicalBlock(block) : isRxBlock(block))
 
-  // ── Phase 3: Rx tab split — sheets vs other Rx blocks ─────────────────────
-
   const sheetItems   = visibleItems.filter(({ block }) => block.block_type === 'prescription_sheet')
   const otherRxItems = visibleItems.filter(({ block }) => block.block_type !== 'prescription_sheet')
 
-  // Clamp active index whenever the sheet count changes (e.g. after a delete)
   const clampedSheetIndex = Math.min(activeSheetIndex, Math.max(0, sheetItems.length - 1))
   const activeSheetItem   = sheetItems[clampedSheetIndex]
 
@@ -649,20 +763,15 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
   return (
     <div style={{ fontFamily: 'var(--font-body)' }}>
-      {/* Sub-tab switcher — now calls handleTabChange to reset sheet index */}
       <SubTabBar active={activeTab} onChange={handleTabChange} />
 
       {activeTab === 'rx' ? (
-        // ── Rx tab — Phase 3 layout ──────────────────────────────────────────
         <>
-          {/* ── Prescription Sheets section ───────────────────────────────── */}
+          {/* ── Prescription Sheets section ──────────────────────────────── */}
           <div style={{ marginBottom: 'var(--space-2)' }}>
             <div style={{
-              fontSize: 11,
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              color: 'var(--color-text-tertiary)',
+              fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+              letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
               marginBottom: 'var(--space-2)',
             }}>
               Prescription Sheets
@@ -674,7 +783,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
               onSelect={setActiveSheetIndex}
               onAdd={() => {
                 addBlock('prescription_sheet')
-                // Select the newly added sheet — it lands at the end
                 setActiveSheetIndex(sheetItems.length)
               }}
               disabled={disabled}
@@ -695,47 +803,38 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
             )}
           </div>
 
-          {/* ── Other Rx blocks (notes, text posts, image galleries) ───────── */}
+          {/* ── Other Rx blocks ──────────────────────────────────────────── */}
           {otherRxItems.length > 0 && (
             <div style={{ marginTop: 'var(--space-5)' }}>
               <div style={{
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--color-text-tertiary)',
+                fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
                 marginBottom: 'var(--space-3)',
                 paddingTop: 'var(--space-4)',
                 borderTop: '1px dashed var(--color-border)',
               }}>
                 Rx-level blocks (shown below all sheets in app)
               </div>
-              {otherRxItems.map(({ block, globalIndex }, localIndex) => (
-                <BlockCard
-                  key={globalIndex}
-                  block={block}
-                  index={localIndex}
-                  total={otherRxItems.length}
-                  disabled={disabled}
-                  onMoveUp={() => {
-                    if (localIndex === 0) return
-                    const prevGlobal = otherRxItems[localIndex - 1].globalIndex
-                    swapBlocks(globalIndex, prevGlobal)
-                  }}
-                  onMoveDown={() => {
-                    if (localIndex === otherRxItems.length - 1) return
-                    const nextGlobal = otherRxItems[localIndex + 1].globalIndex
-                    swapBlocks(globalIndex, nextGlobal)
-                  }}
-                  onDelete={() => deleteBlock(globalIndex)}
-                >
-                  {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
-                </BlockCard>
-              ))}
+
+              {/* Decision 3: summary bar + Decision 1+2: collapse cards */}
+              <BlockCardList
+                items={otherRxItems}
+                disabled={disabled}
+                onMoveUp={(localIndex) => {
+                  if (localIndex === 0) return
+                  swapBlocks(otherRxItems[localIndex].globalIndex, otherRxItems[localIndex - 1].globalIndex)
+                }}
+                onMoveDown={(localIndex) => {
+                  if (localIndex === otherRxItems.length - 1) return
+                  swapBlocks(otherRxItems[localIndex].globalIndex, otherRxItems[localIndex + 1].globalIndex)
+                }}
+                onDelete={deleteBlock}
+                renderEditor={renderEditor}
+              />
             </div>
           )}
 
-          {/* Add Block button — prescription_sheet excluded (added via picker above) */}
+          {/* Add Block button — sheets added via picker above */}
           <div style={{ marginTop: 'var(--space-3)' }}>
             <AddBlockButton
               activeTab={activeTab}
@@ -746,33 +845,26 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
           </div>
         </>
       ) : (
-        // ── Clinical tab — unchanged layout ──────────────────────────────────
+        // ── Clinical tab ──────────────────────────────────────────────────
         <>
           {visibleItems.length === 0 ? (
             <EmptyState activeTab={activeTab} />
           ) : (
-            visibleItems.map(({ block, globalIndex }, localIndex) => (
-              <BlockCard
-                key={globalIndex}
-                block={block}
-                index={localIndex}
-                total={visibleItems.length}
-                disabled={disabled}
-                onMoveUp={() => {
-                  if (localIndex === 0) return
-                  const prevGlobal = visibleItems[localIndex - 1].globalIndex
-                  swapBlocks(globalIndex, prevGlobal)
-                }}
-                onMoveDown={() => {
-                  if (localIndex === visibleItems.length - 1) return
-                  const nextGlobal = visibleItems[localIndex + 1].globalIndex
-                  swapBlocks(globalIndex, nextGlobal)
-                }}
-                onDelete={() => deleteBlock(globalIndex)}
-              >
-                {renderEditor(block, (patch) => patchBlockData(globalIndex, patch))}
-              </BlockCard>
-            ))
+            // Decision 3: summary bar + Decision 1+2: collapse cards
+            <BlockCardList
+              items={visibleItems}
+              disabled={disabled}
+              onMoveUp={(localIndex) => {
+                if (localIndex === 0) return
+                swapBlocks(visibleItems[localIndex].globalIndex, visibleItems[localIndex - 1].globalIndex)
+              }}
+              onMoveDown={(localIndex) => {
+                if (localIndex === visibleItems.length - 1) return
+                swapBlocks(visibleItems[localIndex].globalIndex, visibleItems[localIndex + 1].globalIndex)
+              }}
+              onDelete={deleteBlock}
+              renderEditor={renderEditor}
+            />
           )}
           <div style={{ marginTop: 'var(--space-3)' }}>
             <AddBlockButton activeTab={activeTab} onAdd={addBlock} disabled={disabled} />
@@ -782,4 +874,3 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
-
