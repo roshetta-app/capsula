@@ -1,22 +1,17 @@
 /**
  * BlockListEditor — src/components/admin/BlockListEditor.jsx
  *
- * Visual Redesign — Decisions 1, 2, 3
+ * Visual Redesign — Decisions 1, 2, 3, 5, 6
  *
- * Decision 1: Each BlockCard gets a colored left border (4px) and faint tinted
- *             header derived from BLOCK_CHIP_COLORS. Body stays neutral.
+ * Decision 1: Colored chip + tinted header per block type (left border REMOVED).
+ * Decision 2: Collapse by default; new blocks open expanded; preview in header.
+ * Decision 3: SummaryBar — ordered map of block types above each list.
+ * Decision 5: Section dividers ("Prescription Sheets", "Rx-level blocks") are
+ *             real visual dividers: larger weight, full-width hairline, more space.
+ * Decision 6: "Remove sheet" moved from top action bar to bottom of sheet content,
+ *             rendered as a small text-style danger link.
  *
- * Decision 2: All BlockCards collapse by default. Collapsed state shows: colored
- *             header + chip + one-line preview + controls + expand chevron.
- *             Clicking the header or chevron expands. New blocks (_isNew flag)
- *             open expanded automatically. Multiple cards may be open at once.
- *
- * Decision 3: A SummaryBar sits above each block list, showing the ordered map
- *             of block types (Note → Text → Images → …) with no counts.
- *             Each chip scrolls to that block and expands it.
- *             Bar updates live as blocks change.
- *
- * All other logic (tab routing, mutations, sheet picker) is unchanged.
+ * Left colored border fully removed from BlockCard and ActiveSheetEditor.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -49,15 +44,14 @@ const BLOCK_LABELS = {
   },
 }
 
-// Decision 1: borderColor + headerTint added alongside existing chip colors
 const BLOCK_CHIP_COLORS = {
-  image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE', borderColor: '#7C3AED', headerTint: '#F5F3FF' },
-  free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE', borderColor: '#1D4ED8', headerTint: '#EFF6FF' },
-  note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7', borderColor: '#B45309', headerTint: '#FFFBEB' },
-  prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5', borderColor: '#047857', headerTint: '#F0FDF4' },
+  image_gallery:      { chipColor: '#7C3AED', chipBg: '#EDE9FE', headerTint: '#F5F3FF' },
+  free_text_post:     { chipColor: '#1D4ED8', chipBg: '#DBEAFE', headerTint: '#EFF6FF' },
+  note_callout:       { chipColor: '#B45309', chipBg: '#FEF3C7', headerTint: '#FFFBEB' },
+  prescription_sheet: { chipColor: '#047857', chipBg: '#D1FAE5', headerTint: '#F0FDF4' },
 }
 
-const FALLBACK_COLORS = { chipColor: '#6B7280', chipBg: '#F3F4F6', borderColor: '#E8E6E1', headerTint: 'var(--color-bg)' }
+const FALLBACK_COLORS = { chipColor: '#6B7280', chipBg: '#F3F4F6', headerTint: 'var(--color-bg)' }
 
 const CLINICAL_BLOCK_OPTIONS = [
   { value: 'image_gallery',  label: '+ Image Gallery' },
@@ -148,16 +142,8 @@ function BlockChip({ blockType, context }) {
   )
 }
 
-// ─── Decision 1 + 2: BlockCard ────────────────────────────────────────────────
+// ─── Decision 1 + 2: BlockCard (no left border) ───────────────────────────────
 
-/**
- * BlockCard
- *
- * New props vs. original:
- *   defaultExpanded {Boolean} — open on first render (true for newly added blocks)
- *   domRef          {ref}     — forwarded so SummaryBar can scrollIntoView
- *   onRegisterExpand {fn}     — called once with the expand() fn for SummaryBar
- */
 function BlockCard({
   block, index, total, onMoveUp, onMoveDown, onDelete, disabled,
   defaultExpanded = false, domRef, onRegisterExpand, children,
@@ -165,7 +151,6 @@ function BlockCard({
   const [expanded, setExpanded] = useState(defaultExpanded)
   const colors = BLOCK_CHIP_COLORS[block.block_type] ?? FALLBACK_COLORS
 
-  // Register expand fn with SummaryBar registry (Decision 3)
   useEffect(() => {
     if (onRegisterExpand) onRegisterExpand(() => setExpanded(true))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,9 +162,7 @@ function BlockCard({
     <div
       ref={domRef}
       style={{
-        // Decision 1: colored left border + neutral outer border
         border: '1.5px solid var(--color-border)',
-        borderLeft: `4px solid ${colors.borderColor}`,
         borderRadius: 'var(--radius-lg)',
         backgroundColor: 'var(--color-surface)',
         overflow: 'hidden',
@@ -187,7 +170,7 @@ function BlockCard({
         scrollMarginTop: 80,
       }}
     >
-      {/* Decision 1: tinted header; Decision 2: click-to-toggle */}
+      {/* Tinted header; click-to-toggle */}
       <div
         onClick={toggle}
         style={{
@@ -201,7 +184,7 @@ function BlockCard({
       >
         <BlockChip blockType={block.block_type} context={block.data?.context} />
 
-        {/* Decision 2: collapsed preview text */}
+        {/* Collapsed preview text */}
         {!expanded && (
           <span style={{
             fontSize: 12,
@@ -286,16 +269,6 @@ function iconBtnStyle({ disabled, danger } = {}) {
 
 // ─── Decision 3: SummaryBar ───────────────────────────────────────────────────
 
-/**
- * SummaryBar
- *
- * Shows the ordered sequence of block types: Note → Text → Images → Note
- * No counts — just the positional map.
- *
- * Props:
- *   items      — array of { block, globalIndex }
- *   expandRefs — Map<globalIndex, { domRef: RefObject, expand: () => void }>
- */
 function SummaryBar({ items, expandRefs }) {
   if (!items || items.length === 0) return null
 
@@ -313,7 +286,6 @@ function SummaryBar({ items, expandRefs }) {
     const entry = expandRefs?.get(globalIndex)
     if (!entry) return
     entry.expand()
-    // Small delay so expand state propagates before we scroll
     setTimeout(() => {
       entry.domRef?.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 40)
@@ -407,7 +379,7 @@ function SubTabBar({ active, onChange }) {
   )
 }
 
-// ─── Phase 3: SheetPickerBar ──────────────────────────────────────────────────
+// ─── SheetPickerBar ───────────────────────────────────────────────────────────
 
 function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
   return (
@@ -467,26 +439,30 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
   )
 }
 
-// ─── Phase 3: ActiveSheetEditor ───────────────────────────────────────────────
+// ─── Decision 6: ActiveSheetEditor — "Remove sheet" at bottom, no left border ──
 
 function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
-  const colors = BLOCK_CHIP_COLORS.prescription_sheet
   return (
     <div style={{
       border: '1.5px solid var(--color-border)',
-      borderLeft: `4px solid ${colors.borderColor}`,
       borderRadius: 'var(--radius-lg)',
       overflow: 'hidden',
       backgroundColor: 'var(--color-surface)',
     }}>
-      {/* Action bar */}
+      <div style={{ padding: 'var(--space-4)' }}>
+        <PrescriptionSheetEditor
+          block={block}
+          onChange={onPatchData}
+          disabled={disabled}
+        />
+      </div>
+
+      {/* Decision 6: destructive action at the bottom, text-style danger link */}
       <div style={{
+        padding: 'var(--space-3) var(--space-4)',
+        borderTop: '1px solid var(--color-border)',
         display: 'flex',
-        alignItems: 'center',
         justifyContent: 'flex-end',
-        padding: 'var(--space-2) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: colors.headerTint,
       }}>
         <button
           onClick={onDelete}
@@ -495,26 +471,19 @@ function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
           style={{
             fontSize: 12,
             fontFamily: 'var(--font-body)',
-            fontWeight: 600,
-            color: '#DC2626',
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FECACA',
-            borderRadius: 'var(--radius-md)',
-            padding: '5px 12px',
+            fontWeight: 500,
+            color: disabled ? '#9CA3AF' : '#DC2626',
+            backgroundColor: 'transparent',
+            border: 'none',
+            padding: '2px 0',
             cursor: disabled ? 'default' : 'pointer',
+            textDecoration: 'underline',
+            textDecorationColor: disabled ? '#D1D5DB' : '#FECACA',
             opacity: disabled ? 0.5 : 1,
           }}
         >
           Remove sheet
         </button>
-      </div>
-
-      <div style={{ padding: 'var(--space-4)' }}>
-        <PrescriptionSheetEditor
-          block={block}
-          onChange={onPatchData}
-          disabled={disabled}
-        />
       </div>
     </div>
   )
@@ -621,18 +590,12 @@ function EmptyState({ activeTab }) {
   )
 }
 
-// ─── BlockCardList — renders a list of BlockCards with SummaryBar ──────────────
-//
-// Extracted to keep the main component clean.
-// Manages the expandRefs Map for Decision 3 SummaryBar navigation.
+// ─── BlockCardList ────────────────────────────────────────────────────────────
 
 function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, renderEditor }) {
-  // expandRefs: Map<globalIndex, { domRef: { current: Element }, expand: () => void }>
-  // We use a ref so the Map instance is stable across renders.
   const expandRefsRef = useRef(new Map())
   const expandRefs = expandRefsRef.current
 
-  // Clean up stale entries whenever items change
   useEffect(() => {
     const currentKeys = new Set(items.map(i => i.globalIndex))
     for (const key of expandRefs.keys()) {
@@ -645,7 +608,6 @@ function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, render
       <SummaryBar items={items} expandRefs={expandRefs} />
 
       {items.map(({ block, globalIndex }, localIndex) => {
-        // Ensure entry exists in the registry before the card mounts
         if (!expandRefs.has(globalIndex)) {
           expandRefs.set(globalIndex, { domRef: { current: null }, expand: () => {} })
         }
@@ -659,9 +621,7 @@ function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, render
             total={items.length}
             disabled={disabled}
             defaultExpanded={block._isNew === true}
-            // Pass a stable callback ref for the DOM node
             domRef={(el) => { entry.domRef = { current: el } }}
-            // Let the card register its expand fn with us
             onRegisterExpand={(expandFn) => { entry.expand = expandFn }}
             onMoveUp={() => onMoveUp(localIndex)}
             onMoveDown={() => onMoveDown(localIndex)}
@@ -767,14 +727,30 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
       {activeTab === 'rx' ? (
         <>
-          {/* ── Prescription Sheets section ──────────────────────────────── */}
-          <div style={{ marginBottom: 'var(--space-2)' }}>
+          {/* ── Decision 5: Prescription Sheets section divider ──────────── */}
+          <div style={{ marginBottom: 'var(--space-2)', marginTop: 'var(--space-6)' }}>
             <div style={{
-              fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
-              marginBottom: 'var(--space-2)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              marginBottom: 'var(--space-4)',
             }}>
-              Prescription Sheets
+              <span style={{
+                fontSize: 12,
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: 'var(--color-text-secondary)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}>
+                Prescription Sheets
+              </span>
+              <div style={{
+                flex: 1,
+                height: 1,
+                backgroundColor: 'var(--color-border)',
+              }} />
             </div>
 
             <SheetPickerBar
@@ -803,20 +779,42 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
             )}
           </div>
 
-          {/* ── Other Rx blocks ──────────────────────────────────────────── */}
+          {/* ── Decision 5: Rx-level blocks section divider ──────────────── */}
           {otherRxItems.length > 0 && (
-            <div style={{ marginTop: 'var(--space-5)' }}>
+            <div style={{ marginTop: 'var(--space-6)' }}>
               <div style={{
-                fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
-                marginBottom: 'var(--space-3)',
-                paddingTop: 'var(--space-4)',
-                borderTop: '1px dashed var(--color-border)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-3)',
+                marginBottom: 'var(--space-4)',
               }}>
-                Rx-level blocks (shown below all sheets in app)
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  color: 'var(--color-text-secondary)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  Rx-level blocks
+                </span>
+                <div style={{
+                  flex: 1,
+                  height: 1,
+                  backgroundColor: 'var(--color-border)',
+                }} />
+                <span style={{
+                  fontSize: 11,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}>
+                  shown below all sheets in app
+                </span>
               </div>
 
-              {/* Decision 3: summary bar + Decision 1+2: collapse cards */}
               <BlockCardList
                 items={otherRxItems}
                 disabled={disabled}
@@ -850,7 +848,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
           {visibleItems.length === 0 ? (
             <EmptyState activeTab={activeTab} />
           ) : (
-            // Decision 3: summary bar + Decision 1+2: collapse cards
             <BlockCardList
               items={visibleItems}
               disabled={disabled}
