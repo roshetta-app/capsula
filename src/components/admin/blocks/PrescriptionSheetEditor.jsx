@@ -1,14 +1,14 @@
 /**
  * src/components/admin/blocks/PrescriptionSheetEditor.jsx
  *
- * Decision 4: Each RowCard gets a colored top border (3px) matching its row type.
- *   note          → Amber   (#f59e0b)
- *   drug_freetext → Teal    (#0ea5e9)
- *   drug_library  → Indigo  (#6366f1)
- *   free_text     → Blue    (#1D4ED8)
- *
- * No left-side colored borders anywhere (consistent with BlockListEditor).
- * Row body background stays neutral. All other logic unchanged.
+ * Changes:
+ *   - Removed the distinct colored top-edge border from RowCard.
+ *     All four borders are now uniform (1px solid var(--color-border)).
+ *   - Row header background is a faint per-type color tint (color + '12')
+ *     matching the rx-level block header style, instead of transparent / color-bg.
+ *   - The rows section beneath the sheet label now mirrors the rx-level block map:
+ *     a labelled section header, the row list, and the add-row buttons rendered
+ *     in the same visual grouping used for top-level blocks.
  *
  * Data shape (block.data):
  *   {
@@ -94,11 +94,8 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
 
   return (
     <div style={{
-      // Decision 4: colored top border per row type; no left border
-      borderTop: `3px solid ${cfg.color}`,
-      borderRight: '1px solid var(--color-border)',
-      borderBottom: '1px solid var(--color-border)',
-      borderLeft: '1px solid var(--color-border)',
+      // Uniform border — no colored top edge (removed Decision 4 colored top border)
+      border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
       overflow: 'hidden',
@@ -110,7 +107,8 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px',
           cursor: 'pointer',
-          background: expanded ? 'var(--color-bg)' : 'transparent',
+          // Faint per-type color tint — same pattern as rx-level block headers
+          background: cfg.color + '12',
           borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
           userSelect: 'none',
         }}
@@ -232,6 +230,54 @@ function AddRowButton({ label, color, onClick }) {
   )
 }
 
+// ─── BlockMap — the shared drug / note / text add-row section ─────────────────
+//
+// Mirrors the rx-level block list appearance: a faint-bg labelled section header
+// above the row list, followed by the add-row buttons.  Used both for the sheet's
+// own rows and (in future) for any per-sheet sub-sections.
+
+function BlockMap({ rows, onAddDrugLibrary, onAddDrugFreetext, onAddNote, onAddFreeText, children }) {
+  return (
+    <div style={{
+      border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-md)',
+      overflow: 'hidden',
+    }}>
+      {/* Section header — faint bg, same as rx-level block header tint */}
+      <div style={{
+        padding: '7px 12px',
+        background: 'var(--color-bg)',
+        borderBottom: '1px solid var(--color-border)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700,
+          color: 'var(--color-text-secondary)',
+          textTransform: 'uppercase', letterSpacing: '0.05em',
+        }}>
+          Rows
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          {rows.length} item{rows.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Row list or empty state */}
+      <div style={{ padding: '10px 10px 0' }}>
+        {children}
+      </div>
+
+      {/* Add-row buttons */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', padding: '10px 10px 10px' }}>
+        <AddRowButton label="Drug (free text)" color="#0ea5e9" onClick={onAddDrugFreetext} />
+        <AddRowButton label="Drug (library)"   color="#6366f1" onClick={onAddDrugLibrary} />
+        <AddRowButton label="Note"             color="#f59e0b" onClick={onAddNote} />
+        <AddRowButton label="Text Block"       color="#1D4ED8" onClick={onAddFreeText} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function PrescriptionSheetEditor({ block, onChange }) {
@@ -327,8 +373,17 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
         />
       </div>
 
-      {/* ── Row list ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {/* ── Block map: rows under the sheet label ─────────────────────────────
+          Mirrors the rx-level block list: labelled section header, row cards,
+          add-row buttons — all inside a single bordered container.
+      ──────────────────────────────────────────────────────────────────────── */}
+      <BlockMap
+        rows={rows}
+        onAddDrugLibrary={addDrugLibrary}
+        onAddDrugFreetext={addDrugFreetext}
+        onAddNote={addNote}
+        onAddFreeText={addFreeText}
+      >
         {rows.length === 0 ? (
           <div style={{
             textAlign: 'center', fontSize: 13,
@@ -336,47 +391,26 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
             padding: '14px 0',
             border: '1.5px dashed var(--color-border)',
             borderRadius: 'var(--radius-md)',
+            marginBottom: 10,
           }}>
             No rows yet — add a drug, note, or text block below.
           </div>
         ) : (
-          rows.map((row, idx) => (
-            <RowCard
-              key={idx}
-              row={row}
-              idx={idx}
-              total={rows.length}
-              onChange={nextRow => updateRow(idx, nextRow)}
-              onMove={moveRow}
-              onDelete={deleteRow}
-            />
-          ))
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+            {rows.map((row, idx) => (
+              <RowCard
+                key={idx}
+                row={row}
+                idx={idx}
+                total={rows.length}
+                onChange={nextRow => updateRow(idx, nextRow)}
+                onMove={moveRow}
+                onDelete={deleteRow}
+              />
+            ))}
+          </div>
         )}
-      </div>
-
-      {/* ── Add row buttons ── */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <AddRowButton
-          label="Drug (free text)"
-          color="#0ea5e9"
-          onClick={addDrugFreetext}
-        />
-        <AddRowButton
-          label="Drug (library)"
-          color="#6366f1"
-          onClick={addDrugLibrary}
-        />
-        <AddRowButton
-          label="Note"
-          color="#f59e0b"
-          onClick={addNote}
-        />
-        <AddRowButton
-          label="Text Block"
-          color="#1D4ED8"
-          onClick={addFreeText}
-        />
-      </div>
+      </BlockMap>
 
     </div>
   )

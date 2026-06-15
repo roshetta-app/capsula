@@ -16,8 +16,7 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 // ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
 /**
- * Writing hand icon — replaces the Rx glyph on the Treatment tab.
- * Implies active clinical authoring / prescribing rather than a typographic symbol.
+ * Writing hand icon — Rx / Treatment tab.
  */
 function IconWritingHand({ color }) {
   return (
@@ -29,7 +28,7 @@ function IconWritingHand({ color }) {
   )
 }
 
-/** Stethoscope icon for Clinical tab — unchanged */
+/** Stethoscope icon for Clinical tab */
 function IconStethoscope({ color }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -41,9 +40,11 @@ function IconStethoscope({ color }) {
   )
 }
 
+// Rx is first, Clinical is second.
+// Both occupy flex: 1 so they split the full header width equally.
 const TABS = [
-  { label: 'Treatment', renderIcon: (color) => <IconWritingHand color={color} /> },
-  { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
+  { label: 'Rx',       renderIcon: (color) => <IconWritingHand color={color} /> },
+  { label: 'Clinical', renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
 export default function ConditionDetailScreen() {
@@ -172,7 +173,7 @@ export default function ConditionDetailScreen() {
           transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
 
-          {/* Panel 0 — Prescriptions */}
+          {/* Panel 0 — Rx / Prescriptions */}
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
             <div style={{
               maxWidth: 680,
@@ -337,8 +338,8 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           </div>
         )}
 
-        {/* ─── Tab strip ─────────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex' }}>
+        {/* ─── Tab strip — full-width equal cells ─────────────────────────────── */}
+        <div style={{ display: 'flex', width: '100%' }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
             const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
@@ -395,4 +396,4 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       </div>
     </header>
   )
-                     }
+}
