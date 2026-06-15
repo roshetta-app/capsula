@@ -12,6 +12,10 @@
  *             rendered as a small text-style danger link.
  *
  * Left colored border fully removed from BlockCard and ActiveSheetEditor.
+ *
+ * Tab changes:
+ *   - Rx tab is now first (default active), Clinical is second.
+ *   - SubTabBar is full-width with underline active indicator (matches app tab style).
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -339,40 +343,57 @@ function SummaryBar({ items, expandRefs }) {
   )
 }
 
-// ─── Sub-tab pill bar ─────────────────────────────────────────────────────────
+// ─── Sub-tab bar — full width, underline style, Rx first ─────────────────────
+
+const SUB_TABS = [
+  { key: 'rx',       label: 'Rx'       },
+  { key: 'clinical', label: 'Clinical' },
+]
 
 function SubTabBar({ active, onChange }) {
   return (
     <div style={{
-      display: 'flex', gap: 'var(--space-1)',
-      backgroundColor: 'var(--color-bg)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 3,
+      display: 'flex',
+      width: '100%',
+      borderBottom: '1px solid var(--color-border)',
       marginBottom: 'var(--space-4)',
-      width: 'fit-content',
     }}>
-      {['clinical', 'rx'].map(tab => {
-        const isActive = active === tab
+      {SUB_TABS.map(({ key, label }) => {
+        const isActive = active === key
         return (
-          <button
-            key={tab}
-            onClick={() => onChange(tab)}
-            style={{
-              padding: '6px 18px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 13, fontWeight: isActive ? 600 : 400,
-              fontFamily: 'var(--font-body)',
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: isActive ? 'var(--color-surface)' : 'transparent',
-              color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-              transition: 'all 0.15s ease',
-            }}
+          <div
+            key={key}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
           >
-            {tab === 'clinical' ? 'Clinical' : 'Rx'}
-          </button>
+            <button
+              onClick={() => onChange(key)}
+              style={{
+                width: '100%',
+                padding: '8px var(--space-2) 10px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: isActive ? 600 : 400,
+                fontFamily: 'var(--font-body)',
+                color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                transition: 'color 0.15s ease',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none',
+              }}
+            >
+              {label}
+            </button>
+            <span style={{
+              display: 'block',
+              height: 2,
+              width: '100%',
+              borderRadius: '1px 1px 0 0',
+              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+              transition: 'background-color 0.15s ease',
+              marginBottom: -1,
+            }} />
+          </div>
         )
       })}
     </div>
@@ -638,7 +659,8 @@ function BlockCardList({ items, disabled, onMoveUp, onMoveDown, onDelete, render
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export default function BlockListEditor({ blocks = [], onChange, disabled = false }) {
-  const [activeTab, setActiveTab] = useState('clinical')
+  // Rx is now the default active tab (was 'clinical')
+  const [activeTab, setActiveTab] = useState('rx')
   const [activeSheetIndex, setActiveSheetIndex] = useState(0)
 
   function handleTabChange(tab) {
