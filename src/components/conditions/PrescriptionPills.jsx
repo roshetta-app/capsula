@@ -3,6 +3,13 @@ import { useState, useEffect, useRef } from 'react'
 /**
  * PrescriptionPills — dropdown selector for choosing between prescription sheets.
  *
+ * Changes:
+ *  - Micro-label changed from "Select protocol" → "Treatment options" to better
+ *    convey that the list may contain different scenarios, severities, or drug choices
+ *    for the same condition — not just protocol variants.
+ *  - Trigger icon changed from generic file/document → writing hand (✍) to imply
+ *    an active prescription / clinical decision, consistent with the Rx tab icon.
+ *
  * Fixes:
  *  - Closed state: bottom border was missing because `borderBottom: open ? 'none' : undefined`
  *    resolves to `undefined` (no style), which browser inherits as the shorthand border's bottom.
@@ -13,15 +20,14 @@ import { useState, useEffect, useRef } from 'react'
 
 // ─── Inline SVG icons ─────────────────────────────────────────────────────────
 
-function IconFileText({ size = 15, color = 'currentColor' }) {
+/** Writing hand — implies active prescription / clinical authoring */
+function IconWritingHand({ size = 16, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
+      {/* Pen nib / writing tip */}
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   )
 }
@@ -97,10 +103,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      // Reduced bottom margin — sheet rows pick up from here with less gap
       style={{ marginBottom: 'var(--space-3)', position: 'relative' }}
     >
-      {/* Micro-label */}
+      {/* Micro-label — describes what the dropdown contains */}
       <div style={{
         fontSize: 10,
         fontWeight: 600,
@@ -110,7 +115,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         marginBottom: 6,
         fontFamily: 'var(--font-body)',
       }}>
-        Select protocol
+        Treatment options
       </div>
 
       {/* Trigger box */}
@@ -122,7 +127,6 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '11px 14px',
-          // Always set all four border sides explicitly so closed state has a bottom border
           borderTop:    `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
           borderLeft:   `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
           borderRight:  `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
@@ -137,9 +141,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           transition: 'border-color 0.15s ease',
         }}
       >
-        {/* Left: icon + label */}
+        {/* Left: writing hand icon + selected label */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <IconFileText
+          <IconWritingHand
             size={16}
             color={open ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
           />

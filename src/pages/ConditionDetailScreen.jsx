@@ -10,22 +10,26 @@ import BottomNav from '../components/BottomNav'
 import ShareCard from '../components/ui/ShareCard'
 import { shareConditionPrescription } from '../utils/sharing'
 import { logUsageEvent } from '../analytics/usageEvents'
+import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 // ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
-/** Rx icon for Treatment tab */
-function IconRx({ color }) {
+/**
+ * Writing hand icon — replaces the Rx glyph on the Treatment tab.
+ * Implies active clinical authoring / prescribing rather than a typographic symbol.
+ */
+function IconWritingHand({ color }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      {/* R shape */}
-      <path d="M6 20V4h5a4 4 0 0 1 0 8H6" />
-      <path d="M13 12l5 8" />
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
     </svg>
   )
 }
 
-/** Stethoscope icon for Clinical tab */
+/** Stethoscope icon for Clinical tab — unchanged */
 function IconStethoscope({ color }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -38,7 +42,7 @@ function IconStethoscope({ color }) {
 }
 
 const TABS = [
-  { label: 'Treatment', renderIcon: (color) => <IconRx color={color} /> },
+  { label: 'Treatment', renderIcon: (color) => <IconWritingHand color={color} /> },
   { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
@@ -196,6 +200,17 @@ const pageStyle = {
 // ─── DetailHeader ─────────────────────────────────────────────────────────────
 
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
+  const isDark = useIsDark()
+
+  // Resolve specialty icon + color from the condition's token system,
+  // matching exactly what ConditionCard and SpecialtyFilterPills use.
+  const tokenKey  = condition?.specialtyColorToken ?? FALLBACK_TOKEN
+  const iconType  = condition?.specialtyIconType   ?? 'lucide'
+  const iconValue = iconType === 'custom'
+    ? (condition?.specialtyIconUrl  ?? '')
+    : (condition?.specialtyIcon     ?? 'Stethoscope')
+  const colors    = resolveToken(tokenKey, isDark)
+
   return (
     <header style={{
       position: 'sticky',
@@ -263,10 +278,11 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           )}
         </div>
 
-        {/* Condition title block — specialty eyebrow above title, no age pill */}
+        {/* Condition title block */}
         {condition && (
           <div style={{ marginBottom: 4 }}>
-            {/* Specialty eyebrow — icon + name, dim, small */}
+            {/* Specialty eyebrow — uses the real specialty icon from the DB,
+                matching ConditionCard and SpecialtyFilterPills exactly */}
             {condition.specialtyName && (
               <div style={{
                 display: 'flex',
@@ -274,12 +290,12 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 gap: 5,
                 marginBottom: 4,
               }}>
-                {/* Small specialty dot/line accent */}
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
-                  stroke="var(--color-text-tertiary)" strokeWidth="2"
-                  strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                </svg>
+                <SpecialtyIcon
+                  iconType={iconType}
+                  iconValue={iconValue}
+                  size={12}
+                  color={colors.fg}
+                />
                 <span style={{
                   fontSize: 11,
                   fontWeight: 500,

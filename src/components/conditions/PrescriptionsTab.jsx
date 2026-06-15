@@ -11,8 +11,10 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *
  * Design changes:
  *   - rx-context note_callout blocks that sit OUTSIDE the sheet now have a
- *     clear visual separator above them (dashed divider + dim label) so the
- *     user understands they are not part of the active prescription sheet.
+ *     clear visual separator above them (dashed divider) so the user understands
+ *     they are not part of the active prescription sheet.
+ *   - "General notes" label removed from divider — the dashed line alone provides
+ *     sufficient structural separation without the redundant text label.
  *   - PersonalNotes section spacing tightened to match overall screen rhythm.
  *   - Medical disclaimer margin reduced to match.
  *
@@ -59,36 +61,16 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
 
       {/* ── Rx-context note_callout blocks ──────────────────────────────────
           These exist outside the sheet and persist regardless of which sheet
-          is selected. A separator makes clear they are not part of the sheet.
+          is selected. A dashed separator makes clear they are not part of the sheet.
+          The "General notes" label has been removed — the line alone is sufficient.
       ──────────────────────────────────────────────────────────────────────── */}
       {rxNotes.length > 0 && (
         <>
-          {/* Dashed separator with label */}
+          {/* Dashed separator — no label */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 'var(--space-2)',
             margin: 'var(--space-3) 0 var(--space-2)',
-          }}>
-            <div style={{
-              flex: 1,
-              borderTop: '1px dashed var(--color-border)',
-            }} />
-            <span style={{
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.07em',
-              textTransform: 'uppercase',
-              color: 'var(--color-text-tertiary)',
-              whiteSpace: 'nowrap',
-            }}>
-              General notes
-            </span>
-            <div style={{
-              flex: 1,
-              borderTop: '1px dashed var(--color-border)',
-            }} />
-          </div>
+            borderTop: '1px dashed var(--color-border)',
+          }} />
 
           {rxNotes.map(b => (
             <NoteCallout key={b.id} text={b.data?.text} flavor={b.data?.flavor} />
