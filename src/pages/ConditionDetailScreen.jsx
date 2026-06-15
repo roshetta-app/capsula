@@ -108,7 +108,7 @@ export default function ConditionDetailScreen() {
     return (
       <div style={pageStyle}>
         <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-4)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
           Loading…
         </div>
         <BottomNav />
@@ -120,7 +120,7 @@ export default function ConditionDetailScreen() {
     return (
       <div style={pageStyle}>
         <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-4)', textAlign: 'center' }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
           <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any condition in the database.</div>
         </div>
@@ -151,6 +151,15 @@ export default function ConditionDetailScreen() {
         />
       </div>
 
+      {/*
+        Swipe container — overflow: hidden clips the off-screen panel, but the
+        page itself scrolls naturally. Each panel owns its own content height;
+        the scroll stops naturally at the last element (disclaimer) with only
+        enough bottom padding to clear BottomNav (60px + safe area).
+
+        Lateral padding matches Layout's --space-6 (24px) so content aligns
+        identically with the home screen.
+      */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -165,7 +174,12 @@ export default function ConditionDetailScreen() {
 
           {/* Panel 0 — Prescriptions */}
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
-            <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-5) var(--space-4)', paddingBottom: 'calc(var(--space-12) + 60px)' }}>
+            <div style={{
+              maxWidth: 680,
+              margin: '0 auto',
+              padding: 'var(--space-5) var(--space-6)',
+              paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
+            }}>
               <PrescriptionsTab
                 blocks={condition.blocks ?? []}
                 conditionId={condition.id}
@@ -175,7 +189,12 @@ export default function ConditionDetailScreen() {
 
           {/* Panel 1 — Clinical Data */}
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
-            <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-5) var(--space-4)', paddingBottom: 'calc(var(--space-12) + 60px)' }}>
+            <div style={{
+              maxWidth: 680,
+              margin: '0 auto',
+              padding: 'var(--space-5) var(--space-6)',
+              paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
+            }}>
               <ClinicalDataTab blocks={condition.blocks ?? []} />
             </div>
           </div>
@@ -202,8 +221,6 @@ const pageStyle = {
 function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTab, setActiveTab }) {
   const isDark = useIsDark()
 
-  // Resolve specialty icon + color from the condition's token system,
-  // matching exactly what ConditionCard and SpecialtyFilterPills use.
   const tokenKey  = condition?.specialtyColorToken ?? FALLBACK_TOKEN
   const iconType  = condition?.specialtyIconType   ?? 'lucide'
   const iconValue = iconType === 'custom'
@@ -219,7 +236,8 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--space-4) 0' }}>
+      {/* Use same --space-6 lateral padding as Layout / ConditionsScreen */}
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--space-6) 0' }}>
 
         {/* Top row: back + actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 6 : 'var(--space-2)' }}>
@@ -281,8 +299,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
         {/* Condition title block */}
         {condition && (
           <div style={{ marginBottom: 4 }}>
-            {/* Specialty eyebrow — uses the real specialty icon from the DB,
-                matching ConditionCard and SpecialtyFilterPills exactly */}
             {condition.specialtyName && (
               <div style={{
                 display: 'flex',
@@ -308,7 +324,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
               </div>
             )}
 
-            {/* Condition title — prominent */}
             <h1 style={{
               fontSize: 21,
               fontWeight: 700,
@@ -380,4 +395,4 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       </div>
     </header>
   )
-}
+                     }
