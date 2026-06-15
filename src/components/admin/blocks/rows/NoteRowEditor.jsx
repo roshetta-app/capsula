@@ -12,6 +12,8 @@
  * Pure controlled component — zero DB calls.
  */
 
+import { useRef, useEffect } from 'react'
+
 const FLAVOR_OPTIONS = [
   { value: 'info',    label: 'Info',    color: '#3b82f6' },
   { value: 'warning', label: 'Warning', color: '#f59e0b' },
@@ -29,6 +31,48 @@ function FieldLabel({ children }) {
         {children}
       </span>
     </div>
+  )
+}
+
+/** Auto-grows to fit content — no fixed height, no scrollbar */
+function AutoTextarea({ value, onChange, placeholder }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+    ref.current.style.height = 'auto'
+    ref.current.style.height = `${ref.current.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      dir="auto"
+      rows={2}
+      style={{
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '7px 10px',
+        border: '1.5px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 13,
+        fontFamily: 'var(--font-body)',
+        backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-primary)',
+        outline: 'none',
+        resize: 'none',
+        overflow: 'hidden',
+        lineHeight: 1.55,
+        minHeight: 36,
+        display: 'block',
+        transition: 'border-color 0.15s ease',
+      }}
+      onFocus={e => { e.currentTarget.style.borderColor = 'var(--color-accent)' }}
+      onBlur={e => { e.currentTarget.style.borderColor = 'var(--color-border)' }}
+    />
   )
 }
 
@@ -82,22 +126,10 @@ export default function NoteRowEditor({ row, onChange }) {
       {/* ── Note text ── */}
       <div>
         <FieldLabel>Note text</FieldLabel>
-        <input
-          type="text"
+        <AutoTextarea
           value={row.text ?? ''}
-          onChange={e => patch({ text: e.target.value })}
+          onChange={text => patch({ text })}
           placeholder="e.g. Take with food"
-          dir="auto"
-          style={{
-            width: '100%', boxSizing: 'border-box',
-            padding: '7px 10px',
-            border: '1.5px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            fontSize: 13, fontFamily: 'var(--font-body)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text-primary)',
-            outline: 'none',
-          }}
         />
       </div>
 
