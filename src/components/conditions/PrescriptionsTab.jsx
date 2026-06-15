@@ -17,6 +17,7 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     sufficient structural separation without the redundant text label.
  *   - PersonalNotes section spacing tightened to match overall screen rhythm.
  *   - Medical disclaimer margin reduced to match.
+ *   - Disclaimer split across two lines for better legibility.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -81,21 +82,23 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Medical Disclaimer */}
+      {/* Medical Disclaimer — two sentences on two lines */}
       <div style={{
         marginTop: 'var(--space-4)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         gap: 6,
       }}>
-        <ShieldCheck size={12} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-        <span style={{
+        <ShieldCheck size={12} color="var(--color-text-tertiary)" style={{ flexShrink: 0, marginTop: 1 }} />
+        <div style={{
           fontSize: 11,
           color: 'var(--color-text-tertiary)',
           fontWeight: 400,
+          lineHeight: 1.6,
         }}>
-          Verify doses before prescribing. Individual patient factors apply.
-        </span>
+          <div>Verify doses before prescribing.</div>
+          <div>Individual patient factors apply.</div>
+        </div>
       </div>
     </div>
   )
