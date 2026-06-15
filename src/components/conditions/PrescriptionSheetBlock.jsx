@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import NoteCallout from '../ui/NoteCallout'
+import FreeTextPostBlock from './FreeTextPostBlock'
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Section 3.3).
@@ -10,6 +11,7 @@ import NoteCallout from '../ui/NoteCallout'
  *                    looked up against useDrugs() formulation list (id = formulation UUID)
  *   drug_freetext — { drug_name, dose_text }
  *   note          — { text, flavor? } — rendered via NoteCallout in flat inline row style
+ *   free_text     — { markdown }       — rendered via FreeTextPostBlock (markdown prose)
  *
  * Design changes:
  *   - NumberBadge: replaced filled blue circle with a clean outlined square badge.
@@ -19,6 +21,10 @@ import NoteCallout from '../ui/NoteCallout'
  *     stays visually subordinate to the drug name (fontWeight 500, color secondary+).
  *   - Drug-level notes (note_en / note_ar): no longer italic/grey/small — now
  *     rendered as a mild inline callout with a small dot prefix at full secondary color.
+ *   - Terminal divider: a visually distinct dashed full-width rule with a small "end"
+ *     label appears after the last prescription row to clearly separate the sheet
+ *     content from what follows (personal notes, disclaimer).  The between-item
+ *     dividers remain as thin solid hairlines so the two kinds never look the same.
  *
  * Props:
  *   sheet  { label, rows: [...] }  — block.data of a prescription_sheet block
@@ -74,6 +80,13 @@ export default function PrescriptionSheetBlock({ sheet }) {
               />
             )
 
+          case 'free_text':
+            return (
+              <div key={i} style={{ padding: '6px 0' }}>
+                <FreeTextPostBlock block={{ id: i, blockType: 'free_text_post', data: { markdown: row.markdown ?? '' } }} />
+              </div>
+            )
+
           default:
             if (process.env.NODE_ENV !== 'production') {
               console.warn(`[PrescriptionSheetBlock] Unrecognized row_type: "${row.row_type}"`)
@@ -81,6 +94,41 @@ export default function PrescriptionSheetBlock({ sheet }) {
             return null
         }
       })}
+
+      {/* ── Terminal divider ─────────────────────────────────────────────────────
+          Visually distinct from the thin solid hairlines between prescription items.
+          Uses a dashed pattern + subtle label to clearly mark "end of sheet" and
+          separate the content from personal notes / disclaimer below.
+      ────────────────────────────────────────────────────────────────────────── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 'var(--space-3)',
+        marginBottom: 'var(--space-1)',
+      }}>
+        <div style={{
+          flex: 1,
+          height: 0,
+          borderTop: '1.5px dashed var(--color-border)',
+        }} />
+        <span style={{
+          fontSize: 9,
+          fontWeight: 600,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: 'var(--color-text-tertiary)',
+          opacity: 0.6,
+          flexShrink: 0,
+        }}>
+          end of sheet
+        </span>
+        <div style={{
+          flex: 1,
+          height: 0,
+          borderTop: '1.5px dashed var(--color-border)',
+        }} />
+      </div>
     </div>
   )
 }
@@ -382,4 +430,5 @@ const rowWrap = {
   alignItems: 'flex-start',
   gap: 'var(--space-3)',
   padding: '11px 0',
-}
+        }
+            
