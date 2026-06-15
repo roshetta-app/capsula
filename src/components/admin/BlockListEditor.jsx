@@ -40,20 +40,28 @@ const CLINICAL_BLOCK_OPTIONS = [
   { value: 'free_text_post', label: '+ Text Post'     },
   { value: 'note_callout',   label: '+ Note'          },
 ]
+// Phase 2 (Step 2.3): image_gallery and free_text_post added to Rx options
 const RX_BLOCK_OPTIONS = [
   { value: 'prescription_sheet', label: '+ Prescription Sheet' },
+  { value: 'image_gallery',      label: '+ Image Gallery'      },
+  { value: 'free_text_post',     label: '+ Text Post'          },
   { value: 'note_callout',       label: '+ Note'               },
 ]
 
 // Which block types belong to each sub-tab
+// Phase 2 (Step 2.2): image_gallery now context-aware instead of hardcoded Clinical.
+// Backward-compat: existing galleries with no context field have context === undefined,
+// which is !== 'rx', so they continue to appear in Clinical. No migration needed.
 function isClinicalBlock(block) {
-  if (block.block_type === 'image_gallery')  return true
+  if (block.block_type === 'image_gallery'  && block.data?.context !== 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context !== 'rx') return true
   if (block.block_type === 'note_callout'   && block.data?.context !== 'rx') return true
   return false
 }
 function isRxBlock(block) {
   if (block.block_type === 'prescription_sheet') return true
+  // image_gallery: Rx only when context === 'rx' (Phase 2, Step 2.2)
+  if (block.block_type === 'image_gallery'  && block.data?.context === 'rx') return true
   if (block.block_type === 'free_text_post' && block.data?.context === 'rx') return true
   if (block.block_type === 'note_callout'   && block.data?.context === 'rx') return true
   return false
@@ -64,7 +72,8 @@ function isRxBlock(block) {
 function defaultData(blockType, context) {
   switch (blockType) {
     case 'image_gallery':
-      return { images: [] }
+      // Phase 2 (Step 2.1): context now stored so Rx galleries route correctly
+      return { images: [], context: context ?? 'clinical' }
     case 'free_text_post':
       return { markdown: '', context: context ?? 'clinical' }
     case 'note_callout':
@@ -302,7 +311,7 @@ function AddBlockButton({ activeTab, onAdd, disabled }) {
 function EmptyState({ activeTab }) {
   const msg = activeTab === 'clinical'
     ? 'No clinical blocks yet. Use "Add Block" to add an Image Gallery, Text Post, or Note.'
-    : 'No Rx blocks yet. Use "Add Block" to add a Prescription Sheet or Note.'
+    : 'No Rx blocks yet. Use "Add Block" to add a Prescription Sheet, Image Gallery, Text Post, or Note.'
   return (
     <div style={{
       textAlign: 'center',
@@ -487,4 +496,3 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
-

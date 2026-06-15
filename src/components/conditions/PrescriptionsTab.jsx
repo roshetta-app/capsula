@@ -4,14 +4,22 @@ import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import NoteCallout from '../ui/NoteCallout'
 import PersonalNotes from './PersonalNotes'
+import BlockRenderer from './BlockRenderer'
 import { getRxBlocks } from '../../utils/blockFilters'
 
 /**
- * PrescriptionsTab — Rx tab container (Phase 2.8).
+ * PrescriptionsTab — Rx tab container (Phase 2.8 + Phase 2 CMS refactor).
  *
- * Design changes:
- *   - rx-context note_callout blocks that sit OUTSIDE the sheet now have a
- *     clear visual separator above them (dashed divider) so the user understands
+ * Phase 2 changes:
+ *   - image_gallery and free_text_post blocks with context 'rx' now render
+ *     in the Rx tab via BlockRenderer (rxExtras), positioned below the active
+ *     prescription sheet and above Rx-level notes.
+ *   - getRxBlocks() already returns these block types after the blockFilters.js
+ *     update; this component just splits them out and renders them.
+ *
+ * Design:
+ *   - rx-context note_callout blocks that sit OUTSIDE the sheet have a clear
+ *     visual separator above them (dashed divider) so the user understands
  *     they are not part of the active prescription sheet.
  *   - "General notes" label removed from divider — the dashed line alone provides
  *     sufficient structural separation without the redundant text label.
@@ -27,8 +35,12 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
   const [activeIndex, setActiveIndex] = useState(0)
 
   const rxBlocks = getRxBlocks(blocks)
-  const sheets = rxBlocks.filter(b => b.blockType === 'prescription_sheet')
-  const rxNotes = rxBlocks.filter(b => b.blockType === 'note_callout')
+  const sheets   = rxBlocks.filter(b => b.blockType === 'prescription_sheet')
+  const rxNotes  = rxBlocks.filter(b => b.blockType === 'note_callout')
+  // Phase 2: image galleries and free-text posts assigned to Rx context
+  const rxExtras = rxBlocks.filter(b =>
+    b.blockType === 'image_gallery' || b.blockType === 'free_text_post'
+  )
 
   const active = sheets[Math.min(activeIndex, sheets.length - 1)]
 
@@ -58,6 +70,19 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
           {/* Active sheet */}
           <PrescriptionSheetBlock sheet={active?.data} />
         </>
+      )}
+
+      {/* ── Rx extra blocks (image galleries, text posts) ────────────────────
+          Rendered below the active sheet and above Rx-level notes.
+          These are image_gallery or free_text_post blocks whose data.context
+          is 'rx'. Ordered by orderIndex (from getRxBlocks sort).
+      ──────────────────────────────────────────────────────────────────────── */}
+      {rxExtras.length > 0 && (
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          {rxExtras.map(block => (
+            <BlockRenderer key={block.id} block={block} />
+          ))}
+        </div>
       )}
 
       {/* ── Rx-context note_callout blocks ──────────────────────────────────

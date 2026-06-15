@@ -21,8 +21,14 @@
  * Filters out:
  *   - prescription_sheet blocks (belong to Rx tab)
  *   - note_callout blocks whose data.context === 'rx' (belong to Rx tab per 2.8)
+ *   - image_gallery blocks whose data.context === 'rx' (belong to Rx tab per Phase 2)
  *   - image_gallery blocks with empty data.images[] (per 3.1 — zero images = no content)
+ *   - free_text_post blocks whose data.context === 'rx' (belong to Rx tab per 2.8)
  *   - free_text_post blocks with empty data.markdown (per 3.2 — empty = no content)
+ *
+ * Backward-compat: existing image_gallery blocks with no context field have
+ * data.context === undefined, which is !== 'rx', so they continue to appear
+ * in Clinical. No migration required.
  *
  * @param {Array<{id: string, blockType: string, orderIndex: number, data: object}>} allBlocks
  * @returns {Array}
@@ -43,10 +49,14 @@ export function getClinicalDataBlocks(allBlocks) {
   return allBlocks
     .filter(b => {
       if (!CLINICAL_TYPES.has(b.blockType)) return false
+      // Phase 2: image_gallery with context 'rx' belongs to Rx tab, not Clinical
+      if (b.blockType === 'image_gallery' && b.data?.context === 'rx') return false
       // image_gallery with no images has no content (Section 3.1)
       if (b.blockType === 'image_gallery' && !b.data?.images?.length) return false
       // note_callout with context 'rx' belongs to Rx tab (Section 2.8)
       if (b.blockType === 'note_callout' && b.data?.context === 'rx') return false
+      // free_text_post with context 'rx' belongs to Rx tab (Section 2.8)
+      if (b.blockType === 'free_text_post' && b.data?.context === 'rx') return false
       // free_text_post with empty markdown has no content (Section 3.2)
       if (b.blockType === 'free_text_post' && !b.data?.markdown) return false
       return true
@@ -57,8 +67,10 @@ export function getClinicalDataBlocks(allBlocks) {
 /**
  * Returns the ordered list of blocks to render in the Rx tab.
  *
- * Algorithm (Section 2.3 + 2.8):
+ * Algorithm (Section 2.3 + 2.8 + Phase 2):
  *   - prescription_sheet blocks, sorted by orderIndex.
+ *   - image_gallery blocks whose data.context === 'rx' (Phase 2 — new).
+ *   - free_text_post blocks whose data.context === 'rx' (Phase 2 — new).
  *   - note_callout blocks whose data.context === 'rx', interleaved by orderIndex.
  *   - Empty prescription_sheet blocks (rows: []) are excluded (per 3.3 — no content).
  *
@@ -74,6 +86,10 @@ export function getRxBlocks(allBlocks) {
         // Empty rows array = no content (Section 3.3)
         return b.data?.rows?.length > 0
       }
+      // Phase 2: image_gallery with context 'rx' appears in Rx tab
+      if (b.blockType === 'image_gallery' && b.data?.context === 'rx') return true
+      // Phase 2: free_text_post with context 'rx' appears in Rx tab
+      if (b.blockType === 'free_text_post' && b.data?.context === 'rx') return true
       // note_callout with context 'rx' participates in Rx tab (Section 2.8)
       if (b.blockType === 'note_callout' && b.data?.context === 'rx') return true
       return false
