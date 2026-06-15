@@ -15,6 +15,12 @@
  *   - Block card frame (header with human name + colored chip + ↑ ↓ 🗑)
  *   - Editor slot (all four block editors wired)
  *   - Stable internal ordering helpers
+ *
+ * Rx tab changes:
+ *   - free_text_post blocks can now be added to the Rx tab (context: 'rx').
+ *     They appear as standalone text/markdown blocks alongside prescription sheets
+ *     and notes — useful for treatment rationale, intro paragraphs, etc.
+ *   - isRxBlock updated to recognise free_text_post with context === 'rx'.
  */
 
 import { useState } from 'react'
@@ -42,18 +48,20 @@ const CLINICAL_BLOCK_OPTIONS = [
 ]
 const RX_BLOCK_OPTIONS = [
   { value: 'prescription_sheet', label: '+ Prescription Sheet' },
+  { value: 'free_text_post',     label: '+ Text Post'          },
   { value: 'note_callout',       label: '+ Note'               },
 ]
 
 // Which block types belong to each sub-tab
 function isClinicalBlock(block) {
   if (block.block_type === 'image_gallery')  return true
-  if (block.block_type === 'free_text_post') return true
+  if (block.block_type === 'free_text_post' && block.data?.context !== 'rx') return true
   if (block.block_type === 'note_callout' && block.data?.context !== 'rx') return true
   return false
 }
 function isRxBlock(block) {
   if (block.block_type === 'prescription_sheet') return true
+  if (block.block_type === 'free_text_post' && block.data?.context === 'rx') return true
   if (block.block_type === 'note_callout' && block.data?.context === 'rx') return true
   return false
 }
@@ -65,7 +73,7 @@ function defaultData(blockType, context) {
     case 'image_gallery':
       return { images: [] }
     case 'free_text_post':
-      return { markdown: '' }
+      return { markdown: '', context: context ?? 'clinical' }
     case 'note_callout':
       return { text: '', flavor: 'info', context: context ?? 'clinical' }
     case 'prescription_sheet':
@@ -301,7 +309,7 @@ function AddBlockButton({ activeTab, onAdd, disabled }) {
 function EmptyState({ activeTab }) {
   const msg = activeTab === 'clinical'
     ? 'No clinical blocks yet. Use "Add Block" to add an Image Gallery, Text Post, or Note.'
-    : 'No Rx blocks yet. Use "Add Block" to add a Prescription Sheet or Note.'
+    : 'No Rx blocks yet. Use "Add Block" to add a Prescription Sheet, Text Post, or Note.'
   return (
     <div style={{
       textAlign: 'center',
@@ -378,13 +386,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
   // ── Block editor renderer ──────────────────────────────────────────────────
 
-  /**
-   * Renders the correct editor for a given block.
-   *
-   * ImageGalleryEditor + FreeTextPostEditor accept { data, onChange(dataPatch) }.
-   * NoteCalloutEditor + PrescriptionSheetEditor accept { block, onChange(fullData) }.
-   * patchData is the patchBlockData-bound helper that merges a data patch.
-   */
   function renderEditor(block, patchData) {
     switch (block.block_type) {
       case 'image_gallery':
@@ -424,7 +425,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
   // ── Derive visible list ────────────────────────────────────────────────────
 
-  // Each item: { block, globalIndex } so we can address mutations on full array
   const visibleItems = blocks
     .map((block, globalIndex) => ({ block, globalIndex }))
     .filter(({ block }) => activeTab === 'clinical' ? isClinicalBlock(block) : isRxBlock(block))
@@ -442,7 +442,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
       ) : (
         visibleItems.map(({ block, globalIndex }, localIndex) => (
           <BlockCard
-            key={globalIndex}        // stable within render; phase 3.7 can use block._key
+            key={globalIndex}
             block={block}
             index={localIndex}
             total={visibleItems.length}
@@ -470,5 +470,5 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
       </div>
     </div>
   )
-}
-
+                    }
+      
