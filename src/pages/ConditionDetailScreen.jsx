@@ -16,7 +16,8 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 // ─── Tab icon SVGs ────────────────────────────────────────────────────────────
 
 /**
- * Writing hand icon — Rx / Treatment tab.
+ * Writing hand icon — replaces the Rx glyph on the Treatment tab.
+ * Implies active clinical authoring / prescribing rather than a typographic symbol.
  */
 function IconWritingHand({ color }) {
   return (
@@ -28,7 +29,7 @@ function IconWritingHand({ color }) {
   )
 }
 
-/** Stethoscope icon for Clinical tab */
+/** Stethoscope icon for Clinical tab — unchanged */
 function IconStethoscope({ color }) {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
@@ -40,11 +41,9 @@ function IconStethoscope({ color }) {
   )
 }
 
-// Rx is first, Clinical is second.
-// Both occupy flex: 1 so they split the full header width equally.
 const TABS = [
-  { label: 'Rx',       renderIcon: (color) => <IconWritingHand color={color} /> },
-  { label: 'Clinical', renderIcon: (color) => <IconStethoscope color={color} /> },
+  { label: 'Treatment', renderIcon: (color) => <IconWritingHand color={color} /> },
+  { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
 export default function ConditionDetailScreen() {
@@ -152,15 +151,6 @@ export default function ConditionDetailScreen() {
         />
       </div>
 
-      {/*
-        Swipe container — overflow: hidden clips the off-screen panel, but the
-        page itself scrolls naturally. Each panel owns its own content height;
-        the scroll stops naturally at the last element (disclaimer) with only
-        enough bottom padding to clear BottomNav (60px + safe area).
-
-        Lateral padding matches Layout's --space-6 (24px) so content aligns
-        identically with the home screen.
-      */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
@@ -173,7 +163,7 @@ export default function ConditionDetailScreen() {
           transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
 
-          {/* Panel 0 — Rx / Prescriptions */}
+          {/* Panel 0 — Prescriptions */}
           <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
             <div style={{
               maxWidth: 680,
@@ -237,7 +227,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      {/* Use same --space-6 lateral padding as Layout / ConditionsScreen */}
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--space-6) 0' }}>
 
         {/* Top row: back + actions */}
@@ -338,8 +327,8 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           </div>
         )}
 
-        {/* ─── Tab strip — full-width equal cells ─────────────────────────────── */}
-        <div style={{ display: 'flex', width: '100%' }}>
+        {/* ─── Tab strip ─────────────────────────────────────────────────────── */}
+        <div style={{ display: 'flex' }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
             const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
