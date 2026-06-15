@@ -1,11 +1,18 @@
 /**
  * src/components/admin/blocks/PrescriptionSheetEditor.jsx
  *
- * CMS editor for `prescription_sheet` blocks.
+ * Decision 4: Each RowCard gets a colored top border (3px) matching its row type.
+ *   note          → Amber   (#f59e0b)
+ *   drug_freetext → Teal    (#0ea5e9)
+ *   drug_library  → Indigo  (#6366f1)
+ *   free_text     → Blue    (#1D4ED8)
+ *
+ * No left-side colored borders anywhere (consistent with BlockListEditor).
+ * Row body background stays neutral. All other logic unchanged.
  *
  * Data shape (block.data):
  *   {
- *     label: string,          // required; first sheet pre-fills "Standard"
+ *     label: string,
  *     rows: Array<
  *       | { row_type: "drug_library",  formulation_id, _formulationMeta?, dose_override, note_en, note_ar, drug_link_enabled }
  *       | { row_type: "drug_freetext", drug_name, dose_text }
@@ -13,22 +20,6 @@
  *       | { row_type: "free_text",     markdown }
  *     >
  *   }
- *
- * Props:
- *   block    — the full block object (block.data is what we edit)
- *   onChange — (nextData) => void   ← called with updated data only
- *
- * _formulationMeta is a transient UI key on drug_library rows — PrescriptionSheetEditor
- * passes it through as-is. The parent save logic (ConditionEditor) must strip keys
- * prefixed with _ before persisting.
- *
- * Pure controlled component — zero DB calls.
- *
- * Row sub-editors:
- *   DrugLibraryRowEditor  — src/components/admin/blocks/rows/DrugLibraryRowEditor.jsx
- *   DrugFreetextRowEditor — src/components/admin/blocks/rows/DrugFreetextRowEditor.jsx
- *   NoteRowEditor         — src/components/admin/blocks/rows/NoteRowEditor.jsx
- *   FreeTextPostEditor    — src/components/admin/blocks/FreeTextPostEditor.jsx  (reused inline)
  */
 
 import { useState } from 'react'
@@ -95,6 +86,7 @@ function rowSummary(row) {
 
 function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
+  const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
 
   function handleEditorChange(nextRow) {
     onChange(nextRow)
@@ -102,7 +94,11 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
 
   return (
     <div style={{
-      border: '1px solid var(--color-border)',
+      // Decision 4: colored top border per row type; no left border
+      borderTop: `3px solid ${cfg.color}`,
+      borderRight: '1px solid var(--color-border)',
+      borderBottom: '1px solid var(--color-border)',
+      borderLeft: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
       overflow: 'hidden',
@@ -384,5 +380,4 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
 
     </div>
   )
-          }
-        
+}
