@@ -7,8 +7,8 @@ import { useState, useEffect, useRef } from 'react'
  *  - Micro-label changed from "Select protocol" → "Treatment options" to better
  *    convey that the list may contain different scenarios, severities, or drug choices
  *    for the same condition — not just protocol variants.
- *  - Trigger icon changed from generic file/document → writing hand (✍) to imply
- *    an active prescription / clinical decision, consistent with the Rx tab icon.
+ *  - Trigger icon changed from writing hand → green dot to signal the active /
+ *    selected prescription sheet at a glance, consistent with status-dot conventions.
  *
  * Fixes:
  *  - Closed state: bottom border was missing because `borderBottom: open ? 'none' : undefined`
@@ -19,18 +19,6 @@ import { useState, useEffect, useRef } from 'react'
  */
 
 // ─── Inline SVG icons ─────────────────────────────────────────────────────────
-
-/** Writing hand — implies active prescription / clinical authoring */
-function IconWritingHand({ size = 16, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      {/* Pen nib / writing tip */}
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-    </svg>
-  )
-}
 
 function IconChevronDown({ size = 16, color = 'currentColor' }) {
   return (
@@ -64,6 +52,20 @@ function IconDot({ size = 15, color = 'currentColor' }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
       <circle cx="12" cy="12" r="3.5" />
     </svg>
+  )
+}
+
+/** Green status dot — indicates the currently active prescription sheet */
+function ActiveDot() {
+  return (
+    <span style={{
+      display: 'inline-block',
+      width: 9,
+      height: 9,
+      borderRadius: '50%',
+      backgroundColor: '#22c55e',
+      flexShrink: 0,
+    }} />
   )
 }
 
@@ -141,12 +143,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           transition: 'border-color 0.15s ease',
         }}
       >
-        {/* Left: writing hand icon + selected label */}
+        {/* Left: green active dot + selected label */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <IconWritingHand
-            size={16}
-            color={open ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
-          />
+          <ActiveDot />
           <span style={{
             fontSize: 14,
             fontWeight: 600,
