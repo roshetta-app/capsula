@@ -2,6 +2,7 @@
  * FreeTextPostEditor — src/components/admin/blocks/FreeTextPostEditor.jsx
  *
  * Phase 3.4: CMS editor for free_text_post blocks.
+ * Phase 5:   Upgraded preview to render ::: directive cards (matches app renderer).
  *
  * Props:
  *   data     { markdown: string }   — block.data (read-only; patch via onChange)
@@ -10,7 +11,7 @@
  *
  * Features:
  *   - Auto-growing textarea for markdown input
- *   - Live preview panel (react-markdown + remark-breaks, matches app renderer)
+ *   - Live preview panel — renders directive cards + markdown (matches app exactly)
  *   - Toggle between Edit / Preview / Split view
  *   - Character count
  *   - RTL-aware: dir="auto" on both textarea and preview (Arabic/English mixed content)
@@ -20,8 +21,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkBreaks from 'remark-breaks'
+import { renderDirectiveMarkdown } from '../../../lib/directiveRenderer'
 
 // ─── View mode toggle ──────────────────────────────────────────────────────────
 
@@ -71,7 +71,6 @@ function ModeToggle({ mode, onChange }) {
 function AutoTextarea({ value, onChange, disabled, placeholder }) {
   const ref = useRef(null)
 
-  // Grow on value change
   useEffect(() => {
     if (!ref.current) return
     ref.current.style.height = 'auto'
@@ -113,19 +112,21 @@ function AutoTextarea({ value, onChange, disabled, placeholder }) {
 
 // ─── Preview panel ─────────────────────────────────────────────────────────────
 
-const previewProse = {
-  fontSize: 14,
-  lineHeight: 1.7,
-  color: 'var(--color-text-primary)',
-  fontFamily: 'var(--font-body)',
-}
-
 function PreviewPanel({ markdown }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!ref.current) return
+    ref.current.innerHTML = renderDirectiveMarkdown(markdown)
+  }, [markdown])
+
   if (!markdown?.trim()) {
     return (
       <div style={{
-        ...previewProse,
+        fontSize: 14,
+        lineHeight: 1.7,
         color: 'var(--color-text-tertiary)',
+        fontFamily: 'var(--font-body)',
         fontStyle: 'italic',
         padding: 'var(--space-3)',
         border: '1px solid var(--color-border)',
@@ -140,9 +141,10 @@ function PreviewPanel({ markdown }) {
 
   return (
     <div
+      ref={ref}
       dir="auto"
+      className="dir-prose"
       style={{
-        ...previewProse,
         padding: 'var(--space-3)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-md)',
@@ -150,40 +152,7 @@ function PreviewPanel({ markdown }) {
         minHeight: 140,
         overflowY: 'auto',
       }}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkBreaks]}
-        components={{
-          p: ({ children }) => (
-            <p dir="auto" style={{ margin: '0 0 0.75em 0', unicodeBidi: 'plaintext' }}>{children}</p>
-          ),
-          strong: ({ children }) => <strong style={{ fontWeight: 700 }}>{children}</strong>,
-          em:     ({ children }) => <em style={{ fontStyle: 'italic' }}>{children}</em>,
-          ul: ({ children }) => <ul style={{ paddingLeft: '1.4em', margin: '0 0 0.75em 0' }}>{children}</ul>,
-          ol: ({ children }) => <ol style={{ paddingLeft: '1.4em', margin: '0 0 0.75em 0' }}>{children}</ol>,
-          li: ({ children }) => <li style={{ marginBottom: '0.2em' }}>{children}</li>,
-          h1: ({ children }) => <h1 style={{ fontSize: '1.2em', fontWeight: 700, margin: '0 0 0.5em 0' }}>{children}</h1>,
-          h2: ({ children }) => <h2 style={{ fontSize: '1.1em', fontWeight: 700, margin: '0 0 0.5em 0' }}>{children}</h2>,
-          h3: ({ children }) => <h3 style={{ fontSize: '1em',   fontWeight: 700, margin: '0 0 0.5em 0' }}>{children}</h3>,
-          blockquote: ({ children }) => (
-            <blockquote style={{
-              borderLeft: '3px solid var(--color-border)',
-              paddingLeft: '0.8em',
-              margin: '0 0 0.75em 0',
-              color: 'var(--color-text-secondary)',
-            }}>
-              {children}
-            </blockquote>
-          ),
-          code: ({ inline, children }) => inline
-            ? <code style={{ fontSize: '0.9em', backgroundColor: 'var(--color-border)', borderRadius: 3, padding: '1px 4px' }}>{children}</code>
-            : <pre style={{ overflowX: 'auto', fontSize: '0.9em', backgroundColor: 'var(--color-border)', borderRadius: 6, padding: 'var(--space-2)', margin: '0 0 0.75em 0' }}><code>{children}</code></pre>,
-          hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1em 0' }} />,
-        }}
-      >
-        {markdown}
-      </ReactMarkdown>
-    </div>
+    />
   )
 }
 
@@ -222,7 +191,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           color: 'var(--color-text-tertiary)',
           fontFamily: 'var(--font-body)',
         }}>
-          {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown supported'}
+          {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
         </span>
       </div>
 
@@ -232,7 +201,7 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           value={markdown}
           onChange={handleChange}
           disabled={disabled}
-          placeholder="Write in markdown…"
+          placeholder="Write in markdown… use :::warning, :::dose, :::redflags etc. for cards"
         />
       )}
 
@@ -245,12 +214,13 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gap: 'var(--space-2)',
+          minWidth: 0,
         }}>
           <AutoTextarea
             value={markdown}
             onChange={handleChange}
             disabled={disabled}
-            placeholder="Write in markdown…"
+            placeholder="Write in markdown… use :::warning, :::dose, :::redflags etc. for cards"
           />
           <PreviewPanel markdown={markdown} />
         </div>
