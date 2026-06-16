@@ -113,13 +113,6 @@ function AutoTextarea({ value, onChange, disabled, placeholder }) {
 // ─── Preview panel ─────────────────────────────────────────────────────────────
 
 function PreviewPanel({ markdown }) {
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!ref.current) return
-    ref.current.innerHTML = renderDirectiveMarkdown(markdown)
-  }, [markdown])
-
   if (!markdown?.trim()) {
     return (
       <div style={{
@@ -141,7 +134,6 @@ function PreviewPanel({ markdown }) {
 
   return (
     <div
-      ref={ref}
       dir="auto"
       className="dir-prose"
       style={{
@@ -152,6 +144,7 @@ function PreviewPanel({ markdown }) {
         minHeight: 140,
         overflowY: 'auto',
       }}
+      dangerouslySetInnerHTML={{ __html: renderDirectiveMarkdown(markdown) }}
     />
   )
 }
