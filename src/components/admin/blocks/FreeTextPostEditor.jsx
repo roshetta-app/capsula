@@ -3,6 +3,8 @@
  *
  * Phase 3.4: CMS editor for free_text_post blocks.
  * Phase 5:   Upgraded preview to render ::: directive cards (matches app renderer).
+ * Phase 6:   Added "Copy AI Prompt" button — fetches directive_ai_prompt from
+ *            cms_config on mount, copies to clipboard on click.
  *
  * Props:
  *   data     { markdown: string }   — block.data (read-only; patch via onChange)
@@ -14,6 +16,7 @@
  *   - Live preview panel — renders directive cards + markdown (matches app exactly)
  *   - Toggle between Edit / Preview / Split view
  *   - Character count
+ *   - Copy AI Prompt button — one-click clipboard copy of the stored system prompt
  *   - RTL-aware: dir="auto" on both textarea and preview (Arabic/English mixed content)
  *
  * Data shape (Section 3.2 of masterplan):
@@ -22,6 +25,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { renderDirectiveMarkdown } from '../../../lib/directiveRenderer'
+import { supabase } from '../../../lib/supabase'
+import { fetchCmsConfig } from '../../../lib/queries'
 
 // ─── View mode toggle ──────────────────────────────────────────────────────────
 
@@ -63,6 +68,47 @@ function ModeToggle({ mode, onChange }) {
         )
       })}
     </div>
+  )
+}
+
+// ─── Copy AI Prompt button ─────────────────────────────────────────────────────
+
+// status: idle | loading | copied | error
+function CopyPromptButton({ onCopy, status }) {
+  const label = {
+    idle:    '⚡ Copy AI Prompt',
+    loading: 'Loading…',
+    copied:  '✓ Copied!',
+    error:   'Failed — try again',
+  }[status] ?? '⚡ Copy AI Prompt'
+
+  const color = {
+    idle:    'var(--color-text-secondary)',
+    loading: 'var(--color-text-tertiary)',
+    copied:  'var(--color-success)',
+    error:   'var(--color-danger)',
+  }[status] ?? 'var(--color-text-secondary)'
+
+  return (
+    <button
+      onClick={onCopy}
+      style={{
+        padding: '4px 10px',
+        fontSize: 11,
+        fontWeight: 500,
+        fontFamily: 'var(--font-body)',
+        borderRadius: 'var(--radius-sm)',
+        border: '1px solid var(--color-border)',
+        cursor: status === 'loading' ? 'default' : 'pointer',
+        backgroundColor: 'var(--color-surface)',
+        color,
+        transition: 'color 0.15s',
+        whiteSpace: 'nowrap',
+        opacity: status === 'loading' ? 0.6 : 1,
+      }}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -160,12 +206,49 @@ function PreviewPanel({ markdown }) {
  */
 export default function FreeTextPostEditor({ data, onChange, disabled = false }) {
   const markdown = data?.markdown ?? ''
-  const [mode, setMode] = useState('Edit')
+  const [mode, setMode]             = useState('Edit')
+  const [aiPrompt, setAiPrompt]     = useState(null)   // null = not yet fetched
+  const [copyStatus, setCopyStatus] = useState('idle') // idle | loading | copied | error
 
   const charCount = markdown.length
 
+  // Fetch the AI prompt once on mount — cached in state for the session.
+  useEffect(() => {
+    fetchCmsConfig(supabase, 'directive_ai_prompt')
+      .then(value => setAiPrompt(value ?? ''))
+      .catch(() => setAiPrompt(''))   // silent fail — button will show error on click
+  }, [])
+
   function handleChange(val) {
     onChange({ markdown: val })
+  }
+
+  async function handleCopyPrompt() {
+    if (copyStatus === 'loading') return
+
+    // Prompt not yet loaded — fetch on demand then copy
+    if (aiPrompt === null) {
+      setCopyStatus('loading')
+      try {
+        const value = await fetchCmsConfig(supabase, 'directive_ai_prompt')
+        setAiPrompt(value ?? '')
+        await navigator.clipboard.writeText(value ?? '')
+        setCopyStatus('copied')
+      } catch {
+        setCopyStatus('error')
+      }
+      setTimeout(() => setCopyStatus('idle'), 2000)
+      return
+    }
+
+    // Prompt already cached — copy immediately
+    try {
+      await navigator.clipboard.writeText(aiPrompt)
+      setCopyStatus('copied')
+    } catch {
+      setCopyStatus('error')
+    }
+    setTimeout(() => setCopyStatus('idle'), 2000)
   }
 
   return (
@@ -179,13 +262,16 @@ export default function FreeTextPostEditor({ data, onChange, disabled = false })
         flexWrap: 'wrap',
       }}>
         <ModeToggle mode={mode} onChange={setMode} />
-        <span style={{
-          fontSize: 11,
-          color: 'var(--color-text-tertiary)',
-          fontFamily: 'var(--font-body)',
-        }}>
-          {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <span style={{
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            {charCount > 0 ? `${charCount.toLocaleString()} chars` : 'Markdown + cards supported'}
+          </span>
+          <CopyPromptButton onCopy={handleCopyPrompt} status={copyStatus} />
+        </div>
       </div>
 
       {/* Editor area */}

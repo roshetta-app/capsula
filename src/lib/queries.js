@@ -254,3 +254,24 @@ export async function fetchAllConditions(supabase) {
   if (error) throw error
   return mapConditions(data)
 }
+
+// ─── CMS config ───────────────────────────────────────────────────────────────
+
+/**
+ * Fetch a single value from the cms_config key-value table.
+ * Used by FreeTextPostEditor to load the directive AI prompt.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} key
+ * @returns {Promise<string | null>}
+ */
+export async function fetchCmsConfig(supabase, key) {
+  const { data, error } = await supabase
+    .from('cms_config')
+    .select('value')
+    .eq('key', key)
+    .single()
+
+  if (error) throw error
+  return data?.value ?? null
+}

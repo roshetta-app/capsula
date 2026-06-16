@@ -1,4 +1,3 @@
-
 /**
  * adminQueries.js — Supabase write operations for the admin CMS.
  *
@@ -771,4 +770,23 @@ export async function syncConditionTags(conditionId, tagNames) {
     .from('condition_tags')
     .insert(rows)
   return { error: insertErr ?? null }
+}
+
+// ─── CMS config (Phase 2) ────────────────────────────────────────────────────
+
+/**
+ * Update a value in the cms_config key-value table.
+ * Used by developers to update the directive AI prompt without a Supabase dashboard visit.
+ * (Phase 3 may expose this via a CMS UI — for now it is available but not wired to any screen.)
+ *
+ * @param {string} key
+ * @param {string} value
+ */
+export async function updateCmsConfig(key, value) {
+  const { error } = await supabase
+    .from('cms_config')
+    .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+
+  if (error) throw error
+  return { error: null }
 }
