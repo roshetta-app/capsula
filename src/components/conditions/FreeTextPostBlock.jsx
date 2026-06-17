@@ -10,36 +10,31 @@
  * Renders nothing if markdown is empty (per 3.2 spec).
  *
  * Heading hierarchy (Phase 4.1) — preserved exactly:
- *   ## → section label: 10px, weight 500, uppercase, letter-spacing 0.06em,
- *          color-text-tertiary, margin-top space-5, margin-bottom 6px
- *   ### → sub-label: 11px, weight 500, color-text-secondary,
- *          margin-top space-3, margin-bottom 4px
- *   #   → reserved / fallback: same as ##
+ *   ## → section label: rendered via .dir-prose h2 styles in globals.css
+ *   ### → sub-label: rendered via .dir-prose h3 styles in globals.css
  *
- * Directive cards (Phase 5):
+ * Directive cards (Phase 5 redesign — 8 types):
  *   :::type [Optional Title]\n content \n::: blocks render as styled clinical cards.
  *   Card CSS lives in globals.css under the .dir-card-* classes.
+ *   Active types: danger, warning, redflags, contraindications, dose, criteria, tip, pearls
+ *
+ * Fix (Phase 5 redesign):
+ *   Uses dangerouslySetInnerHTML instead of ref+useEffect to avoid first-mount
+ *   render failure when markdown content is already present on open.
  */
 
-import { useEffect, useRef } from 'react'
 import { renderDirectiveMarkdown } from '../../lib/directiveRenderer'
 
 export default function FreeTextPostBlock({ block }) {
   const markdown = block?.data?.markdown ?? ''
-  const ref = useRef(null)
-
-  useEffect(() => {
-    if (!ref.current) return
-    ref.current.innerHTML = renderDirectiveMarkdown(markdown)
-  }, [markdown])
 
   if (!markdown.trim()) return null
 
   return (
     <div
-      ref={ref}
       dir="auto"
       className="dir-prose"
+      dangerouslySetInnerHTML={{ __html: renderDirectiveMarkdown(markdown) }}
     />
   )
 }
