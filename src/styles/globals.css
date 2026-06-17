@@ -266,10 +266,18 @@ body {
 
 /* ─── Lists ───────────────────────────────────────────────────────────────────── */
 
-.dir-prose ul,
+/* FIX: Tailwind v4 preflight resets list-style to none on all ul/ol.
+   Explicitly restore bullet and number markers so they render in .dir-prose. */
+.dir-prose ul {
+  margin: 0 0 10px;
+  padding-inline-start: 20px;
+  list-style-type: disc;
+}
+
 .dir-prose ol {
   margin: 0 0 10px;
   padding-inline-start: 20px;
+  list-style-type: decimal;
 }
 
 .dir-prose li {
