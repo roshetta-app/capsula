@@ -49,6 +49,27 @@ export const DIRECTIVES = {
   pearls:            { label: 'Clinical Pearls',    cls: 'dir-card-pearls' },
 }
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+/**
+ * stripLooseListParagraphs(html: string) → string
+ *
+ * marked wraps list-item content in <p> tags when items are separated by blank
+ * lines ("loose list" mode). This produces <li><p>text</p></li>, which causes
+ * the browser to treat the paragraph as a block-level child and can suppress
+ * the list marker glyph (bullet / number) depending on how the list is styled.
+ *
+ * This helper removes the single <p>…</p> wrapper from each <li> so markers
+ * render correctly. It is safe for our content because CMS list items are
+ * always single-paragraph; multi-paragraph items are not used.
+ *
+ * Works against any marked version — operates on the final HTML string rather
+ * than hooking into the renderer, so it is version-agnostic.
+ */
+function stripLooseListParagraphs(html) {
+  return html.replace(/<li><p>([\s\S]*?)<\/p>\n?<\/li>/g, '<li>$1</li>')
+}
+
 // ─── Renderer ──────────────────────────────────────────────────────────────────
 
 /**
@@ -74,7 +95,9 @@ export function renderDirectiveMarkdown(raw) {
 
       // Unknown or removed directive type — render body as plain prose, discard the wrapper.
       if (!cfg) {
-        const fallbackHtml = marked.parse(body.trim(), { breaks: true, gfm: true })
+        const fallbackHtml = stripLooseListParagraphs(
+          marked.parse(body.trim(), { breaks: true, gfm: true })
+        )
         const key = `DIRECTIVE_PLACEHOLDER_${counter++}`
         blocks[key] = fallbackHtml
         return `\n\n${key}\n\n`
@@ -82,7 +105,9 @@ export function renderDirectiveMarkdown(raw) {
 
       // Build header: "LABEL" or "LABEL: Title" when a title is provided
       const labelText = title ? `${cfg.label}: ${title}` : cfg.label
-      const innerHtml = marked.parse(body.trim(), { breaks: true, gfm: true })
+      const innerHtml = stripLooseListParagraphs(
+        marked.parse(body.trim(), { breaks: true, gfm: true })
+      )
 
       const cardHtml = `<div class="dir-card ${cfg.cls}" dir="auto">
   <div class="dir-card-header">${labelText}</div>
@@ -95,7 +120,9 @@ export function renderDirectiveMarkdown(raw) {
   )
 
   // Step 2 — Run marked on clean markdown only (no card HTML present).
-  let html = marked.parse(withPlaceholders, { breaks: false, gfm: true })
+  let html = stripLooseListParagraphs(
+    marked.parse(withPlaceholders, { breaks: false, gfm: true })
+  )
 
   // Step 3 — Swap placeholders back.
   // marked may have wrapped them in <p> tags — strip those too.

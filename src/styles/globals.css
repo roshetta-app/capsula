@@ -269,10 +269,7 @@ body {
 .dir-prose ul,
 .dir-prose ol {
   margin: 0 0 10px;
-  padding-inline-start: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  padding-inline-start: 20px;
 }
 
 .dir-prose li {
@@ -280,6 +277,10 @@ body {
   line-height: 1.6;
   color: var(--color-text-primary);
   unicode-bidi: plaintext;
+}
+
+.dir-prose li + li {
+  margin-top: 4px;
 }
 
 /* ─── Inline formatting ───────────────────────────────────────────────────────── */
