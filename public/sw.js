@@ -21,6 +21,11 @@
  * Phase 3K addition:
  *   - Push event handler: shows notification when push message received
  *   - notificationclick handler: focuses/opens the app on tap
+ *
+ * Fix (GH Pages blank-on-deploy race):
+ *   - RELOAD broadcast is delayed 4 s after activate so any in-flight
+ *     404→index.html redirects finish decoding sessionStorage before the
+ *     tab is told to reload.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -52,9 +57,20 @@ self.addEventListener('activate', event => {
         )
       )
       .then(() => self.clients.claim())
-      .then(() => self.clients.matchAll({ type: 'window' }))
-      .then(clients => {
-        clients.forEach(client => client.postMessage({ type: 'RELOAD' }))
+      .then(() => {
+        // Delay the RELOAD broadcast by 4 s.
+        // This prevents the SW update from interrupting an in-flight
+        // GitHub Pages 404 → /capsula/?p=1 → index.html redirect chain.
+        // Without the delay the SW can claim the tab and send RELOAD
+        // while sessionStorage still holds the pending gh_pages_redirect
+        // key, causing the decode script in index.html to run on the
+        // reloaded page instead of the redirect-target page — resulting
+        // in a blank screen or wrong route on desktop after a deploy.
+        setTimeout(() => {
+          self.clients.matchAll({ type: 'window' }).then(clients => {
+            clients.forEach(client => client.postMessage({ type: 'RELOAD' }))
+          })
+        }, 4000)
       })
   )
 })
