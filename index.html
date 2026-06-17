@@ -3,6 +3,16 @@
   <head>
     <meta charset="UTF-8" />
 
+    <!--
+      Prevent the browser from HTTP-caching this file.
+      After a Vite build, asset filenames change (content hashes). If the
+      browser serves a stale index.html it requests old hashed filenames
+      that no longer exist on the server → 404 → blank page on desktop.
+      no-store forces a network fetch every time, which is correct for an
+      app shell whose only real content is a <script> tag.
+    -->
+    <meta http-equiv="Cache-Control" content="no-store" />
+
     <!-- Critical for mobile display -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 

@@ -34,13 +34,23 @@ createRoot(document.getElementById('root')).render(
 
 // ─── Service worker registration + auto-update ────────────────────────────────
 //
-// Two complementary triggers for desktop reliability:
+// After a new SW activates it takes control (controllerchange) and sends a
+// RELOAD message. Both triggers call the same hardReload() helper.
 //
-//   1. controllerchange  — fires when the NEW sw takes control (most reliable on desktop)
-//   2. message RELOAD    — sent by sw.js activate; catches cases where controller
-//                          was already set before controllerchange fires
+// Why hardReload() instead of location.reload()?
+//   location.reload() re-uses the browser's HTTP cache, which may still hold
+//   the old index.html (with old Vite-hashed asset filenames). Those filenames
+//   no longer exist after a new build → ERR_ABORTED 404 → blank page on desktop.
 //
-// We guard with a flag so we never double-reload.
+//   Instead we navigate to /capsula/?sw-reload=<timestamp> — a URL the browser
+//   has never seen, so it cannot serve it from HTTP cache. GitHub Pages returns
+//   the fresh index.html. React Router's basename strips /capsula and the app
+//   boots normally at the root route.
+//
+//   The ?sw-reload param is ignored by the app; it exists only to bust the cache.
+//
+// Guard: a single reloading flag prevents controllerchange and the RELOAD
+// message from both firing a navigation in the same update cycle.
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -49,22 +59,27 @@ if ('serviceWorker' in navigator) {
       .then(registration => {
         console.log('[SW] Registered:', registration.scope)
 
-        // ── Trigger 1: controllerchange ────────────────────────────────────
         let reloading = false
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
+
+        function hardReload(reason) {
           if (reloading) return
           reloading = true
-          console.log('[SW] Controller changed — reloading for fresh build')
-          window.location.reload()
+          console.log('[SW] ' + reason + ' — navigating for fresh build')
+          // Cache-busting: unique URL forces browser past HTTP cache for index.html
+          window.location.replace(
+            '/capsula/?sw-reload=' + Date.now()
+          )
+        }
+
+        // ── Trigger 1: new SW takes control ───────────────────────────────
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          hardReload('Controller changed')
         })
 
-        // ── Trigger 2: message from SW ─────────────────────────────────────
+        // ── Trigger 2: explicit RELOAD message from SW activate ────────────
         navigator.serviceWorker.addEventListener('message', event => {
           if (event.data?.type === 'RELOAD') {
-            if (reloading) return
-            reloading = true
-            console.log('[SW] RELOAD message received — reloading')
-            window.location.reload()
+            hardReload('RELOAD message received')
           }
         })
 
