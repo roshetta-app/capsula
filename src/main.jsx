@@ -72,10 +72,13 @@ if ('serviceWorker' in navigator) {
           if (reloading) return
           reloading = true
           console.log('[SW] ' + reason + ' — navigating for fresh build')
-          // Cache-busting: unique URL forces browser past HTTP cache for index.html
-          window.location.replace(
-            '/capsula/?sw-reload=' + Date.now()
-          )
+          // Cache-busting: unique URL forces browser past HTTP cache for index.html.
+          // Built from the CURRENT location (not a hardcoded root path) so a
+          // reload while deep in the CMS lands back on the same page, not
+          // the main app screen.
+          var url = new URL(window.location.href)
+          url.searchParams.set('sw-reload', Date.now())
+          window.location.replace(url.toString())
         }
 
         // ── Trigger 1: new SW takes control ───────────────────────────────
