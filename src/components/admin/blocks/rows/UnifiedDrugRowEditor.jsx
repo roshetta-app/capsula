@@ -611,16 +611,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         if (existingBrand) {
           brandId = existingBrand.id
         } else {
-          const brandSlugBase = `${brandName}-${concentration}-${row.form}`
-            .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
           const { data: newBrand, error: bErr } = await insertBrand({
             formulation_id: formulationId,
-            slug: brandSlugBase || `brand-${Date.now()}`,
             name: brandName,
             name_ar: '',
             manufacturer: null,
             source: SOURCE_FLAG_VALUE,
             is_published: true,
+            is_available: true,
           })
           if (bErr) throw new Error(`Creating brand "${brandName}": ${bErr.message}`)
           brandId = newBrand.id
