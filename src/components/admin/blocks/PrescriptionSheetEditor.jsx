@@ -1,40 +1,60 @@
 /**
  * src/components/admin/blocks/PrescriptionSheetEditor.jsx
  *
- * Changes:
- *   - Removed the distinct colored top-edge border from RowCard.
- *     All four borders are now uniform (1px solid var(--color-border)).
- *   - Row header background is a faint per-type color tint (color + '12')
- *     matching the rx-level block header style, instead of transparent / color-bg.
- *   - Simplified layout: removed the BlockMap wrapper box and "ROWS" section header.
- *     Rows and add-row buttons render flat — no redundant border-in-border nesting.
+ * Phase 1 changes (prescription redesign):
+ *   - Replaced separate Drug (library) / Drug (free text) row types with a
+ *     single unified 'drug' row_type, using UnifiedDrugRowEditor.
+ *     Old drug_library and drug_freetext add-row buttons replaced with one
+ *     "+ Drug" button.
+ *   - Added 'section_header' row type with a simple label field (§2.4).
+ *   - Wired PromoteAlternativeDialog (§2.2a / step 1.11): attempting to
+ *     delete a 'drug' row that has alternatives now shows a promote dialog
+ *     instead of immediately removing the row.
+ *   - rowSummary and ROW_TYPE_LABELS updated for new row types.
+ *   - _formulationMeta (and any other underscore-prefixed transient fields)
+ *     are still the parent's responsibility to strip before persisting;
+ *     this behaviour is unchanged.
  *
  * Data shape (block.data):
  *   {
  *     label: string,
  *     rows: Array<
- *       | { row_type: "drug_library",  formulation_id, _formulationMeta?, dose_override, note_en, note_ar, drug_link_enabled }
- *       | { row_type: "drug_freetext", drug_name, dose_text }
- *       | { row_type: "note",          text, flavor? }
- *       | { row_type: "free_text",     markdown }
+ *       | { row_type: "drug",           id, brand_name, brand_id, generic_name, generic_id,
+ *                                       formulation_id, concentration, form, dose,
+ *                                       note_en, note_ar, drug_link_enabled, source_flag,
+ *                                       alternatives: AlternativeDrug[] }
+ *       | { row_type: "section_header", id, label }
+ *       | { row_type: "note",           id, text_en, text_ar }
+ *       | { row_type: "free_text",      id, content }
  *     >
  *   }
+ *
+ * Legacy row_type values ("drug_library", "drug_freetext") may still exist
+ * in persisted data for rows not yet touched by an editor. The RowCard
+ * renderer treats them gracefully: both render via UnifiedDrugRowEditor,
+ * mapping old field names on the fly (dose_override→dose, drug_name→brand_name,
+ * dose_text→dose) so no data migration is required.
  */
 
 import { useState } from 'react'
 import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
-import DrugLibraryRowEditor  from './rows/DrugLibraryRowEditor'
-import DrugFreetextRowEditor from './rows/DrugFreetextRowEditor'
+import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
+import { DRUG_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
+import { nanoid } from 'nanoid'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROW_TYPE_LABELS = {
-  drug_library:  { label: 'Drug (library)',   color: '#6366f1' },
-  drug_freetext: { label: 'Drug (free text)', color: '#0ea5e9' },
-  note:          { label: 'Note',             color: '#f59e0b' },
-  free_text:     { label: 'Text Block',       color: '#1D4ED8' },
+  // New unified type
+  drug:           { label: 'Drug',           color: '#6366f1' },
+  section_header: { label: 'Section',        color: '#10b981' },
+  note:           { label: 'Note',           color: '#f59e0b' },
+  free_text:      { label: 'Text Block',     color: '#1D4ED8' },
+  // Legacy types — still renderable, will be normalised on next edit
+  drug_library:   { label: 'Drug (library)', color: '#6366f1' },
+  drug_freetext:  { label: 'Drug (text)',    color: '#0ea5e9' },
 }
 
 // ─── Row type chip ─────────────────────────────────────────────────────────────
@@ -63,32 +83,126 @@ function RowTypeChip({ rowType }) {
 // ─── Row summary (one-line collapsed view) ─────────────────────────────────────
 
 function rowSummary(row) {
+  // New unified drug row
+  if (row.row_type === 'drug') {
+    const name = row.brand_name || row.generic_name || ''
+    const rest = [row.concentration, row.form].filter(Boolean).join(' ')
+    return [name, rest].filter(Boolean).join(' ') || 'Empty drug'
+  }
+  // Legacy: drug_library
   if (row.row_type === 'drug_library') {
     const m = row._formulationMeta
     if (m) return `${m.name_en} ${m.concentration} ${m.form}`.trim()
     return row.formulation_id ? `Formulation ${row.formulation_id.slice(0, 8)}…` : 'No formulation selected'
   }
+  // Legacy: drug_freetext
   if (row.row_type === 'drug_freetext') {
     return [row.drug_name, row.dose_text].filter(Boolean).join(' — ') || 'Empty drug'
   }
+  if (row.row_type === 'section_header') {
+    return row.label || 'Untitled section'
+  }
   if (row.row_type === 'note') {
-    return row.text || 'Empty note'
+    return row.text_en || row.text || 'Empty note'
   }
   if (row.row_type === 'free_text') {
-    const md = row.markdown ?? ''
+    const md = row.content ?? row.markdown ?? ''
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
   }
   return ''
 }
 
+// ─── Normalise legacy rows to new shape on first edit ─────────────────────────
+// Called when a legacy row is passed to onChange so it gets upgraded in state.
+
+function normaliseLegacyDrugRow(row) {
+  if (row.row_type === 'drug') return row // already new
+  if (row.row_type === 'drug_library') {
+    const m = row._formulationMeta
+    return {
+      ...DRUG_ROW_TEMPLATE,
+      id:               row.id ?? nanoid(),
+      row_type:         'drug',
+      generic_name:     m?.name_en ?? null,
+      formulation_id:   row.formulation_id ?? null,
+      concentration:    m?.concentration ?? null,
+      form:             m?.form ?? null,
+      dose:             row.dose_override ?? null,
+      note_en:          row.note_en ?? null,
+      note_ar:          row.note_ar ?? null,
+      drug_link_enabled: row.drug_link_enabled ?? true,
+      _formulationMeta: m ?? null,
+    }
+  }
+  if (row.row_type === 'drug_freetext') {
+    return {
+      ...DRUG_ROW_TEMPLATE,
+      id:           row.id ?? nanoid(),
+      row_type:     'drug',
+      brand_name:   row.drug_name ?? null,
+      dose:         row.dose_text ?? null,
+    }
+  }
+  return row
+}
+
+// ─── Section header editor (inline, simple) ───────────────────────────────────
+
+function SectionHeaderRowEditor({ row, onChange }) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+        <span style={{
+          fontSize: 11, fontWeight: 700,
+          color: 'var(--color-text-secondary)',
+          textTransform: 'uppercase', letterSpacing: '0.05em',
+        }}>
+          Section label
+        </span>
+        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+          e.g. "For fever", "For cough"
+        </span>
+      </div>
+      <input
+        type="text"
+        value={row.label ?? ''}
+        onChange={e => onChange({ ...row, label: e.target.value })}
+        placeholder="Section heading…"
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '7px 10px',
+          border: '1.5px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 13, fontFamily: 'var(--font-body)',
+          backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-primary)',
+          outline: 'none',
+          fontWeight: 600,
+        }}
+      />
+    </div>
+  )
+}
+
 // ─── Individual row card ───────────────────────────────────────────────────────
 
-function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
+function RowCard({ row, idx, total, onChange, onMove, onDeleteRequest }) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
 
+  // Normalise legacy drug rows on first change
   function handleEditorChange(nextRow) {
     onChange(nextRow)
+  }
+
+  // For drug rows that are legacy, normalise when expanding so the unified
+  // editor receives a clean shape. We do this once on expand by firing onChange.
+  function handleExpand() {
+    const nowExpanded = !expanded
+    setExpanded(nowExpanded)
+    if (nowExpanded && (row.row_type === 'drug_library' || row.row_type === 'drug_freetext')) {
+      onChange(normaliseLegacyDrugRow(row))
+    }
   }
 
   return (
@@ -100,7 +214,7 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
     }}>
       {/* ── Row header ── */}
       <div
-        onClick={() => setExpanded(e => !e)}
+        onClick={handleExpand}
         style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px',
@@ -154,7 +268,7 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
           </button>
           <button
             type="button"
-            onClick={() => onDelete(idx)}
+            onClick={() => onDeleteRequest(idx)}
             title="Remove row"
             style={iconBtn(false, true)}
           >
@@ -166,13 +280,19 @@ function RowCard({ row, idx, total, onChange, onMove, onDelete }) {
       {/* ── Expanded editor ── */}
       {expanded && (
         <div style={{ padding: '12px 14px' }}>
-          {row.row_type === 'drug_library'  && <DrugLibraryRowEditor  row={row} onChange={handleEditorChange} />}
-          {row.row_type === 'drug_freetext' && <DrugFreetextRowEditor row={row} onChange={handleEditorChange} />}
-          {row.row_type === 'note'          && <NoteRowEditor         row={row} onChange={handleEditorChange} />}
-          {row.row_type === 'free_text'     && (
+          {(row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext') && (
+            <UnifiedDrugRowEditor row={row} onChange={handleEditorChange} />
+          )}
+          {row.row_type === 'section_header' && (
+            <SectionHeaderRowEditor row={row} onChange={handleEditorChange} />
+          )}
+          {row.row_type === 'note' && (
+            <NoteRowEditor row={row} onChange={handleEditorChange} />
+          )}
+          {row.row_type === 'free_text' && (
             <FreeTextPostEditor
-              data={{ markdown: row.markdown ?? '' }}
-              onChange={patch => handleEditorChange({ ...row, markdown: patch.markdown })}
+              data={{ markdown: row.content ?? row.markdown ?? '' }}
+              onChange={patch => handleEditorChange({ ...row, content: patch.markdown, markdown: patch.markdown })}
             />
           )}
         </div>
@@ -234,6 +354,10 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
   const label = data.label ?? ''
   const rows  = data.rows  ?? []
 
+  // State for the promote dialog (step 1.11)
+  // { rowIdx: number } when open, null when closed
+  const [promoteDialog, setPromoteDialog] = useState(null)
+
   function update(patch) {
     onChange({ label, rows, ...patch })
   }
@@ -257,35 +381,69 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
     update({ rows: next })
   }
 
+  // Delete request: if it's a drug row with alternatives, show the promote
+  // dialog instead of deleting immediately (step 1.11).
+  function handleDeleteRequest(idx) {
+    const row = rows[idx]
+    const isDrug = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
+    const hasAlternatives = isDrug && (row.alternatives ?? []).length > 0
+    if (hasAlternatives) {
+      setPromoteDialog({ rowIdx: idx })
+    } else {
+      deleteRow(idx)
+    }
+  }
+
   function deleteRow(idx) {
     update({ rows: rows.filter((_, i) => i !== idx) })
   }
 
+  // Promote an alternative to the main slot, then remove the original row
+  function handlePromote(altIndex) {
+    const { rowIdx } = promoteDialog
+    const row = rows[rowIdx]
+    const promoted = promoteAlternativeToMain(row, altIndex)
+    const next = rows.map((r, i) => i === rowIdx ? promoted : r)
+    update({ rows: next })
+    setPromoteDialog(null)
+  }
+
+  function handleDeleteAll() {
+    deleteRow(promoteDialog.rowIdx)
+    setPromoteDialog(null)
+  }
+
   // ── Add templates ──────────────────────────────────────────────────────────
 
-  function addDrugLibrary() {
+  function addDrug() {
     addRow({
-      row_type:          'drug_library',
-      formulation_id:    null,
-      _formulationMeta:  null,
-      dose_override:     null,
-      note_en:           null,
-      note_ar:           null,
-      drug_link_enabled: true,
+      ...DRUG_ROW_TEMPLATE,
+      id: nanoid(),
     })
   }
 
-  function addDrugFreetext() {
-    addRow({ row_type: 'drug_freetext', drug_name: '', dose_text: '' })
+  function addSectionHeader() {
+    addRow({
+      row_type: 'section_header',
+      id: nanoid(),
+      label: '',
+    })
   }
 
   function addNote() {
-    addRow({ row_type: 'note', text: '', flavor: 'info' })
+    addRow({
+      row_type: 'note',
+      id: nanoid(),
+      text_en: null,
+      text_ar: null,
+    })
   }
 
   function addFreeText() {
-    addRow({ row_type: 'free_text', markdown: '' })
+    addRow({ row_type: 'free_text', id: nanoid(), content: '' })
   }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -322,7 +480,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
         />
       </div>
 
-      {/* ── Row list (flat — no wrapper box) ─────────────────────────────────── */}
+      {/* ── Row list ─────────────────────────────────────────────────────────── */}
       {rows.length === 0 ? (
         <div style={{
           textAlign: 'center', fontSize: 13,
@@ -331,31 +489,41 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
           border: '1.5px dashed var(--color-border)',
           borderRadius: 'var(--radius-md)',
         }}>
-          No rows yet — add a drug, note, or text block below.
+          No rows yet — add a drug, section, note, or text block below.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {rows.map((row, idx) => (
             <RowCard
-              key={idx}
+              key={row.id ?? idx}
               row={row}
               idx={idx}
               total={rows.length}
               onChange={nextRow => updateRow(idx, nextRow)}
               onMove={moveRow}
-              onDelete={deleteRow}
+              onDeleteRequest={handleDeleteRequest}
             />
           ))}
         </div>
       )}
 
-      {/* ── Add-row buttons (flat — no wrapper box) ───────────────────────────── */}
+      {/* ── Add-row buttons ───────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <AddRowButton label="Drug (free text)" color="#0ea5e9" onClick={addDrugFreetext} />
-        <AddRowButton label="Drug (library)"   color="#6366f1" onClick={addDrugLibrary} />
-        <AddRowButton label="Note"             color="#f59e0b" onClick={addNote} />
-        <AddRowButton label="Text Block"       color="#1D4ED8" onClick={addFreeText} />
+        <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} />
+        <AddRowButton label="Section"      color="#10b981" onClick={addSectionHeader} />
+        <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} />
+        <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} />
       </div>
+
+      {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}
+      {promoteDialog && (
+        <PromoteAlternativeDialog
+          row={rows[promoteDialog.rowIdx]}
+          onPromote={handlePromote}
+          onDeleteAll={handleDeleteAll}
+          onCancel={() => setPromoteDialog(null)}
+        />
+      )}
 
     </div>
   )
