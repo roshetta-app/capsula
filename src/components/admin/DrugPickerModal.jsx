@@ -28,7 +28,7 @@ async function searchFormulationsForPicker(query) {
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
       generics ( id, name_en, name_ar, slug ),
-      brands ( id, name )
+      brands ( id, name, name_ar )
     `)
     .eq('is_published', true)
     .order('concentration')
@@ -274,3 +274,4 @@ export default function DrugPickerModal({ isOpen, onClose, onSelect }) {
     </Modal>
   )
 }
+

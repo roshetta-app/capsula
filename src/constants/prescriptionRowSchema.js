@@ -43,6 +43,13 @@ export const ROW_TYPES = {
  *                                              from an existing generics row. Null = unlinked free text
  *                                              or left blank entirely (masterplan §2.6).
  *
+ * @property {string|null} name_ar           - LOCKED (2026-06-20). Arabic display name shown
+ *                                              directly under the English name. Mirrors
+ *                                              brand.name_ar when this row is brand-led, or
+ *                                              generic.name_ar when unbranded. Auto-filled on
+ *                                              library pick (brand/formulation/generic select),
+ *                                              but always freely editable for free-text rows.
+ *
  * @property {string|null} formulation_id    - uuid, set only if this row is fully linked to a
  *                                              specific formulations row (concentration + form
  *                                              combination already exists in the library).
@@ -65,8 +72,10 @@ export const ROW_TYPES = {
  *                                              get their own independent `dose` when they are a
  *                                              genuinely different formulation.
  *
- * @property {string|null} note_en
- * @property {string|null} note_ar
+ * @property {string|null} note              - LOCKED (2026-06-20, supersedes separate note_en/note_ar).
+ *                                              Single bidi field — author types English or Arabic
+ *                                              (or both) into one box; the renderer applies dir="auto"
+ *                                              so each language displays in its natural direction.
  * @property {boolean} drug_link_enabled     - carried over unchanged from current drug_library rows
  *
  * @property {'manual_entry'|null} source_flag
@@ -99,12 +108,12 @@ export const DRUG_ROW_TEMPLATE = {
   brand_id: null,
   generic_name: null,
   generic_id: null,
+  name_ar: null,
   formulation_id: null,
   concentration: null,
   form: null,
   dose: null,
-  note_en: null,
-  note_ar: null,
+  note: null,
   drug_link_enabled: true,
   source_flag: null,
   alternatives: [],
@@ -122,6 +131,11 @@ export const DRUG_ROW_TEMPLATE = {
  * @property {string|null} brand_id
  * @property {string|null} generic_name
  * @property {string|null} generic_id
+ * @property {string|null} name_ar
+ *   - Same rule as DrugRow.name_ar: brand.name_ar if this alternative is
+ *     brand-led, else generic.name_ar. Always shown under this
+ *     alternative's own name, even when it shares the parent's dose/note
+ *     cluster — only dose/note/breadcrumb are shared, not the name.
  * @property {string|null} formulation_id
  * @property {string|null} concentration
  * @property {string|null} form
@@ -130,15 +144,17 @@ export const DRUG_ROW_TEMPLATE = {
  *     as its parent drug row (i.e. it's just a different brand name for the
  *     exact same generic + concentration + form), `dose` here is ignored
  *     in favor of the parent row's single `dose` field — there is only one
- *     dose to show, since it really is the same medicine. The CMS should
- *     show this field as shared/read-only in that case, not a second
- *     editable box. If this alternative's formulation_id differs from the
- *     parent's (or either side is unlinked free text with no formulation_id
- *     at all), `dose` is this alternative's own independent, fully editable
- *     value — it is a genuinely different drug and may need a different
- *     amount.
- * @property {string|null} note_en
- * @property {string|null} note_ar
+ *     dose to show, since it really is the same medicine. The CMS hides
+ *     this field entirely in that case (not a second editable box that
+ *     gets silently dropped). If this alternative's formulation_id differs
+ *     from the parent's (or either side is unlinked free text with no
+ *     formulation_id at all), `dose` is this alternative's own independent,
+ *     fully editable value — it is a genuinely different drug and may need
+ *     a different amount.
+ * @property {string|null} note
+ *   - Same sharing rule as `dose`: hidden/inherited from the parent's
+ *     `note` when this alternative shares the parent's formulation_id,
+ *     otherwise its own independent value.
  * @property {'manual_entry'|null} source_flag
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
@@ -146,12 +162,12 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_id: null,
   generic_name: null,
   generic_id: null,
+  name_ar: null,
   formulation_id: null,
   concentration: null,
   form: null,
   dose: null,
-  note_en: null,
-  note_ar: null,
+  note: null,
   source_flag: null,
 };
 
@@ -211,6 +227,12 @@ export const FREE_TEXT_ROW_TEMPLATE = {
  *
  *   (new, both origins)
  *     brand_id, generic_id -> new, nullable link fields
+ *     name_ar                -> new (2026-06-20). Single Arabic display name,
+ *                               replaces relying on generic name alone; mirrors
+ *                               brand.name_ar when branded, else generic.name_ar.
+ *     note_en + note_ar      -> MERGED (2026-06-20) into a single `note` field.
+ *                               One bidi textbox instead of two; renderer uses
+ *                               dir="auto" to display each language correctly.
  *     alternatives           -> new, array, replaces both the old
  *                               prescription_drug_alternatives table concept
  *                               (which was used 2 times total in production
@@ -293,13 +315,14 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     brand_id: chosen.brand_id,
     generic_name: chosen.generic_name,
     generic_id: chosen.generic_id,
+    name_ar: chosen.name_ar,
     formulation_id: chosen.formulation_id,
     concentration: chosen.concentration,
     form: chosen.form,
     dose: chosen.dose,
-    note_en: chosen.note_en,
-    note_ar: chosen.note_ar,
+    note: chosen.note,
     source_flag: chosen.source_flag,
     alternatives: remaining,
   };
 }
+

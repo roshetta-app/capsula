@@ -9,9 +9,9 @@ import { alternativeSharesParentDose } from '../../constants/prescriptionRowSche
  *
  * Row types (in `sheet.rows[]`, array order = display order):
  *   drug              — unified row, post-redesign (masterplan §2.1, §2.2, §2.2a).
- *                        { brand_name, brand_id, generic_name, generic_id,
+ *                        { brand_name, brand_id, generic_name, generic_id, name_ar,
  *                          formulation_id, concentration, form, dose,
- *                          note_en, note_ar, drug_link_enabled, source_flag,
+ *                          note, drug_link_enabled, source_flag,
  *                          alternatives: [...] }
  *   section_header    — { label } — visual group boundary (masterplan §2.4).
  *                        Not a numbered/drug row itself; everything below it
@@ -96,6 +96,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
                     index={index}
                     row={row}
                     formulation={formulation}
+                    drugs={drugs}
                     navigate={navigate}
                     isLast={isLast}
                   />
@@ -243,85 +244,122 @@ function SectionHeader({ label }) {
  *   Main line: {brand_name} {concentration} {form} if a brand is present,
  *   otherwise {generic_name} {concentration} {form}.
  *   Secondary line (small, italic): generic name underneath, only when a
- *   brand is present.
+ *   brand is present. The Arabic name (name_ar), when present, is shown
+ *   directly under the English name for every member.
  *
- * Alternatives (§2.2a):
- *   Each entry in row.alternatives renders as an additional "or" line nested
- *   under the main drug, in the same card. One number for the whole group
+ * Alternatives — formulation clusters (§2.2a, REVISED 2026-06-20):
+ *   Every alternative that shares its formulation_id with the parent drug
+ *   row is folded into the parent's cluster — they share one breadcrumb,
+ *   one dose line, and one note; only the name (+ Arabic name) repeats per
+ *   member. Alternatives with a different (but shared among themselves)
+ *   formulation_id form their own cluster, each with its own breadcrumb/
+ *   dose/note. Alternatives with no formulation_id (free text) are always
+ *   their own standalone cluster. Clusters are separated visually by an
+ *   "or" divider; members within a cluster are separated by the same
+ *   divider, just without a second breadcrumb/dose/note block. One number
+ *   badge for the whole row regardless of how many clusters it expands to
  *   (§2.4a) — alternatives never get their own NumberBadge.
- *   - Generic line: shown once for the group if an alternative shares the
- *     same generic as the main drug; shown independently if it's a
- *     genuinely different generic.
- *   - Dose: shared with the parent's single dose field if same
- *     formulation_id (alternativeSharesParentDose), otherwise its own
- *     independent dose.
  */
-function UnifiedDrugRow({ index, row, formulation, navigate, isLast }) {
-  const hasBrand = !!row.brand_name?.trim()
-  const mainName = hasBrand ? row.brand_name : row.generic_name
-  const mainGeneric = row.generic_name
-  const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
+function buildFormulationClusters(row, drugs, mainFormulation) {
+  const alts = row.alternatives ?? []
+  const mainFormulationId = row.formulation_id ?? null
 
-  const mainSameGeneric = (a, b) => {
-    if (row.generic_id) return a === row.generic_id
-    return !!a && !!b && a === b
+  const mainCluster = {
+    formulationId: mainFormulationId,
+    dose: row.dose,
+    note: row.note,
+    formulation: mainFormulationId ? (mainFormulation ?? null) : null,
+    members: [{ isMain: true, data: row }],
   }
+
+  const otherClusters = new Map()
+  const standalone = []
+
+  for (const alt of alts) {
+    if (alternativeSharesParentDose(row, alt)) {
+      mainCluster.members.push({ isMain: false, data: alt })
+      continue
+    }
+    if (alt.formulation_id) {
+      if (!otherClusters.has(alt.formulation_id)) {
+        otherClusters.set(alt.formulation_id, {
+          formulationId: alt.formulation_id,
+          dose: alt.dose,
+          note: alt.note,
+          formulation: (drugs ?? []).find(d => d.id === alt.formulation_id) ?? null,
+          members: [],
+        })
+      }
+      otherClusters.get(alt.formulation_id).members.push({ isMain: false, data: alt })
+    } else {
+      standalone.push({
+        formulationId: null,
+        dose: alt.dose,
+        note: alt.note,
+        formulation: null,
+        members: [{ isMain: false, data: alt }],
+      })
+    }
+  }
+
+  return [mainCluster, ...otherClusters.values(), ...standalone]
+}
+
+function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
+  const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
+  const clusters = buildFormulationClusters(row, drugs, formulation)
 
   return (
     <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <DrugMainLine
-          name={mainName}
-          concentration={row.concentration}
-          form={row.form}
-          generic={hasBrand ? mainGeneric : null}
-          linkEnabled={linkEnabled}
-          slug={formulation?.slug}
-          navigate={navigate}
-        />
-
-        {row.dose && <DoseLine text={row.dose} />}
-
-        <DrugNotes noteEn={row.note_en} noteAr={row.note_ar} />
-
-        {/* ── Nested alternatives (§2.2a) ── */}
-        {(row.alternatives ?? []).map((alt, idx) => {
-          const altHasBrand = !!alt.brand_name?.trim()
-          const altName = altHasBrand ? alt.brand_name : alt.generic_name
-          const sharesGeneric = mainSameGeneric(alt.generic_id, row.generic_id) ||
-            (!alt.generic_id && !row.generic_id && alt.generic_name && alt.generic_name === row.generic_name)
-          const sharesDose = alternativeSharesParentDose(row, alt)
-          const altLinkEnabled = Boolean(alt.formulation_id) // own formulation, no slug data here without a lookup
-
+        {clusters.map((cluster, cIdx) => {
+          const isMainCluster = cIdx === 0
           return (
-            <div key={idx}>
-              <OrDivider />
-              <DrugMainLine
-                name={altName}
-                concentration={alt.concentration}
-                form={alt.form}
-                generic={altHasBrand && !sharesGeneric ? alt.generic_name : null}
-                linkEnabled={false}
-                slug={null}
-                navigate={navigate}
-              />
-              {!sharesDose && alt.dose && <DoseLine text={alt.dose} />}
-              <DrugNotes noteEn={alt.note_en} noteAr={alt.note_ar} />
+            <div key={cIdx}>
+              {cIdx > 0 && <OrDivider />}
+
+              {cluster.members.map((member, mIdx) => {
+                const data = member.data
+                const memberHasBrand = !!data.brand_name?.trim()
+                const memberName = memberHasBrand ? data.brand_name : data.generic_name
+                const memberGeneric = memberHasBrand ? data.generic_name : null
+                return (
+                  <div key={mIdx}>
+                    {mIdx > 0 && <OrDivider />}
+                    <DrugMainLine
+                      name={memberName}
+                      nameAr={data.name_ar}
+                      concentration={mIdx === 0 ? data.concentration : null}
+                      form={mIdx === 0 ? data.form : null}
+                      generic={memberGeneric}
+                      linkEnabled={member.isMain && linkEnabled}
+                      slug={member.isMain ? formulation?.slug : null}
+                      navigate={navigate}
+                    />
+                  </div>
+                )
+              })}
+
+              {cluster.dose && <DoseLine text={cluster.dose} />}
+              <RowNote note={cluster.note} />
+
+              {/* Breadcrumb: Category › Generic — once per cluster, only when
+                  linked to a real formulation. Non-main clusters show the
+                  breadcrumb as display-only text (no tap-to-navigate), since
+                  their names themselves remain plain text. */}
+              {cluster.formulation?.category && (
+                <Breadcrumb
+                  category={cluster.formulation.category}
+                  genericName={cluster.formulation.genericName}
+                  linkEnabled={isMainCluster && linkEnabled}
+                  slug={cluster.formulation.slug}
+                  navigate={navigate}
+                />
+              )}
             </div>
           )
         })}
-
-        {/* Breadcrumb: Category › Generic — only when linked to a real formulation */}
-        {formulation?.category && (
-          <Breadcrumb
-            category={formulation.category}
-            genericName={formulation.genericName}
-            linkEnabled={linkEnabled}
-            slug={formulation.slug}
-            navigate={navigate}
-          />
-        )}
       </div>
     </div>
   )
@@ -329,7 +367,7 @@ function UnifiedDrugRow({ index, row, formulation, navigate, isLast }) {
 
 // ─── Shared display pieces (used by both the unified row and its alternatives) ─
 
-function DrugMainLine({ name, concentration, form, generic, linkEnabled, slug, navigate }) {
+function DrugMainLine({ name, nameAr, concentration, form, generic, linkEnabled, slug, navigate }) {
   if (!name) return null
   return (
     <>
@@ -367,6 +405,18 @@ function DrugMainLine({ name, concentration, form, generic, linkEnabled, slug, n
           </span>
         )}
       </div>
+
+      {/* Arabic name — shown directly under the English name (§2.1, 2026-06-20) */}
+      {nameAr && (
+        <div dir="rtl" style={{
+          fontSize: 12.5,
+          color: 'var(--color-text-secondary)',
+          marginTop: 1,
+          unicodeBidi: 'plaintext',
+        }}>
+          {nameAr}
+        </div>
+      )}
 
       {(concentration || form) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 3, flexWrap: 'wrap' }}>
@@ -407,6 +457,11 @@ function DoseLine({ text }) {
   )
 }
 
+/**
+ * DrugNotes — LEGACY two-field (note_en/note_ar) rendering. Kept unchanged
+ * for `drug_library` / `drug_freetext` legacy rows so they don't regress
+ * visually (masterplan §3.5). New unified `drug` rows use RowNote below.
+ */
 function DrugNotes({ noteEn, noteAr }) {
   if (!noteEn && !noteAr) return null
   return (
@@ -438,6 +493,33 @@ function DrugNotes({ noteEn, noteAr }) {
           <span>{noteAr}</span>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * RowNote — single bidi note field for unified `drug` rows (and their
+ * formulation clusters), post note_en/note_ar merge (2026-06-20). Uses
+ * dir="auto" so English or Arabic content displays in its natural
+ * direction without needing two separate fields/blocks.
+ */
+function RowNote({ note }) {
+  if (!note) return null
+  return (
+    <div style={{
+      marginTop: 5,
+      display: 'flex', alignItems: 'flex-start', gap: 5,
+    }}>
+      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
+      <span dir="auto" style={{
+        fontSize: 12.5,
+        fontWeight: 400,
+        color: 'var(--color-text-secondary)',
+        lineHeight: 1.5,
+        unicodeBidi: 'plaintext',
+      }}>
+        {note}
+      </span>
     </div>
   )
 }
@@ -674,3 +756,4 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+

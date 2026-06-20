@@ -19,6 +19,7 @@ import { useToast } from '../../context/ToastContext'
 const SOURCE_OPTIONS = [
   { value: 'EDA',             label: 'EDA' },
   { value: 'manual',          label: 'Manual' },
+  { value: 'manual_entry',    label: 'Manual entry (promoted)' },
   { value: 'pharmacy-review', label: 'Pharmacy review' },
 ]
 
@@ -368,3 +369,4 @@ const inputStyle = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
+

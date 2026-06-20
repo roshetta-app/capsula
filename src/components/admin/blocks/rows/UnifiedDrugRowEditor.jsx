@@ -11,7 +11,8 @@
  *
  * Steps implemented here:
  *   1.1  All fields: brand name (autocomplete), generic name (autocomplete),
- *        concentration, form (dropdown), dose, note_en, note_ar.
+ *        Arabic name (auto-filled on library pick, freely editable),
+ *        concentration, form (dropdown), dose, note (single bidi field).
  *   1.2  Brand-name autocomplete: queries brands+formulations+generics; on
  *        select pre-fills concentration / form / generic_name / generic_id /
  *        formulation_id from the picked brand's formulation. Free-text if no match.
@@ -27,7 +28,10 @@
  *        appends to row.alternatives array.
  *   1.9  Alternatives rendered nested under main drug (indented), each with
  *        its own remove control.
- *   1.10 Shared-vs-own dose: uses alternativeSharesParentDose() from schema file.
+ *   1.10 Shared-vs-own dose/note: uses alternativeSharesParentDose() from
+ *        schema file. When shared, both the dose and note inputs are
+ *        hidden entirely (not just visually suppressed) so an admin can't
+ *        fill in a value that's silently ignored at render time.
  *   1.11 Delete-with-promote flow: if a row has alternatives, the parent is
  *        notified via onDeleteRequest (not onDelete) so PrescriptionSheetEditor
  *        can show the promote dialog. This component exports the
@@ -235,7 +239,7 @@ async function fetchBrandSuggestions(query) {
   const { data } = await supabase
     .from('brands')
     .select(`
-      id, name,
+      id, name, name_ar,
       formulations (
         id, concentration, form, route, default_dose_override,
         generics ( id, name_en, name_ar )
@@ -274,6 +278,7 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       brand_id:        (formulation.brands?.[0]?.id)   ?? null,
       generic_name:    generic?.name_en ?? null,
       generic_id:      generic?.id      ?? null,
+      name_ar:         (formulation.brands?.[0]?.name_ar) ?? generic?.name_ar ?? null,
       formulation_id:  formulation.id,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
@@ -351,6 +356,7 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
                 brand_id:       brand.id,
                 generic_name:   f?.generics?.name_en ?? alt.generic_name,
                 generic_id:     f?.generics?.id      ?? alt.generic_id,
+                name_ar:        brand.name_ar ?? f?.generics?.name_ar ?? null,
                 formulation_id: f?.id                ?? null,
                 concentration:  f?.concentration     ?? null,
                 form:           f?.form              ?? null,
@@ -376,7 +382,11 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           <AutocompleteInput
             value={alt.generic_name ?? ''}
             onChange={val => patch({ generic_name: val || null, generic_id: null })}
-            onSelect={g => patch({ generic_name: g.name_en, generic_id: g.id })}
+            onSelect={g => patch({
+              generic_name: g.name_en,
+              generic_id: g.id,
+              name_ar: alt.brand_name?.trim() ? alt.name_ar : (g.name_ar ?? null),
+            })}
             placeholder="e.g. paracetamol"
             fetchSuggestions={fetchGenericSuggestions}
             renderSuggestion={g => (
@@ -387,6 +397,19 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
             )}
           />
         </div>
+      </div>
+
+      {/* Arabic name — auto-filled from library pick, always editable */}
+      <div>
+        <FieldLabel hint="optional — auto-filled from library">Arabic name</FieldLabel>
+        <input
+          type="text"
+          value={alt.name_ar ?? ''}
+          onChange={e => patch({ name_ar: e.target.value || null })}
+          placeholder="الاسم بالعربي"
+          dir="rtl"
+          style={textInput({ textAlign: 'right' })}
+        />
       </div>
 
       {/* Concentration + Form */}
@@ -416,32 +439,41 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         </div>
       </div>
 
-      {/* Dose — shared or independent */}
-      <div>
-        <FieldLabel hint={sharesParentDose ? 'Same formulation — shared with main drug' : undefined}>
-          Dose / instructions
-        </FieldLabel>
-        {sharesParentDose ? (
-          <div style={{
-            ...textInput(),
-            backgroundColor: 'var(--color-bg)',
-            color: 'var(--color-text-tertiary)',
-            fontStyle: 'italic',
-            cursor: 'not-allowed',
-          }}>
-            {parentRow.dose || 'Shared with main drug'}
+      {/* Dose + Note — shared/inherited, or independent */}
+      {sharesParentDose ? (
+        <div style={{
+          fontSize: 11, fontStyle: 'italic',
+          color: 'var(--color-text-tertiary)',
+          padding: '6px 2px',
+        }}>
+          Dose &amp; note are shared with the main drug (same formulation) — edit them on the row above.
+        </div>
+      ) : (
+        <>
+          <div>
+            <FieldLabel>Dose / instructions</FieldLabel>
+            <input
+              type="text"
+              value={alt.dose ?? ''}
+              onChange={e => patch({ dose: e.target.value || null })}
+              placeholder="e.g. 10mg/kg every 8h"
+              dir="auto"
+              style={textInput()}
+            />
           </div>
-        ) : (
-          <input
-            type="text"
-            value={alt.dose ?? ''}
-            onChange={e => patch({ dose: e.target.value || null })}
-            placeholder="e.g. 10mg/kg every 8h"
-            dir="auto"
-            style={textInput()}
-          />
-        )}
-      </div>
+          <div>
+            <FieldLabel hint="auto-detects English/Arabic">Note</FieldLabel>
+            <input
+              type="text"
+              value={alt.note ?? ''}
+              onChange={e => patch({ note: e.target.value || null })}
+              placeholder="Optional note for this alternative"
+              dir="auto"
+              style={textInput()}
+            />
+          </div>
+        </>
+      )}
 
       {/* Picker modal */}
       <DrugPickerModal
@@ -483,6 +515,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       brand_id:        brand.id,
       generic_name:    generic?.name_en   ?? row.generic_name,
       generic_id:      generic?.id        ?? row.generic_id,
+      name_ar:         brand.name_ar ?? generic?.name_ar ?? null,
       formulation_id:  f?.id              ?? null,
       concentration:   f?.concentration   ?? null,
       form:            f?.form            ?? null,
@@ -504,6 +537,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       formulation_id:  formulation.id,
       generic_name:    generic?.name_en   ?? row.generic_name,
       generic_id:      generic?.id        ?? row.generic_id,
+      name_ar:         generic?.name_ar ?? null,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
       dose:            formulation.default_dose_override ?? row.dose,
@@ -518,7 +552,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
   // ── Generic autocomplete select ──────────────────────────────────────────
   function handleGenericSelect(generic) {
-    patch({ generic_name: generic.name_en, generic_id: generic.id })
+    patch({
+      generic_name: generic.name_en,
+      generic_id: generic.id,
+      // Brand's Arabic name takes precedence when this row is brand-led;
+      // only auto-fill from the generic when there's no brand typed yet.
+      name_ar: row.brand_name?.trim() ? row.name_ar : (generic.name_ar ?? null),
+    })
   }
 
   // ── Promote to library (§2.5) ────────────────────────────────────────────
@@ -572,7 +612,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           const { data: newGeneric, error: gErr } = await insertGeneric({
             slug: slugBase || `generic-${Date.now()}`,
             name_en: genericName,
-            name_ar: '',
+            // If this row is brand-led, the typed name_ar belongs to the
+            // brand being created below, not the generic — only carry it
+            // here for generic-only rows.
+            name_ar: row.brand_name?.trim() ? '' : (row.name_ar?.trim() || ''),
             category: promoteCategory,
             class: null,
           })
@@ -614,7 +657,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           const { data: newBrand, error: bErr } = await insertBrand({
             formulation_id: formulationId,
             name: brandName,
-            name_ar: '',
+            name_ar: row.name_ar?.trim() || '',
             manufacturer: null,
             source: SOURCE_FLAG_VALUE,
             is_published: true,
@@ -650,6 +693,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       ...ALTERNATIVE_DRUG_TEMPLATE,
       generic_name:   generic?.name_en   ?? null,
       generic_id:     generic?.id        ?? null,
+      name_ar:        generic?.name_ar   ?? null,
       formulation_id: formulation.id,
       concentration:  formulation.concentration ?? null,
       form:           formulation.form ?? null,
@@ -785,6 +829,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       </div>
 
+      {/* ── Arabic name — auto-filled from library pick, always editable ── */}
+      <div>
+        <FieldLabel hint="optional — auto-filled from library">Arabic name</FieldLabel>
+        <input
+          type="text"
+          value={row.name_ar ?? ''}
+          onChange={e => patch({ name_ar: e.target.value || null })}
+          placeholder="الاسم بالعربي"
+          dir="rtl"
+          style={textInput({ textAlign: 'right' })}
+        />
+      </div>
+
       {/* ── Concentration + Form ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
@@ -917,28 +974,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         />
       </div>
 
-      {/* ── Note EN ── */}
+      {/* ── Note ── */}
       <div>
-        <FieldLabel hint="English">Drug note</FieldLabel>
+        <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
         <input
           type="text"
-          value={row.note_en ?? ''}
-          onChange={e => patch({ note_en: e.target.value || null })}
+          value={row.note ?? ''}
+          onChange={e => patch({ note: e.target.value || null })}
           placeholder="e.g. Only if cramping present"
+          dir="auto"
           style={textInput()}
-        />
-      </div>
-
-      {/* ── Note AR ── */}
-      <div>
-        <FieldLabel hint="Arabic (RTL)">Drug note — Arabic</FieldLabel>
-        <input
-          type="text"
-          value={row.note_ar ?? ''}
-          onChange={e => patch({ note_ar: e.target.value || null })}
-          placeholder="ملاحظة بالعربي (اختياري)"
-          dir="rtl"
-          style={textInput({ textAlign: 'right' })}
         />
       </div>
 
@@ -1145,4 +1190,5 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 
