@@ -38,6 +38,16 @@
  *        notified via onDeleteRequest (not onDelete) so PrescriptionSheetEditor
  *        can show the promote dialog. This component exports the
  *        PromoteAlternativeDialog too, for use in PrescriptionSheetEditor.
+ *   3.3  PHASE 3 (2026-06-20): "Same formulation, different brand" alternatives
+ *        get a dedicated scoped entry point — DrugPickerModal mode="brand-scoped",
+ *        pre-filtered to the parent/main row's formulation_id (only shown once
+ *        that formulation_id exists). The resulting alternative's
+ *        formulation_id/concentration/form/route/category are force-set from
+ *        the parent row, not from the picked brand's own nested formulation —
+ *        so it can never independently drift from the parent's identity, which
+ *        is what makes alternativeSharesParentDose() reliably true for this
+ *        path. The existing unscoped "Pick a brand…" / "Pick a formulation…"
+ *        buttons remain, unchanged, for the "different drug, same purpose" case.
  *
  * Props:
  *   row        — DrugRow shape (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE)
@@ -360,6 +370,10 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const sharesParentDose = alternativeSharesParentDose(parentRow, alt)
   const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
   const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
+  // Phase 3 (2026-06-20): scoped picker for "same formulation, different
+  // brand" — only ever offered/openable when the parent row is itself
+  // linked to a formulation. See handleScopedBrandPick below.
+  const [scopedBrandPickerOpen, setScopedBrandPickerOpen] = useState(false)
   // Phase 3 (2026-06-20): holds the age-group choice step when a freshly
   // picked formulation has more than one doses_structured row. Null when
   // there's nothing to choose (chooser not shown).
@@ -413,6 +427,31 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
     } else {
       patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
     }
+  }
+
+  // When a brand is picked via the formulation-scoped picker (Phase 3,
+  // 2026-06-20) — "same formulation, different brand". The picker only
+  // ever returns brands already attached to parentRow.formulation_id, but
+  // formulation_id/concentration/form/route/category are still force-set
+  // from parentRow here (not from the picked brand's own nested
+  // formulation) as defense in depth, so this alternative's identity can
+  // never drift from the parent's even if the query result shape changes
+  // later. Always shares the parent's dose/note by construction — there is
+  // no dose resolution step, since formulation_id equality is guaranteed.
+  function handleScopedBrandPick(brand) {
+    patch({
+      brand_name:      brand.name,
+      brand_id:        brand.id,
+      generic_name:    parentRow.generic_name,
+      generic_id:      parentRow.generic_id,
+      name_ar:         brand.name_ar ?? parentRow.name_ar ?? null,
+      formulation_id:  parentRow.formulation_id,
+      concentration:   parentRow.concentration,
+      form:            parentRow.form,
+      route:           parentRow.route,
+      category:        parentRow.category,
+      _formulationMeta: parentRow._formulationMeta,
+    })
   }
 
   // When a formulation is picked for this alternative (formulation mode)
@@ -471,25 +510,45 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           Or
         </span>
         {!isLinked && <NotInLibraryTag />}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-          <button
-            type="button"
-            onClick={() => setBrandPickerOpen(true)}
-            style={{
-              padding: '3px 9px',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Pick a brand…
-          </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          {parentRow.formulation_id ? (
+            <button
+              type="button"
+              onClick={() => setScopedBrandPickerOpen(true)}
+              title="Only shows brands already under the parent drug's exact formulation — concentration, form, and dose stay locked to match"
+              style={{
+                padding: '3px 9px',
+                border: '1px solid var(--color-accent)',
+                borderRadius: 'var(--radius-md)',
+                background: '#EFF6FF',
+                color: 'var(--color-accent)',
+                fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              Pick brand (same formulation)…
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setBrandPickerOpen(true)}
+              style={{
+                padding: '3px 9px',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)',
+                color: 'var(--color-text-secondary)',
+                fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              Pick a brand…
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFormulationPickerOpen(true)}
+            title="Opens the full picker — use this for a genuinely different drug serving the same purpose"
             style={{
               padding: '3px 9px',
               border: '1px solid var(--color-border)',
@@ -672,6 +731,22 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         onSelect={handleFormulationPick}
         mode="formulation"
       />
+      {parentRow.formulation_id && (
+        <DrugPickerModal
+          isOpen={scopedBrandPickerOpen}
+          onClose={() => setScopedBrandPickerOpen(false)}
+          onSelect={handleScopedBrandPick}
+          mode="brand-scoped"
+          scopeFormulationId={parentRow.formulation_id}
+          scopeContext={{
+            genericName:   parentRow.generic_name,
+            concentration: parentRow.concentration,
+            form:          parentRow.form,
+            route:         parentRow.route,
+            category:      parentRow.category,
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -683,6 +758,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
   const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
   const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
+  // Phase 3 (2026-06-20): scoped "add alternative" entry point — same
+  // formulation, different brand. Only ever offered when row.formulation_id
+  // is already set (see render below).
+  const [altScopedBrandPickerOpen, setAltScopedBrandPickerOpen] = useState(false)
 
   // Phase 3 (2026-06-20): age-group dose chooser state.
   // mainDoseChoice holds { baseFields, doseRows } while the main row's dose
@@ -950,6 +1029,30 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       const newAlt = { ...baseAlt, dose: resolved.dose, dose_who: resolved.dose_who }
       patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
     }
+  }
+
+  // Add a "same formulation, different brand" alternative (Phase 3,
+  // 2026-06-20) — picker is pre-scoped to row.formulation_id, so the new
+  // alternative's formulation_id is always force-set to match the main
+  // row's, never independently typed. Always shares the parent's dose/note
+  // by construction (alternativeSharesParentDose is keyed on formulation_id
+  // equality) — no dose-choice step needed here.
+  function handleAltScopedBrandPick(brand) {
+    const newAlt = {
+      ...ALTERNATIVE_DRUG_TEMPLATE,
+      brand_name:      brand.name,
+      brand_id:        brand.id,
+      generic_name:    row.generic_name,
+      generic_id:      row.generic_id,
+      name_ar:         brand.name_ar ?? row.name_ar ?? null,
+      formulation_id:  row.formulation_id,
+      concentration:   row.concentration,
+      form:            row.form,
+      route:           row.route,
+      category:        row.category,
+      _formulationMeta: row._formulationMeta,
+    }
+    patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
   }
 
   function finalizePendingAltDose(doseRow) {
@@ -1343,6 +1446,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
       {/* ── Add alternative buttons ── */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {row.formulation_id && (
+          <button
+            type="button"
+            onClick={() => setAltScopedBrandPickerOpen(true)}
+            title="Only shows brands already under this drug's exact formulation — concentration, form, and dose stay locked to match"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '5px 10px',
+              border: '1.5px dashed var(--color-accent)',
+              borderRadius: 'var(--radius-md)',
+              background: '#EFF6FF',
+              color: 'var(--color-accent)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            <Plus size={11} /> Alt: same formulation, new brand…
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setAltBrandPickerOpen(true)}
@@ -1362,6 +1484,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         <button
           type="button"
           onClick={() => setAltFormulationPickerOpen(true)}
+          title="Use this for a genuinely different drug serving the same purpose"
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '5px 10px',
@@ -1426,6 +1549,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         }}
         mode="formulation"
       />
+      {row.formulation_id && (
+        <DrugPickerModal
+          isOpen={altScopedBrandPickerOpen}
+          onClose={() => setAltScopedBrandPickerOpen(false)}
+          onSelect={brand => {
+            setAltScopedBrandPickerOpen(false)
+            handleAltScopedBrandPick(brand)
+          }}
+          mode="brand-scoped"
+          scopeFormulationId={row.formulation_id}
+          scopeContext={{
+            genericName:   row.generic_name,
+            concentration: row.concentration,
+            form:          row.form,
+            route:         row.route,
+            category:      row.category,
+          }}
+        />
+      )}
 
     </div>
   )
@@ -1530,4 +1672,5 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 

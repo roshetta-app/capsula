@@ -151,6 +151,32 @@ export async function deleteBrand(id) {
   return { error }
 }
 
+// ─── Brands scoped to one formulation (Phase 3, 2026-06-20) ──────────────────
+//
+// Used by the "same formulation, different brand" alternative picker
+// (masterplan §3.3 / prescription_system_audit_and_plan.md Phase 3). Unlike
+// searchBrandsForPicker in DrugPickerModal.jsx (which searches all brands
+// across all formulations), this is pre-scoped to exactly one formulation_id
+// so the resulting picker can only ever return brands that already share the
+// parent row's formulation — making `formulation_id` agreement on the
+// resulting alternative a guarantee of the query, not something the caller
+// has to remember to check.
+
+/**
+ * Fetch all brands attached to one specific formulation, for the
+ * formulation-scoped "pick a brand" picker used when adding a
+ * same-formulation alternative.
+ * @param {string} formulationId
+ */
+export async function fetchBrandsForFormulation(formulationId) {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, name, name_ar')
+    .eq('formulation_id', formulationId)
+    .order('name')
+  return { data: data ?? [], error }
+}
+
 // ─── Specialties (5.4 + 3H) ──────────────────────────────────────────────────
 
 export async function insertSpecialty(data) {
@@ -847,4 +873,5 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
 
