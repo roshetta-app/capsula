@@ -106,6 +106,35 @@ function FieldLabel({ children, hint }) {
   )
 }
 
+// ─── Read-only display line (Phase 2) ──────────────────────────────────────────
+// Used in place of an editable input once a row/alternative is linked to a
+// formulation — brand/concentration/form, generic, and route/category render
+// as static text instead of text boxes. To change a linked row's identity,
+// the author re-opens a picker; there is no text box to type over.
+
+function labelFor(list, value) {
+  if (!value) return null
+  return list.find(o => o.value === value)?.label ?? value
+}
+
+function ReadOnlyField({ children, hint, label }) {
+  return (
+    <div>
+      <FieldLabel hint={hint}>{label}</FieldLabel>
+      <div style={{
+        ...textInput(),
+        backgroundColor: 'var(--color-bg)',
+        color: children ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+        cursor: 'default',
+        display: 'flex', alignItems: 'center',
+        minHeight: 32, boxSizing: 'border-box',
+      }}>
+        {children || '—'}
+      </div>
+    </div>
+  )
+}
+
 // ─── "Not in library" tag (§2.4b) ─────────────────────────────────────────────
 
 function NotInLibraryTag() {
@@ -268,6 +297,8 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       formulation_id:  f?.id             ?? null,
       concentration:   f?.concentration  ?? null,
       form:            f?.form           ?? null,
+      route:           f?.route          ?? null,
+      category:        generic?.category ?? null,
       dose:            sharesParentDose ? alt.dose : (f?.default_dose_override ?? null),
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
@@ -290,6 +321,8 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       formulation_id:  formulation.id,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
+      route:           formulation.route ?? null,
+      category:        generic?.category ?? null,
       dose:            sharesParentDose ? alt.dose : (formulation.default_dose_override ?? null),
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
@@ -301,6 +334,9 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   }
 
   const isLinked = !!(alt.brand_id || alt.generic_id)
+  // Phase 2: field read-only/editable lock is keyed specifically off formulation_id
+  // (not brand_id/generic_id alone), per the locked decision in prescriptionRowSchema.js.
+  const isFormulationLinked = !!alt.formulation_id
 
   return (
     <div style={{
@@ -367,39 +403,87 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         </button>
       </div>
 
-      {/* Brand name — plain text (library linking done via pickers above) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div>
-          <FieldLabel>Brand name</FieldLabel>
-          <input
-            type="text"
-            value={alt.brand_name ?? ''}
-            onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
-            placeholder="e.g. Adol"
-            style={textInput()}
-          />
-        </div>
-        <div>
-          <FieldLabel>Generic name</FieldLabel>
-          <AutocompleteInput
-            value={alt.generic_name ?? ''}
-            onChange={val => patch({ generic_name: val || null, generic_id: null })}
-            onSelect={g => patch({
-              generic_name: g.name_en,
-              generic_id: g.id,
-              name_ar: alt.brand_name?.trim() ? alt.name_ar : (g.name_ar ?? null),
-            })}
-            placeholder="e.g. paracetamol"
-            fetchSuggestions={fetchGenericSuggestions}
-            renderSuggestion={g => (
-              <span style={{ fontSize: 13 }}>
-                <strong>{g.name_en}</strong>
-                {g.name_ar && <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>}
-              </span>
-            )}
-          />
-        </div>
-      </div>
+      {isFormulationLinked ? (
+        <>
+          {/* Brand + concentration + form — one read-only line, sourced from the library */}
+          <ReadOnlyField label="Brand · concentration · form">
+            {[alt.brand_name, alt.concentration, alt.form].filter(Boolean).join(' · ')}
+          </ReadOnlyField>
+
+          {/* Generic — read-only line */}
+          <ReadOnlyField label="Generic">
+            {alt.generic_name}
+          </ReadOnlyField>
+
+          {/* Route + category — read-only line */}
+          <ReadOnlyField label="Route · category" hint="from the library">
+            {[labelFor(DRUG_ROUTES, alt.route), labelFor(DRUG_CATEGORIES, alt.category)].filter(Boolean).join(' · ')}
+          </ReadOnlyField>
+        </>
+      ) : (
+        <>
+          {/* Brand name — plain text (library linking done via pickers above) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <FieldLabel>Brand name</FieldLabel>
+              <input
+                type="text"
+                value={alt.brand_name ?? ''}
+                onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
+                placeholder="e.g. Adol"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel>Generic name</FieldLabel>
+              <AutocompleteInput
+                value={alt.generic_name ?? ''}
+                onChange={val => patch({ generic_name: val || null, generic_id: null })}
+                onSelect={g => patch({
+                  generic_name: g.name_en,
+                  generic_id: g.id,
+                  name_ar: alt.brand_name?.trim() ? alt.name_ar : (g.name_ar ?? null),
+                })}
+                placeholder="e.g. paracetamol"
+                fetchSuggestions={fetchGenericSuggestions}
+                renderSuggestion={g => (
+                  <span style={{ fontSize: 13 }}>
+                    <strong>{g.name_en}</strong>
+                    {g.name_ar && <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>}
+                  </span>
+                )}
+              />
+            </div>
+          </div>
+
+          {/* Concentration + Form */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div>
+              <FieldLabel>Concentration</FieldLabel>
+              <input
+                type="text"
+                value={alt.concentration ?? ''}
+                onChange={e => patch({ concentration: e.target.value || null })}
+                placeholder="e.g. 500mg"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel>Form</FieldLabel>
+              <select
+                value={alt.form ?? ''}
+                onChange={e => patch({ form: e.target.value || null })}
+                style={{ ...textInput(), appearance: 'none' }}
+              >
+                <option value="">— select —</option>
+                {DRUG_FORMS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Arabic name — auto-filled from library pick, always editable */}
       <div>
@@ -414,32 +498,6 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         />
       </div>
 
-      {/* Concentration + Form */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-        <div>
-          <FieldLabel>Concentration</FieldLabel>
-          <input
-            type="text"
-            value={alt.concentration ?? ''}
-            onChange={e => patch({ concentration: e.target.value || null })}
-            placeholder="e.g. 500mg"
-            style={textInput()}
-          />
-        </div>
-        <div>
-          <FieldLabel>Form</FieldLabel>
-          <select
-            value={alt.form ?? ''}
-            onChange={e => patch({ form: e.target.value || null })}
-            style={{ ...textInput(), appearance: 'none' }}
-          >
-            <option value="">— select —</option>
-            {DRUG_FORMS.map(f => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
 
       {/* Dose + Note — shared/inherited, or independent */}
       {sharesParentDose ? (
@@ -526,6 +584,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       formulation_id:  f?.id              ?? null,
       concentration:   f?.concentration   ?? null,
       form:            f?.form            ?? null,
+      route:           f?.route           ?? null,
+      category:        generic?.category  ?? null,
       dose:            f?.default_dose_override ?? row.dose,
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
@@ -546,6 +606,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       name_ar:         generic?.name_ar ?? null,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
+      route:           formulation.route ?? null,
+      category:        generic?.category ?? null,
       dose:            formulation.default_dose_override ?? row.dose,
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
@@ -689,6 +751,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       formulation_id:  f?.id             ?? null,
       concentration:   f?.concentration  ?? null,
       form:            f?.form           ?? null,
+      route:           f?.route          ?? null,
+      category:        generic?.category ?? null,
       dose:            f?.default_dose_override ?? null,
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
@@ -710,6 +774,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       formulation_id:  formulation.id,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
+      route:           formulation.route ?? null,
+      category:        generic?.category ?? null,
       dose:            formulation.default_dose_override ?? null,
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
@@ -742,6 +808,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // ── Derived state ────────────────────────────────────────────────────────
 
   const isLinked = !!(row.brand_id || row.generic_id || row.formulation_id)
+  // Phase 2: field read-only/editable lock is keyed specifically off formulation_id
+  // (not brand_id/generic_id alone), per the locked decision in prescriptionRowSchema.js.
+  const isFormulationLinked = !!row.formulation_id
   const showLink = row.drug_link_enabled ?? true
   const hasAlt   = (row.alternatives ?? []).length > 0
 
@@ -816,37 +885,85 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       )}
 
-      {/* ── Brand name + Generic name (side by side) ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div>
-          <FieldLabel>Brand name</FieldLabel>
-          <input
-            type="text"
-            value={row.brand_name ?? ''}
-            onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
-            placeholder="e.g. Augmentin"
-            style={textInput()}
-          />
-        </div>
-        <div>
-          <FieldLabel hint="optional">Generic name</FieldLabel>
-          <AutocompleteInput
-            value={row.generic_name ?? ''}
-            onChange={val => patch({ generic_name: val || null, generic_id: null })}
-            onSelect={handleGenericSelect}
-            placeholder="e.g. amoxicillin-clavulanate"
-            fetchSuggestions={fetchGenericSuggestions}
-            renderSuggestion={g => (
-              <span style={{ fontSize: 13 }}>
-                <strong>{g.name_en}</strong>
-                {g.name_ar && (
-                  <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>
+      {isFormulationLinked ? (
+        <>
+          {/* Brand + concentration + form — one read-only line, sourced from the library */}
+          <ReadOnlyField label="Brand · concentration · form">
+            {[row.brand_name, row.concentration, row.form].filter(Boolean).join(' · ')}
+          </ReadOnlyField>
+
+          {/* Generic — read-only line */}
+          <ReadOnlyField label="Generic">
+            {row.generic_name}
+          </ReadOnlyField>
+
+          {/* Route + category — read-only line */}
+          <ReadOnlyField label="Route · category" hint="from the library">
+            {[labelFor(DRUG_ROUTES, row.route), labelFor(DRUG_CATEGORIES, row.category)].filter(Boolean).join(' · ')}
+          </ReadOnlyField>
+        </>
+      ) : (
+        <>
+          {/* ── Brand name + Generic name (side by side) ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <FieldLabel>Brand name</FieldLabel>
+              <input
+                type="text"
+                value={row.brand_name ?? ''}
+                onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
+                placeholder="e.g. Augmentin"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel hint="optional">Generic name</FieldLabel>
+              <AutocompleteInput
+                value={row.generic_name ?? ''}
+                onChange={val => patch({ generic_name: val || null, generic_id: null })}
+                onSelect={handleGenericSelect}
+                placeholder="e.g. amoxicillin-clavulanate"
+                fetchSuggestions={fetchGenericSuggestions}
+                renderSuggestion={g => (
+                  <span style={{ fontSize: 13 }}>
+                    <strong>{g.name_en}</strong>
+                    {g.name_ar && (
+                      <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>
+                    )}
+                  </span>
                 )}
-              </span>
-            )}
-          />
-        </div>
-      </div>
+              />
+            </div>
+          </div>
+
+          {/* ── Concentration + Form ── */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <FieldLabel>Concentration</FieldLabel>
+              <input
+                type="text"
+                value={row.concentration ?? ''}
+                onChange={e => patch({ concentration: e.target.value || null })}
+                placeholder="e.g. 500mg, 120mg/5ml"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel>Form</FieldLabel>
+              <select
+                value={row.form ?? ''}
+                onChange={e => patch({ form: e.target.value || null })}
+                style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+              >
+                <option value="">— select —</option>
+                {DRUG_FORMS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Arabic name — auto-filled from library pick, always editable ── */}
       <div>
@@ -859,33 +976,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           dir="rtl"
           style={textInput({ textAlign: 'right' })}
         />
-      </div>
-
-      {/* ── Concentration + Form ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <div>
-          <FieldLabel>Concentration</FieldLabel>
-          <input
-            type="text"
-            value={row.concentration ?? ''}
-            onChange={e => patch({ concentration: e.target.value || null })}
-            placeholder="e.g. 500mg, 120mg/5ml"
-            style={textInput()}
-          />
-        </div>
-        <div>
-          <FieldLabel>Form</FieldLabel>
-          <select
-            value={row.form ?? ''}
-            onChange={e => patch({ form: e.target.value || null })}
-            style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
-          >
-            <option value="">— select —</option>
-            {DRUG_FORMS.map(f => (
-              <option key={f.value} value={f.value}>{f.label}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* ── Save to library (§2.5) — free-text mode only ── */}
@@ -1242,3 +1332,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+

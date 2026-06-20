@@ -53,12 +53,27 @@ export const ROW_TYPES = {
  * @property {string|null} formulation_id    - uuid, set only if this row is fully linked to a
  *                                              specific formulations row (concentration + form
  *                                              combination already exists in the library).
- *                                              Concentration/form below are always the editable
- *                                              display values regardless of link state.
+ *                                              PHASE 2 (2026-06-20): when this is set, the row is
+ *                                              "linked" and brand_name/concentration/form/generic_name/
+ *                                              route/category render as read-only display lines in
+ *                                              the CMS editor — only `dose` stays editable. When this
+ *                                              is null (free-text row), all of those fields are plain
+ *                                              editable inputs, exactly as before Phase 2.
  *
- * @property {string|null} concentration     - free text, e.g. "500mg", "120mg/5ml"
+ * @property {string|null} concentration     - free text, e.g. "500mg", "120mg/5ml". Editable only
+ *                                              while formulation_id is null; once linked, this is a
+ *                                              read-only snapshot taken at pick time, never live.
  * @property {string|null} form               - free text or matched against config/forms.js list,
- *                                              e.g. "tablet", "syrup"
+ *                                              e.g. "tablet", "syrup". Same editability rule as
+ *                                              concentration above.
+ * @property {string|null} route             - PHASE 2 (2026-06-20), new. Snapshotted from
+ *                                              formulations.route at pick time, same pattern as
+ *                                              concentration/form — never live, never written back.
+ *                                              Null for free-text rows; always editable via re-pick
+ *                                              only, never a text box.
+ * @property {string|null} category          - PHASE 2 (2026-06-20), new. Snapshotted from
+ *                                              generics.category at pick time, same pattern as
+ *                                              route above. Null for free-text rows.
  *
  * @property {string|null} dose              - single editable text field (masterplan §2.3).
  *                                              Pre-filled from formulation default on library pick,
@@ -112,6 +127,8 @@ export const DRUG_ROW_TEMPLATE = {
   formulation_id: null,
   concentration: null,
   form: null,
+  route: null,
+  category: null,
   dose: null,
   note: null,
   drug_link_enabled: true,
@@ -139,6 +156,10 @@ export const DRUG_ROW_TEMPLATE = {
  * @property {string|null} formulation_id
  * @property {string|null} concentration
  * @property {string|null} form
+ * @property {string|null} route             - PHASE 2 (2026-06-20), new. Same rule as DrugRow.route:
+ *                                              snapshotted at pick time, read-only display once
+ *                                              formulation_id is set.
+ * @property {string|null} category          - PHASE 2 (2026-06-20), new. Same rule as DrugRow.category.
  * @property {string|null} dose
  *   - LOCKED (2026-06-20): if this alternative has the same formulation_id
  *     as its parent drug row (i.e. it's just a different brand name for the
@@ -166,6 +187,8 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   formulation_id: null,
   concentration: null,
   form: null,
+  route: null,
+  category: null,
   dose: null,
   note: null,
   source_flag: null,
@@ -319,10 +342,13 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     formulation_id: chosen.formulation_id,
     concentration: chosen.concentration,
     form: chosen.form,
+    route: chosen.route,
+    category: chosen.category,
     dose: chosen.dose,
     note: chosen.note,
     source_flag: chosen.source_flag,
     alternatives: remaining,
   };
 }
+
 
