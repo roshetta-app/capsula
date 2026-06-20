@@ -572,7 +572,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           const { data: newGeneric, error: gErr } = await insertGeneric({
             slug: slugBase || `generic-${Date.now()}`,
             name_en: genericName,
-            name_ar: null,
+            name_ar: '',
             category: promoteCategory,
             class: null,
           })
