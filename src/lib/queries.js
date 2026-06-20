@@ -26,7 +26,7 @@ export async function fetchFlatDrugs(supabase) {
   const { data, error } = await supabase
     .from('formulations')
     .select(`
-      id, slug, concentration, form, route, doses, doses_structured, default_dose_override,
+      id, slug, concentration, form, route, doses_structured, default_dose_override,
       generics (
         id, slug, name_en, name_ar, category, class,
         uses_legacy, uses_structured, warnings_legacy,
@@ -76,7 +76,7 @@ export async function fetchFlatDrugs(supabase) {
       concentration:        f.concentration,
       form:                 f.form,
       route:                f.route,
-      doses:                f.doses_structured ?? f.doses ?? [],   // prefer new structured
+      doses:                f.doses_structured ?? [],
       defaultDoseOverride:  f.default_dose_override,
       // Brands (published only, available only)
       brands: (f.brands ?? [])
