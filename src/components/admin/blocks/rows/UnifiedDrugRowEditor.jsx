@@ -10,12 +10,14 @@
  * not by a different row_type.
  *
  * Steps implemented here:
- *   1.1  All fields: brand name (autocomplete), generic name (autocomplete),
+ *   1.1  All fields: brand name (plain text input), generic name (autocomplete),
  *        Arabic name (auto-filled on library pick, freely editable),
  *        concentration, form (dropdown), dose, note (single bidi field).
- *   1.2  Brand-name autocomplete: queries brands+formulations+generics; on
- *        select pre-fills concentration / form / generic_name / generic_id /
- *        formulation_id from the picked brand's formulation. Free-text if no match.
+ *   1.2  Brand picking: two explicit picker buttons — "Pick a brand…" opens
+ *        DrugPickerModal in brand mode; "Pick a formulation…" opens it in
+ *        formulation mode. Free-text brand_name is a plain editable field
+ *        (no brand autocomplete dropdown — replaced by the explicit pickers
+ *        per Phase 1 spec).
  *   1.3  Generic-name autocomplete (§2.6): independent of brand matching;
  *        links generic_id when a match is found, null otherwise.
  *   1.4  dose_override removed. Single pre-fillable, freely editable dose field.
@@ -24,8 +26,8 @@
  *        the parent PrescriptionSheetEditor should also gate its save.)
  *   1.5a "Not in library" always-visible tag on any row without real library IDs.
  *   1.6  Data shape matches prescriptionRowSchema.js DRUG_ROW_TEMPLATE exactly.
- *   1.8  "Add alternative" button opens DrugPickerModal or free-text entry;
- *        appends to row.alternatives array.
+ *   1.8  "Add alternative" button opens DrugPickerModal (brand or formulation
+ *        mode) or free-text entry; appends to row.alternatives array.
  *   1.9  Alternatives rendered nested under main drug (indented), each with
  *        its own remove control.
  *   1.10 Shared-vs-own dose/note: uses alternativeSharesParentDose() from
@@ -137,10 +139,10 @@ function AutocompleteInput({
   dir = 'auto',
   extraStyle = {},
 }) {
-  const [open, setOpen]           = useState(false)
+  const [open, setOpen]               = useState(false)
   const [suggestions, setSuggestions] = useState([])
-  const [loading, setLoading]     = useState(false)
-  const timerRef = useRef(null)
+  const [loading, setLoading]         = useState(false)
+  const timerRef     = useRef(null)
   const containerRef = useRef(null)
 
   useEffect(() => {
@@ -233,24 +235,6 @@ function AutocompleteInput({
 
 // ─── Autocomplete query functions ──────────────────────────────────────────────
 
-async function fetchBrandSuggestions(query) {
-  // Returns brands with their formulation + generic for pre-fill on select
-  const q = query.toLowerCase()
-  const { data } = await supabase
-    .from('brands')
-    .select(`
-      id, name, name_ar,
-      formulations (
-        id, concentration, form, route, default_dose_override,
-        generics ( id, name_en, name_ar )
-      )
-    `)
-    .ilike('name', `%${query}%`)
-    .eq('formulations.is_published', true)
-    .limit(12)
-  return (data ?? []).filter(b => b.formulations)
-}
-
 async function fetchGenericSuggestions(query) {
   const { data } = await supabase
     .from('generics')
@@ -264,21 +248,45 @@ async function fetchGenericSuggestions(query) {
 
 function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const sharesParentDose = alternativeSharesParentDose(parentRow, alt)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
+  const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
 
   function patch(updates) {
     onChange({ ...alt, ...updates })
   }
 
-  // When a library formulation is picked for this alternative
+  // When a brand is picked for this alternative (brand mode)
+  function handleBrandPick(brand) {
+    const f       = brand.formulations
+    const generic = f?.generics
+    patch({
+      brand_name:      brand.name,
+      brand_id:        brand.id,
+      generic_name:    generic?.name_en ?? alt.generic_name,
+      generic_id:      generic?.id      ?? alt.generic_id,
+      name_ar:         brand.name_ar ?? generic?.name_ar ?? null,
+      formulation_id:  f?.id             ?? null,
+      concentration:   f?.concentration  ?? null,
+      form:            f?.form           ?? null,
+      dose:            sharesParentDose ? alt.dose : (f?.default_dose_override ?? null),
+      _formulationMeta: f ? {
+        name_en:       generic?.name_en ?? '',
+        concentration: f.concentration ?? '',
+        form:          f.form ?? '',
+        route:         f.route ?? '',
+      } : alt._formulationMeta,
+    })
+  }
+
+  // When a formulation is picked for this alternative (formulation mode)
   function handleFormulationPick(formulation) {
     const generic = formulation.generics
     patch({
-      brand_name:      (formulation.brands?.[0]?.name) ?? alt.brand_name,
-      brand_id:        (formulation.brands?.[0]?.id)   ?? null,
+      brand_name:      alt.brand_name,
+      brand_id:        null,
       generic_name:    generic?.name_en ?? null,
       generic_id:      generic?.id      ?? null,
-      name_ar:         (formulation.brands?.[0]?.name_ar) ?? generic?.name_ar ?? null,
+      name_ar:         generic?.name_ar ?? null,
       formulation_id:  formulation.id,
       concentration:   formulation.concentration ?? null,
       form:            formulation.form ?? null,
@@ -303,7 +311,7 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       paddingTop: 8, paddingBottom: 4,
     }}>
       {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         <span style={{
           fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
           textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
@@ -311,21 +319,38 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           Or
         </span>
         {!isLinked && <NotInLibraryTag />}
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          style={{
-            marginLeft: 'auto', padding: '3px 9px',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          Pick from library…
-        </button>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          <button
+            type="button"
+            onClick={() => setBrandPickerOpen(true)}
+            style={{
+              padding: '3px 9px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Pick a brand…
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormulationPickerOpen(true)}
+            style={{
+              padding: '3px 9px',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            Pick a formulation…
+          </button>
+        </div>
         <button
           type="button"
           onClick={onRemove}
@@ -342,39 +367,16 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         </button>
       </div>
 
-      {/* Brand + generic row */}
+      {/* Brand name — plain text (library linking done via pickers above) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         <div>
           <FieldLabel>Brand name</FieldLabel>
-          <AutocompleteInput
+          <input
+            type="text"
             value={alt.brand_name ?? ''}
-            onChange={val => patch({ brand_name: val || null, brand_id: null })}
-            onSelect={brand => {
-              const f = brand.formulations
-              patch({
-                brand_name:     brand.name,
-                brand_id:       brand.id,
-                generic_name:   f?.generics?.name_en ?? alt.generic_name,
-                generic_id:     f?.generics?.id      ?? alt.generic_id,
-                name_ar:        brand.name_ar ?? f?.generics?.name_ar ?? null,
-                formulation_id: f?.id                ?? null,
-                concentration:  f?.concentration     ?? null,
-                form:           f?.form              ?? null,
-                dose:           sharesParentDose ? alt.dose : (f?.default_dose_override ?? null),
-              })
-            }}
+            onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
             placeholder="e.g. Adol"
-            fetchSuggestions={fetchBrandSuggestions}
-            renderSuggestion={b => (
-              <span style={{ fontSize: 13 }}>
-                <strong>{b.name}</strong>
-                {b.formulations?.generics?.name_en && (
-                  <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>
-                    {b.formulations.generics.name_en}
-                  </span>
-                )}
-              </span>
-            )}
+            style={textInput()}
           />
         </div>
         <div>
@@ -475,11 +477,18 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         </>
       )}
 
-      {/* Picker modal */}
+      {/* Picker modals */}
       <DrugPickerModal
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        isOpen={brandPickerOpen}
+        onClose={() => setBrandPickerOpen(false)}
+        onSelect={handleBrandPick}
+        mode="brand"
+      />
+      <DrugPickerModal
+        isOpen={formulationPickerOpen}
+        onClose={() => setFormulationPickerOpen(false)}
         onSelect={handleFormulationPick}
+        mode="formulation"
       />
     </div>
   )
@@ -488,27 +497,25 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function UnifiedDrugRowEditor({ row, onChange }) {
-  const [pickerOpen, setPickerOpen] = useState(false)
-  // addingAltFreetext: when true, shows a quick inline free-text alt entry
-  // instead of the picker. Could be expanded later; for now picker is the
-  // primary path. This state isn't required by Phase 1 spec but keeps the
-  // "add alternative" area extensible.
-  const [altPickerOpen, setAltPickerOpen] = useState(false)
+  const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
+  const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
+  const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
+  const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
 
   // ── Save-to-library promote flow (Phase 2, masterplan §2.5) ───────────────
-  const [promoteOn, setPromoteOn]       = useState(false)
+  const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteRoute, setPromoteRoute]       = useState('')
-  const [promoting, setPromoting]       = useState(false)
-  const [promoteError, setPromoteError] = useState(null)
+  const [promoting, setPromoting]             = useState(false)
+  const [promoteError, setPromoteError]       = useState(null)
 
   function patch(updates) {
     onChange({ ...row, ...updates })
   }
 
-  // ── Brand autocomplete select ────────────────────────────────────────────
-  function handleBrandSelect(brand) {
-    const f = brand.formulations
+  // ── Brand picker select (brand mode — brand-first fill) ───────────────────
+  function handleBrandPick(brand) {
+    const f       = brand.formulations
     const generic = f?.generics
     patch({
       brand_name:      brand.name,
@@ -529,8 +536,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     })
   }
 
-  // ── Library picker select ────────────────────────────────────────────────
-  // (DrugPickerModal picks a formulation, not a brand directly)
+  // ── Formulation picker select (formulation mode — formulation-first fill) ─
   function handleFormulationPick(formulation) {
     const generic = formulation.generics
     patch({
@@ -562,26 +568,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   }
 
   // ── Promote to library (§2.5) ────────────────────────────────────────────
-  // Runs the reuse-or-create sequence immediately when the admin clicks
-  // "Promote now": generic → formulation → brand, in that order, mirroring
-  // AddDrugFlow.jsx's sequential insert pattern. On success, links the row
-  // to the resulting ids and tags it source_flag: 'manual_entry'.
-  //
-  // Decision (flagged, not assumed): if a step fails partway, we do NOT roll
-  // back earlier inserts — there is no client-side transaction available,
-  // and deleting a just-created generic/formulation could race with other
-  // concurrent admin activity. Instead we surface exactly which step
-  // succeeded and which failed, so the admin can finish manually (e.g. via
-  // the Generics CMS) or retry. Retrying re-runs the match step first, so a
-  // retry after a partial failure will find and reuse what was already
-  // created rather than duplicating it.
   async function handlePromote() {
     setPromoteError(null)
 
-    const genericName = row.generic_name?.trim()
+    const genericName  = row.generic_name?.trim()
     const concentration = row.concentration?.trim()
 
-    // Preconditions — surfaced as a message, not silently worked around.
     if (!genericName) {
       setPromoteError('Generic name is required to save to the library (brand name alone isn\u2019t enough to file this under a molecule).')
       return
@@ -596,9 +588,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     }
 
     setPromoting(true)
-    let genericId = row.generic_id ?? null
+    let genericId     = row.generic_id ?? null
     let formulationId = null
-    let brandId = null
+    let brandId       = null
 
     try {
       // 1. Generic — reuse if it matches, else create
@@ -612,9 +604,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           const { data: newGeneric, error: gErr } = await insertGeneric({
             slug: slugBase || `generic-${Date.now()}`,
             name_en: genericName,
-            // If this row is brand-led, the typed name_ar belongs to the
-            // brand being created below, not the generic — only carry it
-            // here for generic-only rows.
             name_ar: row.brand_name?.trim() ? '' : (row.name_ar?.trim() || ''),
             category: promoteCategory,
             class: null,
@@ -668,12 +657,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         }
       }
 
-      // 4. Link the row to the real library ids; typed text stays as-is.
+      // 4. Link the row to the real library ids
       patch({
-        generic_id: genericId,
+        generic_id:     genericId,
         formulation_id: formulationId,
-        brand_id: brandId,
-        source_flag: SOURCE_FLAG_VALUE,
+        brand_id:       brandId,
+        source_flag:    SOURCE_FLAG_VALUE,
       })
       setPromoteOn(false)
       setPromoteCategory('')
@@ -687,17 +676,41 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
   // ── Alternatives ─────────────────────────────────────────────────────────
 
-  function handleAltPickerSelect(formulation) {
-    const generic = formulation.generics
-    const newAlt = {
+  function handleAltBrandPick(brand) {
+    const f       = brand.formulations
+    const generic = f?.generics
+    const newAlt  = {
       ...ALTERNATIVE_DRUG_TEMPLATE,
-      generic_name:   generic?.name_en   ?? null,
-      generic_id:     generic?.id        ?? null,
-      name_ar:        generic?.name_ar   ?? null,
-      formulation_id: formulation.id,
-      concentration:  formulation.concentration ?? null,
-      form:           formulation.form ?? null,
-      dose:           formulation.default_dose_override ?? null,
+      brand_name:      brand.name,
+      brand_id:        brand.id,
+      generic_name:    generic?.name_en  ?? null,
+      generic_id:      generic?.id       ?? null,
+      name_ar:         brand.name_ar ?? generic?.name_ar ?? null,
+      formulation_id:  f?.id             ?? null,
+      concentration:   f?.concentration  ?? null,
+      form:            f?.form           ?? null,
+      dose:            f?.default_dose_override ?? null,
+      _formulationMeta: f ? {
+        name_en:       generic?.name_en ?? '',
+        concentration: f.concentration ?? '',
+        form:          f.form ?? '',
+        route:         f.route ?? '',
+      } : undefined,
+    }
+    patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+  }
+
+  function handleAltFormulationPick(formulation) {
+    const generic = formulation.generics
+    const newAlt  = {
+      ...ALTERNATIVE_DRUG_TEMPLATE,
+      generic_name:    generic?.name_en   ?? null,
+      generic_id:      generic?.id        ?? null,
+      name_ar:         generic?.name_ar   ?? null,
+      formulation_id:  formulation.id,
+      concentration:   formulation.concentration ?? null,
+      form:            formulation.form ?? null,
+      dose:            formulation.default_dose_override ?? null,
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
         concentration: formulation.concentration ?? '',
@@ -728,19 +741,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
   // ── Derived state ────────────────────────────────────────────────────────
 
-  const isLinked     = !!(row.brand_id || row.generic_id || row.formulation_id)
-  const showLink     = row.drug_link_enabled ?? true
-  const hasAlt       = (row.alternatives ?? []).length > 0
+  const isLinked = !!(row.brand_id || row.generic_id || row.formulation_id)
+  const showLink = row.drug_link_enabled ?? true
+  const hasAlt   = (row.alternatives ?? []).length > 0
 
   // Validation: at least one of brand_name / generic_name must be non-empty
-  const hasName      = !!(row.brand_name?.trim() || row.generic_name?.trim())
+  const hasName = !!(row.brand_name?.trim() || row.generic_name?.trim())
 
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* ── Library link status + "not in library" tag (§2.4b) ── */}
+      {/* ── Library link status + picker buttons ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {!isLinked && <NotInLibraryTag />}
         {isLinked && (
@@ -756,22 +769,38 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             Linked to library
           </span>
         )}
-        <button
-          type="button"
-          onClick={() => setPickerOpen(true)}
-          style={{
-            marginLeft: isLinked ? 0 : 'auto',
-            padding: '4px 10px',
-            border: '1.5px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          {isLinked ? 'Change formulation…' : 'Pick from library…'}
-        </button>
+        <div style={{ marginLeft: isLinked ? 0 : 'auto', display: 'flex', gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => setBrandPickerOpen(true)}
+            style={{
+              padding: '4px 10px',
+              border: '1.5px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            {isLinked && row.brand_id ? 'Change brand…' : 'Pick a brand…'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormulationPickerOpen(true)}
+            style={{
+              padding: '4px 10px',
+              border: '1.5px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            {isLinked && !row.brand_id ? 'Change formulation…' : 'Pick a formulation…'}
+          </button>
+        </div>
       </div>
 
       {/* ── Validation error ── */}
@@ -791,22 +820,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         <div>
           <FieldLabel>Brand name</FieldLabel>
-          <AutocompleteInput
+          <input
+            type="text"
             value={row.brand_name ?? ''}
-            onChange={val => patch({ brand_name: val || null, brand_id: null })}
-            onSelect={handleBrandSelect}
+            onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
             placeholder="e.g. Augmentin"
-            fetchSuggestions={fetchBrandSuggestions}
-            renderSuggestion={b => (
-              <span style={{ fontSize: 13 }}>
-                <strong>{b.name}</strong>
-                {b.formulations?.concentration && (
-                  <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>
-                    {b.formulations.concentration} {b.formulations.form}
-                  </span>
-                )}
-              </span>
-            )}
+            style={textInput()}
           />
         </div>
         <div>
@@ -1034,11 +1053,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       )}
 
-      {/* ── Add alternative button + mini-menu ── */}
-      <div style={{ display: 'flex', gap: 6 }}>
+      {/* ── Add alternative buttons ── */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           type="button"
-          onClick={() => setAltPickerOpen(true)}
+          onClick={() => setAltBrandPickerOpen(true)}
           style={{
             display: 'flex', alignItems: 'center', gap: 5,
             padding: '5px 10px',
@@ -1050,7 +1069,23 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             fontFamily: 'var(--font-body)',
           }}
         >
-          <Plus size={11} /> Add alternative (library)
+          <Plus size={11} /> Alt: pick a brand…
+        </button>
+        <button
+          type="button"
+          onClick={() => setAltFormulationPickerOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '5px 10px',
+            border: '1.5px dashed var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            background: 'transparent',
+            color: 'var(--color-text-tertiary)',
+            fontSize: 11, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'var(--font-body)',
+          }}
+        >
+          <Plus size={11} /> Alt: pick a formulation…
         </button>
         <button
           type="button"
@@ -1066,25 +1101,42 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             fontFamily: 'var(--font-body)',
           }}
         >
-          <Plus size={11} /> Add alternative (free text)
+          <Plus size={11} /> Alt: free text
         </button>
       </div>
 
-      {/* ── Library picker modal (main drug) ── */}
+      {/* ── Library picker modals (main drug) ── */}
       <DrugPickerModal
-        isOpen={pickerOpen}
-        onClose={() => setPickerOpen(false)}
+        isOpen={brandPickerOpen}
+        onClose={() => setBrandPickerOpen(false)}
+        onSelect={handleBrandPick}
+        mode="brand"
+      />
+      <DrugPickerModal
+        isOpen={formulationPickerOpen}
+        onClose={() => setFormulationPickerOpen(false)}
         onSelect={handleFormulationPick}
+        mode="formulation"
       />
 
-      {/* ── Library picker modal (add alternative) ── */}
+      {/* ── Library picker modals (add alternative) ── */}
       <DrugPickerModal
-        isOpen={altPickerOpen}
-        onClose={() => setAltPickerOpen(false)}
-        onSelect={formulation => {
-          setAltPickerOpen(false)
-          handleAltPickerSelect(formulation)
+        isOpen={altBrandPickerOpen}
+        onClose={() => setAltBrandPickerOpen(false)}
+        onSelect={brand => {
+          setAltBrandPickerOpen(false)
+          handleAltBrandPick(brand)
         }}
+        mode="brand"
+      />
+      <DrugPickerModal
+        isOpen={altFormulationPickerOpen}
+        onClose={() => setAltFormulationPickerOpen(false)}
+        onSelect={formulation => {
+          setAltFormulationPickerOpen(false)
+          handleAltFormulationPick(formulation)
+        }}
+        mode="formulation"
       />
 
     </div>
@@ -1190,5 +1242,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
-
-
