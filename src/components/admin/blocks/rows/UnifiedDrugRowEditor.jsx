@@ -588,8 +588,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       if (existingFormulation) {
         formulationId = existingFormulation.id
       } else {
+        const formulationSlugBase = `${genericName}-${concentration}-${row.form}`
+          .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
         const { data: newFormulation, error: fErr } = await insertFormulation({
           generic_id: genericId,
+          slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
           form: row.form,
           route: promoteRoute,
