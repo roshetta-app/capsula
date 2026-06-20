@@ -56,9 +56,48 @@
         }
       })();
     </script>
+
+    <!--
+      Blank-on-deploy mitigation (GH Pages CDN propagation race).
+
+      During the ~10 min a new deploy takes to fully propagate across
+      GitHub Pages' CDN edges, a fresh navigation (e.g. opening /admin,
+      which always re-runs the 404.html redirect chain — unlike the main
+      app, which is usually already open) can land on an edge node still
+      serving a mismatched index.html / asset-bundle pairing. The bundle
+      404s, React never mounts, and #root stays empty with no feedback.
+
+      This can't be prevented from here (it's GH Pages' own propagation
+      delay), but it can be made to self-heal: if the main module script
+      fails to load, retry with a cache-busted URL a few times before
+      giving up with a visible reload link instead of a silent blank page.
+      The retry counter is cleared in main.jsx once the module actually
+      starts executing, so this only ever fires on a genuine load failure.
+    -->
+    <script>
+      window.__mainLoadFailed = function () {
+        var key = 'capsula_boot_retry_count';
+        var n = parseInt(sessionStorage.getItem(key) || '0', 10);
+        if (n >= 3) {
+          var root = document.getElementById('root');
+          if (root) {
+            root.innerHTML =
+              '<div style="padding:48px 24px;text-align:center;font-family:system-ui,sans-serif;color:#57534E">' +
+              '<p style="margin-bottom:16px;">Capsula is finishing an update — this is taking longer than usual.</p>' +
+              '<a href="/capsula/" style="color:#0F766E;font-weight:600;text-decoration:underline;">Tap here to reload</a>' +
+              '</div>';
+          }
+          return;
+        }
+        sessionStorage.setItem(key, String(n + 1));
+        setTimeout(function () {
+          window.location.replace('/capsula/?boot-retry=' + Date.now());
+        }, 2500);
+      };
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.jsx" onerror="window.__mainLoadFailed()"></script>
   </body>
 </html>

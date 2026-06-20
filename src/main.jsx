@@ -3,6 +3,13 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
+// Module executed successfully — clear the boot-retry counter from
+// index.html's __mainLoadFailed fallback, so a genuine future load
+// failure (not this one) gets the full retry budget again.
+try {
+  sessionStorage.removeItem('capsula_boot_retry_count')
+} catch (e) { /* sessionStorage unavailable (e.g. private mode edge case) */ }
+
 // ─── PWA install prompt capture ───────────────────────────────────────────────
 //
 // The browser fires `beforeinstallprompt` once, very early — before React mounts.
