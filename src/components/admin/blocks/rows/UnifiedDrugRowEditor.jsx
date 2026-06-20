@@ -47,14 +47,24 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Link, Unlink, Plus, X, ChevronDown } from 'lucide-react'
+import { Link, Unlink, Plus, X, ChevronDown, Library } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import { supabase } from '../../../../lib/supabase'
-import { DRUG_FORMS } from '../../../../config/forms'
+import { DRUG_FORMS, DRUG_ROUTES } from '../../../../config/forms'
+import { DRUG_CATEGORIES } from '../../../../config/categories'
+import {
+  findGenericByName,
+  findFormulationMatch,
+  findBrandMatch,
+  insertGeneric,
+  insertFormulation,
+  insertBrand,
+} from '../../../../lib/adminQueries'
 import {
   DRUG_ROW_TEMPLATE,
   ALTERNATIVE_DRUG_TEMPLATE,
   alternativeSharesParentDose,
+  SOURCE_FLAG_VALUE,
 } from '../../../../constants/prescriptionRowSchema'
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -453,6 +463,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // "add alternative" area extensible.
   const [altPickerOpen, setAltPickerOpen] = useState(false)
 
+  // ── Save-to-library promote flow (Phase 2, masterplan §2.5) ───────────────
+  const [promoteOn, setPromoteOn]       = useState(false)
+  const [promoteCategory, setPromoteCategory] = useState('')
+  const [promoteRoute, setPromoteRoute]       = useState('')
+  const [promoting, setPromoting]       = useState(false)
+  const [promoteError, setPromoteError] = useState(null)
+
   function patch(updates) {
     onChange({ ...row, ...updates })
   }
@@ -502,6 +519,125 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // ── Generic autocomplete select ──────────────────────────────────────────
   function handleGenericSelect(generic) {
     patch({ generic_name: generic.name_en, generic_id: generic.id })
+  }
+
+  // ── Promote to library (§2.5) ────────────────────────────────────────────
+  // Runs the reuse-or-create sequence immediately when the admin clicks
+  // "Promote now": generic → formulation → brand, in that order, mirroring
+  // AddDrugFlow.jsx's sequential insert pattern. On success, links the row
+  // to the resulting ids and tags it source_flag: 'manual_entry'.
+  //
+  // Decision (flagged, not assumed): if a step fails partway, we do NOT roll
+  // back earlier inserts — there is no client-side transaction available,
+  // and deleting a just-created generic/formulation could race with other
+  // concurrent admin activity. Instead we surface exactly which step
+  // succeeded and which failed, so the admin can finish manually (e.g. via
+  // the Generics CMS) or retry. Retrying re-runs the match step first, so a
+  // retry after a partial failure will find and reuse what was already
+  // created rather than duplicating it.
+  async function handlePromote() {
+    setPromoteError(null)
+
+    const genericName = row.generic_name?.trim()
+    const concentration = row.concentration?.trim()
+
+    // Preconditions — surfaced as a message, not silently worked around.
+    if (!genericName) {
+      setPromoteError('Generic name is required to save to the library (brand name alone isn\u2019t enough to file this under a molecule).')
+      return
+    }
+    if (!concentration || !row.form) {
+      setPromoteError('Concentration and form are required to save to the library.')
+      return
+    }
+    if (!promoteCategory || !promoteRoute) {
+      setPromoteError('Category and route are required to save to the library.')
+      return
+    }
+
+    setPromoting(true)
+    let genericId = row.generic_id ?? null
+    let formulationId = null
+    let brandId = null
+
+    try {
+      // 1. Generic — reuse if it matches, else create
+      if (!genericId) {
+        const { data: existingGeneric, error: findGErr } = await findGenericByName(genericName)
+        if (findGErr) throw new Error(`Checking for an existing generic: ${findGErr.message}`)
+        if (existingGeneric) {
+          genericId = existingGeneric.id
+        } else {
+          const slugBase = genericName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+          const { data: newGeneric, error: gErr } = await insertGeneric({
+            slug: slugBase || `generic-${Date.now()}`,
+            name_en: genericName,
+            name_ar: null,
+            category: promoteCategory,
+            class: null,
+          })
+          if (gErr) throw new Error(`Creating generic "${genericName}": ${gErr.message}`)
+          genericId = newGeneric.id
+        }
+      }
+
+      // 2. Formulation — reuse if this concentration/form combo already
+      //    exists under this generic, else create
+      const { data: existingFormulation, error: findFErr } = await findFormulationMatch(genericId, concentration, row.form)
+      if (findFErr) throw new Error(`Checking for an existing formulation: ${findFErr.message}`)
+      if (existingFormulation) {
+        formulationId = existingFormulation.id
+      } else {
+        const { data: newFormulation, error: fErr } = await insertFormulation({
+          generic_id: genericId,
+          concentration,
+          form: row.form,
+          route: promoteRoute,
+          doses: [],
+        })
+        if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
+        formulationId = newFormulation.id
+      }
+
+      // 3. Brand — only if a brand name was typed; reuse if it already
+      //    exists under this formulation, else create
+      const brandName = row.brand_name?.trim()
+      if (brandName) {
+        const { data: existingBrand, error: findBErr } = await findBrandMatch(formulationId, brandName)
+        if (findBErr) throw new Error(`Checking for an existing brand: ${findBErr.message}`)
+        if (existingBrand) {
+          brandId = existingBrand.id
+        } else {
+          const { data: newBrand, error: bErr } = await insertBrand({
+            formulation_id: formulationId,
+            name: brandName,
+            name_ar: null,
+            manufacturer: null,
+            source: SOURCE_FLAG_VALUE,
+            is_published: true,
+            in_stock: true,
+            is_available: true,
+          })
+          if (bErr) throw new Error(`Creating brand "${brandName}": ${bErr.message}`)
+          brandId = newBrand.id
+        }
+      }
+
+      // 4. Link the row to the real library ids; typed text stays as-is.
+      patch({
+        generic_id: genericId,
+        formulation_id: formulationId,
+        brand_id: brandId,
+        source_flag: SOURCE_FLAG_VALUE,
+      })
+      setPromoteOn(false)
+      setPromoteCategory('')
+      setPromoteRoute('')
+    } catch (err) {
+      setPromoteError(err.message ?? 'Promotion failed. Please try again.')
+    } finally {
+      setPromoting(false)
+    }
   }
 
   // ── Alternatives ─────────────────────────────────────────────────────────
@@ -673,6 +809,96 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           </select>
         </div>
       </div>
+
+      {/* ── Save to library (§2.5) — free-text mode only ── */}
+      {!isLinked && (
+        <div style={{
+          border: '1.5px dashed var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 10,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <button
+            type="button"
+            onClick={() => setPromoteOn(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${promoteOn ? 'var(--color-accent)' : 'var(--color-border)'}`,
+              backgroundColor: promoteOn ? '#EFF6FF' : 'transparent',
+              color: promoteOn ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+            }}
+          >
+            <Library size={13} />
+            {promoteOn ? 'Save to library: ON' : 'Save to library'}
+          </button>
+
+          {promoteOn && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <FieldLabel>Category</FieldLabel>
+                  <select
+                    value={promoteCategory}
+                    onChange={e => setPromoteCategory(e.target.value)}
+                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— select —</option>
+                    {DRUG_CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Route</FieldLabel>
+                  <select
+                    value={promoteRoute}
+                    onChange={e => setPromoteRoute(e.target.value)}
+                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— select —</option>
+                    {DRUG_ROUTES.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {promoteError && (
+                <div style={{
+                  fontSize: 11, color: 'var(--color-error, #ef4444)',
+                  padding: '4px 8px',
+                  background: '#ef444410',
+                  border: '1px solid #ef444430',
+                  borderRadius: 'var(--radius-md)',
+                }}>
+                  {promoteError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handlePromote}
+                disabled={promoting}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 'var(--radius-md)',
+                  border: 'none', alignSelf: 'flex-start',
+                  backgroundColor: promoting ? 'var(--color-border)' : 'var(--color-accent)',
+                  color: promoting ? 'var(--color-text-tertiary)' : '#fff',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: promoting ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                {promoting ? 'Saving…' : 'Promote now'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Dose ── */}
       <div>
@@ -917,3 +1143,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+

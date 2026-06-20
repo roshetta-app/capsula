@@ -631,6 +631,63 @@ export async function fetchAllGenerics() {
   return { data: mapped, error: null }
 }
 
+// ─── Promote-to-library matching (Phase 2, masterplan §2.5) ──────────────────
+//
+// Reuse-or-create lookups used by the free-text "save to library" promote
+// flow. Each returns { data: <row|null>, error } — data is null (not an
+// error) when nothing matches, which the caller treats as "create new".
+
+/**
+ * Find an existing generic by exact, case-insensitive name_en match.
+ * @param {string} nameEn
+ */
+export async function findGenericByName(nameEn) {
+  const { data, error } = await supabase
+    .from('generics')
+    .select('id, name_en, category')
+    .ilike('name_en', nameEn.trim())
+    .limit(1)
+    .maybeSingle()
+  return { data: data ?? null, error }
+}
+
+/**
+ * Find an existing formulation under a generic by concentration + form.
+ * Matched case-insensitively on concentration since free text may differ
+ * in spacing/case (e.g. "500mg" vs "500 mg"); form is matched exactly since
+ * it's selected from a fixed list (config/forms.js) on both sides.
+ * @param {string} genericId
+ * @param {string} concentration
+ * @param {string} form
+ */
+export async function findFormulationMatch(genericId, concentration, form) {
+  const { data, error } = await supabase
+    .from('formulations')
+    .select('id, concentration, form, route, default_dose_override')
+    .eq('generic_id', genericId)
+    .eq('form', form)
+    .ilike('concentration', concentration.trim())
+    .limit(1)
+    .maybeSingle()
+  return { data: data ?? null, error }
+}
+
+/**
+ * Find an existing brand under a formulation by exact, case-insensitive name.
+ * @param {string} formulationId
+ * @param {string} name
+ */
+export async function findBrandMatch(formulationId, name) {
+  const { data, error } = await supabase
+    .from('brands')
+    .select('id, name, source')
+    .eq('formulation_id', formulationId)
+    .ilike('name', name.trim())
+    .limit(1)
+    .maybeSingle()
+  return { data: data ?? null, error }
+}
+
 /**
  * Toggle is_published on a generic and invalidate the drugs cache.
  */
@@ -790,3 +847,4 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
