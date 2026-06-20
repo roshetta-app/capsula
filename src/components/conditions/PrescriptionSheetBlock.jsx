@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
-import { alternativeSharesParentDose } from '../../constants/prescriptionRowSchema'
+import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/prescriptionRowSchema'
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -267,6 +267,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   const mainCluster = {
     formulationId: mainFormulationId,
     dose: row.dose,
+    doseWho: row.dose_who ?? null,
     note: row.note,
     formulation: mainFormulationId ? (mainFormulation ?? null) : null,
     members: [{ isMain: true, data: row }],
@@ -285,6 +286,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
         otherClusters.set(alt.formulation_id, {
           formulationId: alt.formulation_id,
           dose: alt.dose,
+          doseWho: alt.dose_who ?? null,
           note: alt.note,
           formulation: (drugs ?? []).find(d => d.id === alt.formulation_id) ?? null,
           members: [],
@@ -295,6 +297,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
       standalone.push({
         formulationId: null,
         dose: alt.dose,
+        doseWho: alt.dose_who ?? null,
         note: alt.note,
         formulation: null,
         members: [{ isMain: false, data: alt }],
@@ -322,7 +325,15 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
               {cluster.members.map((member, mIdx) => {
                 const data = member.data
                 const memberHasBrand = !!data.brand_name?.trim()
-                const memberName = memberHasBrand ? data.brand_name : data.generic_name
+                // Safety net: a row can end up linked (formulation_id set,
+                // resolves to a real published formulation) but missing its
+                // own brand_name/generic_name — e.g. saved before the picker
+                // wrote both fields together. Without this, the row would
+                // render with no name at all. Falls back to the linked
+                // formulation's own generic name so the row never goes blank.
+                const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
+                const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
+                const memberName = memberHasBrand ? data.brand_name : (data.generic_name || fallbackName)
                 const memberGeneric = memberHasBrand ? data.generic_name : null
                 return (
                   <div key={mIdx}>
@@ -341,7 +352,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                 )
               })}
 
-              {cluster.dose && <DoseLine text={cluster.dose} />}
+              {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
               <RowNote note={cluster.note} />
 
               {/* Breadcrumb: Category › Generic — once per cluster, only when
@@ -441,18 +452,36 @@ function DrugMainLine({ name, nameAr, concentration, form, generic, linkEnabled,
   )
 }
 
-function DoseLine({ text }) {
+function DoseLine({ text, who }) {
+  const whoLabel = doseWhoLabel(who)
   return (
     <div dir="auto" style={{
-      fontSize: 13,
-      fontWeight: 500,
-      color: 'var(--color-text-primary)',
-      opacity: 0.72,
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 6,
       marginTop: 3,
-      lineHeight: 1.5,
-      unicodeBidi: 'plaintext',
+      flexWrap: 'wrap',
     }}>
-      {text}
+      {whoLabel && (
+        <span style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+          textTransform: 'uppercase',
+          color: 'var(--color-text-tertiary)',
+          flexShrink: 0,
+        }}>
+          {whoLabel}
+        </span>
+      )}
+      <span style={{
+        fontSize: 13,
+        fontWeight: 500,
+        color: 'var(--color-text-primary)',
+        opacity: 0.72,
+        lineHeight: 1.5,
+        unicodeBidi: 'plaintext',
+      }}>
+        {text}
+      </span>
     </div>
   )
 }

@@ -76,16 +76,31 @@ export const ROW_TYPES = {
  *                                              route above. Null for free-text rows.
  *
  * @property {string|null} dose              - single editable text field (masterplan §2.3).
- *                                              Pre-filled from formulation default on library pick,
- *                                              but editing this NEVER writes back to
- *                                              formulations.default_dose_override or
- *                                              formulations.doses / doses_structured.
+ *                                              Pre-filled on library pick from the chosen row of
+ *                                              formulations.doses_structured (PHASE 3, 2026-06-20 —
+ *                                              previously, incorrectly, pre-filled from
+ *                                              formulations.default_dose_override, which is a
+ *                                              separate drug-detail-page footnote field, not a
+ *                                              dose). Editing this NEVER writes back to
+ *                                              formulations.doses_structured or
+ *                                              formulations.default_dose_override.
  *                                              Replaces old dose_text and dose_override fields.
  *                                              For alternatives sharing this same formulation_id
  *                                              (see AlternativeDrug.dose below), this is the single
  *                                              dose value used for all of them — alternatives only
  *                                              get their own independent `dose` when they are a
  *                                              genuinely different formulation.
+ *
+ * @property {string|null} dose_who          - PHASE 3 (2026-06-20), new. The raw `who` key (e.g.
+ *                                              'adult', 'elderly') of the doses_structured row the
+ *                                              admin picked at add-time, when the formulation has
+ *                                              more than one dose row to choose from. Display-only
+ *                                              provenance tag, shown next to the dose line in the
+ *                                              CMS and the app. Null when the row is free text, the
+ *                                              formulation had zero or one dose row (nothing to
+ *                                              choose), or `dose` was hand-typed without picking a
+ *                                              structured row. Editing `dose` afterward does NOT
+ *                                              clear this tag — it is provenance, not a lock.
  *
  * @property {string|null} note              - LOCKED (2026-06-20, supersedes separate note_en/note_ar).
  *                                              Single bidi field — author types English or Arabic
@@ -130,8 +145,8 @@ export const DRUG_ROW_TEMPLATE = {
   route: null,
   category: null,
   dose: null,
+  dose_who: null,
   note: null,
-  drug_link_enabled: true,
   source_flag: null,
   alternatives: [],
 };
@@ -172,6 +187,10 @@ export const DRUG_ROW_TEMPLATE = {
  *     formulation_id at all), `dose` is this alternative's own independent,
  *     fully editable value — it is a genuinely different drug and may need
  *     a different amount.
+ * @property {string|null} dose_who
+ *   - PHASE 3 (2026-06-20), new. Same rule as DrugRow.dose_who: the raw
+ *     doses_structured `who` key picked at add-time, display-only, not
+ *     cleared by hand-editing `dose` afterward.
  * @property {string|null} note
  *   - Same sharing rule as `dose`: hidden/inherited from the parent's
  *     `note` when this alternative shares the parent's formulation_id,
@@ -190,6 +209,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   route: null,
   category: null,
   dose: null,
+  dose_who: null,
   note: null,
   source_flag: null,
 };
@@ -243,8 +263,10 @@ export const FREE_TEXT_ROW_TEMPLATE = {
  *
  *   drug_library row:
  *     formulation_id  -> unchanged, still formulation_id
- *     dose_override    -> REMOVED. Use dose (pre-filled from formulation default,
- *                          freely editable, never written back to the formulation)
+ *     dose_override    -> REMOVED. Use dose (pre-filled from a chosen
+ *                          formulations.doses_structured row, see dose_who
+ *                          above; freely editable, never written back to
+ *                          the formulation)
  *     note_en/note_ar -> unchanged
  *     drug_link_enabled -> unchanged
  *
@@ -286,6 +308,58 @@ export const FIELD_RENAME_MAP_FOR_REFERENCE = {
  * field), 'manual' (4 rows), 'EDA' (2 rows), 'pharmacy-review' (1 row).
  */
 export const SOURCE_FLAG_VALUE = 'manual_entry';
+
+/**
+ * PHASE 3 (2026-06-20): shared age-group labels for formulations.doses_structured
+ * `who` keys. Single source of truth for both the CMS picker step (choosing
+ * which dose row to prefill from) and the app render (the small provenance
+ * tag next to the dose line) — must read identically in both places.
+ * Mirrors the map already used by DoseTable.jsx on the drug detail screen.
+ */
+export const DOSE_WHO_LABELS = {
+  adult:              'Adult',
+  child:              'Child',
+  'child-6-12':       'Child 6–12y',
+  'child-6-12y':      'Child 6–12y',
+  'child-2-6':        'Child 2–6y',
+  'child-2-6y':       'Child 2–6y',
+  'child-under-2':    'Child <2y',
+  infant:             'Infant',
+  neonate:            'Neonate',
+  elderly:            'Elderly',
+  renal:              'Renal',
+  hepatic:            'Hepatic',
+};
+
+/**
+ * Display label for a doses_structured `who` key, falling back to the raw
+ * value (capitalized as typed) if it isn't in the known map — same
+ * fallback behavior as DoseTable.jsx's formatWho().
+ * @param {string|null} who
+ * @returns {string}
+ */
+export function doseWhoLabel(who) {
+  if (!who) return '';
+  return DOSE_WHO_LABELS[who.toLowerCase().replace(/\s+/g, '-')] ?? who;
+}
+
+/**
+ * PHASE 3 (2026-06-20): formats one formulations.doses_structured row into
+ * the plain dose text copied onto a prescription row at pick time. Folds
+ * the row's max_dose in alongside its instruction, since the prescription
+ * row only has one dose field (no separate max-dose pill like the detail
+ * page table has).
+ * @param {{who?:string, instruction?:string, max_dose?:string|null}} doseRow
+ * @returns {string|null}
+ */
+export function formatDoseRowText(doseRow) {
+  if (!doseRow) return null;
+  const instruction = doseRow.instruction?.trim();
+  if (!instruction) return null;
+  return doseRow.max_dose
+    ? `${instruction} (max ${doseRow.max_dose})`
+    : instruction;
+}
 
 /**
  * Reference logic for Phase 1 (CMS editor) and Phase 3 (app renderer) —
@@ -345,6 +419,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     route: chosen.route,
     category: chosen.category,
     dose: chosen.dose,
+    dose_who: chosen.dose_who,
     note: chosen.note,
     source_flag: chosen.source_flag,
     alternatives: remaining,

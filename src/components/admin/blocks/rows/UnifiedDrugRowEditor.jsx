@@ -71,6 +71,8 @@ import {
   ALTERNATIVE_DRUG_TEMPLATE,
   alternativeSharesParentDose,
   SOURCE_FLAG_VALUE,
+  doseWhoLabel,
+  formatDoseRowText,
 } from '../../../../constants/prescriptionRowSchema'
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -153,6 +155,85 @@ function NotInLibraryTag() {
       Not in library
     </span>
   )
+}
+
+// ─── Dose age-group chooser (Phase 3, 2026-06-20) ─────────────────────────────
+// Shown as a small inline step after a brand/formulation pick, only when the
+// picked formulation has more than one doses_structured row. Lets the admin
+// choose which age-group dose to prefill `dose`/`dose_who` from, instead of
+// guessing (e.g. always "adult"). Skipped entirely (resolved immediately) by
+// the caller when there are 0 or 1 rows — see resolveDosePick() below.
+
+function DoseWhoChooser({ doseRows, onChoose, onSkip }) {
+  return (
+    <div style={{
+      border: '1.5px solid var(--color-accent)',
+      borderRadius: 'var(--radius-md)',
+      padding: '10px 12px',
+      backgroundColor: '#EFF6FF',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+        Which dose should pre-fill this row?
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {doseRows.map((doseRow, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChoose(doseRow)}
+            style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+              padding: '7px 10px', textAlign: 'left',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--color-surface)', cursor: 'pointer',
+              fontFamily: 'var(--font-body)',
+            }}
+          >
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }}>
+              {doseWhoLabel(doseRow.who ?? doseRow.group) || 'Dose'}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              {formatDoseRowText(doseRow)}
+            </span>
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={onSkip}
+        style={{
+          alignSelf: 'flex-start',
+          background: 'none', border: 'none', padding: 0,
+          fontSize: 11, color: 'var(--color-text-tertiary)',
+          textDecoration: 'underline', cursor: 'pointer',
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        Skip — leave dose blank
+      </button>
+    </div>
+  )
+}
+
+/**
+ * Given a picked formulation/brand's doses_structured array, decides whether
+ * a dose can be resolved immediately (0 or 1 rows) or needs the admin to
+ * choose (2+ rows). Returns either:
+ *   { needsChoice: false, dose, dose_who }   — finalize the pick immediately
+ *   { needsChoice: true, doseRows }          — caller should show DoseWhoChooser
+ */
+function resolveDosePick(dosesStructured) {
+  const rows = Array.isArray(dosesStructured) ? dosesStructured : []
+  if (rows.length === 0) {
+    return { needsChoice: false, dose: null, dose_who: null }
+  }
+  if (rows.length === 1) {
+    const only = rows[0]
+    return { needsChoice: false, dose: formatDoseRowText(only), dose_who: only.who ?? only.group ?? null }
+  }
+  return { needsChoice: true, doseRows: rows }
 }
 
 // ─── Autocomplete input ────────────────────────────────────────────────────────
@@ -279,16 +360,30 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const sharesParentDose = alternativeSharesParentDose(parentRow, alt)
   const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
   const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
+  // Phase 3 (2026-06-20): holds the age-group choice step when a freshly
+  // picked formulation has more than one doses_structured row. Null when
+  // there's nothing to choose (chooser not shown).
+  const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
 
   function patch(updates) {
     onChange({ ...alt, ...updates })
+  }
+
+  function finalizeDoseChoice(doseRow) {
+    patch({ dose: formatDoseRowText(doseRow), dose_who: doseRow.who ?? doseRow.group ?? null })
+    setPendingDoseChoice(null)
+  }
+
+  function skipDoseChoice() {
+    patch({ dose: null, dose_who: null })
+    setPendingDoseChoice(null)
   }
 
   // When a brand is picked for this alternative (brand mode)
   function handleBrandPick(brand) {
     const f       = brand.formulations
     const generic = f?.generics
-    patch({
+    const baseFields = {
       brand_name:      brand.name,
       brand_id:        brand.id,
       generic_name:    generic?.name_en ?? alt.generic_name,
@@ -299,20 +394,31 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       form:            f?.form           ?? null,
       route:           f?.route          ?? null,
       category:        generic?.category ?? null,
-      dose:            sharesParentDose ? alt.dose : (f?.default_dose_override ?? null),
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
         concentration: f.concentration ?? '',
         form:          f.form ?? '',
         route:         f.route ?? '',
       } : alt._formulationMeta,
-    })
+    }
+    if (sharesParentDose) {
+      // Same formulation as the parent — dose is shared/hidden, not re-resolved.
+      patch(baseFields)
+      return
+    }
+    const resolved = resolveDosePick(f?.doses_structured)
+    if (resolved.needsChoice) {
+      patch(baseFields)
+      setPendingDoseChoice({ doseRows: resolved.doseRows })
+    } else {
+      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
+    }
   }
 
   // When a formulation is picked for this alternative (formulation mode)
   function handleFormulationPick(formulation) {
     const generic = formulation.generics
-    patch({
+    const baseFields = {
       brand_name:      alt.brand_name,
       brand_id:        null,
       generic_name:    generic?.name_en ?? null,
@@ -323,14 +429,24 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       form:            formulation.form ?? null,
       route:           formulation.route ?? null,
       category:        generic?.category ?? null,
-      dose:            sharesParentDose ? alt.dose : (formulation.default_dose_override ?? null),
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
         concentration: formulation.concentration ?? '',
         form:          formulation.form ?? '',
         route:         formulation.route ?? '',
       },
-    })
+    }
+    if (sharesParentDose) {
+      patch(baseFields)
+      return
+    }
+    const resolved = resolveDosePick(formulation.doses_structured)
+    if (resolved.needsChoice) {
+      patch(baseFields)
+      setPendingDoseChoice({ doseRows: resolved.doseRows })
+    } else {
+      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
+    }
   }
 
   const isLinked = !!(alt.brand_id || alt.generic_id)
@@ -508,10 +624,18 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         }}>
           Dose &amp; note are shared with the main drug (same formulation) — edit them on the row above.
         </div>
+      ) : pendingDoseChoice ? (
+        <DoseWhoChooser
+          doseRows={pendingDoseChoice.doseRows}
+          onChoose={finalizeDoseChoice}
+          onSkip={skipDoseChoice}
+        />
       ) : (
         <>
           <div>
-            <FieldLabel>Dose / instructions</FieldLabel>
+            <FieldLabel hint={alt.dose_who ? doseWhoLabel(alt.dose_who) : undefined}>
+              Dose / instructions
+            </FieldLabel>
             <input
               type="text"
               value={alt.dose ?? ''}
@@ -560,6 +684,15 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
   const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
 
+  // Phase 3 (2026-06-20): age-group dose chooser state.
+  // mainDoseChoice holds { baseFields, doseRows } while the main row's dose
+  // age-group is being chosen after a brand/formulation pick.
+  // pendingAlt holds the new alternative's fields (minus dose) plus
+  // doseRows while its age-group is being chosen — the alternative is only
+  // appended to row.alternatives once the dose is resolved or skipped.
+  const [mainDoseChoice, setMainDoseChoice] = useState(null)
+  const [pendingAlt, setPendingAlt]         = useState(null)
+
   // ── Save-to-library promote flow (Phase 2, masterplan §2.5) ───────────────
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
@@ -575,7 +708,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   function handleBrandPick(brand) {
     const f       = brand.formulations
     const generic = f?.generics
-    patch({
+    const baseFields = {
       brand_name:      brand.name,
       brand_id:        brand.id,
       generic_name:    generic?.name_en   ?? row.generic_name,
@@ -586,20 +719,26 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:            f?.form            ?? null,
       route:           f?.route           ?? null,
       category:        generic?.category  ?? null,
-      dose:            f?.default_dose_override ?? row.dose,
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
         concentration: f.concentration ?? '',
         form:          f.form ?? '',
         route:         f.route ?? '',
       } : row._formulationMeta,
-    })
+    }
+    const resolved = resolveDosePick(f?.doses_structured)
+    if (resolved.needsChoice) {
+      patch(baseFields)
+      setMainDoseChoice({ doseRows: resolved.doseRows })
+    } else {
+      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
+    }
   }
 
   // ── Formulation picker select (formulation mode — formulation-first fill) ─
   function handleFormulationPick(formulation) {
     const generic = formulation.generics
-    patch({
+    const baseFields = {
       formulation_id:  formulation.id,
       generic_name:    generic?.name_en   ?? row.generic_name,
       generic_id:      generic?.id        ?? row.generic_id,
@@ -608,14 +747,30 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:            formulation.form ?? null,
       route:           formulation.route ?? null,
       category:        generic?.category ?? null,
-      dose:            formulation.default_dose_override ?? row.dose,
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
         concentration: formulation.concentration ?? '',
         form:          formulation.form ?? '',
         route:         formulation.route ?? '',
       },
-    })
+    }
+    const resolved = resolveDosePick(formulation.doses_structured)
+    if (resolved.needsChoice) {
+      patch(baseFields)
+      setMainDoseChoice({ doseRows: resolved.doseRows })
+    } else {
+      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
+    }
+  }
+
+  function finalizeMainDoseChoice(doseRow) {
+    patch({ dose: formatDoseRowText(doseRow), dose_who: doseRow.who ?? doseRow.group ?? null })
+    setMainDoseChoice(null)
+  }
+
+  function skipMainDoseChoice() {
+    patch({ dose: null, dose_who: null })
+    setMainDoseChoice(null)
   }
 
   // ── Generic autocomplete select ──────────────────────────────────────────
@@ -741,7 +896,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   function handleAltBrandPick(brand) {
     const f       = brand.formulations
     const generic = f?.generics
-    const newAlt  = {
+    const baseAlt = {
       ...ALTERNATIVE_DRUG_TEMPLATE,
       brand_name:      brand.name,
       brand_id:        brand.id,
@@ -753,7 +908,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:            f?.form           ?? null,
       route:           f?.route          ?? null,
       category:        generic?.category ?? null,
-      dose:            f?.default_dose_override ?? null,
       _formulationMeta: f ? {
         name_en:       generic?.name_en ?? '',
         concentration: f.concentration ?? '',
@@ -761,12 +915,18 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         route:         f.route ?? '',
       } : undefined,
     }
-    patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+    const resolved = resolveDosePick(f?.doses_structured)
+    if (resolved.needsChoice) {
+      setPendingAlt({ baseAlt, doseRows: resolved.doseRows })
+    } else {
+      const newAlt = { ...baseAlt, dose: resolved.dose, dose_who: resolved.dose_who }
+      patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+    }
   }
 
   function handleAltFormulationPick(formulation) {
     const generic = formulation.generics
-    const newAlt  = {
+    const baseAlt = {
       ...ALTERNATIVE_DRUG_TEMPLATE,
       generic_name:    generic?.name_en   ?? null,
       generic_id:      generic?.id        ?? null,
@@ -776,7 +936,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:            formulation.form ?? null,
       route:           formulation.route ?? null,
       category:        generic?.category ?? null,
-      dose:            formulation.default_dose_override ?? null,
       _formulationMeta: {
         name_en:       generic?.name_en ?? '',
         concentration: formulation.concentration ?? '',
@@ -784,7 +943,29 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         route:         formulation.route ?? '',
       },
     }
+    const resolved = resolveDosePick(formulation.doses_structured)
+    if (resolved.needsChoice) {
+      setPendingAlt({ baseAlt, doseRows: resolved.doseRows })
+    } else {
+      const newAlt = { ...baseAlt, dose: resolved.dose, dose_who: resolved.dose_who }
+      patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+    }
+  }
+
+  function finalizePendingAltDose(doseRow) {
+    const newAlt = {
+      ...pendingAlt.baseAlt,
+      dose: formatDoseRowText(doseRow),
+      dose_who: doseRow.who ?? doseRow.group ?? null,
+    }
     patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+    setPendingAlt(null)
+  }
+
+  function skipPendingAltDose() {
+    const newAlt = { ...pendingAlt.baseAlt, dose: null, dose_who: null }
+    patch({ alternatives: [...(row.alternatives ?? []), newAlt] })
+    setPendingAlt(null)
   }
 
   function addFreeTextAlt() {
@@ -1069,19 +1250,27 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       )}
 
       {/* ── Dose ── */}
-      <div>
-        <FieldLabel hint="pre-filled from library; edits stay on this row only">
-          Dose / instructions
-        </FieldLabel>
-        <input
-          type="text"
-          value={row.dose ?? ''}
-          onChange={e => patch({ dose: e.target.value || null })}
-          placeholder="e.g. 1 tablet twice daily for 5 days"
-          dir="auto"
-          style={textInput()}
+      {mainDoseChoice ? (
+        <DoseWhoChooser
+          doseRows={mainDoseChoice.doseRows}
+          onChoose={finalizeMainDoseChoice}
+          onSkip={skipMainDoseChoice}
         />
-      </div>
+      ) : (
+        <div>
+          <FieldLabel hint={row.dose_who ? doseWhoLabel(row.dose_who) : 'pre-filled from library; edits stay on this row only'}>
+            Dose / instructions
+          </FieldLabel>
+          <input
+            type="text"
+            value={row.dose ?? ''}
+            onChange={e => patch({ dose: e.target.value || null })}
+            placeholder="e.g. 1 tablet twice daily for 5 days"
+            dir="auto"
+            style={textInput()}
+          />
+        </div>
+      )}
 
       {/* ── Note ── */}
       <div>
@@ -1141,6 +1330,15 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             />
           ))}
         </div>
+      )}
+
+      {/* ── Pending alternative dose age-group choice (Phase 3) ── */}
+      {pendingAlt && (
+        <DoseWhoChooser
+          doseRows={pendingAlt.doseRows}
+          onChoose={finalizePendingAltDose}
+          onSkip={skipPendingAltDose}
+        />
       )}
 
       {/* ── Add alternative buttons ── */}
