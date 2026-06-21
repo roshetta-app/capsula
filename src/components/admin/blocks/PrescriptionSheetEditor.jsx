@@ -6,7 +6,6 @@
  *     single unified 'drug' row_type, using UnifiedDrugRowEditor.
  *     Old drug_library and drug_freetext add-row buttons replaced with one
  *     "+ Drug" button.
- *   - Added 'section_header' row type with a simple label field (§2.4).
  *   - Wired PromoteAlternativeDialog (§2.2a / step 1.11): attempting to
  *     delete a 'drug' row that has alternatives now shows a promote dialog
  *     instead of immediately removing the row.
@@ -16,14 +15,11 @@
  *     this behaviour is unchanged.
  *
  * PHASE 4 changes (2026-06-21, audit-and-plan §7 Phase 4, resolves §3.4):
- *   - New 'section' row_type added alongside (not replacing) the legacy
- *     'section_header' marker — see prescriptionRowSchema.js SECTION_ROW_TEMPLATE.
- *     A 'section' row is a self-contained card with its own nested
- *     `drugs[]` array, rendered via the same RowCard component used at the
- *     top level (recursion, not duplication).
- *   - The "Section" add-button now creates the new 'section' shape going
- *     forward. No migration: existing 'section_header' rows are left
- *     exactly as they are and keep rendering via SectionHeaderRowEditor.
+ *   - New 'section' row_type added — see prescriptionRowSchema.js
+ *     SECTION_ROW_TEMPLATE. A 'section' row is a self-contained card with
+ *     its own nested `drugs[]` array, rendered via the same RowCard
+ *     component used at the top level (recursion, not duplication).
+ *   - The "Section" add-button creates this shape.
  *   - Row-list mutation logic (add/update/move/delete-with-promote) is
  *     factored into the useRowList() hook so both the top-level rows array
  *     and a section's nested drugs[] array share the same logic instead of
@@ -36,28 +32,28 @@
  *     (inside an open section card only), "+ Section" (creates an empty
  *     section).
  *
+ * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
+ * `drug_library`, and `drug_freetext` row types — no persisted data of
+ * these shapes remained in the database at the time of removal (confirmed
+ * via audit before this change). `section` (Phase 4) is now the only
+ * section mechanism, and `drug` (Phase 1) is now the only drug row shape.
+ * Removed in this phase: ROW_TYPE_LABELS legacy entries, the
+ * normaliseLegacyDrugRow() upgrade-on-expand function, and the
+ * SectionHeaderRowEditor component.
+ *
  * Data shape (block.data):
  *   {
  *     label: string,
  *     rows: Array<
- *       | { row_type: "drug",           id, brand_name, brand_id, generic_name, generic_id,
- *                                       formulation_id, concentration, form, dose,
- *                                       note_en, note_ar, drug_link_enabled, source_flag,
- *                                       alternatives: AlternativeDrug[] }
- *       | { row_type: "section",        id, label, drugs: DrugRow[] }   // PHASE 4
- *       | { row_type: "section_header", id, label }                    // legacy, untouched
- *       | { row_type: "note",           id, text_en, text_ar }
- *       | { row_type: "free_text",      id, content }
+ *       | { row_type: "drug",    id, brand_name, brand_id, generic_name, generic_id,
+ *                                 formulation_id, concentration, form, dose, dose_who,
+ *                                 note, drug_link_enabled, source_flag,
+ *                                 alternatives: AlternativeDrug[] }
+ *       | { row_type: "section", id, label, drugs: DrugRow[] }
+ *       | { row_type: "note",    id, text_en, text_ar }
+ *       | { row_type: "free_text", id, content }
  *     >
  *   }
- *
- * Legacy row_type values ("drug_library", "drug_freetext") may still exist
- * in persisted data for rows not yet touched by an editor. The RowCard
- * renderer treats them gracefully: both render via UnifiedDrugRowEditor,
- * mapping old field names on the fly (dose_override→dose, drug_name→brand_name,
- * dose_text→dose) so no data migration is required. This is unaffected by
- * Phase 4 — a legacy row moved into a section is normalised on first expand,
- * exactly as it would be at the top level.
  */
 
 import { useState } from 'react'
@@ -71,15 +67,10 @@ import { nanoid } from 'nanoid'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ROW_TYPE_LABELS = {
-  // New unified type
   drug:           { label: 'Drug',           color: '#6366f1' },
   section:        { label: 'Section',        color: '#10b981' },
   note:           { label: 'Note',           color: '#f59e0b' },
   free_text:      { label: 'Text Block',     color: '#1D4ED8' },
-  // Legacy types — still renderable, will be normalised on next edit
-  section_header: { label: 'Section (legacy)', color: '#0d9488' },
-  drug_library:   { label: 'Drug (library)', color: '#6366f1' },
-  drug_freetext:  { label: 'Drug (text)',    color: '#0ea5e9' },
 }
 
 // ─── Row type chip ─────────────────────────────────────────────────────────────
@@ -108,29 +99,15 @@ function RowTypeChip({ rowType }) {
 // ─── Row summary (one-line collapsed view) ─────────────────────────────────────
 
 function rowSummary(row) {
-  // New unified drug row
   if (row.row_type === 'drug') {
     const name = row.brand_name || row.generic_name || ''
     const rest = [row.concentration, row.form].filter(Boolean).join(' ')
     return [name, rest].filter(Boolean).join(' ') || 'Empty drug'
   }
-  // Legacy: drug_library
-  if (row.row_type === 'drug_library') {
-    const m = row._formulationMeta
-    if (m) return `${m.name_en} ${m.concentration} ${m.form}`.trim()
-    return row.formulation_id ? `Formulation ${row.formulation_id.slice(0, 8)}…` : 'No formulation selected'
-  }
-  // Legacy: drug_freetext
-  if (row.row_type === 'drug_freetext') {
-    return [row.drug_name, row.dose_text].filter(Boolean).join(' — ') || 'Empty drug'
-  }
   if (row.row_type === 'section') {
     const count = (row.drugs ?? []).length
     const countLabel = count === 1 ? '1 drug' : `${count} drugs`
     return [row.label || 'Untitled section', `(${countLabel})`].join(' ')
-  }
-  if (row.row_type === 'section_header') {
-    return row.label || 'Untitled section'
   }
   if (row.row_type === 'note') {
     return row.text_en || row.text || 'Empty note'
@@ -140,78 +117,6 @@ function rowSummary(row) {
     return md.length > 60 ? md.slice(0, 60) + '…' : md || 'Empty text block'
   }
   return ''
-}
-
-// ─── Normalise legacy rows to new shape on first edit ─────────────────────────
-// Called when a legacy row is passed to onChange so it gets upgraded in state.
-
-function normaliseLegacyDrugRow(row) {
-  if (row.row_type === 'drug') return row // already new
-  if (row.row_type === 'drug_library') {
-    const m = row._formulationMeta
-    return {
-      ...DRUG_ROW_TEMPLATE,
-      id:               row.id ?? nanoid(),
-      row_type:         'drug',
-      generic_name:     m?.name_en ?? null,
-      formulation_id:   row.formulation_id ?? null,
-      concentration:    m?.concentration ?? null,
-      form:             m?.form ?? null,
-      dose:             row.dose_override ?? null,
-      note_en:          row.note_en ?? null,
-      note_ar:          row.note_ar ?? null,
-      drug_link_enabled: row.drug_link_enabled ?? true,
-      _formulationMeta: m ?? null,
-    }
-  }
-  if (row.row_type === 'drug_freetext') {
-    return {
-      ...DRUG_ROW_TEMPLATE,
-      id:           row.id ?? nanoid(),
-      row_type:     'drug',
-      brand_name:   row.drug_name ?? null,
-      dose:         row.dose_text ?? null,
-    }
-  }
-  return row
-}
-
-// ─── Section header editor (inline, simple) ───────────────────────────────────
-
-function SectionHeaderRowEditor({ row, onChange }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-        <span style={{
-          fontSize: 11, fontWeight: 700,
-          color: 'var(--color-text-secondary)',
-          textTransform: 'uppercase', letterSpacing: '0.05em',
-        }}>
-          Section label
-        </span>
-        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-          e.g. "For fever", "For cough"
-        </span>
-      </div>
-      <input
-        type="text"
-        value={row.label ?? ''}
-        onChange={e => onChange({ ...row, label: e.target.value })}
-        placeholder="Section heading…"
-        style={{
-          width: '100%', boxSizing: 'border-box',
-          padding: '7px 10px',
-          border: '1.5px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          fontSize: 13, fontFamily: 'var(--font-body)',
-          backgroundColor: 'var(--color-surface)',
-          color: 'var(--color-text-primary)',
-          outline: 'none',
-          fontWeight: 600,
-        }}
-      />
-    </div>
-  )
 }
 
 // ─── Shared row-list mutation hook (PHASE 4) ──────────────────────────────────
@@ -251,7 +156,7 @@ function useRowList(list, onChange) {
   // dialog instead of deleting immediately (step 1.11).
   function handleDeleteRequest(idx) {
     const row = list[idx]
-    const isDrug = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
+    const isDrug = row.row_type === 'drug'
     const hasAlternatives = isDrug && (row.alternatives ?? []).length > 0
     if (hasAlternatives) {
       setPromoteDialog({ idx })
@@ -387,21 +292,14 @@ function RowCard({
 }) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
-  const isDrugRow = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
+  const isDrugRow = row.row_type === 'drug'
 
-  // Normalise legacy drug rows on first change
   function handleEditorChange(nextRow) {
     onChange(nextRow)
   }
 
-  // For drug rows that are legacy, normalise when expanding so the unified
-  // editor receives a clean shape. We do this once on expand by firing onChange.
   function handleExpand() {
-    const nowExpanded = !expanded
-    setExpanded(nowExpanded)
-    if (nowExpanded && (row.row_type === 'drug_library' || row.row_type === 'drug_freetext')) {
-      onChange(normaliseLegacyDrugRow(row))
-    }
+    setExpanded(!expanded)
   }
 
   return (
@@ -525,9 +423,6 @@ function RowCard({
               onMoveDrugOut={onMoveDrugOutOfSection}
             />
           )}
-          {row.row_type === 'section_header' && (
-            <SectionHeaderRowEditor row={row} onChange={handleEditorChange} />
-          )}
           {row.row_type === 'note' && (
             <NoteRowEditor row={row} onChange={handleEditorChange} />
           )}
@@ -646,10 +541,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
     })
   }
 
-  function addSectionHeader() {
-    // PHASE 4: "+ Section" now creates the new self-contained SECTION_ROW_TEMPLATE
-    // shape going forward — the legacy section_header marker is left untouched
-    // for rows that already exist, but is no longer what new sections look like.
+  function addSection() {
     addRow({
       ...SECTION_ROW_TEMPLATE,
       id: nanoid(),
@@ -739,7 +631,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
       {/* ── Add-row buttons ───────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} />
-        <AddRowButton label="Section"      color="#10b981" onClick={addSectionHeader} />
+        <AddRowButton label="Section"      color="#10b981" onClick={addSection} />
         <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} />
         <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} />
       </div>

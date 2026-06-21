@@ -18,30 +18,21 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *                        SectionHeader followed immediately by its nested
  *                        drugs[], via the same per-row renderer used for the
  *                        sheet's top-level rows (renderRowItem below) —
- *                        recursive, not duplicated. Does not absorb any
- *                        following top-level rows (unlike section_header).
- *   section_header    — LEGACY (kept, no migration — masterplan §2.4 /
- *                        audit-and-plan Phase 4 §6). Flat visual group
- *                        boundary; everything below it belongs to it until
- *                        the next section_header, the next section row, or EOF.
- *   drug_library       — LEGACY, pre-redesign shape. Kept rendering unchanged
- *                         so existing production rows that haven't been
- *                         re-saved via the new CMS editor don't regress
- *                         (masterplan §3.5 — no visual regression requirement).
- *   drug_freetext       — LEGACY, pre-redesign shape. Same reasoning as above.
+ *                        recursive, not duplicated.
  *   note               — { text, flavor? } — rendered via NoteCallout in flat inline row style
  *   free_text          — { markdown }       — rendered via FreeTextPostBlock (markdown prose)
  *
+ * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
+ * `drug_library`, and `drug_freetext` row types. No persisted data of these
+ * shapes exists anywhere in the database as of this phase (confirmed via
+ * audit before removal); `section` (Phase 4) is now the only section
+ * mechanism, and `drug` (Phase 1) is now the only drug row shape.
+ *
  * Section grouping:
- *   The sheet's rows are still a flat top-level array. Two section
- *   mechanisms can coexist in the same array (no migration, Phase 4):
- *     - legacy section_header rows group by array position (everything
- *       until the next section_header / section row / EOF);
- *     - new section rows are self-contained, carrying their own members in
- *       a nested drugs[] array instead of inferring membership from position.
- *   Both render via the same SectionHeader component — PHASE 5 (2026-06-21)
- *   changed SectionHeader's visual treatment (see its own docstring below),
- *   but both mechanisms continue to share it identically.
+ *   The sheet's rows are still a flat top-level array; `section` rows are
+ *   self-contained, carrying their own members in a nested drugs[] array
+ *   instead of inferring membership from array position. Rendered via the
+ *   SectionHeader component (see its own docstring below).
  *
  * Numbering (masterplan §2.4a):
  *   The numbered badge counts rows, not individual drugs. A unified 'drug'
@@ -96,33 +87,6 @@ export default function PrescriptionSheetBlock({ sheet }) {
         )
       }
 
-      case 'drug_library': {
-        const index = nextIndex()
-        const formulation = drugs.find(d => d.id === row.formulation_id)
-        return (
-          <LegacyDrugLibraryRow
-            key={row.id ?? key}
-            index={index}
-            row={row}
-            formulation={formulation}
-            navigate={navigate}
-            isLast={isLast}
-          />
-        )
-      }
-
-      case 'drug_freetext': {
-        const index = nextIndex()
-        return (
-          <LegacyDrugFreetextRow
-            key={row.id ?? key}
-            index={index}
-            row={row}
-            isLast={isLast}
-          />
-        )
-      }
-
       case 'note':
         return (
           <NoteCallout
@@ -151,19 +115,13 @@ export default function PrescriptionSheetBlock({ sheet }) {
   }
 
   // ── Build visual segments ────────────────────────────────────────────
-  // Two section mechanisms coexist (no migration, Phase 4):
-  //   - legacy `section_header` rows: flat marker, everything until the
-  //     next section_header (or new `section` row, or EOF) belongs to it.
-  //   - new `section` rows: self-contained container, { label, drugs: [] }.
-  //     Rendered immediately as its own segment; does not absorb any
-  //     following top-level rows.
+  // `section` rows (Phase 4) are self-contained: { label, drugs: [] }.
+  // Rendered immediately as their own segment; do not absorb any
+  // following top-level rows.
   const segments = []
   let current = { label: null, items: [] }
   for (const row of rows) {
-    if (row.row_type === 'section_header') {
-      if (current.items.length) segments.push(current)
-      current = { label: row.label ?? '', items: [] }
-    } else if (row.row_type === 'section') {
+    if (row.row_type === 'section') {
       if (current.items.length) segments.push(current)
       segments.push({ label: row.label ?? '', items: row.drugs ?? [] })
       current = { label: null, items: [] }
@@ -514,256 +472,6 @@ function DoseLine({ text, who }) {
       }}>
         {text}
       </span>
-    </div>
-  )
-}
-
-/**
- * DrugNotes — LEGACY two-field (note_en/note_ar) rendering. Kept unchanged
- * for `drug_library` / `drug_freetext` legacy rows so they don't regress
- * visually (masterplan §3.5). New unified `drug` rows use RowNote below.
- */
-function DrugNotes({ noteEn, noteAr }) {
-  if (!noteEn && !noteAr) return null
-  return (
-    <div style={{ marginTop: 5 }}>
-      {noteEn && (
-        <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 5,
-          fontSize: 12.5,
-          fontStyle: 'normal',
-          fontWeight: 400,
-          color: 'var(--color-text-secondary)',
-          lineHeight: 1.5,
-        }}>
-          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
-          <span>{noteEn}</span>
-        </div>
-      )}
-      {noteAr && (
-        <div dir="rtl" style={{
-          display: 'flex', alignItems: 'flex-start', gap: 5,
-          fontSize: 12.5,
-          fontStyle: 'normal',
-          fontWeight: 400,
-          color: 'var(--color-text-secondary)',
-          lineHeight: 1.5,
-          marginTop: noteEn ? 2 : 0,
-        }}>
-          <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
-          <span>{noteAr}</span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-/**
- * RowNote — single bidi note field for unified `drug` rows (and their
- * formulation clusters), post note_en/note_ar merge (2026-06-20). Uses
- * dir="auto" so English or Arabic content displays in its natural
- * direction without needing two separate fields/blocks.
- */
-function RowNote({ note }) {
-  if (!note) return null
-  return (
-    <div style={{
-      marginTop: 5,
-      display: 'flex', alignItems: 'flex-start', gap: 5,
-    }}>
-      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
-      <span dir="auto" style={{
-        fontSize: 12.5,
-        fontWeight: 400,
-        color: 'var(--color-text-secondary)',
-        lineHeight: 1.5,
-        unicodeBidi: 'plaintext',
-      }}>
-        {note}
-      </span>
-    </div>
-  )
-}
-
-function Breadcrumb({ category, genericName, linkEnabled, slug, navigate }) {
-  return (
-    <div style={{
-      marginTop: 'var(--space-2)',
-      display: 'flex', alignItems: 'center', gap: 4,
-      fontSize: 11, color: 'var(--color-text-tertiary)',
-    }}>
-      <span style={{ fontWeight: 500 }}>{category}</span>
-      {genericName && (
-        <>
-          <span style={{ opacity: 0.5 }}>›</span>
-          {linkEnabled ? (
-            <button
-              onClick={() => navigate(`/drugs/${slug}`)}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                cursor: 'pointer', fontSize: 11,
-                color: 'var(--color-accent)',
-                fontFamily: 'var(--font-body)',
-                textDecoration: 'underline', textUnderlineOffset: 2,
-              }}
-            >
-              {genericName}
-            </button>
-          ) : (
-            <span>{genericName}</span>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ─── Legacy rows (pre-redesign shape, kept rendering unchanged) ───────────────
-
-function LegacyDrugLibraryRow({ index, row, formulation, navigate, isLast }) {
-  if (!formulation) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn(`[PrescriptionSheetBlock] No formulation found for formulation_id: "${row.formulation_id}"`)
-    }
-    return null
-  }
-
-  const dose = row.dose_override || formulation.doses?.[0]?.instruction || formulation.defaultDoseOverride
-  const brands = formulation.brands ?? []
-  const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation.slug)
-
-  const primary = brands[0]
-  const rest = brands.slice(1)
-
-  return (
-    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
-      <NumberBadge index={index} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {primary ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-              {linkEnabled && formulation.slug ? (
-                <button
-                  onClick={() => navigate(`/drugs/${formulation.slug}`)}
-                  style={{
-                    background: 'none', border: 'none', padding: 0,
-                    cursor: 'pointer', textAlign: 'left',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 15, fontWeight: 600,
-                    color: 'var(--color-accent)',
-                    lineHeight: 1.3,
-                  }}
-                >
-                  {primary.name}
-                </button>
-              ) : (
-                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-                  {primary.name}
-                </span>
-              )}
-              {formulation.genericName && (
-                <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-secondary)' }}>
-                  ({formulation.genericName})
-                </span>
-              )}
-            </div>
-
-            {dose && <DoseLine text={dose} />}
-
-            {(formulation.concentration || formulation.form) && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 3, flexWrap: 'wrap' }}>
-                {formulation.concentration && (
-                  <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{formulation.concentration}</span>
-                )}
-                {formulation.form && (
-                  <span style={{
-                    fontSize: 11, fontWeight: 500,
-                    backgroundColor: 'var(--color-bg)',
-                    border: '1px solid var(--color-border)',
-                    color: 'var(--color-text-tertiary)',
-                    borderRadius: 'var(--radius-full)',
-                    padding: '1px 7px',
-                  }}>
-                    {formulation.form}
-                  </span>
-                )}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div dir="auto" style={{
-              fontSize: 15, fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.3, unicodeBidi: 'plaintext',
-            }}>
-              {formulation.genericName}
-            </div>
-            {dose && <DoseLine text={dose} />}
-          </>
-        )}
-
-        <DrugNotes noteEn={row.note_en} noteAr={row.note_ar} />
-
-        {rest.map(brand => (
-          <div key={brand.id}>
-            <OrDivider />
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
-              {linkEnabled && formulation.slug ? (
-                <button
-                  onClick={() => navigate(`/drugs/${formulation.slug}`)}
-                  style={{
-                    background: 'none', border: 'none', padding: 0,
-                    cursor: 'pointer', textAlign: 'left',
-                    fontFamily: 'var(--font-body)',
-                    fontSize: 15, fontWeight: 600,
-                    color: 'var(--color-accent)', lineHeight: 1.3,
-                  }}
-                >
-                  {brand.name}
-                </button>
-              ) : (
-                <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-                  {brand.name}
-                </span>
-              )}
-              {brand.nameAr && (
-                <span dir="rtl" style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.4 }}>
-                  {brand.nameAr}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
-
-        {formulation.category && (
-          <Breadcrumb
-            category={formulation.category}
-            genericName={formulation.genericName}
-            linkEnabled={linkEnabled}
-            slug={formulation.slug}
-            navigate={navigate}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function LegacyDrugFreetextRow({ index, row, isLast }) {
-  return (
-    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
-      <NumberBadge index={index} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div dir="auto" style={{
-          fontSize: 15, fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          lineHeight: 1.3, unicodeBidi: 'plaintext',
-        }}>
-          {row.drug_name}
-        </div>
-        {row.dose_text && <DoseLine text={row.dose_text} />}
-      </div>
     </div>
   )
 }

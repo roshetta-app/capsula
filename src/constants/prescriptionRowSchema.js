@@ -7,11 +7,17 @@
  * rows matching these shapes — do not duplicate field lists elsewhere.
  *
  * Storage: condition_blocks.data is JSONB. data.rows is a flat array.
- * Most rows sit inline in that flat list (drug, note, free_text, and the
- * legacy section_header marker). PHASE 4 (2026-06-21) adds one exception:
- * ROW_TYPES.SECTION is a self-contained container row whose members live
- * in its own nested `drugs` array, not inferred from list position — see
- * SECTION_ROW_TEMPLATE below. Two levels max (sheet -> section -> drugs).
+ * Most rows sit inline in that flat list (drug, note, free_text). PHASE 4
+ * (2026-06-21) adds one exception: ROW_TYPES.SECTION is a self-contained
+ * container row whose members live in its own nested `drugs` array, not
+ * inferred from list position — see SECTION_ROW_TEMPLATE below. Two levels
+ * max (sheet -> section -> drugs).
+ *
+ * PHASE 7 (2026-06-21): removed the legacy `section_header` row type (the
+ * flat, position-based section marker `section` superseded — see
+ * SECTION_ROW_TEMPLATE) along with all legacy `drug_library`/`drug_freetext`
+ * field-mapping reference material. No persisted data of these shapes
+ * remained in the database at the time of removal (confirmed via audit).
  *
  * Masterplan reference: capsula_prescription_redesign_masterplan.md
  * sections 2.1, 2.3, 2.4, 2.4a, 2.4b, 2.5, 2.6
@@ -19,7 +25,6 @@
 
 export const ROW_TYPES = {
   DRUG: 'drug',
-  SECTION_HEADER: 'section_header',
   SECTION: 'section',
   NOTE: 'note',
   FREE_TEXT: 'free_text',
@@ -88,7 +93,6 @@ export const ROW_TYPES = {
  *                                              dose). Editing this NEVER writes back to
  *                                              formulations.doses_structured or
  *                                              formulations.default_dose_override.
- *                                              Replaces old dose_text and dose_override fields.
  *                                              For alternatives sharing this same formulation_id
  *                                              (see AlternativeDrug.dose below), this is the single
  *                                              dose value used for all of them — alternatives only
@@ -106,11 +110,12 @@ export const ROW_TYPES = {
  *                                              structured row. Editing `dose` afterward does NOT
  *                                              clear this tag — it is provenance, not a lock.
  *
- * @property {string|null} note              - LOCKED (2026-06-20, supersedes separate note_en/note_ar).
- *                                              Single bidi field — author types English or Arabic
- *                                              (or both) into one box; the renderer applies dir="auto"
- *                                              so each language displays in its natural direction.
- * @property {boolean} drug_link_enabled     - carried over unchanged from current drug_library rows
+ * @property {string|null} note              - LOCKED (2026-06-20). Single bidi field — author types
+ *                                              English or Arabic (or both) into one box; the renderer
+ *                                              applies dir="auto" so each language displays in its
+ *                                              natural direction.
+ * @property {boolean} drug_link_enabled     - whether the brand/formulation name links through to
+ *                                              its drug detail page in the app
  *
  * @property {'manual_entry'|null} source_flag
  *   - Set when this row's brand/generic/formulation were created via the
@@ -119,8 +124,7 @@ export const ROW_TYPES = {
  *     from) brands.source = 'manual_entry' on the underlying brands row.
  *
  * @property {AlternativeDrug[]} alternatives
- *   - REVISED (2026-06-20, supersedes the earlier alt_group_id approach).
- *     Alternatives are NOT separate rows linked by a shared key — they live
+ *   - Alternatives are NOT separate rows linked by a shared key — they live
  *     nested directly inside the main drug row, added via an "add
  *     alternative" button on the row that opens the same brand/generic
  *     picker (or lets the author type a free-text alternative). Two levels
@@ -132,8 +136,7 @@ export const ROW_TYPES = {
  *   - If the main row is deleted while it has alternatives, the author is
  *     offered the option to promote one alternative to take over the main
  *     row's fields before the row is removed, rather than silently losing
- *     the alternatives (masterplan-level UX decision, exact confirmation
- *     dialog TBD in Phase 1/4).
+ *     the alternatives.
  */
 export const DRUG_ROW_TEMPLATE = {
   row_type: ROW_TYPES.DRUG,
@@ -156,8 +159,7 @@ export const DRUG_ROW_TEMPLATE = {
 };
 
 /**
- * One entry inside a DrugRow's `alternatives` array (masterplan §2.2,
- * revised version of the alternatives mechanism).
+ * One entry inside a DrugRow's `alternatives` array (masterplan §2.2).
  *
  * Same field set as the main drug row, minus row-level concerns (no id,
  * no row_type, no alternatives-of-its-own — two levels only).
@@ -219,41 +221,16 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
 };
 
 /**
- * Section header row shape (masterplan §2.4).
- * Purely a visual label inserted inline into the flat rows array.
- * Every row following this one belongs to it visually, until the next
- * section_header row or the end of the array. Rows with no preceding
- * section_header render ungrouped (unchanged from today).
- *
- * @typedef {Object} SectionHeaderRow
- * @property {'section_header'} row_type
- * @property {string} id
- * @property {string} label   - e.g. "For cough", "For fever"
- */
-export const SECTION_HEADER_ROW_TEMPLATE = {
-  row_type: ROW_TYPES.SECTION_HEADER,
-  id: null,
-  label: '',
-};
-
-/**
  * Section row shape (PHASE 4, 2026-06-21).
- * Replaces SECTION_HEADER_ROW_TEMPLATE going forward (masterplan §3.4 fix /
- * audit-and-plan Phase 4). Unlike the legacy section_header, which is just a
- * flat marker that visually absorbs every following row until the next
- * marker, a `section` row is a self-contained container: its members live
- * directly in its own `drugs` array, nested inside this one row, instead of
- * being inferred from array position.
+ * Self-contained container: its members live directly in its own `drugs`
+ * array, nested inside this one row, instead of being inferred from array
+ * position. This is the only section mechanism as of PHASE 7 (2026-06-21
+ * — the earlier flat, position-based `section_header` marker was removed
+ * once no persisted data of that shape remained).
  *
  * Two levels max (sheet -> section -> drugs) — a section's `drugs` array
- * holds drug rows only (row_type 'drug', or a moved-in legacy 'drug_library'
- * /'drug_freetext' row left un-normalised until next edit); it never holds
- * another section, a note, or a free_text row.
- *
- * NO MIGRATION (locked 2026-06-20): existing section_header rows, and any
- * legacy drug_library/drug_freetext rows, are left exactly as they are.
- * This shape only governs what *new* sections look like going forward —
- * both shapes can coexist in the same sheet's rows array.
+ * holds drug rows only (row_type 'drug'); it never holds another section,
+ * a note, or a free_text row.
  *
  * @typedef {Object} SectionRow
  * @property {'section'} row_type
@@ -272,7 +249,7 @@ export const SECTION_ROW_TEMPLATE = {
 /**
  * Existing row types, unchanged by this redesign. Included here only so
  * this file is the complete reference for everything that can appear in
- * data.rows, not just the new/changed drug row.
+ * data.rows, not just the drug/section rows above.
  */
 export const NOTE_ROW_TEMPLATE = {
   row_type: ROW_TYPES.NOTE,
@@ -285,50 +262,6 @@ export const FREE_TEXT_ROW_TEMPLATE = {
   row_type: ROW_TYPES.FREE_TEXT,
   id: null,
   content: null,
-};
-
-/**
- * Old field names -> new field names, for reference when migrating any
- * remaining old-shape rows or reading old data during development.
- * (Masterplan §0.4 — data shape reference.)
- *
- *   drug_freetext row:
- *     content        -> split into brand_name / generic_name / concentration / form
- *                        (best-effort parse not required; can be left as a single
- *                        brand_name with concentration/form blank if not separable)
- *     dose_text       -> dose
- *
- *   drug_library row:
- *     formulation_id  -> unchanged, still formulation_id
- *     dose_override    -> REMOVED. Use dose (pre-filled from a chosen
- *                          formulations.doses_structured row, see dose_who
- *                          above; freely editable, never written back to
- *                          the formulation)
- *     note_en/note_ar -> unchanged
- *     drug_link_enabled -> unchanged
- *
- *   (new, both origins)
- *     brand_id, generic_id -> new, nullable link fields
- *     name_ar                -> new (2026-06-20). Single Arabic display name,
- *                               replaces relying on generic name alone; mirrors
- *                               brand.name_ar when branded, else generic.name_ar.
- *     note_en + note_ar      -> MERGED (2026-06-20) into a single `note` field.
- *                               One bidi textbox instead of two; renderer uses
- *                               dir="auto" to display each language correctly.
- *     alternatives           -> new, array, replaces both the old
- *                               prescription_drug_alternatives table concept
- *                               (which was used 2 times total in production
- *                               and is not being carried forward as a
- *                               separate table) and the earlier-considered
- *                               alt_group_id linking-key approach (superseded
- *                               2026-06-20 — alternatives are nested inside
- *                               their parent row, not separate linked rows)
- *     source_flag            -> new, nullable, set by the promote flow
- */
-export const FIELD_RENAME_MAP_FOR_REFERENCE = {
-  'drug_freetext.content': 'brand_name / generic_name / concentration / form (split)',
-  'drug_freetext.dose_text': 'dose',
-  'drug_library.dose_override': 'REMOVED — use dose',
 };
 
 /**
@@ -399,10 +332,6 @@ export function formatDoseRowText(doseRow) {
 }
 
 /**
- * Reference logic for Phase 1 (CMS editor) and Phase 3 (app renderer) —
- * not wired up yet, included here so both implementations agree on the
- * rule without re-deriving it independently.
- *
  * Determines whether an alternative should display/edit its own `dose`,
  * or defer to the parent drug row's single shared `dose`.
  *
@@ -428,8 +357,8 @@ export function alternativeSharesParentDose(parentRow, alternative) {
  * alternative to become the new main row (taking over brand/generic/
  * formulation/concentration/form/dose/notes), or delete everything
  * together. This function does not perform the promotion itself (that's
- * a Phase 1 CMS state-update concern); it documents the expected shape
- * of the result so Phase 1 implements it consistently.
+ * a CMS state-update concern); it documents the expected shape of the
+ * result so the CMS implements it consistently.
  *
  * @param {DrugRow} row             - the row being deleted
  * @param {number} alternativeIndex - index into row.alternatives of the
@@ -462,5 +391,3 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     alternatives: remaining,
   };
 }
-
-
