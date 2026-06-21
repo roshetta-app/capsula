@@ -7,30 +7,34 @@
  *
  * Both contexts use this SAME component with the SAME flavor scheme.
  *
- * Redesigned (Phase 2, Step 2.3): flat inline row matching drug row style.
- * No background, no left border. SVG icon prefix inline.
+ * Redesigned (Phase 1, prescription redesign plan): tinted background card
+ * with rounded corners, clearly distinguished from plain drug rows.
+ * Supersedes the prior "Phase 2, Step 2.3" flat inline row design — that
+ * decision has been explicitly reversed per the project's redesign plan.
+ * Do not revert toward the flat/borderless style based on old phase comments.
  *
- * Changes (design pass):
- *   - Replaced unicode/emoji symbols with clean SVG icons
- *   - Removed italic — note text is now upright and clearly readable
- *   - Slightly boosted font size to 13.5px and weight to 450 for legibility
- *   - Icon sits at top-aligned with first line of text
+ * Visual behaviour after this phase:
+ *   - Soft tinted background using --color-note-bg (light + dark mode tokens)
+ *   - Rounded corners via var(--radius-md)
+ *   - Padding on all four sides — no hairline border-bottom between notes
+ *   - isLast prop is accepted for caller compatibility but no longer drives
+ *     any visual output (the hairline-between-rows pattern is gone)
  *
- * Icon changes:
- *   - info:    circle-i  → medical pulse / ECG line (clinical feel)
- *   - tip:     lightbulb → medical cross (first-aid / clinical)
- *   - warning: triangle  → triangle (kept — universally understood)
+ * Unchanged from prior design:
+ *   - Three SVG icons (IconInfo / IconWarning / IconTip) and FLAVORS map
+ *   - flavor prop: "info" | "warning" | "tip", default "info"
+ *   - All RTL/bidi handling (dir="auto", unicodeBidi: 'plaintext')
+ *   - ReactMarkdown rendering and component overrides
  *
- * RTL/LTR fix:
- *   - Note text is wrapped in a <div dir="auto"> with display:block so each
- *     paragraph / line resolves its own bidi direction independently.
- *   - The ReactMarkdown <p> renderer becomes a block-level <div dir="auto">
- *     instead of an inline <span> so mixed en/ar/emoji content lays out correctly.
+ * Icon legend:
+ *   - info:    ECG / pulse line (clinical feel)
+ *   - tip:     medical cross badge (first-aid / clinical)
+ *   - warning: triangle (universally understood, unchanged)
  *
  * Props:
  *   text    string  — markdown-capable note text (required; renders nothing if empty)
  *   flavor  string  — "info" | "warning" | "tip", default "info"
- *   isLast  bool    — when true, suppresses the bottom hairline (used inside PrescriptionSheetBlock)
+ *   isLast  bool    — accepted but unused; kept so callers don't need updating
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -145,8 +149,9 @@ export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
 
   return (
     <div style={{
-      padding: '10px 0',
-      borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)',
+      background: 'var(--color-note-bg)',
+      borderRadius: 'var(--radius-md)',
+      padding: '10px 12px',
     }}>
       <div style={{
         display: 'flex',
