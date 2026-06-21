@@ -1,5 +1,3 @@
-
-```jsx
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import NoteCallout from '../ui/NoteCallout'
@@ -605,7 +603,3 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
-
-
-
-
