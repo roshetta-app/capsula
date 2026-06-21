@@ -45,17 +45,11 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *
  * Design notes:
  *   - NumberBadge: outlined square badge, optically aligned to cap-height.
- *   - Dose: bold, full-strength color.
- *   - Drug-level notes: tinted NoteCallout card.
+ *   - Dose: full-strength color, no adult/child tag.
+ *   - Drug-level notes: inline card with language-aware icon placement.
  *   - Terminal divider: dashed rule + "end of sheet" label after the last row.
- *   - Drug name: uniform text-primary color for all entries; linked names get
- *     a dotted underline to signal tappability (not accent-blue color).
- *   - Concentration: plain lighter text directly after name (no dot separator).
- *   - Form: pill badge (distinct from concentration).
- *   - Arabic name: text-align left (dir="rtl" kept for correct letter shaping).
- *   - All alternatives show their own concentration + form (not first-only).
- *   - OrMarker: italic + muted color, left-aligned in badge column.
- *   - Search icon: per drug unit, opens Google Images for the drug in Egypt.
+ *   - OrMarker: tinted circle pill sitting in the content column (not under
+ *     the number badge), aligned flush-left with drug names.
  *
  * Props:
  *   sheet  { label, rows: [...] }  — block.data of a prescription_sheet block
@@ -67,17 +61,14 @@ export default function PrescriptionSheetBlock({ sheet }) {
   const rows = sheet?.rows ?? []
   if (!rows.length) return null
 
-  // ── Continuous numbering across the whole sheet (not reset per section,
-  //    and shared across both the top-level walk and any section's nested
-  //    drugs[] walk below) ──────────────────────────────────────────────
+  // ── Continuous numbering across the whole sheet ──────────────────────
   let drugIndex = 0
   function nextIndex() {
     drugIndex += 1
     return drugIndex
   }
 
-  // ── Per-row renderer, reused for both the sheet's top-level rows and a
-  //    section row's nested drugs[] (PHASE 4 — recursive, not duplicated) ──
+  // ── Per-row renderer ─────────────────────────────────────────────────
   function renderRowItem(row, key, isLast) {
     switch (row.row_type) {
       case 'drug': {
@@ -99,10 +90,6 @@ export default function PrescriptionSheetBlock({ sheet }) {
       }
 
       case 'note': {
-        // Row schema (NOTE_ROW_TEMPLATE) stores bilingual text as text_en /
-        // text_ar and carries no flavor field. Combined into one string so
-        // NoteCallout's existing per-paragraph dir="auto" handling renders
-        // each language in its own correctly-directioned paragraph.
         const noteText = [row.text_en, row.text_ar].filter(Boolean).join('\n\n')
         return (
           <NoteCallout
@@ -131,9 +118,6 @@ export default function PrescriptionSheetBlock({ sheet }) {
   }
 
   // ── Build visual segments ────────────────────────────────────────────
-  // `section` rows (Phase 4) are self-contained: { label, drugs: [] }.
-  // Rendered immediately as their own segment; do not absorb any
-  // following top-level rows.
   const segments = []
   let current = { label: null, items: [] }
   for (const row of rows) {
@@ -164,11 +148,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
         )
       })}
 
-      {/* ── Terminal divider ─────────────────────────────────────────────────────
-          Visually distinct from the thin solid hairlines between prescription items.
-          Uses a dashed pattern + subtle label to clearly mark "end of sheet" and
-          separate the content from personal notes / disclaimer below.
-      ────────────────────────────────────────────────────────────────────────── */}
+      {/* ── Terminal divider ─────────────────────────────────────────── */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -176,11 +156,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
         marginTop: 'var(--space-3)',
         marginBottom: 'var(--space-1)',
       }}>
-        <div style={{
-          flex: 1,
-          height: 0,
-          borderTop: '1.5px dashed var(--color-border)',
-        }} />
+        <div style={{ flex: 1, height: 0, borderTop: '1.5px dashed var(--color-border)' }} />
         <span style={{
           fontSize: 9,
           fontWeight: 600,
@@ -192,11 +168,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
         }}>
           end of sheet
         </span>
-        <div style={{
-          flex: 1,
-          height: 0,
-          borderTop: '1.5px dashed var(--color-border)',
-        }} />
+        <div style={{ flex: 1, height: 0, borderTop: '1.5px dashed var(--color-border)' }} />
       </div>
     </div>
   )
@@ -204,31 +176,15 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
 // ─── SectionHeader ────────────────────────────────────────────────────────────
 
-/**
- * SectionHeader — visual group boundary (masterplan §2.4).
- * PHASE 5 (2026-06-21, prescription redesign plan) — renders as one
- * full-width tinted card: the label sits as a heading-style line at the
- * top, and the section's drug rows render directly beneath it inside the
- * same card (see call site in the default export, where this component
- * now wraps its segment's items as children rather than rendering as a
- * sibling before them). Uses --color-section-bg, chosen to be visually
- * distinct from the Phase 1 note card's tint so a group of drugs never
- * reads as the same kind of box as a single annotation.
- * Supersedes the prior "lightest-weight grouping, no background tint"
- * decision — that reversal is explicit and intentional per the redesign
- * plan; do not revert toward it.
- */
 function SectionHeader({ label, children }) {
   if (!label) return null
   return (
-    <div
-      style={{
-        background: 'var(--color-section-bg)',
-        borderRadius: 'var(--radius-md)',
-        padding: 'var(--space-3) var(--space-4) var(--space-2)',
-        margin: '14px 0',
-      }}
-    >
+    <div style={{
+      background: 'var(--color-section-bg)',
+      borderRadius: 'var(--radius-md)',
+      padding: 'var(--space-3) var(--space-4) var(--space-2)',
+      margin: '14px 0',
+    }}>
       <div
         dir="auto"
         style={{
@@ -248,33 +204,15 @@ function SectionHeader({ label, children }) {
   )
 }
 
-// ─── UnifiedDrugRow (Phase 3 — new unified row + nested alternatives) ─────────
+// ─── UnifiedDrugRow ───────────────────────────────────────────────────────────
 
 /**
- * UnifiedDrugRow — renders a single `row_type: 'drug'` row per masterplan §2.2.
+ * UnifiedDrugRow — renders a single `row_type: 'drug'` row.
  *
- * Display rule:
- *   Main line: name [concentration badge-form] — name in text-primary for all
- *   entries; linked names get dotted underline (not accent-blue color).
- *   Concentration sits as plain lighter text right after the name.
- *   Form renders as a pill badge (not plain text).
- *   The Arabic name (name_ar), when present, is shown directly under the
- *   English line for every member, forced text-align: left.
- *
- * Alternatives:
- *   Every boundary between alternatives renders a single OrMarker ("or",
- *   italic + muted, left-aligned in badge column). Every alternative member
- *   shows its own concentration + form (not first-only).
- *
- *   buildFormulationClusters still groups same-formulation alternatives
- *   together so they share one dose line and one note (rendered once after
- *   the last member of the cluster).
- *
- *   One NumberBadge per row regardless of how many alternatives it has
- *   (§2.4a) — unchanged.
- *
- *   A search icon sits to the right of each drug unit's name line, opening
- *   a Google Images search for the drug in Egypt.
+ * Layout: NumberBadge | content-column
+ * OrMarker sits INSIDE the content column (not using negative margin to
+ * undercut the badge). This keeps "or" aligned with drug names, not centered
+ * under the number badge.
  */
 function buildFormulationClusters(row, drugs, mainFormulation) {
   const alts = row.alternatives ?? []
@@ -328,14 +266,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
-  // Flatten clusters into a sequence of renderable units so that every
-  // boundary — within a cluster (same-formulation members) or between
-  // clusters (different formulations) — gets exactly one OrMarker.
-  // Each unit carries: the member's display data, and which cluster it
-  // belongs to (for dose/note rendering after the last member of each
-  // cluster).
-  // NOTE: showConcentrationForm is removed — every member now shows its
-  // own concentration + form, not just the first member of each cluster.
   const units = []
   for (const cluster of clusters) {
     for (let mIdx = 0; mIdx < cluster.members.length; mIdx++) {
@@ -343,6 +273,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
         member: cluster.members[mIdx],
         cluster,
         isLastMemberOfCluster: mIdx === cluster.members.length - 1,
+        showConcentrationForm: mIdx === 0,
       })
     }
   }
@@ -352,7 +283,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {units.map((unit, uIdx) => {
-          const { member, cluster, isLastMemberOfCluster } = unit
+          const { member, cluster, isLastMemberOfCluster, showConcentrationForm } = unit
           const data = member.data
           const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
           const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
@@ -360,24 +291,22 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
 
           return (
             <div key={uIdx}>
-              {/* One OrMarker before every unit except the very first */}
+              {/* OrMarker sits INSIDE the content column — aligned with drug names */}
               {uIdx > 0 && <OrMarker />}
 
               <DrugMainLine
                 name={memberName}
                 nameAr={data.name_ar}
-                concentration={data.concentration}
-                form={data.form}
+                concentration={showConcentrationForm ? data.concentration : null}
+                form={showConcentrationForm ? data.form : null}
                 linkEnabled={member.isMain && linkEnabled}
                 slug={member.isMain ? formulation?.slug : null}
                 navigate={navigate}
               />
 
-              {/* Dose and note render once after the last member of each
-                  cluster — shared by all members in that cluster */}
               {isLastMemberOfCluster && (
                 <>
-                  {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
+                  {cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </>
               )}
@@ -389,118 +318,57 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   )
 }
 
-// ─── Shared display pieces (used by both the unified row and its alternatives) ─
+// ─── DrugMainLine ─────────────────────────────────────────────────────────────
 
-/**
- * DrugMainLine — visual refinement phase.
- *
- * Name color: uniform `text-primary` for all entries (linked or not).
- * Linked names: dotted underline to signal tappability (not accent-blue).
- * Concentration: plain lighter text right after name, no dot separator.
- * Form: pill/badge styling (distinct visual weight from concentration).
- * Arabic name: text-align left (dir="rtl" kept for correct Arabic letter shaping).
- * Search icon: right-side icon that opens Google Images for the drug in Egypt.
- */
 function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, navigate }) {
   if (!name) return null
 
-  const handleSearchClick = (e) => {
-    e.stopPropagation()
-    const query = [name, concentration, form, 'Egypt'].filter(Boolean).join(' ')
-    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer')
-  }
+  const suffix = [concentration, form].filter(Boolean).join(' · ')
 
   return (
     <>
-      {/* Name line: name + concentration (plain text) + form (badge) + search icon */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          {linkEnabled && slug ? (
-            <button
-              onClick={() => navigate(`/drugs/${slug}`)}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                cursor: 'pointer', textAlign: 'left',
-                fontFamily: 'var(--font-body)',
-                fontSize: 17, fontWeight: 700,
-                color: 'var(--color-text-primary)',
-                lineHeight: 1.3,
-                textDecoration: 'underline',
-                textDecorationStyle: 'dotted',
-                textDecorationColor: 'var(--color-text-tertiary)',
-                textUnderlineOffset: 3,
-              }}
-            >
-              {name}
-            </button>
-          ) : (
-            <span style={{
-              fontSize: 17, fontWeight: 700,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.3,
-            }}>
-              {name}
-            </span>
-          )}
-
-          {/* Concentration — plain lighter text, no dot prefix */}
-          {concentration && (
-            <span style={{
-              fontSize: 13, fontWeight: 400,
-              color: 'var(--color-text-secondary)',
-              lineHeight: 1.3,
-            }}>
-              {concentration}
-            </span>
-          )}
-
-          {/* Form — pill badge */}
-          {form && (
-            <span style={{
-              fontSize: 11, fontWeight: 600,
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
+        {linkEnabled && slug ? (
+          <button
+            onClick={() => navigate(`/drugs/${slug}`)}
+            style={{
+              background: 'none', border: 'none', padding: 0,
+              cursor: 'pointer', textAlign: 'left',
+              fontFamily: 'var(--font-body)',
+              fontSize: 15, fontWeight: 600,
               color: 'var(--color-accent)',
-              background: 'var(--color-accent-light)',
-              borderRadius: 20,
-              padding: '1px 8px',
-              lineHeight: 1.5,
-              letterSpacing: '0.01em',
-              flexShrink: 0,
-              alignSelf: 'center',
-            }}>
-              {form}
-            </span>
-          )}
-        </div>
-
-        {/* Search icon — Google Images for this drug in Egypt */}
-        <button
-          onClick={handleSearchClick}
-          aria-label={`Search images for ${name}`}
-          style={{
-            background: 'none', border: 'none', padding: '2px 0 2px 8px',
-            cursor: 'pointer', flexShrink: 0,
-            color: 'var(--color-text-tertiary)',
-            display: 'flex', alignItems: 'center',
-            lineHeight: 1,
-          }}
-        >
-          <Icon name="Search" size={15} color="currentColor" />
-        </button>
+              lineHeight: 1.3,
+            }}
+          >
+            {name}
+          </button>
+        ) : (
+          <span dir="auto" style={{
+            fontSize: 15, fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            lineHeight: 1.3, unicodeBidi: 'plaintext',
+          }}>
+            {name}
+          </span>
+        )}
+        {suffix && (
+          <span style={{
+            fontSize: 12, fontWeight: 400,
+            color: 'var(--color-text-secondary)',
+            lineHeight: 1.3,
+          }}>
+            · {suffix}
+          </span>
+        )}
       </div>
 
-      {/* Arabic name — own line directly below, dir="rtl" for correct shaping,
-          text-align forced left per design spec */}
       {nameAr && (
-        <div
-          dir="rtl"
-          style={{
-            fontSize: 12.5,
-            color: 'var(--color-text-secondary)',
-            marginTop: 2,
-            unicodeBidi: 'plaintext',
-            textAlign: 'left',
-          }}
-        >
+        <div dir="rtl" style={{
+          fontSize: 12.5,
+          color: 'var(--color-text-secondary)',
+          marginTop: 1,
+          unicodeBidi: 'plaintext',
+        }}>
           {nameAr}
         </div>
       )}
@@ -508,37 +376,24 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
   )
 }
 
+// ─── DoseLine ─────────────────────────────────────────────────────────────────
+
 /**
- * DoseLine — bold, full-strength color.
- * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (17px).
- * The dose_who provenance tag (whoLabel) is unchanged.
+ * DoseLine — no adult/child tag (who prop removed from call site and ignored).
+ * Font: 15px / 600 — slightly larger and bolder than before (was 14px / 700
+ * but visually lighter due to the tag stealing emphasis).
  */
-function DoseLine({ text, who }) {
-  const whoLabel = doseWhoLabel(who)
+function DoseLine({ text }) {
   return (
     <div dir="auto" style={{
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: 6,
       marginTop: 4,
-      flexWrap: 'wrap',
+      unicodeBidi: 'plaintext',
     }}>
-      {whoLabel && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-          flexShrink: 0,
-        }}>
-          {whoLabel}
-        </span>
-      )}
       <span style={{
-        fontSize: 14,
-        fontWeight: 400,
+        fontSize: 15,
+        fontWeight: 600,
         color: 'var(--color-text-primary)',
         lineHeight: 1.5,
-        unicodeBidi: 'plaintext',
       }}>
         {text}
       </span>
@@ -546,21 +401,61 @@ function DoseLine({ text, who }) {
   )
 }
 
+// ─── RowNote ──────────────────────────────────────────────────────────────────
+
 /**
- * RowNote — renders through NoteCallout so cluster notes get the tinted
- * card styling as standalone note_callout blocks.
+ * RowNote — inline note card that follows the text direction of its content.
+ *
+ * Uses `dir="auto"` so the browser detects language direction from the first
+ * strong character. The info icon is placed with flexbox in row direction:
+ *   - LTR text  → icon on the LEFT  (natural flex order)
+ *   - RTL text  → icon on the RIGHT (flex row is mirrored by dir="rtl")
+ *
+ * Text: black (text-primary), 14px — more readable than the previous muted styling.
+ * Does NOT go through NoteCallout (which has a fixed LTR icon position).
  */
 function RowNote({ note }) {
   if (!note) return null
-  return <NoteCallout text={note} flavor="info" />
+
+  return (
+    <div
+      dir="auto"
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 7,
+        marginTop: 6,
+        padding: '7px 10px',
+        borderRadius: 'var(--radius-sm, 6px)',
+        background: 'var(--color-surface-muted)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      {/* Icon floats to the correct side via dir="auto" mirroring flex-row */}
+      <span style={{
+        flexShrink: 0,
+        marginTop: 1,
+        color: 'var(--color-text-tertiary)',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+        <Icon name="Info" size={14} color="currentColor" />
+      </span>
+      <span style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: 'var(--color-text-primary)',
+        lineHeight: 1.55,
+        unicodeBidi: 'plaintext',
+      }}>
+        {note}
+      </span>
+    </div>
+  )
 }
 
-// ─── Shared sub-pieces ──────────────────────────────────────────────────────
+// ─── NumberBadge ──────────────────────────────────────────────────────────────
 
-/**
- * NumberBadge — clean outlined square with rounded corners.
- * marginTop: 1 keeps the badge optically aligned with the cap-height of the drug name.
- */
 function NumberBadge({ index }) {
   return (
     <div style={{
@@ -583,34 +478,40 @@ function NumberBadge({ index }) {
   )
 }
 
+// ─── OrMarker ─────────────────────────────────────────────────────────────────
+
 /**
- * OrMarker — italic + muted styling, left-aligned in the badge column.
- * Sits in the badge column (22px wide) by using a negative left margin to
- * step back out of the content column. Gap between badge and content is
- * var(--space-3) = 12px, so marginLeft: -(22 + 12) = -34px positions "or"
- * directly beneath the NumberBadge above it.
+ * OrMarker — tinted circle pill, sits in the content column aligned with
+ * drug names. No negative margin hack — it's a natural block in the flex
+ * content column so it lines up flush-left with the drug name above it.
  */
 function OrMarker() {
   return (
     <div style={{
-      marginLeft: -34,
-      width: 22,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '3px 0',
+      padding: '4px 0',
     }}>
       <span style={{
-        fontSize: 11,
-        fontWeight: 400,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        fontWeight: 600,
         fontStyle: 'italic',
         color: 'var(--color-text-tertiary)',
+        background: 'var(--color-surface-muted)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 999,
+        padding: '1px 8px',
+        lineHeight: 1.6,
+        letterSpacing: '0.02em',
       }}>
         or
       </span>
     </div>
   )
 }
+
+// BracketConnector deleted — Phase 4 redesign. Do not restore.
 
 const rowWrap = {
   display: 'flex',
