@@ -48,6 +48,15 @@
  *        is what makes alternativeSharesParentDose() reliably true for this
  *        path. The existing unscoped "Pick a brand…" / "Pick a formulation…"
  *        buttons remain, unchanged, for the "different drug, same purpose" case.
+ *   6.1  PHASE 6 (2026-06-21): "Save to library" parity for alternatives.
+ *        AlternativeRow now has the same promote button, category/route
+ *        selects, and error display that the main row's free-text mode
+ *        already had — gated the same way, on !isLinked. Reuses the exact
+ *        generic→formulation→brand reuse-or-create logic from the main
+ *        row's handlePromote (no new query functions), just reading from
+ *        and patch()-ing this alternative's own fields instead of the
+ *        parent row's. Promoting one alternative never touches the parent
+ *        row or any other alternative on the same drug row.
  *
  * Props:
  *   row        — DrugRow shape (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE)
@@ -379,8 +388,128 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   // there's nothing to choose (chooser not shown).
   const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
 
+  // Phase 6 (2026-06-21): "Save to library" parity with the main row.
+  // Mirrors UnifiedDrugRowEditor's own promote state below, but scoped to
+  // this alternative — promoting an alternative never touches the parent
+  // row or any other alternative.
+  const [promoteOn, setPromoteOn]             = useState(false)
+  const [promoteCategory, setPromoteCategory] = useState('')
+  const [promoteRoute, setPromoteRoute]       = useState('')
+  const [promoting, setPromoting]             = useState(false)
+  const [promoteError, setPromoteError]       = useState(null)
+
   function patch(updates) {
     onChange({ ...alt, ...updates })
+  }
+
+  // ── Promote to library (Phase 6) ───────────────────────────────────────
+  // Same reuse-or-create logic as the main row's handlePromote — generic →
+  // formulation → brand — just reading/writing this alternative's own
+  // fields via patch() instead of the parent row's.
+  async function handlePromote() {
+    setPromoteError(null)
+
+    const genericName   = alt.generic_name?.trim()
+    const concentration  = alt.concentration?.trim()
+
+    if (!genericName) {
+      setPromoteError('Generic name is required to save to the library (brand name alone isn\u2019t enough to file this under a molecule).')
+      return
+    }
+    if (!concentration || !alt.form) {
+      setPromoteError('Concentration and form are required to save to the library.')
+      return
+    }
+    if (!promoteCategory || !promoteRoute) {
+      setPromoteError('Category and route are required to save to the library.')
+      return
+    }
+
+    setPromoting(true)
+    let genericId     = alt.generic_id ?? null
+    let formulationId = null
+    let brandId       = null
+
+    try {
+      // 1. Generic — reuse if it matches, else create
+      if (!genericId) {
+        const { data: existingGeneric, error: findGErr } = await findGenericByName(genericName)
+        if (findGErr) throw new Error(`Checking for an existing generic: ${findGErr.message}`)
+        if (existingGeneric) {
+          genericId = existingGeneric.id
+        } else {
+          const slugBase = genericName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+          const { data: newGeneric, error: gErr } = await insertGeneric({
+            slug: slugBase || `generic-${Date.now()}`,
+            name_en: genericName,
+            name_ar: alt.brand_name?.trim() ? '' : (alt.name_ar?.trim() || ''),
+            category: promoteCategory,
+            class: null,
+          })
+          if (gErr) throw new Error(`Creating generic "${genericName}": ${gErr.message}`)
+          genericId = newGeneric.id
+        }
+      }
+
+      // 2. Formulation — reuse if this concentration/form combo already
+      //    exists under this generic, else create
+      const { data: existingFormulation, error: findFErr } = await findFormulationMatch(genericId, concentration, alt.form)
+      if (findFErr) throw new Error(`Checking for an existing formulation: ${findFErr.message}`)
+      if (existingFormulation) {
+        formulationId = existingFormulation.id
+      } else {
+        const formulationSlugBase = `${genericName}-${concentration}-${alt.form}`
+          .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        const { data: newFormulation, error: fErr } = await insertFormulation({
+          generic_id: genericId,
+          slug: formulationSlugBase || `formulation-${Date.now()}`,
+          concentration,
+          form: alt.form,
+          route: promoteRoute,
+          doses: [],
+        })
+        if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
+        formulationId = newFormulation.id
+      }
+
+      // 3. Brand — only if a brand name was typed; reuse if it already
+      //    exists under this formulation, else create
+      const brandName = alt.brand_name?.trim()
+      if (brandName) {
+        const { data: existingBrand, error: findBErr } = await findBrandMatch(formulationId, brandName)
+        if (findBErr) throw new Error(`Checking for an existing brand: ${findBErr.message}`)
+        if (existingBrand) {
+          brandId = existingBrand.id
+        } else {
+          const { data: newBrand, error: bErr } = await insertBrand({
+            formulation_id: formulationId,
+            name: brandName,
+            name_ar: alt.name_ar?.trim() || '',
+            manufacturer: null,
+            source: SOURCE_FLAG_VALUE,
+            is_published: true,
+            is_available: true,
+          })
+          if (bErr) throw new Error(`Creating brand "${brandName}": ${bErr.message}`)
+          brandId = newBrand.id
+        }
+      }
+
+      // 4. Link this alternative to the real library ids
+      patch({
+        generic_id:     genericId,
+        formulation_id: formulationId,
+        brand_id:       brandId,
+        source_flag:    SOURCE_FLAG_VALUE,
+      })
+      setPromoteOn(false)
+      setPromoteCategory('')
+      setPromoteRoute('')
+    } catch (err) {
+      setPromoteError(err.message ?? 'Promotion failed. Please try again.')
+    } finally {
+      setPromoting(false)
+    }
   }
 
   function finalizeDoseChoice(doseRow) {
@@ -672,6 +801,96 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           style={textInput({ textAlign: 'right' })}
         />
       </div>
+
+      {/* ── Save to library (Phase 6) — free-text mode only, parity with the main row ── */}
+      {!isLinked && (
+        <div style={{
+          border: '1.5px dashed var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 10,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <button
+            type="button"
+            onClick={() => setPromoteOn(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', borderRadius: 'var(--radius-md)',
+              border: `1.5px solid ${promoteOn ? 'var(--color-accent)' : 'var(--color-border)'}`,
+              backgroundColor: promoteOn ? '#EFF6FF' : 'transparent',
+              color: promoteOn ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+            }}
+          >
+            <Library size={13} />
+            {promoteOn ? 'Save to library: ON' : 'Save to library'}
+          </button>
+
+          {promoteOn && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <FieldLabel>Category</FieldLabel>
+                  <select
+                    value={promoteCategory}
+                    onChange={e => setPromoteCategory(e.target.value)}
+                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— select —</option>
+                    {DRUG_CATEGORIES.map(c => (
+                      <option key={c.value} value={c.value}>{c.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <FieldLabel>Route</FieldLabel>
+                  <select
+                    value={promoteRoute}
+                    onChange={e => setPromoteRoute(e.target.value)}
+                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="">— select —</option>
+                    {DRUG_ROUTES.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {promoteError && (
+                <div style={{
+                  fontSize: 11, color: 'var(--color-error, #ef4444)',
+                  padding: '4px 8px',
+                  background: '#ef444410',
+                  border: '1px solid #ef444430',
+                  borderRadius: 'var(--radius-md)',
+                }}>
+                  {promoteError}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handlePromote}
+                disabled={promoting}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', borderRadius: 'var(--radius-md)',
+                  border: 'none', alignSelf: 'flex-start',
+                  backgroundColor: promoting ? 'var(--color-border)' : 'var(--color-accent)',
+                  color: promoting ? 'var(--color-text-tertiary)' : '#fff',
+                  fontSize: 12, fontWeight: 600,
+                  cursor: promoting ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font-body)',
+                }}
+              >
+                {promoting ? 'Saving…' : 'Promote now'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
 
       {/* Dose + Note — shared/inherited, or independent */}
