@@ -13,9 +13,17 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *                          formulation_id, concentration, form, dose,
  *                          note, drug_link_enabled, source_flag,
  *                          alternatives: [...] }
- *   section_header    — { label } — visual group boundary (masterplan §2.4).
- *                        Not a numbered/drug row itself; everything below it
- *                        belongs to it until the next section_header or EOF.
+ *   section           — PHASE 4 (2026-06-21). Self-contained container row,
+ *                        { label, drugs: DrugRow[] }. Renders its own
+ *                        SectionHeader followed immediately by its nested
+ *                        drugs[], via the same per-row renderer used for the
+ *                        sheet's top-level rows (renderRowItem below) —
+ *                        recursive, not duplicated. Does not absorb any
+ *                        following top-level rows (unlike section_header).
+ *   section_header    — LEGACY (kept, no migration — masterplan §2.4 /
+ *                        audit-and-plan Phase 4 §6). Flat visual group
+ *                        boundary; everything below it belongs to it until
+ *                        the next section_header, the next section row, or EOF.
  *   drug_library       — LEGACY, pre-redesign shape. Kept rendering unchanged
  *                         so existing production rows that haven't been
  *                         re-saved via the new CMS editor don't regress
@@ -25,16 +33,20 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *   free_text          — { markdown }       — rendered via FreeTextPostBlock (markdown prose)
  *
  * Section grouping:
- *   Rows are still a flat array (no nested JSON structure — masterplan §2.4).
- *   This component groups them visually at render time only: every row
- *   (of any type) belongs to the nearest preceding section_header row,
- *   until the next section_header or the end of the list. Rows before the
- *   first section_header render ungrouped, exactly as before this redesign.
+ *   The sheet's rows are still a flat top-level array. Two section
+ *   mechanisms can coexist in the same array (no migration, Phase 4):
+ *     - legacy section_header rows group by array position (everything
+ *       until the next section_header / section row / EOF);
+ *     - new section rows are self-contained, carrying their own members in
+ *       a nested drugs[] array instead of inferring membership from position.
+ *   Both render visually the same way today (SectionHeader, tint background)
+ *   — Phase 5 is what changes the visual treatment, not Phase 4.
  *
  * Numbering (masterplan §2.4a):
  *   The numbered badge counts rows, not individual drugs. A unified 'drug'
  *   row with N nested alternatives is still one row -> one number. Numbering
- *   runs continuously across the whole sheet, not reset per section.
+ *   runs continuously across the whole sheet, including across section
+ *   boundaries and into/out of a section's nested drugs[], never reset.
  *
  * Design notes carried over from the pre-Phase-3 version:
  *   - NumberBadge: outlined square badge, optically aligned to cap-height.
@@ -52,28 +64,113 @@ export default function PrescriptionSheetBlock({ sheet }) {
   const rows = sheet?.rows ?? []
   if (!rows.length) return null
 
-  // ── Build visual segments: groups of rows under an optional section label ──
-  // section_header rows themselves are not rendered as list items; they just
-  // open a new segment. Rows before the first section_header form a segment
-  // with label = null (rendered ungrouped, unchanged from pre-redesign look).
+  // ── Continuous numbering across the whole sheet (not reset per section,
+  //    and shared across both the top-level walk and any section's nested
+  //    drugs[] walk below) ──────────────────────────────────────────────
+  let drugIndex = 0
+  function nextIndex() {
+    drugIndex += 1
+    return drugIndex
+  }
+
+  // ── Per-row renderer, reused for both the sheet's top-level rows and a
+  //    section row's nested drugs[] (PHASE 4 — recursive, not duplicated) ──
+  function renderRowItem(row, key, isLast) {
+    switch (row.row_type) {
+      case 'drug': {
+        const index = nextIndex()
+        const formulation = row.formulation_id
+          ? drugs.find(d => d.id === row.formulation_id)
+          : null
+        return (
+          <UnifiedDrugRow
+            key={row.id ?? key}
+            index={index}
+            row={row}
+            formulation={formulation}
+            drugs={drugs}
+            navigate={navigate}
+            isLast={isLast}
+          />
+        )
+      }
+
+      case 'drug_library': {
+        const index = nextIndex()
+        const formulation = drugs.find(d => d.id === row.formulation_id)
+        return (
+          <LegacyDrugLibraryRow
+            key={row.id ?? key}
+            index={index}
+            row={row}
+            formulation={formulation}
+            navigate={navigate}
+            isLast={isLast}
+          />
+        )
+      }
+
+      case 'drug_freetext': {
+        const index = nextIndex()
+        return (
+          <LegacyDrugFreetextRow
+            key={row.id ?? key}
+            index={index}
+            row={row}
+            isLast={isLast}
+          />
+        )
+      }
+
+      case 'note':
+        return (
+          <NoteCallout
+            key={row.id ?? key}
+            text={row.text}
+            flavor={row.flavor}
+            isLast={isLast}
+          />
+        )
+
+      case 'free_text':
+        return (
+          <div key={row.id ?? key} style={{ padding: '6px 0' }}>
+            <FreeTextPostBlock
+              block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.markdown ?? '' } }}
+            />
+          </div>
+        )
+
+      default:
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[PrescriptionSheetBlock] Unrecognized row_type: "${row.row_type}"`)
+        }
+        return null
+    }
+  }
+
+  // ── Build visual segments ────────────────────────────────────────────
+  // Two section mechanisms coexist (no migration, Phase 4):
+  //   - legacy `section_header` rows: flat marker, everything until the
+  //     next section_header (or new `section` row, or EOF) belongs to it.
+  //   - new `section` rows: self-contained container, { label, drugs: [] }.
+  //     Rendered immediately as its own segment; does not absorb any
+  //     following top-level rows.
   const segments = []
   let current = { label: null, items: [] }
   for (const row of rows) {
     if (row.row_type === 'section_header') {
       if (current.items.length) segments.push(current)
       current = { label: row.label ?? '', items: [] }
+    } else if (row.row_type === 'section') {
+      if (current.items.length) segments.push(current)
+      segments.push({ label: row.label ?? '', items: row.drugs ?? [] })
+      current = { label: null, items: [] }
     } else {
       current.items.push(row)
     }
   }
   if (current.items.length) segments.push(current)
-
-  // ── Continuous numbering across the whole sheet (not reset per section) ──
-  let drugIndex = 0
-  function nextIndex() {
-    drugIndex += 1
-    return drugIndex
-  }
 
   return (
     <div>
@@ -83,78 +180,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
           {segment.items.map((row, i) => {
             const isLast =
               segIdx === segments.length - 1 && i === segment.items.length - 1
-
-            switch (row.row_type) {
-              case 'drug': {
-                const index = nextIndex()
-                const formulation = row.formulation_id
-                  ? drugs.find(d => d.id === row.formulation_id)
-                  : null
-                return (
-                  <UnifiedDrugRow
-                    key={row.id ?? i}
-                    index={index}
-                    row={row}
-                    formulation={formulation}
-                    drugs={drugs}
-                    navigate={navigate}
-                    isLast={isLast}
-                  />
-                )
-              }
-
-              case 'drug_library': {
-                const index = nextIndex()
-                const formulation = drugs.find(d => d.id === row.formulation_id)
-                return (
-                  <LegacyDrugLibraryRow
-                    key={i}
-                    index={index}
-                    row={row}
-                    formulation={formulation}
-                    navigate={navigate}
-                    isLast={isLast}
-                  />
-                )
-              }
-
-              case 'drug_freetext': {
-                const index = nextIndex()
-                return (
-                  <LegacyDrugFreetextRow
-                    key={i}
-                    index={index}
-                    row={row}
-                    isLast={isLast}
-                  />
-                )
-              }
-
-              case 'note':
-                return (
-                  <NoteCallout
-                    key={i}
-                    text={row.text}
-                    flavor={row.flavor}
-                    isLast={isLast}
-                  />
-                )
-
-              case 'free_text':
-                return (
-                  <div key={i} style={{ padding: '6px 0' }}>
-                    <FreeTextPostBlock
-                      block={{ id: i, blockType: 'free_text_post', data: { markdown: row.markdown ?? '' } }}
-                    />
-                  </div>
-                )
-
-              default:
-                if (process.env.NODE_ENV !== 'production') {
-                  console.warn(`[PrescriptionSheetBlock] Unrecognized row_type: "${row.row_type}"`)
-                }
-                return null
-            }
+            return renderRowItem(row, i, isLast)
           })}
         </div>
       ))}

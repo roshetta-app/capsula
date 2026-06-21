@@ -7,8 +7,11 @@
  * rows matching these shapes — do not duplicate field lists elsewhere.
  *
  * Storage: condition_blocks.data is JSONB. data.rows is a flat array.
- * No nested "sections" array — sections are just another row type
- * (see ROW_TYPES.SECTION_HEADER) sitting inline in the same list.
+ * Most rows sit inline in that flat list (drug, note, free_text, and the
+ * legacy section_header marker). PHASE 4 (2026-06-21) adds one exception:
+ * ROW_TYPES.SECTION is a self-contained container row whose members live
+ * in its own nested `drugs` array, not inferred from list position — see
+ * SECTION_ROW_TEMPLATE below. Two levels max (sheet -> section -> drugs).
  *
  * Masterplan reference: capsula_prescription_redesign_masterplan.md
  * sections 2.1, 2.3, 2.4, 2.4a, 2.4b, 2.5, 2.6
@@ -17,6 +20,7 @@
 export const ROW_TYPES = {
   DRUG: 'drug',
   SECTION_HEADER: 'section_header',
+  SECTION: 'section',
   NOTE: 'note',
   FREE_TEXT: 'free_text',
 };
@@ -230,6 +234,39 @@ export const SECTION_HEADER_ROW_TEMPLATE = {
   row_type: ROW_TYPES.SECTION_HEADER,
   id: null,
   label: '',
+};
+
+/**
+ * Section row shape (PHASE 4, 2026-06-21).
+ * Replaces SECTION_HEADER_ROW_TEMPLATE going forward (masterplan §3.4 fix /
+ * audit-and-plan Phase 4). Unlike the legacy section_header, which is just a
+ * flat marker that visually absorbs every following row until the next
+ * marker, a `section` row is a self-contained container: its members live
+ * directly in its own `drugs` array, nested inside this one row, instead of
+ * being inferred from array position.
+ *
+ * Two levels max (sheet -> section -> drugs) — a section's `drugs` array
+ * holds drug rows only (row_type 'drug', or a moved-in legacy 'drug_library'
+ * /'drug_freetext' row left un-normalised until next edit); it never holds
+ * another section, a note, or a free_text row.
+ *
+ * NO MIGRATION (locked 2026-06-20): existing section_header rows, and any
+ * legacy drug_library/drug_freetext rows, are left exactly as they are.
+ * This shape only governs what *new* sections look like going forward —
+ * both shapes can coexist in the same sheet's rows array.
+ *
+ * @typedef {Object} SectionRow
+ * @property {'section'} row_type
+ * @property {string} id        - uuid, generated client-side on row creation
+ * @property {string} label     - e.g. "For cough", "For fever"
+ * @property {DrugRow[]} drugs  - nested drug rows belonging to this section,
+ *                                 in display order. Defaults to an empty array.
+ */
+export const SECTION_ROW_TEMPLATE = {
+  row_type: ROW_TYPES.SECTION,
+  id: null,
+  label: '',
+  drugs: [],
 };
 
 /**

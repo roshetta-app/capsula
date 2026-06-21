@@ -15,6 +15,27 @@
  *     are still the parent's responsibility to strip before persisting;
  *     this behaviour is unchanged.
  *
+ * PHASE 4 changes (2026-06-21, audit-and-plan §7 Phase 4, resolves §3.4):
+ *   - New 'section' row_type added alongside (not replacing) the legacy
+ *     'section_header' marker — see prescriptionRowSchema.js SECTION_ROW_TEMPLATE.
+ *     A 'section' row is a self-contained card with its own nested
+ *     `drugs[]` array, rendered via the same RowCard component used at the
+ *     top level (recursion, not duplication).
+ *   - The "Section" add-button now creates the new 'section' shape going
+ *     forward. No migration: existing 'section_header' rows are left
+ *     exactly as they are and keep rendering via SectionHeaderRowEditor.
+ *   - Row-list mutation logic (add/update/move/delete-with-promote) is
+ *     factored into the useRowList() hook so both the top-level rows array
+ *     and a section's nested drugs[] array share the same logic instead of
+ *     two copies of it.
+ *   - New cross-list actions on drug rows: "move into section…" (top-level
+ *     drug rows only, shown when at least one section exists) and "move
+ *     out of section" (nested drug rows only). Both are explicit buttons,
+ *     no drag-and-drop.
+ *   - Add actions: "+ Drug" (top level, always available), "+ Add drug"
+ *     (inside an open section card only), "+ Section" (creates an empty
+ *     section).
+ *
  * Data shape (block.data):
  *   {
  *     label: string,
@@ -23,7 +44,8 @@
  *                                       formulation_id, concentration, form, dose,
  *                                       note_en, note_ar, drug_link_enabled, source_flag,
  *                                       alternatives: AlternativeDrug[] }
- *       | { row_type: "section_header", id, label }
+ *       | { row_type: "section",        id, label, drugs: DrugRow[] }   // PHASE 4
+ *       | { row_type: "section_header", id, label }                    // legacy, untouched
  *       | { row_type: "note",           id, text_en, text_ar }
  *       | { row_type: "free_text",      id, content }
  *     >
@@ -33,15 +55,17 @@
  * in persisted data for rows not yet touched by an editor. The RowCard
  * renderer treats them gracefully: both render via UnifiedDrugRowEditor,
  * mapping old field names on the fly (dose_override→dose, drug_name→brand_name,
- * dose_text→dose) so no data migration is required.
+ * dose_text→dose) so no data migration is required. This is unaffected by
+ * Phase 4 — a legacy row moved into a section is normalised on first expand,
+ * exactly as it would be at the top level.
  */
 
 import { useState } from 'react'
-import { ChevronUp, ChevronDown, Trash2 } from 'lucide-react'
+import { ChevronUp, ChevronDown, Trash2, LogOut } from 'lucide-react'
 import UnifiedDrugRowEditor, { PromoteAlternativeDialog } from './rows/UnifiedDrugRowEditor'
 import NoteRowEditor         from './rows/NoteRowEditor'
 import FreeTextPostEditor    from './FreeTextPostEditor'
-import { DRUG_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
+import { DRUG_ROW_TEMPLATE, SECTION_ROW_TEMPLATE, promoteAlternativeToMain } from '../../../constants/prescriptionRowSchema'
 import { nanoid } from 'nanoid'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -49,10 +73,11 @@ import { nanoid } from 'nanoid'
 const ROW_TYPE_LABELS = {
   // New unified type
   drug:           { label: 'Drug',           color: '#6366f1' },
-  section_header: { label: 'Section',        color: '#10b981' },
+  section:        { label: 'Section',        color: '#10b981' },
   note:           { label: 'Note',           color: '#f59e0b' },
   free_text:      { label: 'Text Block',     color: '#1D4ED8' },
   // Legacy types — still renderable, will be normalised on next edit
+  section_header: { label: 'Section (legacy)', color: '#0d9488' },
   drug_library:   { label: 'Drug (library)', color: '#6366f1' },
   drug_freetext:  { label: 'Drug (text)',    color: '#0ea5e9' },
 }
@@ -98,6 +123,11 @@ function rowSummary(row) {
   // Legacy: drug_freetext
   if (row.row_type === 'drug_freetext') {
     return [row.drug_name, row.dose_text].filter(Boolean).join(' — ') || 'Empty drug'
+  }
+  if (row.row_type === 'section') {
+    const count = (row.drugs ?? []).length
+    const countLabel = count === 1 ? '1 drug' : `${count} drugs`
+    return [row.label || 'Untitled section', `(${countLabel})`].join(' ')
   }
   if (row.row_type === 'section_header') {
     return row.label || 'Untitled section'
@@ -184,11 +214,180 @@ function SectionHeaderRowEditor({ row, onChange }) {
   )
 }
 
-// ─── Individual row card ───────────────────────────────────────────────────────
+// ─── Shared row-list mutation hook (PHASE 4) ──────────────────────────────────
+// Add/update/move/delete-with-promote logic, factored out so both the
+// top-level rows array (PrescriptionSheetEditor) and a section's nested
+// drugs[] array (SectionRowEditor) share the same behaviour instead of two
+// parallel copies of it.
+//
+//   list     — the array this hook operates on (rows, or a section's drugs)
+//   onChange — (nextList) => void, called with the full replacement array
 
-function RowCard({ row, idx, total, onChange, onMove, onDeleteRequest }) {
+function useRowList(list, onChange) {
+  // { idx } when open, null when closed
+  const [promoteDialog, setPromoteDialog] = useState(null)
+
+  function addRow(newRow) {
+    onChange([...list, { ...newRow, _isNew: true }])
+  }
+
+  function updateRow(idx, nextRow) {
+    onChange(list.map((r, i) => i === idx ? { ...nextRow, _isNew: false } : r))
+  }
+
+  function moveRow(idx, direction) {
+    const swapIdx = idx + direction
+    if (swapIdx < 0 || swapIdx >= list.length) return
+    const next = [...list]
+    ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+    onChange(next)
+  }
+
+  function deleteRow(idx) {
+    onChange(list.filter((_, i) => i !== idx))
+  }
+
+  // Delete request: if it's a drug row with alternatives, show the promote
+  // dialog instead of deleting immediately (step 1.11).
+  function handleDeleteRequest(idx) {
+    const row = list[idx]
+    const isDrug = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
+    const hasAlternatives = isDrug && (row.alternatives ?? []).length > 0
+    if (hasAlternatives) {
+      setPromoteDialog({ idx })
+    } else {
+      deleteRow(idx)
+    }
+  }
+
+  // Promote an alternative to the main slot, then remove the original row
+  function handlePromote(altIndex) {
+    const { idx } = promoteDialog
+    const row = list[idx]
+    const promoted = promoteAlternativeToMain(row, altIndex)
+    onChange(list.map((r, i) => i === idx ? promoted : r))
+    setPromoteDialog(null)
+  }
+
+  function handleDeleteAll() {
+    deleteRow(promoteDialog.idx)
+    setPromoteDialog(null)
+  }
+
+  return {
+    addRow, updateRow, moveRow, deleteRow,
+    handleDeleteRequest, handlePromote, handleDeleteAll,
+    promoteDialog, setPromoteDialog,
+  }
+}
+
+// ─── Section row editor (PHASE 4 — nested drugs[] card) ──────────────────────
+// Renders a 'section' row's label field plus its own nested drug-row list,
+// each member rendered via the same RowCard component used at the top level
+// (recursion, not duplication). Only drug-type rows belong here — two levels
+// max (sheet -> section -> drugs).
+
+function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
+  const drugs = row.drugs ?? []
+  const {
+    updateRow, moveRow, handleDeleteRequest,
+    promoteDialog, handlePromote, handleDeleteAll, setPromoteDialog,
+  } = useRowList(drugs, nextDrugs => onChange({ ...row, drugs: nextDrugs }))
+
+  function addDrugToSection() {
+    onChange({ ...row, drugs: [...drugs, { ...DRUG_ROW_TEMPLATE, id: nanoid(), _isNew: true }] })
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700,
+            color: 'var(--color-text-secondary)',
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+          }}>
+            Section label
+          </span>
+          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+            e.g. "For fever", "For cough"
+          </span>
+        </div>
+        <input
+          type="text"
+          value={row.label ?? ''}
+          onChange={e => onChange({ ...row, label: e.target.value })}
+          placeholder="Section heading…"
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '7px 10px',
+            border: '1.5px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            fontSize: 13, fontFamily: 'var(--font-body)',
+            backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text-primary)',
+            outline: 'none',
+            fontWeight: 600,
+          }}
+        />
+      </div>
+
+      {/* ── Nested drug rows ── */}
+      {drugs.length === 0 ? (
+        <div style={{
+          textAlign: 'center', fontSize: 12,
+          color: 'var(--color-text-tertiary)',
+          padding: '10px 0',
+          border: '1.5px dashed var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+        }}>
+          No drugs in this section yet.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {drugs.map((drug, idx) => (
+            <RowCard
+              key={drug.id ?? idx}
+              row={drug}
+              idx={idx}
+              total={drugs.length}
+              onChange={nextRow => updateRow(idx, nextRow)}
+              onMove={moveRow}
+              onDeleteRequest={handleDeleteRequest}
+              isNested
+              onMoveOut={() => onMoveDrugOut(idx)}
+            />
+          ))}
+        </div>
+      )}
+
+      <div>
+        <AddRowButton label="Add drug" color="#6366f1" onClick={addDrugToSection} />
+      </div>
+
+      {/* ── Promote-alternative dialog, scoped to this section's drugs ── */}
+      {promoteDialog && (
+        <PromoteAlternativeDialog
+          row={drugs[promoteDialog.idx]}
+          onPromote={handlePromote}
+          onDeleteAll={handleDeleteAll}
+          onCancel={() => setPromoteDialog(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+
+function RowCard({
+  row, idx, total, onChange, onMove, onDeleteRequest,
+  isNested = false, onMoveOut = null,
+  sections = [], onMoveIntoSection = null,
+  onMoveDrugOutOfSection = null,
+}) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
+  const isDrugRow = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
 
   // Normalise legacy drug rows on first change
   function handleEditorChange(nextRow) {
@@ -243,11 +442,47 @@ function RowCard({ row, idx, total, onChange, onMove, onDeleteRequest }) {
           {rowSummary(row)}
         </span>
 
-        {/* ↑ ↓ 🗑 controls */}
+        {/* Move into section… / move out of section / ↑ ↓ 🗑 controls */}
         <div
-          style={{ display: 'flex', gap: 2, flexShrink: 0 }}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}
           onClick={e => e.stopPropagation()}
         >
+          {/* PHASE 4: top-level drug rows can be filed into an existing section */}
+          {isDrugRow && !isNested && sections.length > 0 && (
+            <select
+              value=""
+              onChange={e => { if (e.target.value) onMoveIntoSection(e.target.value) }}
+              title="Move into section…"
+              style={{
+                fontSize: 11, fontWeight: 600,
+                color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 6,
+                background: 'var(--color-surface)',
+                padding: '3px 4px',
+                maxWidth: 132,
+                cursor: 'pointer',
+              }}
+            >
+              <option value="">Move into section…</option>
+              {sections.map(s => (
+                <option key={s.id} value={s.id}>{s.label || 'Untitled section'}</option>
+              ))}
+            </select>
+          )}
+
+          {/* PHASE 4: nested drug rows can be moved back out to the top level */}
+          {isDrugRow && isNested && (
+            <button
+              type="button"
+              onClick={onMoveOut}
+              title="Move out of section"
+              style={iconBtn(false)}
+            >
+              <LogOut size={13} />
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => onMove(idx, -1)}
@@ -280,8 +515,15 @@ function RowCard({ row, idx, total, onChange, onMove, onDeleteRequest }) {
       {/* ── Expanded editor ── */}
       {expanded && (
         <div style={{ padding: '12px 14px' }}>
-          {(row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext') && (
+          {isDrugRow && (
             <UnifiedDrugRowEditor row={row} onChange={handleEditorChange} />
+          )}
+          {row.row_type === 'section' && (
+            <SectionRowEditor
+              row={row}
+              onChange={handleEditorChange}
+              onMoveDrugOut={onMoveDrugOutOfSection}
+            />
           )}
           {row.row_type === 'section_header' && (
             <SectionHeaderRowEditor row={row} onChange={handleEditorChange} />
@@ -354,63 +596,45 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
   const label = data.label ?? ''
   const rows  = data.rows  ?? []
 
-  // State for the promote dialog (step 1.11)
-  // { rowIdx: number } when open, null when closed
-  const [promoteDialog, setPromoteDialog] = useState(null)
-
   function update(patch) {
     onChange({ label, rows, ...patch })
   }
 
-  // ── Row mutations ──────────────────────────────────────────────────────────
+  // ── Row mutations (shared hook — same logic the section's nested drugs[]
+  //    list uses, applied here to the top-level rows array) ───────────────
+  const {
+    addRow, updateRow, moveRow,
+    handleDeleteRequest, promoteDialog, handlePromote, handleDeleteAll, setPromoteDialog,
+  } = useRowList(rows, nextRows => update({ rows: nextRows }))
 
-  function addRow(newRow) {
-    update({ rows: [...rows, { ...newRow, _isNew: true }] })
-  }
+  // ── PHASE 4: move a drug row into / out of a section ───────────────────
+  // Crosses list boundaries (top-level rows <-> a section's nested drugs[]),
+  // so this lives at this level rather than inside useRowList, which only
+  // ever sees one list at a time.
 
-  function updateRow(idx, nextRow) {
-    const next = rows.map((r, i) => i === idx ? { ...nextRow, _isNew: false } : r)
+  const sections = rows
+    .filter(r => r.row_type === 'section')
+    .map(r => ({ id: r.id, label: r.label }))
+
+  function moveDrugIntoSection(topIdx, sectionId) {
+    const row = rows[topIdx]
+    const withoutRow = rows.filter((_, i) => i !== topIdx)
+    const next = withoutRow.map(r =>
+      r.row_type === 'section' && r.id === sectionId
+        ? { ...r, drugs: [...(r.drugs ?? []), { ...row, _isNew: false }] }
+        : r
+    )
     update({ rows: next })
   }
 
-  function moveRow(idx, direction) {
-    const swapIdx = idx + direction
-    if (swapIdx < 0 || swapIdx >= rows.length) return
-    const next = [...rows]
-    ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
+  function moveDrugOutOfSection(sectionTopIdx, drugIdx) {
+    const section = rows[sectionTopIdx]
+    const sectionDrugs = section.drugs ?? []
+    const drug = sectionDrugs[drugIdx]
+    const remainingDrugs = sectionDrugs.filter((_, i) => i !== drugIdx)
+    const next = rows.map((r, i) => i === sectionTopIdx ? { ...r, drugs: remainingDrugs } : r)
+    next.splice(sectionTopIdx + 1, 0, { ...drug, _isNew: false })
     update({ rows: next })
-  }
-
-  // Delete request: if it's a drug row with alternatives, show the promote
-  // dialog instead of deleting immediately (step 1.11).
-  function handleDeleteRequest(idx) {
-    const row = rows[idx]
-    const isDrug = row.row_type === 'drug' || row.row_type === 'drug_library' || row.row_type === 'drug_freetext'
-    const hasAlternatives = isDrug && (row.alternatives ?? []).length > 0
-    if (hasAlternatives) {
-      setPromoteDialog({ rowIdx: idx })
-    } else {
-      deleteRow(idx)
-    }
-  }
-
-  function deleteRow(idx) {
-    update({ rows: rows.filter((_, i) => i !== idx) })
-  }
-
-  // Promote an alternative to the main slot, then remove the original row
-  function handlePromote(altIndex) {
-    const { rowIdx } = promoteDialog
-    const row = rows[rowIdx]
-    const promoted = promoteAlternativeToMain(row, altIndex)
-    const next = rows.map((r, i) => i === rowIdx ? promoted : r)
-    update({ rows: next })
-    setPromoteDialog(null)
-  }
-
-  function handleDeleteAll() {
-    deleteRow(promoteDialog.rowIdx)
-    setPromoteDialog(null)
   }
 
   // ── Add templates ──────────────────────────────────────────────────────────
@@ -423,10 +647,12 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
   }
 
   function addSectionHeader() {
+    // PHASE 4: "+ Section" now creates the new self-contained SECTION_ROW_TEMPLATE
+    // shape going forward — the legacy section_header marker is left untouched
+    // for rows that already exist, but is no longer what new sections look like.
     addRow({
-      row_type: 'section_header',
+      ...SECTION_ROW_TEMPLATE,
       id: nanoid(),
-      label: '',
     })
   }
 
@@ -502,6 +728,9 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
               onChange={nextRow => updateRow(idx, nextRow)}
               onMove={moveRow}
               onDeleteRequest={handleDeleteRequest}
+              sections={sections}
+              onMoveIntoSection={sectionId => moveDrugIntoSection(idx, sectionId)}
+              onMoveDrugOutOfSection={drugIdx => moveDrugOutOfSection(idx, drugIdx)}
             />
           ))}
         </div>
@@ -518,7 +747,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
       {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}
       {promoteDialog && (
         <PromoteAlternativeDialog
-          row={rows[promoteDialog.rowIdx]}
+          row={rows[promoteDialog.idx]}
           onPromote={handlePromote}
           onDeleteAll={handleDeleteAll}
           onCancel={() => setPromoteDialog(null)}
