@@ -19,8 +19,10 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *                        drugs[], via the same per-row renderer used for the
  *                        sheet's top-level rows (renderRowItem below) —
  *                        recursive, not duplicated.
- *   note               — { text, flavor? } — rendered via NoteCallout in flat inline row style
- *   free_text          — { markdown }       — rendered via FreeTextPostBlock (markdown prose)
+ *   note               — { text_en?, text_ar? } — both languages combined into one
+ *                        string and rendered via NoteCallout in flat inline row style
+ *                        (no per-row flavor; always defaults to NoteCallout's "info")
+ *   free_text          — { content }        — rendered via FreeTextPostBlock (markdown prose)
  *
  * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
  * `drug_library`, and `drug_freetext` row types. No persisted data of these
@@ -87,21 +89,26 @@ export default function PrescriptionSheetBlock({ sheet }) {
         )
       }
 
-      case 'note':
+      case 'note': {
+        // Row schema (NOTE_ROW_TEMPLATE) stores bilingual text as text_en /
+        // text_ar and carries no flavor field. Combined into one string so
+        // NoteCallout's existing per-paragraph dir="auto" handling renders
+        // each language in its own correctly-directioned paragraph.
+        const noteText = [row.text_en, row.text_ar].filter(Boolean).join('\n\n')
         return (
           <NoteCallout
             key={row.id ?? key}
-            text={row.text}
-            flavor={row.flavor}
+            text={noteText}
             isLast={isLast}
           />
         )
+      }
 
       case 'free_text':
         return (
           <div key={row.id ?? key} style={{ padding: '6px 0' }}>
             <FreeTextPostBlock
-              block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.markdown ?? '' } }}
+              block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.content ?? '' } }}
             />
           </div>
         )
@@ -622,3 +629,4 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
