@@ -6,19 +6,14 @@
  * note_callout blocks.
  *
  * Props:
- *   row      — { row_type, text, flavor? }
+ *   row      — { row_type, text_en, text_ar } (NOTE_ROW_TEMPLATE — no flavor;
+ *              the app always renders these via NoteCallout's default flavor)
  *   onChange — (nextRow) => void
  *
  * Pure controlled component — zero DB calls.
  */
 
 import { useRef, useEffect } from 'react'
-
-const FLAVOR_OPTIONS = [
-  { value: 'info',    label: 'Info',    color: '#3b82f6' },
-  { value: 'warning', label: 'Warning', color: '#f59e0b' },
-  { value: 'tip',     label: 'Tip',     color: '#10b981' },
-]
 
 function FieldLabel({ children }) {
   return (
@@ -77,8 +72,6 @@ function AutoTextarea({ value, onChange, placeholder }) {
 }
 
 export default function NoteRowEditor({ row, onChange }) {
-  const flavor = row.flavor ?? 'info'
-
   function patch(updates) {
     onChange({ ...row, ...updates })
   }
@@ -86,53 +79,27 @@ export default function NoteRowEditor({ row, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
 
-      {/* ── Flavor selector ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{
-          fontSize: 11, fontWeight: 700,
-          color: 'var(--color-text-secondary)',
-          textTransform: 'uppercase', letterSpacing: '0.05em',
-          minWidth: 40,
-        }}>
-          Type
-        </span>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {FLAVOR_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => patch({ flavor: opt.value })}
-              style={{
-                padding: '3px 12px',
-                borderRadius: 99,
-                border: flavor === opt.value
-                  ? `2px solid ${opt.color}`
-                  : '2px solid var(--color-border)',
-                background: flavor === opt.value ? opt.color + '18' : 'transparent',
-                color: flavor === opt.value ? opt.color : 'var(--color-text-tertiary)',
-                fontWeight: flavor === opt.value ? 700 : 400,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-                transition: 'all 0.15s',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+      {/* ── Note text (English) ── */}
+      <div>
+        <FieldLabel>Note text (English)</FieldLabel>
+        <AutoTextarea
+          value={row.text_en ?? ''}
+          onChange={text_en => patch({ text_en })}
+          placeholder="e.g. Take with food"
+        />
       </div>
 
-      {/* ── Note text ── */}
+      {/* ── Note text (Arabic) ── */}
       <div>
-        <FieldLabel>Note text</FieldLabel>
+        <FieldLabel>Note text (Arabic)</FieldLabel>
         <AutoTextarea
-          value={row.text ?? ''}
-          onChange={text => patch({ text })}
-          placeholder="e.g. Take with food"
+          value={row.text_ar ?? ''}
+          onChange={text_ar => patch({ text_ar })}
+          placeholder="النص بالعربية (اختياري)"
         />
       </div>
 
     </div>
   )
 }
+
