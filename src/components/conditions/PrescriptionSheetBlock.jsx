@@ -441,6 +441,12 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
   )
 }
 
+/**
+ * DoseLine — Phase 3 redesign (prescription redesign plan).
+ * Bold, full-strength color, no opacity dimming.
+ * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (15px).
+ * The dose_who provenance tag (whoLabel) is unchanged.
+ */
 function DoseLine({ text, who }) {
   const whoLabel = doseWhoLabel(who)
   return (
@@ -462,10 +468,9 @@ function DoseLine({ text, who }) {
         </span>
       )}
       <span style={{
-        fontSize: 13,
-        fontWeight: 500,
+        fontSize: 14,
+        fontWeight: 700,
         color: 'var(--color-text-primary)',
-        opacity: 0.72,
         lineHeight: 1.5,
         unicodeBidi: 'plaintext',
       }}>
@@ -621,5 +626,6 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
 
 
