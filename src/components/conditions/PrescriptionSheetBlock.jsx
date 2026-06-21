@@ -140,16 +140,20 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
   return (
     <div>
-      {segments.map((segment, segIdx) => (
-        <div key={segIdx}>
-          {segment.label !== null && <SectionHeader label={segment.label} />}
-          {segment.items.map((row, i) => {
-            const isLast =
-              segIdx === segments.length - 1 && i === segment.items.length - 1
-            return renderRowItem(row, i, isLast)
-          })}
-        </div>
-      ))}
+      {segments.map((segment, segIdx) => {
+        const renderItems = () => segment.items.map((row, i) => {
+          const isLast =
+            segIdx === segments.length - 1 && i === segment.items.length - 1
+          return renderRowItem(row, i, isLast)
+        })
+        return (
+          <div key={segIdx}>
+            {segment.label !== null
+              ? <SectionHeader label={segment.label}>{renderItems()}</SectionHeader>
+              : renderItems()}
+          </div>
+        )
+      })}
 
       {/* ── Terminal divider ─────────────────────────────────────────────────────
           Visually distinct from the thin solid hairlines between prescription items.
@@ -193,37 +197,44 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
 /**
  * SectionHeader — visual group boundary (masterplan §2.4).
- * PHASE 5 (2026-06-21) — corrected from the earlier tinted-background sketch:
- * renders as the lightest-weight grouping on the page (top divider, centered
- * uppercase label, bottom divider, no background tint) since the formulation
- * bracket carries the real "same drug" meaning and a section is just an
- * organizational label over otherwise-unrelated drugs.
+ * PHASE 5 (2026-06-21, prescription redesign plan) — renders as one
+ * full-width tinted card: the label sits as a heading-style line at the
+ * top, and the section's drug rows render directly beneath it inside the
+ * same card (see call site in the default export, where this component
+ * now wraps its segment's items as children rather than rendering as a
+ * sibling before them). Uses --color-section-bg, chosen to be visually
+ * distinct from the Phase 1 note card's tint so a group of drugs never
+ * reads as the same kind of box as a single annotation.
+ * Supersedes the prior "lightest-weight grouping, no background tint"
+ * decision — that reversal is explicit and intentional per the redesign
+ * plan; do not revert toward it.
  */
-function SectionHeader({ label }) {
+function SectionHeader({ label, children }) {
   if (!label) return null
   return (
     <div
-      dir="auto"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        margin: '14px 0 6px',
-        unicodeBidi: 'plaintext',
+        background: 'var(--color-section-bg)',
+        borderRadius: 'var(--radius-md)',
+        padding: 'var(--space-3) var(--space-4) var(--space-2)',
+        margin: '14px 0',
       }}
     >
-      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
-      <span style={{
-        fontSize: 11,
-        fontWeight: 700,
-        letterSpacing: '0.08em',
-        color: 'var(--color-text-tertiary)',
-        textTransform: 'uppercase',
-        flexShrink: 0,
-      }}>
+      <div
+        dir="auto"
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          color: 'var(--color-text-tertiary)',
+          textTransform: 'uppercase',
+          marginBottom: 4,
+          unicodeBidi: 'plaintext',
+        }}
+      >
         {label}
-      </span>
-      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
+      </div>
+      {children}
     </div>
   )
 }

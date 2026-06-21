@@ -96,6 +96,12 @@
      section card variable (--color-section-bg, added in Phase 5). */
   --color-note-bg:          #F5F4F1;
 
+  /* Section card — Phase 5 redesign: tinted background card wrapping a
+     section's label and its nested drug rows. Deliberately a different
+     hue (cool violet) from the note card's warm grey above, so a note
+     and a section never read as "the same kind of box" at a glance. */
+  --color-section-bg:       #F3EFFA;
+
   --font-display:           "DM Sans", sans-serif;
   --font-body:              "DM Sans", sans-serif;
   --font-arabic:            "Noto Sans Arabic", sans-serif;
@@ -146,6 +152,10 @@
   /* Note card — dark mode: slightly lifted from the dark surface,
      clearly visible but not bright or alert-colored. */
   --color-note-bg:          #262D3A;
+
+  /* Section card — dark mode: deep violet, kept distinct in hue from the
+     note card's slate-grey above (same pairing logic as light mode). */
+  --color-section-bg:       #241F33;
 
   --shadow-card:            0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
   --shadow-elevated:        0 4px 12px rgba(0,0,0,0.4);
