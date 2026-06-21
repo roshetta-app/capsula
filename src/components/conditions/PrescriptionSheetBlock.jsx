@@ -348,7 +348,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   }
 
   return (
-    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
+    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '1.5px solid var(--color-border)' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {units.map((unit, uIdx) => {
@@ -531,21 +531,30 @@ function DoseLine({ text }) {
 /**
  * RowNote — inline note card with language-aware icon placement.
  *
- * Uses dir="auto" on the flex container so the browser detects direction
- * from the first strong character in the text:
- *   Arabic text  → flex row is mirrored → icon appears on the RIGHT
- *   English text → flex row is normal   → icon appears on the LEFT
+ * Direction is resolved explicitly (rather than left to the browser's
+ * dir="auto" heuristic) so the icon's flex order reliably flips for
+ * Arabic-leading text:
+ *   Arabic text  → row direction rtl → icon renders on the RIGHT
+ *   English text → row direction ltr → icon renders on the LEFT
  *
- * Text: var(--color-text-primary) (black), 14px/500 — legible, not muted.
+ * Text: var(--color-text-primary) (black), 15px/600 — bolder and a touch
+ * larger than before for legibility (previously 14px/500).
  * Does not use NoteCallout (which has a fixed LTR icon position).
  */
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
+
 function RowNote({ note }) {
   if (!note) return null
+
+  const isArabic = ARABIC_RE.test(note.trim().charAt(0)) || ARABIC_RE.test(note)
+  const direction = isArabic ? 'rtl' : 'ltr'
+
   return (
     <div
-      dir="auto"
+      dir={direction}
       style={{
         display: 'flex',
+        flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 7,
         marginTop: 6,
@@ -564,13 +573,16 @@ function RowNote({ note }) {
       }}>
         <Icon name="Info" size={13} color="currentColor" />
       </span>
-      <span style={{
-        fontSize: 14,
-        fontWeight: 500,
-        color: 'var(--color-text-primary)',
-        lineHeight: 1.55,
-        unicodeBidi: 'plaintext',
-      }}>
+      <span
+        dir="auto"
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          color: 'var(--color-text-primary)',
+          lineHeight: 1.55,
+          unicodeBidi: 'plaintext',
+        }}
+      >
         {note}
       </span>
     </div>
@@ -606,26 +618,34 @@ function NumberBadge({ index }) {
 }
 
 /**
- * OrMarker — tinted circle pill sitting in the content column, aligned
+ * OrMarker — perfect circle, sitting in the content column, aligned
  * flush-left with the drug names above and below it. No negative margin —
  * it is a natural block element in the flex content column.
+ *
+ * Shape: equal width/height (fixed 22px), single "or" character, so the
+ * badge always renders as a true circle (not a pill).
+ * Color: warm/neutral amber tint (--color-warning-light bg, --color-warning
+ * text) — distinct from both plain grey and the blue accent used elsewhere
+ * in the sheet (NumberBadge, form pill), so it reads as its own kind of
+ * marker rather than a muted variant of either.
  */
 function OrMarker() {
   return (
     <div style={{ padding: '3px 0' }}>
       <span style={{
         display: 'inline-flex',
+        width: 22,
+        height: 22,
         alignItems: 'center',
         justifyContent: 'center',
         fontSize: 10,
-        fontWeight: 500,
+        fontWeight: 700,
         fontStyle: 'italic',
-        color: 'var(--color-text-tertiary)',
-        background: 'var(--color-surface-muted)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 999,
-        padding: '1px 9px',
-        lineHeight: 1.6,
+        color: 'var(--color-warning)',
+        background: 'var(--color-warning-light)',
+        borderRadius: '50%',
+        flexShrink: 0,
+        lineHeight: 1,
       }}>
         or
       </span>
@@ -639,4 +659,3 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
-

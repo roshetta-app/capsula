@@ -20,10 +20,21 @@
  *   - isLast prop is accepted for caller compatibility but no longer drives
  *     any visual output (the hairline-between-rows pattern is gone)
  *
+ * PHASE 8 (2026-06-22) — note legibility + RTL icon placement:
+ *   - Text color changed from --color-text-secondary (grey) to
+ *     --color-text-primary (black), and weight/size bumped from 13px/450
+ *     to 14px/600, so notes read as primary content rather than muted
+ *     metadata.
+ *   - Icon placement is now language-aware: Arabic-leading text renders
+ *     the icon on the RIGHT (row direction flips to rtl); English-leading
+ *     text keeps the icon on the LEFT. Previously the icon was always on
+ *     the left regardless of text direction.
+ *
  * Unchanged from prior design:
  *   - Three SVG icons (IconInfo / IconWarning / IconTip) and FLAVORS map
  *   - flavor prop: "info" | "warning" | "tip", default "info"
- *   - All RTL/bidi handling (dir="auto", unicodeBidi: 'plaintext')
+ *   - All RTL/bidi handling (dir="auto", unicodeBidi: 'plaintext') for
+ *     per-paragraph markdown content
  *   - ReactMarkdown rendering and component overrides
  *
  * Icon legend:
@@ -99,11 +110,21 @@ const FLAVORS = {
   },
 }
 
+// Matches Arabic + Arabic Supplement Unicode blocks — used to detect
+// Arabic-leading text so the icon side can follow text direction.
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
+
 export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
   if (!text || !text.trim()) return null
 
   const f = FLAVORS[flavor] ?? FLAVORS.info
   const { Icon } = f
+
+  // Direction is resolved from the first strong character so the icon's
+  // flex order flips for Arabic-leading notes: icon on the RIGHT for
+  // Arabic, LEFT for English (previously always left, ignoring direction).
+  const isArabic = ARABIC_RE.test(text.trim().charAt(0))
+  const direction = isArabic ? 'rtl' : 'ltr'
 
   /**
    * RTL/LTR fix:
@@ -153,23 +174,29 @@ export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
       borderRadius: 'var(--radius-md)',
       padding: '10px 12px',
     }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 8,
-      }}>
-        {/* SVG icon — color-coded per flavor */}
+      <div
+        dir={direction}
+        style={{
+          display: 'flex',
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}
+      >
+        {/* SVG icon — color-coded per flavor; side follows text direction */}
         <Icon color={f.colorLight} />
 
-        {/* Note text — block container, each paragraph resolves its own bidi */}
+        {/* Note text — block container, each paragraph resolves its own bidi.
+            Color bumped to text-primary (black) and weight/size increased
+            for legibility — was text-secondary (grey) at 13px/450. */}
         <div
           style={{
             flex: 1,
             minWidth: 0,
-            fontSize: 13,
-            fontWeight: 450,
+            fontSize: 14,
+            fontWeight: 600,
             fontStyle: 'normal',
-            color: 'var(--color-text-secondary)',
+            color: 'var(--color-text-primary)',
             display: 'flex',
             flexDirection: 'column',
             gap: 4,
