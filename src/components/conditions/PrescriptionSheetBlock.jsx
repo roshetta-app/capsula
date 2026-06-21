@@ -1,3 +1,5 @@
+
+```jsx
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import NoteCallout from '../ui/NoteCallout'
@@ -240,22 +242,20 @@ function SectionHeader({ label }) {
  *   The Arabic name (name_ar), when present, is shown directly under the
  *   English line for every member.
  *
- * Alternatives — formulation clusters (§2.2a, REVISED 2026-06-20):
- *   Every alternative that shares its formulation_id with the parent drug
- *   row is folded into the parent's cluster — they share one breadcrumb,
- *   one dose line, and one note; only the name (+ Arabic name) repeats per
- *   member. Alternatives with a different (but shared among themselves)
- *   formulation_id form their own cluster, each with its own breadcrumb/
- *   dose/note. Alternatives with no formulation_id (free text) are always
- *   their own standalone cluster. Clusters are separated visually by an
- *   "or" divider (OrDivider); members within the SAME cluster are
- *   separated by a BracketConnector — PHASE 5 (2026-06-21) — since members
- *   within a cluster share one formulation (e.g. Ventolin/Asmalin) and the
- *   bracket is the stronger "pick one, they're the same medicine" signal,
- *   distinct from the lighter "or" used between genuinely different
- *   formulations. One number badge for the whole row regardless of how
- *   many clusters it expands to (§2.4a) — alternatives never get their own
- *   NumberBadge.
+ * Alternatives — Phase 4 redesign (prescription redesign plan):
+ *   Every boundary between alternatives — same-formulation or different-
+ *   formulation — renders a single OrMarker ("or", left-aligned, bold).
+ *   BracketConnector ("same medicine", no "or") and the "no or between
+ *   same-formulation members" rule are both deleted; that decision is
+ *   explicitly reversed per the redesign plan.
+ *
+ *   buildFormulationClusters still groups same-formulation alternatives
+ *   together so they share one dose line and one note (rendered once after
+ *   the last member of the cluster). Only the connector between those
+ *   members changed — it is now the same OrMarker as every other boundary.
+ *
+ *   One NumberBadge per row regardless of how many alternatives it has
+ *   (§2.4a) — unchanged.
  */
 function buildFormulationClusters(row, drugs, mainFormulation) {
   const alts = row.alternatives ?? []
@@ -309,58 +309,67 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
+  // Flatten clusters into a sequence of renderable units so that every
+  // boundary — within a cluster (same-formulation members) or between
+  // clusters (different formulations) — gets exactly one OrMarker.
+  // Each unit carries: the member's display data, and which cluster it
+  // belongs to (for dose/note/breadcrumb rendering after the last member
+  // of each cluster).
+  const units = []
+  for (const cluster of clusters) {
+    for (let mIdx = 0; mIdx < cluster.members.length; mIdx++) {
+      units.push({
+        member: cluster.members[mIdx],
+        cluster,
+        isLastMemberOfCluster: mIdx === cluster.members.length - 1,
+        showConcentrationForm: mIdx === 0,
+      })
+    }
+  }
+
   return (
     <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '0.5px solid var(--color-border-subtle)' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        {clusters.map((cluster, cIdx) => {
-          const isMainCluster = cIdx === 0
-          return (
-            <div key={cIdx}>
-              {cIdx > 0 && <OrDivider />}
+        {units.map((unit, uIdx) => {
+          const { member, cluster, isLastMemberOfCluster, showConcentrationForm } = unit
+          const data = member.data
+          const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
+          const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
+          const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
+          const isMainCluster = clusters.indexOf(cluster) === 0
 
-              {cluster.members.map((member, mIdx) => {
-                const data = member.data
-                // Safety net: a row can end up linked (formulation_id set,
-                // resolves to a real published formulation) but missing its
-                // own brand_name/generic_name — e.g. saved before the picker
-                // wrote both fields together. Without this, the row would
-                // render with no name at all. Falls back to the linked
-                // formulation's own generic name so the row never goes blank.
-                const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
-                const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
-                const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
-                return (
-                  <div key={mIdx}>
-                    {mIdx > 0 && <BracketConnector />}
-                    <DrugMainLine
-                      name={memberName}
-                      nameAr={data.name_ar}
-                      concentration={mIdx === 0 ? data.concentration : null}
-                      form={mIdx === 0 ? data.form : null}
-                      linkEnabled={member.isMain && linkEnabled}
-                      slug={member.isMain ? formulation?.slug : null}
+          return (
+            <div key={uIdx}>
+              {/* One OrMarker before every unit except the very first */}
+              {uIdx > 0 && <OrMarker />}
+
+              <DrugMainLine
+                name={memberName}
+                nameAr={data.name_ar}
+                concentration={showConcentrationForm ? data.concentration : null}
+                form={showConcentrationForm ? data.form : null}
+                linkEnabled={member.isMain && linkEnabled}
+                slug={member.isMain ? formulation?.slug : null}
+                navigate={navigate}
+              />
+
+              {/* Dose, note, and breadcrumb render once after the last member
+                  of each cluster — shared by all members in that cluster */}
+              {isLastMemberOfCluster && (
+                <>
+                  {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
+                  {cluster.note && <RowNote note={cluster.note} />}
+                  {cluster.formulation?.category && (
+                    <Breadcrumb
+                      category={cluster.formulation.category}
+                      genericName={cluster.formulation.genericName}
+                      linkEnabled={isMainCluster && linkEnabled}
+                      slug={cluster.formulation.slug}
                       navigate={navigate}
                     />
-                  </div>
-                )
-              })}
-
-              {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
-              <RowNote note={cluster.note} />
-
-              {/* Breadcrumb: Category › Generic — once per cluster, only when
-                  linked to a real formulation. Non-main clusters show the
-                  breadcrumb as display-only text (no tap-to-navigate), since
-                  their names themselves remain plain text. */}
-              {cluster.formulation?.category && (
-                <Breadcrumb
-                  category={cluster.formulation.category}
-                  genericName={cluster.formulation.genericName}
-                  linkEnabled={isMainCluster && linkEnabled}
-                  slug={cluster.formulation.slug}
-                  navigate={navigate}
-                />
+                  )}
+                </>
               )}
             </div>
           )
@@ -481,30 +490,14 @@ function DoseLine({ text, who }) {
 }
 
 /**
- * RowNote — single bidi note field for unified `drug` rows (and their
- * formulation clusters), post note_en/note_ar merge (2026-06-20). Uses
- * dir="auto" so English or Arabic content displays in its natural
- * direction without needing two separate fields/blocks.
+ * RowNote — Phase 4 redesign (prescription redesign plan).
+ * Now renders through NoteCallout so cluster notes get the same tinted
+ * card styling as standalone note_callout blocks (Phase 1). The old
+ * dot-prefix (●) flat row style is removed entirely.
  */
 function RowNote({ note }) {
   if (!note) return null
-  return (
-    <div style={{
-      marginTop: 5,
-      display: 'flex', alignItems: 'flex-start', gap: 5,
-    }}>
-      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
-      <span dir="auto" style={{
-        fontSize: 12.5,
-        fontWeight: 400,
-        color: 'var(--color-text-secondary)',
-        lineHeight: 1.5,
-        unicodeBidi: 'plaintext',
-      }}>
-        {note}
-      </span>
-    </div>
-  )
+  return <NoteCallout text={note} flavor="info" />
 }
 
 function Breadcrumb({ category, genericName, linkEnabled, slug, navigate }) {
@@ -568,57 +561,43 @@ function NumberBadge({ index }) {
   )
 }
 
-function OrDivider() {
+/**
+ * OrMarker — Phase 4 redesign (prescription redesign plan).
+ * Replaces both the old OrDivider (centered rule + muted "or") and
+ * BracketConnector ("same medicine" bracket, no "or"). Every boundary
+ * between alternatives, same-formulation or not, renders this one component.
+ * Supersedes the "no or between same-formulation members" rule from Phase 5
+ * (2026-06-21) — that decision is explicitly reversed per the redesign plan.
+ * Sits in the badge column (22px wide) by using a negative left margin to
+ * step back out of the content column. Gap between badge and content is
+ * var(--space-3) = 12px, so marginLeft: -(22 + 12) = -34px positions "or"
+ * directly beneath the NumberBadge above it.
+ */
+function OrMarker() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: '6px 0' }}>
-      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
+    <div style={{
+      marginLeft: -34,
+      width: 22,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '3px 0',
+    }}>
       <span style={{
-        fontSize: 10, fontWeight: 600, letterSpacing: '0.07em',
-        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+        fontSize: 11,
+        fontWeight: 700,
+        color: 'var(--color-text-primary)',
       }}>
         or
       </span>
-      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
     </div>
   )
 }
 
-/**
- * BracketConnector — PHASE 5 (2026-06-21). Connects members within the same
- * formulation cluster (e.g. Ventolin / Asmalin) — interchangeable brands of
- * the literal same drug. Deliberately heavier than OrDivider (accent color,
- * bracket shape, no "or" text) since this is the strongest visual signal on
- * the page: "pick one, they're the same medicine." Different-formulation
- * clusters keep the plain OrDivider, unchanged.
- */
-function BracketConnector() {
-  return (
-    <div style={{
-      display: 'flex',
-      alignItems: 'center',
-      gap: 6,
-      margin: '4px 0 4px 2px',
-    }}>
-      <div style={{
-        width: 14,
-        height: 10,
-        borderLeft: '1.5px solid var(--color-accent)',
-        borderTop: '1.5px solid var(--color-accent)',
-        borderBottom: '1.5px solid var(--color-accent)',
-        borderRadius: '4px 0 0 4px',
-      }} />
-      <span style={{
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        color: 'var(--color-accent)',
-      }}>
-        same medicine
-      </span>
-    </div>
-  )
-}
+// BracketConnector deleted — Phase 4 redesign (prescription redesign plan).
+// All alternatives, same-formulation or not, now use OrMarker. The
+// "same medicine" bracket and the "no or between same-formulation members"
+// rule are reversed per the redesign plan. Do not restore.
 
 const rowWrap = {
   display: 'flex',
@@ -626,6 +605,7 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
 
 
 
