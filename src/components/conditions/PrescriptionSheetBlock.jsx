@@ -322,8 +322,8 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   // boundary — within a cluster (same-formulation members) or between
   // clusters (different formulations) — gets exactly one OrMarker.
   // Each unit carries: the member's display data, and which cluster it
-  // belongs to (for dose/note/breadcrumb rendering after the last member
-  // of each cluster).
+  // belongs to (for dose/note rendering after the last member of each
+  // cluster).
   const units = []
   for (const cluster of clusters) {
     for (let mIdx = 0; mIdx < cluster.members.length; mIdx++) {
@@ -346,7 +346,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
           const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
           const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
           const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
-          const isMainCluster = clusters.indexOf(cluster) === 0
 
           return (
             <div key={uIdx}>
@@ -363,21 +362,12 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                 navigate={navigate}
               />
 
-              {/* Dose, note, and breadcrumb render once after the last member
-                  of each cluster — shared by all members in that cluster */}
+              {/* Dose and note render once after the last member of each
+                  cluster — shared by all members in that cluster */}
               {isLastMemberOfCluster && (
                 <>
                   {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
                   {cluster.note && <RowNote note={cluster.note} />}
-                  {cluster.formulation?.category && (
-                    <Breadcrumb
-                      category={cluster.formulation.category}
-                      genericName={cluster.formulation.genericName}
-                      linkEnabled={isMainCluster && linkEnabled}
-                      slug={cluster.formulation.slug}
-                      navigate={navigate}
-                    />
-                  )}
                 </>
               )}
             </div>
@@ -507,39 +497,6 @@ function DoseLine({ text, who }) {
 function RowNote({ note }) {
   if (!note) return null
   return <NoteCallout text={note} flavor="info" />
-}
-
-function Breadcrumb({ category, genericName, linkEnabled, slug, navigate }) {
-  return (
-    <div style={{
-      marginTop: 'var(--space-2)',
-      display: 'flex', alignItems: 'center', gap: 4,
-      fontSize: 11, color: 'var(--color-text-tertiary)',
-    }}>
-      <span style={{ fontWeight: 500 }}>{category}</span>
-      {genericName && (
-        <>
-          <span style={{ opacity: 0.5 }}>›</span>
-          {linkEnabled ? (
-            <button
-              onClick={() => navigate(`/drugs/${slug}`)}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                cursor: 'pointer', fontSize: 11,
-                color: 'var(--color-accent)',
-                fontFamily: 'var(--font-body)',
-                textDecoration: 'underline', textUnderlineOffset: 2,
-              }}
-            >
-              {genericName}
-            </button>
-          ) : (
-            <span>{genericName}</span>
-          )}
-        </>
-      )}
-    </div>
-  )
 }
 
 // ─── Shared sub-pieces ──────────────────────────────────────────────────────
