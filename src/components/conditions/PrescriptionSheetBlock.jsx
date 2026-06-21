@@ -3,7 +3,7 @@ import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
-import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/prescriptionRowSchema'
+import { alternativeSharesParentDose } from '../../constants/prescriptionRowSchema'
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -377,7 +377,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                   cluster — shared by all members in that cluster */}
               {isLastMemberOfCluster && (
                 <>
-                  {cluster.dose && <DoseLine text={cluster.dose} who={cluster.doseWho} />}
+                  {cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </>
               )}
@@ -509,36 +509,18 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
 }
 
 /**
- * DoseLine — bold, full-strength color.
- * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (17px).
- * The dose_who provenance tag (whoLabel) is unchanged.
+ * DoseLine — no adult/child tag. Font 15px/600 — slightly larger and bolder
+ * than before to improve legibility.
+ * Size hierarchy: Arabic name (12.5px) < dose (15px) < main name (17px).
  */
-function DoseLine({ text, who }) {
-  const whoLabel = doseWhoLabel(who)
+function DoseLine({ text }) {
   return (
-    <div dir="auto" style={{
-      display: 'flex',
-      alignItems: 'baseline',
-      gap: 6,
-      marginTop: 4,
-      flexWrap: 'wrap',
-    }}>
-      {whoLabel && (
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-          flexShrink: 0,
-        }}>
-          {whoLabel}
-        </span>
-      )}
+    <div dir="auto" style={{ marginTop: 4, unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 14,
-        fontWeight: 400,
+        fontSize: 15,
+        fontWeight: 600,
         color: 'var(--color-text-primary)',
         lineHeight: 1.5,
-        unicodeBidi: 'plaintext',
       }}>
         {text}
       </span>
@@ -547,12 +529,52 @@ function DoseLine({ text, who }) {
 }
 
 /**
- * RowNote — renders through NoteCallout so cluster notes get the tinted
- * card styling as standalone note_callout blocks.
+ * RowNote — inline note card with language-aware icon placement.
+ *
+ * Uses dir="auto" on the flex container so the browser detects direction
+ * from the first strong character in the text:
+ *   Arabic text  → flex row is mirrored → icon appears on the RIGHT
+ *   English text → flex row is normal   → icon appears on the LEFT
+ *
+ * Text: var(--color-text-primary) (black), 14px/500 — legible, not muted.
+ * Does not use NoteCallout (which has a fixed LTR icon position).
  */
 function RowNote({ note }) {
   if (!note) return null
-  return <NoteCallout text={note} flavor="info" />
+  return (
+    <div
+      dir="auto"
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 7,
+        marginTop: 6,
+        padding: '7px 10px',
+        borderRadius: 'var(--radius-sm, 6px)',
+        background: 'var(--color-surface-muted)',
+        border: '1px solid var(--color-border)',
+      }}
+    >
+      <span style={{
+        flexShrink: 0,
+        marginTop: 2,
+        color: 'var(--color-text-tertiary)',
+        display: 'flex',
+        alignItems: 'center',
+      }}>
+        <Icon name="Info" size={13} color="currentColor" />
+      </span>
+      <span style={{
+        fontSize: 14,
+        fontWeight: 500,
+        color: 'var(--color-text-primary)',
+        lineHeight: 1.55,
+        unicodeBidi: 'plaintext',
+      }}>
+        {note}
+      </span>
+    </div>
+  )
 }
 
 // ─── Shared sub-pieces ──────────────────────────────────────────────────────
@@ -584,27 +606,26 @@ function NumberBadge({ index }) {
 }
 
 /**
- * OrMarker — italic + muted styling, left-aligned in the badge column.
- * Sits in the badge column (22px wide) by using a negative left margin to
- * step back out of the content column. Gap between badge and content is
- * var(--space-3) = 12px, so marginLeft: -(22 + 12) = -34px positions "or"
- * directly beneath the NumberBadge above it.
+ * OrMarker — tinted circle pill sitting in the content column, aligned
+ * flush-left with the drug names above and below it. No negative margin —
+ * it is a natural block element in the flex content column.
  */
 function OrMarker() {
   return (
-    <div style={{
-      marginLeft: -34,
-      width: 22,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '3px 0',
-    }}>
+    <div style={{ padding: '3px 0' }}>
       <span style={{
-        fontSize: 11,
-        fontWeight: 400,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 10,
+        fontWeight: 500,
         fontStyle: 'italic',
         color: 'var(--color-text-tertiary)',
+        background: 'var(--color-surface-muted)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 999,
+        padding: '1px 9px',
+        lineHeight: 1.6,
       }}>
         or
       </span>
@@ -618,3 +639,4 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
