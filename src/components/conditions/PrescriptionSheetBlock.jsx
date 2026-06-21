@@ -476,6 +476,66 @@ function DoseLine({ text, who }) {
   )
 }
 
+/**
+ * RowNote — single bidi note field for unified `drug` rows (and their
+ * formulation clusters), post note_en/note_ar merge (2026-06-20). Uses
+ * dir="auto" so English or Arabic content displays in its natural
+ * direction without needing two separate fields/blocks.
+ */
+function RowNote({ note }) {
+  if (!note) return null
+  return (
+    <div style={{
+      marginTop: 5,
+      display: 'flex', alignItems: 'flex-start', gap: 5,
+    }}>
+      <span style={{ color: 'var(--color-text-tertiary)', fontSize: 10, marginTop: 3, flexShrink: 0 }}>●</span>
+      <span dir="auto" style={{
+        fontSize: 12.5,
+        fontWeight: 400,
+        color: 'var(--color-text-secondary)',
+        lineHeight: 1.5,
+        unicodeBidi: 'plaintext',
+      }}>
+        {note}
+      </span>
+    </div>
+  )
+}
+
+function Breadcrumb({ category, genericName, linkEnabled, slug, navigate }) {
+  return (
+    <div style={{
+      marginTop: 'var(--space-2)',
+      display: 'flex', alignItems: 'center', gap: 4,
+      fontSize: 11, color: 'var(--color-text-tertiary)',
+    }}>
+      <span style={{ fontWeight: 500 }}>{category}</span>
+      {genericName && (
+        <>
+          <span style={{ opacity: 0.5 }}>›</span>
+          {linkEnabled ? (
+            <button
+              onClick={() => navigate(`/drugs/${slug}`)}
+              style={{
+                background: 'none', border: 'none', padding: 0,
+                cursor: 'pointer', fontSize: 11,
+                color: 'var(--color-accent)',
+                fontFamily: 'var(--font-body)',
+                textDecoration: 'underline', textUnderlineOffset: 2,
+              }}
+            >
+              {genericName}
+            </button>
+          ) : (
+            <span>{genericName}</span>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Shared sub-pieces ──────────────────────────────────────────────────────
 
 /**
