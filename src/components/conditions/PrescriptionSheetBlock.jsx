@@ -45,8 +45,12 @@ import { alternativeSharesParentDose } from '../../constants/prescriptionRowSche
  *
  * Design notes:
  *   - NumberBadge: outlined square badge, optically aligned to cap-height.
- *   - Dose: bold, full-strength color.
- *   - Drug-level notes: tinted NoteCallout card.
+ *   - Dose: bold, dose-teal color, distinct from the drug name.
+ *   - Drug-level notes: plain de-emphasized text, no card chrome.
+ *   - Row divider: bold hairline rendered ONLY between two consecutive
+ *     `drug` rows (PHASE 9). A drug row followed by a note/free_text row,
+ *     or a lone drug row with no following sibling, never draws this line
+ *     — it would otherwise sit on top of an unrelated element below it.
  *   - Terminal divider: dashed rule + "end of sheet" label after the last row.
  *   - Drug name: uniform text-primary color for all entries; linked names get
  *     a dotted underline to signal tappability (not accent-blue color).
@@ -78,7 +82,13 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
   // ── Per-row renderer, reused for both the sheet's top-level rows and a
   //    section row's nested drugs[] (PHASE 4 — recursive, not duplicated) ──
-  function renderRowItem(row, key, isLast) {
+  //
+  //    `nextRow` (the next sibling within the same segment/section, or
+  //    undefined if this is the last item) drives whether a drug row draws
+  //    its bottom divider — PHASE 9: the divider must only ever sit between
+  //    two drug rows, never on top of a note/free_text row, and never on a
+  //    lone drug row with no sibling beneath it.
+  function renderRowItem(row, key, nextRow) {
     switch (row.row_type) {
       case 'drug': {
         const index = nextIndex()
@@ -93,7 +103,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
             formulation={formulation}
             drugs={drugs}
             navigate={navigate}
-            isLast={isLast}
+            showDivider={nextRow?.row_type === 'drug'}
           />
         )
       }
@@ -108,7 +118,6 @@ export default function PrescriptionSheetBlock({ sheet }) {
           <NoteCallout
             key={row.id ?? key}
             text={noteText}
-            isLast={isLast}
           />
         )
       }
@@ -151,9 +160,8 @@ export default function PrescriptionSheetBlock({ sheet }) {
     <div>
       {segments.map((segment, segIdx) => {
         const renderItems = () => segment.items.map((row, i) => {
-          const isLast =
-            segIdx === segments.length - 1 && i === segment.items.length - 1
-          return renderRowItem(row, i, isLast)
+          const nextRow = segment.items[i + 1]
+          return renderRowItem(row, i, nextRow)
         })
         return (
           <div key={segIdx}>
@@ -324,7 +332,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   return [mainCluster, ...otherClusters.values(), ...standalone]
 }
 
-function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
+function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider }) {
   const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
@@ -348,7 +356,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
   }
 
   return (
-    <div style={{ ...rowWrap, borderBottom: isLast ? 'none' : '1.5px solid var(--color-border)' }}>
+    <div style={{ ...rowWrap, borderBottom: showDivider ? '1.5px solid var(--color-border)' : 'none' }}>
       <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {units.map((unit, uIdx) => {
@@ -509,17 +517,22 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
 }
 
 /**
- * DoseLine — no adult/child tag. Font 15px/600 — slightly larger and bolder
- * than before to improve legibility.
- * Size hierarchy: Arabic name (12.5px) < dose (15px) < main name (17px).
+ * DoseLine — no adult/child tag.
+ * PHASE 9 (2026-06-22): color changed from plain text-primary (black) to
+ * --color-dose (teal, shared with .dir-card-dose elsewhere in the app) and
+ * size dropped from 15px to 14px. Previously the dose line was nearly
+ * indistinguishable from the drug name at a glance (15px/600 black vs.
+ * 17px/700 black) — the color shift now makes it scannable as "this is the
+ * dose" on its own, rather than just a second bold black line.
+ * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (17px).
  */
 function DoseLine({ text }) {
   return (
     <div dir="auto" style={{ marginTop: 4, unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 15,
-        fontWeight: 600,
-        color: 'var(--color-text-primary)',
+        fontSize: 14,
+        fontWeight: 700,
+        color: 'var(--color-dose)',
         lineHeight: 1.5,
       }}>
         {text}
@@ -529,7 +542,17 @@ function DoseLine({ text }) {
 }
 
 /**
- * RowNote — inline note card with language-aware icon placement.
+ * RowNote — plain inline note with language-aware icon placement.
+ *
+ * PHASE 9 (2026-06-22) — hierarchy fix: removed the bordered/tinted card
+ * treatment (background, border, padding-as-chrome). A boxed note with an
+ * icon was visually competing with — and often beating — the dose line for
+ * attention, which inverted the intended reading order (name > dose >
+ * alternatives > note). The note is now plain text in the same "supporting
+ * detail" tier as the Arabic name line below the drug name: smaller,
+ * lighter weight, secondary color, no card. The icon is kept (small, muted)
+ * since it's still useful as an at-a-glance "this has a note" marker, but
+ * it no longer sits inside its own boxed UI element.
  *
  * Direction is resolved explicitly (rather than left to the browser's
  * dir="auto" heuristic) so the icon's flex order reliably flips for
@@ -537,9 +560,12 @@ function DoseLine({ text }) {
  *   Arabic text  → row direction rtl → icon renders on the RIGHT
  *   English text → row direction ltr → icon renders on the LEFT
  *
- * Text: var(--color-text-primary) (black), 15px/600 — bolder and a touch
- * larger than before for legibility (previously 14px/500).
- * Does not use NoteCallout (which has a fixed LTR icon position).
+ * Text: var(--color-text-secondary), 13px/500, italic — deliberately
+ * subordinate to both the drug name (17px/700) and the dose line
+ * (14px/700, --color-dose), so it reads as an aside, not primary content.
+ * Does not use NoteCallout (which has a fixed LTR icon position and the
+ * heavier boxed-card treatment appropriate for standalone note rows, not
+ * per-drug annotations).
  */
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
 
@@ -556,12 +582,8 @@ function RowNote({ note }) {
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 7,
-        marginTop: 6,
-        padding: '7px 10px',
-        borderRadius: 'var(--radius-sm, 6px)',
-        background: 'var(--color-surface-muted)',
-        border: '1px solid var(--color-border)',
+        gap: 5,
+        marginTop: 4,
       }}
     >
       <span style={{
@@ -571,15 +593,16 @@ function RowNote({ note }) {
         display: 'flex',
         alignItems: 'center',
       }}>
-        <Icon name="Info" size={13} color="currentColor" />
+        <Icon name="Info" size={12} color="currentColor" />
       </span>
       <span
         dir="auto"
         style={{
-          fontSize: 15,
-          fontWeight: 700,
-          color: 'var(--color-text-primary)',
-          lineHeight: 1.55,
+          fontSize: 13,
+          fontWeight: 500,
+          fontStyle: 'italic',
+          color: 'var(--color-text-secondary)',
+          lineHeight: 1.5,
           unicodeBidi: 'plaintext',
         }}
       >
@@ -659,3 +682,4 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
