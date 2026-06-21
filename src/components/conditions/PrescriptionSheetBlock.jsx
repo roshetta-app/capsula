@@ -39,8 +39,9 @@ import { alternativeSharesParentDose, doseWhoLabel } from '../../constants/presc
  *       until the next section_header / section row / EOF);
  *     - new section rows are self-contained, carrying their own members in
  *       a nested drugs[] array instead of inferring membership from position.
- *   Both render visually the same way today (SectionHeader, tint background)
- *   — Phase 5 is what changes the visual treatment, not Phase 4.
+ *   Both render via the same SectionHeader component — PHASE 5 (2026-06-21)
+ *   changed SectionHeader's visual treatment (see its own docstring below),
+ *   but both mechanisms continue to share it identically.
  *
  * Numbering (masterplan §2.4a):
  *   The numbered badge counts rows, not individual drugs. A unified 'drug'
@@ -227,9 +228,11 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
 /**
  * SectionHeader — visual group boundary (masterplan §2.4).
- * Confirmed direction from mockup review (v1.1): must read as a clear group
- * boundary, not a plain uppercase label — tint background + divider, more
- * emphasis than body text.
+ * PHASE 5 (2026-06-21) — corrected from the earlier tinted-background sketch:
+ * renders as the lightest-weight grouping on the page (top divider, centered
+ * uppercase label, bottom divider, no background tint) since the formulation
+ * bracket carries the real "same drug" meaning and a section is just an
+ * organizational label over otherwise-unrelated drugs.
  */
 function SectionHeader({ label }) {
   if (!label) return null
@@ -239,24 +242,23 @@ function SectionHeader({ label }) {
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 10,
         margin: '14px 0 6px',
-        padding: '6px 10px',
-        backgroundColor: 'var(--color-accent-light)',
-        borderRadius: 'var(--radius-md, 8px)',
-        borderLeft: '3px solid var(--color-accent)',
         unicodeBidi: 'plaintext',
       }}
     >
+      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
       <span style={{
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: 700,
-        letterSpacing: '0.03em',
-        color: 'var(--color-accent)',
+        letterSpacing: '0.08em',
+        color: 'var(--color-text-tertiary)',
         textTransform: 'uppercase',
+        flexShrink: 0,
       }}>
         {label}
       </span>
+      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border-subtle)' }} />
     </div>
   )
 }
@@ -281,10 +283,14 @@ function SectionHeader({ label }) {
  *   formulation_id form their own cluster, each with its own breadcrumb/
  *   dose/note. Alternatives with no formulation_id (free text) are always
  *   their own standalone cluster. Clusters are separated visually by an
- *   "or" divider; members within a cluster are separated by the same
- *   divider, just without a second breadcrumb/dose/note block. One number
- *   badge for the whole row regardless of how many clusters it expands to
- *   (§2.4a) — alternatives never get their own NumberBadge.
+ *   "or" divider (OrDivider); members within the SAME cluster are
+ *   separated by a BracketConnector — PHASE 5 (2026-06-21) — since members
+ *   within a cluster share one formulation (e.g. Ventolin/Asmalin) and the
+ *   bracket is the stronger "pick one, they're the same medicine" signal,
+ *   distinct from the lighter "or" used between genuinely different
+ *   formulations. One number badge for the whole row regardless of how
+ *   many clusters it expands to (§2.4a) — alternatives never get their own
+ *   NumberBadge.
  */
 function buildFormulationClusters(row, drugs, mainFormulation) {
   const alts = row.alternatives ?? []
@@ -363,7 +369,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                 const memberGeneric = memberHasBrand ? data.generic_name : null
                 return (
                   <div key={mIdx}>
-                    {mIdx > 0 && <OrDivider />}
+                    {mIdx > 0 && <BracketConnector />}
                     <DrugMainLine
                       name={memberName}
                       nameAr={data.name_ar}
@@ -805,10 +811,46 @@ function OrDivider() {
   )
 }
 
+/**
+ * BracketConnector — PHASE 5 (2026-06-21). Connects members within the same
+ * formulation cluster (e.g. Ventolin / Asmalin) — interchangeable brands of
+ * the literal same drug. Deliberately heavier than OrDivider (accent color,
+ * bracket shape, no "or" text) since this is the strongest visual signal on
+ * the page: "pick one, they're the same medicine." Different-formulation
+ * clusters keep the plain OrDivider, unchanged.
+ */
+function BracketConnector() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      margin: '4px 0 4px 2px',
+    }}>
+      <div style={{
+        width: 14,
+        height: 10,
+        borderLeft: '1.5px solid var(--color-accent)',
+        borderTop: '1.5px solid var(--color-accent)',
+        borderBottom: '1.5px solid var(--color-accent)',
+        borderRadius: '4px 0 0 4px',
+      }} />
+      <span style={{
+        fontSize: 10,
+        fontWeight: 600,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color: 'var(--color-accent)',
+      }}>
+        same medicine
+      </span>
+    </div>
+  )
+}
+
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
-
