@@ -233,12 +233,12 @@ function SectionHeader({ label }) {
 /**
  * UnifiedDrugRow — renders a single `row_type: 'drug'` row per masterplan §2.2.
  *
- * Display rule (§2.2):
- *   Main line: {brand_name} {concentration} {form} if a brand is present,
- *   otherwise {generic_name} {concentration} {form}.
- *   Secondary line (small, italic): generic name underneath, only when a
- *   brand is present. The Arabic name (name_ar), when present, is shown
- *   directly under the English name for every member.
+ * Display rule (§2.2, updated Phase 2 redesign):
+ *   Main line: name · concentration · form — one continuous line.
+ *   Brand name is preferred when present; falls back to generic name.
+ *   Secondary italic generic-name text was removed in Phase 2 (not moved).
+ *   The Arabic name (name_ar), when present, is shown directly under the
+ *   English line for every member.
  *
  * Alternatives — formulation clusters (§2.2a, REVISED 2026-06-20):
  *   Every alternative that shares its formulation_id with the parent drug
@@ -321,7 +321,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
 
               {cluster.members.map((member, mIdx) => {
                 const data = member.data
-                const memberHasBrand = !!data.brand_name?.trim()
                 // Safety net: a row can end up linked (formulation_id set,
                 // resolves to a real published formulation) but missing its
                 // own brand_name/generic_name — e.g. saved before the picker
@@ -330,8 +329,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                 // formulation's own generic name so the row never goes blank.
                 const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
                 const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
-                const memberName = memberHasBrand ? data.brand_name : (data.generic_name || fallbackName)
-                const memberGeneric = memberHasBrand ? data.generic_name : null
+                const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
                 return (
                   <div key={mIdx}>
                     {mIdx > 0 && <BracketConnector />}
@@ -340,7 +338,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
                       nameAr={data.name_ar}
                       concentration={mIdx === 0 ? data.concentration : null}
                       form={mIdx === 0 ? data.form : null}
-                      generic={memberGeneric}
                       linkEnabled={member.isMain && linkEnabled}
                       slug={member.isMain ? formulation?.slug : null}
                       navigate={navigate}
@@ -375,11 +372,26 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, isLast }) {
 
 // ─── Shared display pieces (used by both the unified row and its alternatives) ─
 
-function DrugMainLine({ name, nameAr, concentration, form, generic, linkEnabled, slug, navigate }) {
+/**
+ * DrugMainLine — Phase 2 redesign (prescription redesign plan).
+ *
+ * Name + concentration + form now render as one continuous flex line,
+ * separated by a middle dot (·). The secondary italic generic-name span
+ * has been deleted (not moved). The form value loses its pill/badge
+ * styling and renders as plain text matching concentration's visual weight.
+ * Arabic name line is unchanged — own line directly below, dir="rtl".
+ * Tap-to-navigate behavior is unchanged.
+ */
+function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, navigate }) {
   if (!name) return null
+
+  // Build the separator-joined suffix only from present values
+  const suffix = [concentration, form].filter(Boolean).join(' · ')
+
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexWrap: 'wrap' }}>
+      {/* One continuous line: name [· concentration · form] */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap' }}>
         {linkEnabled && slug ? (
           <button
             onClick={() => navigate(`/drugs/${slug}`)}
@@ -403,18 +415,18 @@ function DrugMainLine({ name, nameAr, concentration, form, generic, linkEnabled,
             {name}
           </span>
         )}
-        {/* Secondary generic line — small, italic, only shown when a brand is present (§2.2) */}
-        {generic && (
+        {suffix && (
           <span style={{
-            fontSize: 12.5, fontStyle: 'italic', fontWeight: 400,
+            fontSize: 12, fontWeight: 400,
             color: 'var(--color-text-secondary)',
+            lineHeight: 1.3,
           }}>
-            {generic}
+            · {suffix}
           </span>
         )}
       </div>
 
-      {/* Arabic name — shown directly under the English name (§2.1, 2026-06-20) */}
+      {/* Arabic name — own line directly below, dir="rtl", unchanged (§2.1) */}
       {nameAr && (
         <div dir="rtl" style={{
           fontSize: 12.5,
@@ -423,26 +435,6 @@ function DrugMainLine({ name, nameAr, concentration, form, generic, linkEnabled,
           unicodeBidi: 'plaintext',
         }}>
           {nameAr}
-        </div>
-      )}
-
-      {(concentration || form) && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', marginTop: 3, flexWrap: 'wrap' }}>
-          {concentration && (
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{concentration}</span>
-          )}
-          {form && (
-            <span style={{
-              fontSize: 11, fontWeight: 500,
-              backgroundColor: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-              color: 'var(--color-text-tertiary)',
-              borderRadius: 'var(--radius-full)',
-              padding: '1px 7px',
-            }}>
-              {form}
-            </span>
-          )}
         </div>
       )}
     </>
@@ -629,4 +621,5 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
 
