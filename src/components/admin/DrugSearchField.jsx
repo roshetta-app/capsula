@@ -22,7 +22,9 @@
  *     form/Arabic name/category populate silently in the background
  *     (passed to onLink) but are not shown as separate visible fields.
  *     Once linked, the name renders read-only with a tiny link-glyph
- *     icon (LOCKED — linked indicator: icon only, no text label).
+ *     icon (LOCKED — linked indicator: icon only, no text label) and a
+ *     pill icon to the left of the name (Decision 5 / Phase 1.5 visual
+ *     hierarchy: pill icon always present left of the drug name).
  *   - Once linked, the admin cannot type directly into the name to
  *     search for a replacement. An explicit icon-only "change" action
  *     (pencil/swap glyph) re-opens the search field for that row,
@@ -64,10 +66,19 @@
  *     existing alternatives flow, which Decision 1 supersedes; not
  *     carried over here. Promote-to-library (Decision 7 / Phase 4) is a
  *     separate, later workstream.
+ *
+ * PHASE 1.5 (2026-06-22) — Admin Condition Editor Redesign:
+ *   Added pill icon (faPills, FontAwesome) to the left of the drug name
+ *   in the linked read-only display, per Decision 5's locked visual
+ *   hierarchy ("small pill icon to the left of each name"). The Link2
+ *   glyph remains as the linked-indicator icon (Decision 1: "a linked
+ *   drug name shows a tiny icon only"). Layout: [pill] [name] [link
+ *   glyph] [change button].
  */
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
+import { faPills } from '@fortawesome/free-solid-svg-icons'
 import Icon from '../ui/Icon'
 import { supabase } from '../../lib/supabase'
 
@@ -239,6 +250,11 @@ export default function DrugSearchField({
   }
 
   // ── Linked, read-only state ───────────────────────────────────────────
+  // PHASE 1.5: pill icon added to the left of the name per Decision 5's
+  // locked visual hierarchy (name is the loudest element: 15px/600-weight,
+  // pill icon to the left). The Link2 glyph stays as the linked indicator
+  // per Decision 1 (icon-only, no text label). Layout:
+  //   [pill icon]  [name]  [Link2 glyph]  [change/pencil button]
   if (isLinked && !editing) {
     return (
       <div style={{
@@ -246,7 +262,12 @@ export default function DrugSearchField({
         alignItems: 'center',
         gap:        6,
       }}>
-        <Icon name="Link2" size={13} color="var(--color-text-tertiary)" />
+        {/* Pill icon — always-present name prefix (Decision 5 / Phase 1.5) */}
+        <Icon
+          faIcon={faPills}
+          size={13}
+          color="var(--color-text-tertiary)"
+        />
         <span style={{
           flex:       1,
           fontSize:   15,
@@ -255,6 +276,9 @@ export default function DrugSearchField({
         }}>
           {value}
         </span>
+        {/* Link2 glyph — linked indicator (Decision 1: icon-only, no text) */}
+        <Icon name="Link2" size={13} color="var(--color-text-tertiary)" />
+        {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
         <button
           type="button"
           onClick={handleStartChange}

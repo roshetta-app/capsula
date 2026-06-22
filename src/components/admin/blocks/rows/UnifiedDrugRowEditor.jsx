@@ -72,6 +72,18 @@
  *            onLink result is shaped identically to what DrugPickerModal
  *            mode="brand" already produced. Only the entry point changed,
  *            not the fill logic.
+ *        1.3 Free-text manual entry path preserved: typing without selecting
+ *            a search result leaves the row unlinked (brand_id / generic_id /
+ *            formulation_id stay null). DrugSearchField's live editing state
+ *            is the unlinked path — no separate mechanism needed.
+ *        1.4 Drug-link toggle rendered as icon-only button (Decision 1's
+ *            anti-label-clutter rule). Labeled button text ("Drug link: ON /
+ *            OFF") and explanatory subtext ("Name taps navigate to Drug
+ *            Detail screen") removed. Only the Link/Unlink icon remains,
+ *            with an aria-label for accessibility.
+ *        1.5 Visual hierarchy applied to drug name per Decision 5: 15px /
+ *            600-weight / primary color / pill icon to the left. Implemented
+ *            in DrugSearchField.jsx's linked read-only display.
  *        DrugPickerModal mode="formulation" and mode="brand-scoped" call
  *        sites tied to *identity* entry are removed along with their now-dead
  *        trigger buttons/state (handleFormulationPick / handleScopedBrandPick
@@ -922,7 +934,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     patch({ brand_name: text || null, brand_id: null })
   }
 
-  // ── Promote to library (§2.5) ────────────────────────────────────────────
+  // ── Promote to library (§2.5) ────────────────────────────────────────
   async function handlePromote() {
     setPromoteError(null)
 
@@ -1341,30 +1353,34 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         />
       </div>
 
-      {/* ── Drug link toggle ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <button
-          type="button"
-          onClick={() => patch({ drug_link_enabled: !showLink })}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 10px', borderRadius: 'var(--radius-md)',
-            border: `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
-            backgroundColor: showLink ? '#EFF6FF' : 'transparent',
-            color: showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          {showLink ? <Link size={12} /> : <Unlink size={12} />}
-          {showLink ? 'Drug link: ON' : 'Drug link: OFF'}
-        </button>
-        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-          {showLink
-            ? 'Name taps navigate to Drug Detail screen'
-            : 'Name shown as plain text'}
-        </span>
-      </div>
+      {/* ── Drug link toggle (Phase 1.4) ──
+          PHASE 1.4 (2026-06-22): replaced the labeled button + explanatory
+          subtext span with an icon-only toggle (Decision 1's anti-label-
+          clutter rule — "icon-only, no text button, consistent with the
+          rest of this doc's anti-label-clutter rule"). The Link/Unlink
+          icon communicates state; aria-label provides accessibility. */}
+      <button
+        type="button"
+        onClick={() => patch({ drug_link_enabled: !showLink })}
+        aria-label={showLink ? 'Drug link on — tap to disable' : 'Drug link off — tap to enable'}
+        title={showLink ? 'Drug link: ON — name taps navigate to Drug Detail' : 'Drug link: OFF — name shown as plain text'}
+        style={{
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          width:           28,
+          height:          28,
+          borderRadius:    'var(--radius-md)',
+          border:          `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
+          backgroundColor: showLink ? '#EFF6FF' : 'transparent',
+          color:           showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+          cursor:          'pointer',
+          padding:         0,
+          flexShrink:      0,
+        }}
+      >
+        {showLink ? <Link size={13} /> : <Unlink size={13} />}
+      </button>
 
       {/* ── Alternatives (§2.2a) ── */}
       {hasAlt && (
