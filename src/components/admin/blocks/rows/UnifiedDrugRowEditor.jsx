@@ -499,13 +499,21 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       } else {
         const formulationSlugBase = `${genericName}-${concentration}-${alt.form}`
           .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        // Seed doses_structured from whatever dose is already typed on this
+        // row, but only here — this is the one moment the formulation is
+        // being created for the first time, so there's no existing library
+        // dose to protect. Once linked, editing `dose` never writes back
+        // (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE `dose` doc).
+        const initialDose = alt.dose?.trim()
         const { data: newFormulation, error: fErr } = await insertFormulation({
           generic_id: genericId,
           slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
           form: alt.form,
           route: promoteRoute,
-          doses_structured: [],
+          doses_structured: initialDose
+            ? [{ who: alt.dose_who ?? null, instruction: initialDose, max_dose: null }]
+            : [],
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
@@ -1030,13 +1038,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       } else {
         const formulationSlugBase = `${genericName}-${concentration}-${row.form}`
           .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        // Seed doses_structured from whatever dose is already typed on this
+        // row, but only here — this is the one moment the formulation is
+        // being created for the first time, so there's no existing library
+        // dose to protect. Once linked, editing `dose` never writes back
+        // (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE `dose` doc).
+        const initialDose = row.dose?.trim()
         const { data: newFormulation, error: fErr } = await insertFormulation({
           generic_id: genericId,
           slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
           form: row.form,
           route: promoteRoute,
-          doses_structured: [],
+          doses_structured: initialDose
+            ? [{ who: row.dose_who ?? null, instruction: initialDose, max_dose: null }]
+            : [],
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
