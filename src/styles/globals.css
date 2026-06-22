@@ -96,12 +96,11 @@
      section card variable (--color-section-bg, added in Phase 5). */
   --color-note-bg:          #F5F4F1;
 
-  /* Dose text — Phase 9 redesign: reused from the .dir-card-dose teal
-     family so the prescription sheet's dose line shares the same
-     semantic "this is dosing info" color as directive dose cards
-     elsewhere in the app, instead of plain text-primary black (which
-     made it too visually similar to the drug name above it). */
-  --color-dose:             #0F766E;
+  /* Dose text — Phase 9 redesign, refined to slate/ink (option A from
+     color review): cool near-black neutral, distinct in weight/tone from
+     plain text-primary without reading as a status color (teal/green read
+     as "success/done", which dosing info is not). */
+  --color-dose:             #2C2C2A;
 
   /* Section card — Phase 5 redesign: tinted background card wrapping a
      section's label and its nested drug rows. Deliberately a different
@@ -160,10 +159,9 @@
      clearly visible but not bright or alert-colored. */
   --color-note-bg:          #262D3A;
 
-  /* Dose text — dark mode: matches .dir-card-dose's dark-mode teal so
-     dosing info stays consistent with the same semantic color in both
-     themes. */
-  --color-dose:             #2DD4BF;
+  /* Dose text — dark mode: light slate, mirrors the light-mode near-black
+     ink at the equivalent gray-ramp stop. */
+  --color-dose:             #D3D1C7;
 
   /* Section card — dark mode: deep violet, kept distinct in hue from the
      note card's slate-grey above (same pairing logic as light mode). */

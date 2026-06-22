@@ -519,11 +519,15 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
 /**
  * DoseLine — no adult/child tag.
  * PHASE 9 (2026-06-22): color changed from plain text-primary (black) to
- * --color-dose (teal, shared with .dir-card-dose elsewhere in the app) and
- * size dropped from 15px to 14px. Previously the dose line was nearly
- * indistinguishable from the drug name at a glance (15px/600 black vs.
- * 17px/700 black) — the color shift now makes it scannable as "this is the
- * dose" on its own, rather than just a second bold black line.
+ * --color-dose, and size dropped from 15px to 14px. Previously the dose
+ * line was nearly indistinguishable from the drug name at a glance
+ * (15px/600 black vs. 17px/700 black) — the color/size shift now makes it
+ * scannable as "this is the dose" on its own.
+ * --color-dose was initially set to a teal (reused from .dir-card-dose)
+ * but that read as a status/success color, out of place in a plain
+ * drug-row context. Replaced with a cool slate/ink tone — distinct in
+ * shade from text-primary without carrying any semantic (success/warning)
+ * connotation.
  * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (17px).
  */
 function DoseLine({ text }) {
