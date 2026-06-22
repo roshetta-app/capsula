@@ -31,6 +31,37 @@
  *     letting the admin pick a different result (re-link) or type free
  *     text (unlink to manual entry) — LOCKED, see Decision 1.
  *
+ * Free-text commit flow (BUG FIX, 2026-06-23):
+ *   For unlinked/free-text rows the previous implementation had no
+ *   "commit" moment: the admin typed a name but the field stayed open
+ *   indefinitely in live-search state, giving no signal that the name
+ *   had been accepted and that the dose/note/generic fields below were
+ *   ready to fill.
+ *
+ *   Fix: a third display state — "committed free-text" — sits between
+ *   the open-search state (default for a new, nameless row) and the
+ *   linked read-only state (only reached when a library result is
+ *   selected). In the committed state the typed name is shown inline
+ *   (pill icon + name text + pencil to re-open), matching the linked
+ *   display's layout but WITHOUT the link-chain glyph, so the admin
+ *   can tell at a glance that this name is free-typed (unlinked) while
+ *   still getting the visual cue that the name is set and the fields
+ *   below are live.
+ *
+ *   Commit triggers (for unlinked rows only):
+ *     • Enter key in the search input (when query is non-empty)
+ *     • Clicking the "Use '[name]' as drug name →" trailing item that
+ *       appears at the bottom of the dropdown (always present when the
+ *       dropdown is open, so the admin always has an explicit path even
+ *       when library results are shown alongside)
+ *     • Clicking outside the field while query is non-empty (onBlur
+ *       commit — auto-commits on focus-leave so the admin doesn't have
+ *       to do anything extra if they tab to the next field)
+ *
+ *   Uncommit (re-open search): clicking the pencil icon in committed
+ *   state re-opens the search field pre-filled with the current name,
+ *   so the admin can refine the text or pick a library result.
+ *
  * Props:
  *   value         string                — current display name (linked
  *                                          name, or free-typed text)
@@ -74,6 +105,9 @@
  *   glyph remains as the linked-indicator icon (Decision 1: "a linked
  *   drug name shows a tiny icon only"). Layout: [pill] [name] [link
  *   glyph] [change button].
+ *
+ * BUG FIX (2026-06-23):
+ *   Added free-text commit state. See "Free-text commit flow" above.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -186,12 +220,22 @@ export default function DrugSearchField({
   mode = 'formulation',
   placeholder = 'Search or type a drug name…',
 }) {
-  // When linked, the field shows read-only display by default; "change"
-  // re-opens it into the live search state below.
-  const [editing, setEditing] = useState(!isLinked)
-  const [query, setQuery] = useState(isLinked ? '' : value)
+  // Three display states for this field:
+  //   editing   = true,  committed = false → open search input (new/nameless rows, or
+  //                                          after clicking pencil to change)
+  //   editing   = false, committed = true  → committed free-text display (name set,
+  //                                          not linked — no chain glyph)
+  //   isLinked  = true,  editing   = false → library-linked read-only display (chain glyph)
+  //
+  // A row starts in editing state. Once the admin types a name and commits
+  // (Enter / blur / "Use as name" click), it moves to committed state so the
+  // fields below become obviously accessible. Clicking the pencil in committed
+  // state re-opens the search input pre-filled with the current name.
+  const [editing, setEditing]     = useState(!isLinked && !value)
+  const [committed, setCommitted] = useState(!isLinked && !!value)
+  const [query, setQuery]         = useState(isLinked ? '' : (value || ''))
   const [suggestions, setSuggestions] = useState([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading]     = useState(false)
   const inputRef = useRef(null)
 
   // Keep local query in sync if the row's value changes from outside
@@ -234,6 +278,7 @@ export default function DrugSearchField({
   function handleSelect(suggestion) {
     setSuggestions([])
     setEditing(false)
+    setCommitted(false) // linked state supersedes committed
     setQuery('')
     onLink?.(suggestion._raw)
   }
@@ -242,8 +287,52 @@ export default function DrugSearchField({
     setSuggestions([])
   }
 
+  // ── Commit the current query as a free-text drug name ──────────────────
+  // Called on Enter key, blur (when query is non-empty), or "Use as name"
+  // click. Transitions from editing → committed state.
+  function commitFreeText() {
+    const name = query.trim()
+    if (!name) return
+    setSuggestions([])
+    setEditing(false)
+    setCommitted(true)
+    // Ensure the parent row has the final trimmed name.
+    onChangeText?.(name)
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commitFreeText()
+    }
+    if (e.key === 'Escape') {
+      setSuggestions([])
+    }
+  }
+
+  function handleBlur() {
+    // Auto-commit on focus-leave if a name has been typed, so tabbing
+    // to the next field below works naturally without requiring an
+    // explicit Enter press.
+    if (query.trim()) {
+      commitFreeText()
+    }
+  }
+
+  // ── Re-open search from committed free-text state ─────────────────────
+  // Pre-fills the query with the current name so the admin can refine
+  // or pick a library result without re-typing from scratch.
+  function handleEditCommitted() {
+    setCommitted(false)
+    setEditing(true)
+    setQuery(value || '')
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
+
+  // ── Re-open search from linked state (existing behavior) ──────────────
   function handleStartChange() {
     setEditing(true)
+    setCommitted(false)
     setQuery('')
     onUnlink?.()
     setTimeout(() => inputRef.current?.focus(), 0)
@@ -300,6 +389,55 @@ export default function DrugSearchField({
     )
   }
 
+  // ── Committed free-text state (BUG FIX) ───────────────────────────────
+  // Name has been typed and confirmed by the admin (Enter / blur / "Use
+  // as name" click). Visually similar to the linked state but without the
+  // Link2 chain glyph — so the admin can distinguish unlinked (no chain)
+  // from library-linked (chain glyph). Clicking pencil re-opens search.
+  if (!isLinked && committed && value) {
+    return (
+      <div style={{
+        display:    'flex',
+        alignItems: 'center',
+        gap:        6,
+      }}>
+        {/* Pill icon — matches linked display layout */}
+        <Icon
+          faIcon={faPills}
+          size={13}
+          color="var(--color-text-tertiary)"
+        />
+        <span style={{
+          flex:       1,
+          fontSize:   15,
+          fontWeight: 600,
+          color:      'var(--color-text-primary)',
+        }}>
+          {value}
+        </span>
+        {/* No Link2 glyph — absence is the "not linked" signal */}
+        {/* Edit button — re-opens search pre-filled with current name */}
+        <button
+          type="button"
+          onClick={handleEditCommitted}
+          aria-label="Edit drug name"
+          style={{
+            display:    'flex',
+            alignItems: 'center',
+            background: 'none',
+            border:     'none',
+            padding:    4,
+            cursor:     'pointer',
+            color:      'var(--color-text-tertiary)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <Icon name="Pencil" size={13} />
+        </button>
+      </div>
+    )
+  }
+
   // ── Live search / free-text state ─────────────────────────────────────
   return (
     <div style={{ position: 'relative' }}>
@@ -320,6 +458,8 @@ export default function DrugSearchField({
           type="text"
           value={query}
           onChange={e => handleTextChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleBlur}
           placeholder={placeholder}
           style={{
             width:           '100%',
@@ -335,7 +475,6 @@ export default function DrugSearchField({
             outline:         'none',
           }}
           onFocus={e => e.target.style.borderColor = 'var(--color-accent)'}
-          onBlur={e  => e.target.style.borderColor  = 'var(--color-border)'}
         />
         {query && (
           <button
@@ -373,10 +512,12 @@ export default function DrugSearchField({
         </div>
       )}
 
-      {!loading && suggestions.length > 0 && (
+      {!loading && (suggestions.length > 0 || query.trim().length >= 2) && (
         <AutocompleteDropdownInline
           suggestions={suggestions}
+          freeTextName={query.trim()}
           onSelect={handleSelect}
+          onCommitFreeText={commitFreeText}
           onDismiss={handleDismissDropdown}
         />
       )}
@@ -393,8 +534,14 @@ export default function DrugSearchField({
 // component's local style scale — avoids visually oversized dropdowns on
 // every row while keeping the exact same interaction pattern (LOCKED —
 // search mechanics: matches the existing pattern, not a new one).
+//
+// BUG FIX (2026-06-23): Added freeTextName + onCommitFreeText props.
+// When freeTextName is non-empty, a trailing "Use '[name]' as drug name →"
+// item is always appended below any library results (or shown alone when
+// there are no results), giving the admin an explicit click target to
+// commit a free-text name without pressing Enter.
 
-function AutocompleteDropdownInline({ suggestions, onSelect, onDismiss }) {
+function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCommitFreeText, onDismiss }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -410,6 +557,10 @@ function AutocompleteDropdownInline({ suggestions, onSelect, onDismiss }) {
       document.removeEventListener('touchstart', handle)
     }
   }, [onDismiss])
+
+  // Only show the dropdown if there are library results OR a committable name.
+  const showFreeTextRow = !!freeTextName
+  if (suggestions.length === 0 && !showFreeTextRow) return null
 
   return (
     <div
@@ -433,7 +584,11 @@ function AutocompleteDropdownInline({ suggestions, onSelect, onDismiss }) {
         <button
           key={s.id}
           role="option"
-          onClick={() => onSelect(s)}
+          // Use mouseDown (not onClick) so this fires before the input's
+          // onBlur → commitFreeText. Without this, blur fires first and
+          // commits a free-text name right before the library pick lands,
+          // causing a brief double-update.
+          onMouseDown={e => { e.preventDefault(); onSelect(s) }}
           style={{
             width:       '100%',
             display:     'flex',
@@ -455,6 +610,39 @@ function AutocompleteDropdownInline({ suggestions, onSelect, onDismiss }) {
           {s.name}
         </button>
       ))}
+
+      {/* ── "Use as drug name" free-text commit row ────────────────────
+          Always shown when the admin has typed something, whether or not
+          library results exist. Clicking this commits the typed name and
+          transitions to the committed free-text display state, making
+          the dose/note/generic fields below immediately accessible.    */}
+      {showFreeTextRow && (
+        <button
+          role="option"
+          onMouseDown={e => { e.preventDefault(); onCommitFreeText() }}
+          style={{
+            width:       '100%',
+            display:     'flex',
+            alignItems:  'center',
+            gap:         6,
+            padding:     '8px 12px',
+            background:  'none',
+            border:      'none',
+            borderTop:   suggestions.length > 0 ? '1px solid var(--color-border)' : 'none',
+            cursor:      'pointer',
+            fontFamily:  'var(--font-body)',
+            fontSize:    12,
+            color:       'var(--color-text-secondary)',
+            textAlign:   'left',
+            fontStyle:   'italic',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--color-bg)'}
+          onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+        >
+          Use &ldquo;{freeTextName}&rdquo; as drug name →
+        </button>
+      )}
     </div>
   )
 }
