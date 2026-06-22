@@ -1,6 +1,3 @@
-`src\components\admin\blocks\rows\UnifiedDrugRowEditor.jsx`:
-
-```jsx
 /**
  * src/components/admin/blocks/rows/UnifiedDrugRowEditor.jsx
  *
