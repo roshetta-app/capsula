@@ -290,14 +290,35 @@ export default function DrugSearchField({
   // ── Commit the current query as a free-text drug name ──────────────────
   // Called on Enter key, blur (when query is non-empty), or "Use as name"
   // click. Transitions from editing → committed state.
+  //
+  // BUG FIX (2026-06-23): onUnlink moved here from handleStartChange. A
+  // previously-linked row's library-snapshot fields (formulation_id,
+  // concentration, etc.) must only be cleared once the admin actually
+  // commits a real change — not the instant they click the pencil — so
+  // that backing out (clicking away with nothing typed) leaves the row
+  // exactly as it was. If this row was linked, clear those fields now,
+  // immediately before writing the new free-text name.
   function commitFreeText() {
     const name = query.trim()
     if (!name) return
     setSuggestions([])
     setEditing(false)
     setCommitted(true)
+    if (isLinked) onUnlink?.()
     // Ensure the parent row has the final trimmed name.
     onChangeText?.(name)
+  }
+
+  // ── Cancel out of the search/editing state without changing anything ──
+  // Fired on Escape, or on blur when nothing has been typed (query is
+  // empty). Simply closes the editing state — since nothing has been
+  // written to the row yet (see commitFreeText/handleSelect above), the
+  // component falls straight back to whichever display (linked or
+  // committed free-text) reflects the row's untouched, original data.
+  function cancelEditing() {
+    setSuggestions([])
+    setEditing(false)
+    setQuery('')
   }
 
   function handleKeyDown(e) {
@@ -306,16 +327,20 @@ export default function DrugSearchField({
       commitFreeText()
     }
     if (e.key === 'Escape') {
-      setSuggestions([])
+      cancelEditing()
     }
   }
 
   function handleBlur() {
     // Auto-commit on focus-leave if a name has been typed, so tabbing
     // to the next field below works naturally without requiring an
-    // explicit Enter press.
+    // explicit Enter press. If nothing was typed, this is a "changed my
+    // mind" cancel — revert to the previous display instead of leaving
+    // the search box open indefinitely.
     if (query.trim()) {
       commitFreeText()
+    } else {
+      cancelEditing()
     }
   }
 
@@ -329,12 +354,18 @@ export default function DrugSearchField({
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
-  // ── Re-open search from linked state (existing behavior) ──────────────
+  // ── Re-open search from linked state ───────────────────────────────────
+  // BUG FIX (2026-06-23): no longer calls onUnlink here. Clicking the
+  // pencil only opens the search field for browsing/typing — the row's
+  // existing link is left completely intact until the admin actually
+  // commits a change (picks a new result, or types and commits free
+  // text). This makes "click the pencil, then change my mind and click
+  // elsewhere" a true no-op, instead of having already wiped the link
+  // the moment the pencil was clicked.
   function handleStartChange() {
     setEditing(true)
     setCommitted(false)
     setQuery('')
-    onUnlink?.()
     setTimeout(() => inputRef.current?.focus(), 0)
   }
 
@@ -646,3 +677,4 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
