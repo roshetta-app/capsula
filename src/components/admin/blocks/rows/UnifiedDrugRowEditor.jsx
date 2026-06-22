@@ -683,6 +683,9 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
       <DrugSearchField
         value={displayName}
         isLinked={isLinked}
+        concentration={alt.concentration}
+        form={alt.form}
+        nameAr={alt.name_ar}
         mode="brand"
         onChangeText={handleChangeText}
         onLink={handleBrandPick}
@@ -728,21 +731,24 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
               </select>
             </div>
           </div>
+
+          {/* Arabic name — manual entry only for free-text/unlinked rows.
+              Once linked, this comes from the library and is shown
+              read-only inside DrugSearchField's summary line above
+              instead of as a separate editable field (BUG FIX 2026-06-23). */}
+          <div>
+            <FieldLabel hint="optional">Arabic name</FieldLabel>
+            <input
+              type="text"
+              value={alt.name_ar ?? ''}
+              onChange={e => patch({ name_ar: e.target.value || null })}
+              placeholder="الاسم بالعربي"
+              dir="rtl"
+              style={textInput({ textAlign: 'right' })}
+            />
+          </div>
         </>
       )}
-
-      {/* Arabic name — auto-filled from library pick, always editable */}
-      <div>
-        <FieldLabel hint="optional — auto-filled from library">Arabic name</FieldLabel>
-        <input
-          type="text"
-          value={alt.name_ar ?? ''}
-          onChange={e => patch({ name_ar: e.target.value || null })}
-          placeholder="الاسم بالعربي"
-          dir="rtl"
-          style={textInput({ textAlign: 'right' })}
-        />
-      </div>
 
       {/* ── Save to library (Phase 6) — free-text mode only, parity with the main row ── */}
       {!isLinked && (
@@ -1264,6 +1270,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       <DrugSearchField
         value={displayName}
         isLinked={isLinked}
+        concentration={row.concentration}
+        form={row.form}
+        nameAr={row.name_ar}
         mode="brand"
         onChangeText={handleChangeText}
         onLink={handleBrandPick}
@@ -1312,21 +1321,24 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               </select>
             </div>
           </div>
+
+          {/* Arabic name — manual entry only for free-text/unlinked rows.
+              Once linked, this comes from the library and is shown
+              read-only inside DrugSearchField's summary line above
+              instead of as a separate editable field (BUG FIX 2026-06-23). */}
+          <div>
+            <FieldLabel hint="optional">Arabic name</FieldLabel>
+            <input
+              type="text"
+              value={row.name_ar ?? ''}
+              onChange={e => patch({ name_ar: e.target.value || null })}
+              placeholder="الاسم بالعربي"
+              dir="rtl"
+              style={textInput({ textAlign: 'right' })}
+            />
+          </div>
         </>
       )}
-
-      {/* ── Arabic name — auto-filled from library pick, always editable ── */}
-      <div>
-        <FieldLabel hint="optional — auto-filled from library">Arabic name</FieldLabel>
-        <input
-          type="text"
-          value={row.name_ar ?? ''}
-          onChange={e => patch({ name_ar: e.target.value || null })}
-          placeholder="الاسم بالعربي"
-          dir="rtl"
-          style={textInput({ textAlign: 'right' })}
-        />
-      </div>
 
       {/* ── Save to library (§2.5) — free-text mode only ── */}
       {!isLinked && (

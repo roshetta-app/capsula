@@ -211,9 +211,23 @@ function toSuggestion(result, mode) {
   return { id: result.id, name: brandNames ? `${label} (${brandNames})` : label, _raw: result }
 }
 
+// ─── Linked read-only summary label ────────────────────────────────────────
+// BUG FIX (2026-06-23): the linked display previously showed only the drug
+// name. Concentration/form/Arabic name are library data once a row is
+// linked — read-only, not separately editable fields — so they're folded
+// into this one summary line instead of a standalone Arabic name input
+// sitting elsewhere on the row. Format: "Name — concentration, form — name_ar".
+function buildLinkedSummary(name, concentration, form, nameAr) {
+  const concForm = [concentration, form].filter(Boolean).join(', ')
+  return [name, concForm, nameAr].filter(Boolean).join(' — ')
+}
+
 export default function DrugSearchField({
   value = '',
   isLinked = false,
+  concentration = null,
+  form = null,
+  nameAr = null,
   onChangeText,
   onLink,
   onUnlink,
@@ -388,13 +402,13 @@ export default function DrugSearchField({
           size={13}
           color="var(--color-text-tertiary)"
         />
-        <span style={{
+        <span dir="auto" style={{
           flex:       1,
           fontSize:   15,
           fontWeight: 600,
           color:      'var(--color-text-primary)',
         }}>
-          {value}
+          {buildLinkedSummary(value, concentration, form, nameAr)}
         </span>
         {/* Link2 glyph — linked indicator (Decision 1: icon-only, no text) */}
         <Icon name="Link2" size={13} color="var(--color-text-tertiary)" />
@@ -677,4 +691,5 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
 
