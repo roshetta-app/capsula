@@ -682,6 +682,47 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         placeholder="Search or type a drug name…"
       />
 
+      {/* ── Manual drug fields — shown only when not linked to library ── */}
+      {!isLinked && (
+        <>
+          <div>
+            <FieldLabel>Generic name</FieldLabel>
+            <input
+              type="text"
+              value={alt.generic_name ?? ''}
+              onChange={e => patch({ generic_name: e.target.value || null })}
+              placeholder="Generic name (e.g. Amoxicillin)"
+              style={textInput()}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <FieldLabel>Concentration</FieldLabel>
+              <input
+                type="text"
+                value={alt.concentration ?? ''}
+                onChange={e => patch({ concentration: e.target.value || null })}
+                placeholder="e.g. 500mg"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel>Form</FieldLabel>
+              <select
+                value={alt.form ?? ''}
+                onChange={e => patch({ form: e.target.value || null })}
+                style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+              >
+                <option value="">— select form —</option>
+                {DRUG_FORMS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Arabic name — auto-filled from library pick, always editable */}
       <div>
         <FieldLabel hint="optional — auto-filled from library">Arabic name</FieldLabel>
@@ -1213,6 +1254,50 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         onUnlink={handleUnlink}
         placeholder="Search or type a drug name…"
       />
+
+      {/* ── Manual drug fields — shown only when not linked to library ──
+          When linked, library fills these silently. When unlinked/free-text,
+          the admin must be able to fill them manually (required for
+          "Save to library" and for complete drug data). */}
+      {!isLinked && (
+        <>
+          <div>
+            <FieldLabel>Generic name</FieldLabel>
+            <input
+              type="text"
+              value={row.generic_name ?? ''}
+              onChange={e => patch({ generic_name: e.target.value || null })}
+              placeholder="Generic name (e.g. Amoxicillin)"
+              style={textInput()}
+            />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <FieldLabel>Concentration</FieldLabel>
+              <input
+                type="text"
+                value={row.concentration ?? ''}
+                onChange={e => patch({ concentration: e.target.value || null })}
+                placeholder="e.g. 500mg"
+                style={textInput()}
+              />
+            </div>
+            <div>
+              <FieldLabel>Form</FieldLabel>
+              <select
+                value={row.form ?? ''}
+                onChange={e => patch({ form: e.target.value || null })}
+                style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+              >
+                <option value="">— select form —</option>
+                {DRUG_FORMS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Arabic name — auto-filled from library pick, always editable ── */}
       <div>
