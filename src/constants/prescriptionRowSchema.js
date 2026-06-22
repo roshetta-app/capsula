@@ -391,3 +391,283 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     alternatives: remaining,
   };
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+ * PHASE 0 (2026-06-22) — flat grouped drug-options shape.
+ *
+ * Admin Condition Editor Redesign, Decision 5: the editor UI must stop
+ * expressing a main/alternative hierarchy. All drug options on one
+ * prescription line become equal, flat entries; one or more of them can
+ * share a single dose/note by belonging to the same `group_id`.
+ *
+ * This section is purely additive — DRUG_ROW_TEMPLATE and
+ * ALTERNATIVE_DRUG_TEMPLATE above are UNCHANGED, and existing
+ * `main` + `alternatives[]` data keeps working as-is. Nothing here is
+ * wired into any row UI yet (that starts in Phase 1/2). What this adds:
+ *
+ *   1. DRUG_OPTION_TEMPLATE — the new flat per-option shape used once a
+ *      row is rendered as a list of options-in-groups.
+ *   2. toDrugOptions(row)   — deterministic, lossless mapping from an
+ *      existing DrugRow (main + alternatives[]) into a flat
+ *      DrugOptionGroup[] with group_id assigned, per the Phase 2.8
+ *      migration rule (kept here, not just in the UI, so app code and
+ *      CMS code share one implementation and can't drift).
+ *   3. fromDrugOptions(row, groups) — the inverse: folds flat
+ *      DrugOptionGroup[] back onto a DrugRow's main fields +
+ *      alternatives[], so existing save/load code paths through
+ *      DRUG_ROW_TEMPLATE keep working unchanged while the UI itself
+ *      operates on the flat shape.
+ *
+ * No schema/table change. condition_blocks.data keeps storing rows in
+ * the existing DRUG_ROW_TEMPLATE shape; group_id is a derived/UI-layer
+ * concept layered on top via these two pure functions, not a new
+ * persisted column. Whether group_id should eventually be persisted
+ * directly (instead of re-derived on every load via toDrugOptions) is a
+ * Phase 2.8 implementation choice once the admin's "move to group"
+ * action needs to override the derived default — not a Phase 0 decision.
+ * ──────────────────────────────────────────────────────────────────── */
+
+/**
+ * One flat drug option inside a grouped drug-options block (Decision 5).
+ * Same identity/library fields as AlternativeDrug — this does not
+ * introduce a new way to represent "which drug" beyond what already
+ * exists, only a new way to group options for shared dose/note display.
+ *
+ * @typedef {Object} DrugOption
+ * @property {string} id                     - uuid, stable per option across
+ *                                              re-renders/re-grouping (needed
+ *                                              so the move-to-group action in
+ *                                              Phase 2 can target a specific
+ *                                              option without relying on
+ *                                              array index).
+ * @property {string} group_id               - uuid. Options sharing a
+ *                                              group_id share one dose field
+ *                                              and one note field (Decision 5).
+ *                                              Never null/undefined — every
+ *                                              option belongs to exactly one
+ *                                              group, even a group of one.
+ * @property {string|null} brand_name
+ * @property {string|null} brand_id
+ * @property {string|null} generic_name
+ * @property {string|null} generic_id
+ * @property {string|null} name_ar
+ * @property {string|null} formulation_id
+ * @property {string|null} concentration
+ * @property {string|null} form
+ * @property {string|null} route
+ * @property {string|null} category
+ * @property {'manual_entry'|null} source_flag
+ * @property {boolean} drug_link_enabled     - per-drug link toggle (Decision 1;
+ *                                              also the locked app-side rule in
+ *                                              the App-Side Rendering Impact
+ *                                              section — link is per-drug, not
+ *                                              per-main, once groups are flat).
+ *
+ * Dose/note are intentionally NOT fields on DrugOption — they live once per
+ * GROUP (see DrugOptionGroup below), not once per option, matching Decision 5
+ * ("a group is a set of one or more drug names that share one dose field and
+ * one note field").
+ */
+export const DRUG_OPTION_TEMPLATE = {
+  id: null,
+  group_id: null,
+  brand_name: null,
+  brand_id: null,
+  generic_name: null,
+  generic_id: null,
+  name_ar: null,
+  formulation_id: null,
+  concentration: null,
+  form: null,
+  route: null,
+  category: null,
+  source_flag: null,
+  drug_link_enabled: true,
+};
+
+/**
+ * A group of one or more DrugOptions sharing one dose + one note
+ * (Decision 5). This is the shape the Phase 2 UI iterates over to render
+ * "vertical stack of names, one dose line, one collapsible note" per group.
+ *
+ * @typedef {Object} DrugOptionGroup
+ * @property {string} group_id
+ * @property {DrugOption[]} options   - display order within the group
+ * @property {string|null} dose
+ * @property {string|null} dose_who
+ * @property {string|null} note
+ */
+
+/**
+ * Deterministic, lossless mapping from a DrugRow's existing main +
+ * alternatives[] fields into a flat array of DrugOptionGroup.
+ *
+ * Migration rule (LOCKED, Phase 2.8 — implemented here so both the CMS
+ * and any future app-side read share one source of truth):
+ *   - The main drug always starts its own group.
+ *   - Each alternative whose formulation_id matches the main drug's
+ *     formulation_id (alternativeSharesParentDose() — reused, not
+ *     reimplemented) joins the main drug's group, preserving today's
+ *     dose-sharing display exactly as-is.
+ *   - Any alternative whose formulation_id differs, or is null
+ *     (free-text/manual alternatives), becomes its OWN separate group,
+ *     carrying its own dose/note over unchanged.
+ *   - No admin action is required; this runs on read for legacy rows
+ *     that have no explicit group_id yet.
+ *
+ * This function does not mutate `row`.
+ *
+ * @param {DrugRow} row
+ * @returns {DrugOptionGroup[]}
+ */
+export function toDrugOptions(row) {
+  const mainOption = {
+    ...DRUG_OPTION_TEMPLATE,
+    id: row.id,
+    group_id: row.id, // main always seeds its own group id
+    brand_name: row.brand_name,
+    brand_id: row.brand_id,
+    generic_name: row.generic_name,
+    generic_id: row.generic_id,
+    name_ar: row.name_ar,
+    formulation_id: row.formulation_id,
+    concentration: row.concentration,
+    form: row.form,
+    route: row.route,
+    category: row.category,
+    source_flag: row.source_flag,
+    drug_link_enabled: row.drug_link_enabled !== false,
+  };
+
+  const mainGroup = {
+    group_id: mainOption.group_id,
+    options: [mainOption],
+    dose: row.dose,
+    dose_who: row.dose_who,
+    note: row.note,
+  };
+
+  const groups = [mainGroup];
+
+  (row.alternatives ?? []).forEach((alt, index) => {
+    const sharesMainDose = alternativeSharesParentDose(row, alt);
+
+    const option = {
+      ...DRUG_OPTION_TEMPLATE,
+      // Alternatives have no id of their own in the legacy shape — derive
+      // a stable one from the main row's id + position so re-renders don't
+      // thrash; a real client-generated uuid is assigned once this option
+      // is actually edited/moved (Phase 2 concern, not Phase 0).
+      id: `${row.id}-alt-${index}`,
+      group_id: sharesMainDose ? mainGroup.group_id : `${row.id}-alt-group-${index}`,
+      brand_name: alt.brand_name,
+      brand_id: alt.brand_id,
+      generic_name: alt.generic_name,
+      generic_id: alt.generic_id,
+      name_ar: alt.name_ar,
+      formulation_id: alt.formulation_id,
+      concentration: alt.concentration,
+      form: alt.form,
+      route: alt.route,
+      category: alt.category,
+      source_flag: alt.source_flag,
+      drug_link_enabled: alt.drug_link_enabled !== false,
+    };
+
+    if (sharesMainDose) {
+      mainGroup.options.push(option);
+    } else {
+      groups.push({
+        group_id: option.group_id,
+        options: [option],
+        dose: alt.dose,
+        dose_who: alt.dose_who,
+        note: alt.note,
+      });
+    }
+  });
+
+  return groups;
+}
+
+/**
+ * Inverse of toDrugOptions(): folds a flat DrugOptionGroup[] back onto a
+ * DrugRow's existing main-field + alternatives[] shape, so existing
+ * save/load code paths that read/write DRUG_ROW_TEMPLATE fields keep
+ * working unchanged while the UI itself operates on the flat shape.
+ *
+ * Convention (per Decision 5's storage note): the first option of the
+ * first group becomes the row's "main" fields; every other option across
+ * every group becomes an entry in `alternatives[]`. An alternative that
+ * shares its group with the main option has its dose/note set to null on
+ * the way out (meaning "shared with parent" — read back correctly by
+ * alternativeSharesParentDose() as long as formulation_id also matches).
+ * An alternative in any other group carries that group's own dose/note.
+ *
+ * NOTE: if an admin explicitly groups two options together that do NOT
+ * share a formulation_id (a real possibility once Phase 2's manual
+ * "move to group" action exists), this cannot be round-tripped through
+ * formulation_id-based grouping alone — alternativeSharesParentDose()
+ * would recompute "false" on next load even though the admin grouped
+ * them on purpose. Flagging for Phase 2.8 rather than solving here:
+ * Phase 0 only needs the default/derived case (toDrugOptions) to be
+ * correct, since no UI can produce that edge case yet.
+ *
+ * @param {DrugRow} row               - existing row, used only for its
+ *                                       non-drug-option fields (row_type, id)
+ * @param {DrugOptionGroup[]} groups
+ * @returns {DrugRow}
+ */
+export function fromDrugOptions(row, groups) {
+  const flattened = groups.flatMap(g =>
+    g.options.map(opt => ({ option: opt, group: g }))
+  );
+
+  if (flattened.length === 0) {
+    return { ...DRUG_ROW_TEMPLATE, id: row.id };
+  }
+
+  const [{ option: mainOpt, group: mainGrp }, ...rest] = flattened;
+
+  const alternatives = rest.map(({ option: opt, group: grp }) => {
+    const sharesMainGroup = grp.group_id === mainGrp.group_id;
+    return {
+      ...ALTERNATIVE_DRUG_TEMPLATE,
+      brand_name: opt.brand_name,
+      brand_id: opt.brand_id,
+      generic_name: opt.generic_name,
+      generic_id: opt.generic_id,
+      name_ar: opt.name_ar,
+      formulation_id: opt.formulation_id,
+      concentration: opt.concentration,
+      form: opt.form,
+      route: opt.route,
+      category: opt.category,
+      source_flag: opt.source_flag,
+      dose: sharesMainGroup ? null : grp.dose,
+      dose_who: sharesMainGroup ? null : grp.dose_who,
+      note: sharesMainGroup ? null : grp.note,
+    };
+  });
+
+  return {
+    ...DRUG_ROW_TEMPLATE,
+    id: row.id,
+    brand_name: mainOpt.brand_name,
+    brand_id: mainOpt.brand_id,
+    generic_name: mainOpt.generic_name,
+    generic_id: mainOpt.generic_id,
+    name_ar: mainOpt.name_ar,
+    formulation_id: mainOpt.formulation_id,
+    concentration: mainOpt.concentration,
+    form: mainOpt.form,
+    route: mainOpt.route,
+    category: mainOpt.category,
+    dose: mainGrp.dose,
+    dose_who: mainGrp.dose_who,
+    note: mainGrp.note,
+    source_flag: mainOpt.source_flag,
+    drug_link_enabled: mainOpt.drug_link_enabled,
+    alternatives,
+  };
+}
