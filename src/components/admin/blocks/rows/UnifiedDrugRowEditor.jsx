@@ -1,3 +1,6 @@
+`src\components\admin\blocks\rows\UnifiedDrugRowEditor.jsx`:
+
+```jsx
 /**
  * src/components/admin/blocks/rows/UnifiedDrugRowEditor.jsx
  *
@@ -505,7 +508,7 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           concentration,
           form: alt.form,
           route: promoteRoute,
-          doses: [],
+          doses_structured: [],
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
@@ -1036,7 +1039,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           concentration,
           form: row.form,
           route: promoteRoute,
-          doses: [],
+          doses_structured: [],
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
@@ -1720,3 +1723,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
