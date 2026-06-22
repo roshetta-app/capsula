@@ -58,6 +58,31 @@
  *        parent row's. Promoting one alternative never touches the parent
  *        row or any other alternative on the same drug row.
  *
+ *   PHASE 1 (2026-06-22) — Admin Condition Editor Redesign, Decision 1:
+ *        1.1 The Brand Name / Generic Name / Concentration / Form fields,
+ *            their read-only-once-linked display block, and the
+ *            "Pick a brand…" / "Pick a formulation…" / "Pick brand (same
+ *            formulation)…" trigger buttons are REMOVED from both the main
+ *            row and AlternativeRow's identity entry. Replaced by a single
+ *            DrugSearchField per drug line (Phase 0.2 component).
+ *        1.2 Silent auto-fill of concentration/form/Arabic name/category on
+ *            library selection is preserved unchanged — handleBrandPick (main)
+ *            and AlternativeRow's own handleBrandPick are reused as-is for
+ *            DrugSearchField's onLink, since DrugSearchField's mode="brand"
+ *            onLink result is shaped identically to what DrugPickerModal
+ *            mode="brand" already produced. Only the entry point changed,
+ *            not the fill logic.
+ *        DrugPickerModal mode="formulation" and mode="brand-scoped" call
+ *        sites tied to *identity* entry are removed along with their now-dead
+ *        trigger buttons/state (handleFormulationPick / handleScopedBrandPick
+ *        and their modals). The "Add alternative" buttons at the bottom of
+ *        the main row (which add a brand-new alternative line) are a
+ *        separate, Phase 2-scoped concern and are left untouched here.
+ *        KNOWN GAP (flagged, not solved here): mode="brand" search cannot
+ *        find a formulation that has zero brands yet (pure generic, no
+ *        brand row). The old "Pick a formulation…" button could. No locked
+ *        decision covers this; flagging for the project owner.
+ *
  * Props:
  *   row        — DrugRow shape (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE)
  *   onChange   — (nextRow: DrugRow) => void
@@ -74,6 +99,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, Unlink, Plus, X, ChevronDown, Library } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
+import DrugSearchField from '../../DrugSearchField'
 import { supabase } from '../../../../lib/supabase'
 import { DRUG_FORMS, DRUG_ROUTES } from '../../../../config/forms'
 import { DRUG_CATEGORIES } from '../../../../config/categories'
@@ -377,16 +403,12 @@ async function fetchGenericSuggestions(query) {
 
 function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const sharesParentDose = alternativeSharesParentDose(parentRow, alt)
-  const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
-  const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
-  // Phase 3 (2026-06-20): scoped picker for "same formulation, different
-  // brand" — only ever offered/openable when the parent row is itself
-  // linked to a formulation. See handleScopedBrandPick below.
-  const [scopedBrandPickerOpen, setScopedBrandPickerOpen] = useState(false)
-  // Phase 3 (2026-06-20): holds the age-group choice step when a freshly
-  // picked formulation has more than one doses_structured row. Null when
-  // there's nothing to choose (chooser not shown).
-  const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
+  // PHASE 1 (2026-06-22): brandPickerOpen/formulationPickerOpen/
+  // scopedBrandPickerOpen and their trigger buttons + modals are removed —
+  // identity entry now goes through the single DrugSearchField below
+  // (Decision 1). handleBrandPick is kept and reused as DrugSearchField's
+  // onLink; handleFormulationPick/handleScopedBrandPick are removed as
+  // dead code along with the modals that called them.
 
   // Phase 6 (2026-06-21): "Save to library" parity with the main row.
   // Mirrors UnifiedDrugRowEditor's own promote state below, but scoped to
@@ -397,6 +419,11 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const [promoteRoute, setPromoteRoute]       = useState('')
   const [promoting, setPromoting]             = useState(false)
   const [promoteError, setPromoteError]       = useState(null)
+
+  // Phase 3 (2026-06-20): holds the age-group choice step when a freshly
+  // picked formulation has more than one doses_structured row. Null when
+  // there's nothing to choose (chooser not shown).
+  const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
 
   function patch(updates) {
     onChange({ ...alt, ...updates })
@@ -522,7 +549,10 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
     setPendingDoseChoice(null)
   }
 
-  // When a brand is picked for this alternative (brand mode)
+  // When a brand is picked for this alternative (brand mode). Reused
+  // unchanged as DrugSearchField's onLink (PHASE 1, Decision 1, step 1.2) —
+  // the auto-fill behavior this function implements does not change, only
+  // how it gets triggered.
   function handleBrandPick(brand) {
     const f       = brand.formulations
     const generic = f?.generics
@@ -558,69 +588,39 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
     }
   }
 
-  // When a brand is picked via the formulation-scoped picker (Phase 3,
-  // 2026-06-20) — "same formulation, different brand". The picker only
-  // ever returns brands already attached to parentRow.formulation_id, but
-  // formulation_id/concentration/form/route/category are still force-set
-  // from parentRow here (not from the picked brand's own nested
-  // formulation) as defense in depth, so this alternative's identity can
-  // never drift from the parent's even if the query result shape changes
-  // later. Always shares the parent's dose/note by construction — there is
-  // no dose resolution step, since formulation_id equality is guaranteed.
-  function handleScopedBrandPick(brand) {
+  // PHASE 1 (2026-06-22): explicit unlink — clears only the library-snapshot
+  // fields (ids + concentration/form/route/category/_formulationMeta), same
+  // convention as the main row's onUnlink below. brand_name/generic_name/
+  // name_ar are left as-is so the admin sees their previous text as a
+  // starting point if they back out of the "change" action without typing
+  // anything new.
+  function handleUnlink() {
     patch({
-      brand_name:      brand.name,
-      brand_id:        brand.id,
-      generic_name:    parentRow.generic_name,
-      generic_id:      parentRow.generic_id,
-      name_ar:         brand.name_ar ?? parentRow.name_ar ?? null,
-      formulation_id:  parentRow.formulation_id,
-      concentration:   parentRow.concentration,
-      form:            parentRow.form,
-      route:           parentRow.route,
-      category:        parentRow.category,
-      _formulationMeta: parentRow._formulationMeta,
+      brand_id: null,
+      generic_id: null,
+      formulation_id: null,
+      concentration: null,
+      form: null,
+      route: null,
+      category: null,
+      _formulationMeta: undefined,
     })
   }
 
-  // When a formulation is picked for this alternative (formulation mode)
-  function handleFormulationPick(formulation) {
-    const generic = formulation.generics
-    const baseFields = {
-      brand_name:      alt.brand_name,
-      brand_id:        null,
-      generic_name:    generic?.name_en ?? null,
-      generic_id:      generic?.id      ?? null,
-      name_ar:         generic?.name_ar ?? null,
-      formulation_id:  formulation.id,
-      concentration:   formulation.concentration ?? null,
-      form:            formulation.form ?? null,
-      route:           formulation.route ?? null,
-      category:        generic?.category ?? null,
-      _formulationMeta: {
-        name_en:       generic?.name_en ?? '',
-        concentration: formulation.concentration ?? '',
-        form:          formulation.form ?? '',
-        route:         formulation.route ?? '',
-      },
-    }
-    if (sharesParentDose) {
-      patch(baseFields)
-      return
-    }
-    const resolved = resolveDosePick(formulation.doses_structured)
-    if (resolved.needsChoice) {
-      patch(baseFields)
-      setPendingDoseChoice({ doseRows: resolved.doseRows })
-    } else {
-      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
-    }
+  // PHASE 1 (2026-06-22): free-text typing writes to brand_name, matching
+  // the pre-existing convention that brand_name is the primary display
+  // field for an unlinked row (generic_name is left untouched — typically
+  // null for a freshly free-typed alternative). Flagged as a Phase 1
+  // implementation choice, not an explicit locked decision in the plan doc.
+  function handleChangeText(text) {
+    patch({ brand_name: text || null, brand_id: null })
   }
 
   const isLinked = !!(alt.brand_id || alt.generic_id)
   // Phase 2: field read-only/editable lock is keyed specifically off formulation_id
   // (not brand_id/generic_id alone), per the locked decision in prescriptionRowSchema.js.
   const isFormulationLinked = !!alt.formulation_id
+  const displayName = alt.brand_name || alt.generic_name || ''
 
   return (
     <div style={{
@@ -639,63 +639,12 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           Or
         </span>
         {!isLinked && <NotInLibraryTag />}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-          {parentRow.formulation_id ? (
-            <button
-              type="button"
-              onClick={() => setScopedBrandPickerOpen(true)}
-              title="Only shows brands already under the parent drug's exact formulation — concentration, form, and dose stay locked to match"
-              style={{
-                padding: '3px 9px',
-                border: '1px solid var(--color-accent)',
-                borderRadius: 'var(--radius-md)',
-                background: '#EFF6FF',
-                color: 'var(--color-accent)',
-                fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              Pick brand (same formulation)…
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setBrandPickerOpen(true)}
-              style={{
-                padding: '3px 9px',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--color-surface)',
-                color: 'var(--color-text-secondary)',
-                fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              Pick a brand…
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setFormulationPickerOpen(true)}
-            title="Opens the full picker — use this for a genuinely different drug serving the same purpose"
-            style={{
-              padding: '3px 9px',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Pick a formulation…
-          </button>
-        </div>
         <button
           type="button"
           onClick={onRemove}
           title="Remove alternative"
           style={{
+            marginLeft: 'auto',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             width: 22, height: 22, flexShrink: 0,
             border: '1px solid var(--color-border)',
@@ -707,87 +656,19 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         </button>
       </div>
 
-      {isFormulationLinked ? (
-        <>
-          {/* Brand + concentration + form — one read-only line, sourced from the library */}
-          <ReadOnlyField label="Brand · concentration · form">
-            {[alt.brand_name, alt.concentration, alt.form].filter(Boolean).join(' · ')}
-          </ReadOnlyField>
-
-          {/* Generic — read-only line */}
-          <ReadOnlyField label="Generic">
-            {alt.generic_name}
-          </ReadOnlyField>
-
-          {/* Route + category — read-only line */}
-          <ReadOnlyField label="Route · category" hint="from the library">
-            {[labelFor(DRUG_ROUTES, alt.route), labelFor(DRUG_CATEGORIES, alt.category)].filter(Boolean).join(' · ')}
-          </ReadOnlyField>
-        </>
-      ) : (
-        <>
-          {/* Brand name — plain text (library linking done via pickers above) */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div>
-              <FieldLabel>Brand name</FieldLabel>
-              <input
-                type="text"
-                value={alt.brand_name ?? ''}
-                onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
-                placeholder="e.g. Adol"
-                style={textInput()}
-              />
-            </div>
-            <div>
-              <FieldLabel>Generic name</FieldLabel>
-              <AutocompleteInput
-                value={alt.generic_name ?? ''}
-                onChange={val => patch({ generic_name: val || null, generic_id: null })}
-                onSelect={g => patch({
-                  generic_name: g.name_en,
-                  generic_id: g.id,
-                  name_ar: alt.brand_name?.trim() ? alt.name_ar : (g.name_ar ?? null),
-                })}
-                placeholder="e.g. paracetamol"
-                fetchSuggestions={fetchGenericSuggestions}
-                renderSuggestion={g => (
-                  <span style={{ fontSize: 13 }}>
-                    <strong>{g.name_en}</strong>
-                    {g.name_ar && <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>}
-                  </span>
-                )}
-              />
-            </div>
-          </div>
-
-          {/* Concentration + Form */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <div>
-              <FieldLabel>Concentration</FieldLabel>
-              <input
-                type="text"
-                value={alt.concentration ?? ''}
-                onChange={e => patch({ concentration: e.target.value || null })}
-                placeholder="e.g. 500mg"
-                style={textInput()}
-              />
-            </div>
-            <div>
-              <FieldLabel>Form</FieldLabel>
-              <select
-                value={alt.form ?? ''}
-                onChange={e => patch({ form: e.target.value || null })}
-                style={{ ...textInput(), appearance: 'none' }}
-              >
-                <option value="">— select —</option>
-                {DRUG_FORMS.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </>
-      )}
+      {/* PHASE 1 (2026-06-22): single search field replaces the old
+          Brand Name / Generic Name / Concentration / Form fields, the
+          read-only triple ReadOnlyField block, and the three picker
+          buttons (Decision 1). */}
+      <DrugSearchField
+        value={displayName}
+        isLinked={isLinked}
+        mode="brand"
+        onChangeText={handleChangeText}
+        onLink={handleBrandPick}
+        onUnlink={handleUnlink}
+        placeholder="Search or type a drug name…"
+      />
 
       {/* Arabic name — auto-filled from library pick, always editable */}
       <div>
@@ -936,36 +817,6 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
           </div>
         </>
       )}
-
-      {/* Picker modals */}
-      <DrugPickerModal
-        isOpen={brandPickerOpen}
-        onClose={() => setBrandPickerOpen(false)}
-        onSelect={handleBrandPick}
-        mode="brand"
-      />
-      <DrugPickerModal
-        isOpen={formulationPickerOpen}
-        onClose={() => setFormulationPickerOpen(false)}
-        onSelect={handleFormulationPick}
-        mode="formulation"
-      />
-      {parentRow.formulation_id && (
-        <DrugPickerModal
-          isOpen={scopedBrandPickerOpen}
-          onClose={() => setScopedBrandPickerOpen(false)}
-          onSelect={handleScopedBrandPick}
-          mode="brand-scoped"
-          scopeFormulationId={parentRow.formulation_id}
-          scopeContext={{
-            genericName:   parentRow.generic_name,
-            concentration: parentRow.concentration,
-            form:          parentRow.form,
-            route:         parentRow.route,
-            category:      parentRow.category,
-          }}
-        />
-      )}
     </div>
   )
 }
@@ -973,13 +824,13 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function UnifiedDrugRowEditor({ row, onChange }) {
-  const [brandPickerOpen, setBrandPickerOpen]           = useState(false)
-  const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
   const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
   const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
   // Phase 3 (2026-06-20): scoped "add alternative" entry point — same
   // formulation, different brand. Only ever offered when row.formulation_id
-  // is already set (see render below).
+  // is already set (see render below). Unrelated to Phase 1 (this opens a
+  // picker that adds a brand-new alternative line; it does not edit an
+  // existing line's identity), so left untouched here.
   const [altScopedBrandPickerOpen, setAltScopedBrandPickerOpen] = useState(false)
 
   // Phase 3 (2026-06-20): age-group dose chooser state.
@@ -1003,6 +854,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   }
 
   // ── Brand picker select (brand mode — brand-first fill) ───────────────────
+  // PHASE 1 (2026-06-22): reused unchanged as DrugSearchField's onLink for
+  // the main row's identity field (Decision 1, step 1.2) — auto-fill
+  // behavior is identical to before, only the trigger changed (was a
+  // "Pick a brand…" button opening DrugPickerModal; now the search field's
+  // own dropdown result).
   function handleBrandPick(brand) {
     const f       = brand.formulations
     const generic = f?.generics
@@ -1033,34 +889,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     }
   }
 
-  // ── Formulation picker select (formulation mode — formulation-first fill) ─
-  function handleFormulationPick(formulation) {
-    const generic = formulation.generics
-    const baseFields = {
-      formulation_id:  formulation.id,
-      generic_name:    generic?.name_en   ?? row.generic_name,
-      generic_id:      generic?.id        ?? row.generic_id,
-      name_ar:         generic?.name_ar ?? null,
-      concentration:   formulation.concentration ?? null,
-      form:            formulation.form ?? null,
-      route:           formulation.route ?? null,
-      category:        generic?.category ?? null,
-      _formulationMeta: {
-        name_en:       generic?.name_en ?? '',
-        concentration: formulation.concentration ?? '',
-        form:          formulation.form ?? '',
-        route:         formulation.route ?? '',
-      },
-    }
-    const resolved = resolveDosePick(formulation.doses_structured)
-    if (resolved.needsChoice) {
-      patch(baseFields)
-      setMainDoseChoice({ doseRows: resolved.doseRows })
-    } else {
-      patch({ ...baseFields, dose: resolved.dose, dose_who: resolved.dose_who })
-    }
-  }
-
   function finalizeMainDoseChoice(doseRow) {
     patch({ dose: formatDoseRowText(doseRow), dose_who: doseRow.who ?? doseRow.group ?? null })
     setMainDoseChoice(null)
@@ -1071,15 +899,27 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     setMainDoseChoice(null)
   }
 
-  // ── Generic autocomplete select ──────────────────────────────────────────
-  function handleGenericSelect(generic) {
+  // PHASE 1 (2026-06-22): explicit unlink for the main row — same
+  // convention as AlternativeRow.handleUnlink above: clear only the
+  // library-snapshot fields, leave brand_name/generic_name/name_ar as-is.
+  function handleUnlink() {
     patch({
-      generic_name: generic.name_en,
-      generic_id: generic.id,
-      // Brand's Arabic name takes precedence when this row is brand-led;
-      // only auto-fill from the generic when there's no brand typed yet.
-      name_ar: row.brand_name?.trim() ? row.name_ar : (generic.name_ar ?? null),
+      brand_id: null,
+      generic_id: null,
+      formulation_id: null,
+      concentration: null,
+      form: null,
+      route: null,
+      category: null,
+      _formulationMeta: undefined,
     })
+  }
+
+  // PHASE 1 (2026-06-22): free-text typing writes to brand_name — see the
+  // same note on AlternativeRow.handleChangeText above re: this being a
+  // Phase 1 implementation choice, not an explicitly locked decision.
+  function handleChangeText(text) {
+    patch({ brand_name: text || null, brand_id: null })
   }
 
   // ── Promote to library (§2.5) ────────────────────────────────────────────
@@ -1320,60 +1160,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // Validation: at least one of brand_name / generic_name must be non-empty
   const hasName = !!(row.brand_name?.trim() || row.generic_name?.trim())
 
+  // PHASE 1 (2026-06-22): single display name shown by DrugSearchField,
+  // same brand-name-first convention used everywhere else in this file.
+  const displayName = row.brand_name || row.generic_name || ''
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-      {/* ── Library link status + picker buttons ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        {!isLinked && <NotInLibraryTag />}
-        {isLinked && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center',
-            padding: '1px 7px', borderRadius: 99,
-            fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            background: '#10b98118',
-            color: '#065f46',
-            border: '1px solid #10b98140',
-          }}>
-            Linked to library
-          </span>
-        )}
-        <div style={{ marginLeft: isLinked ? 0 : 'auto', display: 'flex', gap: 6 }}>
-          <button
-            type="button"
-            onClick={() => setBrandPickerOpen(true)}
-            style={{
-              padding: '4px 10px',
-              border: '1.5px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            {isLinked && row.brand_id ? 'Change brand…' : 'Pick a brand…'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setFormulationPickerOpen(true)}
-            style={{
-              padding: '4px 10px',
-              border: '1.5px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 11, fontWeight: 600, cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            {isLinked && !row.brand_id ? 'Change formulation…' : 'Pick a formulation…'}
-          </button>
-        </div>
-      </div>
 
       {/* ── Validation error ── */}
       {!hasName && (
@@ -1388,85 +1182,25 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       )}
 
-      {isFormulationLinked ? (
-        <>
-          {/* Brand + concentration + form — one read-only line, sourced from the library */}
-          <ReadOnlyField label="Brand · concentration · form">
-            {[row.brand_name, row.concentration, row.form].filter(Boolean).join(' · ')}
-          </ReadOnlyField>
-
-          {/* Generic — read-only line */}
-          <ReadOnlyField label="Generic">
-            {row.generic_name}
-          </ReadOnlyField>
-
-          {/* Route + category — read-only line */}
-          <ReadOnlyField label="Route · category" hint="from the library">
-            {[labelFor(DRUG_ROUTES, row.route), labelFor(DRUG_CATEGORIES, row.category)].filter(Boolean).join(' · ')}
-          </ReadOnlyField>
-        </>
-      ) : (
-        <>
-          {/* ── Brand name + Generic name (side by side) ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <FieldLabel>Brand name</FieldLabel>
-              <input
-                type="text"
-                value={row.brand_name ?? ''}
-                onChange={e => patch({ brand_name: e.target.value || null, brand_id: null })}
-                placeholder="e.g. Augmentin"
-                style={textInput()}
-              />
-            </div>
-            <div>
-              <FieldLabel hint="optional">Generic name</FieldLabel>
-              <AutocompleteInput
-                value={row.generic_name ?? ''}
-                onChange={val => patch({ generic_name: val || null, generic_id: null })}
-                onSelect={handleGenericSelect}
-                placeholder="e.g. amoxicillin-clavulanate"
-                fetchSuggestions={fetchGenericSuggestions}
-                renderSuggestion={g => (
-                  <span style={{ fontSize: 13 }}>
-                    <strong>{g.name_en}</strong>
-                    {g.name_ar && (
-                      <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 6 }}>{g.name_ar}</span>
-                    )}
-                  </span>
-                )}
-              />
-            </div>
-          </div>
-
-          {/* ── Concentration + Form ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <FieldLabel>Concentration</FieldLabel>
-              <input
-                type="text"
-                value={row.concentration ?? ''}
-                onChange={e => patch({ concentration: e.target.value || null })}
-                placeholder="e.g. 500mg, 120mg/5ml"
-                style={textInput()}
-              />
-            </div>
-            <div>
-              <FieldLabel>Form</FieldLabel>
-              <select
-                value={row.form ?? ''}
-                onChange={e => patch({ form: e.target.value || null })}
-                style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
-              >
-                <option value="">— select —</option>
-                {DRUG_FORMS.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </>
-      )}
+      {/* PHASE 1 (2026-06-22): single search field replaces the old
+          link-status badges, "Pick a brand…"/"Pick a formulation…"
+          buttons, the Brand Name / Generic Name / Concentration / Form
+          fields, and the read-only triple ReadOnlyField block (Decision 1).
+          The "Not in library" tag is left as-is (not addressed by Decision
+          1; helper-text/badge decluttering happens in Phase 3/4). The
+          "Linked to library" text pill is removed — DrugSearchField's own
+          icon-only link glyph is now the only linked indicator, per the
+          LOCKED "linked indicator" rule. */}
+      {!isLinked && <NotInLibraryTag />}
+      <DrugSearchField
+        value={displayName}
+        isLinked={isLinked}
+        mode="brand"
+        onChangeText={handleChangeText}
+        onLink={handleBrandPick}
+        onUnlink={handleUnlink}
+        placeholder="Search or type a drug name…"
+      />
 
       {/* ── Arabic name — auto-filled from library pick, always editable ── */}
       <div>
@@ -1663,7 +1397,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         />
       )}
 
-      {/* ── Add alternative buttons ── */}
+      {/* ── Add alternative buttons ──
+          PHASE 1 (2026-06-22): left untouched — these add a brand-new
+          alternative line (a separate, Phase 2-scoped concern, not the
+          identity-field redesign this phase covers). Each newly added
+          alternative renders through AlternativeRow above, which already
+          uses the new single DrugSearchField for its own identity entry. */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {row.formulation_id && (
           <button
@@ -1735,21 +1474,10 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </button>
       </div>
 
-      {/* ── Library picker modals (main drug) ── */}
-      <DrugPickerModal
-        isOpen={brandPickerOpen}
-        onClose={() => setBrandPickerOpen(false)}
-        onSelect={handleBrandPick}
-        mode="brand"
-      />
-      <DrugPickerModal
-        isOpen={formulationPickerOpen}
-        onClose={() => setFormulationPickerOpen(false)}
-        onSelect={handleFormulationPick}
-        mode="formulation"
-      />
-
-      {/* ── Library picker modals (add alternative) ── */}
+      {/* ── Library picker modals (add alternative) ──
+          PHASE 1: only the add-alternative modals remain. The main row's
+          own brandPickerOpen/formulationPickerOpen modals are removed —
+          identity entry no longer opens DrugPickerModal directly. */}
       <DrugPickerModal
         isOpen={altBrandPickerOpen}
         onClose={() => setAltBrandPickerOpen(false)}
@@ -1891,5 +1619,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
-
-
