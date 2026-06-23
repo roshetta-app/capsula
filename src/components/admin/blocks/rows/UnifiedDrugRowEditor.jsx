@@ -415,7 +415,7 @@ async function fetchGenericSuggestions(query) {
   return data ?? []
 }
 
-// ─── Alternative row (nested, indented) ───────────────────────────────────────
+// ─── Alternative row (flat — Phase 2.1, no nesting/indentation) ───────────────
 
 function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const sharesParentDose = alternativeSharesParentDose(parentRow, alt)
@@ -650,22 +650,22 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   const isFormulationLinked = !!alt.formulation_id
   const displayName = alt.brand_name || alt.generic_name || ''
 
+  // PHASE 2.1 (2026-06-24) — Admin Condition Editor Redesign, Decision 5:
+  // the marginLeft/paddingLeft/borderLeft nesting and the "Or" corner-label
+  // that used to visually thread this row under the main drug (indented,
+  // rejected by project owner) are removed. This row now renders flat —
+  // visually equal to the main row, no indentation, no "corner-down-right"
+  // marker. Decision 5's actual group/divider/move-menu UI (steps 2.2–2.5)
+  // is a separate, later step — not implemented here. For now, multiple
+  // drug options on one line simply stack with normal spacing; the divider
+  // line between groups lands in 2.5.
   return (
     <div style={{
-      marginLeft: 18,
-      paddingLeft: 14,
-      borderLeft: '2px solid var(--color-border)',
       display: 'flex', flexDirection: 'column', gap: 8,
       paddingTop: 8, paddingBottom: 4,
     }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{
-          fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-          textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-        }}>
-          Or
-        </span>
         {!isLinked && <NotInLibraryTag />}
         <button
           type="button"
@@ -1851,5 +1851,6 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 
 
