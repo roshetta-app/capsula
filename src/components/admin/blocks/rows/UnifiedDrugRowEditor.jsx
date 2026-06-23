@@ -130,6 +130,13 @@ import {
   SOURCE_FLAG_VALUE,
   doseWhoLabel,
   formatDoseRowText,
+  // PHASE 2.2-A: flat group state model (Decision 5). toDrugOptions converts
+  // the existing main + alternatives[] on-load shape into the new flat
+  // DrugOptionGroup[] the Phase 2 UI will iterate over. fromDrugOptions
+  // folds it back so existing save/load paths through DRUG_ROW_TEMPLATE keep
+  // working unchanged while the component operates on the flat shape internally.
+  toDrugOptions,
+  fromDrugOptions,
 } from '../../../../constants/prescriptionRowSchema'
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -922,6 +929,36 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function UnifiedDrugRowEditor({ row, onChange }) {
+  // PHASE 2.2-A — flat group state model (Decision 5, no rendering change yet).
+  //
+  // `groups` is the component's internal working copy of the drug options,
+  // expressed as a flat DrugOptionGroup[] (see prescriptionRowSchema.js).
+  // On mount it is derived from the incoming `row` (main + alternatives[])
+  // via toDrugOptions(). Phase 2.2-B will loop over this array to render the
+  // new flat UI; Phase 2.2-C adds note slots; Phase 2.2-D adds visual
+  // hierarchy and divider lines. None of those rendering changes happen yet.
+  //
+  // Intentionally NOT kept in sync with `row` on every prop change —
+  // UnifiedDrugRowEditor is an "owned" editor (it drives row state outward
+  // via onChange), so the groups array is the source of truth while the
+  // component is mounted. The parent's `row` prop is only read on mount.
+  const [groups, setGroups] = useState(() => toDrugOptions(row))
+
+  // DEV-ONLY testability: log the derived groups once on mount so Phase 2.2-A
+  // can be verified by opening the console and confirming:
+  //   - One group per formulation cluster (alternatives sharing formulation_id
+  //     with the main drug join its group; others get their own group).
+  //   - Each option carries the correct identity fields from main/alternatives.
+  //   - Dose and note land on the group, not on individual options.
+  // This useEffect is intentionally left in for the duration of Phase 2 and
+  // will be removed once Phase 2 rendering work is complete.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      // eslint-disable-next-line no-console
+      console.log('[UnifiedDrugRowEditor] groups on mount:', groups)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   // BUG FIX (2026-06-23): note field starts collapsed behind an "Add a drug
   // note" button instead of always showing an open (usually empty) input —
   // matches the locked note-field-expand decision in the redesign plan doc
@@ -1851,6 +1888,7 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 
 
 
