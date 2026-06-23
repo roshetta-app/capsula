@@ -1332,7 +1332,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           The "Linked to library" text pill is removed — DrugSearchField's
           own icon-only link glyph is now the only linked indicator, per
           the LOCKED "linked indicator" rule. */}
-      {!isLinked && <NotInLibraryTag />}
+      {/* BUG FIX (2026-06-23): gated on showManualFields (was !isLinked) so
+          a brand-new row opens with just the search bar — the tag now
+          only appears once free-text entry has actually started, not
+          immediately just because the row is unlinked-and-empty. */}
+      {showManualFields && <NotInLibraryTag />}
       <DrugSearchField
         value={displayName}
         isLinked={isLinked}
@@ -1523,64 +1527,75 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       )}
 
-      {/* ── Dose ── */}
-      {mainDoseChoice ? (
-        <DoseWhoChooser
-          doseRows={mainDoseChoice.doseRows}
-          onChoose={finalizeMainDoseChoice}
-          onSkip={skipMainDoseChoice}
-        />
-      ) : (
-        <div>
-          <FieldLabel hint={row.dose_who ? doseWhoLabel(row.dose_who) : 'pre-filled from library; edits stay on this row only'}>
-            Dose / instructions
-          </FieldLabel>
-          <input
-            type="text"
-            value={row.dose ?? ''}
-            onChange={e => patch({ dose: e.target.value || null })}
-            placeholder="e.g. 1 tablet twice daily for 5 days"
-            dir="auto"
-            style={textInput()}
+      {/* ── Dose ──
+          BUG FIX (2026-06-23): gated on (isLinked || showManualFields) so
+          a brand-new, untouched row doesn't show this before there's any
+          drug on the row yet — same reasoning as the manual fields and
+          the "Not in library" tag above. */}
+      {(isLinked || showManualFields) && (
+        mainDoseChoice ? (
+          <DoseWhoChooser
+            doseRows={mainDoseChoice.doseRows}
+            onChoose={finalizeMainDoseChoice}
+            onSkip={skipMainDoseChoice}
           />
-        </div>
+        ) : (
+          <div>
+            <FieldLabel hint={row.dose_who ? doseWhoLabel(row.dose_who) : 'pre-filled from library; edits stay on this row only'}>
+              Dose / instructions
+            </FieldLabel>
+            <input
+              type="text"
+              value={row.dose ?? ''}
+              onChange={e => patch({ dose: e.target.value || null })}
+              placeholder="e.g. 1 tablet twice daily for 5 days"
+              dir="auto"
+              style={textInput()}
+            />
+          </div>
+        )
       )}
 
       {/* ── Note (BUG FIX 2026-06-23) ──
           Starts collapsed behind an "Add a drug note" button instead of
           an always-open (usually empty) input, so the row doesn't show
           an unnecessary open field when there's nothing to say. Stays
-          open once opened — no auto-collapse on blur. */}
-      {noteOpen ? (
-        <div>
-          <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
-          <input
-            type="text"
-            value={row.note ?? ''}
-            onChange={e => patch({ note: e.target.value || null })}
-            placeholder="e.g. Only if cramping present"
-            dir="auto"
-            autoFocus
-            style={textInput()}
-          />
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setNoteOpen(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '5px 10px', borderRadius: 'var(--radius-md)',
-            border: '1.5px dashed var(--color-border)',
-            backgroundColor: 'transparent',
-            color: 'var(--color-text-secondary)',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
-          }}
-        >
-          <Plus size={13} />
-          Add a drug note
-        </button>
+          open once opened — no auto-collapse on blur.
+          BUG FIX (2026-06-23): also now gated on (isLinked ||
+          showManualFields) — same as Dose above, hidden entirely until
+          there's a drug on the row. */}
+      {(isLinked || showManualFields) && (
+        noteOpen ? (
+          <div>
+            <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
+            <input
+              type="text"
+              value={row.note ?? ''}
+              onChange={e => patch({ note: e.target.value || null })}
+              placeholder="e.g. Only if cramping present"
+              dir="auto"
+              autoFocus
+              style={textInput()}
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setNoteOpen(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', borderRadius: 'var(--radius-md)',
+              border: '1.5px dashed var(--color-border)',
+              backgroundColor: 'transparent',
+              color: 'var(--color-text-secondary)',
+              fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+            }}
+          >
+            <Plus size={13} />
+            Add a drug note
+          </button>
+        )
       )}
 
       {/* ── Alternatives (§2.2a) ── */}
