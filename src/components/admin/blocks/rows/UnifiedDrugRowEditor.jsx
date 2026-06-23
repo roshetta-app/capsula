@@ -208,6 +208,10 @@ function NotInLibraryTag() {
       color: '#b45309',
       border: '1px solid #f59e0b40',
       flexShrink: 0,
+      alignSelf: 'flex-start', // BUG FIX (2026-06-23): without this, a
+      // column flex parent (the main row's outer container) stretches
+      // this span to the parent's full width — only the text/padding
+      // looked tag-sized, the element box itself spanned edge-to-edge.
     }}>
       Not in library
     </span>
@@ -690,6 +694,7 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
         concentration={alt.concentration}
         form={alt.form}
         nameAr={alt.name_ar}
+        genericName={alt.generic_name}
         mode="brand"
         onChangeText={handleChangeText}
         onLink={handleBrandPick}
@@ -923,6 +928,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // (stays expanded once opened, no auto-collapse). Defaults open if this
   // row already has a note, so existing notes aren't hidden on load.
   const [noteOpen, setNoteOpen] = useState(!!row.note)
+
+  // BUG FIX (2026-06-23): brand_name (via the search bar) is now the
+  // default path to reveal the rest of the manual fields on a fresh,
+  // unlinked row — see showManualFields below. genericOnlyMode is the
+  // explicit fallback for the rarer case of entering a drug with no
+  // brand at all; defaults on if the row already has a generic name
+  // with no brand, so existing generic-only rows aren't hidden on load.
+  const [genericOnlyMode, setGenericOnlyMode] = useState(
+    !!row.generic_name?.trim() && !row.brand_name?.trim()
+  )
 
   const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
   const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
@@ -1266,7 +1281,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const hasAlt   = (row.alternatives ?? []).length > 0
 
   // Validation: at least one of brand_name / generic_name must be non-empty
-  const hasName = !!(row.brand_name?.trim() || row.generic_name?.trim())
+  // BUG FIX (2026-06-23): a fresh, unlinked row now shows only the search
+  // bar until the admin commits a brand name there (the default, most-used
+  // path) or explicitly opts into genericOnlyMode via the fallback link
+  // below the search bar. Replaces the old always-on field block.
+  const showManualFields = !isLinked && (!!row.brand_name?.trim() || genericOnlyMode)
 
   // PHASE 1 (2026-06-22): single display name shown by DrugSearchField,
   // same brand-name-first convention used everywhere else in this file.
@@ -1306,28 +1325,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* ── Validation error ── */}
-      {!hasName && (
-        <div style={{
-          fontSize: 11, color: 'var(--color-error, #ef4444)',
-          padding: '4px 8px',
-          background: '#ef444410',
-          border: '1px solid #ef444430',
-          borderRadius: 'var(--radius-md)',
-        }}>
-          A drug row must have at least a brand name or generic name.
-        </div>
-      )}
-
       {/* PHASE 1 (2026-06-22): single search field replaces the old
           link-status badges, "Pick a brand…"/"Pick a formulation…"
           buttons, the Brand Name / Generic Name / Concentration / Form
           fields, and the read-only triple ReadOnlyField block (Decision 1).
-          The "Not in library" tag is left as-is (not addressed by Decision
-          1; helper-text/badge decluttering happens in Phase 3/4). The
-          "Linked to library" text pill is removed — DrugSearchField's own
-          icon-only link glyph is now the only linked indicator, per the
-          LOCKED "linked indicator" rule. */}
+          The "Linked to library" text pill is removed — DrugSearchField's
+          own icon-only link glyph is now the only linked indicator, per
+          the LOCKED "linked indicator" rule. */}
       {!isLinked && <NotInLibraryTag />}
       <DrugSearchField
         value={displayName}
@@ -1335,6 +1339,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         concentration={row.concentration}
         form={row.form}
         nameAr={row.name_ar}
+        genericName={row.generic_name}
         mode="brand"
         onChangeText={handleChangeText}
         onLink={handleBrandPick}
@@ -1343,11 +1348,33 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         extraAction={drugLinkToggle}
       />
 
-      {/* ── Manual drug fields — shown only when not linked to library ──
-          When linked, library fills these silently. When unlinked/free-text,
-          the admin must be able to fill them manually (required for
-          "Save to library" and for complete drug data). */}
-      {!isLinked && (
+      {/* BUG FIX (2026-06-23): fallback for the less-common case of a
+          generic-only row (no brand name at all). Brand name via the
+          search bar above is the default, primary path; this link only
+          appears before any fields have been revealed, so it doesn't
+          clutter the row once the admin is already filling it in. */}
+      {!isLinked && !showManualFields && (
+        <button
+          type="button"
+          onClick={() => setGenericOnlyMode(true)}
+          style={{
+            alignSelf: 'flex-start',
+            background: 'none', border: 'none', padding: 0,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            color: 'var(--color-text-tertiary)', textDecoration: 'underline',
+            fontFamily: 'var(--font-body)',
+          }}
+        >
+          Or add generic only (no brand)
+        </button>
+      )}
+
+      {/* ── Manual drug fields ──
+          BUG FIX (2026-06-23): now gated on showManualFields instead of
+          plain !isLinked, so a fresh row shows only the search bar until
+          the admin commits a brand name there (or opts into
+          genericOnlyMode above) — not immediately on row creation. */}
+      {showManualFields && (
         <>
           <div>
             <FieldLabel>Generic name</FieldLabel>
@@ -1403,8 +1430,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </>
       )}
 
-      {/* ── Save to library (§2.5) — free-text mode only ── */}
-      {!isLinked && (
+      {/* ── Save to library (§2.5) — free-text mode only ──
+          BUG FIX (2026-06-23): gated on showManualFields (was !isLinked)
+          so this doesn't appear before the admin has actually entered any
+          drug info to save — same reasoning as the manual fields above. */}
+      {showManualFields && (
         <div style={{
           border: '1.5px dashed var(--color-border)',
           borderRadius: 'var(--radius-md)',
@@ -1806,4 +1836,5 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 

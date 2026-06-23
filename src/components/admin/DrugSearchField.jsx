@@ -236,6 +236,7 @@ export default function DrugSearchField({
   concentration = null,
   form = null,
   nameAr = null,
+  genericName = null,
   onChangeText,
   onLink,
   onUnlink,
@@ -405,46 +406,64 @@ export default function DrugSearchField({
   // Drug Detail page on the app side — unrelated to this glyph) now renders
   // here instead, passed in via extraAction, so the two "link" concepts
   // aren't scattered across two places on the row.
+  //
+  // BUG FIX (2026-06-23): added a second, grey line under the brand summary
+  // showing the generic name — brand_name/concentration/form/name_ar were
+  // already combined into one line; generic_name is distinct enough
+  // (different drug identity, not a display detail of the brand) to get
+  // its own quieter line rather than being folded into the same string.
   if (isLinked && !editing) {
     return (
-      <div style={{
-        display:    'flex',
-        alignItems: 'center',
-        gap:        6,
-      }}>
-        {/* Pill icon — always-present name prefix (Decision 5 / Phase 1.5) */}
-        <Icon
-          faIcon={faPills}
-          size={13}
-          color="var(--color-text-tertiary)"
-        />
-        <span dir="auto" style={{
-          flex:       1,
-          fontSize:   15,
-          fontWeight: 600,
-          color:      'var(--color-text-primary)',
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        6,
         }}>
-          {buildLinkedSummary(value, concentration, form, nameAr)}
-        </span>
-        {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
-        <button
-          type="button"
-          onClick={handleStartChange}
-          aria-label="Change drug"
-          style={{
-            display:    'flex',
-            alignItems: 'center',
-            background: 'none',
-            border:     'none',
-            padding:    4,
-            cursor:     'pointer',
+          {/* Pill icon — always-present name prefix (Decision 5 / Phase 1.5) */}
+          <Icon
+            faIcon={faPills}
+            size={13}
+            color="var(--color-text-tertiary)"
+          />
+          <span dir="auto" style={{
+            flex:       1,
+            fontSize:   15,
+            fontWeight: 600,
+            color:      'var(--color-text-primary)',
+          }}>
+            {buildLinkedSummary(value, concentration, form, nameAr)}
+          </span>
+          {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
+          <button
+            type="button"
+            onClick={handleStartChange}
+            aria-label="Change drug"
+            style={{
+              display:    'flex',
+              alignItems: 'center',
+              background: 'none',
+              border:     'none',
+              padding:    4,
+              cursor:     'pointer',
+              color:      'var(--color-text-tertiary)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Icon name="Pencil" size={13} />
+          </button>
+          {extraAction}
+        </div>
+        {genericName && (
+          <span dir="auto" style={{
+            fontSize:   12,
+            fontWeight: 500,
             color:      'var(--color-text-tertiary)',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Icon name="Pencil" size={13} />
-        </button>
-        {extraAction}
+            paddingLeft: 19, // aligns under the name, past the pill icon
+          }}>
+            {genericName}
+          </span>
+        )}
       </div>
     )
   }
@@ -708,6 +727,7 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
 
 
 
