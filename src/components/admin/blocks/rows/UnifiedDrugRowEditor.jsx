@@ -422,6 +422,10 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
   // onLink; handleFormulationPick/handleScopedBrandPick are removed as
   // dead code along with the modals that called them.
 
+  // BUG FIX (2026-06-23): same collapsed-note treatment as the main row —
+  // see UnifiedDrugRowEditor's noteOpen for the full rationale.
+  const [noteOpen, setNoteOpen] = useState(!!alt.note)
+
   // Phase 6 (2026-06-21): "Save to library" parity with the main row.
   // Mirrors UnifiedDrugRowEditor's own promote state below, but scoped to
   // this alternative — promoting an alternative never touches the parent
@@ -871,17 +875,39 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
               style={textInput()}
             />
           </div>
-          <div>
-            <FieldLabel hint="auto-detects English/Arabic">Note</FieldLabel>
-            <input
-              type="text"
-              value={alt.note ?? ''}
-              onChange={e => patch({ note: e.target.value || null })}
-              placeholder="Optional note for this alternative"
-              dir="auto"
-              style={textInput()}
-            />
-          </div>
+          {/* BUG FIX (2026-06-23): same collapsed-note treatment as the
+              main row's Drug note field. */}
+          {noteOpen ? (
+            <div>
+              <FieldLabel hint="auto-detects English/Arabic">Note</FieldLabel>
+              <input
+                type="text"
+                value={alt.note ?? ''}
+                onChange={e => patch({ note: e.target.value || null })}
+                placeholder="Optional note for this alternative"
+                dir="auto"
+                autoFocus
+                style={textInput()}
+              />
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setNoteOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '5px 10px', borderRadius: 'var(--radius-md)',
+                border: '1.5px dashed var(--color-border)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-text-secondary)',
+                fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+              }}
+            >
+              <Plus size={13} />
+              Add a drug note
+            </button>
+          )}
         </>
       )}
     </div>
@@ -891,6 +917,13 @@ function AlternativeRow({ alt, parentRow, onRemove, onChange }) {
 // ─── Main component ────────────────────────────────────────────────────────────
 
 export default function UnifiedDrugRowEditor({ row, onChange }) {
+  // BUG FIX (2026-06-23): note field starts collapsed behind an "Add a drug
+  // note" button instead of always showing an open (usually empty) input —
+  // matches the locked note-field-expand decision in the redesign plan doc
+  // (stays expanded once opened, no auto-collapse). Defaults open if this
+  // row already has a note, so existing notes aren't hidden on load.
+  const [noteOpen, setNoteOpen] = useState(!!row.note)
+
   const [altBrandPickerOpen, setAltBrandPickerOpen]         = useState(false)
   const [altFormulationPickerOpen, setAltFormulationPickerOpen] = useState(false)
   // Phase 3 (2026-06-20): scoped "add alternative" entry point — same
@@ -1239,6 +1272,35 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // same brand-name-first convention used everywhere else in this file.
   const displayName = row.brand_name || row.generic_name || ''
 
+  // BUG FIX (2026-06-23): drug-link toggle moved up next to DrugSearchField's
+  // pencil button (passed in as extraAction below) instead of sitting on
+  // its own beneath all the row's fields. Same button, same handler/state
+  // (drug_link_enabled) — only its position changed.
+  const drugLinkToggle = (
+    <button
+      type="button"
+      onClick={() => patch({ drug_link_enabled: !showLink })}
+      aria-label={showLink ? 'Drug link on — tap to disable' : 'Drug link off — tap to enable'}
+      title={showLink ? 'Drug link: ON — name taps navigate to Drug Detail' : 'Drug link: OFF — name shown as plain text'}
+      style={{
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        width:           28,
+        height:          28,
+        borderRadius:    'var(--radius-md)',
+        border:          `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        backgroundColor: showLink ? '#EFF6FF' : 'transparent',
+        color:           showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+        cursor:          'pointer',
+        padding:         0,
+        flexShrink:      0,
+      }}
+    >
+      {showLink ? <Link size={13} /> : <Unlink size={13} />}
+    </button>
+  )
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -1278,6 +1340,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         onLink={handleBrandPick}
         onUnlink={handleUnlink}
         placeholder="Search or type a drug name…"
+        extraAction={drugLinkToggle}
       />
 
       {/* ── Manual drug fields — shown only when not linked to library ──
@@ -1453,47 +1516,42 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       )}
 
-      {/* ── Note ── */}
-      <div>
-        <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
-        <input
-          type="text"
-          value={row.note ?? ''}
-          onChange={e => patch({ note: e.target.value || null })}
-          placeholder="e.g. Only if cramping present"
-          dir="auto"
-          style={textInput()}
-        />
-      </div>
-
-      {/* ── Drug link toggle (Phase 1.4) ──
-          PHASE 1.4 (2026-06-22): replaced the labeled button + explanatory
-          subtext span with an icon-only toggle (Decision 1's anti-label-
-          clutter rule — "icon-only, no text button, consistent with the
-          rest of this doc's anti-label-clutter rule"). The Link/Unlink
-          icon communicates state; aria-label provides accessibility. */}
-      <button
-        type="button"
-        onClick={() => patch({ drug_link_enabled: !showLink })}
-        aria-label={showLink ? 'Drug link on — tap to disable' : 'Drug link off — tap to enable'}
-        title={showLink ? 'Drug link: ON — name taps navigate to Drug Detail' : 'Drug link: OFF — name shown as plain text'}
-        style={{
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          width:           28,
-          height:          28,
-          borderRadius:    'var(--radius-md)',
-          border:          `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
-          backgroundColor: showLink ? '#EFF6FF' : 'transparent',
-          color:           showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-          cursor:          'pointer',
-          padding:         0,
-          flexShrink:      0,
-        }}
-      >
-        {showLink ? <Link size={13} /> : <Unlink size={13} />}
-      </button>
+      {/* ── Note (BUG FIX 2026-06-23) ──
+          Starts collapsed behind an "Add a drug note" button instead of
+          an always-open (usually empty) input, so the row doesn't show
+          an unnecessary open field when there's nothing to say. Stays
+          open once opened — no auto-collapse on blur. */}
+      {noteOpen ? (
+        <div>
+          <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
+          <input
+            type="text"
+            value={row.note ?? ''}
+            onChange={e => patch({ note: e.target.value || null })}
+            placeholder="e.g. Only if cramping present"
+            dir="auto"
+            autoFocus
+            style={textInput()}
+          />
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setNoteOpen(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '5px 10px', borderRadius: 'var(--radius-md)',
+            border: '1.5px dashed var(--color-border)',
+            backgroundColor: 'transparent',
+            color: 'var(--color-text-secondary)',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+          }}
+        >
+          <Plus size={13} />
+          Add a drug note
+        </button>
+      )}
 
       {/* ── Alternatives (§2.2a) ── */}
       {hasAlt && (

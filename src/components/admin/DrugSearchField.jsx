@@ -101,13 +101,21 @@
  * PHASE 1.5 (2026-06-22) — Admin Condition Editor Redesign:
  *   Added pill icon (faPills, FontAwesome) to the left of the drug name
  *   in the linked read-only display, per Decision 5's locked visual
- *   hierarchy ("small pill icon to the left of each name"). The Link2
- *   glyph remains as the linked-indicator icon (Decision 1: "a linked
- *   drug name shows a tiny icon only"). Layout: [pill] [name] [link
- *   glyph] [change button].
+ *   hierarchy ("small pill icon to the left of each name"). Layout:
+ *   [pill] [name] [change button] [extraAction].
  *
  * BUG FIX (2026-06-23):
  *   Added free-text commit state. See "Free-text commit flow" above.
+ *
+ * BUG FIX (2026-06-23):
+ *   Removed the Link2 "linked indicator" glyph (it was purely decorative,
+ *   no click handler, duplicating info already shown elsewhere). Added
+ *   `extraAction` prop — a node the caller can render right after the
+ *   pencil button, in both the linked and committed free-text states.
+ *   Used by UnifiedDrugRowEditor to relocate its drug-link-enabled toggle
+ *   (a different concept — whether the name navigates to Drug Detail on
+ *   the app side) up next to the pencil instead of sitting separately
+ *   below all the row's fields.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -233,6 +241,7 @@ export default function DrugSearchField({
   onUnlink,
   mode = 'formulation',
   placeholder = 'Search or type a drug name…',
+  extraAction = null,
 }) {
   // Three display states for this field:
   //   editing   = true,  committed = false → open search input (new/nameless rows, or
@@ -386,9 +395,16 @@ export default function DrugSearchField({
   // ── Linked, read-only state ───────────────────────────────────────────
   // PHASE 1.5: pill icon added to the left of the name per Decision 5's
   // locked visual hierarchy (name is the loudest element: 15px/600-weight,
-  // pill icon to the left). The Link2 glyph stays as the linked indicator
-  // per Decision 1 (icon-only, no text label). Layout:
-  //   [pill icon]  [name]  [Link2 glyph]  [change/pencil button]
+  // pill icon to the left). Layout: [pill icon] [name] [change/pencil
+  // button] [extraAction, if supplied by the caller].
+  //
+  // BUG FIX (2026-06-23): the Link2 "linked indicator" glyph that used to
+  // sit here is removed — it was purely decorative (no click handler) and
+  // duplicated information already conveyed by the row's own drug-link
+  // toggle. That toggle (controls whether the drug name navigates to its
+  // Drug Detail page on the app side — unrelated to this glyph) now renders
+  // here instead, passed in via extraAction, so the two "link" concepts
+  // aren't scattered across two places on the row.
   if (isLinked && !editing) {
     return (
       <div style={{
@@ -410,8 +426,6 @@ export default function DrugSearchField({
         }}>
           {buildLinkedSummary(value, concentration, form, nameAr)}
         </span>
-        {/* Link2 glyph — linked indicator (Decision 1: icon-only, no text) */}
-        <Icon name="Link2" size={13} color="var(--color-text-tertiary)" />
         {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
         <button
           type="button"
@@ -430,15 +444,18 @@ export default function DrugSearchField({
         >
           <Icon name="Pencil" size={13} />
         </button>
+        {extraAction}
       </div>
     )
   }
 
   // ── Committed free-text state (BUG FIX) ───────────────────────────────
   // Name has been typed and confirmed by the admin (Enter / blur / "Use
-  // as name" click). Visually similar to the linked state but without the
-  // Link2 chain glyph — so the admin can distinguish unlinked (no chain)
-  // from library-linked (chain glyph). Clicking pencil re-opens search.
+  // as name" click). Same layout as the linked state above (extraAction
+  // included) — the only visual difference is which state this component
+  // is in, not whether a chain glyph is present (that glyph was removed
+  // from both states — see BUG FIX 2026-06-23 note above). Clicking
+  // pencil re-opens search.
   if (!isLinked && committed && value) {
     return (
       <div style={{
@@ -460,7 +477,6 @@ export default function DrugSearchField({
         }}>
           {value}
         </span>
-        {/* No Link2 glyph — absence is the "not linked" signal */}
         {/* Edit button — re-opens search pre-filled with current name */}
         <button
           type="button"
@@ -479,6 +495,7 @@ export default function DrugSearchField({
         >
           <Icon name="Pencil" size={13} />
         </button>
+        {extraAction}
       </div>
     )
   }
@@ -691,5 +708,6 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
 
 
