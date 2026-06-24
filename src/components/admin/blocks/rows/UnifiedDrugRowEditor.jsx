@@ -274,6 +274,58 @@ function resolveDosePick(dosesStructured) {
   return { needsChoice: true, doseRows: rows }
 }
 
+// ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
+// PHASE 2.2-C: per-group note slot, rendered below the dose field for each
+// group. Holds its own `noteOpen` state so groups open/close independently
+// without polluting the parent. Matches the collapsed-by-default pattern the
+// old main row had (BUG FIX 2026-06-23): starts collapsed behind an
+// "Add a drug note" button; expands on click; stays expanded once opened;
+// defaults open when a note already exists on this group.
+//
+// Props:
+//   note          — current note value (string|null) from the group
+//   onChange      — (value: string|null) => void
+
+function GroupNoteSlot({ note, onChange }) {
+  const [noteOpen, setNoteOpen] = useState(!!note)
+
+  if (noteOpen) {
+    return (
+      <div>
+        <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
+        <input
+          type="text"
+          value={note ?? ''}
+          onChange={e => onChange(e.target.value || null)}
+          placeholder="e.g. Only if cramping present"
+          dir="auto"
+          autoFocus={!note} // only steal focus when the slot was just opened (no existing text)
+          style={textInput()}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setNoteOpen(true)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '5px 10px', borderRadius: 'var(--radius-md)',
+        border: '1.5px dashed var(--color-border)',
+        backgroundColor: 'transparent',
+        color: 'var(--color-text-secondary)',
+        fontSize: 12, fontWeight: 600, cursor: 'pointer',
+        fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+      }}
+    >
+      <Plus size={13} />
+      Add a drug note
+    </button>
+  )
+}
+
 // ─── DrugOptionRow ─────────────────────────────────────────────────────────────
 // PHASE 2.2-B: replaces AlternativeRow. Handles one drug option inside a group.
 // All per-drug state lives here — promote flow, dose-age-group chooser, link/
@@ -756,6 +808,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     emitGroups(nextGroups)
   }
 
+  // Update the shared note for a group (direct text edit).
+  // PHASE 2.2-C: note is a group-level field (Decision 5 — one note per
+  // dose/name cluster, same as dose). Mirrors updateGroupDose exactly.
+  function updateGroupNote(groupIdx, value) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx ? { ...g, note: value || null } : g
+    )
+    emitGroups(nextGroups)
+  }
+
   // ── Add option (replaces "add alternative") ────────────────────────────
   // Newly-added options are auto-joined to an existing group when their
   // formulation_id matches that group's first option — same logic as
@@ -855,11 +917,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             />
           ))}
 
-          {/* ── Shared dose field for this group ──
-              Visibility mirrors the old main row's (isLinked || showManualFields)
-              gate: only shown once the first option in the group has a drug name
-              on it, so a brand-new group doesn't immediately expose a dose field
-              before there is anything to dose. */}
+          {/* ── Shared dose + note for this group ──
+              Both gated on the same "first option has a name" check so a
+              brand-new empty group doesn't expose dose/note prematurely.
+              Note uses GroupNoteSlot so each group's open/closed state is
+              independent (PHASE 2.2-C). */}
           {(() => {
             const firstOpt = group.options[0]
             if (!firstOpt) return null
@@ -867,19 +929,27 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             const firstHasName  = !!firstOpt.brand_name?.trim()
             if (!firstIsLinked && !firstHasName) return null
             return (
-              <div>
-                <FieldLabel hint={group.dose_who ? doseWhoLabel(group.dose_who) : undefined}>
-                  Dose / instructions
-                </FieldLabel>
-                <input
-                  type="text"
-                  value={group.dose ?? ''}
-                  onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                  placeholder="e.g. 1 tablet twice daily for 5 days"
-                  dir="auto"
-                  style={textInput()}
+              <>
+                <div>
+                  <FieldLabel hint={group.dose_who ? doseWhoLabel(group.dose_who) : undefined}>
+                    Dose / instructions
+                  </FieldLabel>
+                  <input
+                    type="text"
+                    value={group.dose ?? ''}
+                    onChange={e => updateGroupDose(groupIdx, e.target.value)}
+                    placeholder="e.g. 1 tablet twice daily for 5 days"
+                    dir="auto"
+                    style={textInput()}
+                  />
+                </div>
+
+                {/* PHASE 2.2-C — per-group note slot */}
+                <GroupNoteSlot
+                  note={group.note}
+                  onChange={value => updateGroupNote(groupIdx, value)}
                 />
-              </div>
+              </>
             )
           })()}
 
@@ -1062,4 +1132,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
       </div>
     </div>
   )
-}
