@@ -1132,3 +1132,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
       </div>
     </div>
   )
+}
