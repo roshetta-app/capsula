@@ -1024,7 +1024,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             const firstOpt = group.options[0]
             if (!firstOpt) return null
             const firstIsLinked = !!(firstOpt.brand_id || firstOpt.generic_id || firstOpt.formulation_id)
-            const firstHasName  = !!firstOpt.brand_name?.trim()
+            const firstHasName  = !!(firstOpt.brand_name?.trim() || firstOpt.generic_name?.trim())
             if (!firstIsLinked && !firstHasName) return null
             return (
               <>

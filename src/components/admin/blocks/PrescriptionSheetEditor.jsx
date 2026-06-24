@@ -711,7 +711,7 @@ function RowCard({
       {expanded && (
         <div style={{ padding: '12px 14px' }}>
           {isDrugRow && (
-            <UnifiedDrugRowEditor row={row} onChange={handleEditorChange} />
+            <UnifiedDrugRowEditor key={row.id} row={row} onChange={handleEditorChange} />
           )}
           {row.row_type === 'section' && (
             <SectionRowEditor
