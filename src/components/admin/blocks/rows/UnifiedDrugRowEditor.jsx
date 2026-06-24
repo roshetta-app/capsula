@@ -134,6 +134,22 @@
  *          option.note written via patch() and round-tripped through
  *          fromDrugOptions → AlternativeDrug.note unchanged.
  *
+ *   PHASE 2.4 (2026-06-25) — move affordance (Decision 5, locked interaction).
+ *        MoveMenu component added. Each DrugOptionRow receives a new `onMove`
+ *        prop: (action: 'new-group'|'above'|'below') => void. A GripVertical
+ *        icon button on the header row opens an inline absolute-positioned
+ *        menu with context-sensitive options:
+ *        - "Move to new group" — only shown when current group has >1 option
+ *          (splitting a sole option off into its own new group is a no-op).
+ *        - "Move to group above" — only shown when groupIdx > 0.
+ *        - "Move to group below" — only shown when groupIdx < groups.length-1.
+ *        Menu dismisses on click-outside (useEffect + ref). Three new mutation
+ *        helpers in the main component: moveToNewGroup, moveToGroupAbove,
+ *        moveToGroupBelow — all routed through emitGroups(). The move icon
+ *        is suppressed entirely when totalOptions === 1 (nothing to move).
+ *        No drag-and-drop, no click-to-cycle — this exact interaction is the
+ *        locked choice per Decision 5.
+ *
  * Props:
  *   row        — DrugRow shape (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE)
  *   onChange   — (nextRow: DrugRow) => void
@@ -147,8 +163,8 @@
  *     DrugPickerModal) — the useDrugs cache is app-facing, not CMS-facing.
  */
 
-import { useState } from 'react'
-import { Link, Unlink, Plus, X, Library } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Link, Unlink, Plus, X, Library, GripVertical } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS, DRUG_ROUTES } from '../../../../config/forms'
@@ -403,6 +419,100 @@ function DrugOptionNoteSlot({ note, onChange }) {
   )
 }
 
+// ─── MoveMenu ──────────────────────────────────────────────────────────────────
+// PHASE 2.4: inline context menu opened by the GripVertical move icon on each
+// DrugOptionRow header. Renders a small absolute-positioned card with whichever
+// of the three move actions are valid for the option's current position.
+//
+// Props:
+//   canMoveToNew   — true when current group has >1 option (splitting a solo
+//                    option into its own new group is a no-op, so suppress it)
+//   canMoveAbove   — true when groupIdx > 0
+//   canMoveBelow   — true when groupIdx < groups.length - 1
+//   onMove         — (action: 'new-group'|'above'|'below') => void
+//   onClose        — () => void
+
+function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose }) {
+  const menuRef = useRef(null)
+
+  // Dismiss on click-outside
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        onClose()
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [onClose])
+
+  const menuItemStyle = {
+    display: 'block', width: '100%',
+    padding: '7px 12px', textAlign: 'left',
+    background: 'none', border: 'none',
+    fontSize: 12, fontFamily: 'var(--font-body)',
+    color: 'var(--color-text-primary)',
+    cursor: 'pointer', whiteSpace: 'nowrap',
+    borderRadius: 'var(--radius-md)',
+  }
+
+  const hasAnyOption = canMoveToNew || canMoveAbove || canMoveBelow
+  if (!hasAnyOption) return null
+
+  return (
+    <div
+      ref={menuRef}
+      style={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        zIndex: 200,
+        marginTop: 4,
+        background: 'var(--color-surface)',
+        border: '1.5px solid var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        padding: '4px',
+        display: 'flex', flexDirection: 'column', gap: 2,
+      }}
+    >
+      {canMoveToNew && (
+        <button
+          type="button"
+          style={menuItemStyle}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+          onClick={() => { onMove('new-group'); onClose() }}
+        >
+          Move to new group
+        </button>
+      )}
+      {canMoveAbove && (
+        <button
+          type="button"
+          style={menuItemStyle}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+          onClick={() => { onMove('above'); onClose() }}
+        >
+          Move to group above
+        </button>
+      )}
+      {canMoveBelow && (
+        <button
+          type="button"
+          style={menuItemStyle}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+          onClick={() => { onMove('below'); onClose() }}
+        >
+          Move to group below
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── DrugOptionRow ─────────────────────────────────────────────────────────────
 // PHASE 2.2-B: replaces AlternativeRow. Handles one drug option inside a group.
 // All per-drug state lives here — promote flow, dose-age-group chooser, link/
@@ -416,8 +526,12 @@ function DrugOptionNoteSlot({ note, onChange }) {
 //                   removing the last option, which would leave an empty row)
 //   onDoseReady   — (dose, dose_who) => void — called when a brand pick resolves
 //                   to a pre-filled dose, so the parent can write it to the group
+//   onMove        — (action: 'new-group'|'above'|'below') => void — PHASE 2.4
+//   canMoveToNew  — bool: show "Move to new group" option            — PHASE 2.4
+//   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
+//   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
-function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady }) {
+function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteRoute, setPromoteRoute]       = useState('')
@@ -426,6 +540,12 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady }) {
 
   // Inline dose-age-group chooser — surfaces when a picked brand has 2+ dose rows
   const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
+
+  // PHASE 2.4: move menu open/closed state. Localised here so each row's
+  // menu is independent — only one can be open at a time per user action
+  // (click-outside dismisses it), but the state still lives per-row.
+  const [moveMenuOpen, setMoveMenuOpen] = useState(false)
+  const moveButtonRef = useRef(null)
 
   // showManualFields / genericOnlyMode: same reveal pattern as the old main row.
   // A fresh option shows only the search bar until a name is committed or the
@@ -610,9 +730,45 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-      {/* Header row: not-in-library tag + remove button */}
+      {/* Header row: not-in-library tag + move button + remove button */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
         {showManualFields && <NotInLibraryTag />}
+
+        {/* PHASE 2.4 — move icon. Hidden when this is the only option across
+            all groups (nothing to move). The wrapper is position:relative so
+            MoveMenu can position itself absolutely below the button. */}
+        {!isOnly && (canMoveToNew || canMoveAbove || canMoveBelow) && (
+          <div style={{ position: 'relative' }}>
+            <button
+              ref={moveButtonRef}
+              type="button"
+              title="Move this drug to a different group"
+              aria-label="Move drug option"
+              onClick={() => setMoveMenuOpen(v => !v)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 22, height: 22, flexShrink: 0,
+                border: '1px solid var(--color-border)',
+                borderRadius: 4,
+                background: moveMenuOpen ? 'var(--color-bg)' : 'transparent',
+                color: moveMenuOpen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                cursor: 'pointer', padding: 0,
+              }}
+            >
+              <GripVertical size={11} />
+            </button>
+            {moveMenuOpen && (
+              <MoveMenu
+                canMoveToNew={canMoveToNew}
+                canMoveAbove={canMoveAbove}
+                canMoveBelow={canMoveBelow}
+                onMove={onMove}
+                onClose={() => setMoveMenuOpen(false)}
+              />
+            )}
+          </div>
+        )}
+
         {!isOnly && (
           <button
             type="button"
@@ -915,6 +1071,75 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     emitGroups(nextGroups)
   }
 
+  // ── Move mutations (PHASE 2.4) ─────────────────────────────────────────
+  // All three helpers follow the same pattern:
+  //   1. Remove the option from its current group; drop the group if now empty.
+  //   2. Insert the option into the target location.
+  //   3. Emit via emitGroups() — no direct state mutation.
+  //
+  // The option carries its own group_id; when it joins an existing group we
+  // overwrite that field so fromDrugOptions() round-trips correctly.
+
+  function moveToNewGroup(groupIdx, optionId) {
+    const srcGroup  = groups[groupIdx]
+    const option    = srcGroup.options.find(o => o.id === optionId)
+    if (!option) return
+
+    const newGroupId  = `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const movedOption = { ...option, group_id: newGroupId }
+
+    // Remove from source group; drop the group entirely if it becomes empty.
+    const remainingSrc = srcGroup.options.filter(o => o.id !== optionId)
+    const srcUpdated   = remainingSrc.length > 0
+      ? [{ ...srcGroup, options: remainingSrc }]
+      : []
+
+    // New group is inserted immediately after the (possibly removed) source.
+    const newGroup = { group_id: newGroupId, options: [movedOption], dose: null, dose_who: null, note: null }
+
+    const before = groups.slice(0, groupIdx)
+    const after  = groups.slice(groupIdx + 1)
+    emitGroups([...before, ...srcUpdated, newGroup, ...after])
+  }
+
+  function moveToGroupAbove(groupIdx, optionId) {
+    if (groupIdx === 0) return
+    const srcGroup    = groups[groupIdx]
+    const targetGroup = groups[groupIdx - 1]
+    const option      = srcGroup.options.find(o => o.id === optionId)
+    if (!option) return
+
+    const movedOption  = { ...option, group_id: targetGroup.group_id }
+    const remainingSrc = srcGroup.options.filter(o => o.id !== optionId)
+
+    const nextGroups = groups.map((g, gi) => {
+      if (gi === groupIdx - 1) return { ...g, options: [...g.options, movedOption] }
+      if (gi === groupIdx)     return remainingSrc.length > 0 ? { ...g, options: remainingSrc } : null
+      return g
+    }).filter(Boolean)
+
+    emitGroups(nextGroups)
+  }
+
+  function moveToGroupBelow(groupIdx, optionId) {
+    if (groupIdx >= groups.length - 1) return
+    const srcGroup    = groups[groupIdx]
+    const targetGroup = groups[groupIdx + 1]
+    const option      = srcGroup.options.find(o => o.id === optionId)
+    if (!option) return
+
+    const movedOption  = { ...option, group_id: targetGroup.group_id }
+    const remainingSrc = srcGroup.options.filter(o => o.id !== optionId)
+
+    const nextGroups = groups.map((g, gi) => {
+      if (gi === groupIdx)     return remainingSrc.length > 0 ? { ...g, options: remainingSrc } : null
+      if (gi === groupIdx + 1) return { ...g, options: [movedOption, ...g.options] }
+      return g
+    }).filter(Boolean)
+
+    emitGroups(nextGroups)
+  }
+
   // ── Add option (replaces "add alternative") ────────────────────────────
   // Newly-added options are auto-joined to an existing group when their
   // formulation_id matches that group's first option — same logic as
@@ -1021,6 +1246,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               onRemove={() => removeOption(groupIdx, option.id)}
               isOnly={totalOptions === 1}
               onDoseReady={(dose, dose_who) => applyDoseToGroup(groupIdx, dose, dose_who)}
+              onMove={action => {
+                if (action === 'new-group') moveToNewGroup(groupIdx, option.id)
+                else if (action === 'above') moveToGroupAbove(groupIdx, option.id)
+                else if (action === 'below') moveToGroupBelow(groupIdx, option.id)
+              }}
+              canMoveToNew={group.options.length > 1}
+              canMoveAbove={groupIdx > 0}
+              canMoveBelow={groupIdx < groups.length - 1}
             />
           ))}
 
@@ -1252,4 +1485,5 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 
