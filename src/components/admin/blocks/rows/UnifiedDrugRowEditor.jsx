@@ -841,7 +841,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // incoming row on mount via toDrugOptions(); all mutations go through
   // emitGroups() which calls setGroups and then fromDrugOptions() → onChange
   // so the external DRUG_ROW_TEMPLATE shape is preserved unchanged.
-  const [groups, setGroups] = useState(() => toDrugOptions(row))
+  const [groups, setGroups] = useState(() => {
+    const initial = toDrugOptions(row)
+    console.log('[DEBUG mount] toDrugOptions(row) ->', initial.flatMap(g => g.options.map(o => ({ id: o.id, brand_name: o.brand_name, note: o.note }))))
+    console.log('[DEBUG mount] row.note:', row.note, 'row.alternatives:', row.alternatives?.map(a => ({ brand_name: a.brand_name, note: a.note })))
+    return initial
+  })
 
   // Add-option picker modals. Replace the old altBrandPickerOpen /
   // altFormulationPickerOpen / altScopedBrandPickerOpen state from Phase 1.
@@ -852,15 +857,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
   function emitGroups(nextGroups) {
     setGroups(nextGroups)
-    onChange(fromDrugOptions(row, nextGroups))
+    const nextRow = fromDrugOptions(row, nextGroups)
+    console.log('[DEBUG emitGroups] outgoing row.note:', nextRow.note, 'row.alternatives:', nextRow.alternatives?.map(a => ({ brand_name: a.brand_name, note: a.note })))
+    onChange(nextRow)
   }
 
   // Update a single option within a group (identified by groupIdx + option.id).
   function updateOption(groupIdx, optionId, nextOption) {
+    console.log('[DEBUG updateOption]', { groupIdx, optionId, nextOptionNote: nextOption.note })
     const nextGroups = groups.map((g, gi) => {
       if (gi !== groupIdx) return g
       return { ...g, options: g.options.map(o => o.id === optionId ? nextOption : o) }
     })
+    console.log('[DEBUG updateOption] nextGroups note values:', nextGroups.flatMap(g => g.options.map(o => ({ id: o.id, note: o.note }))))
     emitGroups(nextGroups)
   }
 

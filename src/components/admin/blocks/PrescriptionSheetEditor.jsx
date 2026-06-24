@@ -164,6 +164,7 @@ function useRowList(list, onChange) {
   }
 
   function updateRow(idx, nextRow) {
+    console.log('[DEBUG updateRow]', { idx, noteOfRow: nextRow.note, altNotes: nextRow.alternatives?.map(a => a.note) })
     onChange(list.map((r, i) => i === idx ? { ...nextRow, _isNew: false } : r))
   }
 
@@ -591,12 +592,16 @@ function RowCard({
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
 
+  console.log('[DEBUG RowCard render]', { idx, rowId: row.id, expanded, rowNote: row.note, altNotes: row.alternatives?.map(a => a.note) })
+
   function handleEditorChange(nextRow) {
     onChange(nextRow)
   }
 
   function handleExpand() {
+    console.log('[DEBUG RowCard handleExpand] toggling expanded from', expanded, 'row.note:', row.note, 'altNotes:', row.alternatives?.map(a => a.note))
     setExpanded(!expanded)
+
   }
 
   return (
