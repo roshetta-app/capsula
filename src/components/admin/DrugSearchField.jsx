@@ -1,3 +1,4 @@
+```jsx
 /**
  * src/components/admin/DrugSearchField.jsx
  * PHASE 0 (2026-06-22) — Admin Condition Editor Redesign, Decision 1.
@@ -261,6 +262,11 @@ export default function DrugSearchField({
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading]     = useState(false)
   const inputRef = useRef(null)
+  // Guard: set to true on mousedown inside the dropdown so that the input's
+  // onBlur handler knows a dropdown click is in progress and should not
+  // commit the typed query as free text (the dropdown's own onMouseDown
+  // will handle the action instead).
+  const dropdownMouseDownRef = useRef(false)
 
   // Keep local query in sync if the row's value changes from outside
   // (e.g. parent resets the row) while not actively editing.
@@ -295,8 +301,18 @@ export default function DrugSearchField({
   }, [query, editing, mode])
 
   function handleTextChange(text) {
+    // Only update local search query while typing — do NOT propagate to the
+    // parent row via onChangeText yet. Writing brand_name on every keystroke
+    // caused two problems:
+    //   1. showManualFields in DrugOptionRow becomes true the instant one
+    //      character is typed, opening the manual-fields section while the
+    //      admin is still searching — Bug 3.
+    //   2. The parent re-renders on every keystroke, re-creating the
+    //      DrugSearchField with a new `value` prop, which fights the local
+    //      query state mid-search.
+    // onChangeText is called only at commit time (Enter / blur / "Use as name"),
+    // so the parent only sees a new name when the admin has actually decided.
     setQuery(text)
-    onChangeText?.(text)
   }
 
   function handleSelect(suggestion) {
@@ -356,11 +372,18 @@ export default function DrugSearchField({
   }
 
   function handleBlur() {
-    // Auto-commit on focus-leave if a name has been typed, so tabbing
-    // to the next field below works naturally without requiring an
-    // explicit Enter press. If nothing was typed, this is a "changed my
-    // mind" cancel — revert to the previous display instead of leaving
-    // the search box open indefinitely.
+    // If the user clicked inside the dropdown, mousedown on the dropdown
+    // button already fired (and set dropdownMouseDownRef=true) before this
+    // blur event. In that case, do nothing here — the dropdown's onMouseDown
+    // handler will call onSelect or onCommitFreeText directly.
+    // This fixes Bug 1: without this guard, blur fired first and committed
+    // the typed query as free text, so the subsequent library-pick from the
+    // dropdown landed on top of an already-committed free-text name, causing
+    // a double-update and the wrong display state.
+    if (dropdownMouseDownRef.current) {
+      dropdownMouseDownRef.current = false
+      return
+    }
     if (query.trim()) {
       commitFreeText()
     } else {
@@ -600,6 +623,7 @@ export default function DrugSearchField({
           onSelect={handleSelect}
           onCommitFreeText={commitFreeText}
           onDismiss={handleDismissDropdown}
+          dropdownMouseDownRef={dropdownMouseDownRef}
         />
       )}
     </div>
@@ -622,7 +646,7 @@ export default function DrugSearchField({
 // there are no results), giving the admin an explicit click target to
 // commit a free-text name without pressing Enter.
 
-function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCommitFreeText, onDismiss }) {
+function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCommitFreeText, onDismiss, dropdownMouseDownRef }) {
   const ref = useRef(null)
 
   useEffect(() => {
@@ -665,11 +689,16 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
         <button
           key={s.id}
           role="option"
-          // Use mouseDown (not onClick) so this fires before the input's
-          // onBlur → commitFreeText. Without this, blur fires first and
-          // commits a free-text name right before the library pick lands,
-          // causing a brief double-update.
-          onMouseDown={e => { e.preventDefault(); onSelect(s) }}
+          onMouseDown={e => {
+            // Set the guard BEFORE e.preventDefault() — this tells the
+            // input's onBlur that a dropdown pick is in progress so it
+            // should not commit free text. e.preventDefault() then stops
+            // the input from losing focus, but the guard is the belt-and-
+            // suspenders safety for browsers where blur fires regardless.
+            if (dropdownMouseDownRef) dropdownMouseDownRef.current = true
+            e.preventDefault()
+            onSelect(s)
+          }}
           style={{
             width:       '100%',
             display:     'flex',
@@ -700,7 +729,11 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
       {showFreeTextRow && (
         <button
           role="option"
-          onMouseDown={e => { e.preventDefault(); onCommitFreeText() }}
+          onMouseDown={e => {
+            if (dropdownMouseDownRef) dropdownMouseDownRef.current = true
+            e.preventDefault()
+            onCommitFreeText()
+          }}
           style={{
             width:       '100%',
             display:     'flex',
@@ -731,3 +764,5 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
 
 
 
+
+```
