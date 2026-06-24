@@ -71,7 +71,7 @@
  *   onChangeText  (text: string) => void — fired as the admin types in
  *                                          the unlinked/free-text state
  *   onLink        (result) => void       — fired when a search result is
- *                                          selected. `result` is either a
+ *                                          selected. "result" is either a
  *                                          formulation object (mode=
  *                                          'formulation') or a brand
  *                                          object (mode='brand'), same
