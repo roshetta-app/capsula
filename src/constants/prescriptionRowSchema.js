@@ -684,3 +684,7 @@ export function fromDrugOptions(row, groups) {
     dose_who: mainGrp.dose_who,
     note: mainGrp.note,
     source_flag: mainOpt.source_flag,
+    drug_link_enabled: mainOpt.drug_link_enabled,
+    alternatives,
+  };
+}

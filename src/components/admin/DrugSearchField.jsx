@@ -1,4 +1,3 @@
-```jsx
 /**
  * src/components/admin/DrugSearchField.jsx
  * PHASE 0 (2026-06-22) — Admin Condition Editor Redesign, Decision 1.
@@ -111,7 +110,7 @@
  * BUG FIX (2026-06-23):
  *   Removed the Link2 "linked indicator" glyph (it was purely decorative,
  *   no click handler, duplicating info already shown elsewhere). Added
- *   `extraAction` prop — a node the caller can render right after the
+ *   "extraAction" prop — a node the caller can render right after the
  *   pencil button, in both the linked and committed free-text states.
  *   Used by UnifiedDrugRowEditor to relocate its drug-link-enabled toggle
  *   (a different concept — whether the name navigates to Drug Detail on
@@ -765,4 +764,3 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
 
 
 
-```
