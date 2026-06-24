@@ -119,6 +119,21 @@
  *          updated DRUG_ROW_TEMPLATE row back through onChange unchanged.
  *        - PromoteAlternativeDialog export unchanged.
  *
+ *   PHASE 2.2-C (2026-06-24) — per-group note slot (Decision 5 two-slot model).
+ *        GroupNoteSlot component added; updateGroupNote() mutation added.
+ *        Group note renders below dose, collapsed by default, stays open.
+ *
+ *   PHASE 2.2-D (2026-06-24) — visual hierarchy + divider + per-drug note slot.
+ *        Decision 5 three-tier hierarchy (name > dose > note) applied:
+ *        - Dose: 12px, regular weight, secondary color, 19px left indent.
+ *        - Notes (both slots): 11px, italic, tertiary color; no FieldLabel.
+ *        - Divider line between groups (locked choice — not a left-rail).
+ *        - Per-drug note slot (DrugOptionNoteSlot) added to DrugOptionRow,
+ *          rendered directly under the drug's search field. Collapsed behind
+ *          "+ note" until clicked; stays open; travels with the drug option.
+ *          option.note written via patch() and round-tripped through
+ *          fromDrugOptions → AlternativeDrug.note unchanged.
+ *
  * Props:
  *   row        — DrugRow shape (see prescriptionRowSchema.js DRUG_ROW_TEMPLATE)
  *   onChange   — (nextRow: DrugRow) => void
@@ -276,33 +291,36 @@ function resolveDosePick(dosesStructured) {
 
 // ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
 // PHASE 2.2-C: per-group note slot, rendered below the dose field for each
-// group. Holds its own `noteOpen` state so groups open/close independently
-// without polluting the parent. Matches the collapsed-by-default pattern the
-// old main row had (BUG FIX 2026-06-23): starts collapsed behind an
-// "Add a drug note" button; expands on click; stays expanded once opened;
-// defaults open when a note already exists on this group.
-//
-// Props:
-//   note          — current note value (string|null) from the group
-//   onChange      — (value: string|null) => void
+// group. Holds its own `noteOpen` state so groups open/close independently.
+// PHASE 2.2-D: restyled to Decision 5 note-tier hierarchy — 11px, italic,
+// tertiary color. No FieldLabel (labels are removed per Decision 4). Button
+// label changed to "+ group note" to distinguish from the per-drug "+ note"
+// slot (DrugOptionNoteSlot) which sits directly under each drug name.
 
 function GroupNoteSlot({ note, onChange }) {
   const [noteOpen, setNoteOpen] = useState(!!note)
 
   if (noteOpen) {
     return (
-      <div>
-        <FieldLabel hint="auto-detects English/Arabic">Drug note</FieldLabel>
-        <input
-          type="text"
-          value={note ?? ''}
-          onChange={e => onChange(e.target.value || null)}
-          placeholder="e.g. Only if cramping present"
-          dir="auto"
-          autoFocus={!note} // only steal focus when the slot was just opened (no existing text)
-          style={textInput()}
-        />
-      </div>
+      <input
+        type="text"
+        value={note ?? ''}
+        onChange={e => onChange(e.target.value || null)}
+        placeholder="Group note (e.g. Take with food)"
+        dir="auto"
+        autoFocus={!note}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '4px 8px',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 11, fontStyle: 'italic',
+          fontFamily: 'var(--font-body)',
+          backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-tertiary)',
+          outline: 'none',
+        }}
+      />
     )
   }
 
@@ -311,17 +329,76 @@ function GroupNoteSlot({ note, onChange }) {
       type="button"
       onClick={() => setNoteOpen(true)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '5px 10px', borderRadius: 'var(--radius-md)',
-        border: '1.5px dashed var(--color-border)',
-        backgroundColor: 'transparent',
-        color: 'var(--color-text-secondary)',
-        fontSize: 12, fontWeight: 600, cursor: 'pointer',
-        fontFamily: 'var(--font-body)', alignSelf: 'flex-start',
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        background: 'none', border: 'none', padding: 0,
+        fontSize: 11, fontStyle: 'italic',
+        color: 'var(--color-text-tertiary)',
+        cursor: 'pointer', fontFamily: 'var(--font-body)',
+        alignSelf: 'flex-start',
       }}
     >
-      <Plus size={13} />
-      Add a drug note
+      + group note
+    </button>
+  )
+}
+
+// ─── DrugOptionNoteSlot ────────────────────────────────────────────────────────
+// PHASE 2.2-D: per-drug note slot (Decision 5 two-slot note model). Rendered
+// directly under each drug name in DrugOptionRow. Same collapsed-by-default /
+// stays-open behavior as GroupNoteSlot, but:
+//   - Labelled "+ note" (shorter — position under the name makes it clear this
+//     is the per-drug note, not the group note below the dose).
+//   - Travels with the drug option when it is moved to a different group
+//     (the note lives on `option.note`, not on the group record).
+//
+// Visual tier: 11px, italic, tertiary color — lowest visual priority, matching
+// the note tier in Decision 5's name > dose > note hierarchy.
+//
+// Props:
+//   note      — current per-drug note value (string|null)
+//   onChange  — (value: string|null) => void
+
+function DrugOptionNoteSlot({ note, onChange }) {
+  const [open, setOpen] = useState(!!note)
+
+  if (open) {
+    return (
+      <input
+        type="text"
+        value={note ?? ''}
+        onChange={e => onChange(e.target.value || null)}
+        placeholder="Drug note (e.g. Preferred for children)"
+        dir="auto"
+        autoFocus={!note}
+        style={{
+          width: '100%', boxSizing: 'border-box',
+          padding: '4px 8px',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          fontSize: 11, fontStyle: 'italic',
+          fontFamily: 'var(--font-body)',
+          backgroundColor: 'var(--color-surface)',
+          color: 'var(--color-text-tertiary)',
+          outline: 'none',
+        }}
+      />
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 4,
+        background: 'none', border: 'none', padding: 0,
+        fontSize: 11, fontStyle: 'italic',
+        color: 'var(--color-text-tertiary)',
+        cursor: 'pointer', fontFamily: 'var(--font-body)',
+        alignSelf: 'flex-start',
+      }}
+    >
+      + note
     </button>
   )
 }
@@ -570,6 +647,17 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady }) {
         placeholder="Search or type a drug name…"
         extraAction={drugLinkToggle}
       />
+
+      {/* PHASE 2.2-D — per-drug note slot (Decision 5 two-slot note model).
+          Sits directly under this drug's name at all times once the option
+          has any content — no gate beyond the option existing. Travels with
+          the drug if it is moved to a different group. */}
+      {(isLinked || !!displayName) && (
+        <DrugOptionNoteSlot
+          note={option.note ?? null}
+          onChange={value => patch({ note: value })}
+        />
+      )}
 
       {/* Generic-only fallback — appears before any fields are revealed */}
       {!isLinked && !showManualFields && (
@@ -897,13 +985,23 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
 
-      {/* PHASE 2.2-B: loop over groups[].
-          Each group renders its stacked DrugOptionRow entries (one per
-          drug name), then one shared dose input below them.
-          No move icon, no note slots, no visual hierarchy yet (2.2-C/D).
-          Divider line between groups comes in 2.2-D. */}
+      {/* PHASE 2.2-B/D: loop over groups[].
+          Each group renders its stacked DrugOptionRow entries (one per drug
+          name), then one shared dose input + group note below them.
+          PHASE 2.2-D: horizontal divider between groups (Decision 5 locked
+          choice — not a colored left-rail, not a label/chip). First group
+          gets no divider above it; subsequent groups get one hr above. */}
       {groups.map((group, groupIdx) => (
         <div key={group.group_id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+
+          {/* Divider between groups — Decision 5 (no divider before first group) */}
+          {groupIdx > 0 && (
+            <hr style={{
+              border: 'none',
+              borderTop: '1px solid var(--color-border)',
+              margin: '4px 0 0',
+            }} />
+          )}
 
           {/* ── Stacked drug-name lines ── */}
           {group.options.map(option => (
@@ -930,21 +1028,33 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             if (!firstIsLinked && !firstHasName) return null
             return (
               <>
-                <div>
-                  <FieldLabel hint={group.dose_who ? doseWhoLabel(group.dose_who) : undefined}>
-                    Dose / instructions
-                  </FieldLabel>
-                  <input
-                    type="text"
-                    value={group.dose ?? ''}
-                    onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                    placeholder="e.g. 1 tablet twice daily for 5 days"
-                    dir="auto"
-                    style={textInput()}
-                  />
-                </div>
+                {/* PHASE 2.2-D — dose tier: 12px, regular weight, secondary color,
+                    19px left indent to align under the drug names above it.
+                    FieldLabel removed (Decision 4 + Decision 5 hierarchy — dose
+                    position communicates its role; no label needed). */}
+                <input
+                  type="text"
+                  value={group.dose ?? ''}
+                  onChange={e => updateGroupDose(groupIdx, e.target.value)}
+                  placeholder={group.dose_who
+                    ? `Dose (${doseWhoLabel(group.dose_who)})`
+                    : 'Dose / instructions'}
+                  dir="auto"
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '3px 8px',
+                    paddingLeft: 19,
+                    border: '1px solid var(--color-border)',
+                    borderRadius: 'var(--radius-md)',
+                    fontSize: 12, fontWeight: 400,
+                    fontFamily: 'var(--font-body)',
+                    backgroundColor: 'var(--color-surface)',
+                    color: 'var(--color-text-secondary)',
+                    outline: 'none',
+                  }}
+                />
 
-                {/* PHASE 2.2-C — per-group note slot */}
+                {/* PHASE 2.2-C/D — per-group note slot (tertiary, italic) */}
                 <GroupNoteSlot
                   note={group.note}
                   onChange={value => updateGroupNote(groupIdx, value)}
@@ -1133,3 +1243,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
