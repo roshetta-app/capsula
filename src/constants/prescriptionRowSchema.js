@@ -483,6 +483,11 @@ export const DRUG_OPTION_TEMPLATE = {
   category: null,
   source_flag: null,
   drug_link_enabled: true,
+  // Per-drug note (Decision 5 two-slot note model). Independent of the
+  // group note (DrugOptionGroup.note). Travels with the drug option if it
+  // is moved to a different group. Defaults null; preserved on round-trip
+  // through toDrugOptions / fromDrugOptions via alt.note.
+  note: null,
 };
 
 /**
@@ -572,6 +577,11 @@ export function toDrugOptions(row) {
       category: alt.category,
       source_flag: alt.source_flag,
       drug_link_enabled: alt.drug_link_enabled !== false,
+      // Per-drug note (Decision 5 two-slot model). Copied from alt.note so
+      // it survives the toDrugOptions round-trip regardless of which group
+      // the option lands in. Previously this was only copied onto own-group
+      // alternatives via grp.note, and silently dropped for same-group ones.
+      note: alt.note ?? null,
     };
 
     if (sharesMainDose) {
@@ -646,7 +656,14 @@ export function fromDrugOptions(row, groups) {
       source_flag: opt.source_flag,
       dose: sharesMainGroup ? null : grp.dose,
       dose_who: sharesMainGroup ? null : grp.dose_who,
-      note: sharesMainGroup ? null : grp.note,
+      // Per-drug note (Decision 5 two-slot model): always opt.note —
+      // the per-drug note travels with the option, not with the group.
+      // Previously this was `sharesMainGroup ? null : grp.note`, which
+      // silently dropped per-drug notes for same-group alternatives and
+      // conflated the group note with the per-drug note for own-group ones.
+      // Own-group alternatives now correctly carry grp.note on their group
+      // object; the alternative's own `note` field is the per-drug slot only.
+      note: opt.note ?? null,
     };
   });
 
@@ -667,7 +684,3 @@ export function fromDrugOptions(row, groups) {
     dose_who: mainGrp.dose_who,
     note: mainGrp.note,
     source_flag: mainOpt.source_flag,
-    drug_link_enabled: mainOpt.drug_link_enabled,
-    alternatives,
-  };
-}
