@@ -3,7 +3,7 @@ import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
-import { alternativeSharesParentDose } from '../../constants/prescriptionRowSchema'
+import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -274,9 +274,14 @@ function SectionHeader({ label, children }) {
  *   italic + muted, left-aligned in badge column). Every alternative member
  *   shows its own concentration + form (not first-only).
  *
- *   buildFormulationClusters still groups same-formulation alternatives
- *   together so they share one dose line and one note (rendered once after
- *   the last member of the cluster).
+ *   buildFormulationClusters now delegates to toDrugOptions() (the same
+ *   function the admin editor uses to build its groups[] state) instead of
+ *   re-deriving clusters from formulation_id alone. PHASE 2.9 (2026-06-25):
+ *   this means a row's clusters now match whatever an admin explicitly
+ *   grouped via the move-to-group action (persisted group_id, Phase 2.8),
+ *   falling back to the original formulation_id-matching default only for
+ *   legacy rows that predate Phase 2.8. Single source of truth — grouping
+ *   logic is no longer duplicated between the CMS and the app render.
  *
  *   One NumberBadge per row regardless of how many alternatives it has
  *   (§2.4a) — unchanged.
@@ -285,55 +290,31 @@ function SectionHeader({ label, children }) {
  *   a Google Images search for the drug in Egypt.
  */
 function buildFormulationClusters(row, drugs, mainFormulation) {
-  const alts = row.alternatives ?? []
-  const mainFormulationId = row.formulation_id ?? null
+  const groups = toDrugOptions(row)
 
-  const mainCluster = {
-    formulationId: mainFormulationId,
-    dose: row.dose,
-    doseWho: row.dose_who ?? null,
-    note: row.note,
-    formulation: mainFormulationId ? (mainFormulation ?? null) : null,
-    members: [{ isMain: true, data: row }],
+  // Per-member formulation lookup (PHASE 2.9): link-gating and fallback
+  // naming used to be special-cased to "only the main member" via isMain.
+  // Every option now looks up its own formulation_id independently, so
+  // alternatives get exactly the same link/fallback-name treatment as the
+  // main drug whenever they're linked to a formulation themselves.
+  const findFormulation = (formulationId) => {
+    if (!formulationId) return null
+    if (formulationId === row.formulation_id) return mainFormulation ?? null
+    return (drugs ?? []).find(d => d.id === formulationId) ?? null
   }
 
-  const otherClusters = new Map()
-  const standalone = []
-
-  for (const alt of alts) {
-    if (alternativeSharesParentDose(row, alt)) {
-      mainCluster.members.push({ isMain: false, data: alt })
-      continue
-    }
-    if (alt.formulation_id) {
-      if (!otherClusters.has(alt.formulation_id)) {
-        otherClusters.set(alt.formulation_id, {
-          formulationId: alt.formulation_id,
-          dose: alt.dose,
-          doseWho: alt.dose_who ?? null,
-          note: alt.note,
-          formulation: (drugs ?? []).find(d => d.id === alt.formulation_id) ?? null,
-          members: [],
-        })
-      }
-      otherClusters.get(alt.formulation_id).members.push({ isMain: false, data: alt })
-    } else {
-      standalone.push({
-        formulationId: null,
-        dose: alt.dose,
-        doseWho: alt.dose_who ?? null,
-        note: alt.note,
-        formulation: null,
-        members: [{ isMain: false, data: alt }],
-      })
-    }
-  }
-
-  return [mainCluster, ...otherClusters.values(), ...standalone]
+  return groups.map(group => ({
+    dose: group.dose,
+    doseWho: group.dose_who ?? null,
+    note: group.note,
+    members: group.options.map(opt => ({
+      data: opt,
+      formulation: findFormulation(opt.formulation_id),
+    })),
+  }))
 }
 
 function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider }) {
-  const linkEnabled = row.drug_link_enabled !== false && Boolean(formulation?.slug)
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
   // Flatten clusters into a sequence of renderable units so that every
@@ -363,8 +344,21 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
           const { member, cluster, isLastMemberOfCluster } = unit
           const data = member.data
           const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
-          const fallbackName = !memberHasOwnName ? (member.isMain ? cluster.formulation?.genericName : null) : null
+          // PHASE 2.9: fallback name and link-gating are now per-member,
+          // using that member's own formulation lookup — previously these
+          // were gated behind `member.isMain`, so an alternative linked to
+          // its own formulation never got a fallback name or a working
+          // link at all.
+          const fallbackName = !memberHasOwnName ? (member.formulation?.genericName ?? null) : null
           const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
+          const memberLinkEnabled = Boolean(data.drug_link_enabled) && Boolean(member.formulation?.slug)
+          // A member's own per-drug note (Decision 5 two-slot model) is
+          // only shown as its own line when it differs from the cluster's
+          // shared group note — for a single-member cluster falling back
+          // to alt.note for both, they're the same value and the group
+          // note below already covers it; rendering both would duplicate
+          // the same text.
+          const showOwnNote = data.note && data.note !== cluster.note
 
           return (
             <div key={uIdx}>
@@ -376,10 +370,12 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 nameAr={data.name_ar}
                 concentration={data.concentration}
                 form={data.form}
-                linkEnabled={member.isMain && linkEnabled}
-                slug={member.isMain ? formulation?.slug : null}
+                linkEnabled={memberLinkEnabled}
+                slug={member.formulation?.slug ?? null}
                 navigate={navigate}
               />
+
+              {showOwnNote && <RowNote note={data.note} />}
 
               {/* Dose and note render once after the last member of each
                   cluster — shared by all members in that cluster */}
@@ -686,4 +682,3 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
-
