@@ -202,6 +202,20 @@ export const DRUG_ROW_TEMPLATE = {
  *     `note` when this alternative shares the parent's formulation_id,
  *     otherwise its own independent value.
  * @property {'manual_entry'|null} source_flag
+ * @property {string|null} group_id
+ *   - PHASE 2.8 (2026-06-25), new. Persisted grouping signal for the flat
+ *     drug-options model (Decision 5 / Phase 0's toDrugOptions/
+ *     fromDrugOptions). Written on every save once a row has passed
+ *     through the updated editor; null on legacy rows that predate this
+ *     field. See toDrugOptions() below for how null is handled (falls back
+ *     to the original formulation_id-based default-grouping rule).
+ * @property {string|null} group_note
+ *   - PHASE 2.8 (2026-06-25), new. The group-level note (Decision 5's
+ *     two-slot model) for any group other than the main drug's group.
+ *     Distinct from `note` above, which is this alternative's own per-drug
+ *     note. Null when this alternative shares the main group (the group
+ *     note in that case is the row's own top-level `note` field) or when
+ *     the group simply has no note set.
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_name: null,
@@ -218,6 +232,8 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   dose_who: null,
   note: null,
   source_flag: null,
+  group_id: null,
+  group_note: null,
 };
 
 /**
@@ -419,12 +435,13 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
  *      operates on the flat shape.
  *
  * No schema/table change. condition_blocks.data keeps storing rows in
- * the existing DRUG_ROW_TEMPLATE shape; group_id is a derived/UI-layer
- * concept layered on top via these two pure functions, not a new
- * persisted column. Whether group_id should eventually be persisted
- * directly (instead of re-derived on every load via toDrugOptions) is a
- * Phase 2.8 implementation choice once the admin's "move to group"
- * action needs to override the derived default — not a Phase 0 decision.
+ * the existing DRUG_ROW_TEMPLATE shape; group_id and group_note are
+ * persisted as plain fields on ALTERNATIVE_DRUG_TEMPLATE (added PHASE 2.8,
+ * 2026-06-25), not new database columns — JSONB needs no migration for
+ * this. See toDrugOptions()/fromDrugOptions() below for the read/write
+ * logic: group_id is read as the primary grouping signal when present,
+ * falling back to the original formulation_id-derived default only for
+ * legacy rows saved before this field existed.
  * ──────────────────────────────────────────────────────────────────── */
 
 /**
@@ -504,21 +521,33 @@ export const DRUG_OPTION_TEMPLATE = {
  */
 
 /**
- * Deterministic, lossless mapping from a DrugRow's existing main +
- * alternatives[] fields into a flat array of DrugOptionGroup.
+ * Deterministic mapping from a DrugRow's existing main + alternatives[]
+ * fields into a flat array of DrugOptionGroup.
  *
- * Migration rule (LOCKED, Phase 2.8 — implemented here so both the CMS
- * and any future app-side read share one source of truth):
- *   - The main drug always starts its own group.
- *   - Each alternative whose formulation_id matches the main drug's
- *     formulation_id (alternativeSharesParentDose() — reused, not
- *     reimplemented) joins the main drug's group, preserving today's
- *     dose-sharing display exactly as-is.
- *   - Any alternative whose formulation_id differs, or is null
- *     (free-text/manual alternatives), becomes its OWN separate group,
- *     carrying its own dose/note over unchanged.
- *   - No admin action is required; this runs on read for legacy rows
- *     that have no explicit group_id yet.
+ * Grouping signal, in priority order:
+ *   1. PHASE 2.8 (2026-06-25): if an alternative has a persisted
+ *      `group_id`, it is trusted directly — it is matched against the
+ *      main option's group_id (always row.id) and against every other
+ *      alternative's persisted group_id, so multiple alternatives sharing
+ *      a `group_id` (including ones an admin explicitly grouped together
+ *      via the move-to-group action, regardless of formulation_id) are
+ *      reassembled into one group, with that group's note sourced from
+ *      whichever member's `group_note` is set.
+ *   2. Legacy fallback (LOCKED, original Phase 0/2.8 migration rule) —
+ *      used only when `group_id` is null/absent, i.e. this alternative
+ *      predates Phase 2.8 and has never been saved through the updated
+ *      editor:
+ *        - Matches the main drug's formulation_id
+ *          (alternativeSharesParentDose() — reused, not reimplemented)
+ *          -> joins the main drug's group, preserving today's
+ *          dose-sharing display exactly as-is.
+ *        - Formulation_id differs, or is null (free-text/manual
+ *          alternatives) -> becomes its OWN separate group, carrying its
+ *          own dose/note over unchanged.
+ *   No admin action is required for legacy rows to keep rendering
+ *   correctly — the very first save through the editor stamps real
+ *   group_id/group_note values going forward (a lazy, per-row migration;
+ *   no bulk backfill needed since condition_blocks.data is JSONB).
  *
  * This function does not mutate `row`.
  *
@@ -553,9 +582,28 @@ export function toDrugOptions(row) {
   };
 
   const groups = [mainGroup];
+  // Looks up an in-progress (non-main) group by its resolved group_id, so
+  // multiple alternatives sharing a persisted group_id land in the same
+  // group instead of each becoming their own (PHASE 2.8).
+  const groupsByKey = new Map();
 
   (row.alternatives ?? []).forEach((alt, index) => {
-    const sharesMainDose = alternativeSharesParentDose(row, alt);
+    const persistedGroupId = alt.group_id ?? null;
+
+    let joinsMain;
+    let resolvedGroupId;
+
+    if (persistedGroupId) {
+      // PHASE 2.8: trust the persisted signal directly.
+      joinsMain = persistedGroupId === mainGroup.group_id;
+      resolvedGroupId = persistedGroupId;
+    } else {
+      // Legacy fallback — unchanged original behavior.
+      joinsMain = alternativeSharesParentDose(row, alt);
+      resolvedGroupId = joinsMain
+        ? mainGroup.group_id
+        : `${row.id}-alt-group-${index}`;
+    }
 
     const option = {
       ...DRUG_OPTION_TEMPLATE,
@@ -564,7 +612,7 @@ export function toDrugOptions(row) {
       // thrash; a real client-generated uuid is assigned once this option
       // is actually edited/moved (Phase 2 concern, not Phase 0).
       id: `${row.id}-alt-${index}`,
-      group_id: sharesMainDose ? mainGroup.group_id : `${row.id}-alt-group-${index}`,
+      group_id: resolvedGroupId,
       brand_name: alt.brand_name,
       brand_id: alt.brand_id,
       generic_name: alt.generic_name,
@@ -577,24 +625,40 @@ export function toDrugOptions(row) {
       category: alt.category,
       source_flag: alt.source_flag,
       drug_link_enabled: alt.drug_link_enabled !== false,
-      // Per-drug note (Decision 5 two-slot model). Copied from alt.note so
-      // it survives the toDrugOptions round-trip regardless of which group
-      // the option lands in. Previously this was only copied onto own-group
-      // alternatives via grp.note, and silently dropped for same-group ones.
+      // Per-drug note (Decision 5 two-slot model) — independent of the
+      // group note, travels with the option regardless of grouping.
       note: alt.note ?? null,
     };
 
-    if (sharesMainDose) {
+    if (joinsMain) {
       mainGroup.options.push(option);
-    } else {
-      groups.push({
-        group_id: option.group_id,
-        options: [option],
-        dose: alt.dose,
-        dose_who: alt.dose_who,
-        note: alt.note,
-      });
+      return;
     }
+
+    const existingGroup = groupsByKey.get(resolvedGroupId);
+    if (existingGroup) {
+      // Another alternative already seeded this group (PHASE 2.8 case of
+      // two+ alternatives sharing a persisted group_id) — just add this
+      // option; dose/dose_who/group_note were already seeded identically
+      // by fromDrugOptions on every member, so the first one encountered
+      // is authoritative.
+      existingGroup.options.push(option);
+      return;
+    }
+
+    const newGroup = {
+      group_id: resolvedGroupId,
+      options: [option],
+      dose: alt.dose,
+      dose_who: alt.dose_who,
+      // PHASE 2.8: prefer the explicit group_note field; fall back to
+      // alt.note only for legacy alternatives saved before group_note
+      // existed, where alt.note was the only place a single-option
+      // group's note could have been stored.
+      note: alt.group_note ?? alt.note ?? null,
+    };
+    groupsByKey.set(resolvedGroupId, newGroup);
+    groups.push(newGroup);
   });
 
   return groups;
@@ -614,14 +678,15 @@ export function toDrugOptions(row) {
  * alternativeSharesParentDose() as long as formulation_id also matches).
  * An alternative in any other group carries that group's own dose/note.
  *
- * NOTE: if an admin explicitly groups two options together that do NOT
- * share a formulation_id (a real possibility once Phase 2's manual
- * "move to group" action exists), this cannot be round-tripped through
- * formulation_id-based grouping alone — alternativeSharesParentDose()
- * would recompute "false" on next load even though the admin grouped
- * them on purpose. Flagging for Phase 2.8 rather than solving here:
- * Phase 0 only needs the default/derived case (toDrugOptions) to be
- * correct, since no UI can produce that edge case yet.
+ * PHASE 2.8 (2026-06-25): every alternative now also persists its
+ * `group_id` and `group_note` literally, so toDrugOptions() can trust
+ * the grouping signal directly on next load instead of re-deriving it
+ * from formulation_id. This is what makes an admin's explicit
+ * "move to group" action (including grouping two options that do NOT
+ * share a formulation_id) survive a save/reload — previously this was a
+ * known gap (see the removed note this docstring used to carry), and the
+ * group-level note for any non-main group was silently dropped entirely
+ * since ALTERNATIVE_DRUG_TEMPLATE had no field for it.
  *
  * @param {DrugRow} row               - existing row, used only for its
  *                                       non-drug-option fields (row_type, id)
@@ -656,14 +721,15 @@ export function fromDrugOptions(row, groups) {
       source_flag: opt.source_flag,
       dose: sharesMainGroup ? null : grp.dose,
       dose_who: sharesMainGroup ? null : grp.dose_who,
-      // Per-drug note (Decision 5 two-slot model): always opt.note —
-      // the per-drug note travels with the option, not with the group.
-      // Previously this was `sharesMainGroup ? null : grp.note`, which
-      // silently dropped per-drug notes for same-group alternatives and
-      // conflated the group note with the per-drug note for own-group ones.
-      // Own-group alternatives now correctly carry grp.note on their group
-      // object; the alternative's own `note` field is the per-drug slot only.
+      // Per-drug note (Decision 5 two-slot model) — always opt.note, the
+      // per-drug note travels with the option, not with the group.
       note: opt.note ?? null,
+      // PHASE 2.8: persist the real grouping signal literally, so it can
+      // be trusted directly on next load (see toDrugOptions above).
+      group_id: opt.group_id,
+      // PHASE 2.8: persist the group-level note for non-main groups —
+      // previously dropped entirely, since this field didn't exist.
+      group_note: sharesMainGroup ? null : (grp.note ?? null),
     };
   });
 
