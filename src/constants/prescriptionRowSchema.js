@@ -198,9 +198,17 @@ export const DRUG_ROW_TEMPLATE = {
  *     doses_structured `who` key picked at add-time, display-only, not
  *     cleared by hand-editing `dose` afterward.
  * @property {string|null} note
- *   - Same sharing rule as `dose`: hidden/inherited from the parent's
- *     `note` when this alternative shares the parent's formulation_id,
- *     otherwise its own independent value.
+ *   - PHASE A DOCSTRING FIX (2026-06-26): this comment previously said
+ *     this field was "hidden/inherited from the parent's note" when
+ *     sharing the parent's formulation_id — that described the OLD,
+ *     pre-two-slot-model behavior and was stale/incorrect as of the
+ *     Decision 5 two-slot note model (see DRUG_OPTION_TEMPLATE.note and
+ *     DrugOptionGroup.note below). This is the alternative's own
+ *     independent per-drug note — it always travels with this specific
+ *     alternative, regardless of which group/cluster it belongs to, and
+ *     is never overridden or hidden by the group's shared note. The
+ *     group-level note for non-main groups lives in `group_note` below,
+ *     a separate field.
  * @property {'manual_entry'|null} source_flag
  * @property {string|null} group_id
  *   - PHASE 2.8 (2026-06-25), new. Persisted grouping signal for the flat
@@ -651,11 +659,25 @@ export function toDrugOptions(row) {
       options: [option],
       dose: alt.dose,
       dose_who: alt.dose_who,
-      // PHASE 2.8: prefer the explicit group_note field; fall back to
-      // alt.note only for legacy alternatives saved before group_note
-      // existed, where alt.note was the only place a single-option
-      // group's note could have been stored.
-      note: alt.group_note ?? alt.note ?? null,
+      // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
+      // The previous `alt.group_note ?? alt.note ?? null` fallback was
+      // written for true legacy data (alternatives saved before
+      // group_note existed as a field at all), but it could not tell
+      // that case apart from a brand-new single-option group where the
+      // admin deliberately set only a per-drug note and intentionally
+      // left the group note empty — both cases present as group_note
+      // being null/undefined. The fallback wrongly fired for both,
+      // copying the per-drug note into the group note slot every time
+      // a single-option group was created (reported bug: per-drug note
+      // on a lone alternative "bleeds into" the group note).
+      // Verified against live data (2026-06-26, Supabase project
+      // szzsqjpmcqsmvkvncgln): only one alternative in the entire
+      // database depended on this fallback, and it was a non-production
+      // stress-test row, not real clinical content. Safe to remove —
+      // any genuinely legacy row gets a real group_id/group_note
+      // stamped the next time it is opened and saved (existing lazy
+      // per-row migration, unchanged by this fix).
+      note: alt.group_note ?? null,
     };
     groupsByKey.set(resolvedGroupId, newGroup);
     groups.push(newGroup);

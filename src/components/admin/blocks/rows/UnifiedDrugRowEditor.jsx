@@ -316,6 +316,16 @@ function resolveDosePick(dosesStructured) {
 function GroupNoteSlot({ note, onChange }) {
   const [noteOpen, setNoteOpen] = useState(!!note)
 
+  // PHASE A BUG FIX (2026-06-26, defensive): re-sync open state whenever
+  // note is non-empty, rather than relying solely on the mount-only
+  // useState(!!note) initializer above. Applied here as a precaution —
+  // see the identical, confirmed-triggering bug in DrugOptionNoteSlot
+  // below for the full explanation of the remount/timing risk this
+  // guards against.
+  useEffect(() => {
+    if (note) setNoteOpen(true)
+  }, [note])
+
   if (noteOpen) {
     return (
       <input
@@ -376,6 +386,25 @@ function GroupNoteSlot({ note, onChange }) {
 
 function DrugOptionNoteSlot({ note, onChange }) {
   const [open, setOpen] = useState(!!note)
+
+  // PHASE A BUG FIX (2026-06-26): re-sync open state whenever note is
+  // non-empty, instead of relying solely on the mount-only
+  // useState(!!note) initializer above. That initializer only
+  // evaluates once, on mount — if this component remounts (new
+  // option.id/key, or the surrounding groups[] array gets rebuilt in a
+  // way that changes this option's position/identity) before the
+  // patched note value has fully flowed back into the option prop this
+  // component receives, `open` re-initializes to false on the remount,
+  // and a non-empty note appears to vanish behind a re-collapsed
+  // "+ note" button — even though the value is still present in state.
+  // This matches the reported bug exactly: a per-drug note in a group
+  // of 2+ "vanishes" after the row collapses, as if it never existed.
+  // This keeps the existing "stays open once clicked, no auto-collapse
+  // on blur" behavior (Decision 5) intact — it only ever forces OPEN
+  // when there is real content to show, never forces closed.
+  useEffect(() => {
+    if (note) setOpen(true)
+  }, [note])
 
   if (open) {
     return (
@@ -1094,9 +1123,32 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       ? [{ ...srcGroup, options: remainingSrc }]
       : []
 
-    // New group is inserted immediately after the (possibly removed) source.
-    const newGroup = { group_id: newGroupId, options: [movedOption], dose: null, dose_who: null, note: null }
+    // PHASE A BUG FIX (2026-06-26): seed the new standalone group's dose
+    // from the group this option is leaving, instead of unconditionally
+    // discarding it (reported bug: moving a drug out of a group loses
+    // its dose). dose/dose_who live on the GROUP, not the option, so
+    // there is nothing on the option itself to recover a dose from —
+    // the dose the admin just had access to a moment ago is the only
+    // sensible starting point, fully editable afterward (not locked,
+    // not a permanent link back to the old group).
+    //
+    // The group NOTE is deliberately NOT carried over here. Unlike
+    // dose, a group note is explicitly shared content the remaining
+    // group members are entitled to — copying it onto a brand-new
+    // split-off group would duplicate someone else's shared note onto
+    // an unrelated group (the same class of bug as the per-drug/group
+    // note bleed fixed in toDrugOptions() above). The option's own
+    // per-drug note already travels correctly via the `...option`
+    // spread above and needs no special handling here.
+    const newGroup = {
+      group_id: newGroupId,
+      options: [movedOption],
+      dose: srcGroup.dose ?? null,
+      dose_who: srcGroup.dose_who ?? null,
+      note: null,
+    }
 
+    // New group is inserted immediately after the (possibly removed) source.
     const before = groups.slice(0, groupIdx)
     const after  = groups.slice(groupIdx + 1)
     emitGroups([...before, ...srcUpdated, newGroup, ...after])
@@ -1270,6 +1322,39 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             if (!firstIsLinked && !firstHasName) return null
             return (
               <>
+                {/* PHASE A BUG FIX (2026-06-26) — persistent dose_who
+                    provenance tag. Previously dose_who was ONLY shown as
+                    placeholder text on the dose input below, but
+                    placeholder text disappears the instant the field has
+                    a value — and dose_who is only ever set at the exact
+                    same moment dose gets a value (via a library pick).
+                    So the tag was invisible at the one moment it should
+                    have been visible (reported bug: "the adult/child
+                    dose tag doesn't appear"). dose_who itself was always
+                    being computed/persisted correctly (handleBrandPick →
+                    onDoseReady → applyDoseToGroup → fromDrugOptions) —
+                    this is a pure rendering addition, not a data fix.
+                    Per the schema's own docs, dose_who is provenance,
+                    not a lock: editing dose by hand afterward does NOT
+                    clear this tag, so it is shown unconditionally
+                    whenever set, regardless of whether dose has since
+                    been hand-edited. */}
+                {group.dose_who && (
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    alignSelf: 'flex-start',
+                    marginLeft: 19, // aligns under the names, matching the dose input's paddingLeft
+                    padding: '1px 7px',
+                    borderRadius: 99,
+                    fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                    color: 'var(--color-accent)',
+                    background: 'var(--color-accent-light)',
+                    fontFamily: 'var(--font-body)',
+                  }}>
+                    {doseWhoLabel(group.dose_who)}
+                  </span>
+                )}
+
                 {/* PHASE 2.2-D — dose tier: 12px, regular weight, secondary color,
                     19px left indent to align under the drug names above it.
                     FieldLabel removed (Decision 4 + Decision 5 hierarchy — dose
@@ -1278,9 +1363,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   type="text"
                   value={group.dose ?? ''}
                   onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                  placeholder={group.dose_who
-                    ? `Dose (${doseWhoLabel(group.dose_who)})`
-                    : 'Dose / instructions'}
+                  placeholder="Dose / instructions"
                   dir="auto"
                   style={{
                     width: '100%', boxSizing: 'border-box',
@@ -1485,5 +1568,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
-
-
