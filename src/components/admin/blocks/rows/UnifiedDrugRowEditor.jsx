@@ -167,7 +167,7 @@ import { useState, useRef, useEffect } from 'react'
 import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
-import { DRUG_FORMS, DRUG_ROUTES } from '../../../../config/forms'
+import { DRUG_FORMS } from '../../../../config/forms'
 import { DRUG_CATEGORIES } from '../../../../config/categories'
 import {
   findGenericByName,
@@ -564,7 +564,6 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
 function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
-  const [promoteRoute, setPromoteRoute]       = useState('')
   const [promoting, setPromoting]             = useState(false)
   const [promoteError, setPromoteError]       = useState(null)
 
@@ -675,8 +674,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       setPromoteError('Concentration and form are required to save to the library.')
       return
     }
-    if (!promoteCategory || !promoteRoute) {
-      setPromoteError('Category and route are required to save to the library.')
+    if (!promoteCategory) {
+      setPromoteError('Category is required to save to the library.')
       return
     }
 
@@ -717,7 +716,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
           form: option.form,
-          route: promoteRoute,
+          route: null,
           doses_structured: [],
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
@@ -748,7 +747,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       patch({ generic_id: genericId, formulation_id: formulationId, brand_id: brandId, source_flag: SOURCE_FLAG_VALUE })
       setPromoteOn(false)
       setPromoteCategory('')
-      setPromoteRoute('')
     } catch (err) {
       setPromoteError(err.message ?? 'Promotion failed. Please try again.')
     } finally {
@@ -941,33 +939,18 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
 
           {promoteOn && (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <FieldLabel>Category</FieldLabel>
-                  <select
-                    value={promoteCategory}
-                    onChange={e => setPromoteCategory(e.target.value)}
-                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
-                  >
-                    <option value="">— select —</option>
-                    {DRUG_CATEGORIES.map(c => (
-                      <option key={c.value} value={c.value}>{c.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <FieldLabel>Route</FieldLabel>
-                  <select
-                    value={promoteRoute}
-                    onChange={e => setPromoteRoute(e.target.value)}
-                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
-                  >
-                    <option value="">— select —</option>
-                    {DRUG_ROUTES.map(r => (
-                      <option key={r.value} value={r.value}>{r.label}</option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <FieldLabel>Category</FieldLabel>
+                <select
+                  value={promoteCategory}
+                  onChange={e => setPromoteCategory(e.target.value)}
+                  style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                >
+                  <option value="">— select —</option>
+                  {DRUG_CATEGORIES.map(c => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </select>
               </div>
 
               {promoteError && (
@@ -1695,3 +1678,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
