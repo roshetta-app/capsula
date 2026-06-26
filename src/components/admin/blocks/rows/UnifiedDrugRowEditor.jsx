@@ -164,7 +164,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link, Unlink, Plus, X, Library, GripVertical } from 'lucide-react'
+import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS, DRUG_ROUTES } from '../../../../config/forms'
@@ -176,6 +176,7 @@ import {
   insertGeneric,
   insertFormulation,
   insertBrand,
+  fetchFormulationWithGeneric,
 } from '../../../../lib/adminQueries'
 import {
   DRUG_OPTION_TEMPLATE,
@@ -1026,35 +1027,39 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // incoming row on mount via toDrugOptions(); all mutations go through
   // emitGroups() which calls setGroups and then fromDrugOptions() → onChange
   // so the external DRUG_ROW_TEMPLATE shape is preserved unchanged.
-  const [groups, setGroups] = useState(() => {
-    const initial = toDrugOptions(row)
-    console.log('[DEBUG mount] toDrugOptions(row) ->', initial.flatMap(g => g.options.map(o => ({ id: o.id, brand_name: o.brand_name, note: o.note }))))
-    console.log('[DEBUG mount] row.note:', row.note, 'row.alternatives:', row.alternatives?.map(a => ({ brand_name: a.brand_name, note: a.note })))
-    return initial
-  })
+  const [groups, setGroups] = useState(() => toDrugOptions(row))
 
   // Add-option picker modals. Replace the old altBrandPickerOpen /
   // altFormulationPickerOpen / altScopedBrandPickerOpen state from Phase 1.
   const [addBrandPickerOpen, setAddBrandPickerOpen]             = useState(false)
   const [addFormulationPickerOpen, setAddFormulationPickerOpen] = useState(false)
 
+  // RESTORE-DOSE FEATURE (2026-06-26): "restore dose from library" button.
+  // Group-scoped pending-choice state, separate from DrugOptionRow's own
+  // pendingDoseChoice (which is per-option, used during a fresh brand
+  // pick). This one lives here because it operates directly on
+  // group.dose/group.dose_who, not on any specific option's library link
+  // action. restoringGroupIdx tracks which group's restore is in flight
+  // (for a loading state); restorePendingChoice holds the dose rows when
+  // the formulation has 2+ and the admin needs to pick one, keyed by
+  // groupIdx so only the relevant group's chooser renders.
+  const [restoringGroupIdx, setRestoringGroupIdx] = useState(null)
+  const [restorePendingChoice, setRestorePendingChoice] = useState(null) // { groupIdx, doseRows } | null
+
   // ── Mutation helpers ───────────────────────────────────────────────────
 
   function emitGroups(nextGroups) {
     setGroups(nextGroups)
     const nextRow = fromDrugOptions(row, nextGroups)
-    console.log('[DEBUG emitGroups] outgoing row.note:', nextRow.note, 'row.alternatives:', nextRow.alternatives?.map(a => ({ brand_name: a.brand_name, note: a.note })))
     onChange(nextRow)
   }
 
   // Update a single option within a group (identified by groupIdx + option.id).
   function updateOption(groupIdx, optionId, nextOption) {
-    console.log('[DEBUG updateOption]', { groupIdx, optionId, nextOptionNote: nextOption.note })
     const nextGroups = groups.map((g, gi) => {
       if (gi !== groupIdx) return g
       return { ...g, options: g.options.map(o => o.id === optionId ? nextOption : o) }
     })
-    console.log('[DEBUG updateOption] nextGroups note values:', nextGroups.flatMap(g => g.options.map(o => ({ id: o.id, note: o.note }))))
     emitGroups(nextGroups)
   }
 
@@ -1098,6 +1103,53 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       gi === groupIdx ? { ...g, note: value || null } : g
     )
     emitGroups(nextGroups)
+  }
+
+  // ── Restore dose from library (new feature, 2026-06-26) ────────────────
+  // "Restore from library" button next to a group's shared dose field.
+  // Only rendered when the group's first option is formulation-linked
+  // (see the button's own render-gate below) — a free-text/manual group
+  // has no library dose to restore, so the button simply doesn't exist
+  // there rather than appearing disabled.
+  //
+  // LOCKED (2026-06-26): always re-fetches the formulation's CURRENT
+  // doses_structured live from Supabase via fetchFormulationWithGeneric
+  // — never uses any cached _formulationMeta snapshot on the row, since
+  // "restore to library value" should mean the real, current library
+  // value, not whatever was true at the moment this row was originally
+  // linked (the library may have been edited since).
+  //
+  // Behavior mirrors the existing fresh-pick flow exactly
+  // (handleBrandPick / resolveDosePick in DrugOptionRow):
+  //   0 dose rows  -> nothing to restore; defensive no-op (button
+  //                   shouldn't be visible in this state to begin with).
+  //   1 dose row   -> applied immediately, no extra confirmation.
+  //   2+ dose rows -> surfaces the same DoseWhoChooser UI used for a
+  //                   fresh multi-dose pick, so the admin re-picks which
+  //                   age-group dose to restore.
+  // Only ever touches group.dose / group.dose_who — never the group
+  // note, never any option's identity fields.
+  async function restoreDoseFromLibrary(groupIdx) {
+    const group = groups[groupIdx]
+    const formulationId = group.options[0]?.formulation_id
+    if (!formulationId) return // defensive — button shouldn't render without this
+
+    setRestoringGroupIdx(groupIdx)
+    try {
+      const { data, error } = await fetchFormulationWithGeneric(formulationId)
+      if (error || !data) return // silently no-op on fetch failure; dose is left untouched
+
+      const resolved = resolveDosePick(data.doses_structured)
+      if (resolved.needsChoice) {
+        setRestorePendingChoice({ groupIdx, doseRows: resolved.doseRows })
+      } else if (resolved.dose) {
+        applyDoseToGroup(groupIdx, resolved.dose, resolved.dose_who)
+      }
+      // resolved.dose === null (formulation has zero dose rows) -> no-op,
+      // nothing to restore to; existing group.dose is left exactly as-is.
+    } finally {
+      setRestoringGroupIdx(null)
+    }
   }
 
   // ── Move mutations (PHASE 2.4) ─────────────────────────────────────────
@@ -1358,26 +1410,74 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                 {/* PHASE 2.2-D — dose tier: 12px, regular weight, secondary color,
                     19px left indent to align under the drug names above it.
                     FieldLabel removed (Decision 4 + Decision 5 hierarchy — dose
-                    position communicates its role; no label needed). */}
-                <input
-                  type="text"
-                  value={group.dose ?? ''}
-                  onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                  placeholder="Dose / instructions"
-                  dir="auto"
-                  style={{
-                    width: '100%', boxSizing: 'border-box',
-                    padding: '3px 8px',
-                    paddingLeft: 19,
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: 12, fontWeight: 400,
-                    fontFamily: 'var(--font-body)',
-                    backgroundColor: 'var(--color-surface)',
-                    color: 'var(--color-text-secondary)',
-                    outline: 'none',
-                  }}
-                />
+                    position communicates its role; no label needed).
+
+                    RESTORE-DOSE FEATURE (2026-06-26): wrapped in a row with a
+                    "restore from library" icon button, gated specifically on
+                    firstOpt.formulation_id (not the broader firstIsLinked check
+                    above, which also covers brand/generic-only links that have
+                    no formulation_id and therefore no doses_structured to
+                    restore from at all). */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="text"
+                    value={group.dose ?? ''}
+                    onChange={e => updateGroupDose(groupIdx, e.target.value)}
+                    placeholder="Dose / instructions"
+                    dir="auto"
+                    style={{
+                      flex: 1,
+                      width: '100%', boxSizing: 'border-box',
+                      padding: '3px 8px',
+                      paddingLeft: 19,
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: 12, fontWeight: 400,
+                      fontFamily: 'var(--font-body)',
+                      backgroundColor: 'var(--color-surface)',
+                      color: 'var(--color-text-secondary)',
+                      outline: 'none',
+                    }}
+                  />
+                  {firstOpt.formulation_id && (
+                    <button
+                      type="button"
+                      onClick={() => restoreDoseFromLibrary(groupIdx)}
+                      disabled={restoringGroupIdx === groupIdx}
+                      title="Restore dose from library"
+                      aria-label="Restore dose from library"
+                      style={{
+                        flexShrink: 0,
+                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                        width: 22, height: 22,
+                        border: 'none', background: 'none', padding: 0,
+                        borderRadius: 'var(--radius-md)',
+                        color: 'var(--color-text-tertiary)',
+                        cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
+                        opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                      }}
+                    >
+                      <RotateCcw size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* RESTORE-DOSE FEATURE (2026-06-26): multi-dose chooser,
+                    only rendered for the group currently being restored. */}
+                {restorePendingChoice?.groupIdx === groupIdx && (
+                  <DoseWhoChooser
+                    doseRows={restorePendingChoice.doseRows}
+                    onChoose={(doseRow) => {
+                      applyDoseToGroup(
+                        groupIdx,
+                        formatDoseRowText(doseRow),
+                        doseRow.who ?? doseRow.group ?? null
+                      )
+                      setRestorePendingChoice(null)
+                    }}
+                    onSkip={() => setRestorePendingChoice(null)}
+                  />
+                )}
 
                 {/* PHASE 2.2-C/D — per-group note slot (tertiary, italic) */}
                 <GroupNoteSlot

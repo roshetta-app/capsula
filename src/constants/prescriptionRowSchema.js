@@ -110,10 +110,30 @@ export const ROW_TYPES = {
  *                                              structured row. Editing `dose` afterward does NOT
  *                                              clear this tag — it is provenance, not a lock.
  *
- * @property {string|null} note              - LOCKED (2026-06-20). Single bidi field — author types
- *                                              English or Arabic (or both) into one box; the renderer
- *                                              applies dir="auto" so each language displays in its
- *                                              natural direction.
+ * @property {string|null} note              - LOCKED (2026-06-20). This is the GROUP-level note for
+ *                                              the main drug's group (Decision 5 two-slot model) — the
+ *                                              note shared by every member of the main drug's cluster,
+ *                                              shown once after the last member of that cluster.
+ *                                              Single bidi field — author types English or Arabic (or
+ *                                              both) into one box; the renderer applies dir="auto" so
+ *                                              each language displays in its natural direction.
+ * @property {string|null} drug_note          - PHASE A BUG FIX (2026-06-26), new. The main drug's own
+ *                                              PER-DRUG note (Decision 5 two-slot model) — independent
+ *                                              of `note` above (the group note), sits directly under
+ *                                              the main drug's own name line, exactly mirroring
+ *                                              AlternativeDrug.note's role for alternatives. Until this
+ *                                              field existed, the main drug had no equivalent per-drug
+ *                                              note slot at all: DrugOptionRow's per-drug note input
+ *                                              wrote to the in-memory main option's `note` field, but
+ *                                              toDrugOptions()/fromDrugOptions() never read or wrote
+ *                                              that value anywhere on `row` — so a per-drug note typed
+ *                                              on the main drug was silently dropped on every save,
+ *                                              while the identical action on an alternative worked
+ *                                              correctly (alternatives already had their own `note`
+ *                                              field to round-trip through). This field closes that
+ *                                              gap. Defaults to null; additive — existing rows have no
+ *                                              main-drug per-drug note, so this is null on migration,
+ *                                              same as AlternativeDrug.note was when it was introduced.
  * @property {boolean} drug_link_enabled     - whether the brand/formulation name links through to
  *                                              its drug detail page in the app
  *
@@ -154,6 +174,7 @@ export const DRUG_ROW_TEMPLATE = {
   dose: null,
   dose_who: null,
   note: null,
+  drug_note: null,
   source_flag: null,
   alternatives: [],
 };
@@ -579,6 +600,11 @@ export function toDrugOptions(row) {
     category: row.category,
     source_flag: row.source_flag,
     drug_link_enabled: row.drug_link_enabled !== false,
+    // PHASE A BUG FIX (2026-06-26): the main drug's own per-drug note
+    // (Decision 5 two-slot model), independent of the group note below.
+    // Previously missing entirely — see DRUG_ROW_TEMPLATE.drug_note's
+    // docstring for the full explanation of the gap this closes.
+    note: row.drug_note ?? null,
   };
 
   const mainGroup = {
@@ -771,6 +797,14 @@ export function fromDrugOptions(row, groups) {
     dose: mainGrp.dose,
     dose_who: mainGrp.dose_who,
     note: mainGrp.note,
+    // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
+    // note back onto drug_note (the group note above is a separate,
+    // shared field). Closes the round-trip gap — see
+    // DRUG_ROW_TEMPLATE.drug_note's docstring. Correct regardless of
+    // which physical drug option ends up as "main" after a move/reorder,
+    // since mainOpt.note already holds that specific option's own
+    // per-drug note value, independent of its origin.
+    drug_note: mainOpt.note ?? null,
     source_flag: mainOpt.source_flag,
     drug_link_enabled: mainOpt.drug_link_enabled,
     alternatives,
