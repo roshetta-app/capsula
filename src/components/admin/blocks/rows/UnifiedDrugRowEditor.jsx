@@ -561,9 +561,10 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
 //   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
 //   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
-function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow }) {
+function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
+  const [promoteDoseWho, setPromoteDoseWho]   = useState('adult')
   const [promoting, setPromoting]             = useState(false)
   const [promoteError, setPromoteError]       = useState(null)
 
@@ -717,7 +718,17 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           concentration,
           form: option.form,
           route: null,
-          doses_structured: [],
+          doses_structured: (() => {
+            const dose = groupDose?.trim()
+            if (!dose) return []
+            if (promoteDoseWho === 'both') {
+              return [
+                { who: 'adult', instruction: dose },
+                { who: 'child', instruction: dose },
+              ]
+            }
+            return [{ who: promoteDoseWho, instruction: dose }]
+          })(),
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
@@ -747,6 +758,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       patch({ generic_id: genericId, formulation_id: formulationId, brand_id: brandId, source_flag: SOURCE_FLAG_VALUE })
       setPromoteOn(false)
       setPromoteCategory('')
+      setPromoteDoseWho('adult')
     } catch (err) {
       setPromoteError(err.message ?? 'Promotion failed. Please try again.')
     } finally {
@@ -922,7 +934,11 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         }}>
           <button
             type="button"
-            onClick={() => setPromoteOn(v => !v)}
+            onClick={() => {
+              const next = !promoteOn
+              setPromoteOn(next)
+              if (!next) { setPromoteCategory(''); setPromoteDoseWho('adult'); setPromoteError(null) }
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '5px 10px', borderRadius: 'var(--radius-md)',
@@ -952,6 +968,21 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
                   ))}
                 </select>
               </div>
+
+              {groupDose?.trim() && (
+                <div>
+                  <FieldLabel>Save dose as</FieldLabel>
+                  <select
+                    value={promoteDoseWho}
+                    onChange={e => setPromoteDoseWho(e.target.value)}
+                    style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
+                  >
+                    <option value="adult">Adult</option>
+                    <option value="child">Child</option>
+                    <option value="both">Both (adult + child)</option>
+                  </select>
+                </div>
+              )}
 
               {promoteError && (
                 <div style={{
@@ -1368,6 +1399,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               canMoveToNew={group.options.length > 1}
               canMoveAbove={groupIdx > 0}
               canMoveBelow={groupIdx < groups.length - 1}
+              groupDose={group.dose ?? ''}
+              groupDoseWho={group.dose_who ?? null}
             />
           ))}
 
@@ -1678,4 +1711,5 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+
 
