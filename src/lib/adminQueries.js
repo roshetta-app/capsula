@@ -81,7 +81,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
     .from('formulations')
     .select(`
       id, concentration, form, route,
-      doses, doses_structured, default_dose_override, is_published,
+      doses_structured, default_dose_override, is_published,
       generics (
         id, slug, name_en, name_ar, category, class,
         uses_legacy, warnings_legacy, textbook_doses, textbook_dose_notes,
@@ -873,5 +873,6 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
 
 
