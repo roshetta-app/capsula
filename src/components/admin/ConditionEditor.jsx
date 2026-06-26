@@ -1,4 +1,3 @@
-
 /**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
@@ -7,6 +6,16 @@
  *     from ConditionContext (which had wrong field name: .name_en vs .name).
  *  2. Inline "＋ New specialty" mini-modal so admins never leave this page.
  *  3. ConditionFormModal eliminated — ConditionsCMS "Add New" now routes here.
+ *
+ * Phase 3 changes (page chrome + declutter):
+ *  - Identity fields and Content Blocks each wrapped in a surface card
+ *    (white card on tinted --color-bg backdrop — Decision 3, Option B).
+ *  - SectionTitle usage inside <main> replaced with SectionCardHeader above each card.
+ *  - Helper <p> text under Tags field removed (Decision 4).
+ *  - Helper <p> text inside NewSpecialtyModal removed (Decision 4).
+ *  - No nested boxes within cards — flat field layout unchanged.
+ *  - Tab chrome (3.3) deferred: lives in BlockListEditor / PrescriptionSheetEditor,
+ *    not in this file.
  */
 
 import { useState, useEffect } from 'react'
@@ -28,15 +37,36 @@ import {
   syncConditionTags,
 } from '../../lib/adminQueries'
 
-// ─── Section header ───────────────────────────────────────────────────────────
+// ─── Section card header ──────────────────────────────────────────────────────
+// Renders the bold uppercase label that sits directly above each section card.
+// Replaces SectionTitle inside <main> — label is now outside the card, not
+// inside it, so the card's padding stays clean with no top-margin offset.
 
-function SectionTitle({ children }) {
+function SectionCardHeader({ children }) {
   return (
     <div style={{
       fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
       textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-      marginBottom: 'var(--space-3)', marginTop: 'var(--space-5)',
-      borderBottom: '1px solid var(--color-border)', paddingBottom: 'var(--space-2)',
+      marginBottom: 'var(--space-2)',
+    }}>
+      {children}
+    </div>
+  )
+}
+
+// ─── Section card wrapper ─────────────────────────────────────────────────────
+// One white card per major section, sits on the tinted --color-bg backdrop.
+// No nested borders inside — content is rendered flat within this single shell.
+
+function SectionCard({ children, style }) {
+  return (
+    <div style={{
+      backgroundColor: 'var(--color-surface)',
+      border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-5)',
+      boxShadow: 'var(--shadow-card)',
+      ...style,
     }}>
       {children}
     </div>
@@ -196,9 +226,7 @@ function NewSpecialtyModal({ isOpen, onClose, onCreated }) {
               outline: 'none',
             }}
           />
-          <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6, fontFamily: 'var(--font-body)' }}>
-            Icon and color can be customised later in Specialties Manager.
-          </p>
+          {/* Phase 3.4: helper text removed — placeholder carries the hint */}
         </div>
 
         {err && (
@@ -466,7 +494,7 @@ export default function ConditionEditor() {
       color: 'var(--color-text-primary)',
     }}>
 
-      {/* Header */}
+      {/* ── Sticky header ─────────────────────────────────────────────────── */}
       <header style={{
         position: 'sticky', top: 0, zIndex: 50,
         backgroundColor: 'var(--color-surface)',
@@ -514,6 +542,7 @@ export default function ConditionEditor() {
         </div>
       </header>
 
+      {/* ── Page body ─────────────────────────────────────────────────────── */}
       <main style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-4) var(--space-4) var(--space-12)' }}>
 
         {/* Error banner */}
@@ -529,12 +558,10 @@ export default function ConditionEditor() {
           </div>
         )}
 
-        {/* ── Details ──────────────────────────────────────────────────────── */}
-        <div>
-
-          {/* ── Identity ─────────────────────────────────────────────────── */}
-
-          <SectionTitle>Identity</SectionTitle>
+        {/* ── Identity card ──────────────────────────────────────────────── */}
+        {/* Phase 3.1: white card on tinted backdrop. Label above card, not inside. */}
+        <SectionCardHeader>Identity</SectionCardHeader>
+        <SectionCard style={{ marginBottom: 'var(--space-5)' }}>
 
           <div style={{ marginBottom: 'var(--space-4)' }}>
             <FieldLabel required>Condition name</FieldLabel>
@@ -565,12 +592,10 @@ export default function ConditionEditor() {
               disabled={saving}
               suggestions={allTags}
             />
-            <p style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 6, fontFamily: 'var(--font-body)' }}>
-              Tags improve search. Type to create a new tag or pick an existing one.
-            </p>
+            {/* Phase 3.4: helper text removed — placeholder carries the hint */}
           </div>
 
-          {/* ── Specialty row: dropdown + inline "New" button ─────────── */}
+          {/* Specialty row: dropdown + inline "New" button */}
           <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
@@ -609,7 +634,7 @@ export default function ConditionEditor() {
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
             <div style={{ flex: 1 }}>
               <FieldLabel>ICD-10 code</FieldLabel>
               <TextInput
@@ -636,21 +661,22 @@ export default function ConditionEditor() {
             </div>
           </div>
 
-        </div>
+        </SectionCard>
 
-        {/* ── Blocks (Clinical + Rx) ───────────────────────────────────────── */}
-        <div style={{ marginTop: 'var(--space-6)' }}>
-          <SectionTitle>Content Blocks</SectionTitle>
+        {/* ── Content Blocks card ────────────────────────────────────────── */}
+        {/* Phase 3.1: same card treatment. BlockListEditor renders flat inside. */}
+        <SectionCardHeader>Content Blocks</SectionCardHeader>
+        <SectionCard>
           <BlockListEditor
             blocks={blocks}
             onChange={setBlocks}
             disabled={saving}
           />
-        </div>
+        </SectionCard>
 
       </main>
 
-      {/* ── Inline specialty creator ──────────────────────────────────────────── */}
+      {/* ── Inline specialty creator ──────────────────────────────────────── */}
       <NewSpecialtyModal
         isOpen={newSpecialtyOpen}
         onClose={() => setNewSpecialtyOpen(false)}
