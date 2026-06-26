@@ -309,7 +309,7 @@ function resolveDosePick(dosesStructured) {
 
 // ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
 // PHASE 2.2-C: per-group note slot, rendered below the dose field for each
-// group. Holds its own `noteOpen` state so groups open/close independently.
+// group. Holds its own 'noteOpen' state so groups open/close independently.
 // PHASE 2.2-D: restyled to Decision 5 note-tier hierarchy — 11px, italic,
 // tertiary color. No FieldLabel (labels are removed per Decision 4). Button
 // label changed to "+ group note" to distinguish from the per-drug "+ note"
@@ -377,7 +377,7 @@ function GroupNoteSlot({ note, onChange }) {
 //   - Labelled "+ note" (shorter — position under the name makes it clear this
 //     is the per-drug note, not the group note below the dose).
 //   - Travels with the drug option when it is moved to a different group
-//     (the note lives on `option.note`, not on the group record).
+//     (the note lives on 'option.note', not on the group record).
 //
 // Visual tier: 11px, italic, tertiary color — lowest visual priority, matching
 // the note tier in Decision 5's name > dose > note hierarchy.
@@ -396,7 +396,7 @@ function DrugOptionNoteSlot({ note, onChange }) {
   // option.id/key, or the surrounding groups[] array gets rebuilt in a
   // way that changes this option's position/identity) before the
   // patched note value has fully flowed back into the option prop this
-  // component receives, `open` re-initializes to false on the remount,
+  // component receives, 'open' re-initializes to false on the remount,
   // and a non-empty note appears to vanish behind a re-collapsed
   // "+ note" button — even though the value is still present in state.
   // This matches the reported bug exactly: a per-drug note in a group
@@ -1191,7 +1191,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     // split-off group would duplicate someone else's shared note onto
     // an unrelated group (the same class of bug as the per-drug/group
     // note bleed fixed in toDrugOptions() above). The option's own
-    // per-drug note already travels correctly via the `...option`
+    // per-drug note already travels correctly via the '...option'
     // spread above and needs no special handling here.
     const newGroup = {
       group_id: newGroupId,
