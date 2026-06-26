@@ -1,3 +1,4 @@
+```jsx
 /**
  * src/components/admin/blocks/rows/UnifiedDrugRowEditor.jsx
  *
@@ -1249,7 +1250,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // formulation_id matches that group's first option — same logic as
   // toDrugOptions() default-join. If no match, a new group is created.
 
-  function addOptionToGroups(newOption) {
+  // pendingDose — optional { dose, dose_who, needsChoice, doseRows } from resolveDosePick.
+  // When provided, the dose is written into the target group in the same emit so the
+  // "Add option: pick a brand/formulation" buttons pre-fill dose identically to picking
+  // a drug inside an existing DrugOptionRow via DrugSearchField (bug fix 2026-06-26).
+  function addOptionToGroups(newOption, pendingDose) {
     const matchGroupIdx = groups.findIndex(g => {
       const firstOpt = g.options[0]
       return (
@@ -1260,22 +1265,43 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     })
 
     let nextGroups
+    let targetGroupIdx
     if (matchGroupIdx >= 0) {
+      targetGroupIdx = matchGroupIdx
       const joined = { ...newOption, group_id: groups[matchGroupIdx].group_id }
-      nextGroups = groups.map((g, gi) =>
-        gi === matchGroupIdx ? { ...g, options: [...g.options, joined] } : g
-      )
+      nextGroups = groups.map((g, gi) => {
+        if (gi !== matchGroupIdx) return g
+        const doseFields = pendingDose && !pendingDose.needsChoice && pendingDose.dose
+          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null }
+          : {}
+        return { ...g, ...doseFields, options: [...g.options, joined] }
+      })
     } else {
+      targetGroupIdx = groups.length
       const newGroupId = `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const standalone = { ...newOption, group_id: newGroupId }
-      nextGroups = [...groups, { group_id: newGroupId, options: [standalone], dose: null, dose_who: null, note: null }]
+      const doseFields = pendingDose && !pendingDose.needsChoice && pendingDose.dose
+        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null }
+        : { dose: null, dose_who: null }
+      nextGroups = [...groups, { group_id: newGroupId, options: [standalone], ...doseFields, note: null }]
     }
     emitGroups(nextGroups)
+
+    // Multi-dose chooser case: option is already added (dose null); surface the
+    // DoseWhoChooser on the target group using the same restorePendingChoice
+    // mechanism the restore-from-library button uses (reuses existing UI).
+    if (pendingDose?.needsChoice) {
+      setRestorePendingChoice({ groupIdx: targetGroupIdx, doseRows: pendingDose.doseRows })
+    }
   }
 
   function addOptionFromBrand(brand) {
     const f       = brand.formulations
     const generic = f?.generics
+    // Resolve dose pre-fill from library — mirrors DrugOptionRow's handleBrandPick.
+    // Bug fix (2026-06-26): "Add option: pick a brand" buttons previously skipped
+    // dose pre-fill entirely; now passed to addOptionToGroups as pendingDose.
+    const pendingDose = resolveDosePick(f?.doses_structured)
     addOptionToGroups({
       ...DRUG_OPTION_TEMPLATE,
       id:             `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1289,11 +1315,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:           f?.form           ?? null,
       route:          f?.route          ?? null,
       category:       generic?.category ?? null,
-    })
+    }, pendingDose)
   }
 
   function addOptionFromFormulation(formulation) {
     const generic = formulation.generics
+    // Resolve dose pre-fill from library — same fix as addOptionFromBrand above.
+    const pendingDose = resolveDosePick(formulation.doses_structured)
     addOptionToGroups({
       ...DRUG_OPTION_TEMPLATE,
       id:             `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1305,7 +1333,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       form:           formulation.form ?? null,
       route:          formulation.route ?? null,
       category:       generic?.category ?? null,
-    })
+    }, pendingDose)
   }
 
   function addFreeTextOption() {
