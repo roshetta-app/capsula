@@ -136,7 +136,7 @@
  *          fromDrugOptions → AlternativeDrug.note unchanged.
  *
  *   PHASE 2.4 (2026-06-25) — move affordance (Decision 5, locked interaction).
- *        MoveMenu component added. Each DrugOptionRow receives a new `onMove`
+ *        MoveMenu component added. Each DrugOptionRow receives a new 'onMove'
  *        prop: (action: 'new-group'|'above'|'below') => void. A GripVertical
  *        icon button on the header row opens an inline absolute-positioned
  *        menu with context-sensitive options:
