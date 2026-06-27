@@ -56,7 +56,6 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
  *     a dotted underline to signal tappability (not accent-blue color).
  *   - Concentration: plain lighter text directly after name (no dot separator).
  *   - Form: pill badge (distinct from concentration).
- *   - Arabic name: text-align left (dir="rtl" kept for correct letter shaping).
  *   - All alternatives show their own concentration + form (not first-only).
  *   - OrMarker: italic + muted color, left-aligned in badge column.
  *   - Search icon: per drug unit, opens Google Images for the drug in Egypt.
@@ -266,8 +265,6 @@ function SectionHeader({ label, children }) {
  *   entries; linked names get dotted underline (not accent-blue color).
  *   Concentration sits as plain lighter text right after the name.
  *   Form renders as a pill badge (not plain text).
- *   The Arabic name (name_ar), when present, is shown directly under the
- *   English line for every member, forced text-align: left.
  *
  * Alternatives:
  *   Every boundary between alternatives renders a single OrMarker ("or",
@@ -367,7 +364,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
               <DrugMainLine
                 name={memberName}
-                nameAr={data.name_ar}
                 concentration={data.concentration}
                 form={data.form}
                 linkEnabled={memberLinkEnabled}
@@ -402,10 +398,9 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  * Linked names: dotted underline to signal tappability (not accent-blue).
  * Concentration: plain lighter text right after name, no dot separator.
  * Form: pill/badge styling (distinct visual weight from concentration).
- * Arabic name: text-align left (dir="rtl" kept for correct Arabic letter shaping).
  * Search icon: right-side icon that opens Google Images for the drug in Egypt.
  */
-function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, navigate }) {
+function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }) {
   if (!name) return null
 
   const handleSearchClick = (e) => {
@@ -491,23 +486,6 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
           <Icon name="Search" size={15} color="currentColor" />
         </button>
       </div>
-
-      {/* Arabic name — own line directly below, dir="rtl" for correct shaping,
-          text-align forced left per design spec */}
-      {nameAr && (
-        <div
-          dir="rtl"
-          style={{
-            fontSize: 12.5,
-            color: 'var(--color-text-secondary)',
-            marginTop: 2,
-            unicodeBidi: 'plaintext',
-            textAlign: 'left',
-          }}
-        >
-          {nameAr}
-        </div>
-      )}
     </>
   )
 }
@@ -524,7 +502,7 @@ function DrugMainLine({ name, nameAr, concentration, form, linkEnabled, slug, na
  * drug-row context. Replaced with a cool slate/ink tone — distinct in
  * shade from text-primary without carrying any semantic (success/warning)
  * connotation.
- * Size hierarchy: Arabic name (12.5px) < dose (14px) < main name (17px).
+ * Size hierarchy: dose (14px) < main name (17px).
  */
 function DoseLine({ text }) {
   return (
@@ -549,7 +527,7 @@ function DoseLine({ text }) {
  * icon was visually competing with — and often beating — the dose line for
  * attention, which inverted the intended reading order (name > dose >
  * alternatives > note). The note is now plain text in the same "supporting
- * detail" tier as the Arabic name line below the drug name: smaller,
+ * detail" tier below the drug name: smaller,
  * lighter weight, secondary color, no card. The icon is kept (small, muted)
  * since it's still useful as an at-a-glance "this has a note" marker, but
  * it no longer sits inside its own boxed UI element.
@@ -682,3 +660,4 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
+
