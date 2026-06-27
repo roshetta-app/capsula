@@ -71,8 +71,8 @@ function DarkModeToggle({ isDark, onToggle }) {
       onClick={onToggle}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       style={{
-        width:                   32,
-        height:                  32,
+        width:                   36,
+        height:                  36,
         borderRadius:            'var(--radius-full)',
         border:                  '1.5px solid var(--color-border)',
         backgroundColor:         'var(--color-surface)',
@@ -124,7 +124,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
         display:      'flex',
         alignItems:   'center',
         gap:          'var(--space-2)',
-        marginBottom: isSearching ? 0 : 6,
+        marginBottom: isSearching ? 0 : 10,
         transition:   'margin-bottom 0.15s ease',
       }}>
         {/* Logo wordmark */}
@@ -132,7 +132,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
           src="/capsula/logo.svg"
           alt="Capsula"
           className="capsula-logo"
-          style={{ display: 'block', height: 25, width: 'auto' }}
+          style={{ display: 'block', height: 27, width: 'auto' }}
         />
         <span style={{ flex: 1 }} />
 
@@ -143,8 +143,8 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
       {!isSearching && (
         <p style={{
           margin:        0,
-          fontSize:      15,
-          fontWeight:    400,
+          fontSize:      16,
+          fontWeight:    450,
           letterSpacing: '-0.1px',
           lineHeight:    1.4,
           color:         '#1a1a1a',
@@ -315,9 +315,9 @@ export default function ConditionsScreen() {
       <Layout>
         <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <div style={shimmer({ width: 144, height: 25, borderRadius: 'var(--radius-sm)' })} />
+            <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
           </div>
-          <div style={shimmer({ width: '55%', height: 17, borderRadius: 'var(--radius-sm)' })} />
+          <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
