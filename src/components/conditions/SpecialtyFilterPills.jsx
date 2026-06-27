@@ -13,6 +13,9 @@
  *   activeSpecialty  string  — 'all' | specialty id
  *   onSelect         (id: string) => void
  *   onMoreTap        () => void  — called when 'More' chip is tapped
+ *   scrollRef        ref  (optional) — forwarded to the internal scrollable
+ *                    div so a parent can read/sync its scrollLeft across
+ *                    multiple instances of this component.
  */
 
 import { SpecialtyIcon, useIsDark }        from '../../utils/specialtyIcon'
@@ -33,6 +36,7 @@ export default function SpecialtyFilterPills({
   activeSpecialty,
   onSelect,
   onMoreTap,
+  scrollRef,
 }) {
   const isDark = useIsDark()
 
@@ -44,16 +48,18 @@ export default function SpecialtyFilterPills({
     : specialties
 
   return (
-    <div style={{
-      display:                 'flex',
-      gap:                     'var(--space-2)',
-      overflowX:               'auto',
-      paddingBottom:           'var(--space-1)',
-      marginBottom:            'var(--space-1)',
-      scrollbarWidth:          'none',
-      msOverflowStyle:         'none',
-      WebkitOverflowScrolling: 'touch',
-    }}>
+    <div
+      ref={scrollRef}
+      style={{
+        display:                 'flex',
+        gap:                     'var(--space-2)',
+        overflowX:               'auto',
+        paddingBottom:           'var(--space-1)',
+        marginBottom:            'var(--space-1)',
+        scrollbarWidth:          'none',
+        msOverflowStyle:         'none',
+        WebkitOverflowScrolling: 'touch',
+      }}>
 
       {/* All pill */}
       <button

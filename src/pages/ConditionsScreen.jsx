@@ -253,9 +253,14 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // The panel slides in from the top with a CSS transform. Total height is
 // auto so it naturally fits the content; overflow is hidden during the
 // transition to prevent content flash.
+//
+// headerRef is forwarded so the parent can measure the panel's rendered
+// height and reserve matching space in the page flow (Fix 1) — the panel
+// itself stays position:fixed and unsized by its parent.
 
 function CompactHeader({
   visible,
+  headerRef,
   isDark,
   onToggleDark,
   query,
@@ -264,9 +269,11 @@ function CompactHeader({
   activeSpecialty,
   onSelectSpecialty,
   onMoreTap,
+  pillsScrollRef,
 }) {
   return (
     <div
+      ref={headerRef}
       aria-hidden={!visible}
       style={{
         position:        'fixed',
@@ -326,6 +333,7 @@ function CompactHeader({
           activeSpecialty={activeSpecialty}
           onSelect={onSelectSpecialty}
           onMoreTap={onMoreTap}
+          scrollRef={pillsScrollRef}
         />
       </div>
     </div>
@@ -374,6 +382,11 @@ function BackToTopButton({ visible, onClick }) {
 
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
+// Matches CompactHeader's transform transition duration (Fix 3) — the main
+// controls' unlock is delayed by this long so the compact header has fully
+// finished sliding out before the main search bar / pills start fading in.
+const HEADER_EXIT_TRANSITION_MS = 220
+
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
@@ -384,13 +397,24 @@ export default function ConditionsScreen() {
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [showBackToTop, setShowBackToTop]         = useState(false)
   const [showCompactHeader, setShowCompactHeader] = useState(false)
+  const [headerHeight, setHeaderHeight]           = useState(0)
   const brandRowRef     = useRef(null)
   const pillsRef        = useRef(null)
+  const compactHeaderRef = useRef(null)
+  // Shared horizontal scroll position between the main pills row and the
+  // compact header's pills row (Fix 4) — both refs point at the two
+  // SpecialtyFilterPills scroll containers; a scroll on either mirrors to
+  // the other.
+  const mainPillsScrollRef    = useRef(null)
+  const compactPillsScrollRef = useRef(null)
   // When the user types or picks a filter from the compact header, we lock
   // the header on screen regardless of scroll position, so results always
   // appear directly below it. The lock is released when both search and
   // filter are cleared.
   const headerLockedRef = useRef(false)
+  // Pending timeout id for the delayed unlock in Fix 3, so a rapid re-lock
+  // (e.g. user types again right after clearing) can cancel a stale timer.
+  const unlockTimeoutRef = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -423,6 +447,28 @@ export default function ConditionsScreen() {
     requestAnimationFrame(step)
   }
 
+  // ── Compact header height measurement (Fix 1) ──────────────────────────────
+  // The compact header is position:fixed, so it doesn't push page content
+  // down on its own. We measure its rendered height whenever it becomes
+  // visible (and on resize) and reserve that much top padding on the content
+  // wrapper below, so the first card / ConditionListHeader row are never
+  // hidden behind the fixed panel.
+
+  useEffect(() => {
+    const el = compactHeaderRef.current
+    if (!el) return
+
+    function measure() {
+      setHeaderHeight(el.offsetHeight)
+    }
+
+    measure()
+
+    const resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(el)
+    return () => resizeObserver.disconnect()
+  }, [showCompactHeader])
+
   // ── Compact header visibility (IntersectionObserver on pillsRef) ──────────────
   // Shows the compact header the moment the specialty pills fully leave the
   // viewport. Once the user types or picks a filter from the compact header,
@@ -442,6 +488,40 @@ export default function ConditionsScreen() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+
+  // ── Shared pill scroll sync (Fix 4) ────────────────────────────────────────
+  // Mirrors horizontal scroll position between the main pills row and the
+  // compact header's pills row, whichever the user is actively scrolling.
+  // A guard flag prevents the mirrored 'scroll' event from re-triggering
+  // the listener on the other element and bouncing back and forth.
+
+  useEffect(() => {
+    const mainEl    = mainPillsScrollRef.current
+    const compactEl = compactPillsScrollRef.current
+    if (!mainEl || !compactEl) return
+
+    let syncing = false
+
+    function mirror(source, target) {
+      return () => {
+        if (syncing) return
+        syncing = true
+        target.scrollLeft = source.scrollLeft
+        syncing = false
+      }
+    }
+
+    const onMainScroll    = mirror(mainEl, compactEl)
+    const onCompactScroll = mirror(compactEl, mainEl)
+
+    mainEl.addEventListener('scroll', onMainScroll, { passive: true })
+    compactEl.addEventListener('scroll', onCompactScroll, { passive: true })
+
+    return () => {
+      mainEl.removeEventListener('scroll', onMainScroll)
+      compactEl.removeEventListener('scroll', onCompactScroll)
+    }
+  }, [specialties])
 
 
   const {
@@ -475,16 +555,38 @@ export default function ConditionsScreen() {
   // These are used exclusively by the compact header (not the main body controls).
   // They lock the header on screen, jump to the top so results are immediately
   // visible, and release the lock only when both search and filter are cleared.
+  //
+  // Fix 3: releasing the lock no longer flips showCompactHeader to false
+  // immediately. Instead it's deferred by HEADER_EXIT_TRANSITION_MS so the
+  // compact header's own slide-out transition finishes first — only then do
+  // the main search bar / pills start their fade/expand-in. Any pending
+  // unlock timer is cleared if the user re-locks before it fires.
+
+  function releaseLockAfterTransition() {
+    if (unlockTimeoutRef.current) clearTimeout(unlockTimeoutRef.current)
+    unlockTimeoutRef.current = setTimeout(() => {
+      headerLockedRef.current = false
+      setShowCompactHeader(false)
+      unlockTimeoutRef.current = null
+    }, HEADER_EXIT_TRANSITION_MS)
+  }
+
+  function engageLock() {
+    if (unlockTimeoutRef.current) {
+      clearTimeout(unlockTimeoutRef.current)
+      unlockTimeoutRef.current = null
+    }
+    headerLockedRef.current = true
+    setShowCompactHeader(true)
+    window.scrollTo(0, 0)
+  }
 
   function handleCompactQueryChange(val) {
     const willBeActive = val.length >= 1 || activeSpecialty !== 'all'
     if (willBeActive) {
-      headerLockedRef.current = true
-      setShowCompactHeader(true)
-      window.scrollTo(0, 0)
+      engageLock()
     } else {
-      headerLockedRef.current = false
-      // Let the IntersectionObserver decide visibility from now on
+      releaseLockAfterTransition()
     }
     setQuery(val)
   }
@@ -492,11 +594,9 @@ export default function ConditionsScreen() {
   function handleCompactSpecialtySelect(id) {
     const willBeActive = query.length >= 1 || id !== 'all'
     if (willBeActive) {
-      headerLockedRef.current = true
-      setShowCompactHeader(true)
-      window.scrollTo(0, 0)
+      engageLock()
     } else {
-      headerLockedRef.current = false
+      releaseLockAfterTransition()
     }
     setActiveSpecialty(id)
     setBottomSheetOpen(false)
@@ -575,6 +675,7 @@ export default function ConditionsScreen() {
           or locked on when the user is actively searching / filtering from it */}
       <CompactHeader
         visible={showCompactHeader}
+        headerRef={compactHeaderRef}
         isDark={isDark}
         onToggleDark={toggleDark}
         query={query}
@@ -583,6 +684,7 @@ export default function ConditionsScreen() {
         activeSpecialty={activeSpecialty}
         onSelectSpecialty={handleCompactSpecialtySelect}
         onMoreTap={() => setBottomSheetOpen(true)}
+        pillsScrollRef={compactPillsScrollRef}
       />
 
       {/* 1. Brand row + tagline + dark mode toggle */}
@@ -632,28 +734,41 @@ export default function ConditionsScreen() {
           activeSpecialty={activeSpecialty}
           onSelect={setActiveSpecialty}
           onMoreTap={() => setBottomSheetOpen(true)}
+          scrollRef={mainPillsScrollRef}
         />
       </div>
 
-      {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
-      <ConditionListHeader
-        totalCount={totalCount}
-        resultCount={resultCount}
-        activeSpecialty={activeSpecialty}
-        specialtyName={specialtyName}
-        isSearching={isSearching}
-        sortMode={sortMode}
-        onSortToggle={cycleSortMode}
-        SORT_LABELS={SORT_LABELS}
-        firstLetter={
-          !isSearching && sortMode === 'az' && resultCount > 0
-            ? alphabetGroup(results)[0]?.letter
-            : undefined
-        }
-      />
+      {/* Content wrapper — reserves space equal to the fixed compact header's
+          rendered height (Fix 1) so the count/sort row and first card are
+          never hidden behind it. Padding only applies while the header is
+          actually shown; it transitions alongside the header's own
+          slide animation so the layout shift doesn't feel abrupt. */}
+      <div style={{
+        paddingTop: showCompactHeader ? headerHeight : 0,
+        transition: 'padding-top 0.22s ease',
+      }}>
 
-      {/* 6. Condition list */}
-      {renderList()}
+        {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
+        <ConditionListHeader
+          totalCount={totalCount}
+          resultCount={resultCount}
+          activeSpecialty={activeSpecialty}
+          specialtyName={specialtyName}
+          isSearching={isSearching}
+          sortMode={sortMode}
+          onSortToggle={cycleSortMode}
+          SORT_LABELS={SORT_LABELS}
+          firstLetter={
+            !isSearching && sortMode === 'az' && resultCount > 0
+              ? alphabetGroup(results)[0]?.letter
+              : undefined
+          }
+        />
+
+        {/* 6. Condition list */}
+        {renderList()}
+
+      </div>
 
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
