@@ -384,8 +384,13 @@ export default function ConditionsScreen() {
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [showBackToTop, setShowBackToTop]         = useState(false)
   const [showCompactHeader, setShowCompactHeader] = useState(false)
-  const brandRowRef = useRef(null)
-  const pillsRef    = useRef(null)
+  const brandRowRef     = useRef(null)
+  const pillsRef        = useRef(null)
+  // When the user types or picks a filter from the compact header, we lock
+  // the header on screen regardless of scroll position, so results always
+  // appear directly below it. The lock is released when both search and
+  // filter are cleared.
+  const headerLockedRef = useRef(false)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -420,13 +425,18 @@ export default function ConditionsScreen() {
 
   // ── Compact header visibility (IntersectionObserver on pillsRef) ──────────────
   // Shows the compact header the moment the specialty pills fully leave the
-  // viewport; hides it the moment any part of the pills re-enters.
+  // viewport. Once the user types or picks a filter from the compact header,
+  // headerLockedRef is set to true and the observer stops hiding the header —
+  // it stays pinned until the user clears both search and filter.
 
   useEffect(() => {
     const el = pillsRef.current
     if (!el) return
     const observer = new IntersectionObserver(
-      ([entry]) => setShowCompactHeader(!entry.isIntersecting),
+      ([entry]) => {
+        if (headerLockedRef.current) return  // locked — ignore scroll position
+        setShowCompactHeader(!entry.isIntersecting)
+      },
       { threshold: 0 }
     )
     observer.observe(el)
@@ -459,6 +469,37 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
+  }
+
+  // ── Compact header action handlers ───────────────────────────────────────────
+  // These are used exclusively by the compact header (not the main body controls).
+  // They lock the header on screen, jump to the top so results are immediately
+  // visible, and release the lock only when both search and filter are cleared.
+
+  function handleCompactQueryChange(val) {
+    const willBeActive = val.length >= 1 || activeSpecialty !== 'all'
+    if (willBeActive) {
+      headerLockedRef.current = true
+      setShowCompactHeader(true)
+      window.scrollTo(0, 0)
+    } else {
+      headerLockedRef.current = false
+      // Let the IntersectionObserver decide visibility from now on
+    }
+    setQuery(val)
+  }
+
+  function handleCompactSpecialtySelect(id) {
+    const willBeActive = query.length >= 1 || id !== 'all'
+    if (willBeActive) {
+      headerLockedRef.current = true
+      setShowCompactHeader(true)
+      window.scrollTo(0, 0)
+    } else {
+      headerLockedRef.current = false
+    }
+    setActiveSpecialty(id)
+    setBottomSheetOpen(false)
   }
 
   // ── List rendering ───────────────────────────────────────────────────────────
@@ -530,16 +571,17 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* Compact sticky header — visible once SpecialtyFilterPills scrolls out of view */}
+      {/* Compact sticky header — visible once SpecialtyFilterPills scrolls out of view,
+          or locked on when the user is actively searching / filtering from it */}
       <CompactHeader
         visible={showCompactHeader}
         isDark={isDark}
         onToggleDark={toggleDark}
         query={query}
-        onQueryChange={setQuery}
+        onQueryChange={handleCompactQueryChange}
         specialties={specialties}
         activeSpecialty={activeSpecialty}
-        onSelectSpecialty={setActiveSpecialty}
+        onSelectSpecialty={handleCompactSpecialtySelect}
         onMoreTap={() => setBottomSheetOpen(true)}
       />
 
@@ -551,8 +593,16 @@ export default function ConditionsScreen() {
         brandRowRef={brandRowRef}
       />
 
-      {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-5)' }}>  {/* was var(--space-2) — added ~12–16px gap before filter chips */}
+      {/* 2. Search bar — hidden while the compact header is showing, so the
+          user never sees two search bars at the same time */}
+      <div style={{
+        marginBottom:  'var(--space-5)',
+        overflow:      'hidden',
+        maxHeight:     showCompactHeader ? 0 : 60,
+        opacity:       showCompactHeader ? 0 : 1,
+        pointerEvents: showCompactHeader ? 'none' : 'auto',
+        transition:    'max-height 0.2s ease, opacity 0.15s ease',
+      }}>
         <SearchBar
           value={query}
           onChange={val => setQuery(val)}
@@ -565,8 +615,18 @@ export default function ConditionsScreen() {
         hidden={true}
       />
 
-      {/* 4. Specialty filter pills — pillsRef drives CompactHeader visibility */}
-      <div ref={pillsRef}>
+      {/* 4. Specialty filter pills — pillsRef drives CompactHeader visibility.
+          Hidden while the compact header is showing for the same reason. */}
+      <div
+        ref={pillsRef}
+        style={{
+          overflow:      'hidden',
+          maxHeight:     showCompactHeader ? 0 : 60,
+          opacity:       showCompactHeader ? 0 : 1,
+          pointerEvents: showCompactHeader ? 'none' : 'auto',
+          transition:    'max-height 0.2s ease, opacity 0.15s ease',
+        }}
+      >
         <SpecialtyFilterPills
           specialties={specialties}
           activeSpecialty={activeSpecialty}
@@ -602,10 +662,7 @@ export default function ConditionsScreen() {
       <SpecialtiesBottomSheet
         specialties={specialties}
         activeSpecialty={activeSpecialty}
-        onSelect={id => {
-          setActiveSpecialty(id)
-          setBottomSheetOpen(false)
-        }}
+        onSelect={id => handleCompactSpecialtySelect(id)}
         onClose={() => setBottomSheetOpen(false)}
         isOpen={bottomSheetOpen}
       />
