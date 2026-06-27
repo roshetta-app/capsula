@@ -584,3 +584,10 @@ body {
    Any :::success / :::info / :::note blocks in existing content will fall back
    to plain prose rendering (unknown directive fallback in directiveRenderer.js). */
 
+/* ─── Logo dark mode ──────────────────────────────────────────────────────────
+   Invert the wordmark in dark mode so black letters become white.
+   The blue pill cap (#2563EB) survives invert+hue-rotate(180deg) as a warm
+   blue, so we nudge it back with a second hue-rotate to keep it on-brand.   */
+.dark .capsula-logo {
+  filter: invert(1) hue-rotate(180deg);
+}

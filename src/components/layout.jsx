@@ -47,8 +47,8 @@ export default function Layout({ children }) {
             <img
               src="/capsula/logo.svg"
               alt="Capsula"
-              height={22}
-              style={{ display: 'block' }}
+              className="capsula-logo"
+              style={{ display: 'block', height: 22, width: 'auto' }}
             />
           </div>
         </header>

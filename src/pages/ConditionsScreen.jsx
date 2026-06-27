@@ -131,8 +131,8 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
         <img
           src="/capsula/logo.svg"
           alt="Capsula"
-          height={26}
-          style={{ display: 'block', flex: 1 }}
+          className="capsula-logo"
+          style={{ display: 'block', height: 28, width: 'auto', flex: 1 }}
         />
 
         {/* Dark mode toggle — top right */}
@@ -314,7 +314,7 @@ export default function ConditionsScreen() {
       <Layout>
         <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <div style={shimmer({ width: 160, height: 26, borderRadius: 'var(--radius-sm)' })} />
+            <div style={shimmer({ width: 160, height: 28, borderRadius: 'var(--radius-sm)' })} />
           </div>
           <div style={shimmer({ width: '72%', height: 28, borderRadius: 'var(--radius-sm)' })} />
           <div style={{ marginTop: 6 }}>
