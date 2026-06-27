@@ -132,7 +132,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
           src="/capsula/logo.svg"
           alt="Capsula"
           className="capsula-logo"
-          style={{ display: 'block', height: 27, width: 'auto' }}
+          style={{ display: 'block', height: 32, width: 'auto' }}
         />
         <span style={{ flex: 1 }} />
 

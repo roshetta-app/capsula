@@ -49,7 +49,7 @@ export default function SpecialtyFilterPills({
       gap:                     'var(--space-2)',
       overflowX:               'auto',
       paddingBottom:           'var(--space-1)',
-      marginBottom:            'var(--space-3)',  /* was var(--space-1) — added ~8px gap below chips */
+      marginBottom:            'var(--space-1)',
       scrollbarWidth:          'none',
       msOverflowStyle:         'none',
       WebkitOverflowScrolling: 'touch',
