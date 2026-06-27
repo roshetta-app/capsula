@@ -9,6 +9,9 @@
  *   - Dark mode toggle added to BrandRow (top-right, sun/moon icon button)
  *   - Static "What are you looking for?" headline replaced with a subtle
  *     rotating tagline (see RotatingTagline below)
+ *   - CompactHeader now includes SearchBar + SpecialtyFilterPills, and
+ *     appears once the SpecialtyFilterPills row scrolls out of view
+ *     (previously triggered by the BrandRow).
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -137,7 +140,7 @@ function RotatingTagline() {
   const [activeIsA, setActiveIsA] = useState(true)
 
   const indexRef     = useRef(0)
-  const pausedRef     = useRef(false)
+  const pausedRef    = useRef(false)
   const idleTimerRef = useRef(null)
 
   useEffect(() => {
@@ -241,11 +244,27 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 
 
 // ─── Compact sticky header ─────────────────────────────────────────────────────
-// Appears once the BrandRow scrolls out of view (detected via IntersectionObserver).
-// Stays pinned until the BrandRow comes back into view. Contains the logo and the
-// dark mode toggle — mirrors the BrandRow's top-right controls in a slim 48px bar.
+// Appears once the SpecialtyFilterPills row scrolls out of view (detected via
+// IntersectionObserver on pillsRef). Contains:
+//   Row 1 — logo + dark mode toggle (always visible when header is open)
+//   Row 2 — SearchBar (shared state with the main search bar)
+//   Row 3 — SpecialtyFilterPills (shared state with the main pills)
+//
+// The panel slides in from the top with a CSS transform. Total height is
+// auto so it naturally fits the content; overflow is hidden during the
+// transition to prevent content flash.
 
-function CompactHeader({ visible, isDark, onToggleDark }) {
+function CompactHeader({
+  visible,
+  isDark,
+  onToggleDark,
+  query,
+  onQueryChange,
+  specialties,
+  activeSpecialty,
+  onSelectSpecialty,
+  onMoreTap,
+}) {
   return (
     <div
       aria-hidden={!visible}
@@ -254,30 +273,61 @@ function CompactHeader({ visible, isDark, onToggleDark }) {
         top:             0,
         left:            0,
         right:           0,
-        height:          48,
-        display:         'flex',
-        alignItems:      'center',
-        paddingLeft:     'var(--space-4)',
-        paddingRight:    'var(--space-4)',
+        zIndex:          50,
         backgroundColor: 'var(--color-surface)',
         borderBottom:    '0.5px solid var(--color-border)',
-        zIndex:          50,
-        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
-        opacity:         visible ? 1 : 0,
-        transition:      'transform 0.2s ease, opacity 0.15s ease',
-        /* Blur backdrop for a polished feel — gracefully ignored on older browsers */
         backdropFilter:  'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
+        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
+        opacity:         visible ? 1 : 0,
+        transition:      'transform 0.22s ease, opacity 0.18s ease',
+        /* Prevent pill overflow from bleeding outside the panel */
+        overflow:        'hidden',
       }}
     >
-      <img
-        src="/capsula/logo.svg"
-        alt="Capsula"
-        className="capsula-logo"
-        style={{ display: 'block', height: 26, width: 'auto' }}
-      />
-      <span style={{ flex: 1 }} />
-      <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
+      {/* Row 1 — logo + dark mode toggle */}
+      <div style={{
+        display:      'flex',
+        alignItems:   'center',
+        height:       48,
+        paddingLeft:  'var(--space-4)',
+        paddingRight: 'var(--space-4)',
+      }}>
+        <img
+          src="/capsula/logo.svg"
+          alt="Capsula"
+          className="capsula-logo"
+          style={{ display: 'block', height: 26, width: 'auto' }}
+        />
+        <span style={{ flex: 1 }} />
+        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
+      </div>
+
+      {/* Row 2 — Search bar */}
+      <div style={{
+        paddingLeft:   'var(--space-4)',
+        paddingRight:  'var(--space-4)',
+        paddingBottom: 'var(--space-2)',
+      }}>
+        <SearchBar
+          value={query}
+          onChange={onQueryChange}
+        />
+      </div>
+
+      {/* Row 3 — Specialty filter pills */}
+      <div style={{
+        paddingLeft:   'var(--space-4)',
+        paddingRight:  'var(--space-4)',
+        paddingBottom: 'var(--space-2)',
+      }}>
+        <SpecialtyFilterPills
+          specialties={specialties}
+          activeSpecialty={activeSpecialty}
+          onSelect={onSelectSpecialty}
+          onMoreTap={onMoreTap}
+        />
+      </div>
     </div>
   )
 }
@@ -335,6 +385,7 @@ export default function ConditionsScreen() {
   const [showBackToTop, setShowBackToTop]         = useState(false)
   const [showCompactHeader, setShowCompactHeader] = useState(false)
   const brandRowRef = useRef(null)
+  const pillsRef    = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -367,12 +418,12 @@ export default function ConditionsScreen() {
     requestAnimationFrame(step)
   }
 
-  // ── Compact header visibility (IntersectionObserver on BrandRow) ─────────────
-  // Shows the compact header the moment the brand row fully leaves the viewport;
-  // hides it the moment any part of the brand row re-enters.
+  // ── Compact header visibility (IntersectionObserver on pillsRef) ──────────────
+  // Shows the compact header the moment the specialty pills fully leave the
+  // viewport; hides it the moment any part of the pills re-enters.
 
   useEffect(() => {
-    const el = brandRowRef.current
+    const el = pillsRef.current
     if (!el) return
     const observer = new IntersectionObserver(
       ([entry]) => setShowCompactHeader(!entry.isIntersecting),
@@ -479,11 +530,17 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* Compact sticky header — visible once BrandRow scrolls out of view */}
+      {/* Compact sticky header — visible once SpecialtyFilterPills scrolls out of view */}
       <CompactHeader
         visible={showCompactHeader}
         isDark={isDark}
         onToggleDark={toggleDark}
+        query={query}
+        onQueryChange={setQuery}
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelectSpecialty={setActiveSpecialty}
+        onMoreTap={() => setBottomSheetOpen(true)}
       />
 
       {/* 1. Brand row + tagline + dark mode toggle */}
@@ -508,13 +565,15 @@ export default function ConditionsScreen() {
         hidden={true}
       />
 
-      {/* 4. Specialty filter pills */}
-      <SpecialtyFilterPills
-        specialties={specialties}
-        activeSpecialty={activeSpecialty}
-        onSelect={setActiveSpecialty}
-        onMoreTap={() => setBottomSheetOpen(true)}
-      />
+      {/* 4. Specialty filter pills — pillsRef drives CompactHeader visibility */}
+      <div ref={pillsRef}>
+        <SpecialtyFilterPills
+          specialties={specialties}
+          activeSpecialty={activeSpecialty}
+          onSelect={setActiveSpecialty}
+          onMoreTap={() => setBottomSheetOpen(true)}
+        />
+      </div>
 
       {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
       <ConditionListHeader
