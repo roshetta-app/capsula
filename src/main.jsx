@@ -58,42 +58,62 @@ createRoot(document.getElementById('root')).render(
 //
 // Guard: a single reloading flag prevents controllerchange and the RELOAD
 // message from both firing a navigation in the same update cycle.
+//
+// Fix (blank-screen-until-tab-reopened bug):
+//   The controllerchange/message listeners used to be attached inside
+//   register().then(...), i.e. only after the registration promise resolved.
+//   That left a race: if a new SW's install → activate → clients.claim() →
+//   postMessage('RELOAD') sequence completed before this tab got around to
+//   attaching the listeners (e.g. this tab was already open and idle when a
+//   deploy landed), both the controllerchange event and the RELOAD message
+//   fired into a void — nobody was listening yet — and the page never
+//   reloaded itself. The tab would silently end up running stale JS against
+//   a new index.html on the next manual refresh, which is what produced the
+//   blank screen; closing and reopening the tab "fixed" it only because the
+//   fresh tab's SW was already in control from the start, so there was no
+//   change event to miss.
+//   Fix: attach both listeners BEFORE calling register(), so they exist no
+//   matter how fast the new SW's lifecycle completes relative to this tab.
 
 if ('serviceWorker' in navigator) {
+  let reloading = false
+
+  function hardReload(reason) {
+    if (reloading) return
+    reloading = true
+    console.log('[SW] ' + reason + ' — navigating for fresh build')
+    // Cache-busting: unique URL forces browser past HTTP cache for index.html.
+    // Built from the CURRENT location (not a hardcoded root path) so a
+    // reload while deep in the CMS lands back on the same page, not
+    // the main app screen.
+    var url = new URL(window.location.href)
+    url.searchParams.set('sw-reload', Date.now())
+    window.location.replace(url.toString())
+  }
+
+  // ── Trigger 1: new SW takes control ───────────────────────────────────
+  // Attached immediately — must exist before register() can possibly
+  // resolve to a SW that later takes control.
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    hardReload('Controller changed')
+  })
+
+  // ── Trigger 2: explicit RELOAD message from SW activate ─────────────────
+  // Attached immediately for the same reason — register() resolving is not
+  // the same moment as "the SW now exists and could send a message."
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data?.type === 'RELOAD') {
+      hardReload('RELOAD message received')
+    }
+  })
+
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/capsula/sw.js')
       .then(registration => {
         console.log('[SW] Registered:', registration.scope)
 
-        let reloading = false
-
-        function hardReload(reason) {
-          if (reloading) return
-          reloading = true
-          console.log('[SW] ' + reason + ' — navigating for fresh build')
-          // Cache-busting: unique URL forces browser past HTTP cache for index.html.
-          // Built from the CURRENT location (not a hardcoded root path) so a
-          // reload while deep in the CMS lands back on the same page, not
-          // the main app screen.
-          var url = new URL(window.location.href)
-          url.searchParams.set('sw-reload', Date.now())
-          window.location.replace(url.toString())
-        }
-
-        // ── Trigger 1: new SW takes control ───────────────────────────────
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-          hardReload('Controller changed')
-        })
-
-        // ── Trigger 2: explicit RELOAD message from SW activate ────────────
-        navigator.serviceWorker.addEventListener('message', event => {
-          if (event.data?.type === 'RELOAD') {
-            hardReload('RELOAD message received')
-          }
-        })
-
-        // ── Poll for updates every 60 s ────────────────────────────────────
+        // ── Poll for updates every 60 s ──────────────────────────────────
         setInterval(() => registration.update(), 60_000)
       })
       .catch(err => console.warn('[SW] Registration failed:', err))
