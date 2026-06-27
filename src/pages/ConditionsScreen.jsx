@@ -208,9 +208,9 @@ function RotatingTagline() {
 
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
-function BrandRow({ isSearching, isDark, onToggleDark }) {
+function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   return (
-    <div style={{
+    <div ref={brandRowRef} style={{
       paddingTop:    'var(--space-6)',  /* was var(--space-4) — added ~8–12px top breathing room */
       paddingBottom: 'calc(var(--space-3) - 4px)',  /* tightened 4px to pull tagline closer to search bar */
     }}>
@@ -235,6 +235,49 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
       </div>
 
       {!isSearching && <RotatingTagline />}
+    </div>
+  )
+}
+
+
+// ─── Compact sticky header ─────────────────────────────────────────────────────
+// Appears once the BrandRow scrolls out of view (detected via IntersectionObserver).
+// Stays pinned until the BrandRow comes back into view. Contains the logo and the
+// dark mode toggle — mirrors the BrandRow's top-right controls in a slim 48px bar.
+
+function CompactHeader({ visible, isDark, onToggleDark }) {
+  return (
+    <div
+      aria-hidden={!visible}
+      style={{
+        position:        'fixed',
+        top:             0,
+        left:            0,
+        right:           0,
+        height:          48,
+        display:         'flex',
+        alignItems:      'center',
+        paddingLeft:     'var(--space-4)',
+        paddingRight:    'var(--space-4)',
+        backgroundColor: 'var(--color-surface)',
+        borderBottom:    '0.5px solid var(--color-border)',
+        zIndex:          50,
+        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
+        opacity:         visible ? 1 : 0,
+        transition:      'transform 0.2s ease, opacity 0.15s ease',
+        /* Blur backdrop for a polished feel — gracefully ignored on older browsers */
+        backdropFilter:  'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+      }}
+    >
+      <img
+        src="/capsula/logo.svg"
+        alt="Capsula"
+        className="capsula-logo"
+        style={{ display: 'block', height: 26, width: 'auto' }}
+      />
+      <span style={{ flex: 1 }} />
+      <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
     </div>
   )
 }
@@ -288,8 +331,10 @@ export default function ConditionsScreen() {
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
   const { isDark, toggleDark }               = useDarkMode()
 
-  const [bottomSheetOpen, setBottomSheetOpen] = useState(false)
-  const [showBackToTop, setShowBackToTop]     = useState(false)
+  const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
+  const [showBackToTop, setShowBackToTop]         = useState(false)
+  const [showCompactHeader, setShowCompactHeader] = useState(false)
+  const brandRowRef = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -321,6 +366,22 @@ export default function ConditionsScreen() {
 
     requestAnimationFrame(step)
   }
+
+  // ── Compact header visibility (IntersectionObserver on BrandRow) ─────────────
+  // Shows the compact header the moment the brand row fully leaves the viewport;
+  // hides it the moment any part of the brand row re-enters.
+
+  useEffect(() => {
+    const el = brandRowRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowCompactHeader(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
 
   const {
     query,
@@ -418,11 +479,19 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
+      {/* Compact sticky header — visible once BrandRow scrolls out of view */}
+      <CompactHeader
+        visible={showCompactHeader}
+        isDark={isDark}
+        onToggleDark={toggleDark}
+      />
+
       {/* 1. Brand row + tagline + dark mode toggle */}
       <BrandRow
         isSearching={isSearching}
         isDark={isDark}
         onToggleDark={toggleDark}
+        brandRowRef={brandRowRef}
       />
 
       {/* 2. Search bar */}
