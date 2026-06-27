@@ -132,8 +132,9 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
           src="/capsula/logo.svg"
           alt="Capsula"
           className="capsula-logo"
-          style={{ display: 'block', height: 28, width: 'auto', flex: 1 }}
+          style={{ display: 'block', height: 28, width: 'auto' }}
         />
+        <span style={{ flex: 1 }} />
 
         {/* Dark mode toggle — top right */}
         <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
