@@ -143,11 +143,11 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
       {!isSearching && (
         <p style={{
           margin:        0,
-          fontSize:      14,
+          fontSize:      17,
           fontWeight:    500,
-          letterSpacing: '0px',
+          letterSpacing: '-0.1px',
           lineHeight:    1.4,
-          color:         'var(--color-text-tertiary)',
+          color:         '#1a1a1a',
         }}>
           What are you looking for?
         </p>
@@ -317,7 +317,7 @@ export default function ConditionsScreen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <div style={shimmer({ width: 160, height: 28, borderRadius: 'var(--radius-sm)' })} />
           </div>
-          <div style={shimmer({ width: '50%', height: 14, borderRadius: 'var(--radius-sm)' })} />
+          <div style={shimmer({ width: '55%', height: 17, borderRadius: 'var(--radius-sm)' })} />
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
