@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -67,6 +68,8 @@ const NAV_CARDS = [
 export default function AdminDashboard() {
   const { signOut } = useAuth()
   const navigate    = useNavigate()
+
+  useEffect(() => { document.title = 'Admin — Capsula' }, [])
 
   async function handleSignOut() {
     await signOut()

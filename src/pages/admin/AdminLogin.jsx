@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -17,6 +17,8 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState(null)
   const [busy,     setBusy]     = useState(false)
+
+  useEffect(() => { document.title = 'Admin — Capsula' }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
