@@ -6,7 +6,7 @@
  *
  * - While searching: shows a result count ("N results"), left-aligned.
  *   No sort toggle during search (results are always relevance-ordered).
- * - Otherwise: shows the sort toggle right-aligned. When `firstLetter` is
+ * - Otherwise: shows the sort toggle right-aligned. When 'firstLetter' is
  *   provided (A–Z mode only), the letter is shown left-aligned on the same
  *   row — so the alphabet divider and the sort toggle share one line instead
  *   of stacking as two separate rows.
@@ -43,7 +43,7 @@ export default function ConditionListHeader({
       alignItems:     'center',
       justifyContent: 'space-between',
       borderTop:      '0.5px solid var(--color-border-subtle)',
-      padding:        '6px 0 4px',
+      padding:        '14px 0 4px',  /* was '6px 0 4px' — increased top padding for hero/list separation */
       marginBottom:   0,
     }}>
       {/* Left side */}

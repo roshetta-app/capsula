@@ -117,7 +117,7 @@ function DarkModeToggle({ isDark, onToggle }) {
 function BrandRow({ isSearching, isDark, onToggleDark }) {
   return (
     <div style={{
-      paddingTop:    'var(--space-4)',
+      paddingTop:    'var(--space-6)',  /* was var(--space-4) — added ~8–12px top breathing room */
       paddingBottom: 'var(--space-3)',
     }}>
       <div style={{
@@ -343,7 +343,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-2)' }}>
+      <div style={{ marginBottom: 'var(--space-5)' }}>  {/* was var(--space-2) — added ~12–16px gap before filter chips */}
         <SearchBar
           value={query}
           onChange={val => setQuery(val)}

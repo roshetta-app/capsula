@@ -4,15 +4,15 @@
  * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  *
  * Horizontal scrollable row of specialty filter pills.
- * "All" is always first. Each pill shows icon + short label.
+ * 'All' is always first. Each pill shows icon + short label.
  * When specialties.length >= OVERFLOW_THRESHOLD (5), chips beyond
- * index 4 are hidden and a "More" chip is appended.
+ * index 4 are hidden and a 'More' chip is appended.
  *
  * Props:
  *   specialties      [{ id, name, slug, iconType, iconValue, colorToken }]
  *   activeSpecialty  string  — 'all' | specialty id
  *   onSelect         (id: string) => void
- *   onMoreTap        () => void  — called when "More" chip is tapped
+ *   onMoreTap        () => void  — called when 'More' chip is tapped
  */
 
 import { SpecialtyIcon, useIsDark }        from '../../utils/specialtyIcon'
@@ -49,7 +49,7 @@ export default function SpecialtyFilterPills({
       gap:                     'var(--space-2)',
       overflowX:               'auto',
       paddingBottom:           'var(--space-1)',
-      marginBottom:            'var(--space-1)',
+      marginBottom:            'var(--space-3)',  /* was var(--space-1) — added ~8px gap below chips */
       scrollbarWidth:          'none',
       msOverflowStyle:         'none',
       WebkitOverflowScrolling: 'touch',
@@ -154,4 +154,3 @@ export default function SpecialtyFilterPills({
     </div>
   )
 }
-
