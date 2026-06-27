@@ -9,13 +9,13 @@
  * Storage: condition_blocks.data is JSONB. data.rows is a flat array.
  * Most rows sit inline in that flat list (drug, note, free_text). PHASE 4
  * (2026-06-21) adds one exception: ROW_TYPES.SECTION is a self-contained
- * container row whose members live in its own nested `drugs` array, not
+ * container row whose members live in its own nested 'drugs' array, not
  * inferred from list position — see SECTION_ROW_TEMPLATE below. Two levels
  * max (sheet -> section -> drugs).
  *
- * PHASE 7 (2026-06-21): removed the legacy `section_header` row type (the
- * flat, position-based section marker `section` superseded — see
- * SECTION_ROW_TEMPLATE) along with all legacy `drug_library`/`drug_freetext`
+ * PHASE 7 (2026-06-21): removed the legacy 'section_header' row type (the
+ * flat, position-based section marker 'section' superseded — see
+ * SECTION_ROW_TEMPLATE) along with all legacy 'drug_library'/'drug_freetext'
  * field-mapping reference material. No persisted data of these shapes
  * remained in the database at the time of removal (confirmed via audit).
  *
@@ -65,7 +65,7 @@ export const ROW_TYPES = {
  *                                              PHASE 2 (2026-06-20): when this is set, the row is
  *                                              "linked" and brand_name/concentration/form/generic_name/
  *                                              route/category render as read-only display lines in
- *                                              the CMS editor — only `dose` stays editable. When this
+ *                                              the CMS editor — only 'dose' stays editable. When this
  *                                              is null (free-text row), all of those fields are plain
  *                                              editable inputs, exactly as before Phase 2.
  *
@@ -96,18 +96,18 @@ export const ROW_TYPES = {
  *                                              For alternatives sharing this same formulation_id
  *                                              (see AlternativeDrug.dose below), this is the single
  *                                              dose value used for all of them — alternatives only
- *                                              get their own independent `dose` when they are a
+ *                                              get their own independent 'dose' when they are a
  *                                              genuinely different formulation.
  *
- * @property {string|null} dose_who          - PHASE 3 (2026-06-20), new. The raw `who` key (e.g.
+ * @property {string|null} dose_who          - PHASE 3 (2026-06-20), new. The raw 'who' key (e.g.
  *                                              'adult', 'elderly') of the doses_structured row the
  *                                              admin picked at add-time, when the formulation has
  *                                              more than one dose row to choose from. Display-only
  *                                              provenance tag, shown next to the dose line in the
  *                                              CMS and the app. Null when the row is free text, the
  *                                              formulation had zero or one dose row (nothing to
- *                                              choose), or `dose` was hand-typed without picking a
- *                                              structured row. Editing `dose` afterward does NOT
+ *                                              choose), or 'dose' was hand-typed without picking a
+ *                                              structured row. Editing 'dose' afterward does NOT
  *                                              clear this tag — it is provenance, not a lock.
  *
  * @property {string|null} note              - LOCKED (2026-06-20). This is the GROUP-level note for
@@ -119,17 +119,17 @@ export const ROW_TYPES = {
  *                                              each language displays in its natural direction.
  * @property {string|null} drug_note          - PHASE A BUG FIX (2026-06-26), new. The main drug's own
  *                                              PER-DRUG note (Decision 5 two-slot model) — independent
- *                                              of `note` above (the group note), sits directly under
+ *                                              of 'note' above (the group note), sits directly under
  *                                              the main drug's own name line, exactly mirroring
  *                                              AlternativeDrug.note's role for alternatives. Until this
  *                                              field existed, the main drug had no equivalent per-drug
  *                                              note slot at all: DrugOptionRow's per-drug note input
- *                                              wrote to the in-memory main option's `note` field, but
+ *                                              wrote to the in-memory main option's 'note' field, but
  *                                              toDrugOptions()/fromDrugOptions() never read or wrote
- *                                              that value anywhere on `row` — so a per-drug note typed
+ *                                              that value anywhere on 'row' — so a per-drug note typed
  *                                              on the main drug was silently dropped on every save,
  *                                              while the identical action on an alternative worked
- *                                              correctly (alternatives already had their own `note`
+ *                                              correctly (alternatives already had their own 'note'
  *                                              field to round-trip through). This field closes that
  *                                              gap. Defaults to null; additive — existing rows have no
  *                                              main-drug per-drug note, so this is null on migration,
@@ -180,7 +180,7 @@ export const DRUG_ROW_TEMPLATE = {
 };
 
 /**
- * One entry inside a DrugRow's `alternatives` array (masterplan §2.2).
+ * One entry inside a DrugRow's 'alternatives' array (masterplan §2.2).
  *
  * Same field set as the main drug row, minus row-level concerns (no id,
  * no row_type, no alternatives-of-its-own — two levels only).
@@ -205,19 +205,19 @@ export const DRUG_ROW_TEMPLATE = {
  * @property {string|null} dose
  *   - LOCKED (2026-06-20): if this alternative has the same formulation_id
  *     as its parent drug row (i.e. it's just a different brand name for the
- *     exact same generic + concentration + form), `dose` here is ignored
- *     in favor of the parent row's single `dose` field — there is only one
+ *     exact same generic + concentration + form), 'dose' here is ignored
+ *     in favor of the parent row's single 'dose' field — there is only one
  *     dose to show, since it really is the same medicine. The CMS hides
  *     this field entirely in that case (not a second editable box that
  *     gets silently dropped). If this alternative's formulation_id differs
  *     from the parent's (or either side is unlinked free text with no
- *     formulation_id at all), `dose` is this alternative's own independent,
+ *     formulation_id at all), 'dose' is this alternative's own independent,
  *     fully editable value — it is a genuinely different drug and may need
  *     a different amount.
  * @property {string|null} dose_who
  *   - PHASE 3 (2026-06-20), new. Same rule as DrugRow.dose_who: the raw
- *     doses_structured `who` key picked at add-time, display-only, not
- *     cleared by hand-editing `dose` afterward.
+ *     doses_structured 'who' key picked at add-time, display-only, not
+ *     cleared by hand-editing 'dose' afterward.
  * @property {string|null} note
  *   - PHASE A DOCSTRING FIX (2026-06-26): this comment previously said
  *     this field was "hidden/inherited from the parent's note" when
@@ -228,7 +228,7 @@ export const DRUG_ROW_TEMPLATE = {
  *     independent per-drug note — it always travels with this specific
  *     alternative, regardless of which group/cluster it belongs to, and
  *     is never overridden or hidden by the group's shared note. The
- *     group-level note for non-main groups lives in `group_note` below,
+ *     group-level note for non-main groups lives in 'group_note' below,
  *     a separate field.
  * @property {'manual_entry'|null} source_flag
  * @property {string|null} group_id
@@ -241,9 +241,9 @@ export const DRUG_ROW_TEMPLATE = {
  * @property {string|null} group_note
  *   - PHASE 2.8 (2026-06-25), new. The group-level note (Decision 5's
  *     two-slot model) for any group other than the main drug's group.
- *     Distinct from `note` above, which is this alternative's own per-drug
+ *     Distinct from 'note' above, which is this alternative's own per-drug
  *     note. Null when this alternative shares the main group (the group
- *     note in that case is the row's own top-level `note` field) or when
+ *     note in that case is the row's own top-level 'note' field) or when
  *     the group simply has no note set.
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
@@ -267,13 +267,13 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
 
 /**
  * Section row shape (PHASE 4, 2026-06-21).
- * Self-contained container: its members live directly in its own `drugs`
+ * Self-contained container: its members live directly in its own 'drugs'
  * array, nested inside this one row, instead of being inferred from array
  * position. This is the only section mechanism as of PHASE 7 (2026-06-21
- * — the earlier flat, position-based `section_header` marker was removed
+ * — the earlier flat, position-based 'section_header' marker was removed
  * once no persisted data of that shape remained).
  *
- * Two levels max (sheet -> section -> drugs) — a section's `drugs` array
+ * Two levels max (sheet -> section -> drugs) — a section's 'drugs' array
  * holds drug rows only (row_type 'drug'); it never holds another section,
  * a note, or a free_text row.
  *
@@ -315,7 +315,7 @@ export const FREE_TEXT_ROW_TEMPLATE = {
  * value), not the existing 'manual' value. This lets newly-promoted brands
  * be told apart from older manual entries that predate this redesign.
  *
- * brands.source is a plain Postgres `text` column (confirmed via live
+ * brands.source is a plain Postgres 'text' column (confirmed via live
  * schema check, not an enum) — adding this value requires no migration,
  * only application code writing this exact string on insert.
  *
@@ -326,7 +326,7 @@ export const SOURCE_FLAG_VALUE = 'manual_entry';
 
 /**
  * PHASE 3 (2026-06-20): shared age-group labels for formulations.doses_structured
- * `who` keys. Single source of truth for both the CMS picker step (choosing
+ * 'who' keys. Single source of truth for both the CMS picker step (choosing
  * which dose row to prefill from) and the app render (the small provenance
  * tag next to the dose line) — must read identically in both places.
  * Mirrors the map already used by DoseTable.jsx on the drug detail screen.
@@ -347,7 +347,7 @@ export const DOSE_WHO_LABELS = {
 };
 
 /**
- * Display label for a doses_structured `who` key, falling back to the raw
+ * Display label for a doses_structured 'who' key, falling back to the raw
  * value (capitalized as typed) if it isn't in the known map — same
  * fallback behavior as DoseTable.jsx's formatWho().
  * @param {string|null} who
@@ -377,8 +377,8 @@ export function formatDoseRowText(doseRow) {
 }
 
 /**
- * Determines whether an alternative should display/edit its own `dose`,
- * or defer to the parent drug row's single shared `dose`.
+ * Determines whether an alternative should display/edit its own 'dose',
+ * or defer to the parent drug row's single shared 'dose'.
  *
  * Rule (locked 2026-06-20): same formulation_id as the parent -> shared
  * dose, no second field. Different formulation_id, or either side missing
@@ -416,6 +416,19 @@ export function alternativeSharesParentDose(parentRow, alternative) {
 export function promoteAlternativeToMain(row, alternativeIndex) {
   const chosen = row.alternatives[alternativeIndex];
   const remaining = row.alternatives.filter((_, i) => i !== alternativeIndex);
+
+  // Under Phase 2.8, alternatives that share the main group have their dose
+  // set to null by fromDrugOptions (meaning 'shared with parent'). If the
+  // chosen alternative has no dose of its own, fall back to the row's current
+  // dose so the promoted row does not silently lose it.
+  const promotedDose    = chosen.dose    ?? row.dose    ?? null;
+  const promotedDoseWho = chosen.dose_who ?? row.dose_who ?? null;
+
+  // group_note: if the chosen alternative was in the main group (group_note
+  // null / same group_id as row.id), preserve the main group's note.
+  // If it was in its own group, use that group's note.
+  const promotedNote = chosen.group_note ?? row.note ?? null;
+
   return {
     ...DRUG_ROW_TEMPLATE,
     id: row.id,
@@ -429,9 +442,11 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     form: chosen.form,
     route: chosen.route,
     category: chosen.category,
-    dose: chosen.dose,
-    dose_who: chosen.dose_who,
-    note: chosen.note,
+    dose: promotedDose,
+    dose_who: promotedDoseWho,
+    note: promotedNote,
+    // Per-drug note (Decision 5 two-slot model) — travels with the option.
+    drug_note: chosen.note ?? null,
     source_flag: chosen.source_flag,
     alternatives: remaining,
   };
@@ -443,11 +458,11 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
  * Admin Condition Editor Redesign, Decision 5: the editor UI must stop
  * expressing a main/alternative hierarchy. All drug options on one
  * prescription line become equal, flat entries; one or more of them can
- * share a single dose/note by belonging to the same `group_id`.
+ * share a single dose/note by belonging to the same 'group_id'.
  *
  * This section is purely additive — DRUG_ROW_TEMPLATE and
  * ALTERNATIVE_DRUG_TEMPLATE above are UNCHANGED, and existing
- * `main` + `alternatives[]` data keeps working as-is. Nothing here is
+ * 'main' + 'alternatives[]' data keeps working as-is. Nothing here is
  * wired into any row UI yet (that starts in Phase 1/2). What this adds:
  *
  *   1. DRUG_OPTION_TEMPLATE — the new flat per-option shape used once a
@@ -555,15 +570,15 @@ export const DRUG_OPTION_TEMPLATE = {
  *
  * Grouping signal, in priority order:
  *   1. PHASE 2.8 (2026-06-25): if an alternative has a persisted
- *      `group_id`, it is trusted directly — it is matched against the
+ *      'group_id', it is trusted directly — it is matched against the
  *      main option's group_id (always row.id) and against every other
  *      alternative's persisted group_id, so multiple alternatives sharing
- *      a `group_id` (including ones an admin explicitly grouped together
+ *      a 'group_id' (including ones an admin explicitly grouped together
  *      via the move-to-group action, regardless of formulation_id) are
  *      reassembled into one group, with that group's note sourced from
- *      whichever member's `group_note` is set.
+ *      whichever member's 'group_note' is set.
  *   2. Legacy fallback (LOCKED, original Phase 0/2.8 migration rule) —
- *      used only when `group_id` is null/absent, i.e. this alternative
+ *      used only when 'group_id' is null/absent, i.e. this alternative
  *      predates Phase 2.8 and has never been saved through the updated
  *      editor:
  *        - Matches the main drug's formulation_id
@@ -578,7 +593,7 @@ export const DRUG_OPTION_TEMPLATE = {
  *   group_id/group_note values going forward (a lazy, per-row migration;
  *   no bulk backfill needed since condition_blocks.data is JSONB).
  *
- * This function does not mutate `row`.
+ * This function does not mutate 'row'.
  *
  * @param {DrugRow} row
  * @returns {DrugOptionGroup[]}
@@ -686,7 +701,7 @@ export function toDrugOptions(row) {
       dose: alt.dose,
       dose_who: alt.dose_who,
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
-      // The previous `alt.group_note ?? alt.note ?? null` fallback was
+      // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
       // group_note existed as a field at all), but it could not tell
       // that case apart from a brand-new single-option group where the
@@ -720,14 +735,14 @@ export function toDrugOptions(row) {
  *
  * Convention (per Decision 5's storage note): the first option of the
  * first group becomes the row's "main" fields; every other option across
- * every group becomes an entry in `alternatives[]`. An alternative that
+ * every group becomes an entry in 'alternatives[]'. An alternative that
  * shares its group with the main option has its dose/note set to null on
  * the way out (meaning "shared with parent" — read back correctly by
  * alternativeSharesParentDose() as long as formulation_id also matches).
  * An alternative in any other group carries that group's own dose/note.
  *
  * PHASE 2.8 (2026-06-25): every alternative now also persists its
- * `group_id` and `group_note` literally, so toDrugOptions() can trust
+ * 'group_id' and 'group_note' literally, so toDrugOptions() can trust
  * the grouping signal directly on next load instead of re-deriving it
  * from formulation_id. This is what makes an admin's explicit
  * "move to group" action (including grouping two options that do NOT
@@ -810,3 +825,4 @@ export function fromDrugOptions(row, groups) {
     alternatives,
   };
 }
+

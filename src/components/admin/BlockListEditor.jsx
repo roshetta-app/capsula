@@ -462,25 +462,23 @@ function SheetPickerBar({ sheets, activeIndex, onSelect, onAdd, disabled }) {
 
 // ─── Decision 6: ActiveSheetEditor — "Remove sheet" at bottom, no left border ──
 
+// Bug 2 fix: outer border div removed. BlockListEditor renders inside
+// ConditionEditor's SectionCard which already provides the card border —
+// wrapping again here created a nested box-inside-a-box (Decision 3 violation).
+// Content and "Remove sheet" button now render flat with only a top separator.
 function ActiveSheetEditor({ block, onPatchData, onDelete, disabled }) {
   return (
-    <div style={{
-      border: '1.5px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
-      overflow: 'hidden',
-      backgroundColor: 'var(--color-surface)',
-    }}>
-      <div style={{ padding: 'var(--space-4)' }}>
-        <PrescriptionSheetEditor
-          block={block}
-          onChange={onPatchData}
-          disabled={disabled}
-        />
-      </div>
+    <div>
+      <PrescriptionSheetEditor
+        block={block}
+        onChange={onPatchData}
+        disabled={disabled}
+      />
 
       {/* Decision 6: destructive action at the bottom, text-style danger link */}
       <div style={{
-        padding: 'var(--space-3) var(--space-4)',
+        paddingTop: 'var(--space-3)',
+        marginTop: 'var(--space-3)',
         borderTop: '1px solid var(--color-border)',
         display: 'flex',
         justifyContent: 'flex-end',
@@ -893,3 +891,4 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
+
