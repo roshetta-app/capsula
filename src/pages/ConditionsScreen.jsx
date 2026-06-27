@@ -141,16 +141,16 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
       </div>
 
       {!isSearching && (
-        <h1 style={{
+        <p style={{
           margin:        0,
-          fontSize:      28,
-          fontWeight:    700,
-          letterSpacing: '-0.6px',
-          lineHeight:    1.15,
-          color:         'var(--color-text-primary)',
+          fontSize:      14,
+          fontWeight:    500,
+          letterSpacing: '0px',
+          lineHeight:    1.4,
+          color:         'var(--color-text-tertiary)',
         }}>
-          What are you<br />looking for?
-        </h1>
+          What are you looking for?
+        </p>
       )}
     </div>
   )
@@ -317,10 +317,7 @@ export default function ConditionsScreen() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <div style={shimmer({ width: 160, height: 28, borderRadius: 'var(--radius-sm)' })} />
           </div>
-          <div style={shimmer({ width: '72%', height: 28, borderRadius: 'var(--radius-sm)' })} />
-          <div style={{ marginTop: 6 }}>
-            <div style={shimmer({ width: '55%', height: 28, borderRadius: 'var(--radius-sm)' })} />
-          </div>
+          <div style={shimmer({ width: '50%', height: 14, borderRadius: 'var(--radius-sm)' })} />
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
