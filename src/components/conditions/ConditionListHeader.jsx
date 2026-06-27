@@ -2,7 +2,6 @@
  * src/components/conditions/ConditionListHeader.jsx
  *
  * Count + sort toggle row.
- * Hairline top border anchors the transition from controls to list.
  *
  * - While searching: shows a result count ("N results"), left-aligned.
  *   No sort toggle during search (results are always relevance-ordered).
@@ -42,8 +41,7 @@ export default function ConditionListHeader({
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'space-between',
-      borderTop:      '0.5px solid var(--color-border-subtle)',
-      padding:        '14px 0 4px',  /* was '6px 0 4px' — increased top padding for hero/list separation */
+      padding:        '2px 0 4px',  /* was '14px 0 4px' with a border-top divider — divider removed and top padding tightened to close the gap under the specialty pills */
       marginBottom:   0,
     }}>
       {/* Left side */}

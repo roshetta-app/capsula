@@ -122,9 +122,9 @@ function DarkModeToggle({ isDark, onToggle }) {
 // frequent events like scroll/keydown don't trigger extra re-renders.
 
 const TAGLINES = [
-  'treat with confidence',
-  'medicine at your fingertips',
-  'the clinic in your pocket',
+  'Treat With Confidence',
+  'Medicine At Your Fingertips',
+  'The Clinic In Your Pocket',
 ]
 
 const TAGLINE_VISIBLE_MS     = 6500 // time each tagline stays on screen (5–8s range)
@@ -193,7 +193,7 @@ function RotatingTagline() {
     fontWeight:     450,
     letterSpacing:  '-0.1px',
     lineHeight:     1.4,
-    color:          '#1a1a1a',
+    color:          'var(--color-text-primary)',
     whiteSpace:     'nowrap',
     transition:     `opacity ${TAGLINE_FADE_MS}ms ease`,
   }
