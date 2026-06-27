@@ -7,6 +7,8 @@
  *   - showSuggestions / clearSuggestions wiring removed
  *   - showList constant removed — list always visible
  *   - Dark mode toggle added to BrandRow (top-right, sun/moon icon button)
+ *   - Static "What are you looking for?" headline replaced with a subtle
+ *     rotating tagline (see RotatingTagline below)
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -14,7 +16,7 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUp } from 'lucide-react'
 import Layout                  from '../components/layout'
@@ -112,6 +114,98 @@ function DarkModeToggle({ isDark, onToggle }) {
   )
 }
 
+// ─── Rotating tagline ──────────────────────────────────────────────────────────
+// Sits in the exact spot the static "What are you looking for?" headline
+// used to occupy, beneath the logo. Cycles through TAGLINES with a gentle
+// crossfade, pauses on any home-screen interaction, and resumes after a
+// short idle period. Uses refs (not state) for pause/idle bookkeeping so
+// frequent events like scroll/keydown don't trigger extra re-renders.
+
+const TAGLINES = [
+  'treat with confidence',
+  'medicine at your fingertips',
+  'the clinic in your pocket',
+]
+
+const TAGLINE_VISIBLE_MS     = 6500 // time each tagline stays on screen (5–8s range)
+const TAGLINE_FADE_MS        = 400  // crossfade duration (300–500ms range)
+const TAGLINE_IDLE_RESUME_MS = 4000 // idle time before rotation resumes (3–5s range)
+
+function RotatingTagline() {
+  const [textA, setTextA]         = useState(TAGLINES[0])
+  const [textB, setTextB]         = useState(TAGLINES[1])
+  const [activeIsA, setActiveIsA] = useState(true)
+
+  const indexRef     = useRef(0)
+  const pausedRef     = useRef(false)
+  const idleTimerRef = useRef(null)
+
+  useEffect(() => {
+    function advance() {
+      if (pausedRef.current) return
+      const nextIndex = (indexRef.current + 1) % TAGLINES.length
+      indexRef.current = nextIndex
+      setActiveIsA(prevActiveIsA => {
+        if (prevActiveIsA) {
+          setTextB(TAGLINES[nextIndex])
+        } else {
+          setTextA(TAGLINES[nextIndex])
+        }
+        return !prevActiveIsA
+      })
+    }
+
+    const intervalId = setInterval(advance, TAGLINE_VISIBLE_MS)
+
+    // Any interaction on the home screen (typing, scrolling, tapping
+    // filters, etc.) pauses rotation; resumes once idle again.
+    function handleInteraction() {
+      pausedRef.current = true
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      idleTimerRef.current = setTimeout(() => {
+        pausedRef.current = false
+      }, TAGLINE_IDLE_RESUME_MS)
+    }
+
+    window.addEventListener('scroll', handleInteraction, { passive: true })
+    window.addEventListener('pointerdown', handleInteraction, { passive: true })
+    window.addEventListener('keydown', handleInteraction)
+    window.addEventListener('input', handleInteraction)
+
+    return () => {
+      clearInterval(intervalId)
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current)
+      window.removeEventListener('scroll', handleInteraction)
+      window.removeEventListener('pointerdown', handleInteraction)
+      window.removeEventListener('keydown', handleInteraction)
+      window.removeEventListener('input', handleInteraction)
+    }
+  }, [])
+
+  // Identical typography to the headline this replaces — only the text
+  // content changes between the two stacked layers.
+  const taglineStyle = {
+    position:      'absolute',
+    top:            0,
+    left:           0,
+    margin:         0,
+    fontSize:       16,
+    fontWeight:     450,
+    letterSpacing:  '-0.1px',
+    lineHeight:     1.4,
+    color:          '#1a1a1a',
+    whiteSpace:     'nowrap',
+    transition:     `opacity ${TAGLINE_FADE_MS}ms ease`,
+  }
+
+  return (
+    <div style={{ position: 'relative', height: 23, overflow: 'hidden' }}>
+      <p style={{ ...taglineStyle, opacity: activeIsA ? 1 : 0 }}>{textA}</p>
+      <p style={{ ...taglineStyle, opacity: activeIsA ? 0 : 1 }}>{textB}</p>
+    </div>
+  )
+}
+
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
 function BrandRow({ isSearching, isDark, onToggleDark }) {
@@ -140,18 +234,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
         <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
       </div>
 
-      {!isSearching && (
-        <p style={{
-          margin:        0,
-          fontSize:      16,
-          fontWeight:    450,
-          letterSpacing: '-0.1px',
-          lineHeight:    1.4,
-          color:         '#1a1a1a',
-        }}>
-          What are you looking for?
-        </p>
-      )}
+      {!isSearching && <RotatingTagline />}
     </div>
   )
 }
@@ -335,7 +418,7 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* 1. Brand row + headline + dark mode toggle */}
+      {/* 1. Brand row + tagline + dark mode toggle */}
       <BrandRow
         isSearching={isSearching}
         isDark={isDark}
