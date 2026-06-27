@@ -155,7 +155,7 @@ function useRowList(list, onChange) {
     onChange([...list, { ...newRow, _isNew: true }])
   }
 
-  // PHASE 8: insert before the row currently at `index`.
+  // PHASE 8: insert before the row currently at 'index'.
   // When index === list.length, this is equivalent to addRow (append).
   function insertRowAt(index, newRow) {
     const next = [...list]
@@ -164,7 +164,6 @@ function useRowList(list, onChange) {
   }
 
   function updateRow(idx, nextRow) {
-    console.log('[DEBUG updateRow]', { idx, noteOfRow: nextRow.note, altNotes: nextRow.alternatives?.map(a => a.note) })
     onChange(list.map((r, i) => i === idx ? { ...nextRow, _isNew: false } : r))
   }
 
@@ -233,7 +232,7 @@ const TOP_LEVEL_TYPES = [
   { type: 'free_text', label: 'Text Block', color: '#1D4ED8' },
 ]
 
-function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss }) {
+function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
   const [hovered,    setHovered]    = useState(false)
   const [focused,    setFocused]    = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -244,11 +243,13 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
     // On touch devices the click fires after touchstart reveals the gap.
     // If the gap is already visible (isTouchActive), open the picker.
     // Otherwise (mouse) open directly.
+    if (disabled) return
     e.stopPropagation()
     setPickerOpen(true)
   }
 
   function handlePlusTouchStart(e) {
+    if (disabled) return
     if (!isTouchActive) {
       e.preventDefault()         // prevent the subsequent mouse events
       onTouchActivate()
@@ -292,6 +293,7 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
         <button
           type="button"
           aria-label={`Insert row at position ${insertIndex + 1}`}
+          disabled={disabled}
           onFocus={() => setFocused(true)}
           onBlur={() => { setFocused(false); if (!pickerOpen) setPickerOpen(false) }}
           onTouchStart={handlePlusTouchStart}
@@ -303,7 +305,8 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
             border: '1.5px solid var(--color-accent)',
             background: 'var(--color-surface)',
             color: 'var(--color-accent)',
-            cursor: 'pointer',
+            cursor: disabled ? 'default' : 'pointer',
+            opacity: disabled ? 0.5 : 1,
             padding: 0,
             margin: '0 6px',
             boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
@@ -380,25 +383,21 @@ function GapInsertControl({ insertIndex, onInsert, isTouchActive, onTouchActivat
 // Sections can only contain drug rows, so there is no type ambiguity —
 // clicking inserts a drug row immediately. No picker UI is shown.
 
-function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss }) {
+function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActivate, onTouchDismiss, disabled = false }) {
   const [hovered, setHovered] = useState(false)
   const [focused, setFocused] = useState(false)
 
   const visible = hovered || focused || isTouchActive
 
   function handleClick(e) {
+    if (disabled) return
     e.stopPropagation()
-    if (!isTouchActive) {
-      onInsert()
-      onTouchDismiss()
-    } else {
-      // Second tap: actually insert
-      onInsert()
-      onTouchDismiss()
-    }
+    onInsert()
+    onTouchDismiss()
   }
 
   function handleTouchStart(e) {
+    if (disabled) return
     if (!isTouchActive) {
       e.preventDefault()
       onTouchActivate()
@@ -424,6 +423,7 @@ function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActiva
         <button
           type="button"
           aria-label={`Insert drug at position ${insertIndex + 1}`}
+          disabled={disabled}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           onTouchStart={handleTouchStart}
@@ -436,7 +436,8 @@ function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActiva
             border: '1.5px solid #6366f1',
             background: 'var(--color-surface)',
             color: '#6366f1',
-            cursor: 'pointer',
+            cursor: disabled ? 'default' : 'pointer',
+            opacity: disabled ? 0.5 : 1,
             padding: 0,
             margin: '0 5px',
             boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
@@ -456,7 +457,7 @@ function GapInsertDrugOnly({ insertIndex, onInsert, isTouchActive, onTouchActiva
 // (recursion, not duplication). Only drug-type rows belong here — two levels
 // max (sheet -> section -> drugs).
 
-function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
+function SectionRowEditor({ row, onChange, onMoveDrugOut, disabled = false }) {
   const drugs = row.drugs ?? []
   const {
     insertRowAt, updateRow, moveRow, handleDeleteRequest,
@@ -490,15 +491,13 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
           }}>
             Section label
           </span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
-            e.g. "For fever", "For cough"
-          </span>
         </div>
         <input
           type="text"
           value={row.label ?? ''}
           onChange={e => onChange({ ...row, label: e.target.value })}
           placeholder="Section heading…"
+          disabled={disabled}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '7px 10px',
@@ -522,6 +521,7 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
             isTouchActive={activeTouchGap === 0}
             onTouchActivate={() => setActiveTouchGap(0)}
             onTouchDismiss={() => setActiveTouchGap(null)}
+            disabled={disabled}
           />
           <div style={{
             textAlign: 'center', fontSize: 12,
@@ -542,6 +542,7 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
             isTouchActive={activeTouchGap === 0}
             onTouchActivate={() => setActiveTouchGap(0)}
             onTouchDismiss={() => setActiveTouchGap(null)}
+            disabled={disabled}
           />
           {drugs.map((drug, idx) => (
             <div key={drug.id ?? idx}>
@@ -554,6 +555,7 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
                 onDeleteRequest={handleDeleteRequest}
                 isNested
                 onMoveOut={() => onMoveDrugOut(idx)}
+                disabled={disabled}
               />
               {/* Gap after every row (including the last — acts as append) */}
               <GapInsertDrugOnly
@@ -562,6 +564,7 @@ function SectionRowEditor({ row, onChange, onMoveDrugOut }) {
                 isTouchActive={activeTouchGap === idx + 1}
                 onTouchActivate={() => setActiveTouchGap(idx + 1)}
                 onTouchDismiss={() => setActiveTouchGap(null)}
+                disabled={disabled}
               />
             </div>
           ))}
@@ -587,21 +590,18 @@ function RowCard({
   isNested = false, onMoveOut = null,
   sections = [], onMoveIntoSection = null,
   onMoveDrugOutOfSection = null,
+  disabled = false,
 }) {
   const [expanded, setExpanded] = useState(row._isNew ?? false)
   const cfg = ROW_TYPE_LABELS[row.row_type] ?? { color: '#9ca3af' }
   const isDrugRow = row.row_type === 'drug'
-
-  console.log('[DEBUG RowCard render]', { idx, rowId: row.id, expanded, rowNote: row.note, altNotes: row.alternatives?.map(a => a.note) })
 
   function handleEditorChange(nextRow) {
     onChange(nextRow)
   }
 
   function handleExpand() {
-    console.log('[DEBUG RowCard handleExpand] toggling expanded from', expanded, 'row.note:', row.note, 'altNotes:', row.alternatives?.map(a => a.note))
     setExpanded(!expanded)
-
   }
 
   return (
@@ -653,6 +653,7 @@ function RowCard({
               value=""
               onChange={e => { if (e.target.value) onMoveIntoSection(e.target.value) }}
               title="Move into section…"
+              disabled={disabled}
               style={{
                 fontSize: 11, fontWeight: 600,
                 color: 'var(--color-text-secondary)',
@@ -661,7 +662,7 @@ function RowCard({
                 background: 'var(--color-surface)',
                 padding: '3px 4px',
                 maxWidth: 132,
-                cursor: 'pointer',
+                cursor: disabled ? 'default' : 'pointer',
               }}
             >
               <option value="">Move into section…</option>
@@ -676,8 +677,9 @@ function RowCard({
             <button
               type="button"
               onClick={onMoveOut}
+              disabled={disabled}
               title="Move out of section"
-              style={iconBtn(false)}
+              style={iconBtn(disabled)}
             >
               <LogOut size={13} />
             </button>
@@ -686,26 +688,27 @@ function RowCard({
           <button
             type="button"
             onClick={() => onMove(idx, -1)}
-            disabled={idx === 0}
+            disabled={disabled || idx === 0}
             title="Move up"
-            style={iconBtn(idx === 0)}
+            style={iconBtn(disabled || idx === 0)}
           >
             <ChevronUp size={13} />
           </button>
           <button
             type="button"
             onClick={() => onMove(idx, 1)}
-            disabled={idx === total - 1}
+            disabled={disabled || idx === total - 1}
             title="Move down"
-            style={iconBtn(idx === total - 1)}
+            style={iconBtn(disabled || idx === total - 1)}
           >
             <ChevronDown size={13} />
           </button>
           <button
             type="button"
             onClick={() => onDeleteRequest(idx)}
+            disabled={disabled}
             title="Remove row"
-            style={iconBtn(false, true)}
+            style={iconBtn(disabled, true)}
           >
             <Trash2 size={13} />
           </button>
@@ -723,6 +726,7 @@ function RowCard({
               row={row}
               onChange={handleEditorChange}
               onMoveDrugOut={onMoveDrugOutOfSection}
+              disabled={disabled}
             />
           )}
           {row.row_type === 'note' && (
@@ -761,23 +765,25 @@ function iconBtn(disabled = false, danger = false) {
 
 // ─── Add-row buttons ───────────────────────────────────────────────────────────
 
-function AddRowButton({ label, color, onClick }) {
+function AddRowButton({ label, color, onClick, disabled = false }) {
   const [hovered, setHovered] = useState(false)
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         padding: '6px 14px',
-        border: `1.5px solid ${hovered ? color : 'var(--color-border)'}`,
+        border: `1.5px solid ${hovered && !disabled ? color : 'var(--color-border)'}`,
         borderRadius: 'var(--radius-md)',
-        background: hovered ? color + '12' : 'var(--color-surface)',
-        color: hovered ? color : 'var(--color-text-secondary)',
+        background: hovered && !disabled ? color + '12' : 'var(--color-surface)',
+        color: hovered && !disabled ? color : 'var(--color-text-secondary)',
         fontSize: 12, fontWeight: 600,
         fontFamily: 'var(--font-body)',
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
         transition: 'all 0.15s',
       }}
     >
@@ -788,7 +794,7 @@ function AddRowButton({ label, color, onClick }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function PrescriptionSheetEditor({ block, onChange }) {
+export default function PrescriptionSheetEditor({ block, onChange, disabled = false }) {
   const data  = block?.data ?? {}
   const label = data.label ?? ''
   const rows  = data.rows  ?? []
@@ -892,15 +898,13 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
           }}>
             Sheet label
           </span>
-          <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginLeft: 6 }}>
-            shown as sub-tab name when condition has 2+ prescription sheets
-          </span>
         </div>
         <input
           type="text"
           value={label}
           onChange={e => update({ label: e.target.value })}
           placeholder="e.g. Standard, Adults, Paediatric"
+          disabled={disabled}
           style={{
             width: '100%', boxSizing: 'border-box',
             padding: '7px 10px',
@@ -934,6 +938,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
             isTouchActive={activeTouchGap === 0}
             onTouchActivate={() => setActiveTouchGap(0)}
             onTouchDismiss={() => setActiveTouchGap(null)}
+            disabled={disabled}
           />
           {rows.map((row, idx) => (
             <div key={row.id ?? idx}>
@@ -947,6 +952,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
                 sections={sections}
                 onMoveIntoSection={sectionId => moveDrugIntoSection(idx, sectionId)}
                 onMoveDrugOutOfSection={drugIdx => moveDrugOutOfSection(idx, drugIdx)}
+                disabled={disabled}
               />
               {/* Gap after every row (including the last — acts as append) */}
               <GapInsertControl
@@ -955,6 +961,7 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
                 isTouchActive={activeTouchGap === idx + 1}
                 onTouchActivate={() => setActiveTouchGap(idx + 1)}
                 onTouchDismiss={() => setActiveTouchGap(null)}
+                disabled={disabled}
               />
             </div>
           ))}
@@ -963,10 +970,10 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
 
       {/* ── Add-row buttons (still present — append to end) ──────────────────── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} />
-        <AddRowButton label="Section"      color="#10b981" onClick={addSection} />
-        <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} />
-        <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} />
+        <AddRowButton label="Drug"         color="#6366f1" onClick={addDrug} disabled={disabled} />
+        <AddRowButton label="Section"      color="#10b981" onClick={addSection} disabled={disabled} />
+        <AddRowButton label="Note"         color="#f59e0b" onClick={addNote} disabled={disabled} />
+        <AddRowButton label="Text Block"   color="#1D4ED8" onClick={addFreeText} disabled={disabled} />
       </div>
 
       {/* ── Promote-alternative dialog (step 1.11) ─────────────────────────── */}
@@ -982,3 +989,4 @@ export default function PrescriptionSheetEditor({ block, onChange }) {
     </div>
   )
 }
+

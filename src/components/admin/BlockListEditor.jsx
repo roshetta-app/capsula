@@ -689,7 +689,7 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
 
   function addBlock(blockType) {
     const maxOrder = blocks.reduce((m, b) => Math.max(m, b.order_index ?? 0), -1)
-    const context  = activeTab === 'rx' ? 'rx' : 'clinical'
+    const context  = (blockType === 'prescription_sheet') ? undefined : (activeTab === 'rx' ? 'rx' : 'clinical')
     onChange([...blocks, {
       block_type:  blockType,
       order_index: maxOrder + 1,
@@ -720,8 +720,6 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
         return <FreeTextPostEditor data={block.data} onChange={patchData} disabled={disabled} />
       case 'note_callout':
         return <NoteCalloutEditor block={block} onChange={patchData} />
-      case 'prescription_sheet':
-        return <PrescriptionSheetEditor block={block} onChange={patchData} />
       default:
         return null
     }
@@ -891,4 +889,5 @@ export default function BlockListEditor({ blocks = [], onChange, disabled = fals
     </div>
   )
 }
+
 
