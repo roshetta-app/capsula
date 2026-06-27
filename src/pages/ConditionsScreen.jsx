@@ -452,9 +452,15 @@ export default function ConditionsScreen() {
   // down on its own. We measure its rendered height whenever it becomes
   // visible (and on resize) and reserve that much top padding on the content
   // wrapper below, so the first card / ConditionListHeader row are never
-  // hidden behind the fixed panel.
+  // hidden behind the fixed panel. headerHeight is reset to 0 immediately
+  // when the header hides, so a stale measured value can never linger and
+  // produce padding for a header that's no longer shown.
 
   useEffect(() => {
+    if (!showCompactHeader) {
+      setHeaderHeight(0)
+      return
+    }
     const el = compactHeaderRef.current
     if (!el) return
 
@@ -553,8 +559,13 @@ export default function ConditionsScreen() {
 
   // ── Compact header action handlers ───────────────────────────────────────────
   // These are used exclusively by the compact header (not the main body controls).
-  // They lock the header on screen, jump to the top so results are immediately
-  // visible, and release the lock only when both search and filter are cleared.
+  // Typing or picking a pill locks the header on screen and jumps to the top
+  // so results are immediately visible. Picking a specialty pill (including
+  // 'All') never releases the lock by itself — it's just a filter choice, and
+  // the header should stay put so the user can keep refining. The lock is
+  // only released by clearing the search text back to empty; otherwise the
+  // header closes solely because the user scrolled the main pills row back
+  // into view (handled separately by the IntersectionObserver effect above).
   //
   // Fix 3: releasing the lock no longer flips showCompactHeader to false
   // immediately. Instead it's deferred by HEADER_EXIT_TRANSITION_MS so the
@@ -581,9 +592,16 @@ export default function ConditionsScreen() {
     window.scrollTo(0, 0)
   }
 
+  // Note: selecting a pill or editing the query FROM the compact header never
+  // releases the lock on its own — only clearing the search text back down to
+  // an empty string releases it (handleCompactQueryChange below), matching the
+  // expectation that the header stays open for further filtering until the
+  // user explicitly clears the search, or scrolls the pills row back into
+  // view. Picking 'All' is a normal filter choice, not a "close the header"
+  // action, so it must not dismiss the panel out from under the user.
+
   function handleCompactQueryChange(val) {
-    const willBeActive = val.length >= 1 || activeSpecialty !== 'all'
-    if (willBeActive) {
+    if (val.length >= 1) {
       engageLock()
     } else {
       releaseLockAfterTransition()
@@ -592,12 +610,7 @@ export default function ConditionsScreen() {
   }
 
   function handleCompactSpecialtySelect(id) {
-    const willBeActive = query.length >= 1 || id !== 'all'
-    if (willBeActive) {
-      engageLock()
-    } else {
-      releaseLockAfterTransition()
-    }
+    engageLock()
     setActiveSpecialty(id)
     setBottomSheetOpen(false)
   }
