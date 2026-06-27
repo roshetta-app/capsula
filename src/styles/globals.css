@@ -205,6 +205,14 @@ body {
   color: var(--color-text-arabic);
 }
 
+/* ─── Input placeholder contrast ─────────────────────────────────────────────── */
+/* Slightly elevated from tertiary to secondary for readability while staying
+   clearly secondary to real user input. Dark mode inherits the same variable. */
+::placeholder {
+  color: var(--color-text-secondary);
+  opacity: 1; /* Firefox sets opacity: 0.54 by default — override to honour our token */
+}
+
 /* ─── Shimmer animation (used in skeleton loaders) ───────────────────────────── */
 @keyframes shimmer {
   0%   { opacity: 1; }

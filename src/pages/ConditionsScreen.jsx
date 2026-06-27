@@ -190,7 +190,7 @@ function RotatingTagline() {
     left:           0,
     margin:         0,
     fontSize:       16,
-    fontWeight:     450,
+    fontWeight:     500,
     letterSpacing:  '-0.1px',
     lineHeight:     1.4,
     color:          'var(--color-text-primary)',
@@ -212,7 +212,7 @@ function BrandRow({ isSearching, isDark, onToggleDark }) {
   return (
     <div style={{
       paddingTop:    'var(--space-6)',  /* was var(--space-4) — added ~8–12px top breathing room */
-      paddingBottom: 'var(--space-3)',
+      paddingBottom: 'calc(var(--space-3) - 4px)',  /* tightened 4px to pull tagline closer to search bar */
     }}>
       <div style={{
         display:      'flex',
