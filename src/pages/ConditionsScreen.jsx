@@ -348,12 +348,15 @@ function StickyLogoHeader({
           marginTop:      'var(--space-2)',
           padding:        'var(--space-1) var(--space-5) var(--space-2)',
         }}>
-          {/* Left: "Specialties" trigger (opens the existing bottom sheet)
-              + optional active-specialty chip, shown as separate elements */}
+          {/* Left: "Specialty Picker" + "active filter" read as one logical
+              group — "choose filter" → "current filter" — via a tighter
+              internal gap than the space separating this group from the
+              sort control on the far right (justify-content: space-between
+              already provides that larger separation). */}
           <div style={{
             display:    'flex',
             alignItems: 'center',
-            gap:        'var(--space-2)',
+            gap:        6,
             minWidth:   0,
           }}>
             <button
@@ -435,33 +438,46 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: sort toggle — secondary utility action, deliberately
-              lighter in weight/color than the Specialties button so the
-              row's hierarchy reads clearly: Specialties (primary) >
-              active chip (state) > sort (utility). Shows the action that
-              will occur on tap (nextMode), matching ConditionListHeader's
-              behavior in the main header — both headers must stay in sync. */}
+          {/* Right: sort toggle — secondary utility action. Strengthened
+              from the previous pass (was reading as insignificant) so the
+              right side of the header feels intentionally balanced rather
+              than empty, while staying clearly secondary to the active
+              specialty chip — color stops short of full text-primary
+              contrast, and no fill/border is introduced. Tap target is
+              guaranteed at 44x44 regardless of label/icon size via
+              minWidth/minHeight, not by guessing at padding. Shows the
+              action that will occur on tap (nextMode), matching
+              ConditionListHeader's behavior in the main header — both
+              headers must stay in sync. */}
           <button
             onClick={onSortToggle}
             aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
             style={{
               display:                 'flex',
               alignItems:              'center',
-              gap:                     4,
+              justifyContent:          'center',
+              gap:                     5,
+              minWidth:                44,
+              minHeight:               44,
+              // Negative vertical margin keeps the 44px tap target from
+              // visually inflating the context row's height — the row
+              // stays as compact as the rest of the header while the
+              // tappable area still meets the 44x44 minimum.
+              margin:                  '-12px 0',
               background:              'none',
               border:                  'none',
-              padding:                 '4px 0 4px 8px',
+              padding:                 '0 var(--space-3)',
               cursor:                  'pointer',
-              color:                   'var(--color-text-tertiary)',
-              fontSize:                12,
-              fontWeight:              400,
+              color:                   'var(--color-text-secondary)',
+              fontSize:                14,
+              fontWeight:              500,
               fontFamily:              'var(--font-body)',
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
             }}
           >
-            <ArrowUpDown size={11} strokeWidth={1.6} aria-hidden="true" />
+            <ArrowUpDown size={14} strokeWidth={1.9} aria-hidden="true" />
             {SORT_LABELS[nextMode]}
           </button>
         </div>
