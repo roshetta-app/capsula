@@ -511,20 +511,19 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
 
   return (
     <div style={{
-      display:  'flex',
-      alignItems: 'stretch',
-      width:    '100%',
-      // Match the visual language of the search bar: white/surface background,
-      // subtle border, generous border radius.
-      backgroundColor:         'var(--color-surface)',
-      border:                  '1.5px solid var(--color-border)',
-      borderRadius:            'var(--radius-full)',
-      minHeight:               48,
-      overflow:                'hidden',
-      transition:              'border-color 0.15s ease',
+      display:        'flex',
+      alignItems:     'stretch',
+      width:          '100%',
+      // Lighter than the search bar — clearly a filter, not an input.
+      // No border; soft neutral fill sets it apart without competing.
+      backgroundColor: 'rgba(0, 0, 0, 0.035)',
+      border:          'none',
+      borderRadius:    'var(--radius-full)',
+      minHeight:       40,
+      overflow:        'hidden',
     }}>
 
-      {/* Main tap area — opens bottom sheet */}
+      {/* Main tap area — full left section opens bottom sheet */}
       <button
         onClick={onOpen}
         aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
@@ -532,8 +531,8 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
           flex:                    1,
           display:                 'flex',
           alignItems:              'center',
-          gap:                     10,
-          padding:                 '0 0 0 16px',
+          gap:                     8,
+          padding:                 '0 8px 0 12px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
@@ -542,13 +541,16 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {/* Icon container — specialty color when active, neutral when idle */}
+        {/* Small tinted circle — accents with specialty color without dominating */}
         <div style={{
-          width:           32,
-          height:          32,
+          width:           22,
+          height:          22,
           flexShrink:      0,
-          borderRadius:    'var(--radius-sm)',
-          backgroundColor: isActive ? colors.bg : 'var(--color-border)',
+          borderRadius:    '50%',
+          // Active: very light specialty tint. Idle: barely-there neutral circle.
+          backgroundColor: isActive
+            ? colors.bg
+            : 'rgba(0, 0, 0, 0.06)',
           display:         'flex',
           alignItems:      'center',
           justifyContent:  'center',
@@ -558,13 +560,13 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
             <SpecialtyIcon
               iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
               iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-              size={16}
+              size={12}
               color={colors.fg}
             />
           ) : (
-            // Neutral stethoscope placeholder when no specialty selected
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="var(--color-text-tertiary)" strokeWidth="2"
+            // Neutral fallback icon — stethoscope marks this as a specialty picker
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+              stroke="var(--color-text-tertiary)" strokeWidth="2.2"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
               <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
@@ -573,35 +575,39 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
           )}
         </div>
 
-        {/* Label */}
+        {/* Label — always primary text color; icon carries the specialty accent */}
         <span style={{
           flex:         1,
           minWidth:     0,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
           whiteSpace:   'nowrap',
-          fontSize:     15,
-          fontWeight:   isActive ? 600 : 400,
+          fontSize:     14,
+          fontWeight:   isActive ? 500 : 400,
           fontFamily:   'var(--font-body)',
-          color:        isActive ? colors.fg : 'var(--color-text-secondary)',
+          // Neutral primary — not colored. The icon swatch carries the specialty.
+          color:        isActive
+            ? 'var(--color-text-primary)'
+            : 'var(--color-text-secondary)',
           textAlign:    'left',
-          transition:   'color 200ms ease, font-weight 200ms ease',
+          transition:   'color 200ms ease',
         }}>
           {isActive ? activeSpecialtyObj.name : 'All Specialties'}
         </span>
 
-        {/* Chevron — right side of main tap area, before optional clear btn */}
-        <svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"
+        {/* Chevron sits right after the label — reads as one unit: "Label ▾" */}
+        <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true"
           style={{
-            flexShrink: 0,
-            marginRight: isActive ? 0 : 14,
-            color: 'var(--color-text-tertiary)',
+            flexShrink:  0,
+            marginRight: isActive ? 4 : 12,
+            color:       'var(--color-text-tertiary)',
+            opacity:     0.7,
           }}>
           <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
         </svg>
       </button>
 
-      {/* Clear button — only shown when active; sits flush inside the control */}
+      {/* Clear (×) — subtle utility action, no divider, shown only when active */}
       {isActive && (
         <button
           onClick={e => { e.stopPropagation(); onClear() }}
@@ -610,19 +616,22 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
             display:                 'flex',
             alignItems:              'center',
             justifyContent:          'center',
-            width:                   44,
+            // Generous tap target with comfortable right padding
+            width:                   40,
             flexShrink:              0,
             background:              'none',
             border:                  'none',
-            borderLeft:              '1px solid var(--color-border)',
+            // No divider — unified feel
             cursor:                  'pointer',
             color:                   'var(--color-text-tertiary)',
+            opacity:                 0.7,
             outline:                 'none',
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"
-            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+          {/* Smaller × — utility weight, not primary weight */}
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round"
             aria-hidden="true">
             <line x1="2" y1="2" x2="10" y2="10"/>
             <line x1="10" y1="2" x2="2"  y2="10"/>
@@ -831,7 +840,7 @@ export default function ConditionsScreen() {
           <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
-        <div style={shimmer({ width: '100%', height: 48, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
+        <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
         {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
       </Layout>
     )
@@ -922,6 +931,7 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 
 
 
