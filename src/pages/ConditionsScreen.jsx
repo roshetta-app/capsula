@@ -139,7 +139,11 @@ const TAGLINE_VISIBLE_MS     = 6500 // time each tagline stays on screen (5–8s
 const TAGLINE_FADE_MS        = 400  // crossfade duration (300–500ms range)
 const TAGLINE_IDLE_RESUME_MS = 4000 // idle time before rotation resumes (3–5s range)
 
-function RotatingTagline() {
+function RotatingTagline({
+  fontSize   = 16,
+  fontWeight = 500,
+  color      = 'var(--color-text-primary)',
+}) {
   const [textA, setTextA]         = useState(TAGLINES[0])
   const [textB, setTextB]         = useState(TAGLINES[1])
   const [activeIsA, setActiveIsA] = useState(true)
@@ -191,17 +195,20 @@ function RotatingTagline() {
   }, [])
 
   // Identical typography to the headline this replaces — only the text
-  // content changes between the two stacked layers.
+  // content changes between the two stacked layers. fontSize/fontWeight/
+  // color are overridable per call site (e.g. StickyLogoHeader uses a
+  // smaller, lighter, lower-contrast variant); defaults match BrandRow's
+  // original values exactly, so BrandRow's rendering is unaffected.
   const taglineStyle = {
     position:      'absolute',
     top:            0,
     left:           0,
     margin:         0,
-    fontSize:       16,
-    fontWeight:     500,
+    fontSize,
+    fontWeight,
     letterSpacing:  '-0.1px',
     lineHeight:     1.4,
-    color:          'var(--color-text-primary)',
+    color,
     whiteSpace:     'nowrap',
     transition:     `opacity ${TAGLINE_FADE_MS}ms ease`,
   }
@@ -289,6 +296,10 @@ function StickyLogoHeader({
         zIndex:          50,
         backgroundColor: 'var(--color-surface)',
         borderBottom:    '1px solid var(--color-border)',
+        // Thin divider (above) plus a very subtle shadow — keeps the
+        // separation from scrolling content visible without introducing
+        // any colored chrome or elevation that reads as a floating card.
+        boxShadow:       '0 1px 4px rgba(0, 0, 0, 0.04)',
         // Slide in from above when visible, slide back out when not
         transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:      'transform 0.25s ease',
@@ -298,20 +309,30 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — ~18% smaller than BrandRow's 32px, extra breathing room */}
-        <div style={{ padding: 'var(--space-3) var(--space-6) 0' }}>
+        {/* 1. Logo row — ~20% larger than the previous 18px sticky-header
+            size, with extra vertical breathing room (~6-8px added) so the
+            branding block reads as premium without growing the overall
+            header height much — absorbed by tightening the logo-tagline
+            gap below. */}
+        <div style={{ padding: '19px var(--space-6) 0' }}>{/* was 12px (var(--space-3)) — +7px for requested breathing room */}
           <img
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
-            style={{ display: 'block', height: 18, width: 'auto', flexShrink: 0 }}
+            style={{ display: 'block', height: 21, width: 'auto', flexShrink: 0 }}
           />
         </div>
 
-        {/* 2. Tagline — same component/typography/animation as BrandRow */}
+        {/* 2. Tagline — smaller, lighter, lower-contrast than BrandRow's
+            tagline, and pulled tighter against the logo so the two read
+            as one branding block. Logo is still the primary focal point. */}
         {!isSearching && (
-          <div style={{ padding: '2px var(--space-6) 0' }}>
-            <RotatingTagline />
+          <div style={{ padding: '1px var(--space-6) 0' }}>
+            <RotatingTagline
+              fontSize={13}
+              fontWeight={400}
+              color="var(--color-text-secondary)"
+            />
           </div>
         )}
 
@@ -393,10 +414,12 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: sort toggle — compact icon + label */}
+          {/* Right: sort toggle — compact icon + label. Shows the action
+              that will occur on tap (nextMode), matching ConditionListHeader's
+              behavior in the main header — both headers must stay in sync. */}
           <button
             onClick={onSortToggle}
-            aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
+            aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
             style={{
               display:                 'flex',
               alignItems:              'center',
@@ -414,7 +437,7 @@ function StickyLogoHeader({
             }}
           >
             <ArrowUpDown size={12} strokeWidth={1.8} aria-hidden="true" />
-            {SORT_LABELS[sortMode]}
+            {SORT_LABELS[nextMode]}
           </button>
         </div>
 
