@@ -24,7 +24,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, ArrowUpDown } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -250,7 +250,20 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // viewport). Slides in from the top with a CSS transition; slides back out
 // when the user scrolls back up and the logo re-enters the viewport.
 
-function StickyLogoHeader({ visible }) {
+function StickyLogoHeader({
+  visible,
+  isDark,
+  onToggleDark,
+  activeSpecialty,
+  specialtyName,
+  onClearSpecialty,
+  sortMode,
+  onSortToggle,
+  SORT_LABELS,
+}) {
+  const nextMode = sortMode === 'az' ? 'recent' : 'az'
+  const hasFilter = activeSpecialty && activeSpecialty !== 'all'
+
   return (
     <div
       aria-hidden="true"
@@ -278,13 +291,86 @@ function StickyLogoHeader({ visible }) {
         margin:     '0 auto',
         display:    'flex',
         alignItems: 'center',
+        gap:        'var(--space-2)',
       }}>
+        {/* Logo — left anchor */}
         <img
           src="/capsula/logo.svg"
           alt="Capsula"
           className="capsula-logo"
-          style={{ display: 'block', height: 22, width: 'auto' }}
+          style={{ display: 'block', height: 22, width: 'auto', flexShrink: 0 }}
         />
+
+        {/* Active specialty chip — only when a filter is active */}
+        {hasFilter && (
+          <button
+            onClick={onClearSpecialty}
+            aria-label={`Clear ${specialtyName} filter`}
+            style={{
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     4,
+              padding:                 '3px 8px 3px 10px',
+              borderRadius:            'var(--radius-full)',
+              border:                  '1.5px solid var(--color-accent)',
+              backgroundColor:         'color-mix(in srgb, var(--color-accent) 12%, transparent)',
+              color:                   'var(--color-accent)',
+              fontSize:                12,
+              fontWeight:              500,
+              fontFamily:              'var(--font-body)',
+              cursor:                  'pointer',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+              whiteSpace:              'nowrap',
+              flexShrink:              1,
+              overflow:                'hidden',
+              textOverflow:            'ellipsis',
+              maxWidth:                140,
+            }}
+          >
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {specialtyName}
+            </span>
+            {/* Inline × icon */}
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+              stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+              aria-hidden="true" style={{ flexShrink: 0 }}>
+              <line x1="2" y1="2" x2="10" y2="10"/>
+              <line x1="10" y1="2" x2="2"  y2="10"/>
+            </svg>
+          </button>
+        )}
+
+        {/* Spacer */}
+        <span style={{ flex: 1 }} />
+
+        {/* Sort indicator — tap to cycle */}
+        <button
+          onClick={onSortToggle}
+          aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            gap:                     3,
+            padding:                 '4px 8px',
+            borderRadius:            'var(--radius-full)',
+            border:                  '1.5px solid var(--color-border)',
+            backgroundColor:         'var(--color-surface)',
+            color:                   'var(--color-text-secondary)',
+            fontSize:                12,
+            fontFamily:              'var(--font-body)',
+            cursor:                  'pointer',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+            flexShrink:              0,
+          }}
+        >
+          <ArrowUpDown size={12} strokeWidth={1.8} aria-hidden="true" />
+          {SORT_LABELS[sortMode]}
+        </button>
+
+        {/* Dark mode toggle */}
+        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
       </div>
     </div>
   )
@@ -494,7 +580,17 @@ export default function ConditionsScreen() {
     <Layout>
 
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
-      <StickyLogoHeader visible={showStickyHeader} />
+      <StickyLogoHeader
+        visible={showStickyHeader}
+        isDark={isDark}
+        onToggleDark={toggleDark}
+        activeSpecialty={activeSpecialty}
+        specialtyName={specialtyName}
+        onClearSpecialty={handleClearFilter}
+        sortMode={sortMode}
+        onSortToggle={cycleSortMode}
+        SORT_LABELS={SORT_LABELS}
+      />
 
       {/* 1. Brand row + tagline + dark mode toggle */}
       <BrandRow
