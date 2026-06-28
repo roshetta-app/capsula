@@ -39,8 +39,10 @@ import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
-import { alphabetGroup }       from '../utils/alphabetGroup'
-import { ROUTES }              from '../router'
+import { alphabetGroup }               from '../utils/alphabetGroup'
+import { SpecialtyIcon, useIsDark }    from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
+import { ROUTES }                       from '../router'
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -252,17 +254,17 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 
 function StickyLogoHeader({
   visible,
-  isDark,
-  onToggleDark,
-  activeSpecialty,
-  specialtyName,
+  activeSpecialtyObj,
   onClearSpecialty,
   sortMode,
   onSortToggle,
   SORT_LABELS,
 }) {
-  const nextMode = sortMode === 'az' ? 'recent' : 'az'
-  const hasFilter = activeSpecialty && activeSpecialty !== 'all'
+  const isDark    = useIsDark()
+  const nextMode  = sortMode === 'az' ? 'recent' : 'az'
+  const hasFilter = !!activeSpecialtyObj
+  const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
+  const colors    = resolveToken(tokenKey, isDark)
 
   return (
     <div
@@ -276,8 +278,6 @@ function StickyLogoHeader({
         backgroundColor: 'var(--color-surface)',
         borderBottom:    '1px solid var(--color-border)',
         padding:         'var(--space-3) var(--space-6)',
-        display:         'flex',
-        alignItems:      'center',
         // Slide in from above when visible, slide back out when not
         transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:      'transform 0.25s ease',
@@ -285,92 +285,89 @@ function StickyLogoHeader({
         pointerEvents:   visible ? 'auto' : 'none',
       }}
     >
-      <div style={{
-        width:      '100%',
-        maxWidth:   680,
-        margin:     '0 auto',
-        display:    'flex',
-        alignItems: 'center',
-        gap:        'var(--space-2)',
-      }}>
-        {/* Logo — left anchor */}
-        <img
-          src="/capsula/logo.svg"
-          alt="Capsula"
-          className="capsula-logo"
-          style={{ display: 'block', height: 22, width: 'auto', flexShrink: 0 }}
-        />
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* Active specialty chip — only when a filter is active */}
-        {hasFilter && (
+        {/* Row 1: logo + sort button */}
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          marginBottom: hasFilter ? 'var(--space-2)' : 0,
+        }}>
+          <img
+            src="/capsula/logo.svg"
+            alt="Capsula"
+            className="capsula-logo"
+            style={{ display: 'block', height: 22, width: 'auto', flexShrink: 0 }}
+          />
+          <span style={{ flex: 1 }} />
+          {/* Sort — plain text, no border or background */}
           <button
-            onClick={onClearSpecialty}
-            aria-label={`Clear ${specialtyName} filter`}
+            onClick={onSortToggle}
+            aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
             style={{
               display:                 'flex',
               alignItems:              'center',
               gap:                     4,
-              padding:                 '3px 8px 3px 10px',
-              borderRadius:            'var(--radius-full)',
-              border:                  '1.5px solid var(--color-accent)',
-              backgroundColor:         'color-mix(in srgb, var(--color-accent) 12%, transparent)',
-              color:                   'var(--color-accent)',
-              fontSize:                12,
-              fontWeight:              500,
-              fontFamily:              'var(--font-body)',
+              background:              'none',
+              border:                  'none',
+              padding:                 '2px 0 2px 8px',
               cursor:                  'pointer',
+              color:                   'var(--color-text-secondary)',
+              fontSize:                12,
+              fontFamily:              'var(--font-body)',
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
-              whiteSpace:              'nowrap',
-              flexShrink:              1,
-              overflow:                'hidden',
-              textOverflow:            'ellipsis',
-              maxWidth:                140,
+              flexShrink:              0,
             }}
           >
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {specialtyName}
-            </span>
-            {/* Inline × icon */}
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-              stroke="currentColor" strokeWidth="2" strokeLinecap="round"
-              aria-hidden="true" style={{ flexShrink: 0 }}>
-              <line x1="2" y1="2" x2="10" y2="10"/>
-              <line x1="10" y1="2" x2="2"  y2="10"/>
-            </svg>
+            <ArrowUpDown size={12} strokeWidth={1.8} aria-hidden="true" />
+            {SORT_LABELS[sortMode]}
           </button>
+        </div>
+
+        {/* Row 2: active specialty chip — matches SpecialtyFilterPills active pill style */}
+        {hasFilter && (
+          <div>
+            <button
+              onClick={onClearSpecialty}
+              aria-label={`Clear ${activeSpecialtyObj.name} filter`}
+              style={{
+                flexShrink:              0,
+                display:                 'inline-flex',
+                alignItems:              'center',
+                gap:                     5,
+                padding:                 '6px 12px',
+                borderRadius:            'var(--radius-full)',
+                fontSize:                13,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                cursor:                  'pointer',
+                transition:              'all 0.15s ease',
+                border:                  `1.5px solid ${colors.pill}`,
+                backgroundColor:         colors.pill,
+                color:                   '#ffffff',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={13}
+                color="#ffffff"
+              />
+              {activeSpecialtyObj.name}
+              {/* Inline × */}
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+                stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+                aria-hidden="true" style={{ flexShrink: 0, marginLeft: 2 }}>
+                <line x1="2" y1="2" x2="10" y2="10"/>
+                <line x1="10" y1="2" x2="2"  y2="10"/>
+              </svg>
+            </button>
+          </div>
         )}
 
-        {/* Spacer */}
-        <span style={{ flex: 1 }} />
-
-        {/* Sort indicator — tap to cycle */}
-        <button
-          onClick={onSortToggle}
-          aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
-          style={{
-            display:                 'flex',
-            alignItems:              'center',
-            gap:                     3,
-            padding:                 '4px 8px',
-            borderRadius:            'var(--radius-full)',
-            border:                  '1.5px solid var(--color-border)',
-            backgroundColor:         'var(--color-surface)',
-            color:                   'var(--color-text-secondary)',
-            fontSize:                12,
-            fontFamily:              'var(--font-body)',
-            cursor:                  'pointer',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
-            flexShrink:              0,
-          }}
-        >
-          <ArrowUpDown size={12} strokeWidth={1.8} aria-hidden="true" />
-          {SORT_LABELS[sortMode]}
-        </button>
-
-        {/* Dark mode toggle */}
-        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
       </div>
     </div>
   )
@@ -492,9 +489,12 @@ export default function ConditionsScreen() {
     resultCount,
   } = useConditionSearch(conditions, sortMode, recentOrder)
 
-  const isSearching   = query.length >= 1
-  const specialtyName = specialties.find(s => s.id === activeSpecialty)?.name ?? ''
-  const totalCount    = conditions.length
+  const isSearching        = query.length >= 1
+  const activeSpecialtyObj = activeSpecialty !== 'all'
+    ? specialties.find(s => s.id === activeSpecialty) ?? null
+    : null
+  const specialtyName      = activeSpecialtyObj?.name ?? ''
+  const totalCount         = conditions.length
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -582,10 +582,7 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
-        isDark={isDark}
-        onToggleDark={toggleDark}
-        activeSpecialty={activeSpecialty}
-        specialtyName={specialtyName}
+        activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
         sortMode={sortMode}
         onSortToggle={cycleSortMode}
