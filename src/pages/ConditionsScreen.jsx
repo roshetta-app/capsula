@@ -260,21 +260,20 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // when the user scrolls back up and the logo re-enters the viewport.
 //
 // Layout (top to bottom):
-//   1. Logo row    — smaller wordmark than BrandRow, left-aligned, extra
-//                    top/left breathing room.
-//   2. Tagline     — same RotatingTagline component/typography/animation as
-//                    BrandRow, hidden while searching (mirrors BrandRow).
-//   3. Divider     — thin full-width hairline separating branding from
-//                    page controls.
-//   4. Context row — page title + optional specialty filter chip on the
-//                    left, sort toggle on the right.
+//   1. Logo row    — wordmark, left-aligned, extra top breathing room.
+//   2. Tagline     — same RotatingTagline component/typography as BrandRow,
+//                    rendered smaller/lighter, hidden while searching.
+//   3. Context row — "Specialties" trigger (opens the existing bottom
+//                    sheet) + optional active-specialty chip on the left,
+//                    sort toggle on the right. Separation from branding
+//                    comes from generous spacing, not a divider line.
 
 function StickyLogoHeader({
   visible,
-  pageTitle = 'Conditions',
   isSearching,
   activeSpecialtyObj,
   onClearSpecialty,
+  onOpenSpecialties,
   sortMode,
   onSortToggle,
   SORT_LABELS,
@@ -289,22 +288,25 @@ function StickyLogoHeader({
     <div
       aria-hidden="true"
       style={{
-        position:        'fixed',
-        top:             0,
-        left:            0,
-        right:           0,
-        zIndex:          50,
-        backgroundColor: 'var(--color-surface)',
-        borderBottom:    '1px solid var(--color-border)',
-        // Thin divider (above) plus a very subtle shadow — keeps the
-        // separation from scrolling content visible without introducing
-        // any colored chrome or elevation that reads as a floating card.
-        boxShadow:       '0 1px 4px rgba(0, 0, 0, 0.04)',
+        position:               'fixed',
+        top:                    0,
+        left:                   0,
+        right:                  0,
+        zIndex:                 50,
+        backgroundColor:        'var(--color-surface)',
+        // Top stays flush with the status bar; bottom corners soften so
+        // the header reads as a floating card attached to the top of the
+        // screen rather than a rigid toolbar. Separation from scrolling
+        // content now comes from this rounding plus the shadow below —
+        // no internal divider line.
+        borderBottomLeftRadius:  18,
+        borderBottomRightRadius: 18,
+        boxShadow:               '0 4px 10px rgba(0, 0, 0, 0.06)',
         // Slide in from above when visible, slide back out when not
-        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:      'transform 0.25s ease',
+        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
+        transition:              'transform 0.25s ease',
         // Prevent interaction when hidden
-        pointerEvents:   visible ? 'auto' : 'none',
+        pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
@@ -336,37 +338,49 @@ function StickyLogoHeader({
           </div>
         )}
 
-        {/* 3. Divider — thin, full-width, light neutral */}
-        <div style={{
-          height:          1,
-          marginTop:       'var(--space-2)',
-          backgroundColor: 'var(--color-border-subtle)',
-        }} />
-
-        {/* 4. Context row — title + specialty chip (left), sort (right) */}
+        {/* 3. Context row — specialty trigger + active chip (left), sort
+            (right). Generous top margin replaces the removed divider as
+            the separator between branding and controls. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            'var(--space-2)',
-          padding:        'var(--space-2) var(--space-6)',
+          marginTop:      'var(--space-4)',
+          padding:        'var(--space-2) var(--space-5) var(--space-3)',
         }}>
-          {/* Left: page title + optional specialty chip */}
+          {/* Left: "Specialties" trigger (opens the existing bottom sheet)
+              + optional active-specialty chip, shown as separate elements */}
           <div style={{
             display:    'flex',
             alignItems: 'center',
             gap:        'var(--space-2)',
             minWidth:   0,
           }}>
-            <span style={{
-              fontSize:   13,
-              fontWeight: 600,
-              fontFamily: 'var(--font-body)',
-              color:      'var(--color-text-primary)',
-              flexShrink: 0,
-            }}>
-              {pageTitle}
-            </span>
+            <button
+              onClick={onOpenSpecialties}
+              aria-label="Browse specialties"
+              style={{
+                display:                 'inline-flex',
+                alignItems:              'center',
+                gap:                     4,
+                background:              'none',
+                border:                  'none',
+                padding:                 '6px 10px 6px 4px',
+                margin:                  0,
+                cursor:                  'pointer',
+                color:                   'var(--color-text-secondary)',
+                fontSize:                13,
+                fontWeight:              500,
+                fontFamily:              'var(--font-body)',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+                flexShrink:              0,
+              }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 10, lineHeight: 1 }}>▾</span>
+              Specialties
+            </button>
 
             {hasFilter && (
               <button
@@ -655,10 +669,10 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
-        pageTitle="Conditions"
         isSearching={isSearching}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
+        onOpenSpecialties={() => setBottomSheetOpen(true)}
         sortMode={sortMode}
         onSortToggle={cycleSortMode}
         SORT_LABELS={SORT_LABELS}
