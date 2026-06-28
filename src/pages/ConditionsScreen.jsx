@@ -251,9 +251,21 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // Appears once the in-page BrandRow logo scrolls out of view (above the
 // viewport). Slides in from the top with a CSS transition; slides back out
 // when the user scrolls back up and the logo re-enters the viewport.
+//
+// Layout (top to bottom):
+//   1. Logo row    — smaller wordmark than BrandRow, left-aligned, extra
+//                    top/left breathing room.
+//   2. Tagline     — same RotatingTagline component/typography/animation as
+//                    BrandRow, hidden while searching (mirrors BrandRow).
+//   3. Divider     — thin full-width hairline separating branding from
+//                    page controls.
+//   4. Context row — page title + optional specialty filter chip on the
+//                    left, sort toggle on the right.
 
 function StickyLogoHeader({
   visible,
+  pageTitle = 'Conditions',
+  isSearching,
   activeSpecialtyObj,
   onClearSpecialty,
   sortMode,
@@ -277,7 +289,6 @@ function StickyLogoHeader({
         zIndex:          50,
         backgroundColor: 'var(--color-surface)',
         borderBottom:    '1px solid var(--color-border)',
-        padding:         'var(--space-3) var(--space-6)',
         // Slide in from above when visible, slide back out when not
         transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:      'transform 0.25s ease',
@@ -287,20 +298,102 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* Row 1: logo + sort button */}
-        <div style={{
-          display:      'flex',
-          alignItems:   'center',
-          marginBottom: hasFilter ? 'var(--space-2)' : 0,
-        }}>
+        {/* 1. Logo row — ~18% smaller than BrandRow's 32px, extra breathing room */}
+        <div style={{ padding: 'var(--space-3) var(--space-6) 0' }}>
           <img
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
-            style={{ display: 'block', height: 22, width: 'auto', flexShrink: 0 }}
+            style={{ display: 'block', height: 18, width: 'auto', flexShrink: 0 }}
           />
-          <span style={{ flex: 1 }} />
-          {/* Sort — plain text, no border or background */}
+        </div>
+
+        {/* 2. Tagline — same component/typography/animation as BrandRow */}
+        {!isSearching && (
+          <div style={{ padding: '2px var(--space-6) 0' }}>
+            <RotatingTagline />
+          </div>
+        )}
+
+        {/* 3. Divider — thin, full-width, light neutral */}
+        <div style={{
+          height:          1,
+          marginTop:       'var(--space-2)',
+          backgroundColor: 'var(--color-border-subtle)',
+        }} />
+
+        {/* 4. Context row — title + specialty chip (left), sort (right) */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          gap:            'var(--space-2)',
+          padding:        'var(--space-2) var(--space-6)',
+        }}>
+          {/* Left: page title + optional specialty chip */}
+          <div style={{
+            display:    'flex',
+            alignItems: 'center',
+            gap:        'var(--space-2)',
+            minWidth:   0,
+          }}>
+            <span style={{
+              fontSize:   13,
+              fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              color:      'var(--color-text-primary)',
+              flexShrink: 0,
+            }}>
+              {pageTitle}
+            </span>
+
+            {hasFilter && (
+              <button
+                onClick={onClearSpecialty}
+                aria-label={`Clear ${activeSpecialtyObj.name} filter`}
+                style={{
+                  display:                 'inline-flex',
+                  alignItems:              'center',
+                  gap:                     4,
+                  background:              colors.bg,
+                  border:                  'none',
+                  borderRadius:            'var(--radius-full)',
+                  padding:                 '3px 8px 3px 6px',
+                  cursor:                  'pointer',
+                  color:                   colors.fg,
+                  fontSize:                11,
+                  fontWeight:              500,
+                  fontFamily:              'var(--font-body)',
+                  outline:                 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  minWidth:                0,
+                  overflow:                'hidden',
+                }}
+              >
+                <SpecialtyIcon
+                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                  size={11}
+                  color={colors.fg}
+                />
+                <span style={{
+                  overflow:     'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace:   'nowrap',
+                }}>
+                  {activeSpecialtyObj.name}
+                </span>
+                <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
+                  stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+                  aria-hidden="true" style={{ flexShrink: 0 }}>
+                  <line x1="2" y1="2" x2="10" y2="10"/>
+                  <line x1="10" y1="2" x2="2"  y2="10"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Right: sort toggle — compact icon + label */}
           <button
             onClick={onSortToggle}
             aria-label={`Sort: ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
@@ -310,7 +403,7 @@ function StickyLogoHeader({
               gap:                     4,
               background:              'none',
               border:                  'none',
-              padding:                 '2px 0 2px 8px',
+              padding:                 '4px 0 4px 8px',
               cursor:                  'pointer',
               color:                   'var(--color-text-secondary)',
               fontSize:                12,
@@ -324,45 +417,6 @@ function StickyLogoHeader({
             {SORT_LABELS[sortMode]}
           </button>
         </div>
-
-        {/* Row 2: active specialty — minimal, no border or background */}
-        {hasFilter && (
-          <div>
-            <button
-              onClick={onClearSpecialty}
-              aria-label={`Clear ${activeSpecialtyObj.name} filter`}
-              style={{
-                display:                 'inline-flex',
-                alignItems:              'center',
-                gap:                     4,
-                background:              'none',
-                border:                  'none',
-                padding:                 0,
-                cursor:                  'pointer',
-                color:                   colors.pill,
-                fontSize:                11,
-                fontWeight:              500,
-                fontFamily:              'var(--font-body)',
-                outline:                 'none',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <SpecialtyIcon
-                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={11}
-                color={colors.pill}
-              />
-              {activeSpecialtyObj.name}
-              <svg width="10" height="10" viewBox="0 0 12 12" fill="none"
-                stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
-                aria-hidden="true" style={{ flexShrink: 0 }}>
-                <line x1="2" y1="2" x2="10" y2="10"/>
-                <line x1="10" y1="2" x2="2"  y2="10"/>
-              </svg>
-            </button>
-          </div>
-        )}
 
       </div>
     </div>
@@ -578,6 +632,8 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
+        pageTitle="Conditions"
+        isSearching={isSearching}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
         sortMode={sortMode}
@@ -650,3 +706,4 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
