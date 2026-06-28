@@ -497,6 +497,142 @@ function StickyLogoHeader({
   )
 }
 
+// ─── Full-width specialty selector ───────────────────────────────────────────
+// Sits directly below the search bar. Same horizontal span as the search bar.
+// One large tappable surface — opens SpecialtiesBottomSheet on tap.
+// Active state: specialty icon + name in specialty color; ✕ to clear.
+// Idle state: neutral icon placeholder + 'All Specialties' label + chevron.
+
+function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear }) {
+  const isDark   = useIsDark()
+  const tokenKey = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
+  const colors   = resolveToken(tokenKey, isDark)
+  const isActive = !!activeSpecialtyObj
+
+  return (
+    <div style={{
+      display:  'flex',
+      alignItems: 'stretch',
+      width:    '100%',
+      // Match the visual language of the search bar: white/surface background,
+      // subtle border, generous border radius.
+      backgroundColor:         'var(--color-surface)',
+      border:                  '1.5px solid var(--color-border)',
+      borderRadius:            'var(--radius-full)',
+      minHeight:               48,
+      overflow:                'hidden',
+      transition:              'border-color 0.15s ease',
+    }}>
+
+      {/* Main tap area — opens bottom sheet */}
+      <button
+        onClick={onOpen}
+        aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
+        style={{
+          flex:                    1,
+          display:                 'flex',
+          alignItems:              'center',
+          gap:                     10,
+          padding:                 '0 0 0 16px',
+          background:              'none',
+          border:                  'none',
+          cursor:                  'pointer',
+          minWidth:                0,
+          outline:                 'none',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {/* Icon container — specialty color when active, neutral when idle */}
+        <div style={{
+          width:           32,
+          height:          32,
+          flexShrink:      0,
+          borderRadius:    'var(--radius-sm)',
+          backgroundColor: isActive ? colors.bg : 'var(--color-border)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          transition:      'background-color 200ms ease',
+        }}>
+          {isActive ? (
+            <SpecialtyIcon
+              iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+              iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+              size={16}
+              color={colors.fg}
+            />
+          ) : (
+            // Neutral stethoscope placeholder when no specialty selected
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="var(--color-text-tertiary)" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+              <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
+              <circle cx="20" cy="10" r="2"/>
+            </svg>
+          )}
+        </div>
+
+        {/* Label */}
+        <span style={{
+          flex:         1,
+          minWidth:     0,
+          overflow:     'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace:   'nowrap',
+          fontSize:     15,
+          fontWeight:   isActive ? 600 : 400,
+          fontFamily:   'var(--font-body)',
+          color:        isActive ? colors.fg : 'var(--color-text-secondary)',
+          textAlign:    'left',
+          transition:   'color 200ms ease, font-weight 200ms ease',
+        }}>
+          {isActive ? activeSpecialtyObj.name : 'All Specialties'}
+        </span>
+
+        {/* Chevron — right side of main tap area, before optional clear btn */}
+        <svg width="12" height="12" viewBox="0 0 10 10" aria-hidden="true"
+          style={{
+            flexShrink: 0,
+            marginRight: isActive ? 0 : 14,
+            color: 'var(--color-text-tertiary)',
+          }}>
+          <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
+        </svg>
+      </button>
+
+      {/* Clear button — only shown when active; sits flush inside the control */}
+      {isActive && (
+        <button
+          onClick={e => { e.stopPropagation(); onClear() }}
+          aria-label={`Clear ${activeSpecialtyObj.name} filter`}
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            width:                   44,
+            flexShrink:              0,
+            background:              'none',
+            border:                  'none',
+            borderLeft:              '1px solid var(--color-border)',
+            cursor:                  'pointer',
+            color:                   'var(--color-text-tertiary)',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+            aria-hidden="true">
+            <line x1="2" y1="2" x2="10" y2="10"/>
+            <line x1="10" y1="2" x2="2"  y2="10"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── Back-to-top floating button ───────────────────────────────────────────────
 
 const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
@@ -695,11 +831,7 @@ export default function ConditionsScreen() {
           <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
         </div>
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-2)', borderRadius: 'var(--radius-full)' })} />
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)', overflow: 'hidden' }}>
-          {[60, 80, 60, 70, 90].map((w, i) => (
-            <div key={i} style={shimmer({ width: w, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
-          ))}
-        </div>
+        <div style={shimmer({ width: '100%', height: 48, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-full)' })} />
         {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
       </Layout>
     )
@@ -731,7 +863,7 @@ export default function ConditionsScreen() {
         brandRowRef={brandRowRef}
       />
 
-      {/* 2. Search bar + inline specialty control */}
+      {/* 2. Search bar */}
       <div style={{ marginBottom: 'var(--space-2)' }}>
         <SearchBar
           ref={searchInputRef}
@@ -746,90 +878,13 @@ export default function ConditionsScreen() {
         hidden={true}
       />
 
-      {/* 4. Inline specialty control — Specialties pill + active chip (when set) */}
-      <div style={{
-        display:    'flex',
-        alignItems: 'center',
-        gap:        6,
-        marginBottom: 'var(--space-3)',
-      }}>
-        <button
-          onClick={() => setBottomSheetOpen(true)}
-          aria-label="Browse specialties"
-          style={{
-            display:                 'inline-flex',
-            alignItems:              'center',
-            gap:                     4,
-            background:              'rgba(0, 0, 0, 0.045)',
-            border:                  'none',
-            borderRadius:            'var(--radius-full)',
-            padding:                 '4px 9px 4px 7px',
-            margin:                  0,
-            cursor:                  'pointer',
-            color:                   'var(--color-text-primary)',
-            fontSize:                13,
-            fontWeight:              600,
-            fontFamily:              'var(--font-body)',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
-            flexShrink:              0,
-          }}
-        >
-          Specialties
-          <svg width="7" height="7" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
-            <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
-          </svg>
-        </button>
-
-        {activeSpecialtyObj && (() => {
-          const tokenKey = activeSpecialtyObj.colorToken ?? FALLBACK_TOKEN
-          const colors   = resolveToken(tokenKey, isDark)
-          return (
-            <button
-              onClick={handleClearFilter}
-              aria-label={`Clear ${activeSpecialtyObj.name} filter`}
-              style={{
-                display:                 'inline-flex',
-                alignItems:              'center',
-                gap:                     4,
-                background:              colors.bg,
-                border:                  'none',
-                borderRadius:            'var(--radius-full)',
-                padding:                 '3px 8px 3px 6px',
-                cursor:                  'pointer',
-                color:                   colors.fg,
-                fontSize:                11,
-                fontWeight:              500,
-                fontFamily:              'var(--font-body)',
-                outline:                 'none',
-                WebkitTapHighlightColor: 'transparent',
-                minWidth:                0,
-                overflow:                'hidden',
-                transition:              'background 200ms ease, color 200ms ease',
-              }}
-            >
-              <SpecialtyIcon
-                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={11}
-                color={colors.fg}
-              />
-              <span style={{
-                overflow:     'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace:   'nowrap',
-              }}>
-                {activeSpecialtyObj.name}
-              </span>
-              <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
-                stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
-                aria-hidden="true" style={{ flexShrink: 0 }}>
-                <line x1="2" y1="2" x2="10" y2="10"/>
-                <line x1="10" y1="2" x2="2"  y2="10"/>
-              </svg>
-            </button>
-          )
-        })()}
+      {/* 4. Full-width specialty selector — same width as search bar */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <SpecialtySelector
+          activeSpecialtyObj={activeSpecialtyObj}
+          onOpen={() => setBottomSheetOpen(true)}
+          onClear={handleClearFilter}
+        />
       </div>
 
       {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
@@ -867,6 +922,7 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 
 
 
