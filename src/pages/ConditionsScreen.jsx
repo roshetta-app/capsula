@@ -13,6 +13,8 @@
  *     the screen and no longer reacts to scroll position. SearchBar and
  *     SpecialtyFilterPills are rendered once, in their normal place in the
  *     page flow.
+ *   - StickyLogoHeader added: slides in once the in-page BrandRow logo
+ *     scrolls out of view, slides back out when it re-enters view.
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -243,6 +245,51 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   )
 }
 
+// ─── Sliding sticky logo header ───────────────────────────────────────────────
+// Appears once the in-page BrandRow logo scrolls out of view (above the
+// viewport). Slides in from the top with a CSS transition; slides back out
+// when the user scrolls back up and the logo re-enters the viewport.
+
+function StickyLogoHeader({ visible }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position:        'fixed',
+        top:             0,
+        left:            0,
+        right:           0,
+        zIndex:          50,
+        backgroundColor: 'var(--color-surface)',
+        borderBottom:    '1px solid var(--color-border)',
+        padding:         'var(--space-3) var(--space-6)',
+        display:         'flex',
+        alignItems:      'center',
+        // Slide in from above when visible, slide back out when not
+        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
+        transition:      'transform 0.25s ease',
+        // Prevent interaction when hidden
+        pointerEvents:   visible ? 'auto' : 'none',
+      }}
+    >
+      <div style={{
+        width:      '100%',
+        maxWidth:   680,
+        margin:     '0 auto',
+        display:    'flex',
+        alignItems: 'center',
+      }}>
+        <img
+          src="/capsula/logo.svg"
+          alt="Capsula"
+          className="capsula-logo"
+          style={{ display: 'block', height: 22, width: 'auto' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 // ─── Back-to-top floating button ───────────────────────────────────────────────
 
 const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
@@ -294,6 +341,7 @@ export default function ConditionsScreen() {
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [showBackToTop, setShowBackToTop]         = useState(false)
+  const [showStickyHeader, setShowStickyHeader]   = useState(false)
   const brandRowRef = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
@@ -305,6 +353,28 @@ export default function ConditionsScreen() {
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
+  // ── Sliding sticky header: visible once BrandRow logo leaves viewport ────────
+  // IntersectionObserver fires when brandRowRef crosses the top of the viewport.
+  // threshold: 0 means the moment any part of the element is out of view.
+  // rootMargin: '-1px' gives a 1px trigger zone so the header appears exactly
+  // as the last pixel of the brand row scrolls off the top.
+
+  useEffect(() => {
+    const el = brandRowRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // isIntersecting === false → element fully above viewport → show header
+        setShowStickyHeader(!entry.isIntersecting)
+      },
+      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
   }, [])
 
   function handleBackToTop() {
@@ -422,6 +492,9 @@ export default function ConditionsScreen() {
 
   return (
     <Layout>
+
+      {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
+      <StickyLogoHeader visible={showStickyHeader} />
 
       {/* 1. Brand row + tagline + dark mode toggle */}
       <BrandRow
