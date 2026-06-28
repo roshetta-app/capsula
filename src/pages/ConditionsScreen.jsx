@@ -1,6 +1,8 @@
 /**
  * src/pages/ConditionsScreen.jsx
  * Phase 5 — Conditions Screen Redesign
+ * Phase 6 — Sticky header polish: visual hierarchy, spacing, toolbar balance,
+ *            search icon in logo row (scroll-to-search)
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -24,7 +26,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, ArrowUpDown } from 'lucide-react'
+import { ArrowUp, ArrowUpDown, Search } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -277,6 +279,7 @@ function StickyLogoHeader({
   sortMode,
   onSortToggle,
   SORT_LABELS,
+  onSearchTap,
 }) {
   const isDark    = useIsDark()
   const nextMode  = sortMode === 'az' ? 'recent' : 'az'
@@ -313,40 +316,69 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — logo size/position unchanged; top padding tightened
-            to remove excess whitespace above the branding block. */}
-        <div style={{ padding: '12px var(--space-6) 0' }}>
+        {/* 1. Logo row — wordmark left, search icon right. The search icon
+            occupies the dead space on the right of the branding block and
+            taps to scroll-to and focus the main search bar below. */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          padding:        '12px var(--space-5) 0',
+        }}>
           <img
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
             style={{ display: 'block', height: 21, width: 'auto', flexShrink: 0 }}
           />
+          <button
+            onClick={onSearchTap}
+            aria-label="Go to search"
+            style={{
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              width:                   36,
+              height:                  36,
+              background:              'none',
+              border:                  'none',
+              borderRadius:            'var(--radius-full)',
+              cursor:                  'pointer',
+              color:                   'var(--color-text-tertiary)',
+              padding:                 0,
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+              flexShrink:              0,
+            }}
+          >
+            <Search size={16} strokeWidth={1.9} aria-hidden="true" />
+          </button>
         </div>
 
-        {/* 2. Tagline — pulled flush against the logo (no top gap) so the
-            two read as one tight branding block. */}
+        {/* 2. Tagline — smaller and lighter than previous pass so it reads as
+            subtle brand reinforcement rather than a primary element. Tight
+            top gap keeps the branding block compact and unified. */}
         {!isSearching && (
-          <div style={{ padding: '0 var(--space-6) 0' }}>
+          <div style={{ padding: '2px var(--space-5) 0' }}>
             <RotatingTagline
-              fontSize={13}
+              fontSize={12}
               fontWeight={400}
-              color="var(--color-text-secondary)"
+              color="var(--color-text-tertiary)"
             />
           </div>
         )}
 
         {/* 3. Context row — specialty trigger + active chip (left), sort
-            (right). Tightened top margin and bottom padding vs. the
-            previous pass — still separated from branding by whitespace
-            alone, just less of it. */}
+            (right). Top gap tightened to 4px so the branding block and
+            toolbar read as one compact unit rather than two separate zones.
+            Horizontal padding aligned to var(--space-5) to match logo row. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            'var(--space-2)',
-          marginTop:      'var(--space-2)',
-          padding:        'var(--space-1) var(--space-5) var(--space-2)',
+          marginTop:      4,
+          padding:        '0 var(--space-5) var(--space-2)',
         }}>
           {/* Left: "Specialty Picker" + "active filter" read as one logical
               group — "choose filter" → "current filter" — via a tighter
@@ -375,7 +407,7 @@ function StickyLogoHeader({
                 // primary action, so it reads first.
                 color:                   'var(--color-text-primary)',
                 fontSize:                13,
-                fontWeight:              600,
+                fontWeight:              500,
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
@@ -469,7 +501,7 @@ function StickyLogoHeader({
               padding:                 '0 var(--space-3)',
               cursor:                  'pointer',
               color:                   'var(--color-text-secondary)',
-              fontSize:                14,
+              fontSize:                13,
               fontWeight:              500,
               fontFamily:              'var(--font-body)',
               outline:                 'none',
@@ -539,7 +571,8 @@ export default function ConditionsScreen() {
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [showBackToTop, setShowBackToTop]         = useState(false)
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
-  const brandRowRef = useRef(null)
+  const brandRowRef    = useRef(null)
+  const searchInputRef = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -573,6 +606,12 @@ export default function ConditionsScreen() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+
+  function handleSearchTap() {
+    searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    // Small delay so scroll completes before focus pulls the keyboard up
+    setTimeout(() => searchInputRef.current?.focus(), 300)
+  }
 
   function handleBackToTop() {
     const start    = window.scrollY
@@ -703,6 +742,7 @@ export default function ConditionsScreen() {
         sortMode={sortMode}
         onSortToggle={cycleSortMode}
         SORT_LABELS={SORT_LABELS}
+        onSearchTap={handleSearchTap}
       />
 
       {/* 1. Brand row + tagline + dark mode toggle */}
@@ -716,6 +756,7 @@ export default function ConditionsScreen() {
       {/* 2. Search bar */}
       <div style={{ marginBottom: 'var(--space-5)' }}>
         <SearchBar
+          ref={searchInputRef}
           value={query}
           onChange={val => setQuery(val)}
         />
@@ -770,4 +811,5 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 

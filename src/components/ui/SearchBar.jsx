@@ -3,6 +3,7 @@
  * Phase 2I — shared search bar used on ConditionsScreen and DrugsScreen.
  * Phase 3  — updated default placeholder to "Search conditions or symptoms…"
  * Phase 5  — flat border-only style; accent ring on focus; no shadow
+ * Phase 6  — forwardRef added so parent can scroll-to and focus the input
  *
  * Props:
  *   value            string
@@ -12,15 +13,16 @@
  *   hasActiveFilters boolean                 — highlights filter icon when true
  */
 
+import { forwardRef }                    from 'react'
 import { Search, X, SlidersHorizontal } from 'lucide-react'
 
-export default function SearchBar({
+const SearchBar = forwardRef(function SearchBar({
   value,
   onChange,
   placeholder = 'Search conditions or symptoms…',
   onFilter,
   hasActiveFilters = false,
-}) {
+}, ref) {
   return (
     <div style={{
       display:    'flex',
@@ -40,6 +42,7 @@ export default function SearchBar({
           }}
         />
         <input
+          ref={ref}
           type="text"
           value={value}
           onChange={e => onChange(e.target.value)}
@@ -116,4 +119,6 @@ export default function SearchBar({
       )}
     </div>
   )
-}
+})
+
+export default SearchBar
