@@ -9,9 +9,10 @@
  *   - Dark mode toggle added to BrandRow (top-right, sun/moon icon button)
  *   - Static "What are you looking for?" headline replaced with a subtle
  *     rotating tagline (see RotatingTagline below)
- *   - CompactHeader now includes SearchBar + SpecialtyFilterPills, and
- *     appears once the SpecialtyFilterPills row scrolls out of view
- *     (previously triggered by the BrandRow).
+ *   - Compact/sliding sticky header removed — header is fixed at the top of
+ *     the screen and no longer reacts to scroll position. SearchBar and
+ *     SpecialtyFilterPills are rendered once, in their normal place in the
+ *     page flow.
  *
  * List rendering modes:
  *   isSearching (query >= 1)  → flat list with highlight, no dividers
@@ -242,104 +243,6 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   )
 }
 
-
-// ─── Compact sticky header ─────────────────────────────────────────────────────
-// Appears once the SpecialtyFilterPills row scrolls out of view (detected via
-// IntersectionObserver on pillsRef). Contains:
-//   Row 1 — logo + dark mode toggle (always visible when header is open)
-//   Row 2 — SearchBar (shared state with the main search bar)
-//   Row 3 — SpecialtyFilterPills (shared state with the main pills)
-//
-// The panel slides in from the top with a CSS transform. Total height is
-// auto so it naturally fits the content; overflow is hidden during the
-// transition to prevent content flash.
-//
-// headerRef is forwarded so the parent can measure the panel's rendered
-// height and reserve matching space in the page flow (Fix 1) — the panel
-// itself stays position:fixed and unsized by its parent.
-
-function CompactHeader({
-  visible,
-  headerRef,
-  isDark,
-  onToggleDark,
-  query,
-  onQueryChange,
-  specialties,
-  activeSpecialty,
-  onSelectSpecialty,
-  onMoreTap,
-  pillsScrollRef,
-}) {
-  return (
-    <div
-      ref={headerRef}
-      aria-hidden={!visible}
-      style={{
-        position:        'fixed',
-        top:             0,
-        left:            0,
-        right:           0,
-        zIndex:          50,
-        backgroundColor: 'var(--color-surface)',
-        borderBottom:    '0.5px solid var(--color-border)',
-        backdropFilter:  'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        transform:       visible ? 'translateY(0)' : 'translateY(-100%)',
-        opacity:         visible ? 1 : 0,
-        transition:      'transform 0.22s ease, opacity 0.18s ease',
-        /* Prevent pill overflow from bleeding outside the panel */
-        overflow:        'hidden',
-      }}
-    >
-      {/* Row 1 — logo + dark mode toggle */}
-      <div style={{
-        display:      'flex',
-        alignItems:   'center',
-        height:       48,
-        paddingLeft:  'var(--space-4)',
-        paddingRight: 'var(--space-4)',
-      }}>
-        <img
-          src="/capsula/logo.svg"
-          alt="Capsula"
-          className="capsula-logo"
-          style={{ display: 'block', height: 26, width: 'auto' }}
-        />
-        <span style={{ flex: 1 }} />
-        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
-      </div>
-
-      {/* Row 2 — Search bar */}
-      <div style={{
-        paddingLeft:   'var(--space-4)',
-        paddingRight:  'var(--space-4)',
-        paddingBottom: 'var(--space-2)',
-      }}>
-        <SearchBar
-          value={query}
-          onChange={onQueryChange}
-        />
-      </div>
-
-      {/* Row 3 — Specialty filter pills */}
-      <div style={{
-        paddingLeft:   'var(--space-4)',
-        paddingRight:  'var(--space-4)',
-        paddingBottom: 'var(--space-2)',
-      }}>
-        <SpecialtyFilterPills
-          specialties={specialties}
-          activeSpecialty={activeSpecialty}
-          onSelect={onSelectSpecialty}
-          onMoreTap={onMoreTap}
-          scrollRef={pillsScrollRef}
-        />
-      </div>
-    </div>
-  )
-}
-
 // ─── Back-to-top floating button ───────────────────────────────────────────────
 
 const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
@@ -382,11 +285,6 @@ function BackToTopButton({ visible, onClick }) {
 
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
-// Matches CompactHeader's transform transition duration (Fix 3) — the main
-// controls' unlock is delayed by this long so the compact header has fully
-// finished sliding out before the main search bar / pills start fading in.
-const HEADER_EXIT_TRANSITION_MS = 220
-
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
@@ -396,25 +294,7 @@ export default function ConditionsScreen() {
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [showBackToTop, setShowBackToTop]         = useState(false)
-  const [showCompactHeader, setShowCompactHeader] = useState(false)
-  const [headerHeight, setHeaderHeight]           = useState(0)
-  const brandRowRef     = useRef(null)
-  const pillsRef        = useRef(null)
-  const compactHeaderRef = useRef(null)
-  // Shared horizontal scroll position between the main pills row and the
-  // compact header's pills row (Fix 4) — both refs point at the two
-  // SpecialtyFilterPills scroll containers; a scroll on either mirrors to
-  // the other.
-  const mainPillsScrollRef    = useRef(null)
-  const compactPillsScrollRef = useRef(null)
-  // When the user types or picks a filter from the compact header, we lock
-  // the header on screen regardless of scroll position, so results always
-  // appear directly below it. The lock is released when both search and
-  // filter are cleared.
-  const headerLockedRef = useRef(false)
-  // Pending timeout id for the delayed unlock in Fix 3, so a rapid re-lock
-  // (e.g. user types again right after clearing) can cancel a stale timer.
-  const unlockTimeoutRef = useRef(null)
+  const brandRowRef = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -447,89 +327,6 @@ export default function ConditionsScreen() {
     requestAnimationFrame(step)
   }
 
-  // ── Compact header height measurement (Fix 1) ──────────────────────────────
-  // The compact header is position:fixed, so it doesn't push page content
-  // down on its own. We measure its rendered height whenever it becomes
-  // visible (and on resize) and reserve that much top padding on the content
-  // wrapper below, so the first card / ConditionListHeader row are never
-  // hidden behind the fixed panel. headerHeight is reset to 0 immediately
-  // when the header hides, so a stale measured value can never linger and
-  // produce padding for a header that's no longer shown.
-
-  useEffect(() => {
-    if (!showCompactHeader) {
-      setHeaderHeight(0)
-      return
-    }
-    const el = compactHeaderRef.current
-    if (!el) return
-
-    function measure() {
-      setHeaderHeight(el.offsetHeight)
-    }
-
-    measure()
-
-    const resizeObserver = new ResizeObserver(measure)
-    resizeObserver.observe(el)
-    return () => resizeObserver.disconnect()
-  }, [showCompactHeader])
-
-  // ── Compact header visibility (IntersectionObserver on pillsRef) ──────────────
-  // Shows the compact header the moment the specialty pills fully leave the
-  // viewport. Once the user types or picks a filter from the compact header,
-  // headerLockedRef is set to true and the observer stops hiding the header —
-  // it stays pinned until the user clears both search and filter.
-
-  useEffect(() => {
-    const el = pillsRef.current
-    if (!el) return
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (headerLockedRef.current) return  // locked — ignore scroll position
-        setShowCompactHeader(!entry.isIntersecting)
-      },
-      { threshold: 0 }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-
-  // ── Shared pill scroll sync (Fix 4) ────────────────────────────────────────
-  // Mirrors horizontal scroll position between the main pills row and the
-  // compact header's pills row, whichever the user is actively scrolling.
-  // A guard flag prevents the mirrored 'scroll' event from re-triggering
-  // the listener on the other element and bouncing back and forth.
-
-  useEffect(() => {
-    const mainEl    = mainPillsScrollRef.current
-    const compactEl = compactPillsScrollRef.current
-    if (!mainEl || !compactEl) return
-
-    let syncing = false
-
-    function mirror(source, target) {
-      return () => {
-        if (syncing) return
-        syncing = true
-        target.scrollLeft = source.scrollLeft
-        syncing = false
-      }
-    }
-
-    const onMainScroll    = mirror(mainEl, compactEl)
-    const onCompactScroll = mirror(compactEl, mainEl)
-
-    mainEl.addEventListener('scroll', onMainScroll, { passive: true })
-    compactEl.addEventListener('scroll', onCompactScroll, { passive: true })
-
-    return () => {
-      mainEl.removeEventListener('scroll', onMainScroll)
-      compactEl.removeEventListener('scroll', onCompactScroll)
-    }
-  }, [specialties])
-
-
   const {
     query,
     setQuery,
@@ -555,64 +352,6 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
-  }
-
-  // ── Compact header action handlers ───────────────────────────────────────────
-  // These are used exclusively by the compact header (not the main body controls).
-  // Typing or picking a pill locks the header on screen and jumps to the top
-  // so results are immediately visible. Picking a specialty pill (including
-  // 'All') never releases the lock by itself — it's just a filter choice, and
-  // the header should stay put so the user can keep refining. The lock is
-  // only released by clearing the search text back to empty; otherwise the
-  // header closes solely because the user scrolled the main pills row back
-  // into view (handled separately by the IntersectionObserver effect above).
-  //
-  // Fix 3: releasing the lock no longer flips showCompactHeader to false
-  // immediately. Instead it's deferred by HEADER_EXIT_TRANSITION_MS so the
-  // compact header's own slide-out transition finishes first — only then do
-  // the main search bar / pills start their fade/expand-in. Any pending
-  // unlock timer is cleared if the user re-locks before it fires.
-
-  function releaseLockAfterTransition() {
-    if (unlockTimeoutRef.current) clearTimeout(unlockTimeoutRef.current)
-    unlockTimeoutRef.current = setTimeout(() => {
-      headerLockedRef.current = false
-      setShowCompactHeader(false)
-      unlockTimeoutRef.current = null
-    }, HEADER_EXIT_TRANSITION_MS)
-  }
-
-  function engageLock() {
-    if (unlockTimeoutRef.current) {
-      clearTimeout(unlockTimeoutRef.current)
-      unlockTimeoutRef.current = null
-    }
-    headerLockedRef.current = true
-    setShowCompactHeader(true)
-    window.scrollTo(0, 0)
-  }
-
-  // Note: selecting a pill or editing the query FROM the compact header never
-  // releases the lock on its own — only clearing the search text back down to
-  // an empty string releases it (handleCompactQueryChange below), matching the
-  // expectation that the header stays open for further filtering until the
-  // user explicitly clears the search, or scrolls the pills row back into
-  // view. Picking 'All' is a normal filter choice, not a "close the header"
-  // action, so it must not dismiss the panel out from under the user.
-
-  function handleCompactQueryChange(val) {
-    if (val.length >= 1) {
-      engageLock()
-    } else {
-      releaseLockAfterTransition()
-    }
-    setQuery(val)
-  }
-
-  function handleCompactSpecialtySelect(id) {
-    engageLock()
-    setActiveSpecialty(id)
-    setBottomSheetOpen(false)
   }
 
   // ── List rendering ───────────────────────────────────────────────────────────
@@ -684,22 +423,6 @@ export default function ConditionsScreen() {
   return (
     <Layout>
 
-      {/* Compact sticky header — visible once SpecialtyFilterPills scrolls out of view,
-          or locked on when the user is actively searching / filtering from it */}
-      <CompactHeader
-        visible={showCompactHeader}
-        headerRef={compactHeaderRef}
-        isDark={isDark}
-        onToggleDark={toggleDark}
-        query={query}
-        onQueryChange={handleCompactQueryChange}
-        specialties={specialties}
-        activeSpecialty={activeSpecialty}
-        onSelectSpecialty={handleCompactSpecialtySelect}
-        onMoreTap={() => setBottomSheetOpen(true)}
-        pillsScrollRef={compactPillsScrollRef}
-      />
-
       {/* 1. Brand row + tagline + dark mode toggle */}
       <BrandRow
         isSearching={isSearching}
@@ -708,16 +431,8 @@ export default function ConditionsScreen() {
         brandRowRef={brandRowRef}
       />
 
-      {/* 2. Search bar — hidden while the compact header is showing, so the
-          user never sees two search bars at the same time */}
-      <div style={{
-        marginBottom:  'var(--space-5)',
-        overflow:      'hidden',
-        maxHeight:     showCompactHeader ? 0 : 60,
-        opacity:       showCompactHeader ? 0 : 1,
-        pointerEvents: showCompactHeader ? 'none' : 'auto',
-        transition:    'max-height 0.2s ease, opacity 0.15s ease',
-      }}>
+      {/* 2. Search bar */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
         <SearchBar
           value={query}
           onChange={val => setQuery(val)}
@@ -730,58 +445,33 @@ export default function ConditionsScreen() {
         hidden={true}
       />
 
-      {/* 4. Specialty filter pills — pillsRef drives CompactHeader visibility.
-          Hidden while the compact header is showing for the same reason. */}
-      <div
-        ref={pillsRef}
-        style={{
-          overflow:      'hidden',
-          maxHeight:     showCompactHeader ? 0 : 60,
-          opacity:       showCompactHeader ? 0 : 1,
-          pointerEvents: showCompactHeader ? 'none' : 'auto',
-          transition:    'max-height 0.2s ease, opacity 0.15s ease',
-        }}
-      >
-        <SpecialtyFilterPills
-          specialties={specialties}
-          activeSpecialty={activeSpecialty}
-          onSelect={setActiveSpecialty}
-          onMoreTap={() => setBottomSheetOpen(true)}
-          scrollRef={mainPillsScrollRef}
-        />
-      </div>
+      {/* 4. Specialty filter pills */}
+      <SpecialtyFilterPills
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelect={setActiveSpecialty}
+        onMoreTap={() => setBottomSheetOpen(true)}
+      />
 
-      {/* Content wrapper — reserves space equal to the fixed compact header's
-          rendered height (Fix 1) so the count/sort row and first card are
-          never hidden behind it. Padding only applies while the header is
-          actually shown; it transitions alongside the header's own
-          slide animation so the layout shift doesn't feel abrupt. */}
-      <div style={{
-        paddingTop: showCompactHeader ? headerHeight : 0,
-        transition: 'padding-top 0.22s ease',
-      }}>
+      {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
+      <ConditionListHeader
+        totalCount={totalCount}
+        resultCount={resultCount}
+        activeSpecialty={activeSpecialty}
+        specialtyName={specialtyName}
+        isSearching={isSearching}
+        sortMode={sortMode}
+        onSortToggle={cycleSortMode}
+        SORT_LABELS={SORT_LABELS}
+        firstLetter={
+          !isSearching && sortMode === 'az' && resultCount > 0
+            ? alphabetGroup(results)[0]?.letter
+            : undefined
+        }
+      />
 
-        {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
-        <ConditionListHeader
-          totalCount={totalCount}
-          resultCount={resultCount}
-          activeSpecialty={activeSpecialty}
-          specialtyName={specialtyName}
-          isSearching={isSearching}
-          sortMode={sortMode}
-          onSortToggle={cycleSortMode}
-          SORT_LABELS={SORT_LABELS}
-          firstLetter={
-            !isSearching && sortMode === 'az' && resultCount > 0
-              ? alphabetGroup(results)[0]?.letter
-              : undefined
-          }
-        />
-
-        {/* 6. Condition list */}
-        {renderList()}
-
-      </div>
+      {/* 6. Condition list */}
+      {renderList()}
 
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
@@ -790,7 +480,7 @@ export default function ConditionsScreen() {
       <SpecialtiesBottomSheet
         specialties={specialties}
         activeSpecialty={activeSpecialty}
-        onSelect={id => handleCompactSpecialtySelect(id)}
+        onSelect={id => setActiveSpecialty(id)}
         onClose={() => setBottomSheetOpen(false)}
         isOpen={bottomSheetOpen}
       />
