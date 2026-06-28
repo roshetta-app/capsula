@@ -521,6 +521,20 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
   const surfaceBg = isDark ? '#1C2333' : '#EEECEA'
   const pressedBg = isDark ? '#232C3E' : '#E5E2DF'
 
+  // When a specialty is active, blend its accent color into the surface
+  // at very low opacity for an elegant, understated tint. Uses the token's
+  // bg value (already the lightest tint) at 60% opacity over the base surface
+  // so the result is always muted — never bold or saturated.
+  const activeSurface = isActive
+    ? (isDark ? '#1C2333' : '#EEECEA') // base — accent overlay applied via boxShadow inset below
+    : (isDark ? '#1C2333' : '#EEECEA')
+
+  // Inset box-shadow applies the accent tint without altering bg color directly,
+  // which lets the pressed-bg transition still work cleanly.
+  const accentInset = isActive
+    ? `inset 0 0 0 9999px ${colors.bg}99` // 60% opacity tint of specialty bg token
+    : 'none'
+
   return (
     <div
       style={{
@@ -529,13 +543,14 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
         width:          '100%',
         // No border — surface treatment alone creates the separation
         backgroundColor: pressed ? pressedBg : surfaceBg,
+        boxShadow:       pressed ? 'none' : accentInset,
         border:          'none',
         // radius-md (10px) vs search bar's radius-full — immediately different shape
         borderRadius:    'var(--radius-md)',
-        // 40dp — visibly shorter than search bar (~56dp) to establish hierarchy
-        minHeight:       40,
+        // 48dp — meets minimum tap target spec, visibly shorter than search bar (~56dp)
+        minHeight:       48,
         overflow:        'hidden',
-        transition:      'background-color 0.12s ease',
+        transition:      'background-color 0.15s ease, box-shadow 0.2s ease',
       }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
@@ -895,7 +910,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-4)' }}>
+      <div style={{ marginBottom: 'var(--space-2)' }}>
         <SearchBar
           ref={searchInputRef}
           value={query}
