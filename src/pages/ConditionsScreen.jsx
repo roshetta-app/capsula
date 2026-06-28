@@ -262,13 +262,11 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // when the user scrolls back up and the logo re-enters the viewport.
 //
 // Layout (top to bottom):
-//   1. Logo row    — wordmark, left-aligned, extra top breathing room.
-//   2. Tagline     — same RotatingTagline component/typography as BrandRow,
-//                    rendered smaller/lighter, hidden while searching.
-//   3. Context row — "Specialties" trigger (opens the existing bottom
-//                    sheet) + optional active-specialty chip on the left,
-//                    sort toggle on the right. Separation from branding
-//                    comes from generous spacing, not a divider line.
+//   1. Logo row    — wordmark left, search icon right. No tagline; logo alone
+//                    is sufficient for brand recognition and keeps the header
+//                    compact.
+//   2. Toolbar     — 'Specialties' pill trigger + optional active-specialty
+//                    chip (left), sort toggle (right).
 
 function StickyLogoHeader({
   visible,
@@ -304,9 +302,10 @@ function StickyLogoHeader({
         // no internal divider line.
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
-        // Very soft ambient shadow — large blur, low opacity, just enough
-        // separation from scrolling content without drawing attention.
-        boxShadow:               '0 10px 28px rgba(0, 0, 0, 0.04)',
+        // Very soft ambient shadow — short blur, barely-there opacity.
+        // The rounded corners define the separation; the shadow is almost
+        // imperceptible, just enough to prevent the header reading as flat.
+        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         // Slide in from above when visible, slide back out when not
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:              'transform 0.25s ease',
@@ -329,7 +328,7 @@ function StickyLogoHeader({
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
-            style={{ display: 'block', height: 23, width: 'auto', flexShrink: 0 }}
+            style={{ display: 'block', height: 25, width: 'auto', flexShrink: 0 }}
           />
           <button
             onClick={onSearchTap}
@@ -338,8 +337,8 @@ function StickyLogoHeader({
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
-              width:                   36,
-              height:                  36,
+              width:                   44,
+              height:                  44,
               background:              'none',
               border:                  'none',
               borderRadius:            'var(--radius-full)',
@@ -351,33 +350,21 @@ function StickyLogoHeader({
               flexShrink:              0,
             }}
           >
-            <Search size={18} strokeWidth={2.1} aria-hidden="true" />
+            <Search size={20} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </div>
 
-        {/* 2. Tagline — smaller and lighter than previous pass so it reads as
-            subtle brand reinforcement rather than a primary element. Tight
-            top gap keeps the branding block compact and unified. */}
-        {!isSearching && (
-          <div style={{ padding: '2px var(--space-5) 0' }}>
-            <RotatingTagline
-              fontSize={12}
-              fontWeight={400}
-              color="var(--color-text-tertiary)"
-            />
-          </div>
-        )}
-
-        {/* 3. Context row — specialty trigger + active chip (left), sort
-            (right). Top gap tightened to 4px so the branding block and
-            toolbar read as one compact unit rather than two separate zones.
-            Horizontal padding aligned to var(--space-5) to match logo row. */}
+        {/* 2. Toolbar — specialty trigger + active chip (left), sort (right).
+            No tagline between logo and toolbar: logo alone anchors the brand,
+            and removing it reduces height and clutter. Gap of 8px gives just
+            enough breathing room without the visual disconnect of the previous
+            larger spacing. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            'var(--space-2)',
-          marginTop:      4,
+          marginTop:      8,
           padding:        '0 var(--space-5) var(--space-2)',
         }}>
           {/* Left: "Specialty Picker" + "active filter" read as one logical
@@ -397,14 +384,14 @@ function StickyLogoHeader({
               style={{
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     5,
-                // Subtle pill shape — no border, no fill, only the rounded
-                // container and padding signal tappability. Background uses
-                // a very low-opacity surface tint that works in both modes.
+                gap:                     4,
+                // Subtle filled pill — shape and weight signal tappability,
+                // no border needed. Tighter padding than previous pass
+                // (2–3 dp shorter) for a more compact, native feel.
                 background:              'rgba(0, 0, 0, 0.045)',
                 border:                  'none',
                 borderRadius:            'var(--radius-full)',
-                padding:                 '5px 10px 5px 8px',
+                padding:                 '4px 9px 4px 7px',
                 margin:                  0,
                 cursor:                  'pointer',
                 color:                   'var(--color-text-primary)',
@@ -417,11 +404,9 @@ function StickyLogoHeader({
               }}
             >
               Specialties
-              {/* Chevron rendered as a small filled triangle rather than a
-                  thin glyph — reads more clearly as a disclosure indicator
-                  ("tap to open a picker") at this size than a typographic
-                  arrow does, while still being lightweight/borderless. */}
-              <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
+              {/* Slightly smaller chevron than previous pass — 7px reads
+                  crisply at this label size without over-asserting. */}
+              <svg width="7" height="7" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
                 <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
               </svg>
             </button>
@@ -447,6 +432,10 @@ function StickyLogoHeader({
                   WebkitTapHighlightColor: 'transparent',
                   minWidth:                0,
                   overflow:                'hidden',
+                  // Subtle crossfade when specialty changes — color and
+                  // background transition together at 200ms so the pill
+                  // feels polished without being distracting.
+                  transition:              'background 200ms ease, color 200ms ease',
                 }}
               >
                 <SpecialtyIcon
@@ -472,17 +461,9 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: sort toggle — secondary utility action. Strengthened
-              from the previous pass (was reading as insignificant) so the
-              right side of the header feels intentionally balanced rather
-              than empty, while staying clearly secondary to the active
-              specialty chip — color stops short of full text-primary
-              contrast, and no fill/border is introduced. Tap target is
-              guaranteed at 44x44 regardless of label/icon size via
-              minWidth/minHeight, not by guessing at padding. Shows the
-              action that will occur on tap (nextMode), matching
-              ConditionListHeader's behavior in the main header — both
-              headers must stay in sync. */}
+          {/* Right: sort toggle — semibold, primary color, tighter icon/label
+              gap so the control reads as one unit. 44×44 tap target preserved
+              via minWidth/minHeight + negative margin trick. */}
           <button
             onClick={onSortToggle}
             aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
@@ -490,28 +471,24 @@ function StickyLogoHeader({
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
-              gap:                     5,
+              gap:                     3,
               minWidth:                44,
               minHeight:               44,
-              // Negative vertical margin keeps the 44px tap target from
-              // visually inflating the context row's height — the row
-              // stays as compact as the rest of the header while the
-              // tappable area still meets the 44x44 minimum.
               margin:                  '-12px 0',
               background:              'none',
               border:                  'none',
               padding:                 '0 var(--space-3)',
               cursor:                  'pointer',
-              color:                   'var(--color-text-secondary)',
+              color:                   'var(--color-text-primary)',
               fontSize:                13,
-              fontWeight:              500,
+              fontWeight:              600,
               fontFamily:              'var(--font-body)',
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
             }}
           >
-            <ArrowUpDown size={14} strokeWidth={1.9} aria-hidden="true" />
+            <ArrowUpDown size={13} strokeWidth={2.0} aria-hidden="true" />
             {SORT_LABELS[nextMode]}
           </button>
         </div>
