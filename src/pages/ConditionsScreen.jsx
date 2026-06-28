@@ -329,7 +329,7 @@ function StickyLogoHeader({
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
-            style={{ display: 'block', height: 21, width: 'auto', flexShrink: 0 }}
+            style={{ display: 'block', height: 23, width: 'auto', flexShrink: 0 }}
           />
           <button
             onClick={onSearchTap}
@@ -344,14 +344,14 @@ function StickyLogoHeader({
               border:                  'none',
               borderRadius:            'var(--radius-full)',
               cursor:                  'pointer',
-              color:                   'var(--color-text-tertiary)',
+              color:                   'var(--color-text-secondary)',
               padding:                 0,
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
             }}
           >
-            <Search size={16} strokeWidth={1.9} aria-hidden="true" />
+            <Search size={18} strokeWidth={2.1} aria-hidden="true" />
           </button>
         </div>
 
@@ -398,16 +398,18 @@ function StickyLogoHeader({
                 display:                 'inline-flex',
                 alignItems:              'center',
                 gap:                     5,
-                background:              'none',
+                // Subtle pill shape — no border, no fill, only the rounded
+                // container and padding signal tappability. Background uses
+                // a very low-opacity surface tint that works in both modes.
+                background:              'rgba(0, 0, 0, 0.045)',
                 border:                  'none',
-                padding:                 '6px 12px 6px 6px',
+                borderRadius:            'var(--radius-full)',
+                padding:                 '5px 10px 5px 8px',
                 margin:                  0,
                 cursor:                  'pointer',
-                // Strongest text weight/color in the row — this is the
-                // primary action, so it reads first.
                 color:                   'var(--color-text-primary)',
                 fontSize:                13,
-                fontWeight:              500,
+                fontWeight:              600,
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
