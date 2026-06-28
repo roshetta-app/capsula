@@ -30,7 +30,6 @@ import { ArrowUp, ArrowUpDown, Search } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
-import SpecialtyFilterPills    from '../components/conditions/SpecialtyFilterPills'
 import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
 import ConditionListHeader     from '../components/conditions/ConditionListHeader'
 import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDivider'
@@ -732,8 +731,8 @@ export default function ConditionsScreen() {
         brandRowRef={brandRowRef}
       />
 
-      {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-5)' }}>
+      {/* 2. Search bar + inline specialty control */}
+      <div style={{ marginBottom: 'var(--space-2)' }}>
         <SearchBar
           ref={searchInputRef}
           value={query}
@@ -747,13 +746,91 @@ export default function ConditionsScreen() {
         hidden={true}
       />
 
-      {/* 4. Specialty filter pills */}
-      <SpecialtyFilterPills
-        specialties={specialties}
-        activeSpecialty={activeSpecialty}
-        onSelect={setActiveSpecialty}
-        onMoreTap={() => setBottomSheetOpen(true)}
-      />
+      {/* 4. Inline specialty control — Specialties pill + active chip (when set) */}
+      <div style={{
+        display:    'flex',
+        alignItems: 'center',
+        gap:        6,
+        marginBottom: 'var(--space-3)',
+      }}>
+        <button
+          onClick={() => setBottomSheetOpen(true)}
+          aria-label="Browse specialties"
+          style={{
+            display:                 'inline-flex',
+            alignItems:              'center',
+            gap:                     4,
+            background:              'rgba(0, 0, 0, 0.045)',
+            border:                  'none',
+            borderRadius:            'var(--radius-full)',
+            padding:                 '4px 9px 4px 7px',
+            margin:                  0,
+            cursor:                  'pointer',
+            color:                   'var(--color-text-primary)',
+            fontSize:                13,
+            fontWeight:              600,
+            fontFamily:              'var(--font-body)',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+            flexShrink:              0,
+          }}
+        >
+          Specialties
+          <svg width="7" height="7" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
+            <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
+          </svg>
+        </button>
+
+        {activeSpecialtyObj && (() => {
+          const tokenKey = activeSpecialtyObj.colorToken ?? FALLBACK_TOKEN
+          const colors   = resolveToken(tokenKey, isDark)
+          return (
+            <button
+              onClick={handleClearFilter}
+              aria-label={`Clear ${activeSpecialtyObj.name} filter`}
+              style={{
+                display:                 'inline-flex',
+                alignItems:              'center',
+                gap:                     4,
+                background:              colors.bg,
+                border:                  'none',
+                borderRadius:            'var(--radius-full)',
+                padding:                 '3px 8px 3px 6px',
+                cursor:                  'pointer',
+                color:                   colors.fg,
+                fontSize:                11,
+                fontWeight:              500,
+                fontFamily:              'var(--font-body)',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+                minWidth:                0,
+                overflow:                'hidden',
+                transition:              'background 200ms ease, color 200ms ease',
+              }}
+            >
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={11}
+                color={colors.fg}
+              />
+              <span style={{
+                overflow:     'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace:   'nowrap',
+              }}>
+                {activeSpecialtyObj.name}
+              </span>
+              <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
+                stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
+                aria-hidden="true" style={{ flexShrink: 0 }}>
+                <line x1="2" y1="2" x2="10" y2="10"/>
+                <line x1="10" y1="2" x2="2"  y2="10"/>
+              </svg>
+            </button>
+          )
+        })()}
+      </div>
 
       {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
       <ConditionListHeader
@@ -790,5 +867,6 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 
 
