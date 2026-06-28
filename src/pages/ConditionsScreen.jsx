@@ -301,7 +301,9 @@ function StickyLogoHeader({
         // no internal divider line.
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
-        boxShadow:               '0 4px 10px rgba(0, 0, 0, 0.06)',
+        // Very soft ambient shadow — large blur, low opacity, just enough
+        // separation from scrolling content without drawing attention.
+        boxShadow:               '0 10px 28px rgba(0, 0, 0, 0.04)',
         // Slide in from above when visible, slide back out when not
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:              'transform 0.25s ease',
@@ -311,12 +313,9 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — ~20% larger than the previous 18px sticky-header
-            size, with extra vertical breathing room (~6-8px added) so the
-            branding block reads as premium without growing the overall
-            header height much — absorbed by tightening the logo-tagline
-            gap below. */}
-        <div style={{ padding: '19px var(--space-6) 0' }}>{/* was 12px (var(--space-3)) — +7px for requested breathing room */}
+        {/* 1. Logo row — logo size/position unchanged; top padding tightened
+            to remove excess whitespace above the branding block. */}
+        <div style={{ padding: '12px var(--space-6) 0' }}>
           <img
             src="/capsula/logo.svg"
             alt="Capsula"
@@ -325,11 +324,10 @@ function StickyLogoHeader({
           />
         </div>
 
-        {/* 2. Tagline — smaller, lighter, lower-contrast than BrandRow's
-            tagline, and pulled tighter against the logo so the two read
-            as one branding block. Logo is still the primary focal point. */}
+        {/* 2. Tagline — pulled flush against the logo (no top gap) so the
+            two read as one tight branding block. */}
         {!isSearching && (
-          <div style={{ padding: '1px var(--space-6) 0' }}>
+          <div style={{ padding: '0 var(--space-6) 0' }}>
             <RotatingTagline
               fontSize={13}
               fontWeight={400}
@@ -339,15 +337,16 @@ function StickyLogoHeader({
         )}
 
         {/* 3. Context row — specialty trigger + active chip (left), sort
-            (right). Generous top margin replaces the removed divider as
-            the separator between branding and controls. */}
+            (right). Tightened top margin and bottom padding vs. the
+            previous pass — still separated from branding by whitespace
+            alone, just less of it. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            'var(--space-2)',
-          marginTop:      'var(--space-4)',
-          padding:        'var(--space-2) var(--space-5) var(--space-3)',
+          marginTop:      'var(--space-2)',
+          padding:        'var(--space-1) var(--space-5) var(--space-2)',
         }}>
           {/* Left: "Specialties" trigger (opens the existing bottom sheet)
               + optional active-specialty chip, shown as separate elements */}
@@ -363,23 +362,31 @@ function StickyLogoHeader({
               style={{
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     4,
+                gap:                     5,
                 background:              'none',
                 border:                  'none',
-                padding:                 '6px 10px 6px 4px',
+                padding:                 '6px 12px 6px 6px',
                 margin:                  0,
                 cursor:                  'pointer',
-                color:                   'var(--color-text-secondary)',
+                // Strongest text weight/color in the row — this is the
+                // primary action, so it reads first.
+                color:                   'var(--color-text-primary)',
                 fontSize:                13,
-                fontWeight:              500,
+                fontWeight:              600,
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
                 flexShrink:              0,
               }}
             >
-              <span aria-hidden="true" style={{ fontSize: 10, lineHeight: 1 }}>▾</span>
               Specialties
+              {/* Chevron rendered as a small filled triangle rather than a
+                  thin glyph — reads more clearly as a disclosure indicator
+                  ("tap to open a picker") at this size than a typographic
+                  arrow does, while still being lightweight/borderless. */}
+              <svg width="8" height="8" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
+                <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
+              </svg>
             </button>
 
             {hasFilter && (
@@ -428,8 +435,11 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: sort toggle — compact icon + label. Shows the action
-              that will occur on tap (nextMode), matching ConditionListHeader's
+          {/* Right: sort toggle — secondary utility action, deliberately
+              lighter in weight/color than the Specialties button so the
+              row's hierarchy reads clearly: Specialties (primary) >
+              active chip (state) > sort (utility). Shows the action that
+              will occur on tap (nextMode), matching ConditionListHeader's
               behavior in the main header — both headers must stay in sync. */}
           <button
             onClick={onSortToggle}
@@ -442,15 +452,16 @@ function StickyLogoHeader({
               border:                  'none',
               padding:                 '4px 0 4px 8px',
               cursor:                  'pointer',
-              color:                   'var(--color-text-secondary)',
+              color:                   'var(--color-text-tertiary)',
               fontSize:                12,
+              fontWeight:              400,
               fontFamily:              'var(--font-body)',
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
             }}
           >
-            <ArrowUpDown size={12} strokeWidth={1.8} aria-hidden="true" />
+            <ArrowUpDown size={11} strokeWidth={1.6} aria-hidden="true" />
             {SORT_LABELS[nextMode]}
           </button>
         </div>
