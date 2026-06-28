@@ -325,27 +325,24 @@ function StickyLogoHeader({
           </button>
         </div>
 
-        {/* Row 2: active specialty chip — matches SpecialtyFilterPills active pill style */}
+        {/* Row 2: active specialty — minimal, no border or background */}
         {hasFilter && (
           <div>
             <button
               onClick={onClearSpecialty}
               aria-label={`Clear ${activeSpecialtyObj.name} filter`}
               style={{
-                flexShrink:              0,
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     5,
-                padding:                 '6px 12px',
-                borderRadius:            'var(--radius-full)',
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
+                gap:                     4,
+                background:              'none',
+                border:                  'none',
+                padding:                 0,
                 cursor:                  'pointer',
-                transition:              'all 0.15s ease',
-                border:                  `1.5px solid ${colors.pill}`,
-                backgroundColor:         colors.pill,
-                color:                   '#ffffff',
+                color:                   colors.pill,
+                fontSize:                11,
+                fontWeight:              500,
+                fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
@@ -353,14 +350,13 @@ function StickyLogoHeader({
               <SpecialtyIcon
                 iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
                 iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={13}
-                color="#ffffff"
+                size={11}
+                color={colors.pill}
               />
               {activeSpecialtyObj.name}
-              {/* Inline × */}
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none"
                 stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
-                aria-hidden="true" style={{ flexShrink: 0, marginLeft: 2 }}>
+                aria-hidden="true" style={{ flexShrink: 0 }}>
                 <line x1="2" y1="2" x2="10" y2="10"/>
                 <line x1="10" y1="2" x2="2"  y2="10"/>
               </svg>
