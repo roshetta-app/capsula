@@ -531,8 +531,10 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
 
   // Inset box-shadow applies the accent tint without altering bg color directly,
   // which lets the pressed-bg transition still work cleanly.
+  // Opacity ~10% (hex 1A) — a whisper tint, not a colored bar. The icon carries
+  // the specialty identity; the surface tint is just a subtle environmental cue.
   const accentInset = isActive
-    ? `inset 0 0 0 9999px ${colors.bg}99` // 60% opacity tint of specialty bg token
+    ? `inset 0 0 0 9999px ${colors.bg}1A`
     : 'none'
 
   return (
@@ -545,8 +547,9 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
         backgroundColor: pressed ? pressedBg : surfaceBg,
         boxShadow:       pressed ? 'none' : accentInset,
         border:          'none',
-        // radius-md (10px) vs search bar's radius-full — immediately different shape
-        borderRadius:    'var(--radius-md)',
+        // radius 8px — slightly tighter than radius-md (10px), more toolbar than card,
+        // further differentiated from search bar's radius-full
+        borderRadius:    '8px',
         // 48dp — meets minimum tap target spec, visibly shorter than search bar (~56dp)
         minHeight:       48,
         overflow:        'hidden',
@@ -565,7 +568,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           flex:                    1,
           display:                 'flex',
           alignItems:              'center',
-          gap:                     8,
+          gap:                     12,
           padding:                 '0 4px 0 14px',
           background:              'none',
           border:                  'none',
@@ -603,8 +606,10 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           )}
         </span>
 
-        {/* Label — medium weight, slightly darker than secondary text.
-            Active: text-primary. Idle: text-secondary (clearly unselected). */}
+        {/* Label — medium weight, restrained color in both states.
+            The icon carries the specialty identity; the label stays calm.
+            Active: text-secondary (readable but not competing with search bar).
+            Idle: text-secondary (same — label reads as filter state, not placeholder). */}
         <span style={{
           flex:         1,
           minWidth:     0,
@@ -614,10 +619,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           fontSize:     14,
           fontWeight:   500,
           fontFamily:   'var(--font-body)',
-          color:        isActive
-            ? 'var(--color-text-primary)'
-            : 'var(--color-text-secondary)',
-          textAlign:    'left',
+          color:        'var(--color-text-secondary)',
           transition:   'color 200ms ease',
         }}>
           {isActive ? activeSpecialtyObj.name : 'All Specialties'}
@@ -639,7 +641,8 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
         </svg>
       </button>
 
-      {/* Clear (×) — animated in/out via width+opacity; no divider */}
+      {/* Clear (×) — animated in/out via width+opacity; no divider.
+          marginLeft provides breathing room between chevron and clear button. */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
@@ -648,8 +651,8 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           display:                 'flex',
           alignItems:              'center',
           justifyContent:          'center',
-          // Slide-in: width expands from 0 → 40, opacity 0 → 1
-          width:                   isActive ? 40 : 0,
+          // Slide-in: width expands from 0 → 44, opacity 0 → 1
+          width:                   isActive ? 44 : 0,
           opacity:                 isActive ? 1 : 0,
           flexShrink:              0,
           overflow:                'hidden',
@@ -662,6 +665,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           WebkitTapHighlightColor: 'transparent',
           transition:              'width 0.18s ease, opacity 0.18s ease',
           padding:                 0,
+          marginLeft:              isActive ? 4 : 0,
         }}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
@@ -674,7 +678,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
       </button>
 
       {/* Right padding spacer when clear is hidden */}
-      {!isActive && <span style={{ width: 14, flexShrink: 0 }} />}
+      {!isActive && <span style={{ width: 16, flexShrink: 0 }} />}
     </div>
   )
 }
