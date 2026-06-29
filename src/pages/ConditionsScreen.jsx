@@ -732,7 +732,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-4)' }}>
+      <div style={{ marginBottom: 'var(--space-3)' }}>  {/* was var(--space-4) — tightened gap to selector below */}
         <SearchBar
           ref={searchInputRef}
           value={query}
@@ -791,10 +791,3 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
-
-
-
-
-
-
-
