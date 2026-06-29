@@ -74,6 +74,15 @@ createRoot(document.getElementById('root')).render(
 //   change event to miss.
 //   Fix: attach both listeners BEFORE calling register(), so they exist no
 //   matter how fast the new SW's lifecycle completes relative to this tab.
+//
+// Fix (stale-UI-after-deploy):
+//   register() now passes { updateViaCache: 'none' }. Without this, the
+//   browser checks for a new sw.js using its normal HTTP caching rules —
+//   so it can keep thinking the old sw.js is still current for a while
+//   even after a deploy, delaying the entire install→activate→RELOAD
+//   chain this app depends on. 'none' forces every update check to be a
+//   real network request, regardless of what cache headers GitHub Pages'
+//   CDN happens to send.
 
 if ('serviceWorker' in navigator) {
   let reloading = false
@@ -109,7 +118,7 @@ if ('serviceWorker' in navigator) {
 
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('/capsula/sw.js')
+      .register('/capsula/sw.js', { updateViaCache: 'none' })
       .then(registration => {
         console.log('[SW] Registered:', registration.scope)
 

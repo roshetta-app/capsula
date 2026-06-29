@@ -26,6 +26,15 @@
  *   - RELOAD broadcast is delayed 4 s after activate so any in-flight
  *     404→index.html redirects finish decoding sessionStorage before the
  *     tab is told to reload.
+ *
+ * Fix (stale-UI-after-deploy):
+ *   - The navigate fetch below now explicitly passes { cache: 'no-store' }.
+ *     Without this, the browser's own HTTP cache could still satisfy this
+ *     fetch even though the SW logic intended it to always hit the network —
+ *     the meta http-equiv Cache-Control tag in index.html does not actually
+ *     stop this in modern browsers, and GitHub Pages offers no way to set a
+ *     real Cache-Control response header. cache: 'no-store' is the spec-level
+ *     way to force a real network round-trip every time.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -140,7 +149,7 @@ self.addEventListener('fetch', event => {
   // correct Vite asset hashes after every deploy.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() =>
+      fetch(request, { cache: 'no-store' }).catch(() =>
         // Offline only: serve whatever index.html we have cached
         caches.match('/capsula/index.html').then(cached =>
           cached ? withCacheHeader(cached) : Response.error()
