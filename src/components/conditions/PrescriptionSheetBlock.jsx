@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
+import { ClipboardList } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -359,9 +360,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
           return (
             <div key={uIdx}>
-              {/* One OrMarker before every unit except the very first */}
-              {uIdx > 0 && <OrMarker />}
-
               <DrugMainLine
                 name={memberName}
                 concentration={data.concentration}
@@ -369,6 +367,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 linkEnabled={memberLinkEnabled}
                 slug={member.formulation?.slug ?? null}
                 navigate={navigate}
+                showOr={uIdx > 0}
               />
 
               {showOwnNote && <RowNote note={data.note} />}
@@ -404,7 +403,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
  *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
  */
-function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }) {
+function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, showOr = false }) {
   if (!name) return null
 
   const handleSearchClick = (e) => {
@@ -415,9 +414,22 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
 
   return (
     <>
-      {/* Name line: name + concentration (plain text) + form (badge) + search icon */}
+      {/* Name line: (or) prefix + name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+          {/* Inline (or) prefix — only for alternative units */}
+          {showOr && (
+            <span style={{
+              fontSize: 10,
+              fontWeight: 700,
+              fontStyle: 'italic',
+              color: 'var(--color-warning)',
+              flexShrink: 0,
+              lineHeight: 1,
+            }}>
+              (or)
+            </span>
+          )}
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -457,19 +469,12 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </span>
           )}
 
-          {/* Form — pill badge.
-              Visual-weight pass: removed the filled accent-light background —
-              a filled chip competed with the drug name and NumberBadge for the
-              same 'accent = important' visual slot. Accent text color kept so
-              the form is still legible as a distinct tag, just no longer filled. */}
+          {/* Form — plain accent text, no pill/fill/border */}
           {form && (
             <span style={{
               fontSize: 10, fontWeight: 600,
               color: 'var(--color-accent)',
-              background: 'var(--color-accent-light)',
-              borderRadius: 20,
-              padding: '1px 8px',
-              lineHeight: 1.5,
+              lineHeight: 1.3,
               letterSpacing: '0.01em',
               flexShrink: 0,
             }}>
@@ -575,14 +580,11 @@ function RowNote({ note }) {
       <span style={{
         flexShrink: 0,
         marginTop: 2,
-        // text-secondary (was text-tertiary) — icon was undershooting the
-        // note text's own color weight, reading fainter than the label
-        // it's marking.
         color: 'var(--color-text-secondary)',
         display: 'flex',
         alignItems: 'center',
       }}>
-        <Icon name="Info" size={12} color="currentColor" />
+        <ClipboardList size={12} color="currentColor" />
       </span>
       <span
         dir="auto"
@@ -614,22 +616,19 @@ function RowNote({ note }) {
 function NumberBadge({ index }) {
   return (
     <div style={{
-      width: 22,
-      height: 22,
-      borderRadius: 8,
-      border: '1px solid var(--color-accent)',
-      backgroundColor: 'var(--color-accent-light)',
-      color: 'var(--color-accent)',
-      fontSize: 11,
-      fontWeight: 700,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
       flexShrink: 0,
-      marginTop: 1,
-      opacity: 0.85,
+      marginTop: 2,
+      minWidth: 22,
+      textAlign: 'left',
     }}>
-      {index}
+      <span style={{
+        fontSize: 13,
+        fontWeight: 700,
+        color: 'var(--color-text-secondary)',
+        lineHeight: 1,
+      }}>
+        {index}.
+      </span>
     </div>
   )
 }
@@ -650,30 +649,7 @@ function NumberBadge({ index }) {
  * in the sheet (NumberBadge, form pill), so it reads as its own kind of
  * marker rather than a muted variant of either.
  */
-function OrMarker() {
-  return (
-    <div style={{ padding: '3px 0' }}>
-      <span style={{
-        display: 'inline-flex',
-        width: 28,
-        height: 18,
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: 9,
-        fontWeight: 700,
-        fontStyle: 'italic',
-        color: 'var(--color-warning)',
-        background: 'var(--color-warning-light)',
-        borderRadius: 12,
-        flexShrink: 0,
-        lineHeight: 1,
-        letterSpacing: '0.02em',
-      }}>
-        or
-      </span>
-    </div>
-  )
-}
+// OrMarker is now inline — rendered as a prefix inside DrugMainLine via prop
 
 const rowWrap = {
   display: 'flex',
