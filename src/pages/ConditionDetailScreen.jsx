@@ -21,7 +21,7 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
  */
 function IconWritingHand({ color }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -32,7 +32,7 @@ function IconWritingHand({ color }) {
 /** Stethoscope icon for Clinical tab — unchanged */
 function IconStethoscope({ color }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3" />
       <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4" />
@@ -294,7 +294,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 display: 'flex',
                 alignItems: 'center',
                 gap: 5,
-                marginBottom: 4,
+                marginBottom: 8,
               }}>
                 <SpecialtyIcon
                   iconType={iconType}
@@ -303,7 +303,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   color={colors.fg}
                 />
                 <span style={{
-                  fontSize: 11,
+                  fontSize: 13,
                   fontWeight: 500,
                   letterSpacing: '0.03em',
                   // Specialty label is a signal, not decoration — text-secondary
@@ -317,12 +317,12 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
             )}
 
             <h1 style={{
-              fontSize: 19,
+              fontSize: 22,
               fontWeight: 700,
               color: 'var(--color-text-primary)',
-              margin: '0 0 6px 0',
+              margin: '0 0 14px 0',
               lineHeight: 1.2,
-              letterSpacing: '-0.3px',
+              letterSpacing: '-0.4px',
             }}>
               {condition.name}
             </h1>
@@ -349,8 +349,8 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    paddingTop: 8,
-                    paddingBottom: 8,
+                    paddingTop: 7,
+                    paddingBottom: 7,
                     paddingLeft: 'var(--space-2)',
                     paddingRight: 'var(--space-2)',
                     width: '100%',
@@ -367,7 +367,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   {renderIcon(color)}
                   <span style={{
                     fontSize: 13,
-                    fontWeight: isActive ? 600 : 400,
+                    fontWeight: isActive ? 600 : 500,
                     color,
                   }}>
                     {label}
@@ -376,7 +376,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 {/* Underline — full width of the tab cell, flush edge-to-edge */}
                 <span style={{
                   display: 'block',
-                  height: 2,
+                  height: 1.5,
                   width: '100%',
                   borderRadius: '1px 1px 0 0',
                   backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',

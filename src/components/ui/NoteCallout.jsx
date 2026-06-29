@@ -164,11 +164,13 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
     return (
       <div style={{
         background: 'var(--color-surface-muted)',
-        borderRadius: 'var(--radius-md)',
-        padding: '10px 12px',
+        borderRadius: 'var(--radius-lg)',
+        padding: '14px 16px',
+        marginTop: 12,
+        marginBottom: 4,
       }}>
         {/* Icon row — sits above the text block */}
-        <div style={{ marginBottom: 6 }}>
+        <div style={{ marginBottom: 8 }}>
           <Icon color={f.colorLight} />
         </div>
         {textContent}
@@ -180,8 +182,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   return (
     <div style={{
       background: 'var(--color-note-bg)',
-      borderRadius: 'var(--radius-md)',
-      padding: '10px 12px',
+      borderRadius: 'var(--radius-lg)',
+      padding: '12px 16px',
     }}>
       <div
         dir={direction}

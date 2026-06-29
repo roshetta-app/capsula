@@ -186,15 +186,15 @@ export default function PrescriptionSheetBlock({ sheet }) {
         <div style={{
           flex: 1,
           height: 0,
-          borderTop: '1.5px dashed var(--color-border)',
+          borderTop: '1px dashed var(--color-border)',
         }} />
         <span style={{
-          fontSize: 9,
-          fontWeight: 600,
-          letterSpacing: '0.1em',
+          fontSize: 8,
+          fontWeight: 500,
+          letterSpacing: '0.08em',
           textTransform: 'uppercase',
           color: 'var(--color-text-tertiary)',
-          opacity: 0.6,
+          opacity: 0.4,
           flexShrink: 0,
         }}>
           end of sheet
@@ -202,7 +202,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
         <div style={{
           flex: 1,
           height: 0,
-          borderTop: '1.5px dashed var(--color-border)',
+          borderTop: '1px dashed var(--color-border)',
         }} />
       </div>
     </div>
@@ -231,20 +231,20 @@ function SectionHeader({ label, children }) {
     <div
       style={{
         background: 'var(--color-section-bg)',
-        borderRadius: 'var(--radius-md)',
-        padding: 'var(--space-3) var(--space-4) var(--space-2)',
-        margin: '14px 0',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-4) var(--space-4) var(--space-3)',
+        margin: '16px 0',
       }}
     >
       <div
         dir="auto"
         style={{
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: 700,
-          letterSpacing: '0.08em',
+          letterSpacing: '0.07em',
           color: 'var(--color-text-tertiary)',
           textTransform: 'uppercase',
-          marginBottom: 4,
+          marginBottom: 8,
           unicodeBidi: 'plaintext',
         }}
       >
@@ -425,7 +425,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 background: 'none', border: 'none', padding: 0,
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
-                fontSize: 15, fontWeight: 700,
+                fontSize: 16, fontWeight: 700,
                 color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'underline',
@@ -438,7 +438,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </button>
           ) : (
             <span style={{
-              fontSize: 15, fontWeight: 700,
+              fontSize: 16, fontWeight: 700,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
@@ -466,7 +466,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             <span style={{
               fontSize: 10, fontWeight: 600,
               color: 'var(--color-accent)',
-              background: 'transparent',
+              background: 'var(--color-accent-light)',
               borderRadius: 20,
               padding: '1px 8px',
               lineHeight: 1.5,
@@ -514,7 +514,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
  */
 function DoseLine({ text }) {
   return (
-    <div dir="auto" style={{ marginTop: 8, paddingLeft: 4, unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: 12, paddingLeft: 6, unicodeBidi: 'plaintext' }}>
       <span style={{
         fontSize: 13,
         fontWeight: 600,
@@ -569,7 +569,7 @@ function RowNote({ note }) {
         flexDirection: 'row',
         alignItems: 'flex-start',
         gap: 5,
-        marginTop: 4,
+        marginTop: 8,
       }}
     >
       <span style={{
@@ -616,9 +616,9 @@ function NumberBadge({ index }) {
     <div style={{
       width: 22,
       height: 22,
-      borderRadius: 6,
-      border: '1.5px solid var(--color-accent)',
-      backgroundColor: 'transparent',
+      borderRadius: 8,
+      border: '1px solid var(--color-accent)',
+      backgroundColor: 'var(--color-accent-light)',
       color: 'var(--color-accent)',
       fontSize: 11,
       fontWeight: 700,
@@ -627,7 +627,7 @@ function NumberBadge({ index }) {
       justifyContent: 'center',
       flexShrink: 0,
       marginTop: 1,
-      opacity: 0.7,
+      opacity: 0.85,
     }}>
       {index}
     </div>
@@ -655,18 +655,19 @@ function OrMarker() {
     <div style={{ padding: '3px 0' }}>
       <span style={{
         display: 'inline-flex',
-        width: 22,
-        height: 22,
+        width: 28,
+        height: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        fontSize: 10,
+        fontSize: 9,
         fontWeight: 700,
         fontStyle: 'italic',
         color: 'var(--color-warning)',
         background: 'var(--color-warning-light)',
-        borderRadius: '50%',
+        borderRadius: 12,
         flexShrink: 0,
         lineHeight: 1,
+        letterSpacing: '0.02em',
       }}>
         or
       </span>
@@ -678,5 +679,5 @@ const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
   gap: 'var(--space-3)',
-  padding: '11px 0',
+  padding: '14px 0',
 }
