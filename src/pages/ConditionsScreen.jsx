@@ -545,6 +545,7 @@ export default function ConditionsScreen() {
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
+  const listHeaderRef  = useRef(null)
 
   // ── Back-to-top visibility ───────────────────────────────────────────────────
 
@@ -633,6 +634,20 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
+  }
+
+  // When a specialty is chosen via the sticky header (user is scrolled down),
+  // scroll the list header into view so the filtered results are immediately
+  // visible without having to scroll back up manually.
+  function handleSelectSpecialty(id) {
+    setActiveSpecialty(id)
+    if (showStickyHeader && listHeaderRef.current) {
+      // Small delay lets React re-render the new results before we scroll,
+      // so the element is in its final position when scrollIntoView fires.
+      setTimeout(() => {
+        listHeaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 50)
+    }
   }
 
   // ── List rendering ───────────────────────────────────────────────────────────
@@ -754,21 +769,23 @@ export default function ConditionsScreen() {
       </div>
 
       {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
-      <ConditionListHeader
-        totalCount={totalCount}
-        resultCount={resultCount}
-        activeSpecialty={activeSpecialty}
-        specialtyName={specialtyName}
-        isSearching={isSearching}
-        sortMode={sortMode}
-        onSortToggle={cycleSortMode}
-        SORT_LABELS={SORT_LABELS}
-        firstLetter={
-          !isSearching && sortMode === 'az' && resultCount > 0
-            ? alphabetGroup(results)[0]?.letter
-            : undefined
-        }
-      />
+      <div ref={listHeaderRef}>
+        <ConditionListHeader
+          totalCount={totalCount}
+          resultCount={resultCount}
+          activeSpecialty={activeSpecialty}
+          specialtyName={specialtyName}
+          isSearching={isSearching}
+          sortMode={sortMode}
+          onSortToggle={cycleSortMode}
+          SORT_LABELS={SORT_LABELS}
+          firstLetter={
+            !isSearching && sortMode === 'az' && resultCount > 0
+              ? alphabetGroup(results)[0]?.letter
+              : undefined
+          }
+        />
+      </div>
 
       {/* 6. Condition list */}
       {renderList()}
@@ -780,7 +797,7 @@ export default function ConditionsScreen() {
       <SpecialtiesBottomSheet
         specialties={specialties}
         activeSpecialty={activeSpecialty}
-        onSelect={id => setActiveSpecialty(id)}
+        onSelect={id => handleSelectSpecialty(id)}
         onClose={() => setBottomSheetOpen(false)}
         isOpen={bottomSheetOpen}
       />
