@@ -123,7 +123,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           display:                 'flex',
           flexDirection:           'column',
           alignItems:              'stretch',
-          padding:                 '10px 8px 10px 14px',
+          padding:                 '12px 8px 12px 14px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
@@ -133,11 +133,9 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {/* Label — low visual emphasis. Its weight relative to the much
-            larger value text below is what creates the hierarchy, not
-            its own size. */}
+        {/* Label — helper text, smallest element in the hierarchy */}
         <span style={{
-          fontSize:     12,
+          fontSize:     11,
           fontWeight:   500,
           fontFamily:   'var(--font-body)',
           color:        'var(--color-text-tertiary)',

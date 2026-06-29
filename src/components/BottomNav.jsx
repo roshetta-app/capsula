@@ -6,6 +6,11 @@
  *             Active = filled (fill='currentColor'), inactive = stroke only.
  *             Favourites icon now follows active-tab state only — removed
  *             hasFavourites fill logic and gold label treatment.
+ * Phase 15 — Inactive tab contrast improved: color switched from
+ *             text-tertiary to text-secondary so inactive tabs are clearly
+ *             readable without competing with the active accent tab.
+ *             Inactive strokeWidth 1.8→2.0 for consistent perceived weight
+ *             at rest. Label fontWeight 400→500 for inactive tabs.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — House (Lucide)
@@ -29,10 +34,6 @@ export default function BottomNav() {
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
 
-  // Active detection:
-  //   /conditions and / both activate the Conditions tab
-  //   /drugs activates Drugs tab (and /drugs/:slug)
-  //   /favourites activates Favourites tab
   function isActive(tabPath) {
     if (tabPath === '/conditions') {
       return location.pathname === '/' ||
@@ -44,21 +45,9 @@ export default function BottomNav() {
   }
 
   const TABS = [
-    {
-      path:  '/conditions',
-      label: 'Conditions',
-      Icon:  House,
-    },
-    {
-      path:  '/drugs',
-      label: 'Drugs',
-      Icon:  Pill,
-    },
-    {
-      path:  '/favourites',
-      label: 'Favourites',
-      Icon:  Star,
-    },
+    { path: '/conditions', label: 'Conditions', Icon: House },
+    { path: '/drugs',      label: 'Drugs',      Icon: Pill  },
+    { path: '/favourites', label: 'Favourites', Icon: Star  },
   ]
 
   return (
@@ -73,7 +62,6 @@ export default function BottomNav() {
       paddingBottom:           'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
     }}>
-      {/* Inner row — centred, capped at 680px, equal 1/3 columns */}
       <div style={{
         maxWidth:   680,
         margin:     '0 auto',
@@ -99,7 +87,9 @@ export default function BottomNav() {
                 border:                  'none',
                 background:              'none',
                 cursor:                  'pointer',
-                color:                   active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                // Active: accent. Inactive: text-secondary (was text-tertiary —
+                // increased contrast so tabs are clearly readable at rest).
+                color:                   active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                 transition:              'color 0.15s ease',
                 fontFamily:              'var(--font-body)',
                 padding:                 '8px 0',
@@ -109,12 +99,12 @@ export default function BottomNav() {
             >
               <Icon
                 size={22}
-                strokeWidth={active ? 2.5 : 1.8}
+                strokeWidth={active ? 2.5 : 2.0}
                 fill="none"
               />
               <span style={{
                 fontSize:      10,
-                fontWeight:    active ? 600 : 400,
+                fontWeight:    active ? 600 : 500,
                 letterSpacing: '0.01em',
               }}>
                 {label}

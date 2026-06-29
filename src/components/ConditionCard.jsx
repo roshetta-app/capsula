@@ -18,6 +18,11 @@
  *             rather than fully saturated. Inset border removed — the bubble
  *             now sits bare on the tint, matching the selector's bare-icon
  *             treatment.
+ * Phase 15 — Visual hierarchy pass: bubble 36→32px, icon 18→16px, softer
+ *             radius (10px). Specialty label darker (secondary not tertiary)
+ *             so it's readable but still clearly below the name. Condition
+ *             name 15→16px so it wins clearly. Row padding 10→12px for
+ *             more breathing room. Tagline gap 3→4px.
  *
  * Props:
  *   condition        ConditionFull
@@ -83,7 +88,7 @@ export default function ConditionCard({
         display:                 'flex',
         alignItems:              isMultiLine ? 'flex-start' : 'center',
         gap:                     'var(--space-3)',
-        padding:                 '10px 0',
+        padding:                 '12px 0',
         borderBottom:            isLast ? 'none' : '1px solid var(--color-border-subtle)',
         cursor:                  'pointer',
         outline:                 'none',
@@ -91,21 +96,17 @@ export default function ConditionCard({
         backgroundColor:         'transparent',
       }}
     >
-      {/* Left: specialty icon bubble — anchored to the top of the text
-          block so it optically aligns with the condition name row on
-          2-line cards and doesn't get overwhelmed on 3-line cards.
-          marginTop offsets the bubble down by ~4px to visually centre
-          it against the name (the largest text element).
-          Background uses the same soft rgba() wash as SpecialtySelector's
-          active-card tint (tintedBg) instead of the token's flat bg hex,
-          and sits bare with no inset border — matching the selector's
-          bare-icon treatment. */}
+      {/* Left: specialty icon bubble — 32px, softer radius, lower visual weight
+          so the condition name takes priority. The bubble acts as a color accent
+          and category signal rather than the dominant element.
+          marginTop offsets the bubble down by ~3px to visually centre it against
+          the name (the largest text element) on multi-line cards. */}
       <div style={{
-        width:           36,
-        height:          36,
+        width:           32,
+        height:          32,
         flexShrink:      0,
-        marginTop:       isMultiLine ? (showSpecialtyName ? 2 : 4) : 0,
-        borderRadius:    'var(--radius-md)',
+        marginTop:       isMultiLine ? (showSpecialtyName ? 2 : 3) : 0,
+        borderRadius:    10,
         backgroundColor: tintedBg(colors.bg, isDark),
         display:         'flex',
         alignItems:      'center',
@@ -114,7 +115,7 @@ export default function ConditionCard({
         <SpecialtyIcon
           iconType={iconType}
           iconValue={iconValue}
-          size={18}
+          size={16}
           color={colors.fg}
         />
       </div>
@@ -125,16 +126,17 @@ export default function ConditionCard({
           <div style={{
             fontSize:      11,
             fontWeight:    500,
-            color:         'var(--color-text-tertiary)',
+            color:         'var(--color-text-secondary)',
             marginBottom:  2,
-            letterSpacing: '0.04em',
+            letterSpacing: '0.02em',
           }}>
             {condition.specialtyName}
           </div>
         )}
 
+        {/* Condition name — dominant element, wins clearly over label and tagline */}
         <div style={{
-          fontSize:     15,
+          fontSize:     16,
           fontWeight:   600,
           color:        'var(--color-text-primary)',
           lineHeight:   1.3,
@@ -153,7 +155,7 @@ export default function ConditionCard({
           <div style={{
             display:      'flex',
             alignItems:   'center',
-            gap:          3,
+            gap:          4,
             fontSize:     12,
             fontStyle:    'italic',
             color:        'var(--color-text-secondary)',

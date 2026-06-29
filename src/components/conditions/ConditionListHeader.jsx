@@ -12,6 +12,10 @@
  *   firstLetter is provided, a clock icon + label is shown left-aligned to
  *   indicate the list is ordered by viewing history.
  *
+ * Phase 15 — Sort button weight reduced (600→500, text-primary→text-secondary)
+ *            so it reads as a secondary control and doesn't compete with the
+ *            condition list content.
+ *
  * Props:
  *   totalCount       number   (currently unused — kept for caller compatibility)
  *   resultCount      number
@@ -84,7 +88,9 @@ export default function ConditionListHeader({
         <span /> /* spacer so sort toggle stays right-aligned in any other state */
       )}
 
-      {/* Right side — sort toggle (hidden while searching) */}
+      {/* Right side — sort toggle (hidden while searching).
+          500 weight and text-secondary color so it reads as a secondary
+          control below the dominant condition list content. */}
       {!isSearching && (
         <button
           onClick={onSortToggle}
@@ -98,14 +104,14 @@ export default function ConditionListHeader({
             cursor:                  'pointer',
             padding:                 '4px 0 4px 8px',
             fontSize:                13,
-            fontWeight:              600,
-            color:                   'var(--color-text-primary)',
+            fontWeight:              500,
+            color:                   'var(--color-text-secondary)',
             fontFamily:              'var(--font-body)',
             WebkitTapHighlightColor: 'transparent',
             outline:                 'none',
           }}
         >
-          <ArrowUpDown size={13} strokeWidth={2.0} aria-hidden="true" />
+          <ArrowUpDown size={13} strokeWidth={1.8} aria-hidden="true" />
           {SORT_LABELS[nextMode]}
         </button>
       )}

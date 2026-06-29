@@ -236,14 +236,14 @@ function RotatingTagline({
 function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   return (
     <div ref={brandRowRef} style={{
-      paddingTop:    'var(--space-6)',  /* was var(--space-4) — added ~8–12px top breathing room */
-      paddingBottom: 'calc(var(--space-3) - 4px)',  /* tightened 4px to pull tagline closer to search bar */
+      paddingTop:    'var(--space-5)',
+      paddingBottom: 'calc(var(--space-3) - 4px)',
     }}>
       <div style={{
         display:      'flex',
         alignItems:   'center',
         gap:          'var(--space-2)',
-        marginBottom: isSearching ? 0 : 10,
+        marginBottom: isSearching ? 0 : 8,
         transition:   'margin-bottom 0.15s ease',
       }}>
         {/* Logo wordmark */}
@@ -251,7 +251,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
           src="/capsula/logo.svg"
           alt="Capsula"
           className="capsula-logo"
-          style={{ display: 'block', height: 32, width: 'auto' }}
+          style={{ display: 'block', height: 30, width: 'auto' }}
         />
         <span style={{ flex: 1 }} />
 
@@ -259,7 +259,13 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
         <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
       </div>
 
-      {!isSearching && <RotatingTagline />}
+      {!isSearching && (
+        <RotatingTagline
+          fontSize={13}
+          fontWeight={400}
+          color="var(--color-text-secondary)"
+        />
+      )}
     </div>
   )
 }
@@ -757,7 +763,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>
+      <div style={{ marginBottom: 'var(--space-4)' }}>
         <SearchBar
           ref={searchInputRef}
           value={query}
