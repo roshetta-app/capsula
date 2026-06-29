@@ -159,6 +159,36 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
     </div>
   )
 
+  // ── variant='sheet-note': refined in-sheet note — icon header row +
+  //    accent left border, no dull grey fill ──────────────────────────────────
+  if (variant === 'sheet-note') {
+    return (
+      <div style={{
+        borderLeft: `2px solid ${f.colorLight}`,
+        paddingLeft: 10,
+        marginTop: 4,
+      }}>
+        {/* Icon header row */}
+        <div style={{ marginBottom: 4 }}>
+          <Icon color={f.colorLight} />
+        </div>
+        <div style={{
+          fontSize: 13,
+          fontWeight: 500,
+          color: 'var(--color-text-secondary)',
+          lineHeight: 1.6,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 3,
+        }}>
+          <ReactMarkdown remarkPlugins={[remarkBreaks]} components={components}>
+            {text}
+          </ReactMarkdown>
+        </div>
+      </div>
+    )
+  }
+
   // ── variant='divider': icon on its own row above text, lighter bg ─────────
   if (variant === 'divider') {
     return (

@@ -117,6 +117,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
           <NoteCallout
             key={row.id ?? key}
             text={noteText}
+            variant="sheet-note"
           />
         )
       }
@@ -239,10 +240,10 @@ function SectionHeader({ label, children }) {
       <div
         dir="auto"
         style={{
-          fontSize: 11,
+          fontSize: 13,
           fontWeight: 700,
-          letterSpacing: '0.08em',
-          color: 'var(--color-text-tertiary)',
+          letterSpacing: '0.04em',
+          color: 'var(--color-text-primary)',
           textTransform: 'uppercase',
           marginBottom: 4,
           unicodeBidi: 'plaintext',
@@ -333,35 +334,42 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
     }
   }
 
+  // Build a flat list of renderable items: each unit may be preceded by
+  // an OrMarker row. OrMarker rows span the full row width so the 'or'
+  // badge aligns left with the drug name column (not under the badge).
+  const items = []
+  for (let uIdx = 0; uIdx < units.length; uIdx++) {
+    const { member, cluster, isLastMemberOfCluster } = units[uIdx]
+    const data = member.data
+    const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
+    const fallbackName = !memberHasOwnName ? (member.formulation?.genericName ?? null) : null
+    const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
+    const memberLinkEnabled = Boolean(data.drug_link_enabled) && Boolean(member.formulation?.slug)
+    const showOwnNote = data.note && data.note !== cluster.note
+
+    if (uIdx > 0) {
+      items.push({ type: 'or', key: `or-${uIdx}` })
+    }
+    items.push({
+      type: 'drug',
+      key: `drug-${uIdx}`,
+      memberName, memberLinkEnabled, data, member, cluster,
+      isLastMemberOfCluster, showOwnNote,
+    })
+  }
+
   return (
-    <div style={{ ...rowWrap, borderBottom: showDivider ? '1.5px solid var(--color-border)' : 'none' }}>
-      <NumberBadge index={index} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        {units.map((unit, uIdx) => {
-          const { member, cluster, isLastMemberOfCluster } = unit
-          const data = member.data
-          const memberHasOwnName = !!(data.brand_name?.trim() || data.generic_name?.trim())
-          // PHASE 2.9: fallback name and link-gating are now per-member,
-          // using that member's own formulation lookup — previously these
-          // were gated behind `member.isMain`, so an alternative linked to
-          // its own formulation never got a fallback name or a working
-          // link at all.
-          const fallbackName = !memberHasOwnName ? (member.formulation?.genericName ?? null) : null
-          const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
-          const memberLinkEnabled = Boolean(data.drug_link_enabled) && Boolean(member.formulation?.slug)
-          // A member's own per-drug note (Decision 5 two-slot model) is
-          // only shown as its own line when it differs from the cluster's
-          // shared group note — for a single-member cluster falling back
-          // to alt.note for both, they're the same value and the group
-          // note below already covers it; rendering both would duplicate
-          // the same text.
-          const showOwnNote = data.note && data.note !== cluster.note
-
-          return (
-            <div key={uIdx}>
-              {/* One OrMarker before every unit except the very first */}
-              {uIdx > 0 && <OrMarker />}
-
+    <div style={{ borderBottom: showDivider ? '1.5px solid var(--color-border)' : 'none' }}>
+      {items.map(item => {
+        if (item.type === 'or') {
+          // OrMarker spans badge + content columns so 'or' aligns with drug names
+          return <OrMarker key={item.key} badgeWidth={22} gap={'var(--space-3)'} />
+        }
+        const { memberName, memberLinkEnabled, data, member, cluster, isLastMemberOfCluster, showOwnNote } = item
+        return (
+          <div key={item.key} style={{ ...rowWrap }}>
+            <NumberBadge index={index} />
+            <div style={{ flex: 1, minWidth: 0 }}>
               <DrugMainLine
                 name={memberName}
                 concentration={data.concentration}
@@ -370,11 +378,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 slug={member.formulation?.slug ?? null}
                 navigate={navigate}
               />
-
               {showOwnNote && <RowNote note={data.note} />}
-
-              {/* Dose and note render once after the last member of each
-                  cluster — shared by all members in that cluster */}
               {isLastMemberOfCluster && (
                 <>
                   {cluster.dose && <DoseLine text={cluster.dose} />}
@@ -382,9 +386,9 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 </>
               )}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -417,7 +421,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
     <>
       {/* Name line: name + concentration (plain text) + form (badge) + search icon */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -635,24 +639,23 @@ function NumberBadge({ index }) {
 }
 
 /**
- * OrMarker — sits in the content column, left-aligned with drug names
- * above and below it (not under the NumberBadge column).
+ * OrMarker — full-width row with badge column kept empty so the 'or'
+ * circle aligns left with the drug name column above and below it.
  *
- * Batch 2 fix: removed the outer padding wrapper that caused the marker
- * to render as a block-level element pushing into its own vertical space
- * misaligned from the drug names. Now renders inline in the content flow
- * so 'or' aligns left with the name text, not with the badge.
- *
- * Shape: equal width/height (fixed 22px), single 'or' character, so the
- * badge always renders as a true circle (not a pill).
- * Color: warm/neutral amber tint (--color-warning-light bg, --color-warning
- * text) — distinct from both plain grey and the blue accent used elsewhere
- * in the sheet (NumberBadge, form pill), so it reads as its own kind of
- * marker rather than a muted variant of either.
+ * Receives the same badgeWidth and gap as rowWrap so the offset matches
+ * exactly without hardcoding magic numbers.
  */
-function OrMarker() {
+function OrMarker({ badgeWidth = 22, gap = 'var(--space-3)' }) {
   return (
-    <div style={{ padding: '3px 0' }}>
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap,
+      padding: '2px 0',
+    }}>
+      {/* Empty badge-column spacer — same width as NumberBadge */}
+      <div style={{ width: badgeWidth, flexShrink: 0 }} />
+      {/* 'or' circle — now left-aligned with drug names */}
       <span style={{
         display: 'inline-flex',
         width: 22,
