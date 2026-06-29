@@ -46,6 +46,11 @@ export default function ConditionCard({
   // the active chip already tells the user which specialty they are in.
   const showSpecialtyName = condition.specialtyName && activeSpecialty === 'all'
 
+  // Only top-align when the card has more than one line of metadata
+  // (specialty label or tagline present). Single-line cards (name only)
+  // use center alignment so the name sits level with the icon bubble.
+  const isMultiLine = showSpecialtyName || !!condition.cardTagline
+
   function handleTap() {
     if (onTap) {
       onTap(condition)
@@ -64,7 +69,7 @@ export default function ConditionCard({
       onKeyDown={e => e.key === 'Enter' && handleTap()}
       style={{
         display:                 'flex',
-        alignItems:              'flex-start',
+        alignItems:              isMultiLine ? 'flex-start' : 'center',
         gap:                     'var(--space-3)',
         padding:                 '10px 0',
         borderBottom:            '1px solid var(--color-border)',
@@ -83,7 +88,7 @@ export default function ConditionCard({
         width:           36,
         height:          36,
         flexShrink:      0,
-        marginTop:       showSpecialtyName ? 2 : 4,
+        marginTop:       isMultiLine ? (showSpecialtyName ? 2 : 4) : 0,
         borderRadius:    'var(--radius-md)',
         backgroundColor: colors.bg,
         display:         'flex',
@@ -153,7 +158,7 @@ export default function ConditionCard({
           color:     'var(--color-text-tertiary)',
           opacity:   0.5,
           flexShrink: 0,
-          marginTop:  showSpecialtyName ? 5 : 7,
+          marginTop:  isMultiLine ? (showSpecialtyName ? 5 : 7) : 0,
         }}
       >
         <polyline points="9 18 15 12 9 6" />
