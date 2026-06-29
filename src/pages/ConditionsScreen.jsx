@@ -634,6 +634,21 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
+    if (showStickyHeader && listHeaderRef.current) {
+      setTimeout(() => {
+        const el            = listHeaderRef.current
+        if (!el) return
+        const STICKY_HEIGHT = 90
+        const GAP           = 28
+        const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
+        const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
+        if (targetScroll > 0 && maxScroll >= targetScroll) {
+          window.scrollTo({ top: targetScroll, behavior: 'instant' })
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' })
+        }
+      }, 50)
+    }
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
