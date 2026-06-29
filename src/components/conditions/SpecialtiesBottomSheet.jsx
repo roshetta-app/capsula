@@ -23,7 +23,7 @@
  *           rectangle.
  * Phase 9 — Open/close animation: sheet slides up from bottom (translateY)
  *           and backdrop fades in/out. Uses shouldRender + animateIn state
- *           to delay unmount until the exit transition completes (~250 ms).
+ *           to delay unmount until the exit transition completes (~320 ms).
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -64,7 +64,7 @@ export default function SpecialtiesBottomSheet({
     } else {
       // Start exit transition immediately; unmount after it finishes.
       setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 250)
+      const t = setTimeout(() => setShouldRender(false), 320)
       return () => clearTimeout(t)
     }
   }, [isOpen])
@@ -99,7 +99,9 @@ export default function SpecialtiesBottomSheet({
           zIndex:          200,
           backgroundColor: 'rgba(0,0,0,0.35)',
           opacity:         animateIn ? 1 : 0,
-          transition:      'opacity 0.25s ease',
+          transition:      animateIn
+            ? 'opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+            : 'opacity 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       />
       <div
@@ -119,7 +121,9 @@ export default function SpecialtiesBottomSheet({
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
           transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform 0.25s ease',
+          transition:      animateIn
+            ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
+            : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       >
         {/* Fixed header — drag handle, label, and the 'All conditions' row.
