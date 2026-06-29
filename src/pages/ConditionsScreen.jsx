@@ -651,7 +651,7 @@ export default function ConditionsScreen() {
 
   function handleClearFilter() {
     setActiveSpecialty('all')
-    if (showStickyHeader) setTimeout(snapToListHeader, 50)
+    if (showStickyHeader) snapToListHeader()
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
