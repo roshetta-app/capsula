@@ -226,8 +226,6 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       zIndex: 50,
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
-      borderRadius: '0 0 var(--radius-lg) var(--radius-lg)',
-      boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--space-6) 0' }}>
 
