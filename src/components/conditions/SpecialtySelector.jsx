@@ -21,15 +21,20 @@
  *            token color instead of staying flat white. Specialty name
  *            now tints to the same accent color as the icon when active
  *            (darker than the new background tint, so it stays readable).
- *            Card corners increased to 20px (between Phase 11's 18px and
- *            the search bar's full pill). Name/label font sizes reduced
- *            (21px→16px, 13px→12px) to match the surrounding screen's
- *            font hierarchy. Vertical padding loosened now that the
- *            removed icon box freed up room. Clear button's alignment
- *            switched from a flex-end + manual bottom-padding hack to
- *            true center alignment, fixing a vertical baseline mismatch
- *            against the icon/name/chevron row. Chevron and clear button
- *            keep their existing specialty-tint treatment, unchanged.
+ *            Card corners increased to 20px; name/label font sizes
+ *            reduced (21px→16px, 13px→12px); vertical padding loosened.
+ *            Clear button's alignment switched from a flex-end + manual
+ *            bottom-padding hack to center alignment.
+ * Phase 13 — Feedback pass on Phase 12: clear button's center-alignment
+ *            still didn't match the value row (it centers against the
+ *            full card height, which sits higher than the value row's
+ *            center once the label row is added above it) — fixed with
+ *            a marginTop offset equal to the label row's height. Shadow
+ *            reduced further (lower opacity, tighter blur). Corner radius
+ *            pulled back from 20px to 16px. Specialty name font reduced
+ *            16px→14px, since 16px read too close to the page tagline's
+ *            size. Chevron and clear button keep their existing
+ *            specialty-tint treatment, unchanged.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -70,10 +75,11 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
 
   // Subtle ambient shadow to lift container off page background without a border.
-  // Lighter than search bar's shadow so hierarchy is preserved.
+  // Lighter than search bar's shadow so hierarchy is preserved. Reduced further
+  // (lower opacity, tighter blur) so the card reads as nearly flat.
   const containerShadow = pressed
-    ? '0 1px 2px rgba(0,0,0,0.04)'
-    : '0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)'
+    ? '0 1px 1px rgba(0,0,0,0.02)'
+    : '0 1px 2px rgba(0,0,0,0.04)'
 
   // Icon color — accent token color when a specialty is active, neutral
   // tertiary text color when idle.
@@ -93,7 +99,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
         border:          'none',
-        borderRadius:    '20px',
+        borderRadius:    '16px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
         transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
@@ -184,7 +190,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             overflow:     'hidden',
             textOverflow: 'ellipsis',
             whiteSpace:   'nowrap',
-            fontSize:     16,
+            fontSize:     14,
             fontWeight:   600,
             fontFamily:   'var(--font-body)',
             color:        isActive ? iconColor : 'var(--color-text-primary)',
@@ -212,10 +218,11 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
       </button>
 
       {/* Clear (x) — slides in/out; soft specialty tint when active; no
-          divider. Centered against the card's full height, which now
-          matches the value row's vertical center since both the main
-          button and this button share the same stretched height and
-          true center alignment — no manual offset needed. */}
+          divider. The outer container centers this button against the
+          full card height, but the value row it needs to align with sits
+          lower than that center (the label row above pushes it down) —
+          so a top margin equal to the label row's reserved height nudges
+          this button down onto the same line as the icon/name/chevron. */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
@@ -225,6 +232,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           alignItems:              'center',
           justifyContent:          'center',
           width:                   isActive ? 44 : 0,
+          marginTop:               18,
           opacity:                 isActive ? 1 : 0,
           flexShrink:              0,
           overflow:                'hidden',
