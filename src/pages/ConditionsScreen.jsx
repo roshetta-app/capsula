@@ -637,15 +637,24 @@ export default function ConditionsScreen() {
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
-  // scroll the list header into view so the filtered results are immediately
-  // visible without having to scroll back up manually.
+  // snap instantly so the list header sits just below the sticky header with
+  // a small gap. If the page isn't tall enough to reach that scroll position
+  // (filtered list is short), snap to top instead so the sticky header hides.
   function handleSelectSpecialty(id) {
     setActiveSpecialty(id)
     if (showStickyHeader && listHeaderRef.current) {
-      // Small delay lets React re-render the new results before we scroll,
-      // so the element is in its final position when scrollIntoView fires.
       setTimeout(() => {
-        listHeaderRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const el            = listHeaderRef.current
+        if (!el) return
+        const STICKY_HEIGHT = 90  // approximate sticky header height in px
+        const GAP           = 12  // breathing room between sticky header and list header
+        const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
+        const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
+        if (targetScroll > 0 && maxScroll >= targetScroll) {
+          window.scrollTo({ top: targetScroll, behavior: 'instant' })
+        } else {
+          window.scrollTo({ top: 0, behavior: 'instant' })
+        }
       }, 50)
     }
   }
