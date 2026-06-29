@@ -38,6 +38,7 @@ import ConditionListHeader     from '../components/conditions/ConditionListHeade
 import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDivider'
 import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
+import SpecialtySelector       from '../components/conditions/SpecialtySelector'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
@@ -500,186 +501,6 @@ function StickyLogoHeader({
   )
 }
 
-// ─── Full-width specialty selector ───────────────────────────────────────────
-// Sits directly below the search bar. Same horizontal span as the search bar.
-// One large tappable surface — opens SpecialtiesBottomSheet on tap.
-// Active state: specialty icon (bare, no bubble) + name in specialty color; ✕ to clear.
-// Idle state: bare neutral icon + 'All Specialties' label + chevron.
-// Phase 8 — toolbar redesign: no border, filled muted surface, radius-md,
-//            clearly distinct from the outlined full-pill search bar above.
-
-function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
-  const isDark   = useIsDark()
-  const [pressed, setPressed] = useState(false)
-  const tokenKey = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
-  const colors   = resolveToken(tokenKey, isDark)
-  const isActive = !!activeSpecialtyObj
-
-  // Clean white surface (light) / elevated surface (dark) — no tint on the container.
-  // The badge carries all specialty color identity; the container stays neutral.
-  const surfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
-  const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
-
-  // Badge: exact same pattern as ConditionCard's specialty icon bubble.
-  // 32×32 rounded square, colors.bg fill, inset 1px inner shadow for depth.
-  // Glow: outer box-shadow using colors.pill at low opacity + high blur —
-  // highly diffused, subtle, never distracting. Transitions smoothly on change.
-  const badgeShadow = isActive
-    ? `inset 0 0 0 1px rgba(0,0,0,0.06), 0 0 0 3px ${colors.pill}26, 0 0 12px 2px ${colors.pill}1A`
-    : 'inset 0 0 0 1px rgba(0,0,0,0.06)'
-
-  // Subtle ambient shadow to lift container off page background without a border.
-  // Lighter than search bar's shadow so hierarchy is preserved.
-  const containerShadow = pressed
-    ? '0 1px 2px rgba(0,0,0,0.04)'
-    : '0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)'
-
-  return (
-    <div
-      style={{
-        display:         'flex',
-        alignItems:      'stretch',
-        width:           '100%',
-        backgroundColor: pressed ? pressedBg : surfaceBg,
-        border:          'none',
-        borderRadius:    '10px',
-        minHeight:       48,
-        overflow:        'hidden',
-        boxShadow:       containerShadow,
-        transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
-      }}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-    >
-
-      {/* Main tap area */}
-      <button
-        onClick={onOpen}
-        aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
-        style={{
-          flex:                    1,
-          display:                 'flex',
-          alignItems:              'center',
-          gap:                     12,
-          padding:                 '0 6px 0 12px',
-          background:              'none',
-          border:                  'none',
-          cursor:                  'pointer',
-          minWidth:                0,
-          outline:                 'none',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        {/* Specialty badge — replicates ConditionCard icon bubble exactly.
-            32×32, radius-md, colors.bg fill, inset inner shadow for depth.
-            Active: soft glow using colors.pill at very low opacity.
-            Idle: neutral slate bg, no glow. Both transition smoothly. */}
-        <div style={{
-          width:           32,
-          height:          32,
-          flexShrink:      0,
-          borderRadius:    'var(--radius-md)',
-          backgroundColor: isActive ? colors.bg : (isDark ? '#1E293B' : '#F1F5F9'),
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          boxShadow:       badgeShadow,
-          transition:      'background-color 0.2s ease, box-shadow 0.25s ease',
-        }}>
-          {isActive ? (
-            <SpecialtyIcon
-              iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-              iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-              size={16}
-              color={colors.fg}
-            />
-          ) : (
-            // Neutral stethoscope — communicates filter purpose without color
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke={isDark ? '#94A3B8' : '#64748B'} strokeWidth="1.75"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
-              <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
-              <circle cx="20" cy="10" r="2"/>
-            </svg>
-          )}
-        </div>
-
-        {/* Label — primary text color when active, secondary when idle.
-            Medium weight. Never uses specialty accent color — badge carries identity. */}
-        <span style={{
-          flex:         1,
-          minWidth:     0,
-          overflow:     'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace:   'nowrap',
-          fontSize:     14,
-          fontWeight:   500,
-          fontFamily:   'var(--font-body)',
-          color:        isActive
-            ? 'var(--color-text-primary)'
-            : 'var(--color-text-secondary)',
-          transition:   'color 0.2s ease',
-        }}>
-          {isActive ? activeSpecialtyObj.name : 'All Specialties'}
-        </span>
-
-        {/* Chevron — neutral, rotates when sheet is open */}
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-          aria-hidden="true"
-          style={{
-            flexShrink:  0,
-            marginRight: isActive ? 0 : 6,
-            color:       'var(--color-text-tertiary)',
-            transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition:  'transform 0.2s ease',
-          }}>
-          <path d="M2 4.5L6 8.5L10 4.5"
-            stroke="currentColor" strokeWidth="1.6"
-            strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {/* Clear (×) — slides in/out; neutral color; no divider */}
-      <button
-        onClick={e => { e.stopPropagation(); onClear() }}
-        aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
-        tabIndex={isActive ? 0 : -1}
-        style={{
-          display:                 'flex',
-          alignItems:              'center',
-          justifyContent:          'center',
-          width:                   isActive ? 44 : 0,
-          opacity:                 isActive ? 1 : 0,
-          flexShrink:              0,
-          overflow:                'hidden',
-          background:              'none',
-          border:                  'none',
-          cursor:                  isActive ? 'pointer' : 'default',
-          pointerEvents:           isActive ? 'auto' : 'none',
-          color:                   'var(--color-text-tertiary)',
-          outline:                 'none',
-          WebkitTapHighlightColor: 'transparent',
-          transition:              'width 0.18s ease, opacity 0.18s ease',
-          padding:                 0,
-        }}
-      >
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
-          aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
-          <circle cx="7" cy="7" r="6.5" fill="var(--color-border)" />
-          <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
-            stroke="var(--color-text-secondary)"
-            strokeWidth="1.4" strokeLinecap="round" />
-        </svg>
-      </button>
-
-      {/* Right padding spacer when clear is hidden */}
-      {!isActive && <span style={{ width: 14, flexShrink: 0 }} />}
-    </div>
-  )
-}
-
 // ─── Back-to-top floating button ───────────────────────────────────────────────
 
 const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
@@ -970,6 +791,7 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 
 
 
