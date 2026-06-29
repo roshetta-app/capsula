@@ -4,6 +4,13 @@
  * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  * Phase 7 — Filter toolbar redesign: single full-width row, no border,
  *            filled surface, clearly distinct from the search bar above.
+ * Phase 8 — Specialty Filter identity redesign: elevated white surface
+ *            (no background tint), bare icon with a diffused ambient
+ *            color halo instead of an icon bubble, calm left-aligned
+ *            typography, grouped chevron + clear controls. Smaller
+ *            radius (--radius-md) and shorter height (42px) than
+ *            SearchBar (--radius-full pill, 46px) to read as a
+ *            secondary control.
  *
  * Renders a single tappable filter row:
  *   [icon]  [specialty name or "All Specialties"]  ···  [× clear]  [chevron]
@@ -23,6 +30,17 @@
 import { useState }                        from 'react'
 import { SpecialtyIcon, useIsDark }        from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }    from '../../utils/specialtyTokens'
+
+// Parses a '#RRGGBB' token color into an [r, g, b] triple for building
+// a low-opacity rgba() ambient halo. Tokens are always 6-digit hex
+// (see specialtyTokens.js) so no '#RGB' shorthand handling is needed.
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return [r, g, b]
+}
 
 export default function SpecialtyFilterPills({
   specialties,
@@ -47,11 +65,14 @@ export default function SpecialtyFilterPills({
   const iconType  = activeSpec?.iconType  ?? 'lucide'
   const iconValue = activeSpec?.iconValue ?? 'Stethoscope'
   const label     = activeSpec?.name      ?? 'All Specialties'
+  const iconColor = isFiltered ? colors.fg : 'var(--color-text-tertiary)'
 
-  // Surface: one step below page bg — distinct from search bar's white surface
-  // Light: #F3F3F1  Dark: #1A2030 (slightly lifted from bg #111827)
-  const surfaceBg = isDark ? '#1A2030' : '#F3F3F1'
-  const pressedBg = isDark ? '#222836' : '#ECEAE6'
+  // Ambient halo — a diffused, low-opacity spread shadow behind the bare
+  // icon. No halo at all in the unfiltered state, since 'All Specialties'
+  // has no accent color to communicate.
+  const [r, g, b] = hexToRgb(colors.fg)
+  const haloAlpha   = isDark ? 0.22 : 0.13
+  const haloColor   = `rgba(${r}, ${g}, ${b}, ${isFiltered ? haloAlpha : 0})`
 
   function handleClear(e) {
     e.stopPropagation()
@@ -71,13 +92,16 @@ export default function SpecialtyFilterPills({
         alignItems:              'center',
         width:                   '100%',
         padding:                 '0 var(--space-4)',
-        height:                  44,
-        gap:                     'var(--space-2)',
-        // Shape — rounded but softer radius than search bar's full pill
+        height:                  42,
+        gap:                     'var(--space-3)',
+        // Shape — smaller radius than the search bar's full pill, to
+        // read as a secondary control rather than a sibling search field.
         borderRadius:            'var(--radius-md)',
-        // Surface — filled, no border
+        // Surface — clean elevated surface, no border. Contrasts with the
+        // search bar's flat border-only treatment.
         border:                  'none',
-        backgroundColor:         pressed ? pressedBg : surfaceBg,
+        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
+        boxShadow:               'var(--shadow-card)',
         // Typography
         fontFamily:              'var(--font-body)',
         fontSize:                14,
@@ -94,97 +118,110 @@ export default function SpecialtyFilterPills({
         userSelect:              'none',
       }}
     >
-      {/* Specialty icon — bare, no background bubble */}
+      {/* Specialty icon — bare, no bubble. A diffused ambient color halo
+          sits behind it instead of a colored container. */}
       <span style={{
-        display:    'flex',
-        alignItems: 'center',
-        flexShrink: 0,
-        color:      isFiltered ? colors.fg : 'var(--color-text-tertiary)',
-        transition: 'color 0.15s ease',
+        display:        'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        flexShrink:      0,
+        width:           16,
+        height:          16,
+        borderRadius:    '50%',
+        color:           iconColor,
+        boxShadow:       `0 0 0 10px ${haloColor}`,
+        transition:      'color 0.2s ease, box-shadow 0.2s ease',
       }}>
         <SpecialtyIcon
           iconType={iconType}
           iconValue={iconValue}
           size={16}
-          color={isFiltered ? colors.fg : 'var(--color-text-tertiary)'}
+          color={iconColor}
         />
       </span>
 
-      {/* Label — grows to fill available space */}
+      {/* Label — left-aligned, grows to fill available space. Always the
+          primary text color and a calm medium weight, per spec. */}
       <span style={{
-        flex:       1,
-        overflow:   'hidden',
-        whiteSpace: 'nowrap',
+        flex:         1,
+        overflow:     'hidden',
+        whiteSpace:   'nowrap',
         textOverflow: 'ellipsis',
-        color:      isFiltered
-          ? 'var(--color-text-primary)'
-          : 'var(--color-text-secondary)',
-        fontWeight: isFiltered ? 500 : 400,
-        transition: 'color 0.15s ease, font-weight 0.15s ease',
+        textAlign:    'left',
+        color:        'var(--color-text-primary)',
+        fontWeight:   500,
       }}>
         {label}
       </span>
 
-      {/* Clear button — only when a specialty is active */}
-      <span
-        aria-hidden={!isFiltered}
-        style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          flexShrink:     0,
-          width:          isFiltered ? 20 : 0,
-          height:         20,
-          overflow:       'hidden',
-          opacity:        isFiltered ? 1 : 0,
-          // Animate width + opacity together for a smooth slide-in/out
-          transition:     'width 0.18s ease, opacity 0.18s ease',
-          pointerEvents:  isFiltered ? 'auto' : 'none',
-        }}
-        onClick={isFiltered ? handleClear : undefined}
-      >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{ display: 'block' }}
-        >
-          <circle cx="7" cy="7" r="7" fill="var(--color-border)" />
-          <path
-            d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
-            stroke="var(--color-text-secondary)"
-            strokeWidth="1.4"
-            strokeLinecap="round"
-          />
-        </svg>
-      </span>
-
-      {/* Chevron — always visible, right-anchored */}
+      {/* Right-side controls — clear button and chevron grouped closely
+          together, both right-anchored, vertically centered. */}
       <span style={{
         display:    'flex',
         alignItems: 'center',
         flexShrink: 0,
-        color:      'var(--color-text-tertiary)',
-        transition: 'color 0.15s ease',
+        gap:        4,
       }}>
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 14 14"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          style={{ display: 'block' }}
+        {/* Clear button — only when a specialty is active */}
+        <span
+          aria-hidden={!isFiltered}
+          style={{
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            flexShrink:     0,
+            width:          isFiltered ? 20 : 0,
+            height:         20,
+            overflow:       'hidden',
+            opacity:        isFiltered ? 1 : 0,
+            // Animate width + opacity together for a smooth slide-in/out
+            transition:     'width 0.18s ease, opacity 0.18s ease',
+            pointerEvents:  isFiltered ? 'auto' : 'none',
+          }}
+          onClick={isFiltered ? handleClear : undefined}
         >
-          <path
-            d="M3 5L7 9L11 5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ display: 'block' }}
+          >
+            <circle cx="7" cy="7" r="7" fill="var(--color-border)" />
+            <path
+              d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
+              stroke="var(--color-text-secondary)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+            />
+          </svg>
+        </span>
+
+        {/* Chevron — always visible */}
+        <span style={{
+          display:    'flex',
+          alignItems: 'center',
+          flexShrink: 0,
+          color:      'var(--color-text-tertiary)',
+        }}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            style={{ display: 'block' }}
+          >
+            <path
+              d="M3 5L7 9L11 5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
       </span>
     </button>
   )
