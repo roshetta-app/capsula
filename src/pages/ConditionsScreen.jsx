@@ -328,27 +328,30 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — wordmark only; search icon moved to toolbar row below */}
+        {/* 1. Logo row — wordmark only; search icon lives in the toolbar row below */}
         <div style={{
           display:    'flex',
           alignItems: 'center',
-          padding:    '12px var(--space-5) 0',
+          padding:    '16px var(--space-6) 0',
         }}>
           <img
             src="/capsula/logo.svg"
             alt="Capsula"
             className="capsula-logo"
-            style={{ display: 'block', height: 25, width: 'auto', flexShrink: 0 }}
+            style={{ display: 'block', height: 27, width: 'auto', flexShrink: 0 }}
           />
         </div>
 
-        {/* 2. Toolbar — specialty pill (fills available space), search icon (right). */}
+        {/* 2. Toolbar — specialty pill (fills available space), search icon (right).
+            Horizontal padding matches var(--space-6) = 24px page margins so the
+            pill's left edge and the search pill's right edge align with the
+            condition list content and the logo above. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
-          gap:            8,
-          marginTop:      8,
-          padding:        '0 12px var(--space-2)',
+          gap:            10,
+          marginTop:      10,
+          padding:        '0 var(--space-6) 14px',
         }}>
 
           {/* Specialty pill — flex:1 so it fills all space left of the search icon */}
@@ -370,15 +373,15 @@ function StickyLogoHeader({
               style={{
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     6,
+                gap:                     8,
                 flex:                    1,
                 minWidth:                0,
-                padding:                 '6px 0 6px 12px',
+                padding:                 '9px 0 9px 14px',
                 background:              'none',
                 border:                  'none',
                 cursor:                  'pointer',
                 color:                   iconColor,
-                fontSize:                13,
+                fontSize:                14,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
@@ -392,11 +395,11 @@ function StickyLogoHeader({
                   <SpecialtyIcon
                     iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
                     iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                    size={14}
+                    size={16}
                     color={iconColor}
                   />
                 ) : (
-                  <ListFilter size={14} strokeWidth={2.0} aria-hidden="true" />
+                  <ListFilter size={16} strokeWidth={1.9} aria-hidden="true" />
                 )}
               </span>
 
@@ -412,13 +415,13 @@ function StickyLogoHeader({
                 {hasFilter ? activeSpecialtyObj.name : 'All Specialties'}
               </span>
 
-              {/* Chevron — larger, tinted */}
+              {/* Chevron */}
               <svg
-                width="10" height="10" viewBox="0 0 10 10"
+                width="11" height="11" viewBox="0 0 10 10"
                 aria-hidden="true"
                 style={{
                   flexShrink:  0,
-                  marginRight: hasFilter ? 0 : 6,
+                  marginRight: hasFilter ? 0 : 8,
                   color:       controlTint,
                   transition:  'color 0.2s ease',
                 }}
@@ -436,7 +439,7 @@ function StickyLogoHeader({
                   display:                 'flex',
                   alignItems:              'center',
                   justifyContent:          'center',
-                  padding:                 '6px 10px 6px 6px',
+                  padding:                 '9px 12px 9px 6px',
                   background:              'none',
                   border:                  'none',
                   cursor:                  'pointer',
@@ -447,7 +450,7 @@ function StickyLogoHeader({
                   transition:              'color 0.2s ease',
                 }}
               >
-                <svg width="15" height="15" viewBox="0 0 14 14" fill="none"
+                <svg width="16" height="16" viewBox="0 0 14 14" fill="none"
                   aria-hidden="true" style={{ display: 'block' }}>
                   <circle cx="7" cy="7" r="7" fill="currentColor" opacity="0.15" />
                   <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
@@ -466,8 +469,8 @@ function StickyLogoHeader({
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
-              width:                   36,
-              height:                  36,
+              width:                   38,
+              height:                  38,
               background:              'rgba(0, 0, 0, 0.045)',
               border:                  'none',
               borderRadius:            'var(--radius-full)',
@@ -479,7 +482,7 @@ function StickyLogoHeader({
               flexShrink:              0,
             }}
           >
-            <Search size={16} strokeWidth={2.2} aria-hidden="true" />
+            <Search size={17} strokeWidth={2.1} aria-hidden="true" />
           </button>
         </div>
 
