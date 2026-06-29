@@ -647,7 +647,7 @@ export default function ConditionsScreen() {
         const el            = listHeaderRef.current
         if (!el) return
         const STICKY_HEIGHT = 90  // approximate sticky header height in px
-        const GAP           = 12  // breathing room between sticky header and list header
+        const GAP           = 28  // breathing room between sticky header and list header
         const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
         const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
         if (targetScroll > 0 && maxScroll >= targetScroll) {
