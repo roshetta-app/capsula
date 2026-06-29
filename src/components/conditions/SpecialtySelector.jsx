@@ -10,17 +10,26 @@
  *            tappable row into a two-line labeled field — a small
  *            'Specialty' label on top, the icon/name/chevron/clear value
  *            row below.
- * Phase 11 — Hierarchy rebalance: selected specialty name is now the
+ * Phase 11 — Hierarchy rebalance: selected specialty name made the
  *            dominant element (21px/600, dark) instead of a uniform
- *            14px/500 row, so the eye lands on the value, not the label.
- *            Icon container shrunk and flattened against the left edge
- *            (radius 13px) instead of floating with its own inset.
- *            Chevron and clear button now pick up a soft specialty tint
- *            when active (previously kept neutral grey in all states —
- *            this is an intentional reversal of that earlier rule, not
- *            an oversight). Card corners increased to 18px; vertical
- *            padding trimmed so the card stays compact despite the
- *            larger value text.
+ *            14px/500 row. Icon container shrunk and flattened against
+ *            the left edge (radius 13px) with an ambient halo. Card
+ *            corners increased to 18px; vertical padding trimmed.
+ * Phase 12 — Active-state tint pass: icon's container box and halo
+ *            removed entirely — icon now sits bare on the card. Card
+ *            background picks up a light wash of the active specialty's
+ *            token color instead of staying flat white. Specialty name
+ *            now tints to the same accent color as the icon when active
+ *            (darker than the new background tint, so it stays readable).
+ *            Card corners increased to 20px (between Phase 11's 18px and
+ *            the search bar's full pill). Name/label font sizes reduced
+ *            (21px→16px, 13px→12px) to match the surrounding screen's
+ *            font hierarchy. Vertical padding loosened now that the
+ *            removed icon box freed up room. Clear button's alignment
+ *            switched from a flex-end + manual bottom-padding hack to
+ *            true center alignment, fixing a vertical baseline mismatch
+ *            against the icon/name/chevron row. Chevron and clear button
+ *            keep their existing specialty-tint treatment, unchanged.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -51,8 +60,13 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const colors   = resolveToken(tokenKey, isDark)
   const isActive = !!activeSpecialtyObj
 
-  // Clean white surface (light) / elevated surface (dark) — no tint on the container.
-  const surfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  // Idle surface stays clean white (light) / elevated surface (dark) — no tint.
+  // Active surface picks up a very light wash of the specialty's bg tint over
+  // that same base, so the card reads as gently colored rather than pure white.
+  const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  const [bgR, bgG, bgB] = hexToRgb(colors.bg)
+  const tintAlpha = isDark ? 0.16 : 0.35
+  const surfaceBg = isActive ? `rgba(${bgR}, ${bgG}, ${bgB}, ${tintAlpha})` : idleSurfaceBg
   const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
 
   // Subtle ambient shadow to lift container off page background without a border.
@@ -65,18 +79,10 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   // tertiary text color when idle.
   const iconColor = isActive ? colors.fg : 'var(--color-text-tertiary)'
 
-  // Icon container — small, flattened against the card's left content edge
-  // (not a floating chip). The ambient halo sits as a box-shadow around
-  // this container, sized to stay contained and never reach the card edges.
-  // No halo at all when idle.
-  const iconContainerBg = isDark ? '#212835' : '#F4F3F1'
-  const [r, g, b] = hexToRgb(colors.fg)
-  const haloAlpha = isDark ? 0.20 : 0.12
-  const haloColor = `rgba(${r}, ${g}, ${b}, ${isActive ? haloAlpha : 0})`
-
   // Soft specialty tint for the chevron and clear button — a lighter touch
   // than the icon's full accent color, so these controls read as gently
   // tinted rather than fully colored. Falls back to neutral grey when idle.
+  const [r, g, b] = hexToRgb(colors.fg)
   const controlTint = isActive ? `rgba(${r}, ${g}, ${b}, 0.65)` : 'var(--color-text-tertiary)'
 
   return (
@@ -87,7 +93,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
         border:          'none',
-        borderRadius:    '18px',
+        borderRadius:    '20px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
         transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
@@ -107,7 +113,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           display:                 'flex',
           flexDirection:           'column',
           alignItems:              'stretch',
-          padding:                 '5px 6px 5px 14px',
+          padding:                 '10px 8px 10px 14px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
@@ -121,7 +127,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             larger value text below is what creates the hierarchy, not
             its own size. */}
         <span style={{
-          fontSize:     13,
+          fontSize:     12,
           fontWeight:   500,
           fontFamily:   'var(--font-body)',
           color:        'var(--color-text-tertiary)',
@@ -134,37 +140,30 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         <span style={{
           display:    'flex',
           alignItems: 'center',
-          gap:        10,
+          gap:        8,
           minWidth:   0,
         }}>
-          {/* Specialty icon — small container flush with the card's left
-              content edge, integrated rather than floating as a chip.
-              Equal top/bottom spacing inside. A contained ambient halo
-              sits around the container, never extending to the card.
-              Idle state: neutral stethoscope, no halo. */}
+          {/* Specialty icon — sits bare on the card, no container box or
+              halo. Flex span retained only for centering against the
+              name and chevron on the same row. */}
           <span style={{
             display:        'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
-            width:           28,
-            height:          28,
-            borderRadius:    '13px',
-            backgroundColor: iconContainerBg,
             color:           iconColor,
-            boxShadow:       `0 0 0 5px ${haloColor}`,
-            transition:      'color 0.2s ease, box-shadow 0.25s ease, background-color 0.2s ease',
+            transition:      'color 0.2s ease',
           }}>
             {isActive ? (
               <SpecialtyIcon
                 iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
                 iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={14}
+                size={16}
                 color={iconColor}
               />
             ) : (
               // Neutral stethoscope — communicates filter purpose without color
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke="currentColor" strokeWidth="1.75"
                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
@@ -174,20 +173,23 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             )}
           </span>
 
-          {/* Specialty name — the dominant element on this control. Large,
-              semibold, high-contrast dark text. Never tinted with the
-              specialty accent color — the icon and controls carry that. */}
+          {/* Specialty name — the dominant element on this control.
+              Semibold, and tinted with the specialty's accent color
+              (same as the icon) when active, in a darker shade than
+              the card's background tint so it stays readable. Falls
+              back to neutral primary text color when idle. */}
           <span style={{
             flex:         1,
             minWidth:     0,
             overflow:     'hidden',
             textOverflow: 'ellipsis',
             whiteSpace:   'nowrap',
-            fontSize:     21,
+            fontSize:     16,
             fontWeight:   600,
             fontFamily:   'var(--font-body)',
-            color:        'var(--color-text-primary)',
+            color:        isActive ? iconColor : 'var(--color-text-primary)',
             letterSpacing: '-0.2px',
+            transition:   'color 0.2s ease',
           }}>
             {isActive ? activeSpecialtyObj.name : 'All Specialties'}
           </span>
@@ -210,15 +212,17 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
       </button>
 
       {/* Clear (x) — slides in/out; soft specialty tint when active; no
-          divider. Bottom-aligned so it sits level with the value row,
-          not centered against the full two-line card. */}
+          divider. Centered against the card's full height, which now
+          matches the value row's vertical center since both the main
+          button and this button share the same stretched height and
+          true center alignment — no manual offset needed. */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
         tabIndex={isActive ? 0 : -1}
         style={{
           display:                 'flex',
-          alignItems:              'flex-end',
+          alignItems:              'center',
           justifyContent:          'center',
           width:                   isActive ? 44 : 0,
           opacity:                 isActive ? 1 : 0,
@@ -232,7 +236,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           outline:                 'none',
           WebkitTapHighlightColor: 'transparent',
           transition:              'width 0.18s ease, opacity 0.18s ease, color 0.2s ease',
-          padding:                 '0 0 5px 0',
+          padding:                 0,
         }}
       >
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
