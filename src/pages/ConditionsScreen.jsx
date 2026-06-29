@@ -632,23 +632,26 @@ export default function ConditionsScreen() {
     setQuery('')
   }
 
+  function snapToListHeader() {
+    if (!listHeaderRef.current) return
+    const el            = listHeaderRef.current
+    const STICKY_HEIGHT = 90
+    const GAP           = 28
+    const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
+    const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
+    // Temporarily disable CSS scroll-behavior: smooth so the jump is truly instant
+    document.documentElement.style.scrollBehavior = 'auto'
+    if (targetScroll > 0 && maxScroll >= targetScroll) {
+      window.scrollTo(0, targetScroll)
+    } else {
+      window.scrollTo(0, 0)
+    }
+    document.documentElement.style.scrollBehavior = ''
+  }
+
   function handleClearFilter() {
     setActiveSpecialty('all')
-    if (showStickyHeader && listHeaderRef.current) {
-      setTimeout(() => {
-        const el            = listHeaderRef.current
-        if (!el) return
-        const STICKY_HEIGHT = 90
-        const GAP           = 28
-        const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
-        const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
-        if (targetScroll > 0 && maxScroll >= targetScroll) {
-          window.scrollTo({ top: targetScroll, behavior: 'instant' })
-        } else {
-          window.scrollTo({ top: 0, behavior: 'instant' })
-        }
-      }, 50)
-    }
+    if (showStickyHeader) setTimeout(snapToListHeader, 50)
   }
 
   // When a specialty is chosen via the sticky header (user is scrolled down),
@@ -657,21 +660,7 @@ export default function ConditionsScreen() {
   // (filtered list is short), snap to top instead so the sticky header hides.
   function handleSelectSpecialty(id) {
     setActiveSpecialty(id)
-    if (showStickyHeader && listHeaderRef.current) {
-      setTimeout(() => {
-        const el            = listHeaderRef.current
-        if (!el) return
-        const STICKY_HEIGHT = 90  // approximate sticky header height in px
-        const GAP           = 28  // breathing room between sticky header and list header
-        const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
-        const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
-        if (targetScroll > 0 && maxScroll >= targetScroll) {
-          window.scrollTo({ top: targetScroll, behavior: 'instant' })
-        } else {
-          window.scrollTo({ top: 0, behavior: 'instant' })
-        }
-      }, 50)
-    }
+    if (showStickyHeader) setTimeout(snapToListHeader, 50)
   }
 
   // ── List rendering ───────────────────────────────────────────────────────────
