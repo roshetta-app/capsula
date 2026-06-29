@@ -164,3 +164,39 @@ export function resolveToken(tokenKey, isDark = false) {
  * All token keys in display order (curated first, fallbacks last).
  */
 export const TOKEN_KEYS = Object.keys(SPECIALTY_TOKENS)
+
+/**
+ * Parses a '#RRGGBB' token color into an [r, g, b] triple so it can be
+ * laid down as a low-opacity rgba() wash instead of a flat fill. Specialty
+ * tokens are always 6-digit hex (see SPECIALTY_TOKENS above).
+ *
+ * Shared by any component that needs the same tint treatment as
+ * SpecialtySelector's active-card background (e.g. ConditionCard's icon
+ * bubble) — centralized here so the math can't drift between them.
+ *
+ * @param {string} hex — e.g. '#E0F2FE'
+ * @returns {[number, number, number]}
+ */
+export function hexToRgb(hex) {
+  const clean = hex.replace('#', '')
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  return [r, g, b]
+}
+
+/**
+ * Builds the same soft rgba() wash used by SpecialtySelector's active card
+ * background, from a token's flat 'bg' hex. Light/dark alpha values match
+ * SpecialtySelector exactly, so any UI using this reads as the same
+ * "ambient tint" rather than the more saturated flat token color.
+ *
+ * @param {string} bgHex — a token's `bg` hex value, e.g. colors.bg
+ * @param {boolean} isDark
+ * @returns {string} an rgba() CSS color string
+ */
+export function tintedBg(bgHex, isDark = false) {
+  const [r, g, b] = hexToRgb(bgHex)
+  const alpha = isDark ? 0.16 : 0.35
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}

@@ -12,6 +12,12 @@
  * Phase 10 — cardTagline gets Info icon + secondary color to differentiate from
  *             specialty label; divider lighter (border-subtle); last card no divider;
  *             sort button in ConditionListHeader matches sticky header style.
+ * Phase 11 — icon bubble background switched from the token's flat 'bg' hex to
+ *             the same soft rgba() wash SpecialtySelector uses for its active
+ *             card tint (via tintedBg), so the bubble reads as gently tinted
+ *             rather than fully saturated. Inset border removed — the bubble
+ *             now sits bare on the tint, matching the selector's bare-icon
+ *             treatment.
  *
  * Props:
  *   condition        ConditionFull
@@ -26,7 +32,7 @@ import { useNavigate }    from 'react-router-dom'
 import { Info }           from 'lucide-react'
 import { highlightMatch } from '../utils/highlightMatch'
 import { SpecialtyIcon, useIsDark }  from '../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
+import { resolveToken, tintedBg, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 
 // ─── ConditionCard ────────────────────────────────────────────────────────────
@@ -89,18 +95,21 @@ export default function ConditionCard({
           block so it optically aligns with the condition name row on
           2-line cards and doesn't get overwhelmed on 3-line cards.
           marginTop offsets the bubble down by ~4px to visually centre
-          it against the name (the largest text element). */}
+          it against the name (the largest text element).
+          Background uses the same soft rgba() wash as SpecialtySelector's
+          active-card tint (tintedBg) instead of the token's flat bg hex,
+          and sits bare with no inset border — matching the selector's
+          bare-icon treatment. */}
       <div style={{
         width:           36,
         height:          36,
         flexShrink:      0,
         marginTop:       isMultiLine ? (showSpecialtyName ? 2 : 4) : 0,
         borderRadius:    'var(--radius-md)',
-        backgroundColor: colors.bg,
+        backgroundColor: tintedBg(colors.bg, isDark),
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
-        boxShadow:       'inset 0 0 0 1px rgba(0,0,0,0.06)',
       }}>
         <SpecialtyIcon
           iconType={iconType}
