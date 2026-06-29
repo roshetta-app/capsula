@@ -3,16 +3,24 @@
  * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  * Phase 7 — Row-list redesign: replaced the 2-column icon-bubble grid with
  *           a single-column row list (bare icon + name, no item border, no
- *           icon background — only a thin divider between rows). Selected
- *           row picks up a light wash of its own specialty color instead
- *           of a border + bg-token combo. Dialog split into a fixed header
- *           (drag handle, label, 'All conditions' row) and a separately
- *           scrollable specialty list, so 'All conditions' stays pinned
- *           while the list beneath it scrolls. 'All conditions' restyled
- *           to match the new row treatment (was a plain blue-link button).
- *           Section label reworded 'Specialty' → 'Select Specialty'. List
- *           order is unchanged — still renders specialties in whatever
- *           order the prop array arrives in (CMS-defined upstream).
+ *           icon background). Selected row picks up a light wash of its
+ *           own specialty color instead of a border + bg-token combo.
+ *           Dialog split into a fixed header (drag handle, label, 'All
+ *           conditions' row) and a separately scrollable specialty list,
+ *           so 'All conditions' stays pinned while the list beneath it
+ *           scrolls. Section label reworded 'Specialty' → 'Select
+ *           Specialty'. List order is unchanged — still renders
+ *           specialties in whatever order the prop array arrives in
+ *           (CMS-defined upstream).
+ * Phase 8 — Feedback pass on Phase 7: 'All conditions' given its own
+ *           distinct treatment (bold weight, slightly larger size, margin
+ *           below) instead of matching the specialty rows exactly, so it
+ *           reads as a standout reset action. Idle-state icons now render
+ *           in their own specialty accent color instead of flat tertiary
+ *           grey, so the list reads colorfully at rest. Row dividers
+ *           removed sheet-wide. Selected row's background tint now has
+ *           rounded corners instead of spanning edge-to-edge as a flat
+ *           rectangle.
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -115,11 +123,14 @@ export default function SpecialtiesBottomSheet({
             Select Specialty
           </div>
 
-          {/* All conditions — first row, styled like the specialty rows
-              below it (bare, no icon, tinted background when selected),
-              with the same divider closing it off from the scrollable
-              list beneath. Uses the neutral fallback token since 'all'
-              has no specialty color of its own. */}
+          {/* All conditions — first row, distinct from the specialty rows
+              below it: bolder weight always (not just when active) so it
+              reads as a standout reset action rather than just another
+              idle list item. Same tinted-background treatment when
+              selected, using the neutral fallback token since 'all' has
+              no specialty color of its own. No divider — divider style
+              removed sheet-wide; the weight/size difference plus the
+              margin below it is what separates it from the list. */}
           <button
             onClick={() => handleSelect('all')}
             style={{
@@ -128,14 +139,15 @@ export default function SpecialtiesBottomSheet({
               alignItems:              'center',
               textAlign:               'left',
               padding:                 '12px 4px',
+              marginBottom:            'var(--space-2)',
+              borderRadius:            'var(--radius-md)',
               background:              activeSpecialty === 'all'
                 ? resolveToken(FALLBACK_TOKEN, isDark).bg
                 : 'none',
               border:                  'none',
-              borderBottom:            '1px solid var(--color-border-subtle)',
-              fontSize:                15,
+              fontSize:                16,
               fontFamily:              'var(--font-body)',
-              fontWeight:              activeSpecialty === 'all' ? 600 : 400,
+              fontWeight:              700,
               color:                   activeSpecialty === 'all'
                 ? resolveToken(FALLBACK_TOKEN, isDark).fg
                 : 'var(--color-text-primary)',
@@ -150,19 +162,20 @@ export default function SpecialtiesBottomSheet({
 
         {/* Scrollable specialty list — one row per specialty, in the order
             received (CMS-defined order, unmodified by this component).
-            Bare icon + name, no icon background, no item border — only a
-            thin divider between rows (omitted after the last row). Selected
-            row picks up a light wash of its own specialty color. */}
+            Bare icon + name, no icon background, no item border, no
+            divider between rows — rows are separated by the selected
+            row's rounded color tint alone. Idle-state icons render in
+            their own specialty accent color (not flat grey) so the list
+            reads colorfully even before a selection is made. */}
         <div style={{
           flex:      1,
           overflowY: 'auto',
           padding:   '0 var(--space-4) var(--space-6)',
         }}>
-          {specialties.map((s, index) => {
-            const isActive  = activeSpecialty === s.id
-            const tokenKey  = s.colorToken ?? FALLBACK_TOKEN
-            const colors    = resolveToken(tokenKey, isDark)
-            const isLastRow = index === specialties.length - 1
+          {specialties.map(s => {
+            const isActive = activeSpecialty === s.id
+            const tokenKey = s.colorToken ?? FALLBACK_TOKEN
+            const colors   = resolveToken(tokenKey, isDark)
 
             return (
               <button
@@ -175,7 +188,7 @@ export default function SpecialtiesBottomSheet({
                   gap:                     'var(--space-3)',
                   padding:                 '12px 4px',
                   border:                  'none',
-                  borderBottom:            isLastRow ? 'none' : '1px solid var(--color-border-subtle)',
+                  borderRadius:            'var(--radius-md)',
                   backgroundColor:         isActive ? colors.bg : 'transparent',
                   fontSize:                15,
                   fontFamily:              'var(--font-body)',
@@ -191,7 +204,7 @@ export default function SpecialtiesBottomSheet({
                   iconType={s.iconType   ?? 'lucide'}
                   iconValue={s.iconValue ?? 'Stethoscope'}
                   size={18}
-                  color={isActive ? colors.fg : 'var(--color-text-tertiary)'}
+                  color={colors.fg}
                 />
                 {s.name}
               </button>
