@@ -6,9 +6,11 @@
  * - While searching: shows a result count ("N results"), left-aligned.
  *   No sort toggle during search (results are always relevance-ordered).
  * - Otherwise: shows the sort toggle right-aligned. When 'firstLetter' is
- *   provided (A–Z mode only), the letter is shown left-aligned on the same
+ *   provided (A-Z mode only), the letter is shown left-aligned on the same
  *   row — so the alphabet divider and the sort toggle share one line instead
- *   of stacking as two separate rows.
+ *   of stacking as two separate rows. When sortMode is 'recent' and no
+ *   firstLetter is provided, a clock icon + label is shown left-aligned to
+ *   indicate the list is ordered by viewing history.
  *
  * Props:
  *   totalCount       number   (currently unused — kept for caller compatibility)
@@ -18,10 +20,10 @@
  *   isSearching      boolean
  *   sortMode         string  — 'az' | 'recent'
  *   onSortToggle     function
- *   SORT_LABELS      object  — { az: 'A – Z', recent: 'Recent first' }
+ *   SORT_LABELS      object  — { az: 'A - Z', recent: 'Recent first' }
  *   firstLetter      string | undefined  — when provided, rendered left-aligned beside the sort toggle
  */
-import { ArrowUpDown } from 'lucide-react'
+import { ArrowUpDown, Clock } from 'lucide-react'
 
 export default function ConditionListHeader({
   totalCount,
@@ -41,7 +43,7 @@ export default function ConditionListHeader({
       display:        'flex',
       alignItems:     'center',
       justifyContent: 'space-between',
-      padding:        '2px 0 4px',  /* was '14px 0 4px' with a border-top divider — divider removed and top padding tightened to close the gap under the specialty pills */
+      padding:        '2px 0 4px',
       marginBottom:   0,
     }}>
       {/* Left side */}
@@ -66,8 +68,20 @@ export default function ConditionListHeader({
         >
           {firstLetter}
         </span>
+      ) : sortMode === 'recent' ? (
+        <span style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        4,
+          fontSize:   11,
+          fontWeight: 500,
+          color:      'var(--color-text-tertiary)',
+        }}>
+          <Clock size={11} strokeWidth={1.8} />
+          Recently viewed
+        </span>
       ) : (
-        <span /> /* spacer so sort toggle stays right-aligned */
+        <span /> /* spacer so sort toggle stays right-aligned in any other state */
       )}
 
       {/* Right side — sort toggle (hidden while searching) */}
