@@ -8,6 +8,9 @@
  *            increased search-bar → filter gap for clearer visual hierarchy.
  * Phase 9 — Pass activeSpecialty to ConditionCard so specialty label is
  *            suppressed when a specific specialty is active (redundant with chip).
+ * Phase 14 — StickyLogoHeader specialty pill redesign: merged single pill mirrors
+ *             SpecialtySelector pattern — ListFilter icon (idle) or specialty icon
+ *             (active) + name + chevron + inline ✕ to clear without opening sheet.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -31,7 +34,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, ArrowUpDown, Search } from 'lucide-react'
+import { ArrowUp, ArrowUpDown, Search, ListFilter } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -46,10 +49,10 @@ import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
-import { alphabetGroup }               from '../utils/alphabetGroup'
-import { SpecialtyIcon, useIsDark }    from '../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
-import { ROUTES }                       from '../router'
+import { alphabetGroup }                           from '../utils/alphabetGroup'
+import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
+import { ROUTES }                                  from '../router'
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -267,11 +270,13 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 // when the user scrolls back up and the logo re-enters the viewport.
 //
 // Layout (top to bottom):
-//   1. Logo row    — wordmark left, search icon right. No tagline; logo alone
-//                    is sufficient for brand recognition and keeps the header
-//                    compact.
-//   2. Toolbar     — 'Specialties' pill trigger + optional active-specialty
-//                    chip (left), sort toggle (right).
+//   1. Logo row    — wordmark left, search icon right.
+//   2. Toolbar     — merged specialty pill (left), sort toggle (right).
+//
+// Specialty pill (merged, mirrors SpecialtySelector pattern):
+//   Idle:   ListFilter icon + "All Specialties" + chevron
+//   Active: specialty icon + name + chevron + inline ✕ (clears without opening sheet)
+//   Tapping anywhere on the pill (except ✕) opens the specialty sheet.
 
 function StickyLogoHeader({
   visible,
@@ -290,6 +295,23 @@ function StickyLogoHeader({
   const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors    = resolveToken(tokenKey, isDark)
 
+  // Pill background: tinted wash when active, plain muted surface when idle.
+  const idlePillBg   = 'rgba(0, 0, 0, 0.045)'
+  const activePillBg = tintedBg(colors.bg, isDark)
+
+  // Icon + name color: accent fg when active, muted primary when idle.
+  const iconColor = hasFilter ? colors.fg : 'var(--color-text-primary)'
+
+  // Chevron + clear button: slightly translucent accent when active, muted when idle.
+  const [r, g, b]  = colors.fg.startsWith('rgba') ? [0, 0, 0] : (() => {
+    const hex   = colors.fg.replace('#', '')
+    const ri    = parseInt(hex.slice(0, 2), 16)
+    const gi    = parseInt(hex.slice(2, 4), 16)
+    const bi    = parseInt(hex.slice(4, 6), 16)
+    return [ri, gi, bi]
+  })()
+  const controlTint  = hasFilter ? `rgba(${r}, ${g}, ${b}, 0.65)` : 'var(--color-text-secondary)'
+
   return (
     <div
       aria-hidden="true"
@@ -300,29 +322,17 @@ function StickyLogoHeader({
         right:                  0,
         zIndex:                 50,
         backgroundColor:        'var(--color-surface)',
-        // Top stays flush with the status bar; bottom corners soften so
-        // the header reads as a floating card attached to the top of the
-        // screen rather than a rigid toolbar. Separation from scrolling
-        // content now comes from this rounding plus the shadow below —
-        // no internal divider line.
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
-        // Very soft ambient shadow — short blur, barely-there opacity.
-        // The rounded corners define the separation; the shadow is almost
-        // imperceptible, just enough to prevent the header reading as flat.
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
-        // Slide in from above when visible, slide back out when not
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:              'transform 0.25s ease',
-        // Prevent interaction when hidden
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — wordmark left, search icon right. The search icon
-            occupies the dead space on the right of the branding block and
-            taps to scroll-to and focus the main search bar below. */}
+        {/* 1. Logo row — wordmark left, search icon right. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
@@ -359,11 +369,7 @@ function StickyLogoHeader({
           </button>
         </div>
 
-        {/* 2. Toolbar — specialty trigger + active chip (left), sort (right).
-            No tagline between logo and toolbar: logo alone anchors the brand,
-            and removing it reduces height and clutter. Gap of 8px gives just
-            enough breathing room without the visual disconnect of the previous
-            larger spacing. */}
+        {/* 2. Toolbar — merged specialty pill (left), sort toggle (right). */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
@@ -372,103 +378,113 @@ function StickyLogoHeader({
           marginTop:      8,
           padding:        '0 var(--space-5) var(--space-2)',
         }}>
-          {/* Left: "Specialty Picker" + "active filter" read as one logical
-              group — "choose filter" → "current filter" — via a tighter
-              internal gap than the space separating this group from the
-              sort control on the far right (justify-content: space-between
-              already provides that larger separation). */}
+
+          {/* Left: merged specialty pill — opens sheet on tap, ✕ clears inline */}
           <div style={{
-            display:    'flex',
-            alignItems: 'center',
-            gap:        6,
-            minWidth:   0,
+            display:         'inline-flex',
+            alignItems:      'center',
+            background:      hasFilter ? activePillBg : idlePillBg,
+            borderRadius:    'var(--radius-full)',
+            overflow:        'hidden',
+            minWidth:        0,
+            flexShrink:      1,
+            transition:      'background 0.2s ease',
           }}>
+
+            {/* Main tap area: icon + name + chevron */}
             <button
               onClick={onOpenSpecialties}
-              aria-label="Browse specialties"
+              aria-label={hasFilter ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
               style={{
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     4,
-                // Subtle filled pill — shape and weight signal tappability,
-                // no border needed. Tighter padding than previous pass
-                // (2–3 dp shorter) for a more compact, native feel.
-                background:              'rgba(0, 0, 0, 0.045)',
+                gap:                     5,
+                padding:                 '4px 0 4px 8px',
+                background:              'none',
                 border:                  'none',
-                borderRadius:            'var(--radius-full)',
-                padding:                 '4px 9px 4px 7px',
-                margin:                  0,
                 cursor:                  'pointer',
-                color:                   'var(--color-text-primary)',
+                color:                   iconColor,
                 fontSize:                13,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
-                flexShrink:              0,
+                minWidth:                0,
+                transition:              'color 0.2s ease',
               }}
             >
-              Specialties
-              {/* Slightly smaller chevron than previous pass — 7px reads
-                  crisply at this label size without over-asserting. */}
-              <svg width="7" height="7" viewBox="0 0 10 10" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }}>
+              {/* Icon: specialty icon when active, ListFilter funnel when idle */}
+              <span style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                {hasFilter ? (
+                  <SpecialtyIcon
+                    iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                    iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                    size={13}
+                    color={iconColor}
+                  />
+                ) : (
+                  <ListFilter size={13} strokeWidth={2.0} aria-hidden="true" />
+                )}
+              </span>
+
+              {/* Name */}
+              <span style={{
+                overflow:      'hidden',
+                textOverflow:  'ellipsis',
+                whiteSpace:    'nowrap',
+                minWidth:      0,
+                transition:    'color 0.2s ease',
+              }}>
+                {hasFilter ? activeSpecialtyObj.name : 'All Specialties'}
+              </span>
+
+              {/* Chevron */}
+              <svg
+                width="7" height="7" viewBox="0 0 10 10"
+                aria-hidden="true"
+                style={{
+                  flexShrink: 0,
+                  marginRight: hasFilter ? 0 : 4,
+                  color:       controlTint,
+                  transition:  'color 0.2s ease',
+                }}
+              >
                 <path d="M1 3 L5 7 L9 3 Z" fill="currentColor" />
               </svg>
             </button>
 
+            {/* ✕ clear button — slides in when a specialty is active */}
             {hasFilter && (
               <button
-                onClick={onClearSpecialty}
+                onClick={e => { e.stopPropagation(); onClearSpecialty() }}
                 aria-label={`Clear ${activeSpecialtyObj.name} filter`}
                 style={{
-                  display:                 'inline-flex',
+                  display:                 'flex',
                   alignItems:              'center',
-                  gap:                     4,
-                  background:              colors.bg,
+                  justifyContent:          'center',
+                  padding:                 '4px 8px 4px 2px',
+                  background:              'none',
                   border:                  'none',
-                  borderRadius:            'var(--radius-full)',
-                  padding:                 '3px 8px 3px 6px',
                   cursor:                  'pointer',
-                  color:                   colors.fg,
-                  fontSize:                11,
-                  fontWeight:              500,
-                  fontFamily:              'var(--font-body)',
+                  color:                   controlTint,
                   outline:                 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minWidth:                0,
-                  overflow:                'hidden',
-                  // Subtle crossfade when specialty changes — color and
-                  // background transition together at 200ms so the pill
-                  // feels polished without being distracting.
-                  transition:              'background 200ms ease, color 200ms ease',
+                  flexShrink:              0,
+                  transition:              'color 0.2s ease',
                 }}
               >
-                <SpecialtyIcon
-                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                  size={11}
-                  color={colors.fg}
-                />
-                <span style={{
-                  overflow:     'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace:   'nowrap',
-                }}>
-                  {activeSpecialtyObj.name}
-                </span>
-                <svg width="9" height="9" viewBox="0 0 12 12" fill="none"
-                  stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"
-                  aria-hidden="true" style={{ flexShrink: 0 }}>
-                  <line x1="2" y1="2" x2="10" y2="10"/>
-                  <line x1="10" y1="2" x2="2"  y2="10"/>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                  aria-hidden="true" style={{ display: 'block' }}>
+                  <circle cx="7" cy="7" r="7" fill="currentColor" opacity="0.15" />
+                  <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
               </button>
             )}
           </div>
 
-          {/* Right: sort toggle — semibold, primary color, tighter icon/label
-              gap so the control reads as one unit. 44×44 tap target preserved
-              via minWidth/minHeight + negative margin trick. */}
+          {/* Right: sort toggle */}
           <button
             onClick={onSortToggle}
             aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
@@ -741,7 +757,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>  {/* was var(--space-4) — tightened gap to selector below */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
         <SearchBar
           ref={searchInputRef}
           value={query}
@@ -765,7 +781,7 @@ export default function ConditionsScreen() {
         />
       </div>
 
-      {/* 5. Count + sort row — in A–Z mode, the first letter is shown inline on the left */}
+      {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
       <ConditionListHeader
         totalCount={totalCount}
         resultCount={resultCount}
@@ -800,5 +816,3 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
-
-``
