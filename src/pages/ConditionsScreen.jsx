@@ -515,52 +515,45 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
   const colors   = resolveToken(tokenKey, isDark)
   const isActive = !!activeSpecialtyObj
 
-  // Filled muted surface — one step darker than page bg, no border.
-  // Light: warm near-white distinct from search bar's #FFFFFF surface.
-  // Dark: slightly lifted from bg #111827 so it reads without a border.
-  const surfaceBg = isDark ? '#1C2333' : '#EEECEA'
-  const pressedBg = isDark ? '#232C3E' : '#E5E2DF'
+  // Clean white surface (light) / elevated surface (dark) — no tint on the container.
+  // The badge carries all specialty color identity; the container stays neutral.
+  const surfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
 
-  // When a specialty is active, blend its accent color into the surface
-  // at very low opacity for an elegant, understated tint. Uses the token's
-  // bg value (already the lightest tint) at 60% opacity over the base surface
-  // so the result is always muted — never bold or saturated.
-  const activeSurface = isActive
-    ? (isDark ? '#1C2333' : '#EEECEA') // base — accent overlay applied via boxShadow inset below
-    : (isDark ? '#1C2333' : '#EEECEA')
+  // Badge: exact same pattern as ConditionCard's specialty icon bubble.
+  // 32×32 rounded square, colors.bg fill, inset 1px inner shadow for depth.
+  // Glow: outer box-shadow using colors.pill at low opacity + high blur —
+  // highly diffused, subtle, never distracting. Transitions smoothly on change.
+  const badgeShadow = isActive
+    ? `inset 0 0 0 1px rgba(0,0,0,0.06), 0 0 0 3px ${colors.pill}26, 0 0 12px 2px ${colors.pill}1A`
+    : 'inset 0 0 0 1px rgba(0,0,0,0.06)'
 
-  // Inset box-shadow applies the accent tint without altering bg color directly,
-  // which lets the pressed-bg transition still work cleanly.
-  // Opacity ~10% (hex 1A) — a whisper tint, not a colored bar. The icon carries
-  // the specialty identity; the surface tint is just a subtle environmental cue.
-  const accentInset = isActive
-    ? `inset 0 0 0 9999px ${colors.bg}1A`
-    : 'none'
+  // Subtle ambient shadow to lift container off page background without a border.
+  // Lighter than search bar's shadow so hierarchy is preserved.
+  const containerShadow = pressed
+    ? '0 1px 2px rgba(0,0,0,0.04)'
+    : '0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)'
 
   return (
     <div
       style={{
-        display:        'flex',
-        alignItems:     'stretch',
-        width:          '100%',
-        // No border — surface treatment alone creates the separation
+        display:         'flex',
+        alignItems:      'stretch',
+        width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
-        boxShadow:       pressed ? 'none' : accentInset,
         border:          'none',
-        // radius 8px — slightly tighter than radius-md (10px), more toolbar than card,
-        // further differentiated from search bar's radius-full
-        borderRadius:    '8px',
-        // 48dp — meets minimum tap target spec, visibly shorter than search bar (~56dp)
+        borderRadius:    '10px',
         minHeight:       48,
         overflow:        'hidden',
-        transition:      'background-color 0.15s ease, box-shadow 0.2s ease',
+        boxShadow:       containerShadow,
+        transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
       }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
     >
 
-      {/* Main tap area — full left section, opens SpecialtiesBottomSheet */}
+      {/* Main tap area */}
       <button
         onClick={onOpen}
         aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
@@ -569,7 +562,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           display:                 'flex',
           alignItems:              'center',
           gap:                     12,
-          padding:                 '0 4px 0 14px',
+          padding:                 '0 6px 0 12px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
@@ -578,38 +571,43 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {/* Bare icon — no circle or square background.
-            Active: specialty accent color. Idle: tertiary neutral. */}
-        <span style={{
-          display:    'flex',
-          alignItems: 'center',
-          flexShrink: 0,
-          transition: 'color 200ms ease',
-          color:      isActive ? colors.fg : 'var(--color-text-tertiary)',
+        {/* Specialty badge — replicates ConditionCard icon bubble exactly.
+            32×32, radius-md, colors.bg fill, inset inner shadow for depth.
+            Active: soft glow using colors.pill at very low opacity.
+            Idle: neutral slate bg, no glow. Both transition smoothly. */}
+        <div style={{
+          width:           32,
+          height:          32,
+          flexShrink:      0,
+          borderRadius:    'var(--radius-md)',
+          backgroundColor: isActive ? colors.bg : (isDark ? '#1E293B' : '#F1F5F9'),
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          boxShadow:       badgeShadow,
+          transition:      'background-color 0.2s ease, box-shadow 0.25s ease',
         }}>
           {isActive ? (
             <SpecialtyIcon
               iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
               iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-              size={15}
+              size={16}
               color={colors.fg}
             />
           ) : (
             // Neutral stethoscope — communicates filter purpose without color
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
-              stroke="var(--color-text-tertiary)" strokeWidth="2"
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke={isDark ? '#94A3B8' : '#64748B'} strokeWidth="1.75"
               strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
               <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
               <circle cx="20" cy="10" r="2"/>
             </svg>
           )}
-        </span>
+        </div>
 
-        {/* Label — medium weight, restrained color in both states.
-            The icon carries the specialty identity; the label stays calm.
-            Active: text-secondary (readable but not competing with search bar).
-            Idle: text-secondary (same — label reads as filter state, not placeholder). */}
+        {/* Label — primary text color when active, secondary when idle.
+            Medium weight. Never uses specialty accent color — badge carries identity. */}
         <span style={{
           flex:         1,
           minWidth:     0,
@@ -619,21 +617,23 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           fontSize:     14,
           fontWeight:   500,
           fontFamily:   'var(--font-body)',
-          color:        'var(--color-text-secondary)',
-          transition:   'color 200ms ease',
+          color:        isActive
+            ? 'var(--color-text-primary)'
+            : 'var(--color-text-secondary)',
+          transition:   'color 0.2s ease',
         }}>
           {isActive ? activeSpecialtyObj.name : 'All Specialties'}
         </span>
 
-        {/* Chevron — rotates when sheet is open for additional state feedback */}
+        {/* Chevron — neutral, rotates when sheet is open */}
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
           aria-hidden="true"
           style={{
             flexShrink:  0,
-            marginRight: isActive ? 0 : 8,
+            marginRight: isActive ? 0 : 6,
             color:       'var(--color-text-tertiary)',
             transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition:  'transform 0.2s ease, color 0.15s ease',
+            transition:  'transform 0.2s ease',
           }}>
           <path d="M2 4.5L6 8.5L10 4.5"
             stroke="currentColor" strokeWidth="1.6"
@@ -641,8 +641,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
         </svg>
       </button>
 
-      {/* Clear (×) — animated in/out via width+opacity; no divider.
-          marginLeft provides breathing room between chevron and clear button. */}
+      {/* Clear (×) — slides in/out; neutral color; no divider */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
@@ -651,7 +650,6 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           display:                 'flex',
           alignItems:              'center',
           justifyContent:          'center',
-          // Slide-in: width expands from 0 → 44, opacity 0 → 1
           width:                   isActive ? 44 : 0,
           opacity:                 isActive ? 1 : 0,
           flexShrink:              0,
@@ -665,7 +663,6 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
           WebkitTapHighlightColor: 'transparent',
           transition:              'width 0.18s ease, opacity 0.18s ease',
           padding:                 0,
-          marginLeft:              isActive ? 4 : 0,
         }}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
@@ -678,7 +675,7 @@ function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
       </button>
 
       {/* Right padding spacer when clear is hidden */}
-      {!isActive && <span style={{ width: 16, flexShrink: 0 }} />}
+      {!isActive && <span style={{ width: 14, flexShrink: 0 }} />}
     </div>
   )
 }
