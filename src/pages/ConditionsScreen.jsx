@@ -34,7 +34,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, ArrowUpDown, Search, ListFilter } from 'lucide-react'
+import { ArrowUp, Search, ListFilter } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -284,13 +284,9 @@ function StickyLogoHeader({
   activeSpecialtyObj,
   onClearSpecialty,
   onOpenSpecialties,
-  sortMode,
-  onSortToggle,
-  SORT_LABELS,
   onSearchTap,
 }) {
   const isDark    = useIsDark()
-  const nextMode  = sortMode === 'az' ? 'recent' : 'az'
   const hasFilter = !!activeSpecialtyObj
   const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors    = resolveToken(tokenKey, isDark)
@@ -332,12 +328,11 @@ function StickyLogoHeader({
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* 1. Logo row — wordmark left, search icon right. */}
+        {/* 1. Logo row — wordmark only; search icon moved to toolbar row below */}
         <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          padding:        '12px var(--space-5) 0',
+          display:    'flex',
+          alignItems: 'center',
+          padding:    '12px var(--space-5) 0',
         }}>
           <img
             src="/capsula/logo.svg"
@@ -345,61 +340,40 @@ function StickyLogoHeader({
             className="capsula-logo"
             style={{ display: 'block', height: 25, width: 'auto', flexShrink: 0 }}
           />
-          <button
-            onClick={onSearchTap}
-            aria-label="Go to search"
-            style={{
-              display:                 'flex',
-              alignItems:              'center',
-              justifyContent:          'center',
-              width:                   44,
-              height:                  44,
-              background:              'none',
-              border:                  'none',
-              borderRadius:            'var(--radius-full)',
-              cursor:                  'pointer',
-              color:                   'var(--color-text-secondary)',
-              padding:                 0,
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-              flexShrink:              0,
-            }}
-          >
-            <Search size={20} strokeWidth={2.2} aria-hidden="true" />
-          </button>
         </div>
 
-        {/* 2. Toolbar — merged specialty pill (left), sort toggle (right). */}
+        {/* 2. Toolbar — specialty pill (fills available space), search icon (right). */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
-          justifyContent: 'space-between',
-          gap:            'var(--space-2)',
+          gap:            8,
           marginTop:      8,
-          padding:        '0 var(--space-5) var(--space-2)',
+          padding:        '0 12px var(--space-2)',
         }}>
 
-          {/* Left: merged specialty pill — opens sheet on tap, ✕ clears inline */}
+          {/* Specialty pill — flex:1 so it fills all space left of the search icon */}
           <div style={{
             display:         'inline-flex',
             alignItems:      'center',
             background:      hasFilter ? activePillBg : idlePillBg,
             borderRadius:    'var(--radius-full)',
             overflow:        'hidden',
+            flex:            1,
             minWidth:        0,
-            flexShrink:      1,
             transition:      'background 0.2s ease',
           }}>
 
-            {/* Main tap area: icon + name + chevron */}
+            {/* Main tap area: icon + name + chevron — flex:1 so name can truncate */}
             <button
               onClick={onOpenSpecialties}
               aria-label={hasFilter ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
               style={{
                 display:                 'inline-flex',
                 alignItems:              'center',
-                gap:                     5,
-                padding:                 '4px 0 4px 8px',
+                gap:                     6,
+                flex:                    1,
+                minWidth:                0,
+                padding:                 '6px 0 6px 12px',
                 background:              'none',
                 border:                  'none',
                 cursor:                  'pointer',
@@ -409,7 +383,6 @@ function StickyLogoHeader({
                 fontFamily:              'var(--font-body)',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
-                minWidth:                0,
                 transition:              'color 0.2s ease',
               }}
             >
@@ -419,16 +392,17 @@ function StickyLogoHeader({
                   <SpecialtyIcon
                     iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
                     iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                    size={13}
+                    size={14}
                     color={iconColor}
                   />
                 ) : (
-                  <ListFilter size={13} strokeWidth={2.0} aria-hidden="true" />
+                  <ListFilter size={14} strokeWidth={2.0} aria-hidden="true" />
                 )}
               </span>
 
               {/* Name */}
               <span style={{
+                flex:          1,
                 overflow:      'hidden',
                 textOverflow:  'ellipsis',
                 whiteSpace:    'nowrap',
@@ -438,13 +412,13 @@ function StickyLogoHeader({
                 {hasFilter ? activeSpecialtyObj.name : 'All Specialties'}
               </span>
 
-              {/* Chevron */}
+              {/* Chevron — larger, tinted */}
               <svg
-                width="7" height="7" viewBox="0 0 10 10"
+                width="10" height="10" viewBox="0 0 10 10"
                 aria-hidden="true"
                 style={{
-                  flexShrink: 0,
-                  marginRight: hasFilter ? 0 : 4,
+                  flexShrink:  0,
+                  marginRight: hasFilter ? 0 : 6,
                   color:       controlTint,
                   transition:  'color 0.2s ease',
                 }}
@@ -453,7 +427,7 @@ function StickyLogoHeader({
               </svg>
             </button>
 
-            {/* ✕ clear button — slides in when a specialty is active */}
+            {/* ✕ clear button — only when active; gap between chevron and ✕ via padding-left */}
             {hasFilter && (
               <button
                 onClick={e => { e.stopPropagation(); onClearSpecialty() }}
@@ -462,7 +436,7 @@ function StickyLogoHeader({
                   display:                 'flex',
                   alignItems:              'center',
                   justifyContent:          'center',
-                  padding:                 '4px 8px 4px 2px',
+                  padding:                 '6px 10px 6px 6px',
                   background:              'none',
                   border:                  'none',
                   cursor:                  'pointer',
@@ -473,7 +447,7 @@ function StickyLogoHeader({
                   transition:              'color 0.2s ease',
                 }}
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+                <svg width="15" height="15" viewBox="0 0 14 14" fill="none"
                   aria-hidden="true" style={{ display: 'block' }}>
                   <circle cx="7" cy="7" r="7" fill="currentColor" opacity="0.15" />
                   <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
@@ -484,33 +458,28 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: sort toggle */}
+          {/* Right: search icon — taps to scroll-to and focus the main search bar */}
           <button
-            onClick={onSortToggle}
-            aria-label={`Sort: currently ${SORT_LABELS[sortMode]}. Tap to switch to ${SORT_LABELS[nextMode]}.`}
+            onClick={onSearchTap}
+            aria-label="Go to search"
             style={{
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
-              gap:                     3,
-              minWidth:                44,
-              minHeight:               44,
-              margin:                  '-12px 0',
-              background:              'none',
+              width:                   36,
+              height:                  36,
+              background:              'rgba(0, 0, 0, 0.045)',
               border:                  'none',
-              padding:                 '0 var(--space-3)',
+              borderRadius:            'var(--radius-full)',
               cursor:                  'pointer',
-              color:                   'var(--color-text-primary)',
-              fontSize:                13,
-              fontWeight:              600,
-              fontFamily:              'var(--font-body)',
+              color:                   'var(--color-text-secondary)',
+              padding:                 0,
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
             }}
           >
-            <ArrowUpDown size={13} strokeWidth={2.0} aria-hidden="true" />
-            {SORT_LABELS[nextMode]}
+            <Search size={16} strokeWidth={2.2} aria-hidden="true" />
           </button>
         </div>
 

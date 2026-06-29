@@ -35,6 +35,9 @@
  *            16px→14px, since 16px read too close to the page tagline's
  *            size. Chevron and clear button keep their existing
  *            specialty-tint treatment, unchanged.
+ * Phase 14 — Idle icon swapped from inline Stethoscope SVG to ListFilter
+ *            (lucide-react) — consistent with the sticky header pill idle state.
+ *            Stethoscope is reserved for the Internal Medicine specialty icon.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -44,6 +47,7 @@
  */
 
 import { useState }                     from 'react'
+import { ListFilter }                   from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
@@ -149,9 +153,8 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           gap:        8,
           minWidth:   0,
         }}>
-          {/* Specialty icon — sits bare on the card, no container box or
-              halo. Flex span retained only for centering against the
-              name and chevron on the same row. */}
+          {/* Icon — ListFilter when idle (consistent with sticky header pill),
+              specialty icon when active. No container box or halo. */}
           <span style={{
             display:        'flex',
             alignItems:      'center',
@@ -168,14 +171,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
                 color={iconColor}
               />
             ) : (
-              // Neutral stethoscope — communicates filter purpose without color
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="1.75"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
-                <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
-                <circle cx="20" cy="10" r="2"/>
-              </svg>
+              <ListFilter size={16} strokeWidth={1.75} aria-hidden="true" />
             )}
           </span>
 
