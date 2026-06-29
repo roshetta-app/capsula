@@ -22,7 +22,7 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
  *                        recursive, not duplicated.
  *   note               — { text_en?, text_ar? } — both languages combined into one
  *                        string and rendered via NoteCallout in flat inline row style
- *                        (no per-row flavor; always defaults to NoteCallout's "info")
+ *                        (no per-row flavor; always defaults to NoteCallout's 'info')
  *   free_text          — { content }        — rendered via FreeTextPostBlock (markdown prose)
  *
  * PHASE 7 (2026-06-21): removed support for the legacy `section_header`,
@@ -51,13 +51,13 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
  *     `drug` rows (PHASE 9). A drug row followed by a note/free_text row,
  *     or a lone drug row with no following sibling, never draws this line
  *     — it would otherwise sit on top of an unrelated element below it.
- *   - Terminal divider: dashed rule + "end of sheet" label after the last row.
+ *   - Terminal divider: dashed rule + 'end of sheet' label after the last row.
  *   - Drug name: uniform text-primary color for all entries; linked names get
  *     a dotted underline to signal tappability (not accent-blue color).
  *   - Concentration: plain lighter text directly after name (no dot separator).
  *   - Form: pill badge (distinct from concentration).
  *   - All alternatives show their own concentration + form (not first-only).
- *   - OrMarker: italic + muted color, left-aligned in badge column.
+ *   - OrMarker: italic + muted color, left-aligned with drug name column.
  *   - Search icon: per drug unit, opens Google Images for the drug in Egypt.
  *
  * Props:
@@ -173,7 +173,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
 
       {/* ── Terminal divider ─────────────────────────────────────────────────────
           Visually distinct from the thin solid hairlines between prescription items.
-          Uses a dashed pattern + subtle label to clearly mark "end of sheet" and
+          Uses a dashed pattern + subtle label to clearly mark 'end of sheet' and
           separate the content from personal notes / disclaimer below.
       ────────────────────────────────────────────────────────────────────────── */}
       <div style={{
@@ -221,7 +221,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
  * sibling before them). Uses --color-section-bg, chosen to be visually
  * distinct from the Phase 1 note card's tint so a group of drugs never
  * reads as the same kind of box as a single annotation.
- * Supersedes the prior "lightest-weight grouping, no background tint"
+ * Supersedes the prior 'lightest-weight grouping, no background tint'
  * decision — that reversal is explicit and intentional per the redesign
  * plan; do not revert toward it.
  */
@@ -267,9 +267,9 @@ function SectionHeader({ label, children }) {
  *   Form renders as a pill badge (not plain text).
  *
  * Alternatives:
- *   Every boundary between alternatives renders a single OrMarker ("or",
- *   italic + muted, left-aligned in badge column). Every alternative member
- *   shows its own concentration + form (not first-only).
+ *   Every boundary between alternatives renders a single OrMarker ('or',
+ *   italic + muted, left-aligned with the drug name column, not the badge).
+ *   Every alternative member shows its own concentration + form (not first-only).
  *
  *   buildFormulationClusters now delegates to toDrugOptions() (the same
  *   function the admin editor uses to build its groups[] state) instead of
@@ -290,7 +290,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   const groups = toDrugOptions(row)
 
   // Per-member formulation lookup (PHASE 2.9): link-gating and fallback
-  // naming used to be special-cased to "only the main member" via isMain.
+  // naming used to be special-cased to 'only the main member' via isMain.
   // Every option now looks up its own formulation_id independently, so
   // alternatives get exactly the same link/fallback-name treatment as the
   // main drug whenever they're linked to a formulation themselves.
@@ -396,9 +396,13 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  *
  * Name color: uniform `text-primary` for all entries (linked or not).
  * Linked names: dotted underline to signal tappability (not accent-blue).
- * Concentration: plain lighter text right after name, no dot separator.
+ * Concentration: plain lighter text right after name, no dot prefix.
  * Form: pill/badge styling (distinct visual weight from concentration).
  * Search icon: right-side icon that opens Google Images for the drug in Egypt.
+ *
+ * Typography scale (batch 2 fine-grained fixes):
+ *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
+ *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
  */
 function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }) {
   if (!name) return null
@@ -412,8 +416,8 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
   return (
     <>
       {/* Name line: name + concentration (plain text) + form (badge) + search icon */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -421,7 +425,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 background: 'none', border: 'none', padding: 0,
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
-                fontSize: 17, fontWeight: 700,
+                fontSize: 15, fontWeight: 700,
                 color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'underline',
@@ -434,7 +438,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </button>
           ) : (
             <span style={{
-              fontSize: 17, fontWeight: 700,
+              fontSize: 15, fontWeight: 700,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
@@ -445,7 +449,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
           {/* Concentration — plain lighter text, no dot prefix */}
           {concentration && (
             <span style={{
-              fontSize: 13, fontWeight: 400,
+              fontSize: 12, fontWeight: 400,
               color: 'var(--color-text-secondary)',
               lineHeight: 1.3,
             }}>
@@ -456,11 +460,11 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
           {/* Form — pill badge.
               Visual-weight pass: removed the filled accent-light background —
               a filled chip competed with the drug name and NumberBadge for the
-              same "accent = important" visual slot. Accent text color kept so
+              same 'accent = important' visual slot. Accent text color kept so
               the form is still legible as a distinct tag, just no longer filled. */}
           {form && (
             <span style={{
-              fontSize: 11, fontWeight: 600,
+              fontSize: 10, fontWeight: 600,
               color: 'var(--color-accent)',
               background: 'transparent',
               borderRadius: 20,
@@ -468,7 +472,6 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
               lineHeight: 1.5,
               letterSpacing: '0.01em',
               flexShrink: 0,
-              alignSelf: 'center',
             }}>
               {form}
             </span>
@@ -500,20 +503,21 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
  * --color-dose, and size dropped from 15px to 14px. Previously the dose
  * line was nearly indistinguishable from the drug name at a glance
  * (15px/600 black vs. 17px/700 black) — the color/size shift now makes it
- * scannable as "this is the dose" on its own.
+ * scannable as 'this is the dose' on its own.
  * --color-dose was initially set to a teal (reused from .dir-card-dose)
  * but that read as a status/success color, out of place in a plain
  * drug-row context. Replaced with a cool slate/ink tone — distinct in
  * shade from text-primary without carrying any semantic (success/warning)
  * connotation.
- * Size hierarchy: dose (14px) < main name (17px).
+ * Batch 2 fine-grained fixes: marginTop 4→8px, added paddingLeft 4px indent,
+ * size 14→13px, weight 700→600 — visually lighter/offset from drug name.
  */
 function DoseLine({ text }) {
   return (
-    <div dir="auto" style={{ marginTop: 4, unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: 8, paddingLeft: 4, unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 14,
-        fontWeight: 700,
+        fontSize: 13,
+        fontWeight: 600,
         color: 'var(--color-dose)',
         lineHeight: 1.5,
       }}>
@@ -530,21 +534,21 @@ function DoseLine({ text }) {
  * treatment (background, border, padding-as-chrome). A boxed note with an
  * icon was visually competing with — and often beating — the dose line for
  * attention, which inverted the intended reading order (name > dose >
- * alternatives > note). The note is now plain text in the same "supporting
- * detail" tier below the drug name: smaller,
+ * alternatives > note). The note is now plain text in the same 'supporting
+ * detail' tier below the drug name: smaller,
  * lighter weight, secondary color, no card. The icon is kept (small, muted)
- * since it's still useful as an at-a-glance "this has a note" marker, but
+ * since it's still useful as an at-a-glance 'this has a note' marker, but
  * it no longer sits inside its own boxed UI element.
  *
  * Direction is resolved explicitly (rather than left to the browser's
  * dir="auto" heuristic) so the icon's flex order reliably flips for
  * Arabic-leading text:
- *   Arabic text  → row direction rtl → icon renders on the RIGHT
- *   English text → row direction ltr → icon renders on the LEFT
+ *   Arabic text  -> row direction rtl -> icon renders on the RIGHT
+ *   English text -> row direction ltr -> icon renders on the LEFT
  *
  * Text: var(--color-text-secondary), 13px/500, italic — deliberately
- * subordinate to both the drug name (17px/700) and the dose line
- * (14px/700, --color-dose), so it reads as an aside, not primary content.
+ * subordinate to both the drug name (15px/700) and the dose line
+ * (13px/600, --color-dose), so it reads as an aside, not primary content.
  * Does not use NoteCallout (which has a fixed LTR icon position and the
  * heavier boxed-card treatment appropriate for standalone note rows, not
  * per-drug annotations).
@@ -631,11 +635,15 @@ function NumberBadge({ index }) {
 }
 
 /**
- * OrMarker — perfect circle, sitting in the content column, aligned
- * flush-left with the drug names above and below it. No negative margin —
- * it is a natural block element in the flex content column.
+ * OrMarker — sits in the content column, left-aligned with drug names
+ * above and below it (not under the NumberBadge column).
  *
- * Shape: equal width/height (fixed 22px), single "or" character, so the
+ * Batch 2 fix: removed the outer padding wrapper that caused the marker
+ * to render as a block-level element pushing into its own vertical space
+ * misaligned from the drug names. Now renders inline in the content flow
+ * so 'or' aligns left with the name text, not with the badge.
+ *
+ * Shape: equal width/height (fixed 22px), single 'or' character, so the
  * badge always renders as a true circle (not a pill).
  * Color: warm/neutral amber tint (--color-warning-light bg, --color-warning
  * text) — distinct from both plain grey and the blue accent used elsewhere

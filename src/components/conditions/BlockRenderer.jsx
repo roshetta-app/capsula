@@ -11,11 +11,12 @@ import NoteCallout from '../ui/NoteCallout'
  * (shape per `mapConditions()` in queries.js, Phase 2.1).
  *
  * Supported block types (Phase 2.13 build scope):
- *   image_gallery      → ImageGalleryBlock (2.4) — thin wrapper, no card chrome
- *   free_text_post     → FreeTextPostBlock (2.5) — markdown + RTL, flush to surface
- *   prescription_sheet → PrescriptionSheetBlock (2.7) — flush to surface
+ *   image_gallery      -> ImageGalleryBlock (2.4) — thin wrapper, no card chrome
+ *   free_text_post     -> FreeTextPostBlock (2.5) — markdown + RTL, flush to surface
+ *   prescription_sheet -> PrescriptionSheetBlock (2.7) — flush to surface
  *                         (data = { label, rows: [...] })
- *   note_callout       → NoteCallout (2.6) — flat inline row, no extra wrap
+ *   note_callout       -> NoteCallout (2.6) — standalone divider block,
+ *                         variant='divider': icon above text, lighter bg
  *
  * Unrecognized block types render `null` + dev-only console warning (per 2.13).
  *
@@ -36,7 +37,7 @@ export default function BlockRenderer({ block }) {
       return <PrescriptionSheetBlock sheet={data} />
 
     case 'note_callout':
-      return <NoteCallout text={data?.text} flavor={data?.flavor} />
+      return <NoteCallout text={data?.text} flavor={data?.flavor} variant="divider" />
 
     default:
       if (process.env.NODE_ENV !== 'production') {

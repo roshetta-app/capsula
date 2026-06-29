@@ -114,7 +114,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         letterSpacing: '0.08em',
         textTransform: 'uppercase',
         color: 'var(--color-text-tertiary)',
-        marginBottom: 6,
+        marginBottom: 4,
         fontFamily: 'var(--font-body)',
       }}>
         Treatment options
@@ -128,7 +128,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '11px 14px',
+          padding: '9px 14px',
           borderTop:    `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
           borderLeft:   `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
           borderRight:  `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
@@ -147,7 +147,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <ActiveDot />
           <span style={{
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 600,
             color: 'var(--color-text-primary)',
             fontFamily: 'var(--font-body)',

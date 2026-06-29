@@ -3,56 +3,27 @@
  *
  * Used in two contexts:
  *   1. Standalone `note_callout` block — rendered by BlockRenderer
- *   2. `row_type: "note"` row inside a `prescription_sheet` block
+ *      → uses variant='divider': icon on its own row above the text, lighter bg
+ *   2. Inline note row inside a PrescriptionSheetBlock sheet
+ *      → uses variant='inline' (default): icon + text side-by-side, current behavior
  *
- * Both contexts use this SAME component with the SAME flavor scheme.
- *
- * Redesigned (Phase 1, prescription redesign plan): tinted background card
- * with rounded corners, clearly distinguished from plain drug rows.
- * Supersedes the prior "Phase 2, Step 2.3" flat inline row design — that
- * decision has been explicitly reversed per the project's redesign plan.
- * Do not revert toward the flat/borderless style based on old phase comments.
- *
- * Visual behaviour after this phase:
- *   - Soft tinted background using --color-note-bg (light + dark mode tokens)
- *   - Rounded corners via var(--radius-md)
- *   - Padding on all four sides — no hairline border-bottom between notes
- *   - isLast prop is accepted for caller compatibility but no longer drives
- *     any visual output (the hairline-between-rows pattern is gone)
- *
- * PHASE 8 (2026-06-22) — note legibility + RTL icon placement:
- *   - Text color changed from --color-text-secondary (grey) to
- *     --color-text-primary (black), and weight/size bumped from 13px/450
- *     to 14px/600, so notes read as primary content rather than muted
- *     metadata.
- *   - Icon placement is now language-aware: Arabic-leading text renders
- *     the icon on the RIGHT (row direction flips to rtl); English-leading
- *     text keeps the icon on the LEFT. Previously the icon was always on
- *     the left regardless of text direction.
- *
- * Unchanged from prior design:
- *   - Three SVG icons (IconInfo / IconWarning / IconTip) and FLAVORS map
- *   - flavor prop: "info" | "warning" | "tip", default "info"
- *   - All RTL/bidi handling (dir="auto", unicodeBidi: 'plaintext') for
- *     per-paragraph markdown content
- *   - ReactMarkdown rendering and component overrides
+ * Props:
+ *   text     string  — markdown-capable note text (required; renders nothing if empty)
+ *   flavor   string  — 'info' | 'warning' | 'tip', default 'info'
+ *   variant  string  — 'inline' (default) | 'divider'
+ *   isLast   bool    — accepted but unused; kept so callers don't need updating
  *
  * Icon legend:
  *   - info:    ECG / pulse line (clinical feel)
  *   - tip:     medical cross badge (first-aid / clinical)
  *   - warning: triangle (universally understood, unchanged)
- *
- * Props:
- *   text    string  — markdown-capable note text (required; renders nothing if empty)
- *   flavor  string  — "info" | "warning" | "tip", default "info"
- *   isLast  bool    — accepted but unused; kept so callers don't need updating
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
 
 // ─── SVG icon components per flavor ──────────────────────────────────────────
 
-/** Medical cross — replaces the generic lightbulb for "tip" */
+/** Medical cross — replaces the generic lightbulb for 'tip' */
 function IconTip({ color }) {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -67,7 +38,7 @@ function IconTip({ color }) {
   )
 }
 
-/** ECG / pulse line — replaces the generic circle-i for "info" */
+/** ECG / pulse line — replaces the generic circle-i for 'info' */
 function IconInfo({ color }) {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"
@@ -114,7 +85,7 @@ const FLAVORS = {
 // Arabic-leading text so the icon side can follow text direction.
 const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
 
-export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
+export default function NoteCallout({ text, flavor = 'info', variant = 'inline', isLast = false }) {
   if (!text || !text.trim()) return null
 
   const f = FLAVORS[flavor] ?? FLAVORS.info
@@ -168,6 +139,44 @@ export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
     em: ({ children }) => <em>{children}</em>,
   }
 
+  const textContent = (
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        fontSize: 14,
+        fontWeight: 600,
+        fontStyle: 'normal',
+        color: 'var(--color-text-primary)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <ReactMarkdown remarkPlugins={[remarkBreaks]} components={components}>
+        {text}
+      </ReactMarkdown>
+    </div>
+  )
+
+  // ── variant='divider': icon on its own row above text, lighter bg ─────────
+  if (variant === 'divider') {
+    return (
+      <div style={{
+        background: 'var(--color-surface-muted)',
+        borderRadius: 'var(--radius-md)',
+        padding: '10px 12px',
+      }}>
+        {/* Icon row — sits above the text block */}
+        <div style={{ marginBottom: 6 }}>
+          <Icon color={f.colorLight} />
+        </div>
+        {textContent}
+      </div>
+    )
+  }
+
+  // ── variant='inline' (default): icon + text side-by-side ─────────────────
   return (
     <div style={{
       background: 'var(--color-note-bg)',
@@ -189,23 +198,7 @@ export default function NoteCallout({ text, flavor = 'info', isLast = false }) {
         {/* Note text — block container, each paragraph resolves its own bidi.
             Color bumped to text-primary (black) and weight/size increased
             for legibility — was text-secondary (grey) at 13px/450. */}
-        <div
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 14,
-            fontWeight: 600,
-            fontStyle: 'normal',
-            color: 'var(--color-text-primary)',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
-          }}
-        >
-          <ReactMarkdown remarkPlugins={[remarkBreaks]} components={components}>
-            {text}
-          </ReactMarkdown>
-        </div>
+        {textContent}
       </div>
     </div>
   )

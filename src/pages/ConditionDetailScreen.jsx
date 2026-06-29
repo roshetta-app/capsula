@@ -1,3 +1,4 @@
+```jsx
 import { useState, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
@@ -227,7 +228,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       backgroundColor: 'var(--color-surface)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '10px var(--space-6) 0' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--space-6) 0' }}>
 
         {/* Top row: back + actions */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: condition ? 6 : 'var(--space-2)' }}>
@@ -317,7 +318,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
             )}
 
             <h1 style={{
-              fontSize: 21,
+              fontSize: 19,
               fontWeight: 700,
               color: 'var(--color-text-primary)',
               margin: '0 0 6px 0',
@@ -350,7 +351,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     alignItems: 'center',
                     gap: 6,
                     paddingTop: 8,
-                    paddingBottom: 10,
+                    paddingBottom: 8,
                     paddingLeft: 'var(--space-2)',
                     paddingRight: 'var(--space-2)',
                     width: '100%',
@@ -366,7 +367,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 >
                   {renderIcon(color)}
                   <span style={{
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: isActive ? 600 : 400,
                     color,
                   }}>

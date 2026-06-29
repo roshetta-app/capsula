@@ -3,16 +3,12 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 /**
  * PersonalNotes — personal note for a condition (Phase 3.1).
  *
- * Design changes:
- *   - Removed card-within-card look (muted background + shadow wrapper).
- *     Now uses a simple top hairline to separate from the prescription content,
- *     matching the ambient/flat rhythm of the rest of the Rx tab.
- *   - Label uses a small left-accent bar (3px colored rule) for visual anchoring
- *     instead of an uppercase micro-label, giving it a more editorial feel.
- *   - Textarea is completely borderless by default — only the bottom rule shows.
- *     On focus a subtle left accent border appears (no box-shadow, no full border).
- *   - "Saved" indicator moves inline next to the label (right side), not below textarea.
- *   - Placeholder softened so the area reads as ambient/inviting rather than form-like.
+ * Batch 2 visual fixes:
+ *   - Label: removed left accent bar, switched to all-caps tertiary micro-label
+ *     pattern ('MY NOTES') matching PrescriptionPills' 'TREATMENT OPTIONS' convention.
+ *   - Textarea: removed borderless/bottom-rule-only treatment; now has a visible
+ *     light card box (border + background) consistent with the app's other
+ *     input-like surfaces. Autosave 'Saved' indicator remains inline next to label.
  *
  * Props:
  *   conditionId  string
@@ -62,27 +58,19 @@ export default function PersonalNotes({ conditionId }) {
       borderTop: '0.5px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row */}
+      {/* Label row — all-caps tertiary micro-label, no accent bar */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
         marginBottom: 8,
       }}>
-        {/* Left accent bar */}
-        <div style={{
-          width: 3,
-          height: 14,
-          borderRadius: 2,
-          backgroundColor: 'var(--color-accent)',
-          opacity: 0.5,
-          flexShrink: 0,
-        }} />
         <span style={{
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: 600,
-          color: 'var(--color-text-secondary)',
-          letterSpacing: '0.01em',
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: 'var(--color-text-tertiary)',
+          fontFamily: 'var(--font-body)',
         }}>
           My notes
         </span>
@@ -100,7 +88,7 @@ export default function PersonalNotes({ conditionId }) {
         </span>
       </div>
 
-      {/* Ambient textarea — borderless, bottom-rule only */}
+      {/* Card-style textarea — visible border + surface background */}
       <textarea
         value={value}
         onChange={handleChange}
@@ -111,16 +99,15 @@ export default function PersonalNotes({ conditionId }) {
           boxSizing: 'border-box',
           fontSize: 14,
           color: 'var(--color-text-primary)',
-          backgroundColor: 'transparent',
-          border: 'none',
-          borderBottom: '1px solid var(--color-border-subtle)',
-          borderRadius: 0,
-          padding: '4px 0 8px',
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: '8px 10px',
           fontFamily: 'var(--font-body)',
           lineHeight: 1.65,
           resize: 'none',
           outline: 'none',
-          minHeight: 64,
+          minHeight: 72,
           display: 'block',
           transition: 'border-color 0.15s ease',
         }}
@@ -128,7 +115,7 @@ export default function PersonalNotes({ conditionId }) {
           e.target.style.borderColor = 'var(--color-accent)'
         }}
         onBlur={e => {
-          e.target.style.borderColor = 'var(--color-border-subtle)'
+          e.target.style.borderColor = 'var(--color-border)'
         }}
       />
     </div>
