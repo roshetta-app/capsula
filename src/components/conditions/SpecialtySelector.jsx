@@ -245,7 +245,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
       >
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none"
           aria-hidden="true" style={{ display: 'block', flexShrink: 0 }}>
-          <circle cx="11" cy="11" r="11" fill="var(--color-border)" opacity="0.5" />
+          <circle cx="11" cy="11" r="11" fill="currentColor" opacity="0.15" />
           <path d="M7.5 7.5L14.5 14.5M14.5 7.5L7.5 14.5"
             stroke="currentColor"
             strokeWidth="1.6" strokeLinecap="round" />

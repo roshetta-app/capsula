@@ -461,7 +461,7 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: search icon — taps to scroll-to and focus the main search bar */}
+          {/* Right: search icon — blue accent icon on light blue bg */}
           <button
             onClick={onSearchTap}
             aria-label="Go to search"
@@ -471,11 +471,11 @@ function StickyLogoHeader({
               justifyContent:          'center',
               width:                   38,
               height:                  38,
-              background:              'rgba(0, 0, 0, 0.045)',
+              background:              'color-mix(in srgb, var(--color-accent) 12%, transparent)',
               border:                  'none',
               borderRadius:            'var(--radius-full)',
               cursor:                  'pointer',
-              color:                   'var(--color-text-secondary)',
+              color:                   'var(--color-accent)',
               padding:                 0,
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
