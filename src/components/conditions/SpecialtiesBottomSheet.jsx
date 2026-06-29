@@ -8,7 +8,7 @@
  *           Dialog split into a fixed header (drag handle, label, 'All
  *           conditions' row) and a separately scrollable specialty list,
  *           so 'All conditions' stays pinned while the list beneath it
- *           scrolls. Section label reworded 'Specialty' → 'Select
+ *           scrolls. Section label reworded 'Specialty' -> 'Select
  *           Specialty'. List order is unchanged — still renders
  *           specialties in whatever order the prop array arrives in
  *           (CMS-defined upstream).
@@ -21,6 +21,9 @@
  *           removed sheet-wide. Selected row's background tint now has
  *           rounded corners instead of spanning edge-to-edge as a flat
  *           rectangle.
+ * Phase 9 — Open/close animation: sheet slides up from bottom (translateY)
+ *           and backdrop fades in/out. Uses shouldRender + animateIn state
+ *           to delay unmount until the exit transition completes (~250 ms).
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -33,7 +36,7 @@
  *   isOpen           boolean
  */
 
-import { useEffect }                    from 'react'
+import { useEffect, useState }          from 'react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
@@ -47,6 +50,25 @@ export default function SpecialtiesBottomSheet({
 }) {
   const isDark = useIsDark()
 
+  // shouldRender keeps the DOM present during the exit transition.
+  // animateIn drives the CSS open/closed visual position.
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      // Mount first, then flip animateIn on the next frame so the
+      // browser has painted the start-position before transitioning.
+      setShouldRender(true)
+      requestAnimationFrame(() => setAnimateIn(true))
+    } else {
+      // Start exit transition immediately; unmount after it finishes.
+      setAnimateIn(false)
+      const t = setTimeout(() => setShouldRender(false), 250)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen])
+
   useEffect(() => {
     if (!isOpen) return
     const handler = (e) => { if (e.key === 'Escape') onClose() }
@@ -59,7 +81,7 @@ export default function SpecialtiesBottomSheet({
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   function handleSelect(id) {
     onSelect(id)
@@ -76,6 +98,8 @@ export default function SpecialtiesBottomSheet({
           inset:           0,
           zIndex:          200,
           backgroundColor: 'rgba(0,0,0,0.35)',
+          opacity:         animateIn ? 1 : 0,
+          transition:      'opacity 0.25s ease',
         }}
       />
       <div
@@ -94,6 +118,8 @@ export default function SpecialtiesBottomSheet({
           flexDirection:   'column',
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
+          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
+          transition:      'transform 0.25s ease',
         }}
       >
         {/* Fixed header — drag handle, label, and the 'All conditions' row.
