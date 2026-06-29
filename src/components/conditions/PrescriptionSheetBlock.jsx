@@ -453,12 +453,16 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </span>
           )}
 
-          {/* Form — pill badge */}
+          {/* Form — pill badge.
+              Visual-weight pass: removed the filled accent-light background —
+              a filled chip competed with the drug name and NumberBadge for the
+              same "accent = important" visual slot. Accent text color kept so
+              the form is still legible as a distinct tag, just no longer filled. */}
           {form && (
             <span style={{
               fontSize: 11, fontWeight: 600,
               color: 'var(--color-accent)',
-              background: 'var(--color-accent-light)',
+              background: 'transparent',
               borderRadius: 20,
               padding: '1px 8px',
               lineHeight: 1.5,
@@ -567,7 +571,10 @@ function RowNote({ note }) {
       <span style={{
         flexShrink: 0,
         marginTop: 2,
-        color: 'var(--color-text-tertiary)',
+        // text-secondary (was text-tertiary) — icon was undershooting the
+        // note text's own color weight, reading fainter than the label
+        // it's marking.
+        color: 'var(--color-text-secondary)',
         display: 'flex',
         alignItems: 'center',
       }}>
@@ -595,6 +602,10 @@ function RowNote({ note }) {
 /**
  * NumberBadge — clean outlined square with rounded corners.
  * marginTop: 1 keeps the badge optically aligned with the cap-height of the drug name.
+ * Visual-weight pass: dropped the solid border + filled accent background.
+ * A badge this prominent competed with the drug name for the dominant-element
+ * slot in the row. Now a transparent-fill outline at 70% opacity — reads as a
+ * quiet positional reference, not an interactive/call-to-action element.
  */
 function NumberBadge({ index }) {
   return (
@@ -603,7 +614,7 @@ function NumberBadge({ index }) {
       height: 22,
       borderRadius: 6,
       border: '1.5px solid var(--color-accent)',
-      backgroundColor: 'var(--color-accent-light)',
+      backgroundColor: 'transparent',
       color: 'var(--color-accent)',
       fontSize: 11,
       fontWeight: 700,
@@ -612,6 +623,7 @@ function NumberBadge({ index }) {
       justifyContent: 'center',
       flexShrink: 0,
       marginTop: 1,
+      opacity: 0.7,
     }}>
       {index}
     </div>
@@ -660,4 +672,3 @@ const rowWrap = {
   gap: 'var(--space-3)',
   padding: '11px 0',
 }
-

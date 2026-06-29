@@ -306,7 +306,9 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   fontSize: 11,
                   fontWeight: 500,
                   letterSpacing: '0.03em',
-                  color: 'var(--color-text-tertiary)',
+                  // Specialty label is a signal, not decoration — text-secondary
+                  // (was text-tertiary) per Condition Detail visual-weight pass.
+                  color: 'var(--color-text-secondary)',
                   lineHeight: 1,
                 }}>
                   {condition.specialtyName}
@@ -331,7 +333,10 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
         <div style={{ display: 'flex' }}>
           {TABS.map(({ label, renderIcon }, i) => {
             const isActive = activeTab === i
-            const color = isActive ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
+            // Inactive tab contrast — text-secondary (was text-tertiary), matching
+            // the BottomNav Phase 15 fix: inactive tabs must stay clearly readable
+            // without competing with the active accent tab.
+            const color = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
             return (
               <div
                 key={label}
