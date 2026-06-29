@@ -732,7 +732,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-2)' }}>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
         <SearchBar
           ref={searchInputRef}
           value={query}
@@ -747,7 +747,7 @@ export default function ConditionsScreen() {
       />
 
       {/* 4. Full-width specialty selector — same width as search bar */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>
+      <div style={{ marginBottom: 'var(--space-4)' }}>
         <SpecialtySelector
           activeSpecialtyObj={activeSpecialtyObj}
           onOpen={() => setBottomSheetOpen(true)}

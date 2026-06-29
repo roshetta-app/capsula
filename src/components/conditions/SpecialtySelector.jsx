@@ -1,13 +1,20 @@
 /**
  * src/components/conditions/SpecialtySelector.jsx
  * Extracted from src/pages/ConditionsScreen.jsx — previously defined inline.
- * Phase 8 — SpecialtySelector toolbar redesign: filled muted surface, no border,
+ * Phase 8  — SpecialtySelector toolbar redesign: filled muted surface, no border,
  *            radius-md, chevron rotation, animated clear button.
- * Phase 9 — Icon identity fix: the 32x32 colored-square badge (a holdover
- *            from ConditionCard's bubble pattern) is replaced with a bare
- *            icon and a diffused, low-opacity ambient color halo behind it.
- *            No square, circle, or colored container around the icon —
- *            the icon itself and the halo are the only color cues.
+ * Phase 9  — Icon identity fix: replaced the 32x32 colored-square badge
+ *            (a holdover from ConditionCard's bubble pattern) with a bare
+ *            icon and an ambient color halo.
+ * Phase 10 — Floating-label field redesign: restructured from a single
+ *            tappable row into a two-line labeled field — a small
+ *            'Specialty' label on top, the icon/name/chevron/clear value
+ *            row below — so the control reads as its own field rather
+ *            than a second search bar. Icon now sits in a small, softly
+ *            rounded neutral container with the ambient halo around that
+ *            container (contained glow, never touching the card edges).
+ *            Name is always the primary text color; only the icon and
+ *            its halo carry the specialty accent color.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -49,14 +56,16 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
     : '0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04)'
 
   // Icon color — accent token color when a specialty is active, neutral
-  // tertiary text color when idle. No badge background of any kind.
+  // tertiary text color when idle.
   const iconColor = isActive ? colors.fg : 'var(--color-text-tertiary)'
 
-  // Ambient halo — a diffused, low-opacity spread shadow behind the bare
-  // icon, sized to read as a soft glow rather than a visible shape edge.
-  // No halo at all when idle, since 'All Specialties' has no accent color.
+  // Icon container — a small, softly rounded neutral fill (not the old
+  // 32x32 condition-card badge). The ambient halo sits as a box-shadow
+  // around this container, sized to stay contained and never reach the
+  // edges of the card. No halo at all when idle.
+  const iconContainerBg = isDark ? '#212835' : '#F4F3F1'
   const [r, g, b] = hexToRgb(colors.fg)
-  const haloAlpha = isDark ? 0.22 : 0.13
+  const haloAlpha = isDark ? 0.20 : 0.12
   const haloColor = `rgba(${r}, ${g}, ${b}, ${isActive ? haloAlpha : 0})`
 
   return (
@@ -68,7 +77,6 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         backgroundColor: pressed ? pressedBg : surfaceBg,
         border:          'none',
         borderRadius:    '10px',
-        minHeight:       48,
         overflow:        'hidden',
         boxShadow:       containerShadow,
         transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
@@ -78,102 +86,123 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
       onPointerLeave={() => setPressed(false)}
     >
 
-      {/* Main tap area */}
+      {/* Main tap area — label on top, value row below, both left-aligned.
+          One cohesive field rather than a single tappable line. */}
       <button
         onClick={onOpen}
         aria-label={isActive ? `Specialty: ${activeSpecialtyObj.name}. Tap to change.` : 'Browse specialties'}
         style={{
           flex:                    1,
           display:                 'flex',
-          alignItems:              'center',
-          gap:                     12,
-          padding:                 '0 6px 0 12px',
+          flexDirection:           'column',
+          alignItems:              'stretch',
+          padding:                 '8px 6px 9px 12px',
           background:              'none',
           border:                  'none',
           cursor:                  'pointer',
           minWidth:                0,
           outline:                 'none',
+          textAlign:               'left',
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {/* Specialty icon — bare, no badge. A diffused ambient color halo
-            sits behind it instead of a colored square or circle. Idle
-            state shows a neutral stethoscope with no halo. */}
+        {/* Floating label — always visible, small, neutral grey */}
         <span style={{
-          display:        'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          flexShrink:      0,
-          width:           16,
-          height:          16,
-          borderRadius:    '50%',
-          color:           iconColor,
-          boxShadow:       `0 0 0 10px ${haloColor}`,
-          transition:      'color 0.2s ease, box-shadow 0.25s ease',
-        }}>
-          {isActive ? (
-            <SpecialtyIcon
-              iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-              iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-              size={16}
-              color={iconColor}
-            />
-          ) : (
-            // Neutral stethoscope — communicates filter purpose without color
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="1.75"
-              strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
-              <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
-              <circle cx="20" cy="10" r="2"/>
-            </svg>
-          )}
-        </span>
-
-        {/* Label — primary text color when active, secondary when idle.
-            Medium weight. Never uses specialty accent color — the icon
-            and its halo carry that identity. */}
-        <span style={{
-          flex:         1,
-          minWidth:     0,
-          overflow:     'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace:   'nowrap',
-          fontSize:     14,
+          fontSize:     11.5,
           fontWeight:   500,
           fontFamily:   'var(--font-body)',
-          color:        isActive
-            ? 'var(--color-text-primary)'
-            : 'var(--color-text-secondary)',
-          transition:   'color 0.2s ease',
+          color:        'var(--color-text-tertiary)',
+          marginBottom: 5,
         }}>
-          {isActive ? activeSpecialtyObj.name : 'All Specialties'}
+          Specialty
         </span>
 
-        {/* Chevron — neutral, rotates when sheet is open */}
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
-          aria-hidden="true"
-          style={{
-            flexShrink:  0,
-            marginRight: isActive ? 0 : 6,
-            color:       'var(--color-text-tertiary)',
-            transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition:  'transform 0.2s ease',
+        {/* Value row — icon, name, chevron. Vertically centered, left aligned. */}
+        <span style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        10,
+          minWidth:   0,
+        }}>
+          {/* Specialty icon — small, softly rounded neutral container.
+              A contained ambient halo sits around the container itself,
+              never extending to the card. Idle state: neutral stethoscope,
+              no halo. */}
+          <span style={{
+            display:        'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            flexShrink:      0,
+            width:           26,
+            height:          26,
+            borderRadius:    '9px',
+            backgroundColor: iconContainerBg,
+            color:           iconColor,
+            boxShadow:       `0 0 0 6px ${haloColor}`,
+            transition:      'color 0.2s ease, box-shadow 0.25s ease, background-color 0.2s ease',
           }}>
-          <path d="M2 4.5L6 8.5L10 4.5"
-            stroke="currentColor" strokeWidth="1.6"
-            strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+            {isActive ? (
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={14}
+                color={iconColor}
+              />
+            ) : (
+              // Neutral stethoscope — communicates filter purpose without color
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.75"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6 6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+                <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
+                <circle cx="20" cy="10" r="2"/>
+              </svg>
+            )}
+          </span>
+
+          {/* Specialty name — always the primary text color. Never tinted
+              with the specialty accent color; the icon carries that identity. */}
+          <span style={{
+            flex:         1,
+            minWidth:     0,
+            overflow:     'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace:   'nowrap',
+            fontSize:     15,
+            fontWeight:   500,
+            fontFamily:   'var(--font-body)',
+            color:        'var(--color-text-primary)',
+          }}>
+            {isActive ? activeSpecialtyObj.name : 'All Specialties'}
+          </span>
+
+          {/* Chevron — neutral, rotates when sheet is open */}
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"
+            aria-hidden="true"
+            style={{
+              flexShrink:  0,
+              marginRight: isActive ? 0 : 6,
+              color:       'var(--color-text-tertiary)',
+              transform:   isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition:  'transform 0.2s ease',
+            }}>
+            <path d="M2 4.5L6 8.5L10 4.5"
+              stroke="currentColor" strokeWidth="1.6"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </button>
 
-      {/* Clear (x) — slides in/out; neutral color; no divider */}
+      {/* Clear (x) — slides in/out; neutral color; no divider. Bottom-aligned
+          so it sits level with the value row, not centered against the
+          full two-line card (which would visually float it too high). */}
       <button
         onClick={e => { e.stopPropagation(); onClear() }}
         aria-label={isActive ? `Clear ${activeSpecialtyObj.name} filter` : undefined}
         tabIndex={isActive ? 0 : -1}
         style={{
           display:                 'flex',
-          alignItems:              'center',
+          alignItems:              'flex-end',
           justifyContent:          'center',
           width:                   isActive ? 44 : 0,
           opacity:                 isActive ? 1 : 0,
@@ -187,7 +216,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           outline:                 'none',
           WebkitTapHighlightColor: 'transparent',
           transition:              'width 0.18s ease, opacity 0.18s ease',
-          padding:                 0,
+          padding:                 '0 0 9px 0',
         }}
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
