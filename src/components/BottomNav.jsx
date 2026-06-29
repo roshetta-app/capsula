@@ -109,8 +109,8 @@ export default function BottomNav() {
             >
               <Icon
                 size={22}
-                strokeWidth={active ? 0 : 1.8}
-                fill={active ? 'currentColor' : 'none'}
+                strokeWidth={active ? 2.5 : 1.8}
+                fill="none"
               />
               <span style={{
                 fontSize:      10,
