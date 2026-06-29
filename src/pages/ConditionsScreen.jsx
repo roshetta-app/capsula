@@ -516,14 +516,14 @@ function BackToTopButton({ visible, onClick }) {
       tabIndex={visible ? 0 : -1}
       style={{
         position:                'fixed',
-        right:                   'var(--space-4)',
-        bottom:                  'calc(76px + env(safe-area-inset-bottom))',
-        width:                   44,
-        height:                  44,
+        right:                   'var(--space-5)',
+        bottom:                  'calc(96px + env(safe-area-inset-bottom))',
+        width:                   50,
+        height:                  50,
         borderRadius:            'var(--radius-full)',
-        border:                  '1px solid var(--color-border)',
-        backgroundColor:         'var(--color-surface)',
-        color:                   'var(--color-text-secondary)',
+        border:                  'none',
+        backgroundColor:         'var(--color-accent)',
+        color:                   '#ffffff',
         boxShadow:               'var(--shadow-elevated)',
         display:                 'flex',
         alignItems:              'center',
@@ -538,7 +538,7 @@ function BackToTopButton({ visible, onClick }) {
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <ArrowUp size={18} strokeWidth={2} />
+      <ArrowUp size={20} strokeWidth={2.5} />
     </button>
   )
 }
