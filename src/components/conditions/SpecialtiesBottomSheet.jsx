@@ -138,7 +138,7 @@ export default function SpecialtiesBottomSheet({
               display:                 'flex',
               alignItems:              'center',
               textAlign:               'left',
-              padding:                 '12px 4px',
+              padding:                 '12px 14px',
               marginBottom:            'var(--space-2)',
               borderRadius:            'var(--radius-md)',
               background:              activeSpecialty === 'all'
@@ -186,7 +186,7 @@ export default function SpecialtiesBottomSheet({
                   display:                 'flex',
                   alignItems:              'center',
                   gap:                     'var(--space-3)',
-                  padding:                 '12px 4px',
+                  padding:                 '12px 14px',
                   border:                  'none',
                   borderRadius:            'var(--radius-md)',
                   backgroundColor:         isActive ? colors.bg : 'transparent',
