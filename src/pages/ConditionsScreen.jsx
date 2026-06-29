@@ -6,6 +6,8 @@
  * Phase 8 — SpecialtySelector toolbar redesign: filled muted surface, no border,
  *            radius-md, bare icon (no bubble), chevron rotation, animated clear button,
  *            increased search-bar → filter gap for clearer visual hierarchy.
+ * Phase 9 — Pass activeSpecialty to ConditionCard so specialty label is
+ *            suppressed when a specific specialty is active (redundant with chip).
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -667,6 +669,7 @@ export default function ConditionsScreen() {
           condition={condition}
           onTap={handleCardTap}
           highlight={isSearching ? query : ''}
+          activeSpecialty={activeSpecialty}
         />
       ))
     }
@@ -681,6 +684,7 @@ export default function ConditionsScreen() {
             condition={condition}
             onTap={handleCardTap}
             highlight=""
+            activeSpecialty={activeSpecialty}
           />
         ))}
       </div>

@@ -6,11 +6,16 @@
  * Phase 7 — divider stepped up from 0.5px border-subtle to 1px border for
  *            clearer card separation without feeling heavy
  * Phase 8 — specialty name renders as typed in DB; removed textTransform uppercase
+ * Phase 9 — specialty name hidden when a specific specialty is active (redundant
+ *            with the active chip); icon bubble anchors to top of text content
+ *            so 3-line cards don't overflow the bubble height.
  *
  * Props:
- *   condition  ConditionFull
- *   onTap      (condition) => void  (optional — falls back to navigate)
- *   highlight  string  — current search query; empty string when not searching
+ *   condition        ConditionFull
+ *   onTap            (condition) => void  (optional — falls back to navigate)
+ *   highlight        string  — current search query; empty string when not searching
+ *   activeSpecialty  string  — 'all' | specialty id. Defaults to 'all'.
+ *                              When not 'all', specialtyName is suppressed.
  */
 
 import { useNavigate }    from 'react-router-dom'
@@ -21,7 +26,12 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 // ─── ConditionCard ────────────────────────────────────────────────────────────
 
-export default function ConditionCard({ condition, onTap, highlight = '' }) {
+export default function ConditionCard({
+  condition,
+  onTap,
+  highlight = '',
+  activeSpecialty = 'all',
+}) {
   const navigate = useNavigate()
   const isDark = useIsDark()
 
@@ -31,6 +41,10 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
     ? (condition.specialtyIconUrl  || '')
     : (condition.specialtyIcon     || 'Stethoscope')
   const colors    = resolveToken(tokenKey, isDark)
+
+  // Suppress the specialty label when browsing a filtered specialty —
+  // the active chip already tells the user which specialty they are in.
+  const showSpecialtyName = condition.specialtyName && activeSpecialty === 'all'
 
   function handleTap() {
     if (onTap) {
@@ -50,7 +64,7 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
       onKeyDown={e => e.key === 'Enter' && handleTap()}
       style={{
         display:                 'flex',
-        alignItems:              'center',
+        alignItems:              'flex-start',
         gap:                     'var(--space-3)',
         padding:                 '10px 0',
         borderBottom:            '1px solid var(--color-border)',
@@ -60,11 +74,16 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         backgroundColor:         'transparent',
       }}
     >
-      {/* Left: specialty icon bubble */}
+      {/* Left: specialty icon bubble — anchored to the top of the text
+          block so it optically aligns with the condition name row on
+          2-line cards and doesn't get overwhelmed on 3-line cards.
+          marginTop offsets the bubble down by ~4px to visually centre
+          it against the name (the largest text element). */}
       <div style={{
         width:           36,
         height:          36,
         flexShrink:      0,
+        marginTop:       showSpecialtyName ? 2 : 4,
         borderRadius:    'var(--radius-md)',
         backgroundColor: colors.bg,
         display:         'flex',
@@ -82,7 +101,7 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
 
       {/* Middle: text content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {condition.specialtyName && (
+        {showSpecialtyName && (
           <div style={{
             fontSize:      11,
             fontWeight:    500,
@@ -125,12 +144,17 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
         )}
       </div>
 
-      {/* Trailing: chevron */}
+      {/* Trailing: chevron — top-aligned to match icon bubble */}
       <svg
         width="12" height="12" viewBox="0 0 24 24"
         fill="none" stroke="currentColor" strokeWidth="2.5"
         strokeLinecap="round" strokeLinejoin="round"
-        style={{ color: 'var(--color-text-tertiary)', opacity: 0.5, flexShrink: 0 }}
+        style={{
+          color:     'var(--color-text-tertiary)',
+          opacity:   0.5,
+          flexShrink: 0,
+          marginTop:  showSpecialtyName ? 5 : 7,
+        }}
       >
         <polyline points="9 18 15 12 9 6" />
       </svg>
