@@ -5,6 +5,7 @@
  * Phase 6 — specialty icon system: Lucide / custom SVG + color tokens
  * Phase 7 — divider stepped up from 0.5px border-subtle to 1px border for
  *            clearer card separation without feeling heavy
+ * Phase 8 — specialty name renders as typed in DB; removed textTransform uppercase
  *
  * Props:
  *   condition  ConditionFull
@@ -87,7 +88,6 @@ export default function ConditionCard({ condition, onTap, highlight = '' }) {
             fontWeight:    500,
             color:         'var(--color-text-tertiary)',
             marginBottom:  2,
-            textTransform: 'uppercase',
             letterSpacing: '0.04em',
           }}>
             {condition.specialtyName}
