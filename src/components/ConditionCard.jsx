@@ -9,6 +9,9 @@
  * Phase 9 — specialty name hidden when a specific specialty is active (redundant
  *            with the active chip); icon bubble anchors to top of text content
  *            so 3-line cards don't overflow the bubble height.
+ * Phase 10 — cardTagline gets Info icon + secondary color to differentiate from
+ *             specialty label; divider lighter (border-subtle); last card no divider;
+ *             sort button in ConditionListHeader matches sticky header style.
  *
  * Props:
  *   condition        ConditionFull
@@ -16,9 +19,11 @@
  *   highlight        string  — current search query; empty string when not searching
  *   activeSpecialty  string  — 'all' | specialty id. Defaults to 'all'.
  *                              When not 'all', specialtyName is suppressed.
+ *   isLast           boolean — when true, suppresses the bottom divider line.
  */
 
 import { useNavigate }    from 'react-router-dom'
+import { Info }           from 'lucide-react'
 import { highlightMatch } from '../utils/highlightMatch'
 import { SpecialtyIcon, useIsDark }  from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -31,6 +36,7 @@ export default function ConditionCard({
   onTap,
   highlight = '',
   activeSpecialty = 'all',
+  isLast = false,
 }) {
   const navigate = useNavigate()
   const isDark = useIsDark()
@@ -72,7 +78,7 @@ export default function ConditionCard({
         alignItems:              isMultiLine ? 'flex-start' : 'center',
         gap:                     'var(--space-3)',
         padding:                 '10px 0',
-        borderBottom:            '1px solid var(--color-border)',
+        borderBottom:            isLast ? 'none' : '1px solid var(--color-border-subtle)',
         cursor:                  'pointer',
         outline:                 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -136,14 +142,18 @@ export default function ConditionCard({
 
         {condition.cardTagline && (
           <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            gap:          3,
             fontSize:     12,
             fontStyle:    'italic',
-            color:        'var(--color-text-tertiary)',
+            color:        'var(--color-text-secondary)',
             marginTop:    3,
             overflow:     'hidden',
             whiteSpace:   'nowrap',
             textOverflow: 'ellipsis',
           }}>
+            <Info size={10} strokeWidth={1.8} style={{ flexShrink: 0, opacity: 0.7 }} />
             {condition.cardTagline}
           </div>
         )}

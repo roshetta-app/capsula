@@ -663,32 +663,37 @@ export default function ConditionsScreen() {
     }
 
     if (isSearching || sortMode === 'recent') {
-      return results.map(condition => (
+      return results.map((condition, i) => (
         <ConditionCard
           key={condition.id}
           condition={condition}
           onTap={handleCardTap}
           highlight={isSearching ? query : ''}
           activeSpecialty={activeSpecialty}
+          isLast={i === results.length - 1}
         />
       ))
     }
 
-    return alphabetGroup(results).map(({ letter, items }, index) => (
-      <div key={letter}>
-        {/* Skip the first divider — it's rendered inline with the sort toggle in ConditionListHeader */}
-        {index > 0 && <AlphabetSectionDivider letter={letter} />}
-        {items.map(condition => (
-          <ConditionCard
-            key={condition.id}
-            condition={condition}
-            onTap={handleCardTap}
-            highlight=""
-            activeSpecialty={activeSpecialty}
-          />
-        ))}
-      </div>
-    ))
+    return alphabetGroup(results).map(({ letter, items }, index) => {
+      const isLastGroup = index === alphabetGroup(results).length - 1
+      return (
+        <div key={letter}>
+          {/* Skip the first divider — it's rendered inline with the sort toggle in ConditionListHeader */}
+          {index > 0 && <AlphabetSectionDivider letter={letter} />}
+          {items.map((condition, i) => (
+            <ConditionCard
+              key={condition.id}
+              condition={condition}
+              onTap={handleCardTap}
+              highlight=""
+              activeSpecialty={activeSpecialty}
+              isLast={isLastGroup && i === items.length - 1}
+            />
+          ))}
+        </div>
+      )
+    })
   }
 
   // ── Cold start skeleton ──────────────────────────────────────────────────────
@@ -795,3 +800,5 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
+``

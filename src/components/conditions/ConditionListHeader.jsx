@@ -97,14 +97,15 @@ export default function ConditionListHeader({
             border:                  'none',
             cursor:                  'pointer',
             padding:                 '4px 0 4px 8px',
-            fontSize:                12,
-            color:                   'var(--color-text-secondary)',
+            fontSize:                13,
+            fontWeight:              600,
+            color:                   'var(--color-text-primary)',
             fontFamily:              'var(--font-body)',
             WebkitTapHighlightColor: 'transparent',
             outline:                 'none',
           }}
         >
-          <ArrowUpDown size={13} strokeWidth={1.8} />
+          <ArrowUpDown size={13} strokeWidth={2.0} aria-hidden="true" />
           {SORT_LABELS[nextMode]}
         </button>
       )}
