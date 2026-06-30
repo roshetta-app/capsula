@@ -7,6 +7,11 @@ import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 
+// Fixed width of the left metadata rail (Rx labels + 'or' connectors).
+// Widened from the original 10px-italic-era 36px to comfortably fit
+// 15-16px Semibold two-digit labels like 'Rx12' without wrapping.
+const RX_RAIL_WIDTH = 42
+
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
  *
@@ -360,21 +365,26 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'baseline', marginTop: uIdx > 0 ? 8 : 0 }}>
-                {/* Prefix column — fixed width so all drug names align */}
-                <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginTop: uIdx > 0 ? 8 : 0 }}>
+                {/* Prefix column — fixed width so all drug names align.
+                    Text is right-aligned within the column (justifyContent:
+                    'flex-end') so the gap to the drug name stays a constant
+                    ~7px regardless of label length ('Rx1' vs 'Rx12' vs 'or') —
+                    the rail's fixed width only reserves space, it doesn't
+                    create the visual distance to the name. */}
+                <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
                     <span style={{
-                      fontSize: 10, fontWeight: 700, fontStyle: 'italic',
-                      color: 'var(--color-accent)',
+                      fontSize: 15, fontWeight: 600,
+                      color: 'color-mix(in srgb, var(--color-accent) 65%, var(--color-text-secondary) 35%)',
                       lineHeight: 1,
                     }}>Rx{index}</span>
                   ) : (
                     <span style={{
-                      fontSize: 10, fontWeight: 700, fontStyle: 'italic',
+                      fontSize: 15, fontWeight: 500,
                       color: 'var(--color-warning)',
                       lineHeight: 1,
-                    }}>(or)</span>
+                    }}>or</span>
                   )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
