@@ -1,42 +1,28 @@
 import { useState, useEffect, useRef } from 'react'
+import { ClipboardPlus } from 'lucide-react'
 
 /**
  * PrescriptionPills — dropdown selector for choosing between prescription sheets.
  *
- * Changes:
- *  - Micro-label changed from "Select protocol" → "Treatment options" to better
- *    convey that the list may contain different scenarios, severities, or drug choices
- *    for the same condition — not just protocol variants.
- *  - Trigger icon changed from writing hand → green dot to signal the active /
- *    selected prescription sheet at a glance, consistent with status-dot conventions.
+ * Trigger redesign — matches SpecialtySelector.jsx's floating-label field
+ * pattern: a small "Treatment plans" label on top, an icon + selected name +
+ * chevron value row below, on a filled accent-tinted card with no border and
+ * an ambient shadow (replacing the previous bordered-button + separate
+ * uppercase-label treatment). The green ActiveDot is replaced with a
+ * clipboard+cross icon (lucide ClipboardPlus) — accent-tinted, since a
+ * prescription sheet is always selected here (no idle/unselected state to
+ * distinguish, unlike SpecialtySelector's optional filter, so the card stays
+ * permanently tinted rather than toggling between idle/active looks).
  *
- * Fixes:
- *  - Closed state: bottom border was missing because `borderBottom: open ? 'none' : undefined`
- *    resolves to `undefined` (no style), which browser inherits as the shorthand border's bottom.
- *    Fixed by always setting an explicit borderBottom value.
- *  - Removed marginBottom so the gap between dropdown and first sheet row is controlled
- *    by the sheet itself (tighter layout).
+ * Dropdown menu and its items (IconCheck / IconDot rows, outside-click
+ * handling, selection logic) are unchanged from the prior implementation.
+ *
+ * Fixes (carried over):
+ *  - Removed marginBottom so the gap between dropdown and first sheet row is
+ *    controlled by the sheet itself (tighter layout).
  */
 
-// ─── Inline SVG icons ─────────────────────────────────────────────────────────
-
-function IconChevronDown({ size = 16, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 9 12 15 18 9" />
-    </svg>
-  )
-}
-
-function IconChevronUp({ size = 16, color = 'currentColor' }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="18 15 12 9 6 15" />
-    </svg>
-  )
-}
+// ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
 
 function IconCheck({ size = 15, color = 'currentColor' }) {
   return (
@@ -55,24 +41,11 @@ function IconDot({ size = 15, color = 'currentColor' }) {
   )
 }
 
-/** Green status dot — indicates the currently active prescription sheet */
-function ActiveDot() {
-  return (
-    <span style={{
-      display: 'inline-block',
-      width: 9,
-      height: 9,
-      borderRadius: '50%',
-      backgroundColor: '#22c55e',
-      flexShrink: 0,
-    }} />
-  )
-}
-
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PrescriptionPills({ prescriptions, activeIndex, onSelect }) {
   const [open, setOpen] = useState(false)
+  const [pressed, setPressed] = useState(false)
   const containerRef = useRef(null)
 
   // Close on outside click
@@ -100,6 +73,12 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
     setOpen(false)
   }
 
+  // Ambient shadow to lift the card off the page background, matching
+  // SpecialtySelector's restrained treatment.
+  const containerShadow = pressed
+    ? '0 1px 1px rgba(0,0,0,0.02)'
+    : '0 1px 2px rgba(0,0,0,0.04)'
+
   return (
     <div
       ref={containerRef}
@@ -107,63 +86,89 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       onTouchMove={e => e.stopPropagation()}
       style={{ marginBottom: 'var(--space-3)', position: 'relative' }}
     >
-      {/* Micro-label — describes what the dropdown contains */}
-      <div style={{
-        fontSize: 10,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        color: 'var(--color-text-tertiary)',
-        marginBottom: 4,
-        fontFamily: 'var(--font-body)',
-      }}>
-        Treatment options
-      </div>
-
-      {/* Trigger box */}
+      {/* Trigger card — floating-label field, same shape as SpecialtySelector */}
       <button
         onClick={() => setOpen(o => !o)}
+        onPointerDown={() => setPressed(true)}
+        onPointerUp={() => setPressed(false)}
+        onPointerLeave={() => setPressed(false)}
+        aria-label={`Treatment plan: ${selected.label}. Tap to change.`}
         style={{
           width: '100%',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '9px 14px',
-          borderTop:    `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
-          borderLeft:   `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
-          borderRight:  `1.5px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
-          borderBottom: open ? 'none' : `1.5px solid var(--color-border)`,
-          borderRadius: open ? '10px 10px 0 0' : '10px',
-          background: 'var(--color-surface)',
+          flexDirection: 'column',
+          alignItems: 'stretch',
+          textAlign: 'left',
+          padding: '12px 14px',
+          background: pressed
+            ? 'color-mix(in srgb, var(--color-accent) 18%, var(--color-surface) 82%)'
+            : 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surface) 90%)',
+          border: 'none',
+          borderRadius: '16px',
+          boxShadow: containerShadow,
           cursor: 'pointer',
           fontFamily: 'var(--font-body)',
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           boxSizing: 'border-box',
-          transition: 'border-color 0.15s ease',
+          transition: 'background-color 0.12s ease, box-shadow 0.12s ease',
         }}
       >
-        {/* Left: green active dot + selected label */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ActiveDot />
+        {/* Label — helper text, smallest element in the hierarchy */}
+        <span style={{
+          fontSize: 11,
+          fontWeight: 500,
+          fontFamily: 'var(--font-body)',
+          color: 'var(--color-text-tertiary)',
+          marginBottom: 2,
+        }}>
+          Treatment plans
+        </span>
+
+        {/* Value row — icon, name, chevron. Vertically centered, left aligned. */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
           <span style={{
-            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            color: 'var(--color-accent)',
+          }}>
+            <ClipboardPlus size={16} strokeWidth={1.9} aria-hidden="true" />
+          </span>
+
+          <span style={{
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontSize: 14,
             fontWeight: 600,
-            color: 'var(--color-text-primary)',
             fontFamily: 'var(--font-body)',
+            color: 'var(--color-accent)',
+            letterSpacing: '-0.2px',
           }}>
             {selected.label}
           </span>
-        </div>
 
-        {/* Right: chevron */}
-        {open
-          ? <IconChevronUp size={16} color="var(--color-accent)" />
-          : <IconChevronDown size={16} color="var(--color-text-tertiary)" />
-        }
+          {/* Chevron — same path as SpecialtySelector for visual parity */}
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="none"
+            aria-hidden="true"
+            style={{
+              flexShrink: 0,
+              color: 'var(--color-accent)',
+              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}>
+            <path d="M2 4.5L6 8.5L10 4.5"
+              stroke="currentColor" strokeWidth="1.6"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
       </button>
 
-      {/* Dropdown list */}
+      {/* Dropdown list — unchanged */}
       {open && (
         <div style={{
           position: 'absolute',
