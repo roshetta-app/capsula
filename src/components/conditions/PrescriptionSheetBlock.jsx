@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
-import { FileText } from 'lucide-react'
+import { FileText, ChevronRight } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -385,7 +385,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                         color: 'var(--color-text-secondary)',
                       }}>Rx</span>
                       <span style={{
-                        fontSize: 16, fontWeight: 800,
+                        fontSize: 14, fontWeight: 800,
                         color: 'var(--color-accent)',
                       }}>{index}</span>
                     </span>
@@ -456,7 +456,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
     <>
       {/* Name line: name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -464,17 +464,19 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 background: 'none', border: 'none', padding: 0,
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
-                fontSize: 18, fontWeight: 600,
-                color: 'color-mix(in srgb, var(--color-text-primary) 80%, var(--color-accent) 20%)',
+                fontSize: 18, fontWeight: 500,
+                color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: 2,
               }}
             >
               {name}
+              <ChevronRight size={14} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
             </button>
           ) : (
             <span style={{
-              fontSize: 18, fontWeight: 600,
+              fontSize: 18, fontWeight: 500,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
@@ -518,7 +520,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
           onClick={handleSearchClick}
           aria-label={`Search images for ${name}`}
           style={{
-            background: 'none', border: 'none', padding: '2px 0 2px 0',
+            background: 'none', border: 'none', padding: '0px 0 4px 0',
             cursor: 'pointer', flexShrink: 0,
             color: 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center',
@@ -583,17 +585,26 @@ function DoseLine({ text }) {
  * heavier boxed-card treatment appropriate for standalone note rows, not
  * per-drug annotations).
  */
+const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
+
 function RowNote({ note }) {
   if (!note) return null
+
+  // Box position stays fixed flush-left (outer dir="ltr") so it always lines
+  // up under the drug name regardless of language. Only the internal packing
+  // order flips for Arabic — icon moves to the right edge of this same box,
+  // text aligns right within it — so each language still feels native
+  // without the whole note jumping to the far right of the screen.
+  const isArabic = ARABIC_RE.test(note.trim().charAt(0)) || ARABIC_RE.test(note)
 
   return (
     <div
       dir="ltr"
       style={{
         display: 'flex',
-        flexDirection: 'row',
+        flexDirection: isArabic ? 'row-reverse' : 'row',
         alignItems: 'flex-start',
-        gap: 3,
+        gap: 6,
         marginTop: 8,
       }}
     >
@@ -615,7 +626,7 @@ function RowNote({ note }) {
           fontStyle: 'normal',
           color: 'color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary) 20%)',
           lineHeight: 1.5,
-          textAlign: 'left',
+          textAlign: isArabic ? 'right' : 'left',
           unicodeBidi: 'plaintext',
         }}
       >
