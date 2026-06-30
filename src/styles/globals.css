@@ -9,11 +9,11 @@
    scripts, with clearer numeral/strength legibility at small sizes, which
    directly serves the dose/concentration text in the prescription sheet.
    Self-hosted via @fontsource (no CDN), works fully offline in the PWA. */
-@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans";
 @import "@fontsource/ibm-plex-sans/500.css";
 @import "@fontsource/ibm-plex-sans/600.css";
 @import "@fontsource/ibm-plex-sans/700.css";
-@import "@fontsource/ibm-plex-sans-arabic/400.css";
+@import "@fontsource/ibm-plex-sans-arabic";
 @import "@fontsource/ibm-plex-sans-arabic/500.css";
 @import "@fontsource/ibm-plex-sans-arabic/600.css";
 @import "@fontsource/ibm-plex-sans-arabic/700.css";
