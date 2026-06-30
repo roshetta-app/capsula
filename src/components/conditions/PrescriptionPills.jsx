@@ -21,10 +21,7 @@ import { ClipboardPlus } from 'lucide-react'
  *
  * Open-state affordance: when open, a 2px accent-blue border wraps the
  * entire merged shape (trigger + dropdown) so it's unambiguous the control
- * is expanded, and a dim scrim (fixed, semi-transparent) covers the rest of
- * the Treatment tab content behind it — same idea as a bottom sheet pulling
- * focus — so the open list reads as the thing currently demanding attention.
- * Tapping the scrim closes the dropdown.
+ * is expanded.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -95,22 +92,6 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         zIndex: open ? 56 : 'auto',
       }}
     >
-      {/* Dim scrim — covers the rest of the Treatment tab content while open,
-          pulling focus to the dropdown like a bottom sheet. Sits below the
-          trigger/dropdown (z-index 55) but above normal page content.
-          Tapping it closes the dropdown. */}
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.35)',
-            zIndex: 55,
-          }}
-        />
-      )}
-
       {/* Trigger card — floating-label field, same shape as SpecialtySelector.
           Bottom corners square off when open so it visually fuses with the
           dropdown directly beneath it. A 2px accent border appears when open,

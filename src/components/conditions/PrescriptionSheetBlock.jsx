@@ -10,32 +10,31 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 // Sized for 13px Semibold labels at flush-left alignment — wide enough for
 // two-digit 'Rx12' without wrapping, tight enough that the rail doesn't
 // read as a gap between the label and the drug name.
-const RX_RAIL_WIDTH = 32
+const RX_RAIL_WIDTH = 28
 const RX_RAIL_GAP = 5
 
 /**
- * IconRx — the classic ℞ prescription-take symbol rendered as a small SVG
- * glyph, replacing the previous literal "Rx" text label. Self-contained
- * icon component rather than two characters of body text.
- *
- * VISUAL PASS: bumped from a too-compact 12px (read as smaller/weaker than
- * the index number beside it) up to a size that visually balances against
- * the 13px/800 index number. Switched to a serif font stack for the glyph
- * text — sans-serif fonts often render ℞ thin/cramped; serif renders it
- * fuller and more legible at small sizes.
+ * IconRx — small "Rx" monogram (italic serif R + smaller x), the classic
+ * pharmacy convention. Replaces an earlier attempt that rendered the
+ * Unicode ℞ glyph via SVG <text> — that approach was unreliable across
+ * fonts/platforms (glyph support and rendering of ℞ varies a lot and often
+ * looks broken or cramped). This is plain styled text instead, so it
+ * renders identically everywhere, while still reading as a distinct
+ * monogram rather than a body-text label.
  */
-function IconRx({ size = 17, color = 'currentColor' }) {
+function IconRx({ size = 14, color = 'currentColor' }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <text
-        x="12" y="18"
-        textAnchor="middle"
-        fontSize="21"
-        fontWeight="700"
-        fontFamily="Georgia, 'Times New Roman', serif"
-        fill={color}
-      >℞</text>
-    </svg>
+    <span style={{
+      display: 'inline-flex',
+      alignItems: 'baseline',
+      fontFamily: 'Georgia, "Times New Roman", serif',
+      fontStyle: 'italic',
+      lineHeight: 1,
+      color,
+    }}>
+      <span style={{ fontSize: size, fontWeight: 700 }}>R</span>
+      <span style={{ fontSize: size * 0.72, fontWeight: 700, marginInlineStart: 0.5 }}>x</span>
+    </span>
   )
 }
 
@@ -395,9 +394,9 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                     room than 'Rx1'), which is the intended visual rhythm. */}
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
-                    <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                    <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
                       <IconRx
-                        size={17}
+                        size={14}
                         color="var(--color-text-secondary)"
                       />
                       {/* VISUAL-WEIGHT PASS: desaturated from the full

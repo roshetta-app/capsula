@@ -186,9 +186,10 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── variant='inline' (default): icon + text side-by-side ─────────────────
   // VISUAL PASS: hairline divider + spacing above separates this from
-  // whatever prescription content precedes it; background darkened a touch
-  // (color-mix toward black) so the note registers as its own element
-  // instead of nearly disappearing into the page background.
+  // whatever prescription content precedes it. Background is a faint grey
+  // tint (was darkened too far toward black in a prior pass — corrected
+  // here to a light, dim wash instead) and vertical padding trimmed for a
+  // shorter box.
   return (
     <>
       <div style={{
@@ -197,9 +198,9 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         margin: '14px 0 10px 0',
       }} />
       <div style={{
-        background: 'color-mix(in srgb, var(--color-note-bg) 85%, black 15%)',
+        background: 'color-mix(in srgb, var(--color-note-bg) 92%, var(--color-text-secondary) 8%)',
         borderRadius: 'var(--radius-lg)',
-        padding: '12px 16px',
+        padding: '9px 16px',
       }}>
         <div
           dir={direction}
