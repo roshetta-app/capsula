@@ -377,14 +377,14 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
                     <span style={{
-                      fontSize: 13, fontWeight: 600,
+                      fontSize: 13, fontWeight: 500,
                       color: 'color-mix(in srgb, var(--color-accent) 65%, var(--color-text-secondary) 35%)',
                       lineHeight: 1,
                     }}>Rx{index}</span>
                   ) : (
                     <span style={{
                       fontSize: 12, fontWeight: 500,
-                      color: 'var(--color-warning)',
+                      color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
                     }}>or</span>
                   )}
@@ -448,7 +448,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
     <>
       {/* Name line: name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -456,7 +456,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 background: 'none', border: 'none', padding: 0,
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
-                fontSize: 18, fontWeight: 700,
+                fontSize: 18, fontWeight: 600,
                 color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'underline',
@@ -469,7 +469,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </button>
           ) : (
             <span style={{
-              fontSize: 18, fontWeight: 700,
+              fontSize: 18, fontWeight: 600,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
@@ -513,7 +513,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
           onClick={handleSearchClick}
           aria-label={`Search images for ${name}`}
           style={{
-            background: 'none', border: 'none', padding: '2px 0 2px 8px',
+            background: 'none', border: 'none', padding: '2px 0 2px 0',
             cursor: 'pointer', flexShrink: 0,
             color: 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center',
@@ -545,9 +545,7 @@ function DoseLine({ text }) {
         fontSize: 14,
         fontWeight: 500,
         color: 'var(--color-dose)',
-        lineHeight: 1.5,
-      }}>
-        {text}
+        lineHeight: 1.55,
       </span>
     </div>
   )
@@ -594,7 +592,7 @@ function RowNote({ note }) {
         display: 'flex',
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 5,
+        gap: 3,
         marginTop: 8,
       }}
     >
@@ -602,6 +600,7 @@ function RowNote({ note }) {
         flexShrink: 0,
         marginTop: 2,
         color: 'var(--color-text-secondary)',
+        opacity: 0.75,
         display: 'flex',
         alignItems: 'center',
       }}>
@@ -675,5 +674,5 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  padding: '14px 0',
+  padding: '15px 0',
 }
