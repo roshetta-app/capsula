@@ -367,12 +367,12 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
             <React.Fragment key={uIdx}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginTop: uIdx > 0 ? 8 : 0 }}>
                 {/* Prefix column — fixed width so all drug names align.
-                    Text is right-aligned within the column (justifyContent:
-                    'flex-end') so the gap to the drug name stays a constant
-                    ~7px regardless of label length ('Rx1' vs 'Rx12' vs 'or') —
-                    the rail's fixed width only reserves space, it doesn't
-                    create the visual distance to the name. */}
-                <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline' }}>
+                    Text is left-aligned within the column (justifyContent:
+                    'flex-start') so 'Rx1' and 'or' share the same flush-left
+                    starting edge — the leftover space before the drug name
+                    naturally varies with label length ('or' leaves more
+                    room than 'Rx1'), which is the intended visual rhythm. */}
+                <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
                     <span style={{
                       fontSize: 15, fontWeight: 600,
@@ -401,12 +401,14 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
               </div>
 
               {/* Dose and note render once after the last member of each
-                  cluster — outside the prefix layout so they span full width */}
+                  cluster — outside the prefix layout so they span full width.
+                  Left-padded by the rail width + gap so they line up under
+                  the drug name column rather than flush with the Rx/or rail. */}
               {isLastMemberOfCluster && (
-                <>
+                <div style={{ paddingLeft: RX_RAIL_WIDTH + 7 }}>
                   {cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
-                </>
+                </div>
               )}
             </React.Fragment>
           )
