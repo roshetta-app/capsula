@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
-import { StickyNote } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -241,8 +241,8 @@ function SectionHeader({ label, children }) {
       style={{
         background: 'var(--color-section-bg)',
         borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-4) var(--space-4) var(--space-3)',
         margin: '16px 0',
+        overflow: 'hidden',
       }}
     >
       <div
@@ -253,15 +253,16 @@ function SectionHeader({ label, children }) {
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
           textTransform: 'none',
-          marginBottom: 10,
-          paddingBottom: 8,
-          borderBottom: '1.5px solid color-mix(in srgb, var(--color-accent) 20%, transparent)',
+          background: 'color-mix(in srgb, var(--color-section-bg) 55%, var(--color-accent) 12%)',
+          padding: 'var(--space-3) var(--space-4)',
           unicodeBidi: 'plaintext',
         }}
       >
         {label}
       </div>
-      {children}
+      <div style={{ padding: 'var(--space-3) var(--space-4) var(--space-3)' }}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -380,11 +381,11 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                   {uIdx === 0 ? (
                     <span style={{ lineHeight: 1 }}>
                       <span style={{
-                        fontSize: 11, fontWeight: 500,
-                        color: 'var(--color-text-tertiary)',
+                        fontSize: 12, fontWeight: 600,
+                        color: 'var(--color-text-secondary)',
                       }}>Rx</span>
                       <span style={{
-                        fontSize: 15, fontWeight: 700,
+                        fontSize: 16, fontWeight: 800,
                         color: 'var(--color-accent)',
                       }}>{index}</span>
                     </span>
@@ -414,7 +415,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                   Left-padded by the rail width + gap so they line up under
                   the drug name column rather than flush with the Rx/or rail. */}
               {isLastMemberOfCluster && (
-                <div style={{ paddingLeft: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
+                <div style={{ paddingInlineStart: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
                   {cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </div>
@@ -464,13 +465,9 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
                 fontSize: 18, fontWeight: 600,
-                color: 'var(--color-text-primary)',
+                color: 'color-mix(in srgb, var(--color-text-primary) 80%, var(--color-accent) 20%)',
                 lineHeight: 1.3,
-                textDecoration: 'underline',
-                textDecorationStyle: 'solid',
-                textDecorationThickness: '1px',
-                textDecorationColor: 'color-mix(in srgb, var(--color-accent) 50%, var(--color-text-tertiary) 50%)',
-                textUnderlineOffset: 3,
+                textDecoration: 'none',
               }}
             >
               {name}
@@ -548,7 +545,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
  */
 function DoseLine({ text }) {
   return (
-    <div dir="auto" style={{ marginTop: 12, paddingLeft: 6, unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: 12, paddingInlineStart: 6, textAlign: 'left', unicodeBidi: 'plaintext' }}>
       <span style={{
         fontSize: 14,
         fontWeight: 500,
@@ -574,11 +571,10 @@ function DoseLine({ text }) {
  * since it's still useful as an at-a-glance 'this has a note' marker, but
  * it no longer sits inside its own boxed UI element.
  *
- * Direction is resolved explicitly (rather than left to the browser's
- * dir="auto" heuristic) so the icon's flex order reliably flips for
- * Arabic-leading text:
- *   Arabic text  -> row direction rtl -> icon renders on the RIGHT
- *   English text -> row direction ltr -> icon renders on the LEFT
+ * Direction: the icon and box position are fixed flush-left regardless of
+ * language, so the note always lines up directly under the drug name above
+ * it. The text itself still gets dir="auto" so Arabic characters/punctuation
+ * shape and order correctly — only the box's position is locked.
  *
  * Text: var(--color-text-secondary), 13px/500, italic — deliberately
  * subordinate to both the drug name (15px/700) and the dose line
@@ -587,17 +583,12 @@ function DoseLine({ text }) {
  * heavier boxed-card treatment appropriate for standalone note rows, not
  * per-drug annotations).
  */
-const ARABIC_RE = /[\u0600-\u06FF\u0750-\u077F]/
-
 function RowNote({ note }) {
   if (!note) return null
 
-  const isArabic = ARABIC_RE.test(note.trim().charAt(0)) || ARABIC_RE.test(note)
-  const direction = isArabic ? 'rtl' : 'ltr'
-
   return (
     <div
-      dir={direction}
+      dir="ltr"
       style={{
         display: 'flex',
         flexDirection: 'row',
@@ -614,16 +605,17 @@ function RowNote({ note }) {
         display: 'flex',
         alignItems: 'center',
       }}>
-        <StickyNote size={13} color="currentColor" />
+        <FileText size={13} color="currentColor" />
       </span>
       <span
         dir="auto"
         style={{
           fontSize: 13,
           fontWeight: 500,
-          fontStyle: 'italic',
+          fontStyle: 'normal',
           color: 'color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary) 20%)',
           lineHeight: 1.5,
+          textAlign: 'left',
           unicodeBidi: 'plaintext',
         }}
       >
