@@ -239,7 +239,7 @@ function SectionHeader({ label, children }) {
       <div
         dir="auto"
         style={{
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: 700,
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
@@ -372,7 +372,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                   {uIdx === 0 ? (
                     <span style={{ lineHeight: 1 }}>
                       <span style={{
-                        fontSize: 12, fontWeight: 600,
+                        fontSize: 11, fontWeight: 600,
                         color: 'var(--color-text-secondary)',
                       }}>Rx</span>
                       {/* VISUAL-WEIGHT PASS: desaturated from the full
@@ -381,13 +381,13 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                           rather than touching the global token, which is
                           shared by the back button, tabs, links, etc. */}
                       <span style={{
-                        fontSize: 14, fontWeight: 800,
+                        fontSize: 13, fontWeight: 800,
                         color: 'color-mix(in srgb, var(--color-accent) 65%, gray 35%)',
                       }}>{index}</span>
                     </span>
                   ) : (
                     <span style={{
-                      fontSize: 12, fontWeight: 500,
+                      fontSize: 11, fontWeight: 500,
                       color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
                     }}>or</span>
@@ -468,7 +468,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 18, fontWeight: 500,
+            fontSize: 17, fontWeight: 500,
             color: 'var(--color-text-primary)',
             lineHeight: 1.3,
           }}>
@@ -488,7 +488,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
               weight, despite being clinically load-bearing information. */}
           {concentration && (
             <span style={{
-              fontSize: 13, fontWeight: 500,
+              fontSize: 12, fontWeight: 500,
               color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
               lineHeight: 1.3,
             }}>
@@ -500,7 +500,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
               subtle pill so it still reads as its own distinct chip. */}
           {form && (
             <span style={{
-              fontSize: 13, fontWeight: 600,
+              fontSize: 12, fontWeight: 600,
               color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
               lineHeight: 1.3,
               letterSpacing: '0.01em',
@@ -551,7 +551,7 @@ function DoseLine({ text }) {
   return (
     <div dir="auto" style={{ marginTop: 10, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 500,
         color: 'var(--color-dose)',
         lineHeight: 1.55,
@@ -623,7 +623,7 @@ function RowNote({ note }) {
       <span
         dir="auto"
         style={{
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 500,
           fontStyle: 'normal',
           color: 'color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary) 20%)',
