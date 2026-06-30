@@ -8,9 +8,11 @@ import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 
 // Fixed width of the left metadata rail (Rx labels + 'or' connectors).
-// Widened from the original 10px-italic-era 36px to comfortably fit
-// 15-16px Semibold two-digit labels like 'Rx12' without wrapping.
-const RX_RAIL_WIDTH = 42
+// Sized for 13px Semibold labels at flush-left alignment — wide enough for
+// two-digit 'Rx12' without wrapping, tight enough that the rail doesn't
+// read as a gap between the label and the drug name.
+const RX_RAIL_WIDTH = 26
+const RX_RAIL_GAP = 5
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -365,7 +367,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginTop: uIdx > 0 ? 8 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? 8 : 0 }}>
                 {/* Prefix column — fixed width so all drug names align.
                     Text is left-aligned within the column (justifyContent:
                     'flex-start') so 'Rx1' and 'or' share the same flush-left
@@ -375,13 +377,13 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
                     <span style={{
-                      fontSize: 15, fontWeight: 600,
+                      fontSize: 13, fontWeight: 600,
                       color: 'color-mix(in srgb, var(--color-accent) 65%, var(--color-text-secondary) 35%)',
                       lineHeight: 1,
                     }}>Rx{index}</span>
                   ) : (
                     <span style={{
-                      fontSize: 15, fontWeight: 500,
+                      fontSize: 12, fontWeight: 500,
                       color: 'var(--color-warning)',
                       lineHeight: 1,
                     }}>or</span>
@@ -405,7 +407,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                   Left-padded by the rail width + gap so they line up under
                   the drug name column rather than flush with the Rx/or rail. */}
               {isLastMemberOfCluster && (
-                <div style={{ paddingLeft: RX_RAIL_WIDTH + 7 }}>
+                <div style={{ paddingLeft: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
                   {cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </div>
@@ -475,22 +477,25 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
             </span>
           )}
 
-          {/* Concentration — plain lighter text, no dot prefix */}
+          {/* Concentration — raised from secondary to near-primary contrast;
+              this was reading as near-invisible at the old --color-text-secondary
+              weight, despite being clinically load-bearing information. */}
           {concentration && (
             <span style={{
-              fontSize: 12, fontWeight: 400,
-              color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 500,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
               lineHeight: 1.3,
             }}>
               {concentration}
             </span>
           )}
 
-          {/* Form — same color as conc but bolder */}
+          {/* Form — same contrast tier as concentration, kept bolder + a
+              subtle pill so it still reads as its own distinct chip. */}
           {form && (
             <span style={{
-              fontSize: 12, fontWeight: 600,
-              color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 600,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
               lineHeight: 1.3,
               letterSpacing: '0.01em',
               flexShrink: 0,
@@ -500,19 +505,22 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
           )}
         </div>
 
-        {/* Search icon — Google Images for this drug in Egypt */}
+        {/* Search icon — Google Images for this drug in Egypt.
+            Bumped from tertiary (near-disabled contrast) to secondary, and
+            14->16px, so it reads as a tappable action rather than a faint
+            decoration. */}
         <button
           onClick={handleSearchClick}
           aria-label={`Search images for ${name}`}
           style={{
             background: 'none', border: 'none', padding: '2px 0 2px 8px',
             cursor: 'pointer', flexShrink: 0,
-            color: 'var(--color-text-tertiary)',
+            color: 'var(--color-text-secondary)',
             display: 'flex', alignItems: 'center',
             lineHeight: 1,
           }}
         >
-          <Icon name="Search" size={15} color="currentColor" />
+          <Icon name="Search" size={16} color="currentColor" />
         </button>
       </div>
     </>
@@ -521,25 +529,21 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
 
 /**
  * DoseLine — no adult/child tag.
- * PHASE 9 (2026-06-22): color changed from plain text-primary (black) to
- * --color-dose, and size dropped from 15px to 14px. Previously the dose
- * line was nearly indistinguishable from the drug name at a glance
- * (15px/600 black vs. 17px/700 black) — the color/size shift now makes it
- * scannable as 'this is the dose' on its own.
- * --color-dose was initially set to a teal (reused from .dir-card-dose)
- * but that read as a status/success color, out of place in a plain
- * drug-row context. Replaced with a cool slate/ink tone — distinct in
- * shade from text-primary without carrying any semantic (success/warning)
- * connotation.
- * Batch 2 fine-grained fixes: marginTop 4→8px, added paddingLeft 4px indent,
- * size 14→13px, weight 700→600 — visually lighter/offset from drug name.
+ * VISUAL HIERARCHY PASS (2026-06-30): dropped from 15px/600 to 14px/500.
+ * At 15px/600 in near-black --color-dose it was pulling visual weight
+ * comparable to the 18px/700 drug name, collapsing the intended hierarchy
+ * (name > dose > strength/form > Rx label). Weight does the "this matters"
+ * signaling here, not boldness — 500 is enough to read as distinct from
+ * plain body text while staying clearly subordinate to the name above it.
+ * --color-dose itself (cool slate/ink, distinct from text-primary, no
+ * success/warning connotation) is unchanged from Phase 9.
  */
 function DoseLine({ text }) {
   return (
     <div dir="auto" style={{ marginTop: 12, paddingLeft: 6, unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 15,
-        fontWeight: 600,
+        fontSize: 14,
+        fontWeight: 500,
         color: 'var(--color-dose)',
         lineHeight: 1.5,
       }}>

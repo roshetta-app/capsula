@@ -4,10 +4,19 @@
    ============================================================================= */
 
 /* ─── Fonts ──────────────────────────────────────────────────────────────────── */
-@import "@fontsource/dm-sans";
-@import "@fontsource/dm-sans/500.css";
-@import "@fontsource/dm-sans/600.css";
-@import "@fontsource/dm-sans/700.css";
+/* Swapped from DM Sans/Noto Sans Arabic — IBM Plex Sans + IBM Plex Sans
+   Arabic are designed by the same foundry as a matched pair across both
+   scripts, with clearer numeral/strength legibility at small sizes, which
+   directly serves the dose/concentration text in the prescription sheet.
+   Self-hosted via @fontsource (no CDN), works fully offline in the PWA. */
+@import "@fontsource/ibm-plex-sans/400.css";
+@import "@fontsource/ibm-plex-sans/500.css";
+@import "@fontsource/ibm-plex-sans/600.css";
+@import "@fontsource/ibm-plex-sans/700.css";
+@import "@fontsource/ibm-plex-sans-arabic/400.css";
+@import "@fontsource/ibm-plex-sans-arabic/500.css";
+@import "@fontsource/ibm-plex-sans-arabic/600.css";
+@import "@fontsource/ibm-plex-sans-arabic/700.css";
 @import "@fontsource/dm-mono";
 
 /* ─── Tailwind v4 ────────────────────────────────────────────────────────────── */
@@ -45,7 +54,7 @@
   --color-ink-faint:     #9E9B95;
 
   /* Font families */
-  --font-sans:  "DM Sans", sans-serif;
+  --font-sans:  "IBM Plex Sans", sans-serif;
   --font-mono:  "DM Mono", monospace;
 
   /* Border radius */
@@ -108,9 +117,9 @@
      and a section never read as "the same kind of box" at a glance. */
   --color-section-bg:       #F3EFFA;
 
-  --font-display:           "DM Sans", sans-serif;
-  --font-body:              "DM Sans", sans-serif;
-  --font-arabic:            "Noto Sans Arabic", sans-serif;
+  --font-display:           "IBM Plex Sans", sans-serif;
+  --font-body:              "IBM Plex Sans", sans-serif;
+  --font-arabic:            "IBM Plex Sans Arabic", sans-serif;
   --font-mono:              "DM Mono", monospace;
 
   --radius-sm:              6px;
