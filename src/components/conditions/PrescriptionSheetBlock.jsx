@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
-import { ClipboardList } from 'lucide-react'
+import { StickyNote } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -248,12 +248,14 @@ function SectionHeader({ label, children }) {
       <div
         dir="auto"
         style={{
-          fontSize: 10,
+          fontSize: 14,
           fontWeight: 700,
-          letterSpacing: '0.07em',
-          color: 'var(--color-text-tertiary)',
-          textTransform: 'uppercase',
-          marginBottom: 8,
+          letterSpacing: '0.01em',
+          color: 'var(--color-text-primary)',
+          textTransform: 'none',
+          marginBottom: 10,
+          paddingBottom: 8,
+          borderBottom: '1.5px solid color-mix(in srgb, var(--color-accent) 20%, transparent)',
           unicodeBidi: 'plaintext',
         }}
       >
@@ -376,11 +378,16 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                     room than 'Rx1'), which is the intended visual rhythm. */}
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
-                    <span style={{
-                      fontSize: 13, fontWeight: 500,
-                      color: 'color-mix(in srgb, var(--color-accent) 65%, var(--color-text-secondary) 35%)',
-                      lineHeight: 1,
-                    }}>Rx{index}</span>
+                    <span style={{ lineHeight: 1 }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 500,
+                        color: 'var(--color-text-tertiary)',
+                      }}>Rx</span>
+                      <span style={{
+                        fontSize: 15, fontWeight: 700,
+                        color: 'var(--color-accent)',
+                      }}>{index}</span>
+                    </span>
                   ) : (
                     <span style={{
                       fontSize: 12, fontWeight: 500,
@@ -460,8 +467,9 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
                 color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'underline',
-                textDecorationStyle: 'dotted',
-                textDecorationColor: 'var(--color-text-tertiary)',
+                textDecorationStyle: 'solid',
+                textDecorationThickness: '1px',
+                textDecorationColor: 'color-mix(in srgb, var(--color-accent) 50%, var(--color-text-tertiary) 50%)',
                 textUnderlineOffset: 3,
               }}
             >
@@ -600,13 +608,13 @@ function RowNote({ note }) {
     >
       <span style={{
         flexShrink: 0,
-        marginTop: 2,
+        marginTop: 3,
         color: 'var(--color-text-secondary)',
         opacity: 0.75,
         display: 'flex',
         alignItems: 'center',
       }}>
-        <ClipboardList size={12} color="currentColor" />
+        <StickyNote size={13} color="currentColor" />
       </span>
       <span
         dir="auto"
@@ -614,7 +622,7 @@ function RowNote({ note }) {
           fontSize: 13,
           fontWeight: 500,
           fontStyle: 'italic',
-          color: 'var(--color-text-secondary)',
+          color: 'color-mix(in srgb, var(--color-text-secondary) 80%, var(--color-text-primary) 20%)',
           lineHeight: 1.5,
           unicodeBidi: 'plaintext',
         }}
