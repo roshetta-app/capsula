@@ -1,8 +1,7 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
-import Icon from '../ui/Icon'
-import { FileText, ExternalLink } from 'lucide-react'
+import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -13,6 +12,25 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 // read as a gap between the label and the drug name.
 const RX_RAIL_WIDTH = 26
 const RX_RAIL_GAP = 5
+
+/**
+ * IconRx — the classic ℞ prescription-take symbol rendered as a small SVG
+ * glyph, replacing the previous literal "Rx" text label. Self-contained
+ * icon component rather than two characters of body text.
+ */
+function IconRx({ size = 12, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <text
+        x="12" y="18"
+        textAnchor="middle"
+        fontSize="19"
+        fontWeight="700"
+        fill={color}
+      >℞</text>
+    </svg>
+  )
+}
 
 /**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
@@ -361,7 +379,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? 8 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: RX_RAIL_GAP, marginTop: uIdx > 0 ? 6 : 0 }}>
                 {/* Prefix column — fixed width so all drug names align.
                     Text is left-aligned within the column (justifyContent:
                     'flex-start') so 'Rx1' and 'or' share the same flush-left
@@ -370,11 +388,11 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                     room than 'Rx1'), which is the intended visual rhythm. */}
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
-                    <span style={{ lineHeight: 1 }}>
-                      <span style={{
-                        fontSize: 11, fontWeight: 600,
-                        color: 'var(--color-text-secondary)',
-                      }}>Rx</span>
+                    <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'baseline', gap: 1 }}>
+                      <IconRx
+                        size={12}
+                        color="var(--color-text-secondary)"
+                      />
                       {/* VISUAL-WEIGHT PASS: desaturated from the full
                           --color-accent blue via color-mix (65% accent /
                           35% gray) — same hue family, lower saturation —
@@ -463,24 +481,15 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
 
   return (
     <>
-      {/* Name line: name + conc + form + search icon — equal spacing */}
+      {/* Name line: name + conc + form + link icon + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 17, fontWeight: 500,
+            fontSize: 17, fontWeight: 600,
             color: 'var(--color-text-primary)',
             lineHeight: 1.3,
           }}>
             {name}
-            {linkEnabled && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0, alignSelf: 'flex-start', marginTop: 1,
-              }}>
-                <ExternalLink size={11} strokeWidth={1.5} color="var(--color-text-tertiary)" />
-              </span>
-            )}
           </span>
 
           {/* Concentration — raised from secondary to near-primary contrast;
@@ -509,12 +518,22 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
               {form}
             </span>
           )}
+
+          {/* Link icon — moved to the end of the whole formula (name +
+              concentration + form), not flush against the name, so it reads
+              as "this entire entry opens a detail page" rather than being
+              visually tied to the name alone. */}
+          {linkEnabled && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <ExternalLink size={11} strokeWidth={1.5} color="var(--color-text-tertiary)" />
+            </span>
+          )}
         </div>
 
-        {/* Search icon — Google Images for this drug in Egypt.
-            Bumped from tertiary (near-disabled contrast) to secondary, and
-            14->16px, so it reads as a tappable action rather than a faint
-            decoration. */}
+        {/* Image-search icon — opens Google Images for this drug in Egypt. */}
         <button
           onClick={handleSearchClick}
           aria-label={`Search images for ${name}`}
@@ -526,7 +545,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
             lineHeight: 1,
           }}
         >
-          <Icon name="Search" size={16} color="currentColor" />
+          <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
         </button>
       </div>
     </>
@@ -549,10 +568,10 @@ const ARABIC_RE_DOSE = /[\u0600-\u06FF\u0750-\u077F]/
 function DoseLine({ text }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   return (
-    <div dir="auto" style={{ marginTop: 10, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: 8, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       <span style={{
         fontSize: 13,
-        fontWeight: 500,
+        fontWeight: 600,
         color: 'var(--color-dose)',
         lineHeight: 1.55,
       }}>
