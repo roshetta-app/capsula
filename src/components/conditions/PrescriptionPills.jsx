@@ -11,14 +11,15 @@ import { ClipboardPlus } from 'lucide-react'
  * green ActiveDot is replaced with a clipboard+cross icon (lucide
  * ClipboardPlus), accent-tinted.
  *
- * Dropdown is no longer a separate floating box. The chrome — background,
- * border radius, ambient shadow — now lives on ONE outer container shared by
- * the trigger and the dropdown rows, so opening the list reads as the same
- * card growing downward (continuous shape, single shadow) rather than two
- * stacked boxes. Outer corners stay rounded regardless of open state
- * (overflow: hidden clips the flat-edged rows inside to that shape).
- * Only the active plan keeps an accent-tinted background on its own row;
- * inactive rows are plain, divided by hairlines.
+ * Dropdown floats over the page (position: absolute) instead of pushing the
+ * content below it down. It's flush against the trigger (no gap) and shares
+ * the trigger's white background and corner radius so the two read as one
+ * continuous card growing downward — but it carries no shadow of its own
+ * (only the trigger keeps the ambient card shadow); when open, the trigger's
+ * bottom corners square off and the dropdown's bottom corners round, so the
+ * seam between them is invisible. Only the active plan keeps an
+ * accent-tinted background on its own row; inactive rows are plain, divided
+ * by hairlines.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -72,8 +73,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
     setOpen(false)
   }
 
-  // Single ambient shadow for the whole merged card (trigger + open rows),
-  // matching SpecialtySelector's restrained treatment.
+  // Ambient shadow lives only on the trigger card — the dropdown has none,
+  // per the floating-but-seamless treatment.
   const containerShadow = pressed
     ? '0 1px 1px rgba(0,0,0,0.02)'
     : '0 1px 2px rgba(0,0,0,0.04)'
@@ -83,18 +84,11 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      style={{
-        marginBottom: 'var(--space-2)',
-        background: 'var(--color-surface)',
-        borderRadius: '16px',
-        overflow: 'hidden',
-        boxShadow: containerShadow,
-        transition: 'box-shadow 0.12s ease',
-      }}
+      style={{ marginBottom: 'var(--space-2)', position: 'relative' }}
     >
-      {/* Trigger row — floating-label field, same shape as SpecialtySelector.
-          No own background/radius/shadow — those live on the shared
-          container above so the open dropdown reads as part of the same card. */}
+      {/* Trigger card — floating-label field, same shape as SpecialtySelector.
+          Bottom corners square off when open so it visually fuses with the
+          dropdown directly beneath it. */}
       <button
         onClick={() => setOpen(o => !o)}
         onPointerDown={() => setPressed(true)}
@@ -110,14 +104,16 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           padding: '9px 14px',
           background: pressed
             ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
-            : 'none',
+            : 'var(--color-surface)',
           border: 'none',
+          borderRadius: open ? '16px 16px 0 0' : '16px',
+          boxShadow: containerShadow,
           cursor: 'pointer',
           fontFamily: 'var(--font-body)',
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           boxSizing: 'border-box',
-          transition: 'background-color 0.12s ease',
+          transition: 'background-color 0.12s ease, box-shadow 0.12s ease',
         }}
       >
         {/* Label — helper text, smallest element in the hierarchy */}
@@ -174,12 +170,23 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         </span>
       </button>
 
-      {/* Dropdown rows — plain flow (not absolutely positioned), no own
-          background/radius/shadow/border; clipped to the shared container's
-          rounded corners via its overflow: hidden. Top hairline separates
-          it from the trigger row. */}
+      {/* Dropdown — floats over the page (absolute, flush against the
+          trigger, no gap), so it overlays content below rather than pushing
+          it down. Same white background as the trigger, top corners square
+          (fuses with trigger above), bottom corners rounded. No shadow,
+          no border — only a top hairline separates it from the trigger. */}
       {open && (
-        <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
+        <div style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: '100%',
+          zIndex: 60,
+          borderTop: '1px solid var(--color-border-subtle)',
+          borderRadius: '0 0 16px 16px',
+          background: 'var(--color-surface)',
+          overflow: 'hidden',
+        }}>
           {prescriptions.map((rx, i) => {
             const isActive = i === activeIndex
             const isLast = i === prescriptions.length - 1
