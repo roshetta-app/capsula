@@ -6,22 +6,19 @@ import { ClipboardPlus } from 'lucide-react'
  *
  * Trigger redesign — matches SpecialtySelector.jsx's floating-label field
  * pattern: a small "Treatment plans" label on top, an icon + selected name +
- * chevron value row below, on a filled accent-tinted card with no border and
- * an ambient shadow (replacing the previous bordered-button + separate
- * uppercase-label treatment). The green ActiveDot is replaced with a
- * clipboard+cross icon (lucide ClipboardPlus) — accent-tinted, since a
- * prescription sheet is always selected here (no idle/unselected state to
- * distinguish, unlike SpecialtySelector's optional filter, so the card stays
- * permanently tinted rather than toggling between idle/active looks).
+ * chevron value row below. Background is plain white (var(--color-surface)),
+ * same as SpecialtySelector's idle state — no accent tint by default. The
+ * green ActiveDot is replaced with a clipboard+cross icon (lucide
+ * ClipboardPlus), accent-tinted.
  *
- * Dropdown menu — restyled to match the new trigger card (borderless,
- * rounded, shadow-lifted, floating slightly below the trigger) instead of
- * the old hard-bordered, sharp-cornered panel. Item rows, selection logic,
- * and outside-click handling are unchanged.
- *
- * Fixes (carried over):
- *  - Removed marginBottom so the gap between dropdown and first sheet row is
- *    controlled by the sheet itself (tighter layout).
+ * Dropdown is no longer a separate floating box. The chrome — background,
+ * border radius, ambient shadow — now lives on ONE outer container shared by
+ * the trigger and the dropdown rows, so opening the list reads as the same
+ * card growing downward (continuous shape, single shadow) rather than two
+ * stacked boxes. Outer corners stay rounded regardless of open state
+ * (overflow: hidden clips the flat-edged rows inside to that shape).
+ * Only the active plan keeps an accent-tinted background on its own row;
+ * inactive rows are plain, divided by hairlines.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -75,8 +72,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
     setOpen(false)
   }
 
-  // Ambient shadow to lift the card off the page background, matching
-  // SpecialtySelector's restrained treatment.
+  // Single ambient shadow for the whole merged card (trigger + open rows),
+  // matching SpecialtySelector's restrained treatment.
   const containerShadow = pressed
     ? '0 1px 1px rgba(0,0,0,0.02)'
     : '0 1px 2px rgba(0,0,0,0.04)'
@@ -86,9 +83,18 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      style={{ marginBottom: 'var(--space-2)', position: 'relative' }}
+      style={{
+        marginBottom: 'var(--space-2)',
+        background: 'var(--color-surface)',
+        borderRadius: '16px',
+        overflow: 'hidden',
+        boxShadow: containerShadow,
+        transition: 'box-shadow 0.12s ease',
+      }}
     >
-      {/* Trigger card — floating-label field, same shape as SpecialtySelector */}
+      {/* Trigger row — floating-label field, same shape as SpecialtySelector.
+          No own background/radius/shadow — those live on the shared
+          container above so the open dropdown reads as part of the same card. */}
       <button
         onClick={() => setOpen(o => !o)}
         onPointerDown={() => setPressed(true)}
@@ -103,17 +109,15 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           textAlign: 'left',
           padding: '9px 14px',
           background: pressed
-            ? 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surface) 90%)'
-            : 'color-mix(in srgb, var(--color-accent) 4%, var(--color-surface) 96%)',
+            ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
+            : 'none',
           border: 'none',
-          borderRadius: '16px',
-          boxShadow: containerShadow,
           cursor: 'pointer',
           fontFamily: 'var(--font-body)',
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           boxSizing: 'border-box',
-          transition: 'background-color 0.12s ease, box-shadow 0.12s ease',
+          transition: 'background-color 0.12s ease',
         }}
       >
         {/* Label — helper text, smallest element in the hierarchy */}
@@ -170,22 +174,12 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         </span>
       </button>
 
-      {/* Dropdown list — restyled to match the trigger's new borderless,
-          shadow-lifted card style (was a hard accent-bordered, sharp-cornered
-          panel left over from the old bordered-button trigger). */}
+      {/* Dropdown rows — plain flow (not absolutely positioned), no own
+          background/radius/shadow/border; clipped to the shared container's
+          rounded corners via its overflow: hidden. Top hairline separates
+          it from the trigger row. */}
       {open && (
-        <div style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 'calc(100% + 4px)',
-          zIndex: 60,
-          border: 'none',
-          borderRadius: '16px',
-          background: 'var(--color-surface)',
-          overflow: 'hidden',
-          boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
-        }}>
+        <div style={{ borderTop: '1px solid var(--color-border-subtle)' }}>
           {prescriptions.map((rx, i) => {
             const isActive = i === activeIndex
             const isLast = i === prescriptions.length - 1
