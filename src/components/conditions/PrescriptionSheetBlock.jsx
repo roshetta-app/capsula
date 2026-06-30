@@ -546,6 +546,8 @@ function DoseLine({ text }) {
         fontWeight: 500,
         color: 'var(--color-dose)',
         lineHeight: 1.55,
+      }}>
+        {text}
       </span>
     </div>
   )
