@@ -14,8 +14,10 @@ import { ClipboardPlus } from 'lucide-react'
  * distinguish, unlike SpecialtySelector's optional filter, so the card stays
  * permanently tinted rather than toggling between idle/active looks).
  *
- * Dropdown menu and its items (IconCheck / IconDot rows, outside-click
- * handling, selection logic) are unchanged from the prior implementation.
+ * Dropdown menu — restyled to match the new trigger card (borderless,
+ * rounded, shadow-lifted, floating slightly below the trigger) instead of
+ * the old hard-bordered, sharp-cornered panel. Item rows, selection logic,
+ * and outside-click handling are unchanged.
  *
  * Fixes (carried over):
  *  - Removed marginBottom so the gap between dropdown and first sheet row is
@@ -84,7 +86,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      style={{ marginBottom: 'var(--space-3)', position: 'relative' }}
+      style={{ marginBottom: 'var(--space-2)', position: 'relative' }}
     >
       {/* Trigger card — floating-label field, same shape as SpecialtySelector */}
       <button
@@ -99,10 +101,10 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           flexDirection: 'column',
           alignItems: 'stretch',
           textAlign: 'left',
-          padding: '12px 14px',
+          padding: '9px 14px',
           background: pressed
-            ? 'color-mix(in srgb, var(--color-accent) 18%, var(--color-surface) 82%)'
-            : 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surface) 90%)',
+            ? 'color-mix(in srgb, var(--color-accent) 10%, var(--color-surface) 90%)'
+            : 'color-mix(in srgb, var(--color-accent) 4%, var(--color-surface) 96%)',
           border: 'none',
           borderRadius: '16px',
           boxShadow: containerShadow,
@@ -168,19 +170,21 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         </span>
       </button>
 
-      {/* Dropdown list — unchanged */}
+      {/* Dropdown list — restyled to match the trigger's new borderless,
+          shadow-lifted card style (was a hard accent-bordered, sharp-cornered
+          panel left over from the old bordered-button trigger). */}
       {open && (
         <div style={{
           position: 'absolute',
           left: 0,
           right: 0,
+          top: 'calc(100% + 4px)',
           zIndex: 60,
-          border: '1.5px solid var(--color-accent)',
-          borderTop: '1px solid var(--color-border-subtle)',
-          borderRadius: '0 0 10px 10px',
+          border: 'none',
+          borderRadius: '16px',
           background: 'var(--color-surface)',
           overflow: 'hidden',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+          boxShadow: '0 6px 16px rgba(0,0,0,0.08)',
         }}>
           {prescriptions.map((rx, i) => {
             const isActive = i === activeIndex
