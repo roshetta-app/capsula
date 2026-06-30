@@ -1,3 +1,4 @@
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
@@ -359,45 +360,46 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
           const showOwnNote = data.note && data.note !== cluster.note
 
           return (
-            <div key={uIdx} style={{ display: 'flex', alignItems: 'center', marginTop: uIdx > 0 ? 8 : 0 }}>
-              {/* Prefix column — fixed width so all drug names align */}
-              <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
-                {uIdx === 0 ? (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, fontStyle: 'italic',
-                    color: 'var(--color-accent)',
-                    lineHeight: 1,
-                  }}>Rx</span>
-                ) : (
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, fontStyle: 'italic',
-                    color: 'var(--color-warning)',
-                    lineHeight: 1,
-                  }}>(or)</span>
-                )}
+            <React.Fragment key={uIdx}>
+              <div style={{ display: 'flex', alignItems: 'center', marginTop: uIdx > 0 ? 8 : 0 }}>
+                {/* Prefix column — fixed width so all drug names align */}
+                <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                  {uIdx === 0 ? (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, fontStyle: 'italic',
+                      color: 'var(--color-accent)',
+                      lineHeight: 1,
+                    }}>Rx</span>
+                  ) : (
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, fontStyle: 'italic',
+                      color: 'var(--color-warning)',
+                      lineHeight: 1,
+                    }}>(or)</span>
+                  )}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <DrugMainLine
+                    name={memberName}
+                    concentration={data.concentration}
+                    form={data.form}
+                    linkEnabled={memberLinkEnabled}
+                    slug={member.formulation?.slug ?? null}
+                    navigate={navigate}
+                  />
+                  {showOwnNote && <RowNote note={data.note} />}
+                </div>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-              <DrugMainLine
-                name={memberName}
-                concentration={data.concentration}
-                form={data.form}
-                linkEnabled={memberLinkEnabled}
-                slug={member.formulation?.slug ?? null}
-                navigate={navigate}
-              />
 
-              {showOwnNote && <RowNote note={data.note} />}
-              </div>
-            </div>
-
-            {/* Dose and note render once after the last member of each
-                cluster — outside the prefix layout so they span full width */}
-            {isLastMemberOfCluster && (
-              <>
-                {cluster.dose && <DoseLine text={cluster.dose} />}
-                {cluster.note && <RowNote note={cluster.note} />}
-              </>
-            )}
+              {/* Dose and note render once after the last member of each
+                  cluster — outside the prefix layout so they span full width */}
+              {isLastMemberOfCluster && (
+                <>
+                  {cluster.dose && <DoseLine text={cluster.dose} />}
+                  {cluster.note && <RowNote note={cluster.note} />}
+                </>
+              )}
+            </React.Fragment>
           )
         })}
       </div>
