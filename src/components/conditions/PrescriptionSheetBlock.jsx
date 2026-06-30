@@ -2,7 +2,7 @@ import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugs } from '../../hooks/useDrugs'
 import Icon from '../ui/Icon'
-import { FileText, ChevronRight } from 'lucide-react'
+import { FileText, ExternalLink } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
@@ -397,14 +397,20 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                     }}>or</span>
                   )}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    flex: 1, minWidth: 0,
+                    cursor: memberLinkEnabled && member.formulation?.slug ? 'pointer' : 'default',
+                  }}
+                  onClick={memberLinkEnabled && member.formulation?.slug
+                    ? () => navigate(`/drugs/${member.formulation.slug}`)
+                    : undefined}
+                >
                   <DrugMainLine
                     name={memberName}
                     concentration={data.concentration}
                     form={data.form}
                     linkEnabled={memberLinkEnabled}
-                    slug={member.formulation?.slug ?? null}
-                    navigate={navigate}
                   />
                   {showOwnNote && <RowNote note={data.note} />}
                 </div>
@@ -434,7 +440,10 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  * DrugMainLine — visual refinement phase.
  *
  * Name color: uniform `text-primary` for all entries (linked or not).
- * Linked names: dotted underline to signal tappability (not accent-blue).
+ * Linked names: small external-link icon after the name signals "opens
+ * another screen" without implying selection state. The whole drug row
+ * (not just the name) is now tappable — handled one level up in
+ * UnifiedDrugRow — so this component just renders the icon as a visual cue.
  * Concentration: plain lighter text right after name, no dot prefix.
  * Form: pill/badge styling (distinct visual weight from concentration).
  * Search icon: right-side icon that opens Google Images for the drug in Egypt.
@@ -443,7 +452,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
  *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
  */
-function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }) {
+function DrugMainLine({ name, concentration, form, linkEnabled }) {
   if (!name) return null
 
   const handleSearchClick = (e) => {
@@ -457,32 +466,17 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
       {/* Name line: name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          {linkEnabled && slug ? (
-            <button
-              onClick={() => navigate(`/drugs/${slug}`)}
-              style={{
-                background: 'none', border: 'none', padding: 0,
-                cursor: 'pointer', textAlign: 'left',
-                fontFamily: 'var(--font-body)',
-                fontSize: 18, fontWeight: 500,
-                color: 'var(--color-text-primary)',
-                lineHeight: 1.3,
-                textDecoration: 'none',
-                display: 'inline-flex', alignItems: 'center', gap: 2,
-              }}
-            >
-              {name}
-              <ChevronRight size={14} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-            </button>
-          ) : (
-            <span style={{
-              fontSize: 18, fontWeight: 500,
-              color: 'var(--color-text-primary)',
-              lineHeight: 1.3,
-            }}>
-              {name}
-            </span>
-          )}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 18, fontWeight: 500,
+            color: 'var(--color-text-primary)',
+            lineHeight: 1.3,
+          }}>
+            {name}
+            {linkEnabled && (
+              <ExternalLink size={13} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+            )}
+          </span>
 
           {/* Concentration — raised from secondary to near-primary contrast;
               this was reading as near-invisible at the old --color-text-secondary
@@ -545,9 +539,12 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }
  * --color-dose itself (cool slate/ink, distinct from text-primary, no
  * success/warning connotation) is unchanged from Phase 9.
  */
+const ARABIC_RE_DOSE = /[\u0600-\u06FF\u0750-\u077F]/
+
 function DoseLine({ text }) {
+  const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   return (
-    <div dir="auto" style={{ marginTop: 12, paddingInlineStart: 6, textAlign: 'left', unicodeBidi: 'plaintext' }}>
+    <div dir="auto" style={{ marginTop: 10, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       <span style={{
         fontSize: 14,
         fontWeight: 500,
@@ -605,7 +602,7 @@ function RowNote({ note }) {
         flexDirection: isArabic ? 'row-reverse' : 'row',
         alignItems: 'flex-start',
         gap: 6,
-        marginTop: 8,
+        marginTop: 6,
       }}
     >
       <span style={{
@@ -687,5 +684,5 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  padding: '15px 0',
+  padding: '13px 0',
 }
