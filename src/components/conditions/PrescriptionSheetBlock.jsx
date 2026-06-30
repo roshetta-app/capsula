@@ -14,31 +14,6 @@ const RX_RAIL_WIDTH = 28
 const RX_RAIL_GAP = 8
 
 /**
- * IconRx — small "Rx" monogram (italic serif R + smaller x), the classic
- * pharmacy convention. Replaces an earlier attempt that rendered the
- * Unicode ℞ glyph via SVG <text> — that approach was unreliable across
- * fonts/platforms (glyph support and rendering of ℞ varies a lot and often
- * looks broken or cramped). This is plain styled text instead, so it
- * renders identically everywhere, while still reading as a distinct
- * monogram rather than a body-text label.
- */
-function IconRx({ size = 14, color = 'currentColor' }) {
-  return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'baseline',
-      fontFamily: 'Georgia, "Times New Roman", serif',
-      fontStyle: 'italic',
-      lineHeight: 1,
-      color,
-    }}>
-      <span style={{ fontSize: size, fontWeight: 600 }}>R</span>
-      <span style={{ fontSize: size * 0.72, fontWeight: 600, marginInlineStart: 0.5 }}>x</span>
-    </span>
-  )
-}
-
-/**
  * PrescriptionSheetBlock — renders ONE prescription_sheet's rows[] (Phase 3).
  *
  * Row types (in `sheet.rows[]`, array order = display order):
@@ -393,26 +368,20 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                     naturally varies with label length ('or' leaves more
                     room than 'Rx1'), which is the intended visual rhythm. */}
                 <div style={{ width: RX_RAIL_WIDTH, flexShrink: 0, display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline' }}>
+                  {/* Rail unification pass: 'Rx{n}' and 'or' are both plain
+                      positional annotations, not design elements — same
+                      body font, same quiet tertiary color, same weight, so
+                      neither competes visually with the drug name. */}
                   {uIdx === 0 ? (
-                    <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
-                      <IconRx
-                        size={13}
-                        color="var(--color-text-secondary)"
-                      />
-                      {/* VISUAL-WEIGHT PASS: desaturated from the full
-                          --color-accent blue via color-mix (65% accent /
-                          35% gray) — same hue family, lower saturation —
-                          rather than touching the global token, which is
-                          shared by the back button, tabs, links, etc. */}
-                      <span style={{
-                        fontSize: 12, fontWeight: 700,
-                        color: 'color-mix(in srgb, var(--color-accent) 65%, gray 35%)',
-                      }}>{index}</span>
-                    </span>
+                    <span style={{
+                      fontSize: 12, fontWeight: 500,
+                      color: 'var(--color-text-tertiary)',
+                      lineHeight: 1,
+                    }}>Rx{index}</span>
                   ) : (
                     <span style={{
-                      fontSize: 11, fontWeight: 500,
-                      color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
+                      fontSize: 12, fontWeight: 500,
+                      color: 'var(--color-text-tertiary)',
                       lineHeight: 1,
                     }}>or</span>
                   )}
