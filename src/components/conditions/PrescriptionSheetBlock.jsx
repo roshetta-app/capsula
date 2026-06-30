@@ -467,14 +467,19 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 18, fontWeight: 500,
             color: 'var(--color-text-primary)',
             lineHeight: 1.3,
           }}>
             {name}
             {linkEnabled && (
-              <ExternalLink size={13} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0, alignSelf: 'flex-start', marginTop: 1,
+              }}>
+                <ExternalLink size={11} strokeWidth={1.5} color="var(--color-text-tertiary)" />
+              </span>
             )}
           </span>
 
