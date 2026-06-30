@@ -54,7 +54,7 @@
   --color-ink-faint:     #9E9B95;
 
   /* Font families */
-  --font-sans:  "IBM Plex Sans", sans-serif;
+  --font-sans:  "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
   --font-mono:  "DM Mono", monospace;
 
   /* Border radius */
@@ -117,8 +117,8 @@
      and a section never read as "the same kind of box" at a glance. */
   --color-section-bg:       #F3EFFA;
 
-  --font-display:           "IBM Plex Sans", sans-serif;
-  --font-body:              "IBM Plex Sans", sans-serif;
+  --font-display:           "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
+  --font-body:              "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
   --font-arabic:            "IBM Plex Sans Arabic", sans-serif;
   --font-mono:              "DM Mono", monospace;
 
