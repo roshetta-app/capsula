@@ -359,7 +359,24 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
           const showOwnNote = data.note && data.note !== cluster.note
 
           return (
-            <div key={uIdx}>
+            <div key={uIdx} style={{ display: 'flex', alignItems: 'center', marginTop: uIdx > 0 ? 8 : 0 }}>
+              {/* Prefix column — fixed width so all drug names align */}
+              <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                {uIdx === 0 ? (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, fontStyle: 'italic',
+                    color: 'var(--color-accent)',
+                    lineHeight: 1,
+                  }}>Rx</span>
+                ) : (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, fontStyle: 'italic',
+                    color: 'var(--color-warning)',
+                    lineHeight: 1,
+                  }}>(or)</span>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
               <DrugMainLine
                 name={memberName}
                 concentration={data.concentration}
@@ -367,20 +384,20 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                 linkEnabled={memberLinkEnabled}
                 slug={member.formulation?.slug ?? null}
                 navigate={navigate}
-                showOr={uIdx > 0}
               />
 
               {showOwnNote && <RowNote note={data.note} />}
-
-              {/* Dose and note render once after the last member of each
-                  cluster — shared by all members in that cluster */}
-              {isLastMemberOfCluster && (
-                <>
-                  {cluster.dose && <DoseLine text={cluster.dose} />}
-                  {cluster.note && <RowNote note={cluster.note} />}
-                </>
-              )}
+              </div>
             </div>
+
+            {/* Dose and note render once after the last member of each
+                cluster — outside the prefix layout so they span full width */}
+            {isLastMemberOfCluster && (
+              <>
+                {cluster.dose && <DoseLine text={cluster.dose} />}
+                {cluster.note && <RowNote note={cluster.note} />}
+              </>
+            )}
           )
         })}
       </div>
@@ -403,7 +420,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
  *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
  */
-function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, showOr = false }) {
+function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate }) {
   if (!name) return null
 
   const handleSearchClick = (e) => {
@@ -414,22 +431,9 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, 
 
   return (
     <>
-      {/* Name line: (or) prefix + name + conc + form + search icon — equal spacing */}
+      {/* Name line: name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-          {/* Inline (or) prefix — only for alternative units */}
-          {showOr && (
-            <span style={{
-              fontSize: 10,
-              fontWeight: 700,
-              fontStyle: 'italic',
-              color: 'var(--color-warning)',
-              flexShrink: 0,
-              lineHeight: 1,
-            }}>
-              (or)
-            </span>
-          )}
           {linkEnabled && slug ? (
             <button
               onClick={() => navigate(`/drugs/${slug}`)}
@@ -437,7 +441,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, 
                 background: 'none', border: 'none', padding: 0,
                 cursor: 'pointer', textAlign: 'left',
                 fontFamily: 'var(--font-body)',
-                fontSize: 16, fontWeight: 700,
+                fontSize: 18, fontWeight: 700,
                 color: 'var(--color-text-primary)',
                 lineHeight: 1.3,
                 textDecoration: 'underline',
@@ -450,7 +454,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, 
             </button>
           ) : (
             <span style={{
-              fontSize: 16, fontWeight: 700,
+              fontSize: 18, fontWeight: 700,
               color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
@@ -469,11 +473,11 @@ function DrugMainLine({ name, concentration, form, linkEnabled, slug, navigate, 
             </span>
           )}
 
-          {/* Form — plain accent text, no pill/fill/border */}
+          {/* Form — same color as conc but bolder */}
           {form && (
             <span style={{
-              fontSize: 10, fontWeight: 600,
-              color: 'var(--color-accent)',
+              fontSize: 12, fontWeight: 600,
+              color: 'var(--color-text-secondary)',
               lineHeight: 1.3,
               letterSpacing: '0.01em',
               flexShrink: 0,
@@ -521,7 +525,7 @@ function DoseLine({ text }) {
   return (
     <div dir="auto" style={{ marginTop: 12, paddingLeft: 6, unicodeBidi: 'plaintext' }}>
       <span style={{
-        fontSize: 13,
+        fontSize: 15,
         fontWeight: 600,
         color: 'var(--color-dose)',
         lineHeight: 1.5,
@@ -654,6 +658,6 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: 'var(--space-3)',
+  gap: 8,
   padding: '14px 0',
 }
