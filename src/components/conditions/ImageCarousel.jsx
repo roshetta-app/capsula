@@ -5,12 +5,16 @@
  *   - Full-bleed: negative horizontal margins break out of panel padding
  *   - 4:3 aspect ratio via padding-top trick; image absolutely fills container
  *   - object-fit: cover, object-position: center
- *   - No border, no radius, no shadow
+ *   - Rounded corners (var(--radius-lg)) matching the app's card radius
+ *     convention — no border, no shadow
  *   - Order: image → dots → caption
  *
  * Interaction:
  *   - Swipe threshold: 50px
- *   - Tap (< 8px movement) → opens Lightbox
+ *   - Tap (< 8px movement on BOTH axes) → opens Lightbox. Requiring both dx
+ *     and dy to stay small (not just dx) prevents a vertical page-scroll
+ *     gesture over the image — which can have a small horizontal delta —
+ *     from being misread as a tap and accidentally opening the lightbox.
  *   - e.stopPropagation() on touchstart blocks parent tab-switcher
  *
  * Props:
@@ -23,6 +27,7 @@ export default function ImageCarousel({ images = [] }) {
   const [index,        setIndex]    = useState(0)
   const [lightboxOpen, setLightbox] = useState(false)
   const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
 
   const goTo   = useCallback((i) => setIndex(Math.max(0, Math.min(images.length - 1, i))), [images.length])
   const openAt = useCallback((i) => { setIndex(i); setLightbox(true) }, [])
@@ -34,21 +39,25 @@ export default function ImageCarousel({ images = [] }) {
   function onTouchStart(e) {
     e.stopPropagation()
     touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
   }
 
   function onTouchEnd(e) {
     e.stopPropagation()
     if (touchStartX.current === null) return
     const dx    = e.changedTouches[0].clientX - touchStartX.current
+    const dy    = e.changedTouches[0].clientY - touchStartY.current
     const absDx = Math.abs(dx)
+    const absDy = Math.abs(dy)
     touchStartX.current = null
+    touchStartY.current = null
 
     if (absDx >= 50) {
       // Swipe — change image
       if (dx < 0 && index < images.length - 1) setIndex(i => i + 1)
       if (dx > 0 && index > 0)                 setIndex(i => i - 1)
-    } else if (absDx < 8) {
-      // Tap — open lightbox
+    } else if (absDx < 8 && absDy < 8) {
+      // True stationary tap (minimal movement on both axes) — open lightbox
       openAt(index)
     }
   }
@@ -74,6 +83,7 @@ export default function ImageCarousel({ images = [] }) {
             overflow: 'hidden',
             cursor: 'zoom-in',
             backgroundColor: 'var(--color-bg)',
+            borderRadius: 'var(--radius-lg)',
           }}
         >
           <img

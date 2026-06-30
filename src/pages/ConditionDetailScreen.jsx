@@ -316,9 +316,12 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
               </div>
             )}
 
+            {/* VISUAL-WEIGHT PASS: fontWeight dropped 700 -> 600. At 700 the
+                title read heavier than intended; 600 keeps it the largest/boldest
+                element on the header while reading a touch less dense. */}
             <h1 style={{
               fontSize: 22,
-              fontWeight: 700,
+              fontWeight: 600,
               color: 'var(--color-text-primary)',
               margin: '0 0 14px 0',
               lineHeight: 1.2,

@@ -60,7 +60,9 @@ const RX_RAIL_GAP = 5
  *     `drug` rows (PHASE 9). A drug row followed by a note/free_text row,
  *     or a lone drug row with no following sibling, never draws this line
  *     — it would otherwise sit on top of an unrelated element below it.
- *   - Terminal divider: dashed rule + 'end of sheet' label after the last row.
+ *   - Terminal marker: a small, low-opacity zigzag after the last row —
+ *     decorative only, no label/text (VISUAL-WEIGHT PASS, supersedes the
+ *     earlier dashed-line + "end of sheet" text treatment).
  *   - Drug name: uniform text-primary color for all entries; linked names get
  *     a dotted underline to signal tappability (not accent-blue color).
  *   - Concentration: plain lighter text directly after name (no dot separator).
@@ -180,39 +182,28 @@ export default function PrescriptionSheetBlock({ sheet }) {
         )
       })}
 
-      {/* ── Terminal divider ─────────────────────────────────────────────────────
-          Visually distinct from the thin solid hairlines between prescription items.
-          Uses a dashed pattern + subtle label to clearly mark 'end of sheet' and
-          separate the content from personal notes / disclaimer below.
+      {/* ── Terminal marker — quiet zigzag, decorative only, no text ───────────────
+          Replaces the previous dashed-line + "end of sheet" label treatment.
+          Low-opacity accent stroke keeps it visually distinct from the solid
+          hairlines between prescription items without drawing attention to itself.
       ────────────────────────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex',
-        alignItems: 'center',
-        gap: 8,
+        justifyContent: 'center',
         marginTop: 'var(--space-3)',
         marginBottom: 'var(--space-1)',
       }}>
-        <div style={{
-          flex: 1,
-          height: 0,
-          borderTop: '1px dashed var(--color-border)',
-        }} />
-        <span style={{
-          fontSize: 8,
-          fontWeight: 500,
-          letterSpacing: '0.08em',
-          textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
-          opacity: 0.4,
-          flexShrink: 0,
-        }}>
-          end of sheet
-        </span>
-        <div style={{
-          flex: 1,
-          height: 0,
-          borderTop: '1px dashed var(--color-border)',
-        }} />
+        <svg width="40" height="8" viewBox="0 0 40 8" fill="none" aria-hidden="true">
+          <polyline
+            points="0,4 5,1 10,7 15,1 20,7 25,1 30,7 35,1 40,4"
+            stroke="var(--color-accent)"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.3"
+            fill="none"
+          />
+        </svg>
       </div>
     </div>
   )
@@ -384,9 +375,14 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                         fontSize: 12, fontWeight: 600,
                         color: 'var(--color-text-secondary)',
                       }}>Rx</span>
+                      {/* VISUAL-WEIGHT PASS: desaturated from the full
+                          --color-accent blue via color-mix (65% accent /
+                          35% gray) — same hue family, lower saturation —
+                          rather than touching the global token, which is
+                          shared by the back button, tabs, links, etc. */}
                       <span style={{
                         fontSize: 14, fontWeight: 800,
-                        color: 'var(--color-accent)',
+                        color: 'color-mix(in srgb, var(--color-accent) 65%, gray 35%)',
                       }}>{index}</span>
                     </span>
                   ) : (
@@ -451,6 +447,10 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
  * Typography scale (batch 2 fine-grained fixes):
  *   name: 17→15px, concentration: 13→12px, form pill: 11→10px
  *   Inner row alignItems: baseline→center (fixes form pill vertical centering)
+ *
+ * VISUAL-WEIGHT PASS: inner row gap dropped 8 -> 5, tightening the spacing
+ * between the drug name, concentration, and form so they read as one
+ * cohesive line rather than three loosely-spaced chips.
  */
 function DrugMainLine({ name, concentration, form, linkEnabled }) {
   if (!name) return null
@@ -465,7 +465,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
     <>
       {/* Name line: name + conc + form + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 18, fontWeight: 500,
