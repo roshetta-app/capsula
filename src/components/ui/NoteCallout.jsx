@@ -17,6 +17,12 @@
  *   - info:    ECG / pulse line (clinical feel)
  *   - tip:     medical cross badge (first-aid / clinical)
  *   - warning: triangle (universally understood, unchanged)
+ *
+ * VISUAL PASS — 'inline' variant only: background darkened a touch (was
+ * reading too close to the page background to register as its own element),
+ * and a thin hairline divider with breathing room above now separates the
+ * note from whatever prescription content precedes it, instead of the note
+ * box just butting up directly against it.
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -179,29 +185,38 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   }
 
   // ── variant='inline' (default): icon + text side-by-side ─────────────────
+  // VISUAL PASS: hairline divider + spacing above separates this from
+  // whatever prescription content precedes it; background darkened a touch
+  // (color-mix toward black) so the note registers as its own element
+  // instead of nearly disappearing into the page background.
   return (
-    <div style={{
-      background: 'var(--color-note-bg)',
-      borderRadius: 'var(--radius-lg)',
-      padding: '12px 16px',
-    }}>
-      <div
-        dir={direction}
-        style={{
-          display: 'flex',
-          flexDirection: 'row',
-          alignItems: 'flex-start',
-          gap: 8,
-        }}
-      >
-        {/* SVG icon — color-coded per flavor; side follows text direction */}
-        <Icon color={f.colorLight} />
+    <>
+      <div style={{
+        height: 1,
+        background: 'var(--color-border)',
+        margin: '14px 0 10px 0',
+      }} />
+      <div style={{
+        background: 'color-mix(in srgb, var(--color-note-bg) 85%, black 15%)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '12px 16px',
+      }}>
+        <div
+          dir={direction}
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'flex-start',
+            gap: 8,
+          }}
+        >
+          {/* SVG icon — color-coded per flavor; side follows text direction */}
+          <Icon color={f.colorLight} />
 
-        {/* Note text — block container, each paragraph resolves its own bidi.
-            Color bumped to text-primary (black) and weight/size increased
-            for legibility — was text-secondary (grey) at 13px/450. */}
-        {textContent}
+          {/* Note text — block container, each paragraph resolves its own bidi. */}
+          {textContent}
+        </div>
       </div>
-    </div>
+    </>
   )
 }

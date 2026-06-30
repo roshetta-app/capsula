@@ -14,12 +14,17 @@ import { ClipboardPlus } from 'lucide-react'
  * Dropdown floats over the page (position: absolute) instead of pushing the
  * content below it down. It's flush against the trigger (no gap) and shares
  * the trigger's white background and corner radius so the two read as one
- * continuous card growing downward — but it carries no shadow of its own
- * (only the trigger keeps the ambient card shadow); when open, the trigger's
- * bottom corners square off and the dropdown's bottom corners round, so the
- * seam between them is invisible. Only the active plan keeps an
- * accent-tinted background on its own row; inactive rows are plain, divided
- * by hairlines.
+ * continuous card growing downward; when open, the trigger's bottom corners
+ * square off and the dropdown's bottom corners round, so the seam between
+ * them is invisible. Only the active plan keeps an accent-tinted background
+ * on its own row; inactive rows are plain, divided by hairlines.
+ *
+ * Open-state affordance: when open, a 2px accent-blue border wraps the
+ * entire merged shape (trigger + dropdown) so it's unambiguous the control
+ * is expanded, and a dim scrim (fixed, semi-transparent) covers the rest of
+ * the Treatment tab content behind it — same idea as a bottom sheet pulling
+ * focus — so the open list reads as the thing currently demanding attention.
+ * Tapping the scrim closes the dropdown.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -84,11 +89,33 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       ref={containerRef}
       onTouchStart={e => e.stopPropagation()}
       onTouchMove={e => e.stopPropagation()}
-      style={{ marginBottom: 'var(--space-2)', position: 'relative' }}
+      style={{
+        marginBottom: 'var(--space-2)',
+        position: 'relative',
+        zIndex: open ? 56 : 'auto',
+      }}
     >
+      {/* Dim scrim — covers the rest of the Treatment tab content while open,
+          pulling focus to the dropdown like a bottom sheet. Sits below the
+          trigger/dropdown (z-index 55) but above normal page content.
+          Tapping it closes the dropdown. */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.35)',
+            zIndex: 55,
+          }}
+        />
+      )}
+
       {/* Trigger card — floating-label field, same shape as SpecialtySelector.
           Bottom corners square off when open so it visually fuses with the
-          dropdown directly beneath it. */}
+          dropdown directly beneath it. A 2px accent border appears when open,
+          continuing into the dropdown below, to make the expanded state
+          unambiguous. */}
       <button
         onClick={() => setOpen(o => !o)}
         onPointerDown={() => setPressed(true)}
@@ -96,6 +123,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         onPointerLeave={() => setPressed(false)}
         aria-label={`Treatment plan: ${selected.label}. Tap to change.`}
         style={{
+          position: 'relative',
+          zIndex: 56,
           width: '100%',
           display: 'flex',
           flexDirection: 'column',
@@ -105,7 +134,8 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           background: pressed
             ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
             : 'var(--color-surface)',
-          border: 'none',
+          border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
+          borderBottom: open ? 'none' : '2px solid transparent',
           borderRadius: open ? '16px 16px 0 0' : '16px',
           boxShadow: containerShadow,
           cursor: 'pointer',
@@ -113,7 +143,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           boxSizing: 'border-box',
-          transition: 'background-color 0.12s ease, box-shadow 0.12s ease',
+          transition: 'background-color 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease',
         }}
       >
         {/* Label — helper text, smallest element in the hierarchy */}
@@ -173,16 +203,18 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       {/* Dropdown — floats over the page (absolute, flush against the
           trigger, no gap), so it overlays content below rather than pushing
           it down. Same white background as the trigger, top corners square
-          (fuses with trigger above), bottom corners rounded. No shadow,
-          no border — only a top hairline separates it from the trigger. */}
+          (fuses with trigger above), bottom corners rounded. Shares the same
+          2px accent border as the trigger when open (no border-top, so the
+          seam between them is invisible — one continuous outlined shape). */}
       {open && (
         <div style={{
           position: 'absolute',
           left: 0,
           right: 0,
           top: '100%',
-          zIndex: 60,
-          borderTop: '1px solid var(--color-border-subtle)',
+          zIndex: 56,
+          border: '2px solid var(--color-accent)',
+          borderTop: 'none',
           borderRadius: '0 0 16px 16px',
           background: 'var(--color-surface)',
           overflow: 'hidden',
