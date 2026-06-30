@@ -337,7 +337,6 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
   return (
     <div style={{ ...rowWrap, borderBottom: showDivider ? '1.5px solid var(--color-border)' : 'none' }}>
-      <NumberBadge index={index} />
       <div style={{ flex: 1, minWidth: 0 }}>
         {units.map((unit, uIdx) => {
           const { member, cluster, isLastMemberOfCluster } = unit
@@ -361,15 +360,15 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
 
           return (
             <React.Fragment key={uIdx}>
-              <div style={{ display: 'flex', alignItems: 'center', marginTop: uIdx > 0 ? 8 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', marginTop: uIdx > 0 ? 8 : 0 }}>
                 {/* Prefix column — fixed width so all drug names align */}
-                <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'center' }}>
+                <div style={{ width: 36, flexShrink: 0, display: 'flex', alignItems: 'baseline' }}>
                   {uIdx === 0 ? (
                     <span style={{
                       fontSize: 10, fontWeight: 700, fontStyle: 'italic',
                       color: 'var(--color-accent)',
                       lineHeight: 1,
-                    }}>Rx</span>
+                    }}>Rx{index}</span>
                   ) : (
                     <span style={{
                       fontSize: 10, fontWeight: 700, fontStyle: 'italic',
@@ -660,6 +659,5 @@ function NumberBadge({ index }) {
 const rowWrap = {
   display: 'flex',
   alignItems: 'flex-start',
-  gap: 8,
   padding: '14px 0',
 }
