@@ -81,6 +81,15 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
     ? '0 1px 1px rgba(0,0,0,0.02)'
     : '0 1px 2px rgba(0,0,0,0.04)'
 
+  // Single source of truth for the trigger's background, reused for its
+  // bottom border color when open (see note below) — keeps the button's
+  // rendered height exactly constant between open/closed states, instead of
+  // a removed border edge shrinking it by 2px and nudging the sheet content
+  // beneath the whole control up/down.
+  const triggerBg = pressed
+    ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
+    : 'var(--color-surface)'
+
   return (
     <div
       ref={containerRef}
@@ -96,7 +105,12 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           Bottom corners square off when open so it visually fuses with the
           dropdown directly beneath it. A 2px accent border appears when open,
           continuing into the dropdown below, to make the expanded state
-          unambiguous. */}
+          unambiguous.
+          LAYOUT-STABILITY FIX: the bottom border always stays 2px wide —
+          when open it's colored to match the trigger's own background
+          (invisible, fuses with the dropdown) rather than being removed
+          entirely, which previously shrank the button's height by 2px and
+          caused the sheet content below to visibly shift on open/close. */}
       <button
         onClick={() => setOpen(o => !o)}
         onPointerDown={() => setPressed(true)}
@@ -112,11 +126,9 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           alignItems: 'stretch',
           textAlign: 'left',
           padding: '9px 14px',
-          background: pressed
-            ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
-            : 'var(--color-surface)',
+          background: triggerBg,
           border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
-          borderBottom: open ? 'none' : '2px solid transparent',
+          borderBottom: open ? `2px solid ${triggerBg}` : '2px solid transparent',
           borderRadius: open ? '16px 16px 0 0' : '16px',
           boxShadow: containerShadow,
           cursor: 'pointer',

@@ -11,7 +11,7 @@ import { toDrugOptions } from '../../constants/prescriptionRowSchema'
 // two-digit 'Rx12' without wrapping, tight enough that the rail doesn't
 // read as a gap between the label and the drug name.
 const RX_RAIL_WIDTH = 28
-const RX_RAIL_GAP = 5
+const RX_RAIL_GAP = 8
 
 /**
  * IconRx — small "Rx" monogram (italic serif R + smaller x), the classic
@@ -32,8 +32,8 @@ function IconRx({ size = 14, color = 'currentColor' }) {
       lineHeight: 1,
       color,
     }}>
-      <span style={{ fontSize: size, fontWeight: 700 }}>R</span>
-      <span style={{ fontSize: size * 0.72, fontWeight: 700, marginInlineStart: 0.5 }}>x</span>
+      <span style={{ fontSize: size, fontWeight: 600 }}>R</span>
+      <span style={{ fontSize: size * 0.72, fontWeight: 600, marginInlineStart: 0.5 }}>x</span>
     </span>
   )
 }
@@ -396,7 +396,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                   {uIdx === 0 ? (
                     <span style={{ lineHeight: 1, display: 'inline-flex', alignItems: 'baseline', gap: 2 }}>
                       <IconRx
-                        size={14}
+                        size={13}
                         color="var(--color-text-secondary)"
                       />
                       {/* VISUAL-WEIGHT PASS: desaturated from the full
@@ -405,7 +405,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                           rather than touching the global token, which is
                           shared by the back button, tabs, links, etc. */}
                       <span style={{
-                        fontSize: 13, fontWeight: 800,
+                        fontSize: 12, fontWeight: 700,
                         color: 'color-mix(in srgb, var(--color-accent) 65%, gray 35%)',
                       }}>{index}</span>
                     </span>
@@ -534,7 +534,7 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
               flexShrink: 0,
             }}>
-              <ExternalLink size={11} strokeWidth={1.5} color="var(--color-text-tertiary)" />
+              <ExternalLink size={11} strokeWidth={1.5} color="var(--color-accent)" style={{ opacity: 0.55 }} />
             </span>
           )}
         </div>

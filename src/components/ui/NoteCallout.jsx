@@ -186,10 +186,10 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── variant='inline' (default): icon + text side-by-side ─────────────────
   // VISUAL PASS: hairline divider + spacing above separates this from
-  // whatever prescription content precedes it. Background is a faint grey
-  // tint (was darkened too far toward black in a prior pass — corrected
-  // here to a light, dim wash instead) and vertical padding trimmed for a
-  // shorter box.
+  // whatever prescription content precedes it. Background is a faint blue
+  // tint (was a grey tint) to match the app's accent-tinted "info" surfaces
+  // elsewhere; corner radius reduced from --radius-lg (16px) to a flatter
+  // 10px. Vertical padding trimmed for a shorter box.
   return (
     <>
       <div style={{
@@ -198,8 +198,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         margin: '14px 0 10px 0',
       }} />
       <div style={{
-        background: 'color-mix(in srgb, var(--color-note-bg) 92%, var(--color-text-secondary) 8%)',
-        borderRadius: 'var(--radius-lg)',
+        background: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-note-bg) 92%)',
+        borderRadius: '10px',
         padding: '9px 16px',
       }}>
         <div
