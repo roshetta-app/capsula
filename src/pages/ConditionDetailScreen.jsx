@@ -289,7 +289,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   onClick={onShare}
                   aria-label="Share prescription"
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                     color: 'var(--color-text-tertiary)',
                     WebkitTapHighlightColor: 'transparent', outline: 'none',
                   }}
@@ -307,7 +307,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   onClick={onFavToggle}
                   aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                     color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
                     transition: 'color 0.15s ease',
                     WebkitTapHighlightColor: 'transparent', outline: 'none',

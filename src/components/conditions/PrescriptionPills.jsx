@@ -21,7 +21,11 @@ import { ClipboardPlus } from 'lucide-react'
  *
  * Open-state affordance: when open, a 2px accent-blue border wraps the
  * entire merged shape (trigger + dropdown) so it's unambiguous the control
- * is expanded.
+ * is expanded. The dropdown is position:absolute (overlays the page rather
+ * than pushing content down), so the border is necessarily split across
+ * the two elements; the trigger's bottom edge and the dropdown both
+ * transition on the same synced clock so they read as one continuous
+ * border opening/closing together rather than two pieces moving independently.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -47,8 +51,25 @@ function IconDot({ size = 15, color = 'currentColor' }) {
 
 export default function PrescriptionPills({ prescriptions, activeIndex, onSelect }) {
   const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const [pressed, setPressed] = useState(false)
   const containerRef = useRef(null)
+  const unmountTimer = useRef(null)
+
+  // Keep the dropdown in the DOM for one transition cycle after `open` goes
+  // false, so the scale/fade transition can actually play on close instead
+  // of the panel snapping away with the hard `{open && ...}` conditional.
+  useEffect(() => {
+    if (open) {
+      if (unmountTimer.current) clearTimeout(unmountTimer.current)
+      setMounted(true)
+    } else if (mounted) {
+      unmountTimer.current = setTimeout(() => setMounted(false), 180)
+    }
+    return () => {
+      if (unmountTimer.current) clearTimeout(unmountTimer.current)
+    }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Close on outside click
   useEffect(() => {
@@ -106,6 +127,15 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           dropdown directly beneath it. A 2px accent border appears when open,
           continuing into the dropdown below, to make the expanded state
           unambiguous.
+          The dropdown below is position:absolute (floats over the page,
+          doesn't push content down), so it sits outside this element's box
+          model — there's no single parent box that could own one border
+          spanning both pieces without measuring and re-positioning an
+          overlay on every render. The border stays split across the two
+          elements (as before), but now both pieces move on the same
+          synced 0.18s clock as the dropdown's new scale/fade transition,
+          so the seam reads as static/fused instead of one piece snapping
+          while the other animates.
           LAYOUT-STABILITY FIX: the bottom border always stays 2px wide —
           when open it's colored to match the trigger's own background
           (invisible, fuses with the dropdown) rather than being removed
@@ -136,7 +166,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           WebkitTapHighlightColor: 'transparent',
           outline: 'none',
           boxSizing: 'border-box',
-          transition: 'background-color 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease',
+          transition: 'background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease',
         }}
       >
         {/* Label — helper text, smallest element in the hierarchy */}
@@ -184,7 +214,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
               flexShrink: 0,
               color: 'var(--color-accent)',
               transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
+              transition: 'transform 0.18s ease',
             }}>
             <path d="M2 4.5L6 8.5L10 4.5"
               stroke="currentColor" strokeWidth="1.6"
@@ -198,8 +228,13 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           it down. Same white background as the trigger, top corners square
           (fuses with trigger above), bottom corners rounded. Shares the same
           2px accent border as the trigger when open (no border-top, so the
-          seam between them is invisible — one continuous outlined shape). */}
-      {open && (
+          seam between them is invisible — one continuous outlined shape).
+          Kept mounted for one transition cycle past close (`mounted` state)
+          so the scale/fade can play on the way out instead of the panel
+          snapping away with a hard conditional. Scales/fades from the top,
+          synced to the trigger's 0.18s border/background transition and the
+          chevron's 0.18s rotation, so all three move together as one unit. */}
+      {mounted && (
         <div style={{
           position: 'absolute',
           left: 0,
@@ -211,6 +246,10 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
           borderRadius: '0 0 16px 16px',
           background: 'var(--color-surface)',
           overflow: 'hidden',
+          transformOrigin: 'top',
+          opacity: open ? 1 : 0,
+          transform: open ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-2px)',
+          transition: 'opacity 0.18s ease, transform 0.18s ease',
         }}>
           {prescriptions.map((rx, i) => {
             const isActive = i === activeIndex
@@ -220,6 +259,7 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
                 key={rx.id}
                 onClick={() => handleSelect(i)}
                 style={{
+                  position: 'relative',
                   width: '100%',
                   display: 'flex',
                   alignItems: 'center',
@@ -230,7 +270,6 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
                   color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
                   background: isActive ? 'var(--color-accent-light)' : 'none',
                   border: 'none',
-                  borderBottom: isLast ? 'none' : '1px solid var(--color-border-subtle)',
                   cursor: 'pointer',
                   fontFamily: 'var(--font-body)',
                   textAlign: 'left',
@@ -248,6 +287,21 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
                   }
                   <span>{rx.label}</span>
                 </div>
+
+                {/* Divider — inset 2px from each side via absolute
+                    positioning (rather than a native borderBottom that
+                    would run edge-to-edge) so it never visually crosses
+                    the outer accent border. */}
+                {!isLast && (
+                  <span style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 2,
+                    right: 2,
+                    height: 1,
+                    background: 'var(--color-border-subtle)',
+                  }} />
+                )}
               </button>
             )
           })}

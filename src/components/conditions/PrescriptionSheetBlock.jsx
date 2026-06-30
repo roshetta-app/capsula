@@ -373,15 +373,20 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                       body font, same quiet tertiary color, same weight, so
                       neither competes visually with the drug name. */}
                   {uIdx === 0 ? (
-                    <span style={{
-                      fontSize: 12, fontWeight: 500,
-                      color: 'var(--color-text-tertiary)',
-                      lineHeight: 1,
-                    }}>Rx{index}</span>
+                    <span style={{ lineHeight: 1 }}>
+                      <span style={{
+                        fontSize: 12, fontWeight: 500,
+                        color: 'var(--color-text-tertiary)',
+                      }}>Rx</span>
+                      <span style={{
+                        fontSize: 12, fontWeight: 500,
+                        color: 'color-mix(in srgb, var(--color-accent) 40%, var(--color-text-tertiary) 60%)',
+                      }}>{index}</span>
+                    </span>
                   ) : (
                     <span style={{
-                      fontSize: 12, fontWeight: 500,
-                      color: 'var(--color-text-tertiary)',
+                      fontSize: 11, fontWeight: 500,
+                      color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
                     }}>or</span>
                   )}
