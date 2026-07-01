@@ -129,11 +129,11 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
       <div style={{
         position: 'relative',
         border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
-        borderRadius: '16px',
+        borderRadius: open ? '16px 16px 0 0' : '16px',
         boxShadow: containerShadow,
         background: triggerBg,
         boxSizing: 'border-box',
-        transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease',
+        transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease, border-radius 0.18s ease',
       }}>
         <button
           onClick={() => setOpen(o => !o)}
@@ -214,27 +214,31 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         {/* Dropdown — absolutely positioned *relative to the outer wrapper
             above*, not the viewport. Still floats over page content below
             (doesn't push it down — the wrapper's height is unaffected by
-            this element), but now lives inside the same box the border is
-            drawn on, so there's one continuous border rather than two
-            borders kept visually in sync. A thin top divider (not a full
-            border) separates it from the trigger when open. Kept mounted
-            for one transition cycle past close (`mounted` state) so the
-            scale/fade can play on the way out instead of snapping away. */}
+            this element). It overlaps the wrapper by the border width
+            (top: 100% minus 2px) so there's zero visible gap, and carries
+            its own matching 2px side/bottom border + radius so the two
+            pieces read as one continuous outlined shape rather than a
+            bordered box with an unbordered panel floating beneath it.
+            Kept mounted for one transition cycle past close (`mounted`
+            state) so the scale/fade can play on the way out instead of
+            snapping away. */}
         {mounted && (
           <div style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            top: '100%',
+            left: -2,
+            right: -2,
+            top: 'calc(100% - 2px)',
             zIndex: 56,
+            border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
             borderTop: '1px solid var(--color-border-subtle)',
             background: 'var(--color-surface)',
-            borderRadius: '0 0 14px 14px',
+            borderRadius: '0 0 16px 16px',
+            boxShadow: containerShadow,
             overflow: 'hidden',
             transformOrigin: 'top',
             opacity: open ? 1 : 0,
             transform: open ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-2px)',
-            transition: 'opacity 0.18s ease, transform 0.18s ease',
+            transition: 'opacity 0.18s ease, transform 0.18s ease, border-color 0.18s ease',
           }}>
             {prescriptions.map((rx, i) => {
               const isActive = i === activeIndex
