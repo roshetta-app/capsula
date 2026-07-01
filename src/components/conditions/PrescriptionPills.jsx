@@ -19,13 +19,14 @@ import { ClipboardPlus } from 'lucide-react'
  * them is invisible. Only the active plan keeps an accent-tinted background
  * on its own row; inactive rows are plain, divided by hairlines.
  *
- * Open-state affordance: when open, a 2px accent-blue border wraps the
- * entire merged shape (trigger + dropdown) so it's unambiguous the control
- * is expanded. The dropdown is position:absolute (overlays the page rather
- * than pushing content down), so the border is necessarily split across
- * the two elements; the trigger's bottom edge and the dropdown both
- * transition on the same synced clock so they read as one continuous
- * border opening/closing together rather than two pieces moving independently.
+ * Open-state affordance: when open, a single 2px accent-blue border wraps
+ * the entire control (trigger + dropdown together) via one outer wrapper
+ * element. The trigger and dropdown are unstyled inner pieces — neither
+ * owns its own border, radius, or shadow. The dropdown is positioned
+ * absolutely *relative to that wrapper* (not the viewport), so it still
+ * floats over page content below without pushing it down, but now sits
+ * inside the same box the border is drawn on — one shape, one border,
+ * no seam to keep in sync across two elements.
  */
 
 // ─── Inline SVG icons (dropdown list only — trigger uses lucide ClipboardPlus) ─
@@ -96,17 +97,12 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
     setOpen(false)
   }
 
-  // Ambient shadow lives only on the trigger card — the dropdown has none,
-  // per the floating-but-seamless treatment.
+  // Shadow and background now live on the outer wrapper, not the trigger
+  // button itself — the wrapper is the single visual shape.
   const containerShadow = pressed
     ? '0 1px 1px rgba(0,0,0,0.02)'
     : '0 1px 2px rgba(0,0,0,0.04)'
 
-  // Single source of truth for the trigger's background, reused for its
-  // bottom border color when open (see note below) — keeps the button's
-  // rendered height exactly constant between open/closed states, instead of
-  // a removed border edge shrinking it by 2px and nudging the sheet content
-  // beneath the whole control up/down.
   const triggerBg = pressed
     ? 'color-mix(in srgb, var(--color-text-primary) 4%, var(--color-surface) 96%)'
     : 'var(--color-surface)'
@@ -122,191 +118,179 @@ export default function PrescriptionPills({ prescriptions, activeIndex, onSelect
         zIndex: open ? 56 : 'auto',
       }}
     >
-      {/* Trigger card — floating-label field, same shape as SpecialtySelector.
-          Bottom corners square off when open so it visually fuses with the
-          dropdown directly beneath it. A 2px accent border appears when open,
-          continuing into the dropdown below, to make the expanded state
-          unambiguous.
-          The dropdown below is position:absolute (floats over the page,
-          doesn't push content down), so it sits outside this element's box
-          model — there's no single parent box that could own one border
-          spanning both pieces without measuring and re-positioning an
-          overlay on every render. The border stays split across the two
-          elements (as before), but now both pieces move on the same
-          synced 0.18s clock as the dropdown's new scale/fade transition,
-          so the seam reads as static/fused instead of one piece snapping
-          while the other animates.
-          LAYOUT-STABILITY FIX: the bottom border always stays 2px wide —
-          when open it's colored to match the trigger's own background
-          (invisible, fuses with the dropdown) rather than being removed
-          entirely, which previously shrank the button's height by 2px and
-          caused the sheet content below to visibly shift on open/close. */}
-      <button
-        onClick={() => setOpen(o => !o)}
-        onPointerDown={() => setPressed(true)}
-        onPointerUp={() => setPressed(false)}
-        onPointerLeave={() => setPressed(false)}
-        aria-label={`Treatment plan: ${selected.label}. Tap to change.`}
-        style={{
-          position: 'relative',
-          zIndex: 56,
-          width: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'stretch',
-          textAlign: 'left',
-          padding: '9px 14px',
-          background: triggerBg,
-          border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
-          borderBottom: open ? `2px solid ${triggerBg}` : '2px solid transparent',
-          borderRadius: open ? '16px 16px 0 0' : '16px',
-          boxShadow: containerShadow,
-          cursor: 'pointer',
-          fontFamily: 'var(--font-body)',
-          WebkitTapHighlightColor: 'transparent',
-          outline: 'none',
-          boxSizing: 'border-box',
-          transition: 'background-color 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease',
-        }}
-      >
-        {/* Label — helper text, smallest element in the hierarchy */}
-        <span style={{
-          fontSize: 11,
-          fontWeight: 500,
-          fontFamily: 'var(--font-body)',
-          color: 'var(--color-text-tertiary)',
-          marginBottom: 2,
-        }}>
-          Treatment plans
-        </span>
-
-        {/* Value row — icon, name, chevron. Vertically centered, left aligned. */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{
+      {/* Outer wrapper — the single source of truth for shape. Owns the
+          border, radius, background, and shadow. Height is driven only by
+          the trigger (the dropdown is absolutely positioned inside this box
+          and doesn't affect wrapper height), so this element never grows
+          or pushes page content down when open — it just gains a visible
+          border and an overlay child. Trigger and dropdown below are plain,
+          unstyled inner pieces: no border, no radius, no shadow of their
+          own, so there's nothing left to keep in sync across two elements. */}
+      <div style={{
+        position: 'relative',
+        border: open ? '2px solid var(--color-accent)' : '2px solid transparent',
+        borderRadius: '16px',
+        boxShadow: containerShadow,
+        background: triggerBg,
+        boxSizing: 'border-box',
+        transition: 'border-color 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease',
+      }}>
+        <button
+          onClick={() => setOpen(o => !o)}
+          onPointerDown={() => setPressed(true)}
+          onPointerUp={() => setPressed(false)}
+          onPointerLeave={() => setPressed(false)}
+          aria-label={`Treatment plan: ${selected.label}. Tap to change.`}
+          style={{
+            width: '100%',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            color: 'var(--color-accent)',
-          }}>
-            <ClipboardPlus size={16} strokeWidth={1.9} aria-hidden="true" />
-          </span>
-
-          <span style={{
-            flex: 1,
-            minWidth: 0,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            fontSize: 14,
-            fontWeight: 600,
+            flexDirection: 'column',
+            alignItems: 'stretch',
+            textAlign: 'left',
+            padding: '9px 14px',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
             fontFamily: 'var(--font-body)',
-            color: 'var(--color-accent)',
-            letterSpacing: '-0.2px',
+            WebkitTapHighlightColor: 'transparent',
+            outline: 'none',
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Label — helper text, smallest element in the hierarchy */}
+          <span style={{
+            fontSize: 11,
+            fontWeight: 500,
+            fontFamily: 'var(--font-body)',
+            color: 'var(--color-text-tertiary)',
+            marginBottom: 2,
           }}>
-            {selected.label}
+            Treatment plans
           </span>
 
-          {/* Chevron — same path as SpecialtySelector for visual parity */}
-          <svg width="13" height="13" viewBox="0 0 12 12" fill="none"
-            aria-hidden="true"
-            style={{
+          {/* Value row — icon, name, chevron. Vertically centered, left aligned. */}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               flexShrink: 0,
               color: 'var(--color-accent)',
-              transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.18s ease',
             }}>
-            <path d="M2 4.5L6 8.5L10 4.5"
-              stroke="currentColor" strokeWidth="1.6"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-      </button>
+              <ClipboardPlus size={16} strokeWidth={1.9} aria-hidden="true" />
+            </span>
 
-      {/* Dropdown — floats over the page (absolute, flush against the
-          trigger, no gap), so it overlays content below rather than pushing
-          it down. Same white background as the trigger, top corners square
-          (fuses with trigger above), bottom corners rounded. Shares the same
-          2px accent border as the trigger when open (no border-top, so the
-          seam between them is invisible — one continuous outlined shape).
-          Kept mounted for one transition cycle past close (`mounted` state)
-          so the scale/fade can play on the way out instead of the panel
-          snapping away with a hard conditional. Scales/fades from the top,
-          synced to the trigger's 0.18s border/background transition and the
-          chevron's 0.18s rotation, so all three move together as one unit. */}
-      {mounted && (
-        <div style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: '100%',
-          zIndex: 56,
-          border: '2px solid var(--color-accent)',
-          borderTop: 'none',
-          borderRadius: '0 0 16px 16px',
-          background: 'var(--color-surface)',
-          overflow: 'hidden',
-          transformOrigin: 'top',
-          opacity: open ? 1 : 0,
-          transform: open ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-2px)',
-          transition: 'opacity 0.18s ease, transform 0.18s ease',
-        }}>
-          {prescriptions.map((rx, i) => {
-            const isActive = i === activeIndex
-            const isLast = i === prescriptions.length - 1
-            return (
-              <button
-                key={rx.id}
-                onClick={() => handleSelect(i)}
-                style={{
-                  position: 'relative',
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '11px 14px',
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                  background: isActive ? 'var(--color-accent-light)' : 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontFamily: 'var(--font-body)',
-                  textAlign: 'left',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline: 'none',
-                  boxSizing: 'border-box',
-                  transition: 'background 0.1s ease',
-                }}
-              >
-                {/* Left: dot or check icon + label */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {isActive
-                    ? <IconCheck size={15} color="var(--color-accent)" />
-                    : <IconDot size={15} color="var(--color-border)" />
-                  }
-                  <span>{rx.label}</span>
-                </div>
+            <span style={{
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontSize: 14,
+              fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              color: 'var(--color-accent)',
+              letterSpacing: '-0.2px',
+            }}>
+              {selected.label}
+            </span>
 
-                {/* Divider — inset 2px from each side via absolute
-                    positioning (rather than a native borderBottom that
-                    would run edge-to-edge) so it never visually crosses
-                    the outer accent border. */}
-                {!isLast && (
-                  <span style={{
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 2,
-                    right: 2,
-                    height: 1,
-                    background: 'var(--color-border-subtle)',
-                  }} />
-                )}
-              </button>
-            )
-          })}
-        </div>
-      )}
+            {/* Chevron — same path as SpecialtySelector for visual parity */}
+            <svg width="13" height="13" viewBox="0 0 12 12" fill="none"
+              aria-hidden="true"
+              style={{
+                flexShrink: 0,
+                color: 'var(--color-accent)',
+                transform: open ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.18s ease',
+              }}>
+              <path d="M2 4.5L6 8.5L10 4.5"
+                stroke="currentColor" strokeWidth="1.6"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </span>
+        </button>
+
+        {/* Dropdown — absolutely positioned *relative to the outer wrapper
+            above*, not the viewport. Still floats over page content below
+            (doesn't push it down — the wrapper's height is unaffected by
+            this element), but now lives inside the same box the border is
+            drawn on, so there's one continuous border rather than two
+            borders kept visually in sync. A thin top divider (not a full
+            border) separates it from the trigger when open. Kept mounted
+            for one transition cycle past close (`mounted` state) so the
+            scale/fade can play on the way out instead of snapping away. */}
+        {mounted && (
+          <div style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: '100%',
+            zIndex: 56,
+            borderTop: '1px solid var(--color-border-subtle)',
+            background: 'var(--color-surface)',
+            borderRadius: '0 0 14px 14px',
+            overflow: 'hidden',
+            transformOrigin: 'top',
+            opacity: open ? 1 : 0,
+            transform: open ? 'scaleY(1) translateY(0)' : 'scaleY(0.96) translateY(-2px)',
+            transition: 'opacity 0.18s ease, transform 0.18s ease',
+          }}>
+            {prescriptions.map((rx, i) => {
+              const isActive = i === activeIndex
+              const isLast = i === prescriptions.length - 1
+              return (
+                <button
+                  key={rx.id}
+                  onClick={() => handleSelect(i)}
+                  style={{
+                    position: 'relative',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '11px 14px',
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 400,
+                    color: isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                    background: isActive ? 'var(--color-accent-light)' : 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'var(--font-body)',
+                    textAlign: 'left',
+                    WebkitTapHighlightColor: 'transparent',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                    transition: 'background 0.1s ease',
+                  }}
+                >
+                  {/* Left: dot or check icon + label */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {isActive
+                      ? <IconCheck size={15} color="var(--color-accent)" />
+                      : <IconDot size={15} color="var(--color-border)" />
+                    }
+                    <span>{rx.label}</span>
+                  </div>
+
+                  {/* Row divider — inset 2px from each side so it doesn't
+                      touch the wrapper's rounded corners/border. */}
+                  {!isLast && (
+                    <span style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 2,
+                      right: 2,
+                      height: 1,
+                      background: 'var(--color-border-subtle)',
+                    }} />
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
