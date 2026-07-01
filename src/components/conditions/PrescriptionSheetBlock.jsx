@@ -232,6 +232,10 @@ export default function PrescriptionSheetBlock({ sheet }) {
  * Supersedes the prior 'lightest-weight grouping, no background tint'
  * decision — that reversal is explicit and intentional per the redesign
  * plan; do not revert toward it.
+ * FADE PASS: header bar's extra accent tint reduced (12%→6%) and its base
+ * mix with --color-section-bg increased (55%→70%) so the label bar sits
+ * closer to the card's own tone instead of pulling extra attention — this
+ * was competing with drug/note content for visual weight.
  */
 function SectionHeader({ label, children }) {
   if (!label) return null
@@ -252,7 +256,7 @@ function SectionHeader({ label, children }) {
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
           textTransform: 'none',
-          background: 'color-mix(in srgb, var(--color-section-bg) 55%, var(--color-accent) 12%)',
+          background: 'color-mix(in srgb, var(--color-section-bg) 70%, var(--color-accent) 6%)',
           padding: 'var(--space-3) var(--space-4)',
           unicodeBidi: 'plaintext',
         }}

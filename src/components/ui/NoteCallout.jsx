@@ -86,19 +86,19 @@ const FLAVORS = {
   info: {
     colorLight: '#4B6CB7',
     colorDark:  '#93C5FD',
-    bg: 'color-mix(in srgb, var(--color-accent) 10%, var(--color-note-bg) 90%)',
+    bg: 'color-mix(in srgb, var(--color-accent) 6%, var(--color-note-bg) 94%)',
     Icon: IconInfo,
   },
   warning: {
     colorLight: '#92400E',
     colorDark:  '#FCD34D',
-    bg: 'color-mix(in srgb, var(--color-warning) 14%, var(--color-note-bg) 86%)',
+    bg: 'color-mix(in srgb, var(--color-warning) 9%, var(--color-note-bg) 91%)',
     Icon: IconWarning,
   },
   tip: {
     colorLight: '#3F6212',
     colorDark:  '#86EFAC',
-    bg: 'color-mix(in srgb, #3F6212 10%, var(--color-note-bg) 90%)',
+    bg: 'color-mix(in srgb, #3F6212 6%, var(--color-note-bg) 94%)',
     Icon: IconTip,
   },
 }
