@@ -201,29 +201,25 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
       padding: '9px 14px',
     }}>
       <div
-        dir={direction}
         style={{
           display: 'flex',
+          flexDirection: isArabic ? 'row-reverse' : 'row',
           alignItems: 'flex-start',
           gap: 8,
         }}
       >
-        {/* Icon and text are placed in explicit JSX order (not flipped via
-            flexDirection: row-reverse) — combining dir="rtl" with
-            row-reverse caused some engines to double-flip and cancel each
-            other out, which is why the icon was stuck on the left even for
-            Arabic notes. Direct JSX ordering has no such ambiguity. */}
-        {isArabic ? (
-          <>
-            {textContent}
-            <Icon color={f.colorLight} />
-          </>
-        ) : (
-          <>
-            <Icon color={f.colorLight} />
-            {textContent}
-          </>
-        )}
+        {/* Icon side is controlled ONLY by flexDirection here — no dir
+            attribute on this row. Combining dir="rtl" with row-reverse (or
+            with reordered JSX children) caused competing flip logic across
+            browser engines, which is why earlier attempts left the icon
+            stuck on the left for Arabic notes. flexDirection alone, with
+            no dir on this element, is unambiguous: row-reverse always
+            renders the icon first-in-source visually second (i.e. on the
+            right), regardless of any dir inherited from an ancestor.
+            dir stays on the inner text content below, where it's needed
+            for correct bidi character shaping — not here. */}
+        <Icon color={f.colorLight} />
+        {textContent}
       </div>
     </div>
   )

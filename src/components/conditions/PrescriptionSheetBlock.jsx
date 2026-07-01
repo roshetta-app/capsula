@@ -117,7 +117,11 @@ export default function PrescriptionSheetBlock({ sheet }) {
             formulation={formulation}
             drugs={drugs}
             navigate={navigate}
-            showDivider={nextRow?.row_type === 'drug' || nextRow?.row_type === 'note'}
+            dividerType={
+              nextRow?.row_type === 'drug' ? 'drug'
+              : nextRow?.row_type === 'note' ? 'note'
+              : null
+            }
           />
         )
       }
@@ -318,7 +322,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   }))
 }
 
-function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider }) {
+function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType }) {
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
   // Flatten clusters into a sequence of renderable units so that every
@@ -340,8 +344,20 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
     }
   }
 
+  // Divider color splits by what follows: a lighter hairline between two
+  // drug rows (de-emphasized, since the row's own spacing already reads as
+  // a boundary), but the current stronger --color-border weight when the
+  // next row is a note bubble (keeps the drug block feeling clearly closed
+  // off before the note begins).
+  const dividerStyle =
+    dividerType === 'drug'
+      ? '1.5px solid color-mix(in srgb, var(--color-border) 55%, transparent 45%)'
+      : dividerType === 'note'
+        ? '1.5px solid var(--color-border)'
+        : 'none'
+
   return (
-    <div style={{ ...rowWrap, borderBottom: showDivider ? '1.5px solid var(--color-border)' : 'none' }}>
+    <div style={{ ...rowWrap, borderBottom: dividerStyle }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         {units.map((unit, uIdx) => {
           const { member, cluster, isLastMemberOfCluster } = unit
@@ -384,13 +400,13 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, showDivider 
                         color: 'var(--color-text-tertiary)',
                       }}>Rx</span>
                       <span style={{
-                        fontSize: 12, fontWeight: 500,
-                        color: 'color-mix(in srgb, var(--color-accent) 40%, var(--color-text-tertiary) 60%)',
+                        fontSize: 12, fontWeight: 600,
+                        color: 'color-mix(in srgb, var(--color-accent) 55%, var(--color-text-tertiary) 45%)',
                       }}>{index}</span>
                     </span>
                   ) : (
                     <span style={{
-                      fontSize: 11, fontWeight: 500,
+                      fontSize: 12, fontWeight: 500,
                       color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
                     }}>or</span>
