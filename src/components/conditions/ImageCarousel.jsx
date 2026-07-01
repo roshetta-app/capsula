@@ -1,13 +1,21 @@
 /**
- * ImageCarousel — full-bleed swipeable image carousel (Phase 4.2).
+ * ImageCarousel — swipeable image carousel (Phase 4.2).
  *
  * Layout:
- *   - Full-bleed: negative horizontal margins break out of panel padding
+ *   - Respects the parent's own lateral padding — no negative margins /
+ *     full-bleed break-out. The earlier full-bleed treatment caused the
+ *     carousel to visually exceed the page's actual lateral margins
+ *     (its hardcoded --space-4 offset didn't match the real parent
+ *     padding), so it now just sits inside its container like every
+ *     other block instead of independently computing an offset.
  *   - 4:3 aspect ratio via padding-top trick; image absolutely fills container
  *   - object-fit: cover, object-position: center
  *   - Rounded corners (var(--radius-lg)) matching the app's card radius
  *     convention — no border, no shadow
  *   - Order: image → dots → caption
+ *   - Caption slot always reserves its own height (min-height, fixed
+ *     margin-top) whether or not a caption is present, so content below
+ *     the carousel doesn't shift up/down depending on caption presence.
  *
  * Interaction:
  *   - Swipe threshold: 50px
@@ -66,8 +74,6 @@ export default function ImageCarousel({ images = [] }) {
     <>
       <div
         style={{
-          marginLeft:  'calc(-1 * var(--space-4))',
-          marginRight: 'calc(-1 * var(--space-4))',
           userSelect: 'none',
           marginBottom: 'var(--space-3)',
         }}
@@ -134,20 +140,21 @@ export default function ImageCarousel({ images = [] }) {
           </div>
         )}
 
-        {/* Caption — below dots, re-applies side padding */}
-        {current.caption && (
-          <div style={{
-            padding: '0 var(--space-4)',
-            marginTop: 6,
-            fontSize: 13,
-            color: 'var(--color-text-secondary)',
-            fontWeight: 400,
-            lineHeight: 1.5,
-            textAlign: 'left',
-          }}>
-            {current.caption}
-          </div>
-        )}
+        {/* Caption slot — always rendered, whether or not this image has a
+            caption, so the space below the carousel never shifts depending
+            on caption presence. min-height reserves one line's worth of
+            space; empty captions render an empty slot instead of nothing. */}
+        <div style={{
+          marginTop: 6,
+          minHeight: 19, // one line at fontSize 13 / lineHeight 1.5
+          fontSize: 13,
+          color: 'var(--color-text-secondary)',
+          fontWeight: 400,
+          lineHeight: 1.5,
+          textAlign: 'left',
+        }}>
+          {current.caption || ''}
+        </div>
       </div>
 
       {/* Lightbox portal */}
