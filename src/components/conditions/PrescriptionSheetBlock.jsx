@@ -141,8 +141,18 @@ export default function PrescriptionSheetBlock({ sheet }) {
       }
 
       case 'free_text':
+        // Scoped override (not touching global .dir-prose, which is shared
+        // with the CMS editor preview and full clinical article content
+        // elsewhere): .dir-prose's heading margins (--space-6 / 24px above
+        // an h2) are sized for a full article with major section breaks,
+        // not a short note squeezed between drug rows in a tight
+        // prescription sheet. rx-prose-tight below collapses those margins
+        // and the paragraph's default weight up one step (400→500) so it
+        // reads with slightly more presence at this small size, matching
+        // the rest of the sheet's spacing rhythm instead of standing apart
+        // with article-level whitespace.
         return (
-          <div key={row.id ?? key} style={{ padding: '6px 0' }}>
+          <div key={row.id ?? key} className="rx-prose-tight" style={{ padding: '6px 0' }}>
             <FreeTextPostBlock
               block={{ id: row.id ?? key, blockType: 'free_text_post', data: { markdown: row.content ?? '' } }}
             />

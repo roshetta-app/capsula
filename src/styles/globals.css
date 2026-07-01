@@ -356,6 +356,38 @@ body {
   color: var(--color-text-secondary);
 }
 
+/* ─── Prescription-sheet free-text scoping ────────────────────────────────────
+   .dir-prose's heading margins (--space-6/24px above h2) are sized for a
+   full clinical article with major section breaks — too much whitespace for
+   a short free-text row squeezed between drug rows in a tight prescription
+   sheet. This wrapper class scopes tighter spacing + a one-step-heavier
+   paragraph weight to that context only, without touching the shared
+   .dir-prose rules used elsewhere (CMS editor preview, full article pages).
+   Applied via className="rx-prose-tight" on the wrapper in
+   PrescriptionSheetBlock.jsx's free_text case. */
+.rx-prose-tight .dir-prose p {
+  margin: 0 0 6px;
+  font-weight: 500;
+}
+
+.rx-prose-tight .dir-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.rx-prose-tight .dir-prose h1,
+.rx-prose-tight .dir-prose h2 {
+  margin: var(--space-3) 0 var(--space-1);
+}
+
+.rx-prose-tight .dir-prose h1:first-child,
+.rx-prose-tight .dir-prose h2:first-child {
+  margin-top: 0;
+}
+
+.rx-prose-tight .dir-prose h3 {
+  margin: var(--space-2) 0 4px;
+}
+
 /* ─── Tables (outside cards) ──────────────────────────────────────────────────── */
 
 .dir-prose table {
