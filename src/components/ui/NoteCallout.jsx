@@ -21,13 +21,13 @@
  *   - warning: triangle (universally understood, unchanged)
  *
  * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
- * shape that anchors to the reading-start side of the text's own direction —
- * not a fixed side. LTR notes hug the left edge with a squared top-left
- * corner (chat-tail cue); RTL notes hug the right edge with a squared
- * top-right corner, mirrored. The icon travels with the bubble on that same
- * leading edge. Both variants share this shape; 'divider' just gets a touch
- * more margin since it stands alone between blocks rather than sitting
- * directly under prescription rows.
+ * shape — full width always, not shrink-wrapped or side-anchored. What
+ * flips with the note's own text direction is the squared corner (a
+ * lightweight tail cue) and the icon's side: LTR notes square the top-left
+ * corner with the icon on the left; RTL notes square the top-right corner
+ * with the icon on the right. Both variants share this shape; 'divider'
+ * just gets a touch more margin since it stands alone between blocks
+ * rather than sitting directly under prescription rows.
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -178,38 +178,38 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   )
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
-  // Anchors to the reading-start side of THIS note's own direction (not a
-  // fixed side): LTR bubbles hug left with a squared top-left corner acting
-  // as a lightweight tail cue; RTL bubbles hug right with a squared
-  // top-right corner, mirrored. The icon sits on that same leading edge
-  // inside the bubble.
+  // Full width, always — this isn't a shrink-wrapped chat message, just a
+  // note block that borrows the bubble idiom. What flips with direction is
+  // the squared corner (tail cue) and the icon's side: LTR notes square the
+  // top-LEFT corner with the icon on the left; RTL notes square the
+  // top-RIGHT corner with the icon on the right — the tail always points
+  // toward the side the text reads FROM.
   const bubbleRadius = isArabic
-    ? '4px 16px 16px 16px'   // squared top-right, RTL
-    : '16px 4px 16px 16px'   // squared top-left, LTR
+    ? '16px 4px 16px 16px'   // squared top-right, RTL
+    : '4px 16px 16px 16px'   // squared top-left, LTR
 
   const bubble = (
-    <div style={{ display: 'flex', justifyContent: isArabic ? 'flex-end' : 'flex-start' }}>
-      <div style={{
-        maxWidth: '92%',
-        background: f.bg,
-        borderRadius: bubbleRadius,
-        padding: '9px 14px',
-      }}>
-        <div
-          dir={direction}
-          style={{
-            display: 'flex',
-            flexDirection: isArabic ? 'row-reverse' : 'row',
-            alignItems: 'flex-start',
-            gap: 8,
-          }}
-        >
-          {/* SVG icon — color-coded per flavor; rides the bubble's leading edge */}
-          <Icon color={f.colorLight} />
+    <div style={{
+      width: '100%',
+      boxSizing: 'border-box',
+      background: f.bg,
+      borderRadius: bubbleRadius,
+      padding: '9px 14px',
+    }}>
+      <div
+        dir={direction}
+        style={{
+          display: 'flex',
+          flexDirection: isArabic ? 'row-reverse' : 'row',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}
+      >
+        {/* SVG icon — color-coded per flavor; rides the bubble's leading edge */}
+        <Icon color={f.colorLight} />
 
-          {/* Note text — block container, each paragraph resolves its own bidi. */}
-          {textContent}
-        </div>
+        {/* Note text — block container, each paragraph resolves its own bidi. */}
+        {textContent}
       </div>
     </div>
   )
