@@ -23,11 +23,15 @@
  * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
  * shape — full width always, not shrink-wrapped or side-anchored. What
  * flips with the note's own text direction is the squared corner (a
- * lightweight tail cue) and the icon's side: LTR notes square the top-left
- * corner with the icon on the left; RTL notes square the top-right corner
- * with the icon on the right. Both variants share this shape; 'divider'
- * just gets a touch more margin since it stands alone between blocks
- * rather than sitting directly under prescription rows.
+ * lightweight tail cue, 4px) and the icon's side: LTR notes square the
+ * top-left corner with the icon on the left; RTL notes square the top-right
+ * corner with the icon on the right. The three non-squared corners use a
+ * softer 20px radius. Icon/text side order is set via direct JSX ordering
+ * rather than flexDirection: row-reverse — combining that with dir="rtl"
+ * caused a double-flip in some engines that left the icon stuck on the left
+ * even for Arabic notes. Both variants share this shape; 'divider' just
+ * gets a touch more margin since it stands alone between blocks rather
+ * than sitting directly under prescription rows.
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -185,8 +189,8 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
   // top-RIGHT corner with the icon on the right — the tail always points
   // toward the side the text reads FROM.
   const bubbleRadius = isArabic
-    ? '16px 4px 16px 16px'   // squared top-right, RTL
-    : '4px 16px 16px 16px'   // squared top-left, LTR
+    ? '20px 4px 20px 20px'   // squared top-right, RTL
+    : '4px 20px 20px 20px'   // squared top-left, LTR
 
   const bubble = (
     <div style={{
@@ -200,16 +204,26 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
         dir={direction}
         style={{
           display: 'flex',
-          flexDirection: isArabic ? 'row-reverse' : 'row',
           alignItems: 'flex-start',
           gap: 8,
         }}
       >
-        {/* SVG icon — color-coded per flavor; rides the bubble's leading edge */}
-        <Icon color={f.colorLight} />
-
-        {/* Note text — block container, each paragraph resolves its own bidi. */}
-        {textContent}
+        {/* Icon and text are placed in explicit JSX order (not flipped via
+            flexDirection: row-reverse) — combining dir="rtl" with
+            row-reverse caused some engines to double-flip and cancel each
+            other out, which is why the icon was stuck on the left even for
+            Arabic notes. Direct JSX ordering has no such ambiguity. */}
+        {isArabic ? (
+          <>
+            {textContent}
+            <Icon color={f.colorLight} />
+          </>
+        ) : (
+          <>
+            <Icon color={f.colorLight} />
+            {textContent}
+          </>
+        )}
       </div>
     </div>
   )

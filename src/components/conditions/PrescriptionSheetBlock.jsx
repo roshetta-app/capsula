@@ -55,10 +55,13 @@ const RX_RAIL_GAP = 8
  *   - NumberBadge: outlined square badge, optically aligned to cap-height.
  *   - Dose: bold, dose-teal color, distinct from the drug name.
  *   - Drug-level notes: plain de-emphasized text, no card chrome.
- *   - Row divider: bold hairline rendered ONLY between two consecutive
- *     `drug` rows (PHASE 9). A drug row followed by a note/free_text row,
- *     or a lone drug row with no following sibling, never draws this line
- *     — it would otherwise sit on top of an unrelated element below it.
+ *   - Row divider: bold hairline rendered between two consecutive `drug`
+ *     rows (PHASE 9), and also between a `drug` row and a following inline
+ *     `note` row (PHASE 10) — now that NoteCallout is a full-width bubble
+ *     rather than a boxed card, the same divider rhythm carries through so
+ *     drug→note spacing reads identically to drug→drug. A drug row
+ *     followed by `free_text`, or a lone drug row with no following
+ *     sibling, still never draws this line.
  *   - Terminal marker: a small, low-opacity zigzag after the last row —
  *     decorative only, no label/text (VISUAL-WEIGHT PASS, supersedes the
  *     earlier dashed-line + "end of sheet" text treatment).
@@ -94,9 +97,11 @@ export default function PrescriptionSheetBlock({ sheet }) {
   //
   //    `nextRow` (the next sibling within the same segment/section, or
   //    undefined if this is the last item) drives whether a drug row draws
-  //    its bottom divider — PHASE 9: the divider must only ever sit between
-  //    two drug rows, never on top of a note/free_text row, and never on a
-  //    lone drug row with no sibling beneath it.
+  //    its bottom divider — PHASE 10: divider renders between two
+  //    consecutive drug rows, and also between a drug row and a following
+  //    inline note row (matches spacing now that NoteCallout is a
+  //    full-width bubble, not a boxed card). Never renders before
+  //    free_text, and never on a lone drug row with no sibling beneath it.
   function renderRowItem(row, key, nextRow) {
     switch (row.row_type) {
       case 'drug': {
@@ -112,7 +117,7 @@ export default function PrescriptionSheetBlock({ sheet }) {
             formulation={formulation}
             drugs={drugs}
             navigate={navigate}
-            showDivider={nextRow?.row_type === 'drug'}
+            showDivider={nextRow?.row_type === 'drug' || nextRow?.row_type === 'note'}
           />
         )
       }
