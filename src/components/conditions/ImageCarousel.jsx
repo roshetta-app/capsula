@@ -140,19 +140,29 @@ export default function ImageCarousel({ images = [] }) {
           </div>
         )}
 
-        {/* Caption slot — always rendered, whether or not this image has a
-            caption, so the space below the carousel never shifts depending
-            on caption presence. min-height reserves one line's worth of
-            space; empty captions render an empty slot instead of nothing. */}
-        <div style={{
-          marginTop: 6,
-          minHeight: 19, // one line at fontSize 13 / lineHeight 1.5
-          fontSize: 13,
-          color: 'var(--color-text-secondary)',
-          fontWeight: 400,
-          lineHeight: 1.5,
-          textAlign: 'left',
-        }}>
+        {/* Caption slot — always rendered (empty when this image has no
+            caption) so the space below the carousel never shifts between
+            captioned/uncaptioned images. Truncated to a single line with
+            an ellipsis rather than just a min-height: a min-height alone
+            only holds for one-line captions — anything that wraps to a
+            second line still pushes content below it down. Truncating
+            guarantees a fixed height regardless of caption length.
+            dir="auto" + matching textAlign so RTL captions align right,
+            same convention as every other text block in the app. */}
+        <div
+          dir="auto"
+          style={{
+            marginTop: 6,
+            height: 19, // one line at fontSize 13 / lineHeight 1.5
+            fontSize: 13,
+            color: 'var(--color-text-secondary)',
+            fontWeight: 400,
+            lineHeight: 1.5,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}
+        >
           {current.caption || ''}
         </div>
       </div>
