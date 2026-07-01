@@ -3,9 +3,11 @@
  *
  * Used in two contexts:
  *   1. Standalone `note_callout` block — rendered by BlockRenderer
- *      → uses variant='divider': icon on its own row above the text, lighter bg
+ *      → variant='divider': same bubble shape, slightly more vertical
+ *        breathing room since it stands alone between blocks
  *   2. Inline note row inside a PrescriptionSheetBlock sheet
- *      → uses variant='inline' (default): icon + text side-by-side, current behavior
+ *      → variant='inline' (default): same bubble shape, tighter spacing
+ *        since it sits directly under prescription content
  *
  * Props:
  *   text     string  — markdown-capable note text (required; renders nothing if empty)
@@ -18,11 +20,14 @@
  *   - tip:     medical cross badge (first-aid / clinical)
  *   - warning: triangle (universally understood, unchanged)
  *
- * VISUAL PASS — 'inline' variant only: background darkened a touch (was
- * reading too close to the page background to register as its own element),
- * and a thin hairline divider with breathing room above now separates the
- * note from whatever prescription content precedes it, instead of the note
- * box just butting up directly against it.
+ * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
+ * shape that anchors to the reading-start side of the text's own direction —
+ * not a fixed side. LTR notes hug the left edge with a squared top-left
+ * corner (chat-tail cue); RTL notes hug the right edge with a squared
+ * top-right corner, mirrored. The icon travels with the bubble on that same
+ * leading edge. Both variants share this shape; 'divider' just gets a touch
+ * more margin since it stands alone between blocks rather than sitting
+ * directly under prescription rows.
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -69,20 +74,27 @@ function IconWarning({ color }) {
   )
 }
 
+// Bubble background is a soft tint of each flavor's color, resolved via
+// color-mix against the app's neutral note surface — same mechanism the
+// old 'inline' box used for its blue tint, now shared across both variants
+// and all three flavors.
 const FLAVORS = {
   info: {
     colorLight: '#4B6CB7',
     colorDark:  '#93C5FD',
+    bg: 'color-mix(in srgb, var(--color-accent) 10%, var(--color-note-bg) 90%)',
     Icon: IconInfo,
   },
   warning: {
     colorLight: '#92400E',
     colorDark:  '#FCD34D',
+    bg: 'color-mix(in srgb, var(--color-warning) 14%, var(--color-note-bg) 86%)',
     Icon: IconWarning,
   },
   tip: {
     colorLight: '#3F6212',
     colorDark:  '#86EFAC',
+    bg: 'color-mix(in srgb, #3F6212 10%, var(--color-note-bg) 90%)',
     Icon: IconTip,
   },
 }
@@ -165,59 +177,55 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
     </div>
   )
 
-  // ── variant='divider': icon on its own row above text, lighter bg ─────────
-  if (variant === 'divider') {
-    return (
-      <div style={{
-        background: 'var(--color-surface-muted)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '14px 16px',
-        marginTop: 12,
-        marginBottom: 4,
-      }}>
-        {/* Icon row — sits above the text block */}
-        <div style={{ marginBottom: 8 }}>
-          <Icon color={f.colorLight} />
-        </div>
-        {textContent}
-      </div>
-    )
-  }
+  // ── Bubble shape — shared by both variants ────────────────────────────────
+  // Anchors to the reading-start side of THIS note's own direction (not a
+  // fixed side): LTR bubbles hug left with a squared top-left corner acting
+  // as a lightweight tail cue; RTL bubbles hug right with a squared
+  // top-right corner, mirrored. The icon sits on that same leading edge
+  // inside the bubble.
+  const bubbleRadius = isArabic
+    ? '4px 16px 16px 16px'   // squared top-right, RTL
+    : '16px 4px 16px 16px'   // squared top-left, LTR
 
-  // ── variant='inline' (default): icon + text side-by-side ─────────────────
-  // VISUAL PASS: hairline divider + spacing above separates this from
-  // whatever prescription content precedes it. Background is a faint blue
-  // tint (was a grey tint) to match the app's accent-tinted "info" surfaces
-  // elsewhere; corner radius reduced from --radius-lg (16px) to a flatter
-  // 10px. Vertical padding trimmed for a shorter box.
-  return (
-    <>
+  const bubble = (
+    <div style={{ display: 'flex', justifyContent: isArabic ? 'flex-end' : 'flex-start' }}>
       <div style={{
-        height: 1,
-        background: 'var(--color-border)',
-        margin: '14px 0 10px 0',
-      }} />
-      <div style={{
-        background: 'color-mix(in srgb, var(--color-accent) 8%, var(--color-note-bg) 92%)',
-        borderRadius: '10px',
-        padding: '9px 16px',
+        maxWidth: '92%',
+        background: f.bg,
+        borderRadius: bubbleRadius,
+        padding: '9px 14px',
       }}>
         <div
           dir={direction}
           style={{
             display: 'flex',
-            flexDirection: 'row',
+            flexDirection: isArabic ? 'row-reverse' : 'row',
             alignItems: 'flex-start',
             gap: 8,
           }}
         >
-          {/* SVG icon — color-coded per flavor; side follows text direction */}
+          {/* SVG icon — color-coded per flavor; rides the bubble's leading edge */}
           <Icon color={f.colorLight} />
 
           {/* Note text — block container, each paragraph resolves its own bidi. */}
           {textContent}
         </div>
       </div>
-    </>
+    </div>
+  )
+
+  if (variant === 'divider') {
+    return (
+      <div style={{ marginTop: 12, marginBottom: 8 }}>
+        {bubble}
+      </div>
+    )
+  }
+
+  // variant='inline' — sits directly under prescription rows, tighter margins
+  return (
+    <div style={{ marginTop: 10, marginBottom: 2 }}>
+      {bubble}
+    </div>
   )
 }
