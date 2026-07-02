@@ -95,6 +95,25 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     only." at Medium (500), remainder at Regular (400) — same pattern
  *     used in an earlier pass, now paired with the lighter icon/spacing.
  *
+ * Footer-metadata pass:
+ *   - lineHeight switched from a unitless ratio (1.4) to an explicit
+ *     19px, landing inside the requested 19-20sp absolute range rather
+ *     than an approximate multiplier of the 13px font size.
+ *   - Icon size 16px → 18px; strokeWidth override removed entirely so it
+ *     falls back to the same default stroke lucide uses everywhere else
+ *     in the app (was explicitly thinned to 1.5 in the previous pass —
+ *     now spec asks it to match other outline icons, not be thinner).
+ *   - Icon color switched from --color-text-tertiary to
+ *     --color-text-secondary (matching the body text's own color token)
+ *     with opacity: 0.55 layered on top, achieving "muted, ~50-60%
+ *     opacity of body text" rather than a separate darker/lighter token.
+ *   - Removed the --space-2 horizontal padding added in the previous
+ *     pass — spec now wants padding "consistent with the rest of the
+ *     screen" rather than an extra footer-specific inset.
+ *   - marginTop increased 56px → 64px (+8px) to clearly separate from
+ *     Personal Notes, per the new "+8-12dp above the current spacing"
+ *     instruction.
+ *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
@@ -155,13 +174,11 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
       {/* Quiet editorial footnote — no divider, no card, no heading.
-          Spacing alone (56dp above) separates it from Personal Notes;
-          low-emphasis tertiary icon and secondary body text keep its
-          visual weight intentionally minimal. */}
+          Spacing alone (64dp above) separates it from Personal Notes;
+          opacity-muted icon and secondary body text keep its visual
+          weight footer-like rather than page content. */}
       <div style={{
-        marginTop: 56,
-        paddingLeft: 'var(--space-2)',
-        paddingRight: 'var(--space-2)',
+        marginTop: 64,
         paddingBottom: 'var(--space-8)',
       }}>
         <div style={{
@@ -169,11 +186,11 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
           alignItems: 'flex-start',
           gap: 12,
         }}>
-          <Shield size={16} strokeWidth={1.5} color="var(--color-text-tertiary)" style={{ flexShrink: 0, marginTop: 1 }} />
+          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1, opacity: 0.55 }} />
           <p style={{
             margin: 0,
             fontSize: 13,
-            lineHeight: 1.4,
+            lineHeight: '19px',
             textAlign: 'left',
             color: 'var(--color-text-secondary)',
           }}>
