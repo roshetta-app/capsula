@@ -223,7 +223,10 @@ export default function ConditionDetailScreen() {
             margin: '0 auto',
             padding: 'var(--space-5) var(--space-6)',
             paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
-            animation: `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)`,
+            // ⚠ DIAGNOSTIC TEST ONLY — animation disabled to isolate root cause.
+            // Do NOT treat this as the fix. Report back whether BottomNav
+            // still glitches with this in place.
+            animation: 'none',
           }}
         >
           {activeTab === 0 ? (
