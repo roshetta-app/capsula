@@ -4,7 +4,6 @@ import { ArrowLeft, Share2 } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { useVisualViewport } from '../hooks/useVisualViewport'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -53,12 +52,6 @@ export default function ConditionDetailScreen() {
   const { conditions, loading } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
-
-  // Tracks visual viewport (shrinks when keyboard opens) and sets
-  // --viewport-height on :root. This screen is mounted outside Layout
-  // (see router.jsx), so it must call this itself rather than relying
-  // on Layout's own call.
-  useVisualViewport()
 
   const [activeTab, setActiveTab] = useState(0)
   const touchStartX  = useRef(null)
@@ -213,7 +206,7 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  height: 'var(--viewport-height, 100dvh)',
+  height: '100dvh',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',

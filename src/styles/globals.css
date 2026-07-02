@@ -192,7 +192,6 @@ html {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   transition: background-color 0.15s ease, color 0.15s ease;
-  overscroll-behavior-y: none;
 }
 
 body {

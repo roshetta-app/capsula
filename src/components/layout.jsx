@@ -2,7 +2,6 @@ import { useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav'
 import OfflineBanner from './ui/OfflineBanner'
 import NotificationsBanner from './ui/NotificationsBanner'
-import { useVisualViewport } from '../hooks/useVisualViewport'
 
 /**
  * Routes that render their own top section and suppress the shared header.
@@ -13,13 +12,9 @@ export default function Layout({ children }) {
   const { pathname } = useLocation()
   const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname)
 
-  // Tracks visual viewport (shrinks when keyboard opens) and sets
-  // --viewport-height on :root so the layout never scrolls behind the keyboard.
-  useVisualViewport()
-
   return (
     <div style={{
-      minHeight:       'var(--viewport-height, 100dvh)',
+      minHeight:       '100dvh',
       backgroundColor: 'var(--color-bg)',
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
@@ -57,7 +52,8 @@ export default function Layout({ children }) {
       <NotificationsBanner />
 
       {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
-          keyboard height is handled by --viewport-height on the outer div. */}
+          keyboard resizing is handled natively via interactive-widget=resizes-content
+          on the viewport meta tag, so no JS-computed height is needed here. */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
