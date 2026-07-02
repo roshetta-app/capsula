@@ -3,13 +3,20 @@ import Icon from '../ui/Icon'
 import { useDirtyState } from '../../hooks/useDirtyState'
 
 /**
- * PersonalNotes — personal note for a condition (Phase 3.4).
+ * PersonalNotes — personal note for a condition (Phase 3.5).
  *
- * Batch 5 tweaks:
- *   - Display state is no longer tappable as a whole — an explicit 'Edit'
- *     button (with pencil icon) makes editability discoverable.
- *   - Editing mode gains a 'Clear' button that empties the draft in one tap
- *     (still requires Save to persist the cleared note).
+ * Batch 6 tweaks:
+ *   - Label 'MY NOTES' + its icon are now bold and primary-text colored
+ *     (previously a muted tertiary micro-label) to read as a clear section
+ *     heading rather than a small caption.
+ *   - Edit button recolored blue (accent) to read as the primary action.
+ *   - Clear button recolored red (danger), with a leading X icon, and moved
+ *     from the bottom action row up into the label row — it occupies the
+ *     same right-aligned slot the 'Saved' indicator uses in display state,
+ *     since the two never show at the same time.
+ *   - Top divider heavied up (2px, tertiary-text color) to read as a
+ *     distinct section break, different from the thin 0.5px dividers used
+ *     elsewhere (e.g. prescription sheet rows).
  *
  * Props:
  *   conditionId  string
@@ -79,39 +86,64 @@ export default function PersonalNotes({ conditionId }) {
   return (
     <div style={{
       marginTop: 'var(--space-4)',
-      borderTop: '0.5px solid var(--color-border)',
+      borderTop: '2px solid var(--color-text-tertiary)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row — icon + all-caps tertiary micro-label */}
+      {/* Label row — bold primary-text label + icon; right slot holds either
+          the Saved indicator (display state) or the Clear button (editing) */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 6,
         marginBottom: 8,
       }}>
-        <Icon name="StickyNote" size={12} color="var(--color-text-tertiary)" />
+        <Icon name="StickyNote" size={15} color="var(--color-text-primary)" />
         <span style={{
-          fontSize: 10,
-          fontWeight: 600,
-          letterSpacing: '0.08em',
+          fontSize: 13,
+          fontWeight: 700,
+          letterSpacing: '0.02em',
           textTransform: 'uppercase',
-          color: 'var(--color-text-tertiary)',
+          color: 'var(--color-text-primary)',
           fontFamily: 'var(--font-body)',
         }}>
           My notes
         </span>
-        {/* Saved indicator — inline, right-aligned, triggered by Save button */}
-        <span style={{
-          marginLeft: 'auto',
-          fontSize: 11,
-          color: 'var(--color-text-tertiary)',
-          opacity: savedOpacity,
-          transition: savedVisible === 'in'
-            ? 'opacity 0.2s ease'
-            : 'opacity 0.4s ease',
-        }}>
-          Saved
-        </span>
+
+        {isEditing ? (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={!draft}
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              fontSize: 12,
+              fontFamily: 'var(--font-body)',
+              color: draft ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: draft ? 'pointer' : 'default',
+            }}
+          >
+            <Icon name="X" size={12} color={draft ? 'var(--color-danger)' : 'var(--color-text-tertiary)'} />
+            Clear
+          </button>
+        ) : (
+          <span style={{
+            marginLeft: 'auto',
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            opacity: savedOpacity,
+            transition: savedVisible === 'in'
+              ? 'opacity 0.2s ease'
+              : 'opacity 0.4s ease',
+          }}>
+            Saved
+          </span>
+        )}
       </div>
 
       {isEditing ? (
@@ -143,65 +175,46 @@ export default function PersonalNotes({ conditionId }) {
             }}
           />
 
-          {/* Clear on the left, Cancel / Save on the right */}
+          {/* Cancel / Save */}
           <div style={{
             display: 'flex',
-            justifyContent: 'space-between',
+            justifyContent: 'flex-end',
             gap: 8,
             marginTop: 8,
           }}>
             <button
               type="button"
-              onClick={handleClear}
-              disabled={!draft}
+              onClick={handleCancel}
               style={{
                 fontSize: 13,
                 fontFamily: 'var(--font-body)',
-                color: draft ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
+                color: 'var(--color-text-secondary)',
                 background: 'none',
-                border: 'none',
-                padding: '6px 4px',
-                cursor: draft ? 'pointer' : 'default',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                padding: '6px 14px',
+                cursor: 'pointer',
               }}
             >
-              Clear
+              Cancel
             </button>
-
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={{
-                  fontSize: 13,
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-text-secondary)',
-                  background: 'none',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '6px 14px',
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={!isDirty}
-                style={{
-                  fontSize: 13,
-                  fontFamily: 'var(--font-body)',
-                  color: '#fff',
-                  background: isDirty ? 'var(--color-accent)' : 'var(--color-border)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '6px 14px',
-                  cursor: isDirty ? 'pointer' : 'default',
-                }}
-              >
-                Save
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty}
+              style={{
+                fontSize: 13,
+                fontFamily: 'var(--font-body)',
+                color: '#fff',
+                background: isDirty ? 'var(--color-accent)' : 'var(--color-border)',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                padding: '6px 14px',
+                cursor: isDirty ? 'pointer' : 'default',
+              }}
+            >
+              Save
+            </button>
           </div>
         </>
       ) : savedValue ? (
@@ -230,15 +243,15 @@ export default function PersonalNotes({ conditionId }) {
                 gap: 4,
                 fontSize: 12,
                 fontFamily: 'var(--font-body)',
-                color: 'var(--color-text-secondary)',
+                color: 'var(--color-accent)',
                 background: 'none',
-                border: '1px solid var(--color-border)',
+                border: '1px solid var(--color-accent)',
                 borderRadius: 'var(--radius-md)',
                 padding: '4px 10px',
                 cursor: 'pointer',
               }}
             >
-              <Icon name="Pencil" size={12} color="var(--color-text-secondary)" />
+              <Icon name="Pencil" size={12} color="var(--color-accent)" />
               Edit
             </button>
           </div>
