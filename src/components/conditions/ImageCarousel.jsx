@@ -2,20 +2,29 @@
  * ImageCarousel — swipeable image carousel (Phase 4.2).
  *
  * Layout:
- *   - Respects the parent's own lateral padding — no negative margins /
- *     full-bleed break-out. The earlier full-bleed treatment caused the
- *     carousel to visually exceed the page's actual lateral margins
- *     (its hardcoded --space-4 offset didn't match the real parent
- *     padding), so it now just sits inside its container like every
- *     other block instead of independently computing an offset.
- *   - 4:3 aspect ratio via padding-top trick; image absolutely fills container
+ *   - Image itself is full-bleed: breaks out of the parent's lateral
+ *     padding (var(--space-6), the panel padding set in
+ *     ConditionDetailScreen.jsx) via negative inline margins + matching
+ *     width increase, so it runs edge-to-edge on the screen. Dots and
+ *     caption stay inside the normal content width, unaffected.
+ *   - 4:3 aspect ratio via `aspect-ratio` (not the old padding-top %
+ *     trick — percentage padding resolves against the *containing
+ *     block's* width, which stays narrower than this element once it's
+ *     broken out with negative margins, so the padding-top hack would
+ *     flatten the image; aspect-ratio is self-referential and immune
+ *     to that).
  *   - object-fit: cover, object-position: center
- *   - Rounded corners (var(--radius-lg)) matching the app's card radius
- *     convention — no border, no shadow
+ *   - No border-radius — full-bleed edges are flush with the screen,
+ *     rounding would look wrong there.
  *   - Order: image → dots → caption
- *   - Caption slot always reserves its own height (min-height, fixed
+ *   - Caption slot always reserves its own height (fixed height, fixed
  *     margin-top) whether or not a caption is present, so content below
  *     the carousel doesn't shift up/down depending on caption presence.
+ *   - Caption row is a flex row with a leading image icon. dir="auto"
+ *     on the row lets the browser resolve RTL/LTR from the caption
+ *     text; flex's default row order then visually flips with it, so
+ *     the icon sits left of LTR captions and right of RTL captions
+ *     with no manual direction branching.
  *
  * Interaction:
  *   - Swipe threshold: 50px
@@ -29,6 +38,7 @@
  *   images  { id, url, caption }[]
  */
 import { useState, useRef, useCallback } from 'react'
+import { Image as ImageIcon } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
 
 export default function ImageCarousel({ images = [] }) {
@@ -78,18 +88,19 @@ export default function ImageCarousel({ images = [] }) {
           marginBottom: 'var(--space-3)',
         }}
       >
-        {/* 4:3 aspect-ratio image container */}
+        {/* Full-bleed 4:3 image container — breaks out of the panel's
+            lateral padding (var(--space-6)) on both sides. */}
         <div
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
           style={{
             position: 'relative',
-            width: '100%',
-            paddingTop: '75%', // 4:3
+            width: 'calc(100% + var(--space-6) * 2)',
+            marginInline: 'calc(var(--space-6) * -1)',
+            aspectRatio: '4 / 3',
             overflow: 'hidden',
             cursor: 'zoom-in',
             backgroundColor: 'var(--color-bg)',
-            borderRadius: 'var(--radius-lg)',
           }}
         >
           <img
@@ -108,7 +119,7 @@ export default function ImageCarousel({ images = [] }) {
           />
         </div>
 
-        {/* Dot indicators */}
+        {/* Dot indicators — stay within the normal content width */}
         {images.length > 1 && (
           <div style={{
             display: 'flex',
@@ -142,28 +153,39 @@ export default function ImageCarousel({ images = [] }) {
 
         {/* Caption slot — always rendered (empty when this image has no
             caption) so the space below the carousel never shifts between
-            captioned/uncaptioned images. Truncated to a single line with
-            an ellipsis rather than just a min-height: a min-height alone
-            only holds for one-line captions — anything that wraps to a
-            second line still pushes content below it down. Truncating
-            guarantees a fixed height regardless of caption length.
-            dir="auto" + matching textAlign so RTL captions align right,
-            same convention as every other text block in the app. */}
+            captioned/uncaptioned images. dir="auto" lets the browser
+            resolve RTL/LTR from the caption text; as a flex row, item
+            order then visually follows that resolved direction, so the
+            leading icon ends up on the correct side without any manual
+            direction logic. Text span keeps the single-line ellipsis
+            truncation from before. */}
         <div
           dir="auto"
           style={{
             marginTop: 6,
             height: 19, // one line at fontSize 13 / lineHeight 1.5
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
             fontSize: 13,
             color: 'var(--color-text-secondary)',
             fontWeight: 400,
             lineHeight: 1.5,
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
           }}
         >
-          {current.caption || ''}
+          {current.caption && (
+            <>
+              <ImageIcon size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+              <span style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                minWidth: 0,
+              }}>
+                {current.caption}
+              </span>
+            </>
+          )}
         </div>
       </div>
 
