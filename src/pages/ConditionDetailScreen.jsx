@@ -230,114 +230,111 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--space-6) 0' }}>
 
-        {/* Top row: back only — share/fav icons moved down to align with
-            the specialty line below (see title block). */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: condition ? 4 : 'var(--space-2)' }}>
-          <button
-            onClick={onBack}
-            aria-label="Back"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            <ArrowLeft size={16} strokeWidth={2} />
-            Back
-          </button>
+        {/* Top row: Back button + specialty icon/label now share a single
+            row (previously two stacked rows) — removes a full row of
+            vertical space from the sticky header. Share + favourite
+            icons stay pinned to the right edge of this same row. */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: condition ? 8 : 'var(--space-2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                fontFamily: 'var(--font-body)', padding: '4px 0',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+                flexShrink: 0,
+              }}
+            >
+              <ArrowLeft size={16} strokeWidth={2} />
+              Back
+            </button>
+
+            {condition && condition.specialtyName && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                <SpecialtyIcon
+                  iconType={iconType}
+                  iconValue={iconValue}
+                  size={12}
+                  color={colors.fg}
+                />
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: 500,
+                  letterSpacing: '0.03em',
+                  // Specialty label is a signal, not decoration — text-secondary
+                  // (was text-tertiary) per Condition Detail visual-weight pass.
+                  color: 'var(--color-text-secondary)',
+                  lineHeight: 1,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  {condition.specialtyName}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {condition && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+              <button
+                onClick={onShare}
+                aria-label="Share prescription"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: 'var(--color-text-tertiary)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2"
+                  strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </button>
+
+              <button
+                onClick={onFavToggle}
+                aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
+                  transition: 'color 0.15s ease',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24"
+                  fill={isFav ? 'currentColor' : 'none'}
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Condition title block */}
+        {/* Condition title */}
         {condition && (
-          <div style={{ marginBottom: 4 }}>
-            {/* Specialty line — now also carries the share + fav buttons on
-                its right edge, aligned with this row instead of the top
-                back-button row. Renders even when there's no specialtyName
-                so the buttons still have a place to sit. */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginBottom: 8,
-            }}>
-              {condition.specialtyName ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <SpecialtyIcon
-                    iconType={iconType}
-                    iconValue={iconValue}
-                    size={12}
-                    color={colors.fg}
-                  />
-                  <span style={{
-                    fontSize: 13,
-                    fontWeight: 500,
-                    letterSpacing: '0.03em',
-                    // Specialty label is a signal, not decoration — text-secondary
-                    // (was text-tertiary) per Condition Detail visual-weight pass.
-                    color: 'var(--color-text-secondary)',
-                    lineHeight: 1,
-                  }}>
-                    {condition.specialtyName}
-                  </span>
-                </div>
-              ) : <div />}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <button
-                  onClick={onShare}
-                  aria-label="Share prescription"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                    color: 'var(--color-text-tertiary)',
-                    WebkitTapHighlightColor: 'transparent', outline: 'none',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24"
-                    fill="none" stroke="currentColor" strokeWidth="2"
-                    strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                </button>
-
-                <button
-                  onClick={onFavToggle}
-                  aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                    color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
-                    transition: 'color 0.15s ease',
-                    WebkitTapHighlightColor: 'transparent', outline: 'none',
-                  }}
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24"
-                    fill={isFav ? 'currentColor' : 'none'}
-                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-
-            {/* VISUAL-WEIGHT PASS: fontWeight dropped 700 -> 600. At 700 the
-                title read heavier than intended; 600 keeps it the largest/boldest
-                element on the header while reading a touch less dense.
-                margin-bottom trimmed 14 -> 10 to reduce the white space
-                between the title and the tab strip below it. */}
-            <h1 style={{
-              fontSize: 22,
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              margin: '0 0 10px 0',
-              lineHeight: 1.2,
-              letterSpacing: '-0.4px',
-            }}>
-              {condition.name}
-            </h1>
-          </div>
+          <h1 style={{
+            fontSize: 22,
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+            margin: '0 0 10px 0',
+            lineHeight: 1.2,
+            letterSpacing: '-0.4px',
+          }}>
+            {condition.name}
+          </h1>
         )}
 
         {/* ─── Tab strip ─────────────────────────────────────────────────────── */}
