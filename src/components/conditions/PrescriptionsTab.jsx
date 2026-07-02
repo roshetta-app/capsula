@@ -74,6 +74,27 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     32px) — real-device review showed the gap from Personal Notes to
  *     the divider was too generous relative to the compact footer below it.
  *
+ * Final quiet-footnote pass:
+ *   - Divider removed entirely — spacing alone now separates the footer
+ *     from Personal Notes, per updated spec ("remove the divider above
+ *     the disclaimer entirely").
+ *   - marginTop set to an exact 56px. No token in the --space-N scale
+ *     lands on 56 (--space-12 is 48, next step up is --space-14 which
+ *     doesn't exist), so a raw pixel value is used deliberately here
+ *     rather than rounding to the nearest token.
+ *   - paddingBottom set to --space-8 (32px), the low end of the
+ *     requested 32-40dp range, keeping the footer's total footprint
+ *     as light as the "intentionally low visual weight" goal asks for.
+ *   - Added horizontal padding (--space-2, 8px each side) so the text
+ *     block reads as a footer inset from the page edge rather than
+ *     flush body content.
+ *   - Icon: 18px → 16px, recolored secondary → tertiary (lowest-emphasis
+ *     text color), strokeWidth explicitly set to 1.5 for a thinner line
+ *     than the default 2, per "thin stroke" spec.
+ *   - Text reverted to a two-weight single sentence: "Clinical reference
+ *     only." at Medium (500), remainder at Regular (400) — same pattern
+ *     used in an earlier pass, now paired with the lighter icon/spacing.
+ *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
@@ -133,32 +154,31 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* True page footer — a quiet closing footnote, not a section.
-          No heading, no bold title, no large icon: a single flowing
-          sentence in secondary color, aligned with a small outlined
-          shield icon on its first line. Thin divider marks the end
-          of the page content; footer itself stays compact. */}
+      {/* Quiet editorial footnote — no divider, no card, no heading.
+          Spacing alone (56dp above) separates it from Personal Notes;
+          low-emphasis tertiary icon and secondary body text keep its
+          visual weight intentionally minimal. */}
       <div style={{
-        marginTop: 'var(--space-8)',
-        borderTop: '1px solid var(--color-border-subtle)',
-        paddingTop: 'var(--space-4)',
-        paddingBottom: 'var(--space-6)',
+        marginTop: 56,
+        paddingLeft: 'var(--space-2)',
+        paddingRight: 'var(--space-2)',
+        paddingBottom: 'var(--space-8)',
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'flex-start',
           gap: 12,
         }}>
-          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
+          <Shield size={16} strokeWidth={1.5} color="var(--color-text-tertiary)" style={{ flexShrink: 0, marginTop: 1 }} />
           <p style={{
             margin: 0,
             fontSize: 13,
-            fontWeight: 400,
             lineHeight: 1.4,
             textAlign: 'left',
             color: 'var(--color-text-secondary)',
           }}>
-            Clinical reference only. Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.
+            <span style={{ fontWeight: 500 }}>Clinical reference only.</span>
+            <span style={{ fontWeight: 400 }}> Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.</span>
           </p>
         </div>
       </div>
