@@ -240,7 +240,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
           justifyContent: 'space-between',
           marginBottom: condition ? 8 : 'var(--space-2)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
             <button
               onClick={onBack}
               aria-label="Back"
@@ -258,28 +258,46 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
             </button>
 
             {condition && condition.specialtyName && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                <SpecialtyIcon
-                  iconType={iconType}
-                  iconValue={iconValue}
-                  size={12}
-                  color={colors.fg}
+              <>
+                {/* Dot divider — separates Back from the specialty group
+                    without a line/dash competing visually with either
+                    side. Muted to the same tone as the specialty group. */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 3,
+                    height: 3,
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--color-text-tertiary)',
+                    opacity: 0.6,
+                    flexShrink: 0,
+                  }}
                 />
-                <span style={{
-                  fontSize: 13,
-                  fontWeight: 500,
-                  letterSpacing: '0.03em',
-                  // Specialty label is a signal, not decoration — text-secondary
-                  // (was text-tertiary) per Condition Detail visual-weight pass.
-                  color: 'var(--color-text-secondary)',
-                  lineHeight: 1,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}>
-                  {condition.specialtyName}
-                </span>
-              </div>
+
+                {/* Specialty icon + label — sized down one point and muted
+                    (opacity) relative to Back, so Back reads as the clear
+                    primary action and this reads as secondary metadata. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, opacity: 0.75 }}>
+                  <SpecialtyIcon
+                    iconType={iconType}
+                    iconValue={iconValue}
+                    size={11}
+                    color={colors.fg}
+                  />
+                  <span style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    letterSpacing: '0.03em',
+                    color: 'var(--color-text-secondary)',
+                    lineHeight: 1,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}>
+                    {condition.specialtyName}
+                  </span>
+                </div>
+              </>
             )}
           </div>
 
