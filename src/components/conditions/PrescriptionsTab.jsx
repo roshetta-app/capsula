@@ -53,20 +53,21 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *   - paddingBottom bumped --space-6 → --space-8 (24px → 32px) so the
  *     footer has generous breathing room before the bottom nav/safe area.
  *
- * Disclaimer header/body split pass:
- *   - Restructured from a single inline sentence into a standalone
- *     section: an icon + "Clinical Reference" title row, with the
- *     verification copy as a separate paragraph beneath it.
- *   - Icon swapped from Shield to BookOpen — an editorial/reference mark
- *     rather than anything cautionary, paired with the title in
- *     --color-text-primary rather than the muted secondary tone.
- *   - Title: 15px / Medium (500) / primary text color, 12px gap from icon.
- *   - Body: unchanged copy, 13px / Regular (400) / secondary text color,
- *     1.375 line-height, 6px marginTop below the title.
- *   - marginTop pulled back --space-10 → --space-8 (40px → 32px) to sit
- *     inside the new 24-32px "previous section" spacing target.
- *   - paddingBottom left at --space-8 (32px) — already inside the
- *     requested 32-40px range, no change needed.
+ * Editorial footer pass:
+ *   - Added a thin top divider (--color-border-subtle) to visually close
+ *     off the page before the footer, instead of relying on spacing alone.
+ *   - Title copy changed "Clinical Reference" → "Good Practice"; heading
+ *     now 16px / Semibold (600) to read as a proper section close rather
+ *     than a small label.
+ *   - Icon kept as BookOpen (book, not shield, per updated preference),
+ *     bumped 18px → 20px, recolored from primary → secondary (muted gray)
+ *     so it reads as quiet/editorial rather than a bolded UI affordance.
+ *   - Icon-title gap tightened 12px → 10px (within the new 8-12px spec).
+ *   - Body: 13px → 14px, line-height 1.375 → 1.45, copy unchanged.
+ *   - marginTop above the divider bumped --space-8 → --space-10 (32px →
+ *     40px) for a clearer break from the previous section.
+ *   - paddingBottom bumped --space-8 → --space-12 (32px → 48px) for a
+ *     calmer, more conclusive page ending.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -127,34 +128,36 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Reference footer — a quiet editorial section, not a warning banner.
-          No card/background/border/shadow. Title row (icon + label) reads
-          as a section header in primary text color; body copy sits below
-          in secondary text color as its own paragraph. */}
+      {/* Editorial footer — a quiet page-close, not a warning banner or card.
+          Thin top divider signals "end of content"; icon and title are
+          deliberately muted/secondary-weighted rather than bold UI elements,
+          so the section reads as informational, not interactive. */}
       <div style={{
-        marginTop: 'var(--space-8)',
-        paddingBottom: 'var(--space-8)',
+        marginTop: 'var(--space-10)',
+        borderTop: '1px solid var(--color-border-subtle)',
+        paddingTop: 'var(--space-5)',
+        paddingBottom: 'var(--space-12)',
       }}>
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 12,
+          gap: 10,
         }}>
-          <BookOpen size={18} color="var(--color-text-primary)" style={{ flexShrink: 0 }} />
+          <BookOpen size={20} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
           <span style={{
-            fontSize: 15,
-            fontWeight: 500,
+            fontSize: 16,
+            fontWeight: 600,
             color: 'var(--color-text-primary)',
           }}>
-            Clinical Reference
+            Good Practice
           </span>
         </div>
         <p style={{
           margin: 0,
           marginTop: 6,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 400,
-          lineHeight: 1.375,
+          lineHeight: 1.45,
           color: 'var(--color-text-secondary)',
         }}>
           Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.
