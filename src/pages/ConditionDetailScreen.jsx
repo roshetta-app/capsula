@@ -57,6 +57,8 @@ export default function ConditionDetailScreen() {
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
   const shareCardRef = useRef(null)
+  const prescriptionsPanelRef = useRef(null)
+  const clinicalPanelRef      = useRef(null)
 
   function handleTouchStart(e) {
     touchStartX.current = e.touches[0].clientX
@@ -77,17 +79,34 @@ export default function ConditionDetailScreen() {
 
   // Only contain overscroll right at the bottom edge of a panel — leaving
   // the top edge on the browser's default ('auto') so pull-to-reload from
-  // the top of the tab content keeps working. Toggled on scroll rather
+  // the top of the tab content keeps working. Toggled dynamically rather
   // than set statically, since overscroll-behavior applies to both edges
   // of an axis and can't otherwise distinguish "leak up past the bottom"
   // (unwanted) from "leak down past the top" (wanted, for refresh).
-  function handlePanelScroll(e) {
-    const el = e.currentTarget
+  function evaluatePanelOverscroll(el) {
+    if (!el) return
+    // A panel with too little content to scroll (e.g. an empty tab) never
+    // fires a scroll event, so relying on onScroll alone leaves it
+    // permanently unguarded. scrollHeight <= clientHeight here means
+    // "nothing to scroll" — treat that the same as "at the bottom."
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 2
     el.style.overscrollBehaviorY = atBottom ? 'contain' : 'auto'
   }
 
+  function handlePanelScroll(e) {
+    evaluatePanelOverscroll(e.currentTarget)
+  }
+
   const condition = conditions.find(c => c.slug === slug)
+
+  // Re-evaluate on mount and whenever the loaded condition or content
+  // changes — covers panels that start out too short to ever scroll,
+  // which would otherwise never trigger the onScroll-based check above.
+  useEffect(() => {
+    evaluatePanelOverscroll(prescriptionsPanelRef.current)
+    evaluatePanelOverscroll(clinicalPanelRef.current)
+  }, [condition?.id])
+
   const isFav = condition ? isConditionFavourited(condition.id) : false
 
   useEffect(() => {
@@ -181,7 +200,7 @@ export default function ConditionDetailScreen() {
               otherwise the page's scroll height was driven by whichever tab
               had more content, letting the shorter tab scroll into blank
               space that belonged to the other, hidden tab. */}
-          <div onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={prescriptionsPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -196,7 +215,7 @@ export default function ConditionDetailScreen() {
           </div>
 
           {/* Panel 1 — Clinical Data */}
-          <div onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={clinicalPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
