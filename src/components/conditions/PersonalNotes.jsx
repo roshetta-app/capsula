@@ -5,18 +5,30 @@ import { useDirtyState } from '../../hooks/useDirtyState'
 /**
  * PersonalNotes — personal note for a condition (Phase 3.5).
  *
- * Batch 6 tweaks:
- *   - Label 'MY NOTES' + its icon are now bold and primary-text colored
- *     (previously a muted tertiary micro-label) to read as a clear section
- *     heading rather than a small caption.
- *   - Edit button recolored blue (accent) to read as the primary action.
- *   - Clear button recolored red (danger), with a leading X icon, and moved
- *     from the bottom action row up into the label row — it occupies the
- *     same right-aligned slot the 'Saved' indicator uses in display state,
- *     since the two never show at the same time.
- *   - Top divider heavied up (2px, tertiary-text color) to read as a
- *     distinct section break, different from the thin 0.5px dividers used
- *     elsewhere (e.g. prescription sheet rows).
+ * Redesign pass: brought in line with the rest of the Condition Details
+ * page (Treatment/Clinical visual language) instead of a standalone
+ * sticky-note widget.
+ *   - Display card: white surface + 1px border + radius-md, reusing the
+ *     same border/radius scheme as the edit textarea below, so read and
+ *     edit states feel like one continuous surface.
+ *   - Label row: 'Personal Notes', no uppercase, styled to match
+ *     PrescriptionSheetBlock's SectionHeader label (13px/700, no
+ *     text-transform, text-primary) — the closest existing "section
+ *     title" precedent on this same page.
+ *   - Divider: 1px var(--color-border) hairline, matching the weight used
+ *     elsewhere on the page, replacing the old heavy 2px tertiary border.
+ *   - Edit action: plain text action (accent color, no button chrome)
+ *     instead of an outlined pill button.
+ *   - Save/Cancel: live in the header row instead of a floating row below
+ *     the textarea; Save enabled only once dirty.
+ *   - Clear: icon-only, gated behind a confirm() instead of a prominent
+ *     always-visible action.
+ *   - Textarea: soft border that only accents on focus (no thick outline),
+ *     auto-grows, defaults to ~4-5 lines instead of a cramped 3.
+ *   - Empty state: flattened, lightweight tap row instead of an
+ *     onboarding-style circular icon badge.
+ *   - Saved indicator: temporary, fades out — unchanged fade timer logic,
+ *     just prefixed with a checkmark.
  *
  * Props:
  *   conditionId  string
@@ -29,6 +41,7 @@ export default function PersonalNotes({ conditionId }) {
   })
   const [draft, setDraft] = useState(savedValue)
   const [isEditing, setIsEditing] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
 
   const isDirty = useDirtyState(savedValue, draft)
 
@@ -78,6 +91,10 @@ export default function PersonalNotes({ conditionId }) {
     setDraft('')
   }
 
+  function handleClearClick() {
+    if (window.confirm('Clear this note?')) handleClear()
+  }
+
   const savedOpacity =
     savedVisible === 'in'  ? 1 :
     savedVisible === 'out' ? 0 :
@@ -86,102 +103,32 @@ export default function PersonalNotes({ conditionId }) {
   return (
     <div style={{
       marginTop: 'var(--space-4)',
-      borderTop: '2px solid var(--color-text-tertiary)',
+      borderTop: '1px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row — bold primary-text label + icon; right slot holds either
-          the Saved indicator (display state) or the Clear button (editing) */}
+      {/* Label row — section-title styled to match SectionHeader's label
+          elsewhere on this page; right slot holds Cancel/Save while
+          editing, nothing extra while displaying (Edit lives on the card
+          itself, Saved lives on the card's own footer). */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 6,
         marginBottom: 8,
       }}>
-        <Icon name="StickyNote" size={15} color="var(--color-text-primary)" />
+        <Icon name="StickyNote" size={14} color="var(--color-text-primary)" />
         <span style={{
           fontSize: 13,
           fontWeight: 700,
-          letterSpacing: '0.02em',
-          textTransform: 'uppercase',
+          letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
           fontFamily: 'var(--font-body)',
         }}>
-          My notes
+          Personal Notes
         </span>
 
-        {isEditing ? (
-          <button
-            type="button"
-            onClick={handleClear}
-            disabled={!draft}
-            style={{
-              marginLeft: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              fontSize: 12,
-              fontFamily: 'var(--font-body)',
-              color: draft ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: draft ? 'pointer' : 'default',
-            }}
-          >
-            <Icon name="X" size={12} color={draft ? 'var(--color-danger)' : 'var(--color-text-tertiary)'} />
-            Clear
-          </button>
-        ) : (
-          <span style={{
-            marginLeft: 'auto',
-            fontSize: 11,
-            color: 'var(--color-text-tertiary)',
-            opacity: savedOpacity,
-            transition: savedVisible === 'in'
-              ? 'opacity 0.2s ease'
-              : 'opacity 0.4s ease',
-          }}>
-            Saved
-          </span>
-        )}
-      </div>
-
-      {isEditing ? (
-        <>
-          {/* Card-style textarea — auto-grows to fit content, accent border */}
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            placeholder="Write a note..."
-            rows={3}
-            autoFocus
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontSize: 14,
-              color: 'var(--color-text-primary)',
-              backgroundColor: 'var(--color-surface)',
-              border: '1px solid var(--color-accent)',
-              borderRadius: 'var(--radius-md)',
-              padding: '8px 10px',
-              fontFamily: 'var(--font-body)',
-              lineHeight: 1.65,
-              resize: 'none',
-              outline: 'none',
-              minHeight: 72,
-              display: 'block',
-              overflow: 'hidden',
-            }}
-          />
-
-          {/* Cancel / Save */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 8,
-            marginTop: 8,
-          }}>
+        {isEditing && (
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
             <button
               type="button"
               onClick={handleCancel}
@@ -190,9 +137,8 @@ export default function PersonalNotes({ conditionId }) {
                 fontFamily: 'var(--font-body)',
                 color: 'var(--color-text-secondary)',
                 background: 'none',
-                border: '1px solid var(--color-border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '6px 14px',
+                border: 'none',
+                padding: 0,
                 cursor: 'pointer',
               }}
             >
@@ -204,36 +150,121 @@ export default function PersonalNotes({ conditionId }) {
               disabled={!isDirty}
               style={{
                 fontSize: 13,
+                fontWeight: 600,
                 fontFamily: 'var(--font-body)',
-                color: '#fff',
-                background: isDirty ? 'var(--color-accent)' : 'var(--color-border)',
+                color: isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                background: 'none',
                 border: 'none',
-                borderRadius: 'var(--radius-md)',
-                padding: '6px 14px',
+                padding: 0,
                 cursor: isDirty ? 'pointer' : 'default',
               }}
             >
               Save
             </button>
           </div>
+        )}
+      </div>
+
+      {isEditing ? (
+        <>
+          {/* Card-style textarea — auto-grows to fit content, soft border
+              that only accents on focus (no thick always-on outline). */}
+          <textarea
+            ref={textareaRef}
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            placeholder="Write a note..."
+            rows={4}
+            autoFocus
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              fontSize: 14,
+              color: 'var(--color-text-primary)',
+              backgroundColor: 'var(--color-surface)',
+              border: `1px solid ${isFocused ? 'var(--color-accent)' : 'var(--color-border)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: '10px 12px',
+              fontFamily: 'var(--font-body)',
+              lineHeight: 1.65,
+              resize: 'none',
+              outline: 'none',
+              minHeight: 100,
+              display: 'block',
+              overflow: 'hidden',
+              transition: 'border-color 0.15s ease',
+            }}
+          />
+
+          {/* Clear — icon-only, confirm-gated, kept low-key beneath the
+              textarea rather than a prominent always-visible action. */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginTop: 8,
+          }}>
+            <button
+              type="button"
+              onClick={handleClearClick}
+              disabled={!draft}
+              aria-label="Clear note"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
+                fontFamily: 'var(--font-body)',
+                color: draft ? 'var(--color-text-tertiary)' : 'var(--color-border)',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: draft ? 'pointer' : 'default',
+              }}
+            >
+              <Icon name="X" size={12} color={draft ? 'var(--color-text-tertiary)' : 'var(--color-border)'} />
+              Clear
+            </button>
+          </div>
         </>
       ) : savedValue ? (
-        /* Display state — soft yellow sticky-note card, explicit Edit button */
-        <div className="personal-note-card">
+        /* Display state — white surface, subtle border, radius-md — same
+           border/radius language as the edit textarea, so this reads as
+           one continuous surface rather than a separate widget. */
+        <div style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-3) var(--space-4)',
+        }}>
           <p style={{
             margin: 0,
             fontSize: 14,
             lineHeight: 1.65,
             fontFamily: 'var(--font-body)',
             whiteSpace: 'pre-wrap',
+            color: 'var(--color-text-primary)',
           }}>
             {savedValue}
           </p>
           <div style={{
             display: 'flex',
+            alignItems: 'center',
             justifyContent: 'flex-end',
+            gap: 10,
             marginTop: 8,
           }}>
+            <span style={{
+              fontSize: 11,
+              color: 'var(--color-text-tertiary)',
+              opacity: savedOpacity,
+              transition: savedVisible === 'in'
+                ? 'opacity 0.2s ease'
+                : 'opacity 0.4s ease',
+            }}>
+              ✓ Saved
+            </span>
             <button
               type="button"
               onClick={startEditing}
@@ -242,12 +273,12 @@ export default function PersonalNotes({ conditionId }) {
                 alignItems: 'center',
                 gap: 4,
                 fontSize: 12,
+                fontWeight: 500,
                 fontFamily: 'var(--font-body)',
                 color: 'var(--color-accent)',
                 background: 'none',
-                border: '1px solid var(--color-accent)',
-                borderRadius: 'var(--radius-md)',
-                padding: '4px 10px',
+                border: 'none',
+                padding: 0,
                 cursor: 'pointer',
               }}
             >
@@ -257,37 +288,27 @@ export default function PersonalNotes({ conditionId }) {
           </div>
         </div>
       ) : (
-        /* Empty state — inviting tap target with icon and privacy note */
+        /* Empty state — lightweight tap row, no onboarding-style circular
+           icon badge. Privacy note stays empty-state-only. */
         <div
           onClick={startEditing}
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
-            gap: 12,
+            alignItems: 'center',
+            gap: 8,
             cursor: 'pointer',
           }}
         >
-          <div style={{
-            width: 36,
-            height: 36,
-            borderRadius: '50%',
-            backgroundColor: 'var(--color-primary-light)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}>
-            <Icon name="StickyNote" size={16} color="var(--color-accent)" />
-          </div>
+          <Icon name="StickyNote" size={14} color="var(--color-text-tertiary)" />
           <div>
             <p style={{
-              margin: '0 0 4px',
-              fontSize: 14,
+              margin: '0 0 2px',
+              fontSize: 13,
               fontWeight: 500,
-              color: 'var(--color-accent)',
+              color: 'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}>
-              Add your personal notes
+              No notes yet — <span style={{ color: 'var(--color-accent)' }}>Add one</span>
             </p>
             <p style={{
               margin: 0,
@@ -298,8 +319,8 @@ export default function PersonalNotes({ conditionId }) {
               alignItems: 'center',
               gap: 4,
             }}>
-              <Icon name="Lock" size={12} color="var(--color-text-tertiary)" />
-              Saved to this device — only you can see it
+              <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
+              Add your own clinical pearls, reminders or mnemonics — saved to this device only.
             </p>
           </div>
         </div>
