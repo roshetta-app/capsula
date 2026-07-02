@@ -74,9 +74,16 @@ const RX_RAIL_GAP = 8
  *   - Search icon: per drug unit, opens Google Images for the drug in Egypt.
  *
  * Props:
- *   sheet  { label, rows: [...] }  — block.data of a prescription_sheet block
+ *   sheet            { label, rows: [...] }  — block.data of a prescription_sheet block
+ *   hasContentAfter  boolean — whether any Rx-level block (note/text/gallery)
+ *                     renders below this sheet. When false, the terminal
+ *                     zigzag marker is skipped entirely — it exists to signal
+ *                     "more content follows the divider," so drawing it with
+ *                     nothing after it reads as a dead-end decoration.
+ *                     Defaults to true (prior always-on behavior) so any
+ *                     other call site is unaffected.
  */
-export default function PrescriptionSheetBlock({ sheet }) {
+export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }) {
   const navigate = useNavigate()
   const { drugs } = useDrugs()
 
@@ -204,25 +211,30 @@ export default function PrescriptionSheetBlock({ sheet }) {
           Replaces the previous dashed-line + "end of sheet" label treatment.
           Low-opacity accent stroke keeps it visually distinct from the solid
           hairlines between prescription items without drawing attention to itself.
+          Only rendered when something (a note/text/gallery block) actually
+          follows the sheet — with nothing after it, the marker has nothing
+          to divide and just reads as a stray decoration under the last row.
       ────────────────────────────────────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'center',
-        marginTop: 'var(--space-3)',
-        marginBottom: 'var(--space-1)',
-      }}>
-        <svg width="40" height="8" viewBox="0 0 40 8" fill="none" aria-hidden="true">
-          <polyline
-            points="0,4 5,1 10,7 15,1 20,7 25,1 30,7 35,1 40,4"
-            stroke="var(--color-accent)"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            opacity="0.3"
-            fill="none"
-          />
-        </svg>
-      </div>
+      {hasContentAfter && (
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: 'var(--space-3)',
+          marginBottom: 'var(--space-1)',
+        }}>
+          <svg width="40" height="8" viewBox="0 0 40 8" fill="none" aria-hidden="true">
+            <polyline
+              points="0,4 5,1 10,7 15,1 20,7 25,1 30,7 35,1 40,4"
+              stroke="var(--color-accent)"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity="0.3"
+              fill="none"
+            />
+          </svg>
+        </div>
+      )}
     </div>
   )
 }
@@ -725,3 +737,4 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
+

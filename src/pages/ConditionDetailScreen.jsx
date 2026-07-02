@@ -228,7 +228,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       borderRadius: '0 0 18px 18px',
       boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '8px var(--space-6) 0' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) 0' }}>
 
         {/* Top row: Back button + specialty icon/label now share a single
             row (previously two stacked rows) — removes a full row of
@@ -286,7 +286,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                   />
                   <span style={{
                     fontSize: 12,
-                    fontWeight: 500,
+                    fontWeight: 400,
                     letterSpacing: '0.03em',
                     color: 'var(--color-text-secondary)',
                     lineHeight: 1,

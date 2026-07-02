@@ -179,8 +179,17 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
             />
           )}
 
-          {/* Active sheet */}
-          <PrescriptionSheetBlock sheet={active?.data} />
+          {/* Active sheet — when there's no PrescriptionPills selector above
+              (single-sheet condition), the shared panel top padding reads
+              as too much space before the sheet starts; a small negative
+              margin here pulls it up to match the Clinical tab's spacing
+              without touching that shared padding. */}
+          <div style={sheets.length <= 1 ? { marginTop: -6 } : undefined}>
+            <PrescriptionSheetBlock
+              sheet={active?.data}
+              hasContentAfter={rxBelowSheet.length > 0}
+            />
+          </div>
         </>
       )}
 
