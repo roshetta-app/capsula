@@ -57,6 +57,7 @@ export default function ConditionDetailScreen() {
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
   const shareCardRef = useRef(null)
+  const tabDirection  = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
 
   // Per-tab scroll memory — since only the active tab's content exists in
   // the page at a time now, the page's own scroll position has to be saved
@@ -66,8 +67,11 @@ export default function ConditionDetailScreen() {
   // Switches tabs while preserving each tab's scroll position: saves where
   // you are on the tab you're leaving, then restores wherever you'd left
   // off on the tab you're arriving on (see the useLayoutEffect below).
+  // Also records the direction of travel so the incoming tab's slide
+  // animation comes from the correct side, for both tap and swipe.
   function switchTab(index) {
     if (index === activeTab) return
+    tabDirection.current = index > activeTab ? 1 : -1
     scrollPositions.current[activeTab] = window.scrollY
     setActiveTab(index)
   }
@@ -184,13 +188,18 @@ export default function ConditionDetailScreen() {
         />
       </div>
 
-      {/* Local keyframes for the tab-swap fade — kept scoped to this file
-          rather than added to globals.css, since this is the only screen
-          that needs it. */}
+      {/* Local keyframes for the tab-switch transition — kept scoped to this
+          file rather than added to globals.css, since this is the only
+          screen that needs it. Direction-aware slide+fade (iOS-style
+          push-transition curve) replaces the earlier flat opacity fade. */}
       <style>{`
-        @keyframes conditionTabFade {
-          from { opacity: 0; }
-          to   { opacity: 1; }
+        @keyframes conditionTabSlideFromRight {
+          from { opacity: 0; transform: translateX(16px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes conditionTabSlideFromLeft {
+          from { opacity: 0; transform: translateX(-16px); }
+          to   { opacity: 1; transform: translateX(0); }
         }
       `}</style>
 
@@ -198,11 +207,14 @@ export default function ConditionDetailScreen() {
           scrolls natively (same mechanism as the home screen), instead of
           each tab owning its own internal scroll box. touchAction: 'pan-y'
           keeps native vertical scrolling working while still letting our
-          own touch handlers see horizontal swipes for tab switching. */}
+          own touch handlers see horizontal swipes for tab switching.
+          flex: 1 makes this wrapper fill the remaining viewport height on
+          short/empty tabs, so swipes below short content still land here
+          instead of falling through to the page background. */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ touchAction: 'pan-y' }}
+        style={{ touchAction: 'pan-y', flex: 1 }}
       >
         <div
           key={activeTab}
@@ -211,7 +223,7 @@ export default function ConditionDetailScreen() {
             margin: '0 auto',
             padding: 'var(--space-5) var(--space-6)',
             paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
-            animation: 'conditionTabFade 0.18s ease',
+            animation: `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.3s cubic-bezier(0.32, 0.72, 0, 1)`,
           }}
         >
           {activeTab === 0 ? (
