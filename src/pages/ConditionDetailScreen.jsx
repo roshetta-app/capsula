@@ -193,7 +193,7 @@ export default function ConditionDetailScreen() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
+        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative', touchAction: 'pan-y' }}
       >
         <div style={{
           display: 'flex',
@@ -208,7 +208,7 @@ export default function ConditionDetailScreen() {
               otherwise the page's scroll height was driven by whichever tab
               had more content, letting the shorter tab scroll into blank
               space that belonged to the other, hidden tab. */}
-          <div ref={prescriptionsPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={prescriptionsPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -223,7 +223,7 @@ export default function ConditionDetailScreen() {
           </div>
 
           {/* Panel 1 — Clinical Data */}
-          <div ref={clinicalPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={clinicalPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
