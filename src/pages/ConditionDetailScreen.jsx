@@ -59,6 +59,12 @@ export default function ConditionDetailScreen() {
   const shareCardRef = useRef(null)
   const tabDirection  = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
 
+  // Tracks whether the user has actually switched tabs at least once (tap
+  // or swipe). Stays false through the very first render — mount and page
+  // refresh — so the slide animation never plays on load, only once a real
+  // switch has happened.
+  const hasSwitchedRef = useRef(false)
+
   // Per-tab scroll memory — since only the active tab's content exists in
   // the page at a time now, the page's own scroll position has to be saved
   // per tab manually on switch, or returning to a tab always lands at the top.
@@ -72,6 +78,7 @@ export default function ConditionDetailScreen() {
   function switchTab(index) {
     if (index === activeTab) return
     tabDirection.current = index > activeTab ? 1 : -1
+    hasSwitchedRef.current = true
     scrollPositions.current[activeTab] = window.scrollY
     setActiveTab(index)
   }
@@ -223,10 +230,15 @@ export default function ConditionDetailScreen() {
             margin: '0 auto',
             padding: 'var(--space-5) var(--space-6)',
             paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
-            // ⚠ DIAGNOSTIC TEST ONLY — animation disabled to isolate root cause.
-            // Do NOT treat this as the fix. Report back whether BottomNav
-            // still glitches with this in place.
-            animation: 'none',
+            // Only animate on a real tab switch (tap or swipe), never on
+            // mount/refresh — hasSwitchedRef stays false through the first
+            // render. Direction picks which side the incoming tab slides
+            // in from. Safe to animate with transform here: BottomNav is
+            // forced onto its own compositing layer (see BottomNav.jsx,
+            // Phase 17), so it no longer jumps when this transform runs.
+            animation: hasSwitchedRef.current
+              ? `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)`
+              : 'none',
           }}
         >
           {activeTab === 0 ? (
