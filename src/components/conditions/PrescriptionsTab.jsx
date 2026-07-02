@@ -70,6 +70,9 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     now asks for a compact footer, not a spacious one.
  *   - paddingTop between divider and text reduced --space-5 → --space-4
  *     (20px → 16px) to keep the footer visually tight/compact as a whole.
+ *   - marginTop above the divider reduced --space-12 → --space-8 (48px →
+ *     32px) — real-device review showed the gap from Personal Notes to
+ *     the divider was too generous relative to the compact footer below it.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -136,7 +139,7 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
           shield icon on its first line. Thin divider marks the end
           of the page content; footer itself stays compact. */}
       <div style={{
-        marginTop: 'var(--space-12)',
+        marginTop: 'var(--space-8)',
         borderTop: '1px solid var(--color-border-subtle)',
         paddingTop: 'var(--space-4)',
         paddingBottom: 'var(--space-6)',
