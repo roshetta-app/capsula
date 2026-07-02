@@ -34,6 +34,13 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     so Personal Notes reads as a complete, clearly separated standalone
  *     module rather than running straight into the disclaimer below it.
  *
+ * Disclaimer redesign pass:
+ *   - Rewritten as a calm, professional footnote instead of an alert —
+ *     no card/background/border/shadow, neutral secondary text color
+ *     throughout (icon + text), single flowing paragraph instead of two
+ *     lines of differing hierarchy. Reads as a quiet footnote in a
+ *     premium medical reference, not a warning banner.
+ *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
@@ -93,25 +100,27 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Medical Disclaimer — two sentences on two lines. marginTop
-          increased (space-4 -> space-8) so Personal Notes reads as a
-          complete, separated module above it. */}
+      {/* Reference disclaimer — a quiet footnote, not a warning banner.
+          No card/background/border/shadow: plain text placed directly on
+          the page, neutral secondary color throughout (icon + text), one
+          flowing paragraph rather than separate-hierarchy lines. */}
       <div style={{
         marginTop: 'var(--space-8)',
+        paddingBottom: 'var(--space-6)',
         display: 'flex',
         alignItems: 'flex-start',
-        gap: 6,
+        gap: 12,
       }}>
-        <ShieldCheck size={12} color="var(--color-text-tertiary)" style={{ flexShrink: 0, marginTop: 1 }} />
-        <div style={{
-          fontSize: 11,
-          color: 'var(--color-text-tertiary)',
+        <ShieldCheck size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
+        <p style={{
+          margin: 0,
+          fontSize: 13,
           fontWeight: 400,
-          lineHeight: 1.6,
+          lineHeight: 1.4,
+          color: 'var(--color-text-secondary)',
         }}>
-          <div>Verify doses before prescribing.</div>
-          <div>Individual patient factors apply.</div>
-        </div>
+          Clinical reference only. Always verify doses and patient-specific factors, and follow local guidelines before prescribing.
+        </p>
       </div>
     </div>
   )
