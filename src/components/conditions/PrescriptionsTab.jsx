@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ShieldCheck } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import PersonalNotes from './PersonalNotes'
@@ -40,6 +40,18 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     throughout (icon + text), single flowing paragraph instead of two
  *     lines of differing hierarchy. Reads as a quiet footnote in a
  *     premium medical reference, not a warning banner.
+ *
+ * Disclaimer polish pass:
+ *   - Copy tightened: "Clinical reference only." now carries Medium (500)
+ *     weight as a lead-in, rest of the sentence stays Regular (400) —
+ *     both in the same flowing <p>, no line break, no hierarchy split.
+ *   - Icon swapped from ShieldCheck to plain Shield (outline only, no
+ *     checkmark) per the "simple outline shield" spec.
+ *   - Line-height tightened from 1.4 to 1.375 to reduce vertical space.
+ *   - marginTop bumped --space-8 → --space-10 (32px → 40px, +8px) to
+ *     better separate the disclaimer from Personal Notes above it.
+ *   - paddingBottom bumped --space-6 → --space-8 (24px → 32px) so the
+ *     footer has generous breathing room before the bottom nav/safe area.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -103,23 +115,24 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Reference disclaimer — a quiet footnote, not a warning banner.
           No card/background/border/shadow: plain text placed directly on
           the page, neutral secondary color throughout (icon + text), one
-          flowing paragraph rather than separate-hierarchy lines. */}
+          flowing paragraph rather than separate-hierarchy lines. Lead-in
+          phrase carries Medium weight, rest of the sentence stays Regular. */}
       <div style={{
-        marginTop: 'var(--space-8)',
-        paddingBottom: 'var(--space-6)',
+        marginTop: 'var(--space-10)',
+        paddingBottom: 'var(--space-8)',
         display: 'flex',
         alignItems: 'flex-start',
         gap: 12,
       }}>
-        <ShieldCheck size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
+        <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
         <p style={{
           margin: 0,
           fontSize: 13,
-          fontWeight: 400,
-          lineHeight: 1.4,
+          lineHeight: 1.375,
           color: 'var(--color-text-secondary)',
         }}>
-          Clinical reference only. Always verify doses and patient-specific factors, and follow local guidelines before prescribing.
+          <span style={{ fontWeight: 500 }}>Clinical reference only.</span>
+          <span style={{ fontWeight: 400 }}> Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.</span>
         </p>
       </div>
     </div>
