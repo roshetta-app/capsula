@@ -192,6 +192,15 @@ html {
   background-color: var(--color-bg);
   color: var(--color-text-primary);
   transition: background-color 0.15s ease, color 0.15s ease;
+  /* Reserves vertical scrollbar space permanently, regardless of whether
+     the current page/tab actually needs to scroll. Without this, switching
+     to short content (e.g. the empty Clinical tab state) removes the
+     scrollbar and hands its width back to the document — shifting every
+     horizontally-centered fixed/sticky element (BottomNav's tab row,
+     DetailHeader) visibly sideways. Reserving it up front means that
+     width never changes on tab switch. No-op on platforms/browsers using
+     overlay scrollbars that don't consume layout width. */
+  scrollbar-gutter: stable;
 }
 
 body {
