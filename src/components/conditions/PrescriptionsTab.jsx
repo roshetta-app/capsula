@@ -114,6 +114,23 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     Personal Notes, per the new "+8-12dp above the current spacing"
  *     instruction.
  *
+ * Final polish pass:
+ *   - "Clinical reference only." weight bumped 500 (Medium) → 600
+ *     (Semibold) per updated spec wording ("semibold" specifically,
+ *     not just "bold"/"Medium" as in earlier passes).
+ *   - Icon opacity reduced 0.55 → 0.47 (~15% lighter) per "lighten the
+ *     icon slightly" — size (18px) and default stroke already sat
+ *     inside the requested ranges, left unchanged.
+ *   - Icon/text alignment switched flex-start → center, and the 1px
+ *     top nudge removed, so the icon centers against the full text
+ *     block rather than pinning to the first line only — spec now
+ *     explicitly wants them to "read as one unit."
+ *   - Gap tightened 12px → 10px (low end of the new 10-12dp range).
+ *   - marginTop pulled back 64px → 56px (-8px, low end of the "8-12dp
+ *     closer to Personal Notes" instruction).
+ *   - paddingBottom reduced --space-8 → --space-6 (32px → 24px) to
+ *     avoid excess empty space at the very end of the page.
+ *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
@@ -174,19 +191,19 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
       {/* Quiet editorial footnote — no divider, no card, no heading.
-          Spacing alone (64dp above) separates it from Personal Notes;
-          opacity-muted icon and secondary body text keep its visual
-          weight footer-like rather than page content. */}
+          Spacing alone (56dp above) separates it from Personal Notes;
+          opacity-muted icon is vertically centered against the text
+          block so the two read as a single low-emphasis unit. */}
       <div style={{
-        marginTop: 64,
-        paddingBottom: 'var(--space-8)',
+        marginTop: 56,
+        paddingBottom: 'var(--space-6)',
       }}>
         <div style={{
           display: 'flex',
-          alignItems: 'flex-start',
-          gap: 12,
+          alignItems: 'center',
+          gap: 10,
         }}>
-          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1, opacity: 0.55 }} />
+          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, opacity: 0.47 }} />
           <p style={{
             margin: 0,
             fontSize: 13,
@@ -194,7 +211,7 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
             textAlign: 'left',
             color: 'var(--color-text-secondary)',
           }}>
-            <span style={{ fontWeight: 500 }}>Clinical reference only.</span>
+            <span style={{ fontWeight: 600 }}>Clinical reference only.</span>
             <span style={{ fontWeight: 400 }}> Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.</span>
           </p>
         </div>
