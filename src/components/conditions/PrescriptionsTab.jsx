@@ -29,6 +29,11 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *   - Medical disclaimer margin reduced to match.
  *   - Disclaimer split across two lines for better legibility.
  *
+ * Personal Notes final polish pass:
+ *   - Medical Disclaimer's marginTop increased from --space-4 to --space-8
+ *     so Personal Notes reads as a complete, clearly separated standalone
+ *     module rather than running straight into the disclaimer below it.
+ *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
  *   conditionId  string   — for PersonalNotes localStorage key
@@ -88,9 +93,11 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Medical Disclaimer — two sentences on two lines */}
+      {/* Medical Disclaimer — two sentences on two lines. marginTop
+          increased (space-4 -> space-8) so Personal Notes reads as a
+          complete, separated module above it. */}
       <div style={{
-        marginTop: 'var(--space-4)',
+        marginTop: 'var(--space-8)',
         display: 'flex',
         alignItems: 'flex-start',
         gap: 6,

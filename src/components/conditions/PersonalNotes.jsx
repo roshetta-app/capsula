@@ -53,6 +53,21 @@ import { useDirtyState } from '../../hooks/useDirtyState'
  *     and padding, so a one-line note no longer collapses to a tiny box
  *     and toggling between display/edit doesn't visibly resize.
  *
+ * Final polish pass (v2):
+ *   - Empty state redesigned: compact (minHeight 56 vs prior open-ended
+ *     height), vertically centered, CTA-first hierarchy ("+ Add your
+ *     first note" primary / "Saved only on this device" secondary —
+ *     echoes the edit-mode privacy line instead of introducing new copy).
+ *   - Saved-state card border switched to --color-border-subtle (softer,
+ *     matches the app's general card border weight) and bottom padding
+ *     increased for more breathing room under the note text.
+ *   - Label row items given lineHeight: 1 so title and Edit sit on the
+ *     same baseline.
+ *   - Edit-mode helper text pulled closer to the textarea (marginTop
+ *     6 -> 4) so it reads as part of the editor, not a floating line.
+ *   - Delete-confirmation copy simplified to "This action can't be
+ *     undone."
+ *
  * Props:
  *   conditionId  string
  */
@@ -164,6 +179,7 @@ export default function PersonalNotes({ conditionId }) {
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
           fontFamily: 'var(--font-body)',
+          lineHeight: 1,
         }}>
           Personal Notes
         </span>
@@ -231,6 +247,7 @@ export default function PersonalNotes({ conditionId }) {
               fontSize: 12,
               fontWeight: 500,
               fontFamily: 'var(--font-body)',
+              lineHeight: 1,
               color: 'var(--color-accent)',
               background: 'none',
               border: 'none',
@@ -284,7 +301,7 @@ export default function PersonalNotes({ conditionId }) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            marginTop: 6,
+            marginTop: 4,
           }}>
             <span style={{
               display: 'flex',
@@ -330,9 +347,9 @@ export default function PersonalNotes({ conditionId }) {
            subsequent edits render at steady-state with no re-animation. */
         <div style={{
           backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
+          border: '1px solid var(--color-border-subtle)',
           borderRadius: 'var(--radius-md)',
-          padding: '10px 12px',
+          padding: '10px 12px 16px',
           minHeight: 88,
           boxSizing: 'border-box',
           opacity: justPopulated ? 0 : 1,
@@ -360,27 +377,33 @@ export default function PersonalNotes({ conditionId }) {
             backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-3) var(--space-4)',
+            padding: '12px 14px',
+            minHeight: 56,
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            gap: 2,
             cursor: 'pointer',
           }}
         >
-          <p style={{
-            margin: 0,
+          <span style={{
             fontSize: 13,
-            color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            No notes yet
-          </p>
-          <p style={{
-            margin: 0,
-            fontSize: 13,
-            fontWeight: 500,
+            fontWeight: 600,
             color: 'var(--color-accent)',
             fontFamily: 'var(--font-body)',
           }}>
-            + Add note
-          </p>
+            + Add your first note
+          </span>
+          <span style={{
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            Saved only on this device
+          </span>
         </div>
       )}
 
@@ -389,7 +412,7 @@ export default function PersonalNotes({ conditionId }) {
         onClose={() => setShowConfirm(false)}
         onConfirm={handleClear}
         title="Delete note?"
-        message="This will permanently remove your personal note from this device."
+        message="This action can't be undone."
         confirmLabel="Delete"
         destructive
       />
