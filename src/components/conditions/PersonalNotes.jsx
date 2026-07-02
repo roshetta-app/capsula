@@ -192,6 +192,30 @@ export default function PersonalNotes({ conditionId }) {
             </button>
           </div>
         )}
+
+        {!isEditing && savedValue && (
+          <button
+            type="button"
+            onClick={startEditing}
+            style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              color: 'var(--color-accent)',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+            }}
+          >
+            <Icon name="Pencil" size={12} color="var(--color-accent)" />
+            Edit
+          </button>
+        )}
       </div>
 
       {isEditing ? (
@@ -293,14 +317,12 @@ export default function PersonalNotes({ conditionId }) {
           }}>
             {savedValue}
           </p>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            gap: 10,
-            marginTop: 6,
-          }}>
-            {savedVisible && (
+          {savedVisible && (
+            <div style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              marginTop: 6,
+            }}>
               <span style={{
                 fontSize: 11,
                 color: 'var(--color-text-tertiary)',
@@ -311,28 +333,8 @@ export default function PersonalNotes({ conditionId }) {
               }}>
                 ✓ Saved
               </span>
-            )}
-            <button
-              type="button"
-              onClick={startEditing}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-accent)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-              }}
-            >
-              <Icon name="Pencil" size={12} color="var(--color-accent)" />
-              Edit
-            </button>
-          </div>
+            </div>
+          )}
         </div>
       ) : (
         /* Empty state — tinted, bordered card (subtle blue tint over
