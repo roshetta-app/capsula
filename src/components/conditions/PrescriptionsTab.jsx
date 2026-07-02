@@ -130,6 +130,15 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     closer to Personal Notes" instruction).
  *   - paddingBottom reduced --space-8 → --space-6 (32px → 24px) to
  *     avoid excess empty space at the very end of the page.
+ *   - Alignment reverted center → flex-start (1px top nudge restored):
+ *     icon now lines up with the first line of text again, per direct
+ *     follow-up feedback overriding the "read as one unit" centering.
+ *
+ * Size-down pass:
+ *   - Whole disclaimer scaled down ~20% per direct follow-up request:
+ *     fontSize 13px → 10px, lineHeight 19px → 15px, icon 18px → 14px.
+ *     Weights, colors, opacity, gap, and spacing all left unchanged —
+ *     this pass only touches physical size.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -200,14 +209,14 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       }}>
         <div style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           gap: 10,
         }}>
-          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, opacity: 0.47 }} />
+          <Shield size={14} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1, opacity: 0.47 }} />
           <p style={{
             margin: 0,
-            fontSize: 13,
-            lineHeight: '19px',
+            fontSize: 10,
+            lineHeight: '15px',
             textAlign: 'left',
             color: 'var(--color-text-secondary)',
           }}>
