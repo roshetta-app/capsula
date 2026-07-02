@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 export default function ConfirmSheet({
   isOpen,
@@ -46,7 +47,13 @@ export default function ConfirmSheet({
     onClose()
   }
 
-  return (
+  // Rendered via portal to document.body — position: fixed only resolves
+  // against the viewport if no ancestor has a transform/filter/etc that
+  // creates its own containing block. PersonalNotes lives inside the
+  // condition detail page's tab-swipe wrapper (transform: translateX +
+  // overflow: hidden), which would otherwise clip and mis-position this
+  // overlay. Portaling to <body> sidesteps that ancestor entirely.
+  return createPortal(
     <div
       ref={overlayRef}
       onClick={e => { if (e.target === overlayRef.current) onClose() }}
@@ -139,6 +146,7 @@ export default function ConfirmSheet({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
