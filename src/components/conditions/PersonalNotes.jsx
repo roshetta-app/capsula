@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
 import Icon from '../ui/Icon'
+import ConfirmSheet from '../ui/ConfirmSheet'
 import { useDirtyState } from '../../hooks/useDirtyState'
 
 /**
@@ -28,6 +29,18 @@ import { useDirtyState } from '../../hooks/useDirtyState'
  *   - Read-mode card padding trimmed so it hugs short notes instead of
  *     leaving empty space.
  *
+ * Final polish pass:
+ *   - Clear confirmation now uses an in-app ConfirmSheet instead of the
+ *     native window.confirm() dialog, matching the app's own visual
+ *     language and destructive-action styling (real --color-danger
+ *     token, not a placeholder fallback).
+ *   - Empty state now sits inside a subtly tinted, bordered card instead
+ *     of bare text, giving it a visible boundary while staying compact
+ *     (no icons/illustrations added).
+ *   - Saving the very first note (empty -> populated) triggers a brief
+ *     CSS opacity/transform fade-in on the card. Subsequent edits to an
+ *     already-populated note do not re-trigger it.
+ *
  * Props:
  *   conditionId  string
  */
@@ -45,6 +58,14 @@ export default function PersonalNotes({ conditionId }) {
 
   // savedVisible: null | 'in' | 'out'
   const [savedVisible, setSavedVisible] = useState(null)
+
+  // Clear confirmation sheet
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  // First-note fade-in — true only for the single render right after an
+  // empty note becomes populated; flipped back to false shortly after
+  // mount so it never re-triggers on subsequent edits.
+  const [justPopulated, setJustPopulated] = useState(false)
 
   const fadeOutRef  = useRef(null)
   const textareaRef = useRef(null)
@@ -74,6 +95,14 @@ export default function PersonalNotes({ conditionId }) {
     el.style.height = `${el.scrollHeight}px`
   }, [isEditing, draft])
 
+  // Flip the fade-in flag off shortly after it turns on, so the
+  // transition plays exactly once per first-save.
+  useEffect(() => {
+    if (!justPopulated) return
+    const id = setTimeout(() => setJustPopulated(false), 300)
+    return () => clearTimeout(id)
+  }, [justPopulated])
+
   function startEditing() {
     setDraft(savedValue)
     setIsEditing(true)
@@ -81,6 +110,7 @@ export default function PersonalNotes({ conditionId }) {
 
   function handleSave() {
     try { localStorage.setItem(storageKey, draft) } catch { /* ignore */ }
+    if (!savedValue && draft) setJustPopulated(true)
     setSavedValue(draft)
     setIsEditing(false)
     triggerSaved()
@@ -96,7 +126,7 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   function handleClearClick() {
-    if (window.confirm('Clear this note?')) handleClear()
+    setShowConfirm(true)
   }
 
   return (
@@ -241,12 +271,17 @@ export default function PersonalNotes({ conditionId }) {
       ) : savedValue ? (
         /* Display state — white surface, subtle border, radius-md — same
            border/radius language as the edit textarea, so this reads as
-           one continuous surface rather than a separate widget. */
+           one continuous surface rather than a separate widget. On the
+           very first save (empty -> populated) this fades/scales in;
+           subsequent edits render at steady-state with no re-animation. */
         <div style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
           padding: 'var(--space-2) var(--space-3)',
+          opacity: justPopulated ? 0 : 1,
+          transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
+          transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
           <p style={{
             margin: 0,
@@ -300,22 +335,48 @@ export default function PersonalNotes({ conditionId }) {
           </div>
         </div>
       ) : (
-        /* Empty state — single compact line, no icons or explanatory
-           copy. The section title above already signals this is a notes
-           area, so nothing here repeats that meaning. */
-        <p
+        /* Empty state — tinted, bordered card (subtle blue tint over
+           surface) so it reads as a distinct tappable area instead of
+           bare text, while staying compact — no icons, no illustrations. */
+        <div
           onClick={startEditing}
           style={{
-            margin: 0,
-            fontSize: 13,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
+            backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-3) var(--space-4)',
             cursor: 'pointer',
           }}
         >
-          No notes yet · <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>Add note</span>
-        </p>
+          <p style={{
+            margin: 0,
+            fontSize: 13,
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            No notes yet
+          </p>
+          <p style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 500,
+            color: 'var(--color-accent)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            + Add note
+          </p>
+        </div>
       )}
+
+      <ConfirmSheet
+        isOpen={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleClear}
+        title="Delete note?"
+        message="This will permanently remove your personal note from this device."
+        confirmLabel="Delete"
+        destructive
+      />
     </div>
   )
 }
