@@ -154,17 +154,22 @@ export default function ConditionDetailScreen() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ overflow: 'hidden' }}
+        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
       >
         <div style={{
           display: 'flex',
           width: '200%',
+          height: '100%',
           transform: `translateX(${activeTab === 0 ? '0%' : '-50%'})`,
           transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
         }}>
 
-          {/* Panel 0 — Prescriptions */}
-          <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
+          {/* Panel 0 — Prescriptions. Each panel owns its own vertical scroll
+              (overflowY: auto) instead of sharing the page's document scroll —
+              otherwise the page's scroll height was driven by whichever tab
+              had more content, letting the shorter tab scroll into blank
+              space that belonged to the other, hidden tab. */}
+          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -179,7 +184,7 @@ export default function ConditionDetailScreen() {
           </div>
 
           {/* Panel 1 — Clinical Data */}
-          <div style={{ width: '50%', flexShrink: 0, boxSizing: 'border-box' }}>
+          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -201,7 +206,10 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  minHeight: '100dvh',
+  height: 'var(--viewport-height, 100dvh)',
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
   backgroundColor: 'var(--color-bg)',
   fontFamily: 'var(--font-body)',
   color: 'var(--color-text-primary)',
@@ -225,6 +233,7 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       top: 0,
       zIndex: 50,
       backgroundColor: 'var(--color-surface)',
+      borderRadius: '0 0 18px 18px',
       boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) 0' }}>
