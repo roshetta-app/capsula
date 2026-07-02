@@ -19,6 +19,14 @@
  *             unmistakable chunk of height (150px+), so a shrink past that
  *             threshold is a reliable, platform-agnostic signal without any
  *             UA/mobile sniffing.
+ * Phase 17 — Forced onto its own compositing layer (transform: translateZ(0)
+ *             + willChange: 'transform'). ConditionDetailScreen's tab-switch
+ *             animation now uses translateX() (not just opacity), and without
+ *             an explicit layer, this fixed nav would visibly jump up/down
+ *             during that animation as WebKit tore down/rebuilt its
+ *             compositing layer. Giving it a stable layer up front isolates
+ *             it from layer churn caused by transform animations elsewhere
+ *             on the page.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — House (Lucide)
@@ -103,6 +111,12 @@ export default function BottomNav() {
       borderTop:               '1px solid var(--color-border)',
       paddingBottom:           'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
+      // Forces this fixed nav onto its own stable compositing layer so it
+      // doesn't visibly jump when a transform-animated element elsewhere
+      // on the page (e.g. ConditionDetailScreen's tab-switch slide) causes
+      // WebKit to tear down/rebuild nearby layers. See Phase 17 note above.
+      transform:               'translateZ(0)',
+      willChange:              'transform',
     }}>
       <div style={{
         maxWidth:   680,
