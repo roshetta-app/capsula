@@ -169,7 +169,7 @@ export default function ConditionDetailScreen() {
               otherwise the page's scroll height was driven by whichever tab
               had more content, letting the shorter tab scroll into blank
               space that belonged to the other, hidden tab. */}
-          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -184,7 +184,7 @@ export default function ConditionDetailScreen() {
           </div>
 
           {/* Panel 1 — Clinical Data */}
-          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -206,7 +206,8 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  height: 'var(--viewport-height, 100dvh)',
+  position: 'fixed',
+  inset: 0,
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
