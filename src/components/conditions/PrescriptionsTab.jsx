@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen } from 'lucide-react'
+import { Shield } from 'lucide-react'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import PersonalNotes from './PersonalNotes'
@@ -53,21 +53,23 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *   - paddingBottom bumped --space-6 → --space-8 (24px → 32px) so the
  *     footer has generous breathing room before the bottom nav/safe area.
  *
- * Editorial footer pass:
- *   - Added a thin top divider (--color-border-subtle) to visually close
- *     off the page before the footer, instead of relying on spacing alone.
- *   - Title copy changed "Clinical Reference" → "Good Practice"; heading
- *     now 16px / Semibold (600) to read as a proper section close rather
- *     than a small label.
- *   - Icon kept as BookOpen (book, not shield, per updated preference),
- *     bumped 18px → 20px, recolored from primary → secondary (muted gray)
- *     so it reads as quiet/editorial rather than a bolded UI affordance.
- *   - Icon-title gap tightened 12px → 10px (within the new 8-12px spec).
- *   - Body: 13px → 14px, line-height 1.375 → 1.45, copy unchanged.
- *   - marginTop above the divider bumped --space-8 → --space-10 (32px →
- *     40px) for a clearer break from the previous section.
- *   - paddingBottom bumped --space-8 → --space-12 (32px → 48px) for a
- *     calmer, more conclusive page ending.
+ * True page-footer pass:
+ *   - Removed the heading row entirely ("Good Practice" title + BookOpen
+ *     icon) — spec now explicitly forbids section headings, bold titles,
+ *     and large icons for this element; it must read as a footnote, not
+ *     a section.
+ *   - Back to a single flowing sentence (title-less), Regular weight
+ *     throughout, no inline spans for weight contrast.
+ *   - Icon reverted BookOpen → Shield (simple outline), 20px → 18px,
+ *     recolored: stays secondary/muted, now aligned with flex-start so
+ *     it lines up with the first line of text rather than being centered
+ *     against a title that no longer exists.
+ *   - marginTop above the divider increased --space-10 → --space-12
+ *     (40px → 48px) for a clearer break before this closing note.
+ *   - paddingBottom reduced --space-12 → --space-6 (48px → 24px) — spec
+ *     now asks for a compact footer, not a spacious one.
+ *   - paddingTop between divider and text reduced --space-5 → --space-4
+ *     (20px → 16px) to keep the footer visually tight/compact as a whole.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -128,40 +130,34 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Editorial footer — a quiet page-close, not a warning banner or card.
-          Thin top divider signals "end of content"; icon and title are
-          deliberately muted/secondary-weighted rather than bold UI elements,
-          so the section reads as informational, not interactive. */}
+      {/* True page footer — a quiet closing footnote, not a section.
+          No heading, no bold title, no large icon: a single flowing
+          sentence in secondary color, aligned with a small outlined
+          shield icon on its first line. Thin divider marks the end
+          of the page content; footer itself stays compact. */}
       <div style={{
-        marginTop: 'var(--space-10)',
+        marginTop: 'var(--space-12)',
         borderTop: '1px solid var(--color-border-subtle)',
-        paddingTop: 'var(--space-5)',
-        paddingBottom: 'var(--space-12)',
+        paddingTop: 'var(--space-4)',
+        paddingBottom: 'var(--space-6)',
       }}>
         <div style={{
           display: 'flex',
-          alignItems: 'center',
-          gap: 10,
+          alignItems: 'flex-start',
+          gap: 12,
         }}>
-          <BookOpen size={20} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
-          <span style={{
-            fontSize: 16,
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
+          <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
+          <p style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 400,
+            lineHeight: 1.4,
+            textAlign: 'left',
+            color: 'var(--color-text-secondary)',
           }}>
-            Good Practice
-          </span>
+            Clinical reference only. Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.
+          </p>
         </div>
-        <p style={{
-          margin: 0,
-          marginTop: 6,
-          fontSize: 14,
-          fontWeight: 400,
-          lineHeight: 1.45,
-          color: 'var(--color-text-secondary)',
-        }}>
-          Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.
-        </p>
       </div>
     </div>
   )
