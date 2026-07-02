@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Shield } from 'lucide-react'
+import { BookOpen } from 'lucide-react'
 import PrescriptionSheetBlock from './PrescriptionSheetBlock'
 import PrescriptionPills from './PrescriptionPills'
 import PersonalNotes from './PersonalNotes'
@@ -52,6 +52,21 @@ import { getRxBlocks } from '../../utils/blockFilters'
  *     better separate the disclaimer from Personal Notes above it.
  *   - paddingBottom bumped --space-6 → --space-8 (24px → 32px) so the
  *     footer has generous breathing room before the bottom nav/safe area.
+ *
+ * Disclaimer header/body split pass:
+ *   - Restructured from a single inline sentence into a standalone
+ *     section: an icon + "Clinical Reference" title row, with the
+ *     verification copy as a separate paragraph beneath it.
+ *   - Icon swapped from Shield to BookOpen — an editorial/reference mark
+ *     rather than anything cautionary, paired with the title in
+ *     --color-text-primary rather than the muted secondary tone.
+ *   - Title: 15px / Medium (500) / primary text color, 12px gap from icon.
+ *   - Body: unchanged copy, 13px / Regular (400) / secondary text color,
+ *     1.375 line-height, 6px marginTop below the title.
+ *   - marginTop pulled back --space-10 → --space-8 (40px → 32px) to sit
+ *     inside the new 24-32px "previous section" spacing target.
+ *   - paddingBottom left at --space-8 (32px) — already inside the
+ *     requested 32-40px range, no change needed.
  *
  * Props:
  *   blocks       Block[]  — condition.blocks (Phase 2.1 shape)
@@ -112,27 +127,37 @@ export default function PrescriptionsTab({ blocks, conditionId }) {
       {/* Personal Notes */}
       {conditionId && <PersonalNotes conditionId={conditionId} />}
 
-      {/* Reference disclaimer — a quiet footnote, not a warning banner.
-          No card/background/border/shadow: plain text placed directly on
-          the page, neutral secondary color throughout (icon + text), one
-          flowing paragraph rather than separate-hierarchy lines. Lead-in
-          phrase carries Medium weight, rest of the sentence stays Regular. */}
+      {/* Reference footer — a quiet editorial section, not a warning banner.
+          No card/background/border/shadow. Title row (icon + label) reads
+          as a section header in primary text color; body copy sits below
+          in secondary text color as its own paragraph. */}
       <div style={{
-        marginTop: 'var(--space-10)',
+        marginTop: 'var(--space-8)',
         paddingBottom: 'var(--space-8)',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 12,
       }}>
-        <Shield size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 1 }} />
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}>
+          <BookOpen size={18} color="var(--color-text-primary)" style={{ flexShrink: 0 }} />
+          <span style={{
+            fontSize: 15,
+            fontWeight: 500,
+            color: 'var(--color-text-primary)',
+          }}>
+            Clinical Reference
+          </span>
+        </div>
         <p style={{
           margin: 0,
+          marginTop: 6,
           fontSize: 13,
+          fontWeight: 400,
           lineHeight: 1.375,
           color: 'var(--color-text-secondary)',
         }}>
-          <span style={{ fontWeight: 500 }}>Clinical reference only.</span>
-          <span style={{ fontWeight: 400 }}> Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.</span>
+          Verify doses, contraindications, patient-specific factors, and local guidelines before prescribing.
         </p>
       </div>
     </div>
