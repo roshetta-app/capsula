@@ -21,17 +21,16 @@
  *   - warning: triangle (universally understood, unchanged)
  *
  * CHAT-BUBBLE PASS: replaced the flat rectangular box with a message-bubble
- * shape — full width always, not shrink-wrapped or side-anchored. What
- * flips with the note's own text direction is the squared corner (a
- * lightweight tail cue, 4px) and the icon's side: LTR notes square the
- * top-left corner with the icon on the left; RTL notes square the top-right
- * corner with the icon on the right. The three non-squared corners use a
- * softer 20px radius. Icon/text side order is set via direct JSX ordering
- * rather than flexDirection: row-reverse — combining that with dir="rtl"
- * caused a double-flip in some engines that left the icon stuck on the left
- * even for Arabic notes. Both variants share this shape; 'divider' just
- * gets a touch more margin since it stands alone between blocks rather
- * than sitting directly under prescription rows.
+ * shape — full width always, not shrink-wrapped or side-anchored. Corners
+ * are fully square (no radius) on all four sides. What still flips with the
+ * note's own text direction is the icon's side: LTR notes place the icon on
+ * the left; RTL notes place it on the right. Icon/text side order is set via
+ * flexDirection: row-reverse rather than JSX reordering or a dir attribute
+ * on the row — combining dir="rtl" with row-reverse caused a double-flip in
+ * some engines that left the icon stuck on the left even for Arabic notes.
+ * Both variants share this shape; 'divider' just gets a touch more margin
+ * since it stands alone between blocks rather than sitting directly under
+ * prescription rows.
  */
 import ReactMarkdown from 'react-markdown'
 import remarkBreaks from 'remark-breaks'
@@ -183,21 +182,14 @@ export default function NoteCallout({ text, flavor = 'info', variant = 'inline',
 
   // ── Bubble shape — shared by both variants ────────────────────────────────
   // Full width, always — this isn't a shrink-wrapped chat message, just a
-  // note block that borrows the bubble idiom. What flips with direction is
-  // the squared corner (tail cue) and the icon's side: LTR notes square the
-  // top-LEFT corner with the icon on the left; RTL notes square the
-  // top-RIGHT corner with the icon on the right — the tail always points
-  // toward the side the text reads FROM.
-  const bubbleRadius = isArabic
-    ? '20px 4px 20px 20px'   // squared top-right, RTL
-    : '4px 20px 20px 20px'   // squared top-left, LTR
-
+  // note block that borrows the bubble idiom. Corners are fully square on
+  // all four sides. Only the icon's side flips with direction.
   const bubble = (
     <div style={{
       width: '100%',
       boxSizing: 'border-box',
       background: f.bg,
-      borderRadius: bubbleRadius,
+      borderRadius: 0,
       padding: '9px 14px',
     }}>
       <div
