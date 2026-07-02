@@ -75,6 +75,18 @@ export default function ConditionDetailScreen() {
     touchStartY.current = null
   }
 
+  // Only contain overscroll right at the bottom edge of a panel — leaving
+  // the top edge on the browser's default ('auto') so pull-to-reload from
+  // the top of the tab content keeps working. Toggled on scroll rather
+  // than set statically, since overscroll-behavior applies to both edges
+  // of an axis and can't otherwise distinguish "leak up past the bottom"
+  // (unwanted) from "leak down past the top" (wanted, for refresh).
+  function handlePanelScroll(e) {
+    const el = e.currentTarget
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 2
+    el.style.overscrollBehaviorY = atBottom ? 'contain' : 'auto'
+  }
+
   const condition = conditions.find(c => c.slug === slug)
   const isFav = condition ? isConditionFavourited(condition.id) : false
 
@@ -169,7 +181,7 @@ export default function ConditionDetailScreen() {
               otherwise the page's scroll height was driven by whichever tab
               had more content, letting the shorter tab scroll into blank
               space that belonged to the other, hidden tab. */}
-          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <div onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -184,7 +196,7 @@ export default function ConditionDetailScreen() {
           </div>
 
           {/* Panel 1 — Clinical Data */}
-          <div style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', overscrollBehavior: 'contain' }}>
+          <div onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <div style={{
               maxWidth: 680,
               margin: '0 auto',
@@ -235,6 +247,10 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       backgroundColor: 'var(--color-surface)',
       borderRadius: '0 0 18px 18px',
       boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+      // Header has no scroll content of its own — without this, a touch
+      // starting here has nothing local to consume it and the browser
+      // treats it as a page drag (including triggering pull-to-reload).
+      touchAction: 'none',
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) 0' }}>
 
