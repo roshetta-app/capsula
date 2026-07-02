@@ -4,6 +4,7 @@ import { ArrowLeft, Share2 } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
+import { useVisualViewport } from '../hooks/useVisualViewport'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -52,6 +53,13 @@ export default function ConditionDetailScreen() {
   const { conditions, loading } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
+
+  // Refresh-safe viewport height — 100dvh alone can be measured against a
+  // not-yet-settled viewport on first paint (e.g. right after a hard
+  // reload/PWA cold launch), before the OS/browser has reported its final
+  // safe usable area. This hook re-measures via visualViewport and writes
+  // the corrected value to --viewport-height, which pageStyle below reads.
+  useVisualViewport()
 
   const [activeTab, setActiveTab] = useState(0)
   const touchStartX  = useRef(null)
@@ -237,7 +245,7 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  height: '100dvh',
+  height: 'var(--viewport-height, 100dvh)',
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
