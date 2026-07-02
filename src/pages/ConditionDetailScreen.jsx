@@ -102,7 +102,19 @@ export default function ConditionDetailScreen() {
   }
 
   function handlePanelScroll(e) {
-    evaluatePanelOverscroll(e.currentTarget)
+    // Throttled to once per rendered frame — onScroll can fire far more
+    // often than the screen repaints, and evaluatePanelOverscroll reads
+    // layout (scrollHeight/scrollTop/clientHeight) and writes a style back,
+    // which is unnecessary work to repeat more often than a frame actually
+    // needs it. rafPending guards against queuing more than one callback
+    // per panel per frame.
+    const el = e.currentTarget
+    if (el._overscrollRafPending) return
+    el._overscrollRafPending = true
+    requestAnimationFrame(() => {
+      el._overscrollRafPending = false
+      evaluatePanelOverscroll(el)
+    })
   }
 
   const condition = conditions.find(c => c.slug === slug)
@@ -193,7 +205,7 @@ export default function ConditionDetailScreen() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative', touchAction: 'pan-y' }}
+        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
       >
         <div style={{
           display: 'flex',
