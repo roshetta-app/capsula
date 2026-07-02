@@ -11,6 +11,14 @@
  *             readable without competing with the active accent tab.
  *             Inactive strokeWidth 1.8→2.0 for consistent perceived weight
  *             at rest. Label fontWeight 400→500 for inactive tabs.
+ * Phase 16 — Hidden while an on-screen keyboard is open (mobile only).
+ *             Detected via a real visual-viewport height shrink against a
+ *             captured baseline, NOT focus — focus alone fires identically
+ *             on desktop (mouse click into a field) where no keyboard ever
+ *             appears and the nav should stay put. A keyboard eats a large,
+ *             unmistakable chunk of height (150px+), so a shrink past that
+ *             threshold is a reliable, platform-agnostic signal without any
+ *             UA/mobile sniffing.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — House (Lucide)
@@ -20,10 +28,16 @@
  *  - Each tab takes exactly 1/3 width (flex:1 with equal flex-basis).
  *  - Safe-area bottom padding for iPhone notch.
  *  - Hidden on all /admin/* routes.
+ *  - Hidden while an on-screen keyboard is open (see Phase 16 note above).
  */
 
+import { useState, useEffect }      from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { House, Pill, Star }        from 'lucide-react'
+
+// Minimum viewport height drop (px) to treat as "a keyboard opened" rather
+// than a desktop window resize or other minor viewport fluctuation.
+const KEYBOARD_HEIGHT_THRESHOLD = 150
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -31,8 +45,36 @@ export default function BottomNav() {
   const location = useLocation()
   const navigate = useNavigate()
 
+  const [keyboardOpen, setKeyboardOpen] = useState(false)
+
+  // Tracks the visual viewport against a captured baseline height. A real
+  // on-screen keyboard shrinks it by a large, unmistakable amount; clicking
+  // into a field with a mouse (desktop) never shrinks it at all, so this
+  // stays false there — no separate mobile/desktop detection needed.
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    let baseline = vv.height
+
+    function update() {
+      // Track the largest height seen (keyboard-closed state) as the
+      // baseline, so this keeps working correctly even if the browser
+      // chrome itself changes height between checks.
+      if (vv.height > baseline) baseline = vv.height
+      setKeyboardOpen(baseline - vv.height > KEYBOARD_HEIGHT_THRESHOLD)
+    }
+
+    update()
+    vv.addEventListener('resize', update)
+    return () => vv.removeEventListener('resize', update)
+  }, [])
+
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
+
+  // Hidden while an on-screen keyboard is open — instant, no animation.
+  if (keyboardOpen) return null
 
   function isActive(tabPath) {
     if (tabPath === '/conditions') {
