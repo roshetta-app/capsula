@@ -41,6 +41,18 @@ import { useDirtyState } from '../../hooks/useDirtyState'
  *     CSS opacity/transform fade-in on the card. Subsequent edits to an
  *     already-populated note do not re-trigger it.
  *
+ * Minor fixes pass:
+ *   - Privacy icon added before the "Saved to this device only" label.
+ *   - Clear button restyled red (--color-danger) to read as destructive.
+ *   - Saved flash moved out of the card's own footer (where its
+ *     mount/unmount was shifting the card's height) into the label row's
+ *     right-hand slot — the same slot Edit normally occupies, so Saved
+ *     swaps in over Edit and swaps back to Edit on fade-out, with no
+ *     layout shift.
+ *   - Display-mode card now shares the edit textarea's minHeight (88)
+ *     and padding, so a one-line note no longer collapses to a tiny box
+ *     and toggling between display/edit doesn't visibly resize.
+ *
  * Props:
  *   conditionId  string
  */
@@ -156,7 +168,7 @@ export default function PersonalNotes({ conditionId }) {
           Personal Notes
         </span>
 
-        {isEditing && (
+        {isEditing ? (
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
             <button
               type="button"
@@ -191,9 +203,23 @@ export default function PersonalNotes({ conditionId }) {
               Save
             </button>
           </div>
-        )}
-
-        {!isEditing && savedValue && (
+        ) : savedVisible ? (
+          /* Saved flash occupies the exact slot Edit lives in, so it
+             swaps in/out in place instead of appearing on a separate
+             line that changes the card's height. */
+          <span style={{
+            marginLeft: 'auto',
+            fontSize: 12,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)',
+            opacity: savedVisible === 'in' ? 1 : 0,
+            transition: savedVisible === 'in'
+              ? 'opacity 0.2s ease'
+              : 'opacity 0.4s ease',
+          }}>
+            ✓ Saved
+          </span>
+        ) : savedValue ? (
           <button
             type="button"
             onClick={startEditing}
@@ -215,7 +241,7 @@ export default function PersonalNotes({ conditionId }) {
             <Icon name="Pencil" size={12} color="var(--color-accent)" />
             Edit
           </button>
-        )}
+        ) : null}
       </div>
 
       {isEditing ? (
@@ -244,7 +270,7 @@ export default function PersonalNotes({ conditionId }) {
               lineHeight: 1.65,
               resize: 'none',
               outline: 'none',
-              minHeight: 80,
+              minHeight: 88,
               display: 'block',
               overflow: 'hidden',
               transition: 'border-color 0.15s ease',
@@ -261,10 +287,14 @@ export default function PersonalNotes({ conditionId }) {
             marginTop: 6,
           }}>
             <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               fontSize: 11,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
             }}>
+              <Icon name="Shield" size={11} color="var(--color-text-tertiary)" />
               Saved to this device only
             </span>
 
@@ -279,14 +309,14 @@ export default function PersonalNotes({ conditionId }) {
                   gap: 4,
                   fontSize: 12,
                   fontFamily: 'var(--font-body)',
-                  color: 'var(--color-text-tertiary)',
+                  color: 'var(--color-danger)',
                   background: 'none',
                   border: 'none',
                   padding: 0,
                   cursor: 'pointer',
                 }}
               >
-                <Icon name="X" size={12} color="var(--color-text-tertiary)" />
+                <Icon name="X" size={12} color="var(--color-danger)" />
                 Clear
               </button>
             )}
@@ -302,7 +332,9 @@ export default function PersonalNotes({ conditionId }) {
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
-          padding: 'var(--space-2) var(--space-3)',
+          padding: '10px 12px',
+          minHeight: 88,
+          boxSizing: 'border-box',
           opacity: justPopulated ? 0 : 1,
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
@@ -317,24 +349,6 @@ export default function PersonalNotes({ conditionId }) {
           }}>
             {savedValue}
           </p>
-          {savedVisible && (
-            <div style={{
-              display: 'flex',
-              justifyContent: 'flex-end',
-              marginTop: 6,
-            }}>
-              <span style={{
-                fontSize: 11,
-                color: 'var(--color-text-tertiary)',
-                opacity: savedVisible === 'in' ? 1 : 0,
-                transition: savedVisible === 'in'
-                  ? 'opacity 0.2s ease'
-                  : 'opacity 0.4s ease',
-              }}>
-                ✓ Saved
-              </span>
-            </div>
-          )}
         </div>
       ) : (
         /* Empty state — tinted, bordered card (subtle blue tint over
