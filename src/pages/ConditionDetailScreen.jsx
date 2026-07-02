@@ -1,10 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Share2 } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { useVisualViewport } from '../hooks/useVisualViewport'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -54,19 +53,42 @@ export default function ConditionDetailScreen() {
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
 
-  // Refresh-safe viewport height — 100dvh alone can be measured against a
-  // not-yet-settled viewport on first paint (e.g. right after a hard
-  // reload/PWA cold launch), before the OS/browser has reported its final
-  // safe usable area. This hook re-measures via visualViewport and writes
-  // the corrected value to --viewport-height, which pageStyle below reads.
-  useVisualViewport()
-
   const [activeTab, setActiveTab] = useState(0)
   const touchStartX  = useRef(null)
   const touchStartY  = useRef(null)
   const shareCardRef = useRef(null)
-  const prescriptionsPanelRef = useRef(null)
-  const clinicalPanelRef      = useRef(null)
+
+  // Per-tab scroll memory — since only the active tab's content exists in
+  // the page at a time now, the page's own scroll position has to be saved
+  // per tab manually on switch, or returning to a tab always lands at the top.
+  const scrollPositions = useRef({ 0: 0, 1: 0 })
+
+  // Switches tabs while preserving each tab's scroll position: saves where
+  // you are on the tab you're leaving, then restores wherever you'd left
+  // off on the tab you're arriving on (see the useLayoutEffect below).
+  function switchTab(index) {
+    if (index === activeTab) return
+    scrollPositions.current[activeTab] = window.scrollY
+    setActiveTab(index)
+  }
+
+  // Runs after the new tab's content is committed to the DOM but before the
+  // browser paints, so the jump to the saved position isn't visible as a
+  // flash of "scrolled to top" first.
+  useLayoutEffect(() => {
+    window.scrollTo(0, scrollPositions.current[activeTab] ?? 0)
+  }, [activeTab])
+
+  // Pull-to-refresh is disabled app-wide (globals.css: body { overscroll-
+  // behavior-y: none }). This screen is a deliberate, scoped exception —
+  // enabled only while it's mounted, reset back to the app default on
+  // unmount so no other screen inherits it.
+  useEffect(() => {
+    document.body.style.overscrollBehaviorY = 'auto'
+    return () => {
+      document.body.style.overscrollBehaviorY = ''
+    }
+  }, [])
 
   function handleTouchStart(e) {
     touchStartX.current = e.touches[0].clientX
@@ -78,54 +100,14 @@ export default function ConditionDetailScreen() {
     const dx = e.changedTouches[0].clientX - touchStartX.current
     const dy = e.changedTouches[0].clientY - touchStartY.current
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx < 0 && activeTab < TABS.length - 1) setActiveTab(t => t + 1)
-      if (dx > 0 && activeTab > 0)               setActiveTab(t => t - 1)
+      if (dx < 0 && activeTab < TABS.length - 1) switchTab(activeTab + 1)
+      if (dx > 0 && activeTab > 0)               switchTab(activeTab - 1)
     }
     touchStartX.current = null
     touchStartY.current = null
   }
 
-  // Only contain overscroll right at the bottom edge of a panel — leaving
-  // the top edge on the browser's default ('auto') so pull-to-reload from
-  // the top of the tab content keeps working. Toggled dynamically rather
-  // than set statically, since overscroll-behavior applies to both edges
-  // of an axis and can't otherwise distinguish "leak up past the bottom"
-  // (unwanted) from "leak down past the top" (wanted, for refresh).
-  function evaluatePanelOverscroll(el) {
-    if (!el) return
-    // A panel with too little content to scroll (e.g. an empty tab) never
-    // fires a scroll event, so relying on onScroll alone leaves it
-    // permanently unguarded. scrollHeight <= clientHeight here means
-    // "nothing to scroll" — treat that the same as "at the bottom."
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 2
-    el.style.overscrollBehaviorY = atBottom ? 'contain' : 'auto'
-  }
-
-  function handlePanelScroll(e) {
-    // Throttled to once per rendered frame — onScroll can fire far more
-    // often than the screen repaints, and evaluatePanelOverscroll reads
-    // layout (scrollHeight/scrollTop/clientHeight) and writes a style back,
-    // which is unnecessary work to repeat more often than a frame actually
-    // needs it. rafPending guards against queuing more than one callback
-    // per panel per frame.
-    const el = e.currentTarget
-    if (el._overscrollRafPending) return
-    el._overscrollRafPending = true
-    requestAnimationFrame(() => {
-      el._overscrollRafPending = false
-      evaluatePanelOverscroll(el)
-    })
-  }
-
   const condition = conditions.find(c => c.slug === slug)
-
-  // Re-evaluate on mount and whenever the loaded condition or content
-  // changes — covers panels that start out too short to ever scroll,
-  // which would otherwise never trigger the onScroll-based check above.
-  useEffect(() => {
-    evaluatePanelOverscroll(prescriptionsPanelRef.current)
-    evaluatePanelOverscroll(clinicalPanelRef.current)
-  }, [condition?.id])
 
   const isFav = condition ? isConditionFavourited(condition.id) : false
 
@@ -158,7 +140,7 @@ export default function ConditionDetailScreen() {
   if (loading) {
     return (
       <div style={pageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
           Loading…
         </div>
@@ -170,7 +152,7 @@ export default function ConditionDetailScreen() {
   if (!condition) {
     return (
       <div style={pageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={setActiveTab} />
+        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
           <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any condition in the database.</div>
@@ -190,7 +172,7 @@ export default function ConditionDetailScreen() {
         onFavToggle={() => toggleCondition(condition.id)}
         onShare={handleShare}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={switchTab}
       />
 
       {/* Hidden ShareCard */}
@@ -202,50 +184,44 @@ export default function ConditionDetailScreen() {
         />
       </div>
 
+      {/* Local keyframes for the tab-swap fade — kept scoped to this file
+          rather than added to globals.css, since this is the only screen
+          that needs it. */}
+      <style>{`
+        @keyframes conditionTabFade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+      `}</style>
+
+      {/* Only the active tab's content is ever mounted — the page itself now
+          scrolls natively (same mechanism as the home screen), instead of
+          each tab owning its own internal scroll box. touchAction: 'pan-y'
+          keeps native vertical scrolling working while still letting our
+          own touch handlers see horizontal swipes for tab switching. */}
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative' }}
+        style={{ touchAction: 'pan-y' }}
       >
-        <div style={{
-          display: 'flex',
-          width: '200%',
-          height: '100%',
-          transform: `translateX(${activeTab === 0 ? '0%' : '-50%'})`,
-          transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
-        }}>
-
-          {/* Panel 0 — Prescriptions. Each panel owns its own vertical scroll
-              (overflowY: auto) instead of sharing the page's document scroll —
-              otherwise the page's scroll height was driven by whichever tab
-              had more content, letting the shorter tab scroll into blank
-              space that belonged to the other, hidden tab. */}
-          <div ref={prescriptionsPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-            <div style={{
-              maxWidth: 680,
-              margin: '0 auto',
-              padding: 'var(--space-5) var(--space-6)',
-              paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
-            }}>
-              <PrescriptionsTab
-                blocks={condition.blocks ?? []}
-                conditionId={condition.id}
-              />
-            </div>
-          </div>
-
-          {/* Panel 1 — Clinical Data */}
-          <div ref={clinicalPanelRef} onScroll={handlePanelScroll} style={{ width: '50%', height: '100%', flexShrink: 0, boxSizing: 'border-box', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-            <div style={{
-              maxWidth: 680,
-              margin: '0 auto',
-              padding: 'var(--space-5) var(--space-6)',
-              paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
-            }}>
-              <ClinicalDataTab blocks={condition.blocks ?? []} />
-            </div>
-          </div>
-
+        <div
+          key={activeTab}
+          style={{
+            maxWidth: 680,
+            margin: '0 auto',
+            padding: 'var(--space-5) var(--space-6)',
+            paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
+            animation: 'conditionTabFade 0.18s ease',
+          }}
+        >
+          {activeTab === 0 ? (
+            <PrescriptionsTab
+              blocks={condition.blocks ?? []}
+              conditionId={condition.id}
+            />
+          ) : (
+            <ClinicalDataTab blocks={condition.blocks ?? []} />
+          )}
         </div>
       </div>
 
@@ -257,10 +233,9 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  height: 'var(--viewport-height, 100dvh)',
+  minHeight: '100dvh',
   display: 'flex',
   flexDirection: 'column',
-  overflow: 'hidden',
   backgroundColor: 'var(--color-bg)',
   fontFamily: 'var(--font-body)',
   color: 'var(--color-text-primary)',
