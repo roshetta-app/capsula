@@ -3,15 +3,13 @@ import Icon from '../ui/Icon'
 import { useDirtyState } from '../../hooks/useDirtyState'
 
 /**
- * PersonalNotes — personal note for a condition (Phase 3.2).
+ * PersonalNotes — personal note for a condition (Phase 3.4).
  *
- * Batch 3 redesign:
- *   - Two distinct states: display (plain text, no box) and editing (bordered
- *     card, auto-growing textarea).
- *   - Explicit Save/Cancel actions replace debounce autosave. Save enabled
- *     only when the draft differs from the saved value (useDirtyState).
- *   - Empty state is an inviting tap target with an icon, 'Add your personal
- *     notes' wording, and a privacy line clarifying notes are device-local.
+ * Batch 5 tweaks:
+ *   - Display state is no longer tappable as a whole — an explicit 'Edit'
+ *     button (with pencil icon) makes editability discoverable.
+ *   - Editing mode gains a 'Clear' button that empties the draft in one tap
+ *     (still requires Save to persist the cleared note).
  *
  * Props:
  *   conditionId  string
@@ -69,6 +67,10 @@ export default function PersonalNotes({ conditionId }) {
     setIsEditing(false)
   }
 
+  function handleClear() {
+    setDraft('')
+  }
+
   const savedOpacity =
     savedVisible === 'in'  ? 1 :
     savedVisible === 'out' ? 0 :
@@ -80,12 +82,14 @@ export default function PersonalNotes({ conditionId }) {
       borderTop: '0.5px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row — all-caps tertiary micro-label */}
+      {/* Label row — icon + all-caps tertiary micro-label */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
+        gap: 6,
         marginBottom: 8,
       }}>
+        <Icon name="StickyNote" size={12} color="var(--color-text-tertiary)" />
         <span style={{
           fontSize: 10,
           fontWeight: 600,
@@ -117,7 +121,7 @@ export default function PersonalNotes({ conditionId }) {
             ref={textareaRef}
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            placeholder="Jot down anything useful for this condition…"
+            placeholder="Write a note..."
             rows={3}
             autoFocus
             style={{
@@ -139,64 +143,106 @@ export default function PersonalNotes({ conditionId }) {
             }}
           />
 
-          {/* Save / Cancel actions */}
+          {/* Clear on the left, Cancel / Save on the right */}
           <div style={{
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
             gap: 8,
             marginTop: 8,
           }}>
             <button
               type="button"
-              onClick={handleCancel}
+              onClick={handleClear}
+              disabled={!draft}
               style={{
                 fontSize: 13,
+                fontFamily: 'var(--font-body)',
+                color: draft ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)',
+                background: 'none',
+                border: 'none',
+                padding: '6px 4px',
+                cursor: draft ? 'pointer' : 'default',
+              }}
+            >
+              Clear
+            </button>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleCancel}
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--color-text-secondary)',
+                  background: 'none',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '6px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty}
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'var(--font-body)',
+                  color: '#fff',
+                  background: isDirty ? 'var(--color-accent)' : 'var(--color-border)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '6px 14px',
+                  cursor: isDirty ? 'pointer' : 'default',
+                }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      ) : savedValue ? (
+        /* Display state — soft yellow sticky-note card, explicit Edit button */
+        <div className="personal-note-card">
+          <p style={{
+            margin: 0,
+            fontSize: 14,
+            lineHeight: 1.65,
+            fontFamily: 'var(--font-body)',
+            whiteSpace: 'pre-wrap',
+          }}>
+            {savedValue}
+          </p>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginTop: 8,
+          }}>
+            <button
+              type="button"
+              onClick={startEditing}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 12,
                 fontFamily: 'var(--font-body)',
                 color: 'var(--color-text-secondary)',
                 background: 'none',
                 border: '1px solid var(--color-border)',
                 borderRadius: 'var(--radius-md)',
-                padding: '6px 14px',
+                padding: '4px 10px',
                 cursor: 'pointer',
               }}
             >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!isDirty}
-              style={{
-                fontSize: 13,
-                fontFamily: 'var(--font-body)',
-                color: '#fff',
-                background: isDirty ? 'var(--color-accent)' : 'var(--color-border)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                padding: '6px 14px',
-                cursor: isDirty ? 'pointer' : 'default',
-              }}
-            >
-              Save
+              <Icon name="Pencil" size={12} color="var(--color-text-secondary)" />
+              Edit
             </button>
           </div>
-        </>
-      ) : savedValue ? (
-        /* Display state — plain text, no box, tappable to edit */
-        <p
-          onClick={startEditing}
-          style={{
-            margin: 0,
-            fontSize: 14,
-            lineHeight: 1.65,
-            color: 'var(--color-text-primary)',
-            fontFamily: 'var(--font-body)',
-            cursor: 'pointer',
-            whiteSpace: 'pre-wrap',
-          }}
-        >
-          {savedValue}
-        </p>
+        </div>
       ) : (
         /* Empty state — inviting tap target with icon and privacy note */
         <div
