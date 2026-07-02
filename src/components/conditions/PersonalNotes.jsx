@@ -53,6 +53,13 @@ import { useDirtyState } from '../../hooks/useDirtyState'
  *     and padding, so a one-line note no longer collapses to a tiny box
  *     and toggling between display/edit doesn't visibly resize.
  *
+ * Icon collision fix:
+ *   - Privacy-line icon swapped Shield → Lock. The page's clinical
+ *     disclaimer footer also uses a Shield icon, so the two were reading
+ *     as the same visual element in two unrelated places on the same
+ *     screen. Lock better matches "saved to this device only" (local
+ *     storage / privacy) and is now visually distinct from the footer.
+ *
  * Final polish pass (v2):
  *   - Empty state redesigned: compact (minHeight 56 vs prior open-ended
  *     height), vertically centered, CTA-first hierarchy ("+ Add your
@@ -311,7 +318,7 @@ export default function PersonalNotes({ conditionId }) {
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
             }}>
-              <Icon name="Shield" size={11} color="var(--color-text-tertiary)" />
+              <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
               Saved to this device only
             </span>
 
