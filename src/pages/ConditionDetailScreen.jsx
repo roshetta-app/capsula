@@ -245,7 +245,15 @@ export default function ConditionDetailScreen() {
 // ─── Shared page style ────────────────────────────────────────────────────────
 
 const pageStyle = {
-  minHeight: '100dvh',
+  // svh (small viewport height) instead of dvh — dvh actively resizes as
+  // the mobile browser toolbar shows/hides, and switching to a much
+  // shorter tab (e.g. an empty Clinical state) combined with the
+  // scrollTo() restore below can trigger that toolbar transition. While
+  // dvh is catching up, position:fixed; bottom:0 elements (BottomNav)
+  // get computed against a momentarily-wrong viewport height, causing a
+  // visible jump. svh is the stable minimum viewport size and doesn't
+  // fluctuate, removing that mismatch window entirely.
+  minHeight: '100svh',
   display: 'flex',
   flexDirection: 'column',
   backgroundColor: 'var(--color-bg)',
