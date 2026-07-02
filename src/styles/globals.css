@@ -300,6 +300,17 @@ body {
   unicode-bidi: plaintext;
 }
 
+/* When a heading is the first element in a .dir-prose block (e.g. a
+   free_text block that opens the Clinical tab), its own top margin stacks
+   on top of the panel's outer padding, doubling up the gap above it.
+   Reset to 0 here — same precedent as .rx-prose-tight below, just applied
+   to the shared base rule so every .dir-prose consumer (Clinical tab, CMS
+   preview, full article pages) benefits, not just prescription-sheet rows. */
+.dir-prose h1:first-child,
+.dir-prose h2:first-child {
+  margin-top: 0;
+}
+
 /* ### → subsection header: Emergency Management, Surgery, Follow-up, etc. */
 .dir-prose h3 {
   margin: var(--space-4) 0 var(--space-1);
@@ -309,6 +320,10 @@ body {
   text-transform: uppercase;
   color: var(--color-text-secondary);
   unicode-bidi: plaintext;
+}
+
+.dir-prose h3:first-child {
+  margin-top: 0;
 }
 
 /* ─── Lists ───────────────────────────────────────────────────────────────────── */
