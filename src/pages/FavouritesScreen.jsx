@@ -300,108 +300,90 @@ function RowStarButton({ onPress }) {
   )
 }
 
-// ─── Segmented control ───────────────────────────────────────────────────────
+// ─── Tab bar ──────────────────────────────────────────────────────────────────
 // Shared between the in-page tab row and the sticky header's copy, so the two
 // never visually diverge. Pure render function of (tabs, activeTab, onSelect).
-// Phase 2O — rebuilt from two independent pill buttons into a single unified
-// capsule: one track, one sliding "elevated" indicator (white + shadow-card)
-// that animates between the two segments via CSS transform. Reads as
-// secondary "switch views" navigation rather than two primary buttons.
-// Assumes exactly two equal-width segments — the 50% math below is only
-// correct for that fixed 2-segment case.
+// Phase 3 — replaced the pill-segmented capsule (track background, sliding
+// elevated indicator, shadow) with a lightweight tab bar matching
+// ConditionDetailScreen's Treatment/Clinical tabs: content-sized cells (not
+// forced 50/50), blue+semibold label with a thin underline for the active
+// tab, gray+regular label with no underline for the inactive one. This reads
+// as page navigation rather than a settings-style switch control.
 
 function renderTabs(tabs, activeTab, onSelect) {
-  const activeIndex = tabs.findIndex(t => t.key === activeTab)
-
   return (
-    <div style={{
-      position:        'relative',
-      display:         'flex',
-      backgroundColor: 'var(--color-border-subtle)',
-      borderRadius:    'var(--radius-full)',
-      padding:         3,
-      height:          48,
-    }}>
-      {/* Sliding indicator — sits behind the segment buttons, animates via transform */}
-      <div style={{
-        position:     'absolute',
-        top:          3,
-        bottom:       3,
-        left:         3,
-        width:        'calc(50% - 3px)',
-        borderRadius: 'var(--radius-full)',
-        backgroundColor: 'var(--color-surface)',
-        boxShadow:    'var(--shadow-card)',
-        transform:    `translateX(${activeIndex * 100}%)`,
-        transition:   'transform 0.2s ease',
-      }} />
-
+    <div style={{ display: 'flex', gap: 28 }}>
       {tabs.map(tab => {
         const isActive = activeTab === tab.key
         const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
 
         return (
-          <button
+          <div
             key={tab.key}
-            onClick={() => onSelect(tab.key)}
-            style={{
-              position:       'relative',
-              zIndex:         1,
-              flex:           1,
-              display:        'flex',
-              alignItems:     'center',
-              justifyContent: 'center',
-              gap:            6,
-              padding:        '0 var(--space-2)',
-              border:         'none',
-              background:     'transparent',
-              fontSize:       13,
-              fontWeight:     isActive ? 600 : 400,
-              fontFamily:     'var(--font-body)',
-              cursor:         'pointer',
-              color:          fg,
-              transition:     'color 0.2s ease',
-            }}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
           >
-            <Star
-              size={13}
-              fill={isActive ? fg : 'none'}
-              strokeWidth={isActive ? 0 : 1.5}
-              color={fg}
-            />
-            {tab.label}
-            {tab.count > 0 && (
-              <span style={{
-                fontSize:        11,
-                fontWeight:      500,
-                backgroundColor: isActive
-                  ? 'var(--color-accent-light)'
-                  : 'var(--color-border-subtle)',
-                color:           fg,
-                borderRadius:    'var(--radius-full)',
-                padding:         '1px 6px',
-                lineHeight:      1.5,
-              }}>
-                {tab.count}
+            <button
+              onClick={() => onSelect(tab.key)}
+              style={{
+                display:     'flex',
+                alignItems:  'center',
+                gap:         6,
+                paddingTop:    7,
+                paddingBottom: 7,
+                border:      'none',
+                background:  'none',
+                cursor:      'pointer',
+                fontFamily:  'var(--font-body)',
+                WebkitTapHighlightColor: 'transparent',
+                outline:     'none',
+                transition:  'color 0.15s ease',
+              }}
+            >
+              <Star
+                size={13}
+                fill={isActive ? fg : 'none'}
+                strokeWidth={isActive ? 0 : 1.5}
+                color={fg}
+              />
+              <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: fg }}>
+                {tab.label}
               </span>
-            )}
-          </button>
+              {tab.count > 0 && (
+                <span style={{
+                  fontSize:   11,
+                  fontWeight: 400,
+                  color:      'var(--color-text-tertiary)',
+                }}>
+                  {tab.count}
+                </span>
+              )}
+            </button>
+            {/* Underline — content width only (this cell is no longer forced
+                to 50%), visible only beneath the active tab */}
+            <span style={{
+              display:         'block',
+              height:          2,
+              width:           '100%',
+              borderRadius:    '1px 1px 0 0',
+              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+              transition:      'background-color 0.15s ease',
+            }} />
+          </div>
         )
       })}
     </div>
   )
 }
 
-// ─── Hero: title + subtitle + search ───────────────────────────────────────
+// ─── Hero: title + subtitle ─────────────────────────────────────────────────
 // Phase 2M — logo removed (title-first hierarchy, per spec: Favourites
 // prioritizes content/page identity over branding — logo stays reserved
 // for Home).
-// Phase 2N — SearchBar is now always visible on both tabs. On Conditions it's
-// live-wired; on Drugs it's a placeholder-only, unwired input (see file
-// header) — the caller passes the right value/onChange/placeholder for
-// whichever tab is active.
+// Phase 3 — SearchBar moved out of the hero and now renders below the tabs
+// (see FavouritesScreen's return): tabs choose the collection, search filters
+// within it. Hero is title + subtitle only.
 
-function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholder }) {
+function FavouritesHero({ heroRef }) {
   return (
     <div ref={heroRef} style={{
       paddingTop:    'var(--space-4)',
@@ -421,17 +403,10 @@ function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholde
         fontSize:     13,
         color:        'var(--color-text-tertiary)',
         marginTop:    2,
-        marginBottom: 10,
+        marginBottom: 6,
       }}>
         Your saved references
       </div>
-
-      <SearchBar
-        value={searchValue}
-        onChange={onSearchChange}
-        placeholder={searchPlaceholder}
-        compact
-      />
     </div>
   )
 }
@@ -606,16 +581,21 @@ export default function FavouritesScreen() {
 
       <div>
 
-        <FavouritesHero
-          heroRef={heroRef}
-          searchValue={heroSearchValue}
-          onSearchChange={heroSearchOnChange}
-          searchPlaceholder={heroSearchPlaceholder}
-        />
+        <FavouritesHero heroRef={heroRef} />
 
-        {/* Unified segmented control — equal width, sliding indicator */}
-        <div style={{ marginBottom: 'var(--space-2)' }}>
+        {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           {renderTabs(tabs, activeTab, setActiveTab)}
+        </div>
+
+        {/* Search — filters only the currently selected collection */}
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <SearchBar
+            value={heroSearchValue}
+            onChange={heroSearchOnChange}
+            placeholder={heroSearchPlaceholder}
+            compact
+          />
         </div>
 
         {/* ── Conditions tab ── */}
