@@ -16,10 +16,24 @@ const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions']
  */
 const HEADER_SUPPRESSED_PREFIXES = ['/conditions/']
 
+/**
+ * Route prefixes whose screens size and scroll themselves internally.
+ * ConditionDetailScreen measures its own height to exactly fill the
+ * viewport and already reserves its own bottom-nav clearance inside its
+ * internal scroll box. If Layout also adds its usual bottom-nav padding
+ * on <main> for these routes, the real page becomes taller than the
+ * viewport (permanently, not just briefly) — enough for a touch-drag to
+ * scroll the whole document instead of just the screen's internal box,
+ * dragging the screen's own sticky header along with it. Skip the padding
+ * here so this screen's self-managed spacing is the only spacing that applies.
+ */
+const SELF_CONTAINED_SCROLL_PREFIXES = ['/conditions/']
+
 export default function Layout({ children }) {
   const { pathname } = useLocation()
   const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname) ||
     HEADER_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
+  const suppressBottomPadding = SELF_CONTAINED_SCROLL_PREFIXES.some(prefix => pathname.startsWith(prefix))
 
   return (
     <div style={{
@@ -62,11 +76,17 @@ export default function Layout({ children }) {
 
       {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
           keyboard resizing is handled natively via interactive-widget=resizes-content
-          on the viewport meta tag, so no JS-computed height is needed here. */}
+          on the viewport meta tag, so no JS-computed height is needed here.
+          Skipped on self-contained-scroll routes (see
+          SELF_CONTAINED_SCROLL_PREFIXES above) — those screens already
+          reserve their own bottom-nav clearance internally, and adding it
+          again here would make the document taller than the viewport. */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
-        padding:  '0 var(--space-6) calc(var(--space-12) + 60px)',
+        padding:  suppressBottomPadding
+          ? '0 var(--space-6) 0'
+          : '0 var(--space-6) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>
