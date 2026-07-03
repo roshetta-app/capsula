@@ -142,11 +142,28 @@
  *  - Tab content array hoisted to a module-level constant (FAVOURITES_TABS)
  *    since it no longer carries per-render count data — renderTabs and
  *    StickyFavouritesHeader no longer take a `tabs` prop.
+ *
+ * Phase 4 — header/tab polish pass (premium, cohesive, own identity),
+ *  interaction model from Phase 3 untouched:
+ *  - Hero and StickyFavouritesHeader both gain a small filled Star icon
+ *    beside the title, in accent color — a visual anchor distinguishing this
+ *    screen from ConditionsScreen at a glance.
+ *  - Vertical rhythm tightened ~15–20%: hero paddingBottom, subtitle
+ *    marginBottom, tabs/search wrapper margins all trimmed.
+ *  - Tab icons replaced: Star → BookOpen (Conditions) / Pill (Drugs) — the
+ *    icons now represent content type rather than "favourited" status, which
+ *    the Star icon never actually conveyed per-tab anyway. Icon size, gap,
+ *    and label size all bumped up; button height fixed at 50px (within the
+ *    48–52dp target) instead of padding-derived.
+ *  - Underline: 3px → 3.5px, corners fully rounded (var(--radius-full)) for
+ *    true rounded ends, still exactly matches the active cell's width.
+ *  - No sort control added (none existed before — already compliant).
+ *  - switchTab/touch handlers/slide-keyframe mechanism unchanged.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star } from 'lucide-react'
+import { Star, BookOpen, Pill } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -158,12 +175,23 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 
-// Static tab order/labels — no longer carries per-render count data, so this
-// can live outside the component. Order matters: switchTab() below uses this
-// array's index to figure out swipe/tap direction (forward vs backward).
+// Static tab order/labels/icons — no longer carries per-render count data, so
+// this can live outside the component. Order matters: switchTab() below uses
+// this array's index to figure out swipe/tap direction (forward vs backward).
+// Icons represent content type (open book = reference material, pill =
+// medication) rather than favourited-status, which a per-tab Star never
+// actually conveyed since both tabs used the identical icon shape.
 const FAVOURITES_TABS = [
-  { key: 'conditions', label: 'Conditions' },
-  { key: 'drugs',      label: 'Drugs'      },
+  {
+    key: 'conditions',
+    label: 'Conditions',
+    renderIcon: (color) => <BookOpen size={15} strokeWidth={1.8} color={color} />,
+  },
+  {
+    key: 'drugs',
+    label: 'Drugs',
+    renderIcon: (color) => <Pill size={15} strokeWidth={1.8} color={color} />,
+  },
 ]
 
 // ─── Snackbar ─────────────────────────────────────────────────────────────────
@@ -339,11 +367,12 @@ function RowStarButton({ onPress }) {
 // never visually diverge. Pure render function of (activeTab, onSelect).
 // Phase 3 — rebuilt to structurally match ConditionDetailScreen's
 // Treatment/Clinical tabs: full-width 50/50 cells (flex: 1, width: 100%
-// button) instead of content-sized columns, no count badge, taller tap
-// target than ConditionDetailScreen's own (10px vs 7px vertical padding —
-// this is Favourites' primary navigation, not a secondary in-header switch),
-// thicker underline (3px vs 1.5px). Active: semibold + accent blue.
-// Inactive: medium weight (500) + text-secondary gray.
+// button) instead of content-sized columns, no count badge.
+// Phase 4 — content-type icons (BookOpen/Pill, via FAVOURITES_TABS.renderIcon)
+// replace the Star fill-toggle — fixed 50px tap height (within 48–52dp target,
+// vs the previous 10px-padding-derived height), larger icon/label, wider
+// icon-label gap, fully-rounded thicker underline for true "rounded ends."
+// Active: semibold + accent blue. Inactive: medium weight (500) + secondary gray.
 
 function renderTabs(activeTab, onSelect) {
   return (
@@ -364,9 +393,8 @@ function renderTabs(activeTab, onSelect) {
                 flexDirection:  'row',
                 alignItems:     'center',
                 justifyContent: 'center',
-                gap:            6,
-                paddingTop:     10,
-                paddingBottom:  10,
+                gap:            8,
+                height:         50,
                 paddingLeft:    'var(--space-2)',
                 paddingRight:   'var(--space-2)',
                 width:          '100%',
@@ -379,23 +407,19 @@ function renderTabs(activeTab, onSelect) {
                 transition:     'color 0.15s ease',
               }}
             >
-              <Star
-                size={13}
-                fill={isActive ? fg : 'none'}
-                strokeWidth={isActive ? 0 : 1.5}
-                color={fg}
-              />
-              <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: fg }}>
+              {tab.renderIcon(fg)}
+              <span style={{ fontSize: 14, fontWeight: isActive ? 600 : 500, color: fg }}>
                 {tab.label}
               </span>
             </button>
             {/* Underline — full width of this 50% cell, exactly matching the
-                active tab's rendered width; visible only beneath the active tab */}
+                active tab's rendered width; rounded ends; visible only
+                beneath the active tab */}
             <span style={{
               display:         'block',
-              height:          3,
+              height:          3.5,
               width:           '100%',
-              borderRadius:    '1.5px 1.5px 0 0',
+              borderRadius:    'var(--radius-full)',
               backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               transition:      'background-color 0.15s ease',
             }} />
@@ -413,28 +437,36 @@ function renderTabs(activeTab, onSelect) {
 // Phase 3 — SearchBar moved out of the hero and now renders below the tabs
 // (see FavouritesScreen's return): tabs choose the collection, search filters
 // within it. Hero is title + subtitle only.
+// Phase 4 — small filled Star icon added beside the title as a visual
+// anchor/identity marker (distinguishes this screen from ConditionsScreen at
+// a glance, per the "header identity" requirement) — same treatment mirrored
+// in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
+// 8→6, subtitle marginBottom 6→5.
 
 function FavouritesHero({ heroRef }) {
   return (
     <div ref={heroRef} style={{
       paddingTop:    'var(--space-4)',
-      paddingBottom: 8,
+      paddingBottom: 6,
     }}>
-      <h1 style={{
-        fontSize:      22,
-        fontWeight:    700,
-        color:         'var(--color-text-primary)',
-        margin:        0,
-        letterSpacing: '-0.3px',
-      }}>
-        Favourites
-      </h1>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Star size={20} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
+        <h1 style={{
+          fontSize:      22,
+          fontWeight:    700,
+          color:         'var(--color-text-primary)',
+          margin:        0,
+          letterSpacing: '-0.3px',
+        }}>
+          Favourites
+        </h1>
+      </div>
 
       <div style={{
         fontSize:     13,
         color:        'var(--color-text-tertiary)',
         marginTop:    2,
-        marginBottom: 6,
+        marginBottom: 5,
       }}>
         Your saved references
       </div>
@@ -448,6 +480,10 @@ function FavouritesHero({ heroRef }) {
 // StickyLogoHeader; Phase 2M replaces the logo row with a plain "Favourites"
 // text label (no logo, no back arrow — Favourites is a bottom-nav tab, there's
 // no "back" destination that makes sense here). Internal padding tightened.
+// Phase 4 — carries the same leading Star icon as the expanded hero (scaled
+// down) so the collapsed state reads as an intentionally-designed compact
+// header, not a cropped one. Still icon + title + tabs only — no subtitle,
+// no search, per spec.
 
 function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
   return (
@@ -470,10 +506,14 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* Title row — text only, no logo, no back arrow */}
+        {/* Title row — icon + text, no logo, no back arrow */}
         <div style={{
-          padding: '14px var(--space-6) 0',
+          display:    'flex',
+          alignItems: 'center',
+          gap:        6,
+          padding:    '14px var(--space-6) 0',
         }}>
+          <Star size={14} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
           <div style={{
             fontSize:      15,
             fontWeight:    700,
@@ -662,12 +702,12 @@ export default function FavouritesScreen() {
         <FavouritesHero heroRef={heroRef} />
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={{ marginBottom: 10 }}>
           {renderTabs(activeTab, switchTab)}
         </div>
 
         {/* Search — filters only the currently selected collection */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={{ marginBottom: 10 }}>
           <SearchBar
             value={heroSearchValue}
             onChange={heroSearchOnChange}
