@@ -8,14 +8,27 @@
  *  - Drug card onTap → navigate to /drugs/:slug (FIX — was dead () => {})
  *  - Removing a favourite shows a brief snackbar: "Removed from favourites"
  *  - Snackbar is triggered by wrapping toggleDrug / toggleCondition
+ *
+ * Phase 2I — bug fix: condition card onTap was wired to remove-from-favourites
+ *  instead of navigating (row tap silently un-favourited the condition and
+ *  never opened it). ConditionCard's onTap is a single full-row tap target
+ *  meant purely for navigation — mirrors DrugCard's onTap below.
+ *  - Condition card onTap → navigate to /conditions/:slug (FIX)
+ *  - Trailing InlineStarButton added per row so removal is still possible
+ *    from this screen (it stopPropagation()s so it never triggers the
+ *    row's navigate). It talks to FavouritesContext directly.
+ *  - InlineStarButton has no callback hook, so the snackbar for condition
+ *    removal is triggered by watching savedConditions.length drop via a
+ *    ref + effect, rather than wrapping toggleCondition like the drug flow.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
+import InlineStarButton from '../components/conditions/InlineStarButton'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -91,7 +104,7 @@ export default function FavouritesScreen() {
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
   }
 
-  const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()
+  const { favourites, toggleDrug } = useFavouritesContext()
   const { conditions } = useConditionContext()
   const { drugs }      = useDrugContext()
   const { stockMap }   = useStock(drugs)
@@ -105,18 +118,24 @@ export default function FavouritesScreen() {
     .map(id => drugs.find(d => d.id === id))
     .filter(Boolean)
 
-  // Wrappers that also trigger the snackbar (called on remove = already favourited)
+  // Wrapper that also triggers the snackbar (called on remove = already favourited)
   const handleRemoveDrug = useCallback((id) => {
     toggleDrug(id)
     showSnack()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toggleDrug])
 
-  const handleRemoveCondition = useCallback((id) => {
-    toggleCondition(id)
-    showSnack()
+  // InlineStarButton toggles conditions directly via FavouritesContext and has
+  // no callback hook of its own, so removal is detected by watching the saved
+  // count drop rather than wrapping toggleCondition.
+  const prevConditionCount = useRef(savedConditions.length)
+  useEffect(() => {
+    if (savedConditions.length < prevConditionCount.current) {
+      showSnack()
+    }
+    prevConditionCount.current = savedConditions.length
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toggleCondition])
+  }, [savedConditions.length])
 
   const tabs = [
     { key: 'conditions', label: 'Conditions', count: savedConditions.length },
@@ -205,12 +224,23 @@ export default function FavouritesScreen() {
         {activeTab === 'conditions' && (
           savedConditions.length === 0
             ? <EmptyState label="conditions" />
-            : savedConditions.map(condition => (
-                <ConditionCard
+            : savedConditions.map((condition, i) => (
+                <div
                   key={condition.id}
-                  condition={condition}
-                  onTap={() => handleRemoveCondition(condition.id)}
-                />
+                  style={{ display: 'flex', alignItems: 'center' }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <ConditionCard
+                      condition={condition}
+                      isLast={i === savedConditions.length - 1}
+                      onTap={() => navigate(`/conditions/${condition.slug}`)}
+                    />
+                  </div>
+                  <InlineStarButton
+                    conditionId={condition.id}
+                    conditionName={condition.name}
+                  />
+                </div>
               ))
         )}
 
