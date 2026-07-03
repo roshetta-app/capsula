@@ -1,3 +1,5 @@
+`src\pages\ConditionDetailScreen.jsx`:
+
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Share2 } from 'lucide-react'
@@ -363,7 +365,14 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
       zIndex: 50,
       backgroundColor: 'var(--color-surface)',
       borderRadius: '0 0 18px 18px',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
+      // Two-layer shadow: a tight, slightly darker line right at the edge
+      // gives the rounded corner a crisp boundary of its own, so it reads
+      // clearly even against a high-contrast full-bleed image directly
+      // below it — the original single soft shadow only worked because it
+      // relied on the header's white matching the page's near-white
+      // background; that match disappears the moment real content (a
+      // photo) sits behind the corner cutout instead.
+      boxShadow: '0 1px 2px rgba(0,0,0,0.08), 0 4px 10px rgba(0,0,0,0.12)',
       // Header has no scroll content of its own — without this, a touch
       // starting here has nothing local to consume it and the browser
       // treats it as a page drag (including triggering pull-to-reload).
