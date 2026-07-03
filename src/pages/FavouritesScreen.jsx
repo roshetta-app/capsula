@@ -28,12 +28,32 @@
  *  outer div, which placed it before the specialty icon bubble too (wrong —
  *  it should sit right before the chevron) and top-aligned it instead of
  *  centering it on the row. Fixed by moving the star into ConditionCard's
- *  new `trailing` slot (see ConditionCard Phase 16), which renders it
+ *  `trailing` slot (see ConditionCard Phase 16), which renders it
  *  immediately before the chevron and centers both together on the row's
  *  full height between the two divider lines.
+ *
+ * Phase 2L — header redesign to match ConditionsScreen's hero + sticky
+ *  header pattern:
+ *  - Plain "Favourites" <h1> replaced with a hero block (logo + heading),
+ *    matching ConditionsScreen's BrandRow spacing/logo sizing. No tagline,
+ *    no dark-mode toggle — this screen has neither in its existing in-page
+ *    content, unlike Conditions.
+ *  - Tab row now sits just below the hero and is tracked via a ref.
+ *  - New StickyFavouritesHeader: a fixed, slide-down panel (logo row +
+ *    the same two tabs) that appears once the hero scrolls out of view.
+ *    Visual shell (position/zIndex/shadow/border-radius/transition) copied
+ *    from ConditionsScreen's StickyLogoHeader; specialty-pill/search-icon/
+ *    color-token logic from that component is NOT included — Favourites has
+ *    no equivalent controls. Tab content is rendered via a shared renderTabs
+ *    helper so the in-page and sticky tab rows never diverge.
+ *  - This is a local, duplicated shell — not extracted into a shared
+ *    component with ConditionsScreen (explicit decision: two occurrences
+ *    don't yet justify the abstraction; avoids touching a working screen).
+ *  - IntersectionObserver watches the hero ref (heroRef) the same way
+ *    ConditionsScreen watches brandRowRef.
  */
 
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import Layout from '../components/layout'
@@ -133,6 +153,166 @@ function RowStarButton({ onPress }) {
   )
 }
 
+// ─── Pill tabs ────────────────────────────────────────────────────────────────
+// Shared between the in-page tab row and the sticky header's copy, so the two
+// never visually diverge. Pure render function of (tabs, activeTab, onSelect).
+
+function renderTabs(tabs, activeTab, onSelect) {
+  return (
+    <div style={{
+      display:              'grid',
+      gridTemplateColumns:  '1fr 1fr',
+      gap:                  'var(--space-2)',
+    }}>
+      {tabs.map(tab => {
+        const isActive = activeTab === tab.key
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onSelect(tab.key)}
+            style={{
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              gap:             'var(--space-2)',
+              padding:         '8px 0',
+              borderRadius:    'var(--radius-full)',
+              fontSize:        13,
+              fontWeight:      isActive ? 600 : 400,
+              fontFamily:      'var(--font-body)',
+              cursor:          'pointer',
+              transition:      'all 0.15s ease',
+              border:          isActive
+                ? '1.5px solid var(--color-accent)'
+                : '1.5px solid var(--color-border)',
+              backgroundColor: isActive
+                ? 'var(--color-accent)'
+                : 'var(--color-surface)',
+              color:           isActive
+                ? '#ffffff'
+                : 'var(--color-text-secondary)',
+            }}
+          >
+            <Star
+              size={13}
+              fill={isActive ? '#ffffff' : 'none'}
+              strokeWidth={isActive ? 0 : 1.5}
+              color={isActive ? '#ffffff' : 'var(--color-text-tertiary)'}
+            />
+            {tab.label}
+            {tab.count > 0 && (
+              <span style={{
+                fontSize:        11,
+                fontWeight:      600,
+                backgroundColor: isActive
+                  ? 'rgba(255,255,255,0.25)'
+                  : 'var(--color-accent-light)',
+                color:           isActive ? '#ffffff' : 'var(--color-accent)',
+                borderRadius:    'var(--radius-full)',
+                padding:         '1px 6px',
+                lineHeight:      1.5,
+              }}>
+                {tab.count}
+              </span>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── Hero: logo + heading ───────────────────────────────────────────────────
+// Matches ConditionsScreen's BrandRow spacing/logo sizing, minus the
+// tagline and dark-mode toggle (this screen has neither today).
+
+function FavouritesHero({ heroRef }) {
+  return (
+    <div ref={heroRef} style={{
+      paddingTop:    'var(--space-5)',
+      paddingBottom: 'calc(var(--space-3) - 4px)',
+    }}>
+      <div style={{
+        display:      'flex',
+        alignItems:   'center',
+        gap:          'var(--space-2)',
+        marginBottom: 8,
+      }}>
+        <img
+          src="/capsula/logo.svg"
+          alt="Capsula"
+          className="capsula-logo"
+          style={{ display: 'block', height: 30, width: 'auto' }}
+        />
+      </div>
+
+      <h1 style={{
+        fontSize:      20,
+        fontWeight:    700,
+        color:         'var(--color-text-primary)',
+        margin:        0,
+        letterSpacing: '-0.3px',
+      }}>
+        Favourites
+      </h1>
+    </div>
+  )
+}
+
+// ─── Sliding sticky header ──────────────────────────────────────────────────
+// Appears once FavouritesHero's logo scrolls out of view. Visual shell
+// (position/zIndex/shadow/border-radius/transition) matches ConditionsScreen's
+// StickyLogoHeader; content below the logo row is this screen's own tabs
+// instead of a specialty pill + search icon.
+
+function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position:                'fixed',
+        top:                     0,
+        left:                    0,
+        right:                   0,
+        zIndex:                  50,
+        backgroundColor:         'var(--color-surface)',
+        borderBottomLeftRadius:  18,
+        borderBottomRightRadius: 18,
+        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
+        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
+        transition:              'transform 0.25s ease',
+        pointerEvents:           visible ? 'auto' : 'none',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
+
+        {/* Logo row */}
+        <div style={{
+          display:    'flex',
+          alignItems: 'center',
+          padding:    '16px var(--space-6) 0',
+        }}>
+          <img
+            src="/capsula/logo.svg"
+            alt="Capsula"
+            className="capsula-logo"
+            style={{ display: 'block', height: 27, width: 'auto', flexShrink: 0 }}
+          />
+        </div>
+
+        {/* Tabs — same content as the in-page row, kept in sync via renderTabs */}
+        <div style={{
+          marginTop: 10,
+          padding:   '0 var(--space-6) 14px',
+        }}>
+          {renderTabs(tabs, activeTab, onSelectTab)}
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 // ─── FavouritesScreen ─────────────────────────────────────────────────────────
 
 export default function FavouritesScreen() {
@@ -184,82 +364,44 @@ export default function FavouritesScreen() {
     { key: 'drugs',      label: 'Drugs',      count: savedDrugs.length      },
   ]
 
+  // ── Sliding sticky header: visible once the hero logo leaves viewport ──────
+  // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
+  const [showStickyHeader, setShowStickyHeader] = useState(false)
+  const heroRef = useRef(null)
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting)
+      },
+      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <Layout>
-      <div style={{ paddingTop: 'var(--space-5)' }}>
 
-        {/* Page heading */}
-        <h1 style={{
-          fontSize:      20,
-          fontWeight:    700,
-          color:         'var(--color-text-primary)',
-          margin:        '0 0 var(--space-4)',
-          letterSpacing: '-0.3px',
-        }}>
-          Favourites
-        </h1>
+      {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
+      <StickyFavouritesHeader
+        visible={showStickyHeader}
+        tabs={tabs}
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
+      />
+
+      <div>
+
+        <FavouritesHero heroRef={heroRef} />
 
         {/* Symmetric pill tabs — equal width, centered, star icon */}
-        <div style={{
-          display:       'grid',
-          gridTemplateColumns: '1fr 1fr',
-          gap:           'var(--space-2)',
-          marginBottom:  'var(--space-4)',
-        }}>
-          {tabs.map(tab => {
-            const isActive = activeTab === tab.key
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  display:         'flex',
-                  alignItems:      'center',
-                  justifyContent:  'center',
-                  gap:             'var(--space-2)',
-                  padding:         '8px 0',
-                  borderRadius:    'var(--radius-full)',
-                  fontSize:        13,
-                  fontWeight:      isActive ? 600 : 400,
-                  fontFamily:      'var(--font-body)',
-                  cursor:          'pointer',
-                  transition:      'all 0.15s ease',
-                  border:          isActive
-                    ? '1.5px solid var(--color-accent)'
-                    : '1.5px solid var(--color-border)',
-                  backgroundColor: isActive
-                    ? 'var(--color-accent)'
-                    : 'var(--color-surface)',
-                  color:           isActive
-                    ? '#ffffff'
-                    : 'var(--color-text-secondary)',
-                }}
-              >
-                <Star
-                  size={13}
-                  fill={isActive ? '#ffffff' : 'none'}
-                  strokeWidth={isActive ? 0 : 1.5}
-                  color={isActive ? '#ffffff' : 'var(--color-text-tertiary)'}
-                />
-                {tab.label}
-                {tab.count > 0 && (
-                  <span style={{
-                    fontSize:        11,
-                    fontWeight:      600,
-                    backgroundColor: isActive
-                      ? 'rgba(255,255,255,0.25)'
-                      : 'var(--color-accent-light)',
-                    color:           isActive ? '#ffffff' : 'var(--color-accent)',
-                    borderRadius:    'var(--radius-full)',
-                    padding:         '1px 6px',
-                    lineHeight:      1.5,
-                  }}>
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          {renderTabs(tabs, activeTab, setActiveTab)}
         </div>
 
         {/* ── Conditions tab ── */}
