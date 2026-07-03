@@ -116,6 +116,32 @@
  *    ~4–8dp. Title, subtitle copy, sticky-header trigger behavior, list row
  *    component, and star placement are unchanged — refinement only, per
  *    the "do not redesign" instruction in the brief.
+ *
+ * Phase 3 — tab bar upgraded from a lightweight underline filter to a
+ *  first-class navigation component, matching ConditionDetailScreen's
+ *  Treatment/Clinical tabs structurally and interactionally:
+ *  - Tabs are full-width 50/50 cells again (flex: 1, width: 100% buttons)
+ *    instead of content-sized columns — mirrors ConditionDetailScreen's TABS
+ *    exactly. Tap target padding increased beyond ConditionDetailScreen's own
+ *    (10px vs 7px) since this is Favourites' primary navigation.
+ *  - Item counts removed entirely — label text only.
+ *  - Underline thickened (3px) and unchanged in behavior: full width of the
+ *    active cell, transparent when inactive, animates via CSS transition.
+ *  - Active label: semibold + accent blue. Inactive: medium weight (500) +
+ *    text-secondary gray.
+ *  - Horizontal swipe added on the tab-content area, porting
+ *    ConditionDetailScreen's exact touch-threshold + direction-aware CSS
+ *    keyframe slide mechanism (touchStartX/Y refs, tabDirection ref,
+ *    hasSwitchedRef so mount never animates, switchTab() computing direction
+ *    from tab order). Deliberately NOT ported: ConditionDetailScreen's
+ *    internal fixed-height scroll box + per-tab scrollTop memory — that's
+ *    tied to that screen's whole-page layout architecture, and adopting it
+ *    here would mean redesigning Favourites' overall scroll structure, which
+ *    this task explicitly rules out. Favourites keeps ordinary page scroll;
+ *    only the gesture + tab-switch + slide-transition parts are reused.
+ *  - Tab content array hoisted to a module-level constant (FAVOURITES_TABS)
+ *    since it no longer carries per-render count data — renderTabs and
+ *    StickyFavouritesHeader no longer take a `tabs` prop.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -131,6 +157,14 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
+
+// Static tab order/labels — no longer carries per-render count data, so this
+// can live outside the component. Order matters: switchTab() below uses this
+// array's index to figure out swipe/tap direction (forward vs backward).
+const FAVOURITES_TABS = [
+  { key: 'conditions', label: 'Conditions' },
+  { key: 'drugs',      label: 'Drugs'      },
+]
 
 // ─── Snackbar ─────────────────────────────────────────────────────────────────
 
@@ -302,41 +336,47 @@ function RowStarButton({ onPress }) {
 
 // ─── Tab bar ──────────────────────────────────────────────────────────────────
 // Shared between the in-page tab row and the sticky header's copy, so the two
-// never visually diverge. Pure render function of (tabs, activeTab, onSelect).
-// Phase 3 — replaced the pill-segmented capsule (track background, sliding
-// elevated indicator, shadow) with a lightweight tab bar matching
-// ConditionDetailScreen's Treatment/Clinical tabs: content-sized cells (not
-// forced 50/50), blue+semibold label with a thin underline for the active
-// tab, gray+regular label with no underline for the inactive one. This reads
-// as page navigation rather than a settings-style switch control.
+// never visually diverge. Pure render function of (activeTab, onSelect).
+// Phase 3 — rebuilt to structurally match ConditionDetailScreen's
+// Treatment/Clinical tabs: full-width 50/50 cells (flex: 1, width: 100%
+// button) instead of content-sized columns, no count badge, taller tap
+// target than ConditionDetailScreen's own (10px vs 7px vertical padding —
+// this is Favourites' primary navigation, not a secondary in-header switch),
+// thicker underline (3px vs 1.5px). Active: semibold + accent blue.
+// Inactive: medium weight (500) + text-secondary gray.
 
-function renderTabs(tabs, activeTab, onSelect) {
+function renderTabs(activeTab, onSelect) {
   return (
-    <div style={{ display: 'flex', gap: 28 }}>
-      {tabs.map(tab => {
+    <div style={{ display: 'flex' }}>
+      {FAVOURITES_TABS.map(tab => {
         const isActive = activeTab === tab.key
         const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
 
         return (
           <div
             key={tab.key}
-            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}
+            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
           >
             <button
               onClick={() => onSelect(tab.key)}
               style={{
-                display:     'flex',
-                alignItems:  'center',
-                gap:         6,
-                paddingTop:    7,
-                paddingBottom: 7,
-                border:      'none',
-                background:  'none',
-                cursor:      'pointer',
-                fontFamily:  'var(--font-body)',
+                display:        'flex',
+                flexDirection:  'row',
+                alignItems:     'center',
+                justifyContent: 'center',
+                gap:            6,
+                paddingTop:     10,
+                paddingBottom:  10,
+                paddingLeft:    'var(--space-2)',
+                paddingRight:   'var(--space-2)',
+                width:          '100%',
+                border:         'none',
+                background:     'none',
+                cursor:         'pointer',
+                fontFamily:     'var(--font-body)',
                 WebkitTapHighlightColor: 'transparent',
-                outline:     'none',
-                transition:  'color 0.15s ease',
+                outline:        'none',
+                transition:     'color 0.15s ease',
               }}
             >
               <Star
@@ -345,26 +385,17 @@ function renderTabs(tabs, activeTab, onSelect) {
                 strokeWidth={isActive ? 0 : 1.5}
                 color={fg}
               />
-              <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: fg }}>
+              <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, color: fg }}>
                 {tab.label}
               </span>
-              {tab.count > 0 && (
-                <span style={{
-                  fontSize:   11,
-                  fontWeight: 400,
-                  color:      'var(--color-text-tertiary)',
-                }}>
-                  {tab.count}
-                </span>
-              )}
             </button>
-            {/* Underline — content width only (this cell is no longer forced
-                to 50%), visible only beneath the active tab */}
+            {/* Underline — full width of this 50% cell, exactly matching the
+                active tab's rendered width; visible only beneath the active tab */}
             <span style={{
               display:         'block',
-              height:          2,
+              height:          3,
               width:           '100%',
-              borderRadius:    '1px 1px 0 0',
+              borderRadius:    '1.5px 1.5px 0 0',
               backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               transition:      'background-color 0.15s ease',
             }} />
@@ -418,7 +449,7 @@ function FavouritesHero({ heroRef }) {
 // text label (no logo, no back arrow — Favourites is a bottom-nav tab, there's
 // no "back" destination that makes sense here). Internal padding tightened.
 
-function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
   return (
     <div
       aria-hidden="true"
@@ -458,7 +489,7 @@ function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
           marginTop: 6,
           padding:   '0 var(--space-6) 10px',
         }}>
-          {renderTabs(tabs, activeTab, onSelectTab)}
+          {renderTabs(activeTab, onSelectTab)}
         </div>
 
       </div>
@@ -543,10 +574,43 @@ export default function FavouritesScreen() {
     showSnack()
   }
 
-  const tabs = [
-    { key: 'conditions', label: 'Conditions', count: savedConditions.length },
-    { key: 'drugs',      label: 'Drugs',      count: savedDrugs.length      },
-  ]
+  // ── Tab switching + swipe (Phase 3) ─────────────────────────────────────────
+  // Ports ConditionDetailScreen's exact swipe mechanism: touch-threshold
+  // detection (not continuous finger-tracked dragging), a direction ref so
+  // the incoming tab's CSS keyframe slides in from the correct side, and a
+  // "has switched yet" guard so the animation never plays on mount/refresh.
+  // Deliberately NOT ported: ConditionDetailScreen's internal fixed-height
+  // scroll box + per-tab scrollTop memory — see file header Phase 3 note.
+  const touchStartX = useRef(null)
+  const touchStartY = useRef(null)
+  const tabDirection = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
+  const hasSwitchedRef = useRef(false)
+
+  function switchTab(key) {
+    if (key === activeTab) return
+    const fromIndex = FAVOURITES_TABS.findIndex(t => t.key === activeTab)
+    const toIndex   = FAVOURITES_TABS.findIndex(t => t.key === key)
+    tabDirection.current = toIndex > fromIndex ? 1 : -1
+    hasSwitchedRef.current = true
+    setActiveTab(key)
+  }
+
+  function handleTouchStart(e) {
+    touchStartX.current = e.touches[0].clientX
+    touchStartY.current = e.touches[0].clientY
+  }
+
+  function handleTouchEnd(e) {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0 && activeTab === 'conditions') switchTab('drugs')
+      if (dx > 0 && activeTab === 'drugs')      switchTab('conditions')
+    }
+    touchStartX.current = null
+    touchStartY.current = null
+  }
 
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
@@ -574,10 +638,24 @@ export default function FavouritesScreen() {
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
         visible={showStickyHeader}
-        tabs={tabs}
         activeTab={activeTab}
-        onSelectTab={setActiveTab}
+        onSelectTab={switchTab}
       />
+
+      {/* Local keyframes for the tab-switch transition — same technique as
+          ConditionDetailScreen, distinct names to avoid any collision.
+          Direction-aware slide+fade, only ever plays after a real switch
+          (see hasSwitchedRef), never on mount/refresh. */}
+      <style>{`
+        @keyframes favTabSlideFromRight {
+          from { opacity: 0; transform: translateX(16px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes favTabSlideFromLeft {
+          from { opacity: 0; transform: translateX(-16px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
+      `}</style>
 
       <div>
 
@@ -585,7 +663,7 @@ export default function FavouritesScreen() {
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          {renderTabs(tabs, activeTab, setActiveTab)}
+          {renderTabs(activeTab, switchTab)}
         </div>
 
         {/* Search — filters only the currently selected collection */}
@@ -598,41 +676,55 @@ export default function FavouritesScreen() {
           />
         </div>
 
-        {/* ── Conditions tab ── */}
-        {activeTab === 'conditions' && (
-          savedConditions.length === 0
-            ? <NothingSavedEmptyState label="conditions" />
-            : conditionSearchEmpty
-              ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
-              : conditionResults.map((condition, i) => (
-                  <ConditionCard
-                    key={condition.id}
-                    condition={condition}
-                    isLast={i === conditionResults.length - 1}
-                    highlight={conditionQuery}
-                    onTap={() => navigate(`/conditions/${condition.slug}`)}
-                    trailing={
-                      <RowStarButton
-                        onPress={() => setConfirmingCondition(condition)}
+        {/* Swipeable content area — tap OR swipe switches tabs, mirroring
+            ConditionDetailScreen's Treatment/Clinical interaction. Keyed by
+            activeTab so the slide animation replays on every real switch. */}
+        <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          <div
+            key={activeTab}
+            style={{
+              animation: hasSwitchedRef.current
+                ? `${tabDirection.current === 1 ? 'favTabSlideFromRight' : 'favTabSlideFromLeft'} 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)`
+                : 'none',
+            }}
+          >
+            {/* ── Conditions tab ── */}
+            {activeTab === 'conditions' && (
+              savedConditions.length === 0
+                ? <NothingSavedEmptyState label="conditions" />
+                : conditionSearchEmpty
+                  ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
+                  : conditionResults.map((condition, i) => (
+                      <ConditionCard
+                        key={condition.id}
+                        condition={condition}
+                        isLast={i === conditionResults.length - 1}
+                        highlight={conditionQuery}
+                        onTap={() => navigate(`/conditions/${condition.slug}`)}
+                        trailing={
+                          <RowStarButton
+                            onPress={() => setConfirmingCondition(condition)}
+                          />
+                        }
                       />
-                    }
-                  />
-                ))
-        )}
+                    ))
+            )}
 
-        {/* ── Drugs tab ── */}
-        {activeTab === 'drugs' && (
-          savedDrugs.length === 0
-            ? <NothingSavedEmptyState label="drugs" />
-            : savedDrugs.map(drug => (
-                <DrugCard
-                  key={drug.id}
-                  drug={drug}
-                  isInStock={stockMap[drug.id] ?? drug.inStock}
-                  onTap={() => navigate(`/drugs/${drug.slug}`)}
-                />
-              ))
-        )}
+            {/* ── Drugs tab ── */}
+            {activeTab === 'drugs' && (
+              savedDrugs.length === 0
+                ? <NothingSavedEmptyState label="drugs" />
+                : savedDrugs.map(drug => (
+                    <DrugCard
+                      key={drug.id}
+                      drug={drug}
+                      isInStock={stockMap[drug.id] ?? drug.inStock}
+                      onTap={() => navigate(`/drugs/${drug.slug}`)}
+                    />
+                  ))
+            )}
+          </div>
+        </div>
 
       </div>
 
