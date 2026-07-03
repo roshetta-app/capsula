@@ -18,20 +18,19 @@
  *    from this screen.
  *
  * Phase 2J — polish pass on the 2I star row:
- *  - Row wrapper switched to alignItems: 'flex-start' so the trailing
- *    controls align with ConditionCard's own top-anchored multi-line
- *    layout instead of centering against the whole card block (which
- *    threw the chevron off-center on multi-line rows).
- *  - Star moved before the chevron. The chevron lives inside
- *    ConditionCard itself, so achieving star-then-chevron means the
- *    star can no longer be InlineStarButton rendered after the card —
- *    it's now a local star button rendered before ConditionCard in the
- *    row, matching the requested visual order.
  *  - Removing a favourite now confirms first via ConfirmSheet (the
  *    consumer-facing confirm dialog — see src/components/ui/ConfirmSheet.jsx;
  *    NOT admin/ConfirmModal.jsx, which is CMS-only) instead of removing
  *    immediately on tap. toggleCondition is called from the sheet's
  *    onConfirm, which is also where the snackbar now fires.
+ *
+ * Phase 2K — the 2J star was rendered as a sibling before ConditionCard's
+ *  outer div, which placed it before the specialty icon bubble too (wrong —
+ *  it should sit right before the chevron) and top-aligned it instead of
+ *  centering it on the row. Fixed by moving the star into ConditionCard's
+ *  new `trailing` slot (see ConditionCard Phase 16), which renders it
+ *  immediately before the chevron and centers both together on the row's
+ *  full height between the two divider lines.
  */
 
 import { useState, useCallback, useRef } from 'react'
@@ -101,8 +100,9 @@ function EmptyState({ label }) {
 }
 
 // ─── Row star button ────────────────────────────────────────────────────────
-// Local (not InlineStarButton) so it can sit before the chevron and open a
-// confirm step instead of toggling immediately on tap.
+// Local (not InlineStarButton) so it can open a confirm step instead of
+// toggling immediately on tap. Rendered into ConditionCard's trailing slot,
+// so it sits right before the chevron and shares its vertical centering.
 
 function RowStarButton({ onPress }) {
   function handleTap(e) {
@@ -267,21 +267,17 @@ export default function FavouritesScreen() {
           savedConditions.length === 0
             ? <EmptyState label="conditions" />
             : savedConditions.map((condition, i) => (
-                <div
+                <ConditionCard
                   key={condition.id}
-                  style={{ display: 'flex', alignItems: 'flex-start' }}
-                >
-                  <RowStarButton
-                    onPress={() => setConfirmingCondition(condition)}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <ConditionCard
-                      condition={condition}
-                      isLast={i === savedConditions.length - 1}
-                      onTap={() => navigate(`/conditions/${condition.slug}`)}
+                  condition={condition}
+                  isLast={i === savedConditions.length - 1}
+                  onTap={() => navigate(`/conditions/${condition.slug}`)}
+                  trailing={
+                    <RowStarButton
+                      onPress={() => setConfirmingCondition(condition)}
                     />
-                  </div>
-                </div>
+                  }
+                />
               ))
         )}
 

@@ -23,6 +23,14 @@
  *             so it's readable but still clearly below the name. Condition
  *             name 15→16px so it wins clearly. Row padding 10→12px for
  *             more breathing room. Tagline gap 3→4px.
+ * Phase 16 — optional trailing slot added before the chevron (used by
+ *             FavouritesScreen to place a star control). The trailing
+ *             group (slot + chevron) is wrapped in its own flex container
+ *             with alignItems: 'center' and height: '100%', so it centers
+ *             on the row's full height (divider to divider) independent of
+ *             the row's own top-alignment for multi-line cards. The
+ *             chevron's old marginTop hack — which only aligned it to the
+ *             icon bubble's top edge, not the row's center — is removed.
  *
  * Props:
  *   condition        ConditionFull
@@ -31,6 +39,8 @@
  *   activeSpecialty  string  — 'all' | specialty id. Defaults to 'all'.
  *                              When not 'all', specialtyName is suppressed.
  *   isLast           boolean — when true, suppresses the bottom divider line.
+ *   trailing         ReactNode  (optional) — rendered before the chevron,
+ *                              vertically centered with it on the row.
  */
 
 import { useNavigate }    from 'react-router-dom'
@@ -48,6 +58,7 @@ export default function ConditionCard({
   highlight = '',
   activeSpecialty = 'all',
   isLast = false,
+  trailing = null,
 }) {
   const navigate = useNavigate()
   const isDark = useIsDark()
@@ -170,20 +181,30 @@ export default function ConditionCard({
         )}
       </div>
 
-      {/* Trailing: chevron — top-aligned to match icon bubble */}
-      <svg
-        width="12" height="12" viewBox="0 0 24 24"
-        fill="none" stroke="currentColor" strokeWidth="2.5"
-        strokeLinecap="round" strokeLinejoin="round"
-        style={{
-          color:     'var(--color-text-tertiary)',
-          opacity:   0.5,
-          flexShrink: 0,
-          marginTop:  isMultiLine ? (showSpecialtyName ? 5 : 7) : 0,
-        }}
-      >
-        <polyline points="9 18 15 12 9 6" />
-      </svg>
+      {/* Trailing: optional slot (e.g. a star control) + chevron, centered
+          together on the row's full height so they sit mid-way between the
+          two divider lines regardless of the row's own top-alignment. */}
+      <div style={{
+        display:    'flex',
+        alignItems: 'center',
+        gap:        'var(--space-1)',
+        alignSelf:  'stretch',
+        flexShrink: 0,
+      }}>
+        {trailing}
+        <svg
+          width="12" height="12" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{
+            color:      'var(--color-text-tertiary)',
+            opacity:    0.5,
+            flexShrink: 0,
+          }}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+      </div>
     </div>
   )
 }
