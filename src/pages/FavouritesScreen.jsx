@@ -68,14 +68,21 @@
  *    array reference every render, which would re-trigger
  *    useConditionSearch's internal "rebuild index" effect (keyed on that
  *    array reference) on every render.
- *  - Search is scoped to the Conditions tab only this session — the Drugs
- *    tab has no star/remove control yet (explicit decision, deferred) and
- *    wiring search there too was deferred with it to avoid a half-built
- *    control. The hero's SearchBar is only rendered while the Conditions
- *    tab is active, rather than always-visible-regardless-of-tab, so there's
- *    no inert search box sitting over the Drugs list. Revisit when Drugs-tab
- *    search is implemented — original spec intent (favourites-in-general)
- *    keeps it always visible once both tabs support it.
+ *  - Search is functionally scoped to the Conditions tab only this session —
+ *    the Drugs tab has no star/remove control yet (explicit decision,
+ *    deferred), and real filtering was deferred with it. The hero's
+ *    SearchBar itself IS shown on both tabs (placeholder swaps between
+ *    "Search favourite conditions…" / "Search favourite drugs…"); the Drugs
+ *    variant is intentionally inert — its own local state (drugQuery) makes
+ *    the input controlled/typeable but is not wired to any filtering.
+ *    Placeholder box only, on purpose, until Drugs-tab search is picked up.
+ *
+ * Phase 2N — SearchBar now always visible regardless of active tab (was
+ *  Conditions-only). Drugs tab gets its own local, unwired query state
+ *  (drugQuery/setDrugQuery) purely so the input is controlled — no
+ *  filtering, no highlight, no hook. Placeholder text is now per-tab:
+ *  "Search favourite conditions…" on Conditions, "Search favourite drugs…"
+ *  on Drugs (was a single generic "Search favourites…" for both).
  *  - Segmented control count badges de-emphasized (opacity ~0.7, weight 500)
  *    so tab labels stay the primary read.
  *  - RowStarButton icon 16px → 13px (already-44px tap target via padding is
@@ -348,10 +355,13 @@ function renderTabs(tabs, activeTab, onSelect) {
 // ─── Hero: title + subtitle + search ───────────────────────────────────────
 // Phase 2M — logo removed (title-first hierarchy, per spec: Favourites
 // prioritizes content/page identity over branding — logo stays reserved
-// for Home). Search is only rendered while the Conditions tab is active
-// (Drugs-tab search wiring deferred this session — see file header).
+// for Home).
+// Phase 2N — SearchBar is now always visible on both tabs. On Conditions it's
+// live-wired; on Drugs it's a placeholder-only, unwired input (see file
+// header) — the caller passes the right value/onChange/placeholder for
+// whichever tab is active.
 
-function FavouritesHero({ heroRef, showSearch, searchValue, onSearchChange }) {
+function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
       paddingTop:    'var(--space-4)',
@@ -376,13 +386,11 @@ function FavouritesHero({ heroRef, showSearch, searchValue, onSearchChange }) {
         Your saved references
       </div>
 
-      {showSearch && (
-        <SearchBar
-          value={searchValue}
-          onChange={onSearchChange}
-          placeholder="Search favourites…"
-        />
-      )}
+      <SearchBar
+        value={searchValue}
+        onChange={onSearchChange}
+        placeholder={searchPlaceholder}
+      />
     </div>
   )
 }
@@ -489,6 +497,20 @@ export default function FavouritesScreen() {
   const isSearchingConditions = conditionQuery.trim().length > 0
   const conditionSearchEmpty  = isSearchingConditions && conditionResults.length === 0
 
+  // Drugs-tab search box — placeholder only (Phase 2N). Local, unwired state
+  // just so the input is controlled/typeable. Do NOT connect this to
+  // filtering, a search hook, or ConditionCard/DrugCard's highlight prop —
+  // that wiring is deferred to a future session (see file header, decision
+  // #19 follow-up).
+  const [drugQuery, setDrugQuery] = useState('')
+
+  // Hero search box swaps value/handler/placeholder based on the active tab.
+  const heroSearchValue = activeTab === 'conditions' ? conditionQuery : drugQuery
+  const heroSearchOnChange = activeTab === 'conditions' ? setConditionQuery : setDrugQuery
+  const heroSearchPlaceholder = activeTab === 'conditions'
+    ? 'Search favourite conditions…'
+    : 'Search favourite drugs…'
+
   // Wrapper that also triggers the snackbar (called on remove = already favourited)
   const handleRemoveDrug = useCallback((id) => {
     toggleDrug(id)
@@ -545,9 +567,9 @@ export default function FavouritesScreen() {
 
         <FavouritesHero
           heroRef={heroRef}
-          showSearch={activeTab === 'conditions'}
-          searchValue={conditionQuery}
-          onSearchChange={setConditionQuery}
+          searchValue={heroSearchValue}
+          onSearchChange={heroSearchOnChange}
+          searchPlaceholder={heroSearchPlaceholder}
         />
 
         {/* Symmetric pill tabs — equal width, centered, star icon */}
