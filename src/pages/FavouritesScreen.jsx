@@ -14,21 +14,33 @@
  *  never opened it). ConditionCard's onTap is a single full-row tap target
  *  meant purely for navigation — mirrors DrugCard's onTap below.
  *  - Condition card onTap → navigate to /conditions/:slug (FIX)
- *  - Trailing InlineStarButton added per row so removal is still possible
- *    from this screen (it stopPropagation()s so it never triggers the
- *    row's navigate). It talks to FavouritesContext directly.
- *  - InlineStarButton has no callback hook, so the snackbar for condition
- *    removal is triggered by watching savedConditions.length drop via a
- *    ref + effect, rather than wrapping toggleCondition like the drug flow.
+ *  - Trailing star control added per row so removal is still possible
+ *    from this screen.
+ *
+ * Phase 2J — polish pass on the 2I star row:
+ *  - Row wrapper switched to alignItems: 'flex-start' so the trailing
+ *    controls align with ConditionCard's own top-anchored multi-line
+ *    layout instead of centering against the whole card block (which
+ *    threw the chevron off-center on multi-line rows).
+ *  - Star moved before the chevron. The chevron lives inside
+ *    ConditionCard itself, so achieving star-then-chevron means the
+ *    star can no longer be InlineStarButton rendered after the card —
+ *    it's now a local star button rendered before ConditionCard in the
+ *    row, matching the requested visual order.
+ *  - Removing a favourite now confirms first via ConfirmSheet (the
+ *    consumer-facing confirm dialog — see src/components/ui/ConfirmSheet.jsx;
+ *    NOT admin/ConfirmModal.jsx, which is CMS-only) instead of removing
+ *    immediately on tap. toggleCondition is called from the sheet's
+ *    onConfirm, which is also where the snackbar now fires.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
-import InlineStarButton from '../components/conditions/InlineStarButton'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -88,6 +100,39 @@ function EmptyState({ label }) {
   )
 }
 
+// ─── Row star button ────────────────────────────────────────────────────────
+// Local (not InlineStarButton) so it can sit before the chevron and open a
+// confirm step instead of toggling immediately on tap.
+
+function RowStarButton({ onPress }) {
+  function handleTap(e) {
+    e.stopPropagation()
+    onPress()
+  }
+
+  return (
+    <button
+      onClick={handleTap}
+      aria-label="Remove from favourites"
+      style={{
+        background:              'none',
+        border:                  'none',
+        cursor:                  'pointer',
+        padding:                 '14px 8px',   // 44px tap height
+        display:                 'flex',
+        alignItems:              'center',
+        justifyContent:          'center',
+        flexShrink:              0,
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+        color:                   '#F59E0B',
+      }}
+    >
+      <Star size={16} fill="#F59E0B" strokeWidth={1.8} />
+    </button>
+  )
+}
+
 // ─── FavouritesScreen ─────────────────────────────────────────────────────────
 
 export default function FavouritesScreen() {
@@ -104,7 +149,7 @@ export default function FavouritesScreen() {
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
   }
 
-  const { favourites, toggleDrug } = useFavouritesContext()
+  const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()
   const { conditions } = useConditionContext()
   const { drugs }      = useDrugContext()
   const { stockMap }   = useStock(drugs)
@@ -125,17 +170,14 @@ export default function FavouritesScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toggleDrug])
 
-  // InlineStarButton toggles conditions directly via FavouritesContext and has
-  // no callback hook of its own, so removal is detected by watching the saved
-  // count drop rather than wrapping toggleCondition.
-  const prevConditionCount = useRef(savedConditions.length)
-  useEffect(() => {
-    if (savedConditions.length < prevConditionCount.current) {
-      showSnack()
-    }
-    prevConditionCount.current = savedConditions.length
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedConditions.length])
+  // Condition removal confirms first — see ConfirmSheet below.
+  const [confirmingCondition, setConfirmingCondition] = useState(null)
+
+  function handleConfirmRemoveCondition() {
+    if (!confirmingCondition) return
+    toggleCondition(confirmingCondition.id)
+    showSnack()
+  }
 
   const tabs = [
     { key: 'conditions', label: 'Conditions', count: savedConditions.length },
@@ -227,8 +269,11 @@ export default function FavouritesScreen() {
             : savedConditions.map((condition, i) => (
                 <div
                   key={condition.id}
-                  style={{ display: 'flex', alignItems: 'center' }}
+                  style={{ display: 'flex', alignItems: 'flex-start' }}
                 >
+                  <RowStarButton
+                    onPress={() => setConfirmingCondition(condition)}
+                  />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <ConditionCard
                       condition={condition}
@@ -236,10 +281,6 @@ export default function FavouritesScreen() {
                       onTap={() => navigate(`/conditions/${condition.slug}`)}
                     />
                   </div>
-                  <InlineStarButton
-                    conditionId={condition.id}
-                    conditionName={condition.name}
-                  />
                 </div>
               ))
         )}
@@ -259,6 +300,16 @@ export default function FavouritesScreen() {
         )}
 
       </div>
+
+      <ConfirmSheet
+        isOpen={!!confirmingCondition}
+        onClose={() => setConfirmingCondition(null)}
+        onConfirm={handleConfirmRemoveCondition}
+        title="Remove from favourites?"
+        message={confirmingCondition ? `"${confirmingCondition.name}" will be removed from your favourites.` : ''}
+        confirmLabel="Remove"
+        destructive
+      />
 
       <Snackbar visible={snackVisible} message="Removed from favourites" />
     </Layout>
