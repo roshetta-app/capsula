@@ -8,9 +8,18 @@ import NotificationsBanner from './ui/NotificationsBanner'
  */
 const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions']
 
+/**
+ * Route prefixes that render their own top section and suppress the shared
+ * header. Condition detail screens (/conditions/:slug) render their own
+ * DetailHeader (back/share/favourite + tab strip) — without this, Layout's
+ * shared header rendered on top of it as a second header bar.
+ */
+const HEADER_SUPPRESSED_PREFIXES = ['/conditions/']
+
 export default function Layout({ children }) {
   const { pathname } = useLocation()
-  const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname)
+  const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname) ||
+    HEADER_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
 
   return (
     <div style={{

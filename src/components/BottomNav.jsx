@@ -19,14 +19,22 @@
  *             unmistakable chunk of height (150px+), so a shrink past that
  *             threshold is a reliable, platform-agnostic signal without any
  *             UA/mobile sniffing.
- * Phase 17 — Forced onto its own compositing layer (transform: translateZ(0)
- *             + willChange: 'transform'). ConditionDetailScreen's tab-switch
- *             animation now uses translateX() (not just opacity), and without
- *             an explicit layer, this fixed nav would visibly jump up/down
- *             during that animation as WebKit tore down/rebuilt its
- *             compositing layer. Giving it a stable layer up front isolates
- *             it from layer churn caused by transform animations elsewhere
- *             on the page.
+ * Phase 17 — (Superseded by Phase 18, see below.) Forced onto its own
+ *             compositing layer (transform: translateZ(0) + willChange:
+ *             'transform') to isolate it from layer churn caused by
+ *             ConditionDetailScreen's tab-switch transform animation.
+ * Phase 18 — Phase 17's compositing isolation removed. Root-caused: the
+ *             visible jump was never a layer/paint problem — it was
+ *             ConditionDetailScreen forcing window.scrollTo() on every tab
+ *             switch, which combined with a real document-height change to
+ *             trigger the mobile browser's toolbar show/hide transition
+ *             (this fixed nav is pinned to the visual viewport, exactly
+ *             what that transition resizes). ConditionDetailScreen now
+ *             scrolls its tab content in its own internal box instead of
+ *             the window, so window.scrollY is never touched and there's
+ *             nothing left for a compositing layer to isolate here.
+ *             Keyboard detection also extracted to useKeyboardOpen() so
+ *             ConditionDetailScreen can share the same signal.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — House (Lucide)
@@ -39,13 +47,9 @@
  *  - Hidden while an on-screen keyboard is open (see Phase 16 note above).
  */
 
-import { useState, useEffect }      from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { House, Pill, Star }        from 'lucide-react'
-
-// Minimum viewport height drop (px) to treat as "a keyboard opened" rather
-// than a desktop window resize or other minor viewport fluctuation.
-const KEYBOARD_HEIGHT_THRESHOLD = 150
+import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -53,30 +57,7 @@ export default function BottomNav() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  const [keyboardOpen, setKeyboardOpen] = useState(false)
-
-  // Tracks the visual viewport against a captured baseline height. A real
-  // on-screen keyboard shrinks it by a large, unmistakable amount; clicking
-  // into a field with a mouse (desktop) never shrinks it at all, so this
-  // stays false there — no separate mobile/desktop detection needed.
-  useEffect(() => {
-    const vv = window.visualViewport
-    if (!vv) return
-
-    let baseline = vv.height
-
-    function update() {
-      // Track the largest height seen (keyboard-closed state) as the
-      // baseline, so this keeps working correctly even if the browser
-      // chrome itself changes height between checks.
-      if (vv.height > baseline) baseline = vv.height
-      setKeyboardOpen(baseline - vv.height > KEYBOARD_HEIGHT_THRESHOLD)
-    }
-
-    update()
-    vv.addEventListener('resize', update)
-    return () => vv.removeEventListener('resize', update)
-  }, [])
+  const keyboardOpen = useKeyboardOpen()
 
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
@@ -111,12 +92,6 @@ export default function BottomNav() {
       borderTop:               '1px solid var(--color-border)',
       paddingBottom:           'env(safe-area-inset-bottom)',
       WebkitTapHighlightColor: 'transparent',
-      // Forces this fixed nav onto its own stable compositing layer so it
-      // doesn't visibly jump when a transform-animated element elsewhere
-      // on the page (e.g. ConditionDetailScreen's tab-switch slide) causes
-      // WebKit to tear down/rebuild nearby layers. See Phase 17 note above.
-      transform:               'translateZ(0)',
-      willChange:              'transform',
     }}>
       <div style={{
         maxWidth:   680,

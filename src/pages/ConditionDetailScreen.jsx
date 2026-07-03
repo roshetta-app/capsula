@@ -4,6 +4,7 @@ import { ArrowLeft, Share2 } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
+import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -66,9 +67,27 @@ export default function ConditionDetailScreen() {
   const hasSwitchedRef = useRef(false)
 
   // Per-tab scroll memory — since only the active tab's content exists in
-  // the page at a time now, the page's own scroll position has to be saved
-  // per tab manually on switch, or returning to a tab always lands at the top.
+  // the box at a time, its scroll position has to be saved per tab
+  // manually on switch, or returning to a tab always lands at the top.
+  // Phase 18: retargeted from window.scrollY to the tab box's own
+  // scrollTop (see scrollBoxRef below) — see that section for why.
   const scrollPositions = useRef({ 0: 0, 1: 0 })
+
+  // The box that actually scrolls for this screen (see rootRef/rootStyle
+  // below for why this replaced window-level scrolling).
+  const scrollBoxRef = useRef(null)
+
+  // Measures its own distance from the top of the viewport so rootStyle's
+  // height can be computed correctly regardless of what renders above this
+  // screen (Layout's header is suppressed here, but OfflineBanner /
+  // NotificationsBanner can still add height above it).
+  const rootRef = useRef(null)
+  const [availableHeight, setAvailableHeight] = useState(null)
+
+  // Shared with BottomNav.jsx — same signal, used here to drop the
+  // bottom-nav clearance padding while BottomNav is hidden (Phase 16),
+  // instead of leaving that space reserved and empty.
+  const keyboardOpen = useKeyboardOpen()
 
   // Switches tabs while preserving each tab's scroll position: saves where
   // you are on the tab you're leaving, then restores wherever you'd left
@@ -79,25 +98,51 @@ export default function ConditionDetailScreen() {
     if (index === activeTab) return
     tabDirection.current = index > activeTab ? 1 : -1
     hasSwitchedRef.current = true
-    scrollPositions.current[activeTab] = window.scrollY
+    if (scrollBoxRef.current) {
+      scrollPositions.current[activeTab] = scrollBoxRef.current.scrollTop
+    }
     setActiveTab(index)
   }
 
   // Runs after the new tab's content is committed to the DOM but before the
   // browser paints, so the jump to the saved position isn't visible as a
-  // flash of "scrolled to top" first.
+  // flash of "scrolled to top" first. Sets scrollTop on the internal box
+  // only — never window.scrollY — so this can't trigger the mobile
+  // browser's toolbar transition the way it used to (see BottomNav.jsx
+  // Phase 18 for the full root-cause note).
   useLayoutEffect(() => {
-    window.scrollTo(0, scrollPositions.current[activeTab] ?? 0)
+    if (scrollBoxRef.current) {
+      scrollBoxRef.current.scrollTop = scrollPositions.current[activeTab] ?? 0
+    }
   }, [activeTab])
 
-  // Pull-to-refresh is disabled app-wide (globals.css: body { overscroll-
-  // behavior-y: none }). This screen is a deliberate, scoped exception —
-  // enabled only while it's mounted, reset back to the app default on
-  // unmount so no other screen inherits it.
-  useEffect(() => {
-    document.body.style.overscrollBehaviorY = 'auto'
+  // Sizes the root to exactly the space available below wherever this
+  // screen actually starts in the viewport, then never lets the root
+  // itself scroll (see rootStyle) — only the tab box inside it does.
+  // That's what makes tab switches structurally unable to move
+  // window.scrollY or change document height at all, rather than just
+  // making it less likely.
+  //
+  // Known limitation: if something above this screen (e.g. OfflineBanner)
+  // mounts or unmounts without a resize event firing, the measurement goes
+  // stale until the next resize/keyboard-open. Not worth a
+  // MutationObserver unless that's actually reported as visible.
+  useLayoutEffect(() => {
+    function measure() {
+      if (!rootRef.current) return
+      const vv = window.visualViewport
+      const viewportHeight = vv?.height ?? window.innerHeight
+      const top = rootRef.current.getBoundingClientRect().top
+      setAvailableHeight(Math.max(viewportHeight - top, 0))
+    }
+
+    measure()
+    const vv = window.visualViewport
+    window.addEventListener('resize', measure)
+    vv?.addEventListener('resize', measure)
     return () => {
-      document.body.style.overscrollBehaviorY = ''
+      window.removeEventListener('resize', measure)
+      vv?.removeEventListener('resize', measure)
     }
   }, [])
 
@@ -150,7 +195,7 @@ export default function ConditionDetailScreen() {
 
   if (loading) {
     return (
-      <div style={pageStyle}>
+      <div style={simplePageStyle}>
         <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
           Loading…
@@ -162,7 +207,7 @@ export default function ConditionDetailScreen() {
 
   if (!condition) {
     return (
-      <div style={pageStyle}>
+      <div style={simplePageStyle}>
         <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
           <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
@@ -174,7 +219,13 @@ export default function ConditionDetailScreen() {
   }
 
   return (
-    <div style={pageStyle}>
+    <div
+      ref={rootRef}
+      style={{
+        ...rootStyle,
+        height: availableHeight != null ? availableHeight : '100svh',
+      }}
+    >
       {/* ─── Header + Tab strip — one combined sticky block, one border at bottom */}
       <DetailHeader
         onBack={() => navigate(-1)}
@@ -210,29 +261,23 @@ export default function ConditionDetailScreen() {
         }
       `}</style>
 
-      {/* Only the active tab's content is ever mounted — the page itself now
-          scrolls natively (same mechanism as the home screen), instead of
-          each tab owning its own internal scroll box. touchAction: 'pan-y'
-          keeps native vertical scrolling working while still letting our
-          own touch handlers see horizontal swipes for tab switching.
-          flex: 1 makes this wrapper fill the remaining viewport height on
-          short/empty tabs, so swipes below short content still land here
-          instead of falling through to the page background. */}
+      {/* Only the active tab's content is ever mounted. This box — not the
+          window — is what actually scrolls: rootStyle gives the root an
+          explicit height and overflow: hidden, this wrapper is flex: 1
+          with overflow-y: auto, so it's the one place scrolling can happen
+          on this screen. touchAction: 'pan-y' keeps native vertical
+          scrolling working while still letting our own touch handlers see
+          horizontal swipes for tab switching. */}
       <div
+        ref={scrollBoxRef}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         style={{
           touchAction: 'pan-y',
           flex: 1,
-          // Stable compositing layer boundary. The child below is fully
-          // destroyed and recreated on every tab switch (key={activeTab}),
-          // which is what actually churns WebKit's compositing tree — not
-          // just the transform animation itself. Isolating BottomNav alone
-          // (Phase 17) wasn't enough to stop that churn from reaching it;
-          // this contains it at the source instead, on the one wrapper
-          // that never remounts.
-          transform: 'translateZ(0)',
-          willChange: 'transform',
+          minHeight: 0, // required so this flex child can actually shrink and scroll instead of pushing the root taller
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         <div
@@ -241,7 +286,14 @@ export default function ConditionDetailScreen() {
             maxWidth: 680,
             margin: '0 auto',
             padding: 'var(--space-5) var(--space-6)',
-            paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
+            // Only reserve clearance for BottomNav while it's actually
+            // rendered. Previously this was a fixed calc() regardless of
+            // BottomNav's visibility, which left dead white space below
+            // the last block (e.g. the disclaimer footer) whenever the
+            // keyboard opened and BottomNav unmounted (Phase 16).
+            paddingBottom: keyboardOpen
+              ? 'var(--space-4)'
+              : 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
             // Only animate on a real tab switch (tap or swipe), never on
             // mount/refresh — hasSwitchedRef stays false through the first
             // render. Direction picks which side the incoming tab slides in from.
@@ -266,20 +318,27 @@ export default function ConditionDetailScreen() {
   )
 }
 
-// ─── Shared page style ────────────────────────────────────────────────────────
+// ─── Shared page styles ─────────────────────────────────────────────────────
 
-const pageStyle = {
-  // svh (small viewport height) instead of dvh — dvh actively resizes as
-  // the mobile browser toolbar shows/hides, and switching to a much
-  // shorter tab (e.g. an empty Clinical state) combined with the
-  // scrollTo() restore below can trigger that toolbar transition. While
-  // dvh is catching up, position:fixed; bottom:0 elements (BottomNav)
-  // get computed against a momentarily-wrong viewport height, causing a
-  // visible jump. svh is the stable minimum viewport size and doesn't
-  // fluctuate, removing that mismatch window entirely.
+// Used only by the loading/not-found states above — those have no tabs, so
+// they keep the simple page-scrolling behavior; there's nothing there that
+// can trigger the bug this file fixes.
+const simplePageStyle = {
   minHeight: '100svh',
   display: 'flex',
   flexDirection: 'column',
+  backgroundColor: 'var(--color-bg)',
+  fontFamily: 'var(--font-body)',
+  color: 'var(--color-text-primary)',
+}
+
+// Used by the real tab view. height is set dynamically per-render (see
+// availableHeight above) — overflow: hidden means this root itself never
+// scrolls, so window.scrollY can never move on this screen.
+const rootStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
   backgroundColor: 'var(--color-bg)',
   fontFamily: 'var(--font-body)',
   color: 'var(--color-text-primary)',
