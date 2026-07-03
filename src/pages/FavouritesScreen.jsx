@@ -183,11 +183,65 @@
  *    identity stays strong once scrolled. Tabs continue to render via the
  *    shared renderTabs, so they inherit the same underline change above
  *    automatically — no separate edit needed there.
+ *
+ * Phase 6 — amber identity + manage/bulk-remove, per updated design brief
+ *  (Favourites needed its own visual identity distinct from Home/
+ *  ConditionDetail's blue, plus a functional reason for a header utility
+ *  icon):
+ *  - New module-level FAV_ACCENT ('#F59E0B') and FAV_ACCENT_BG (its 8%
+ *    tint) replace var(--color-accent) throughout this screen's icon,
+ *    active tab, underline, and badge. Not an arbitrary new color —
+ *    it's the exact hex RowStarButton already used for a favourited
+ *    star, promoted to this screen's identity color. ConditionDetailScreen
+ *    is untouched by this — it keeps var(--color-accent) blue; only the
+ *    underline *geometry* (height/radius) stays shared between the two
+ *    screens, per Phase 5's decision, not the color.
+ *  - FavouritesHero and StickyFavouritesHeader both wrapped in a
+ *    FAV_ACCENT_BG panel (rounded 16px / 18px respectively), so the
+ *    screen reads as a distinct "shelf" from first paint instead of a
+ *    continuation of Home's plain white scroll. Star icon moved from a
+ *    bare icon into a solid FAV_ACCENT circular badge (white icon on
+ *    top) — mirrors the tinted specialty-icon-bubble pattern already
+ *    used in ConditionCard, rather than introducing a new visual motif.
+ *  - renderTabs takes a new `counts` param and shows each tab's live
+ *    favourited count (e.g. "Conditions 8") next to its label.
+ *  - New manage mode, Conditions-tab only (explicit scope decision —
+ *    Drugs is being reworked in a separate upcoming session, see below):
+ *    a ListChecks/X toggle button sits top-right of both header variants
+ *    (same visual slot Home's dark-mode toggle occupies). While active,
+ *    each ConditionCard's onTap toggles selection instead of navigating,
+ *    and its trailing slot swaps RowStarButton for a Circle/CheckCircle2
+ *    selection indicator. A fixed ManageActionBar (same bottom:80 "above
+ *    bottom nav" offset Snackbar already used) appears once ≥1 item is
+ *    selected, with a live count, "Select all"/"Deselect all", and
+ *    "Remove". Remove reuses ConfirmSheet with a count-aware message;
+ *    confirming loops toggleCondition (confirmed safe — useFavourites'
+ *    setter uses a functional update, so N calls in one tick don't
+ *    clobber each other) over the selected ids, fires the existing
+ *    snackbar (now with a dynamic message — see below), clears
+ *    selection, and exits manage mode.
+ *  - Snackbar's message is no longer hardcoded — showSnack(message) now
+ *    takes the string to display, so the existing single-item remove
+ *    flow ("Removed from favourites") and the new bulk flow ("Removed 3
+ *    favourites") can share one component.
+ *  - Manage button only renders when savedConditions.length > 0 — no
+ *    reason to offer a manage action over an empty list.
+ *  - Drugs tab is completely unchanged by this phase: DrugCard isn't
+ *    touched, gets no selection UI, and isManaging has no effect on its
+ *    rendering — rows behave exactly as before regardless of manage
+ *    state. This was an explicit decision, not an oversight: the Drugs
+ *    screen/card is getting its own dedicated rework soon, and adding
+ *    throwaway selection wiring here now would just be rebuilt then.
+ *  - Known trade-off, not fixed this pass: ConditionCard always renders
+ *    its own chevron after the trailing slot, so the chevron is still
+ *    visible in manage mode even though tapping now selects instead of
+ *    navigating. Removing it would mean editing ConditionCard.jsx's
+ *    fixed markup, which was kept out of scope for this pass.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill } from 'lucide-react'
+import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2 } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -198,6 +252,14 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
+
+// Favourites' own identity color — not var(--color-accent) (that's the app's
+// blue, used throughout Home/ConditionDetail). This is the exact hex
+// RowStarButton already uses for a favourited star, so promoting it to this
+// screen's accent reuses a meaning the app already teaches ("amber = saved"),
+// rather than introducing an arbitrary new color.
+const FAV_ACCENT    = '#F59E0B'
+const FAV_ACCENT_BG = 'rgba(245, 158, 11, 0.08)'
 
 // Static tab order/labels/icons — no longer carries per-render count data, so
 // this can live outside the component. Order matters: switchTab() below uses
@@ -244,6 +306,79 @@ function Snackbar({ visible, message }) {
       }}
     >
       {message}
+    </div>
+  )
+}
+
+// ─── Manage-mode bulk action bar ─────────────────────────────────────────────
+// Fixed above the bottom nav (same 80px offset Snackbar already uses for the
+// same purpose). Only ever shown while managing AND at least one condition is
+// selected — the Drugs tab has no selection mechanism yet (deferred, see file
+// header), so this bar only ever reflects Conditions-tab selections.
+
+function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove }) {
+  return (
+    <div style={{
+      position:        'fixed',
+      left:            0,
+      right:           0,
+      bottom:          80,
+      zIndex:          60,
+      display:         'flex',
+      justifyContent:  'center',
+      pointerEvents:   'none',
+    }}>
+      <div style={{
+        pointerEvents:   'auto',
+        width:           'calc(100% - var(--space-6) * 2)',
+        maxWidth:        680 - 48,
+        backgroundColor: 'var(--color-surface)',
+        borderRadius:    'var(--radius-lg)',
+        boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.14)',
+        padding:         '10px 14px',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'space-between',
+        gap:             10,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+            {count} selected
+          </span>
+          <button
+            onClick={onToggleSelectAll}
+            style={{
+              background:     'none',
+              border:         'none',
+              cursor:         'pointer',
+              fontSize:       13,
+              color:          FAV_ACCENT,
+              fontFamily:     'var(--font-body)',
+              padding:        0,
+              textDecoration: 'underline',
+            }}
+          >
+            {allSelected ? 'Deselect all' : 'Select all'}
+          </button>
+        </div>
+        <button
+          onClick={onRemove}
+          style={{
+            padding:         '8px 16px',
+            borderRadius:    'var(--radius-full)',
+            border:          'none',
+            backgroundColor: 'var(--color-danger)',
+            color:           '#fff',
+            fontSize:        13,
+            fontWeight:      600,
+            fontFamily:      'var(--font-body)',
+            cursor:          'pointer',
+            flexShrink:      0,
+          }}
+        >
+          Remove
+        </button>
+      </div>
     </div>
   )
 }
@@ -398,12 +533,13 @@ function RowStarButton({ onPress }) {
 // icon-label gap, fully-rounded thicker underline for true "rounded ends."
 // Active: semibold + accent blue. Inactive: medium weight (500) + secondary gray.
 
-function renderTabs(activeTab, onSelect) {
+function renderTabs(activeTab, onSelect, counts) {
   return (
     <div style={{ display: 'flex' }}>
       {FAVOURITES_TABS.map(tab => {
         const isActive = activeTab === tab.key
-        const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+        const fg = isActive ? FAV_ACCENT : 'var(--color-text-secondary)'
+        const count = counts ? counts[tab.key] : undefined
 
         return (
           <div
@@ -435,6 +571,11 @@ function renderTabs(activeTab, onSelect) {
               <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500, color: fg }}>
                 {tab.label}
               </span>
+              {typeof count === 'number' && (
+                <span style={{ fontSize: 12, fontWeight: 500, color: fg, opacity: 0.75 }}>
+                  {count}
+                </span>
+              )}
             </button>
             {/* Underline — full width of this 50% cell, exactly matching the
                 active tab's rendered width; rounded ends; visible only
@@ -447,7 +588,7 @@ function renderTabs(activeTab, onSelect) {
               width:           '100%',
               marginTop:       4,
               borderRadius:    'var(--radius-full)',
-              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
+              backgroundColor: isActive ? FAV_ACCENT : 'transparent',
               transition:      'background-color 0.15s ease',
             }} />
           </div>
@@ -470,37 +611,77 @@ function renderTabs(activeTab, onSelect) {
 // in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
 // 8→6, subtitle marginBottom 6→5.
 
-function FavouritesHero({ heroRef }) {
+function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton }) {
   return (
     <div ref={heroRef} style={{
-      paddingTop:    'var(--space-4)',
-      paddingBottom: 4,
+      backgroundColor: FAV_ACCENT_BG,
+      borderRadius:    16,
+      padding:         '14px 14px 4px',
+      marginTop:       'var(--space-4)',
     }}>
-      {/* Single lockup: icon on the left, centered against the combined
+      {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
           unit rather than icon+title as one row and subtitle as a separate
-          block underneath. Icon bumped 20→28px so it reads as the screen's
-          visual identifier. */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Star size={28} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
-        <div>
-          <h1 style={{
-            fontSize:      22,
-            fontWeight:    700,
-            color:         'var(--color-text-primary)',
-            margin:        0,
-            letterSpacing: '-0.3px',
-          }}>
-            Favourites
-          </h1>
+          block underneath. Manage toggle sits on the right, filling the
+          same visual slot Home's dark-mode toggle occupies. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <div style={{
-            fontSize:  13,
-            color:     'var(--color-text-tertiary)',
-            marginTop: 2,
+            width:           38,
+            height:          38,
+            borderRadius:    '50%',
+            backgroundColor: FAV_ACCENT,
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            flexShrink:      0,
           }}>
-            Your saved references
+            <Star size={18} fill="#fff" color="#fff" strokeWidth={0} />
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{
+              fontSize:      22,
+              fontWeight:    700,
+              color:         'var(--color-text-primary)',
+              margin:        0,
+              letterSpacing: '-0.3px',
+            }}>
+              Favourites
+            </h1>
+            <div style={{
+              fontSize:  13,
+              color:     'var(--color-text-tertiary)',
+              marginTop: 2,
+            }}>
+              Your saved references
+            </div>
           </div>
         </div>
+
+        {showManageButton && (
+          <button
+            onClick={onToggleManage}
+            aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+            style={{
+              width:                   36,
+              height:                  36,
+              borderRadius:            '50%',
+              border:                  'none',
+              backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              flexShrink:              0,
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              outline:                 'none',
+            }}
+          >
+            {isManaging
+              ? <X size={17} color="#fff" strokeWidth={2} />
+              : <ListChecks size={17} color="#412402" strokeWidth={1.8} />}
+          </button>
+        )}
       </div>
     </div>
   )
@@ -517,7 +698,7 @@ function FavouritesHero({ heroRef }) {
 // header, not a cropped one. Still icon + title + tabs only — no subtitle,
 // no search, per spec.
 
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, onToggleManage, showManageButton, counts }) {
   return (
     <div
       aria-hidden="true"
@@ -527,7 +708,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
         left:                    0,
         right:                   0,
         zIndex:                  50,
-        backgroundColor:         'var(--color-surface)',
+        backgroundColor:         FAV_ACCENT_BG,
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
@@ -538,22 +719,62 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* Title row — icon + text, no logo, no back arrow */}
+        {/* Title row — badge icon + text on the left, manage toggle on the
+            right, same lockup as the expanded hero at a smaller scale */}
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        6,
-          padding:    '14px var(--space-6) 0',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          gap:            8,
+          padding:        '14px var(--space-6) 0',
         }}>
-          <Star size={16} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
-          <div style={{
-            fontSize:      16,
-            fontWeight:    700,
-            color:         'var(--color-text-primary)',
-            letterSpacing: '-0.2px',
-          }}>
-            Favourites
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <div style={{
+              width:           26,
+              height:          26,
+              borderRadius:    '50%',
+              backgroundColor: FAV_ACCENT,
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+            }}>
+              <Star size={13} fill="#fff" color="#fff" strokeWidth={0} />
+            </div>
+            <div style={{
+              fontSize:      16,
+              fontWeight:    700,
+              color:         'var(--color-text-primary)',
+              letterSpacing: '-0.2px',
+            }}>
+              Favourites
+            </div>
           </div>
+
+          {showManageButton && (
+            <button
+              onClick={onToggleManage}
+              aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+              style={{
+                width:                   28,
+                height:                  28,
+                borderRadius:            '50%',
+                border:                  'none',
+                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                flexShrink:              0,
+                cursor:                  'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline:                 'none',
+              }}
+            >
+              {isManaging
+                ? <X size={13} color="#fff" strokeWidth={2} />
+                : <ListChecks size={13} color="#412402" strokeWidth={1.8} />}
+            </button>
+          )}
         </div>
 
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs */}
@@ -561,7 +782,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
           marginTop: 6,
           padding:   '0 var(--space-6) 10px',
         }}>
-          {renderTabs(activeTab, onSelectTab)}
+          {renderTabs(activeTab, onSelectTab, counts)}
         </div>
 
       </div>
@@ -575,14 +796,46 @@ export default function FavouritesScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('conditions')
 
-  // Snackbar state
+  // Snackbar state — message is now dynamic (bulk-remove needs a count-aware
+  // string; single-item remove keeps its original fixed message).
   const [snackVisible, setSnackVisible] = useState(false)
+  const [snackMessage, setSnackMessage] = useState('')
   const snackTimer = useRef(null)
 
-  function showSnack() {
+  function showSnack(message) {
     if (snackTimer.current) clearTimeout(snackTimer.current)
+    setSnackMessage(message)
     setSnackVisible(true)
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
+  }
+
+  // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
+  // Phase 6 note below) ───────────────────────────────────────────────────
+  const [isManaging, setIsManaging] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+
+  function toggleManage() {
+    setIsManaging(prev => !prev)
+    setSelectedIds(new Set())
+  }
+
+  function toggleSelectCondition(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false)
+
+  function handleConfirmBulkRemove() {
+    const ids = Array.from(selectedIds)
+    ids.forEach(id => toggleCondition(id))
+    showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`)
+    setSelectedIds(new Set())
+    setIsManaging(false)
   }
 
   const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()
@@ -633,7 +886,7 @@ export default function FavouritesScreen() {
   // Wrapper that also triggers the snackbar (called on remove = already favourited)
   const handleRemoveDrug = useCallback((id) => {
     toggleDrug(id)
-    showSnack()
+    showSnack('Removed from favourites')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toggleDrug])
 
@@ -643,7 +896,7 @@ export default function FavouritesScreen() {
   function handleConfirmRemoveCondition() {
     if (!confirmingCondition) return
     toggleCondition(confirmingCondition.id)
-    showSnack()
+    showSnack('Removed from favourites')
   }
 
   // ── Tab switching + swipe (Phase 3) ─────────────────────────────────────────
@@ -712,6 +965,10 @@ export default function FavouritesScreen() {
         visible={showStickyHeader}
         activeTab={activeTab}
         onSelectTab={switchTab}
+        isManaging={isManaging}
+        onToggleManage={toggleManage}
+        showManageButton={savedConditions.length > 0}
+        counts={{ conditions: savedConditions.length, drugs: savedDrugs.length }}
       />
 
       {/* Local keyframes for the tab-switch transition — same technique as
@@ -731,11 +988,16 @@ export default function FavouritesScreen() {
 
       <div>
 
-        <FavouritesHero heroRef={heroRef} />
+        <FavouritesHero
+          heroRef={heroRef}
+          isManaging={isManaging}
+          onToggleManage={toggleManage}
+          showManageButton={savedConditions.length > 0}
+        />
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
         <div style={{ marginBottom: 6 }}>
-          {renderTabs(activeTab, switchTab)}
+          {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
         </div>
 
         {/* Search — filters only the currently selected collection */}
@@ -772,17 +1034,34 @@ export default function FavouritesScreen() {
                         condition={condition}
                         isLast={i === conditionResults.length - 1}
                         highlight={conditionQuery}
-                        onTap={() => navigate(`/conditions/${condition.slug}`)}
+                        onTap={
+                          isManaging
+                            ? () => toggleSelectCondition(condition.id)
+                            : () => navigate(`/conditions/${condition.slug}`)
+                        }
                         trailing={
-                          <RowStarButton
-                            onPress={() => setConfirmingCondition(condition)}
-                          />
+                          isManaging
+                            ? (selectedIds.has(condition.id)
+                                ? <CheckCircle2 size={20} color="#fff" fill={FAV_ACCENT} strokeWidth={2} />
+                                : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />)
+                            : (
+                                <RowStarButton
+                                  onPress={() => setConfirmingCondition(condition)}
+                                />
+                              )
                         }
                       />
                     ))
             )}
 
             {/* ── Drugs tab ── */}
+            {/* Phase 6 — manage mode is Conditions-only this session (explicit
+                decision, deferred): DrugCard has no trailing/selection slot,
+                and this screen's Drugs tab has no per-row remove control at
+                all yet (see Phase 2M note above). Rows here render exactly
+                as before regardless of isManaging — no checkboxes, no
+                selection, nothing wired. Revisit once the Drugs screen/card
+                rework lands. */}
             {activeTab === 'drugs' && (
               savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
@@ -800,6 +1079,21 @@ export default function FavouritesScreen() {
 
       </div>
 
+      {isManaging && selectedIds.size > 0 && (
+        <ManageActionBar
+          count={selectedIds.size}
+          allSelected={selectedIds.size === conditionResults.length}
+          onToggleSelectAll={() => {
+            setSelectedIds(prev =>
+              prev.size === conditionResults.length
+                ? new Set()
+                : new Set(conditionResults.map(c => c.id))
+            )
+          }}
+          onRemove={() => setShowBulkConfirm(true)}
+        />
+      )}
+
       <ConfirmSheet
         isOpen={!!confirmingCondition}
         onClose={() => setConfirmingCondition(null)}
@@ -810,7 +1104,17 @@ export default function FavouritesScreen() {
         destructive
       />
 
-      <Snackbar visible={snackVisible} message="Removed from favourites" />
+      <ConfirmSheet
+        isOpen={showBulkConfirm}
+        onClose={() => setShowBulkConfirm(false)}
+        onConfirm={handleConfirmBulkRemove}
+        title="Remove favourites?"
+        message={`${selectedIds.size} favourite${selectedIds.size === 1 ? '' : 's'} will be removed from your saved conditions.`}
+        confirmLabel="Remove"
+        destructive
+      />
+
+      <Snackbar visible={snackVisible} message={snackMessage} />
     </Layout>
   )
 }
