@@ -4,6 +4,11 @@
  * Phase 3  — updated default placeholder to "Search conditions or symptoms…"
  * Phase 5  — flat border-only style; accent ring on focus; no shadow
  * Phase 6  — forwardRef added so parent can scroll-to and focus the input
+ * Phase 7  — optional `compact` prop added (used by FavouritesScreen): reduces
+ *             height 46px → 44px. Default false, so every existing call site
+ *             (ConditionsScreen, DrugsScreen) renders unchanged. Filter button
+ *             sizing follows the same height for visual consistency if it's
+ *             ever paired with compact elsewhere.
  *
  * Props:
  *   value            string
@@ -11,6 +16,7 @@
  *   placeholder      string
  *   onFilter         () => void | undefined  — if provided, shows filter icon
  *   hasActiveFilters boolean                 — highlights filter icon when true
+ *   compact          boolean                 — slightly shorter variant (44px vs 46px)
  */
 
 import { forwardRef }                    from 'react'
@@ -22,7 +28,10 @@ const SearchBar = forwardRef(function SearchBar({
   placeholder = 'Search conditions or symptoms…',
   onFilter,
   hasActiveFilters = false,
+  compact = false,
 }, ref) {
+  const height = compact ? 44 : 46
+
   return (
     <div style={{
       display:    'flex',
@@ -52,7 +61,7 @@ const SearchBar = forwardRef(function SearchBar({
             boxSizing:       'border-box',
             paddingLeft:     40,
             paddingRight:    value ? 40 : 16,
-            height:          46,
+            height:          height,
             borderRadius:    'var(--radius-full)',
             border:          '1.5px solid var(--color-border)',
             backgroundColor: 'var(--color-surface)',
@@ -94,8 +103,8 @@ const SearchBar = forwardRef(function SearchBar({
           onClick={onFilter}
           aria-label="Filter"
           style={{
-            width:           46,
-            height:          46,
+            width:           height,
+            height:          height,
             borderRadius:    'var(--radius-full)',
             border:          hasActiveFilters
               ? '1.5px solid var(--color-accent)'

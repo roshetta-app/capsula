@@ -96,6 +96,26 @@
  *    user already has favourites.
  *  - Spacing tightened: hero top padding space-5 → space-4, hero-to-tabs gap
  *    reduced, sticky header internal padding reduced.
+ *
+ * Phase 2O — refinement pass on top of 2M/2N, per updated design brief
+ *  (preserve design system, refine hierarchy/proportions, no reinvention):
+ *  - Segmented control rebuilt from two independent pill buttons into a
+ *    single unified capsule: one track (var(--color-border-subtle)), one
+ *    sliding "elevated" indicator (var(--color-surface) + var(--shadow-card))
+ *    that animates via CSS transform between the two segments. Selected
+ *    segment's icon/label/count use var(--color-accent) (the app's primary
+ *    blue); unselected uses var(--color-text-secondary). Reads as
+ *    lightweight "switch views" navigation, not two primary actions.
+ *  - Count badges further softened: neutral/tinted backgrounds
+ *    (var(--color-border-subtle) unselected, var(--color-accent-light)
+ *    selected) instead of the previous opacity-based dimming.
+ *  - SearchBar rendered with the new `compact` prop (see SearchBar.jsx
+ *    Phase 7) — 46px → 44px, corner radius/border/icon styling unchanged.
+ *  - Header vertical rhythm tightened further: title→subtitle, subtitle→
+ *    search, search→tabs, and tabs→first-list-item gaps each trimmed
+ *    ~4–8dp. Title, subtitle copy, sticky-header trigger behavior, list row
+ *    component, and star placement are unchanged — refinement only, per
+ *    the "do not redesign" instruction in the brief.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -280,64 +300,84 @@ function RowStarButton({ onPress }) {
   )
 }
 
-// ─── Pill tabs ────────────────────────────────────────────────────────────────
+// ─── Segmented control ───────────────────────────────────────────────────────
 // Shared between the in-page tab row and the sticky header's copy, so the two
 // never visually diverge. Pure render function of (tabs, activeTab, onSelect).
-// Phase 2M — count badge de-emphasized (opacity ~0.7, weight 500) so the
-// segment label stays the primary read; the count is supporting metadata.
+// Phase 2O — rebuilt from two independent pill buttons into a single unified
+// capsule: one track, one sliding "elevated" indicator (white + shadow-card)
+// that animates between the two segments via CSS transform. Reads as
+// secondary "switch views" navigation rather than two primary buttons.
+// Assumes exactly two equal-width segments — the 50% math below is only
+// correct for that fixed 2-segment case.
 
 function renderTabs(tabs, activeTab, onSelect) {
+  const activeIndex = tabs.findIndex(t => t.key === activeTab)
+
   return (
     <div style={{
-      display:              'grid',
-      gridTemplateColumns:  '1fr 1fr',
-      gap:                  'var(--space-2)',
+      position:        'relative',
+      display:         'flex',
+      backgroundColor: 'var(--color-border-subtle)',
+      borderRadius:    'var(--radius-full)',
+      padding:         3,
+      height:          48,
     }}>
+      {/* Sliding indicator — sits behind the segment buttons, animates via transform */}
+      <div style={{
+        position:     'absolute',
+        top:          3,
+        bottom:       3,
+        left:         3,
+        width:        'calc(50% - 3px)',
+        borderRadius: 'var(--radius-full)',
+        backgroundColor: 'var(--color-surface)',
+        boxShadow:    'var(--shadow-card)',
+        transform:    `translateX(${activeIndex * 100}%)`,
+        transition:   'transform 0.2s ease',
+      }} />
+
       {tabs.map(tab => {
         const isActive = activeTab === tab.key
+        const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+
         return (
           <button
             key={tab.key}
             onClick={() => onSelect(tab.key)}
             style={{
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              gap:             'var(--space-2)',
-              padding:         '8px 0',
-              borderRadius:    'var(--radius-full)',
-              fontSize:        13,
-              fontWeight:      isActive ? 600 : 400,
-              fontFamily:      'var(--font-body)',
-              cursor:          'pointer',
-              transition:      'all 0.15s ease',
-              border:          isActive
-                ? '1.5px solid var(--color-accent)'
-                : '1.5px solid var(--color-border)',
-              backgroundColor: isActive
-                ? 'var(--color-accent)'
-                : 'var(--color-surface)',
-              color:           isActive
-                ? '#ffffff'
-                : 'var(--color-text-secondary)',
+              position:       'relative',
+              zIndex:         1,
+              flex:           1,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              gap:            6,
+              padding:        '0 var(--space-2)',
+              border:         'none',
+              background:     'transparent',
+              fontSize:       13,
+              fontWeight:     isActive ? 600 : 400,
+              fontFamily:     'var(--font-body)',
+              cursor:         'pointer',
+              color:          fg,
+              transition:     'color 0.2s ease',
             }}
           >
             <Star
               size={13}
-              fill={isActive ? '#ffffff' : 'none'}
+              fill={isActive ? fg : 'none'}
               strokeWidth={isActive ? 0 : 1.5}
-              color={isActive ? '#ffffff' : 'var(--color-text-tertiary)'}
+              color={fg}
             />
             {tab.label}
             {tab.count > 0 && (
               <span style={{
                 fontSize:        11,
                 fontWeight:      500,
-                opacity:         0.7,
                 backgroundColor: isActive
-                  ? 'rgba(255,255,255,0.25)'
-                  : 'var(--color-accent-light)',
-                color:           isActive ? '#ffffff' : 'var(--color-accent)',
+                  ? 'var(--color-accent-light)'
+                  : 'var(--color-border-subtle)',
+                color:           fg,
                 borderRadius:    'var(--radius-full)',
                 padding:         '1px 6px',
                 lineHeight:      1.5,
@@ -365,7 +405,7 @@ function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholde
   return (
     <div ref={heroRef} style={{
       paddingTop:    'var(--space-4)',
-      paddingBottom: 'var(--space-2)',
+      paddingBottom: 8,
     }}>
       <h1 style={{
         fontSize:      22,
@@ -381,7 +421,7 @@ function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholde
         fontSize:     13,
         color:        'var(--color-text-tertiary)',
         marginTop:    2,
-        marginBottom: 'var(--space-3)',
+        marginBottom: 10,
       }}>
         Your saved references
       </div>
@@ -390,6 +430,7 @@ function FavouritesHero({ heroRef, searchValue, onSearchChange, searchPlaceholde
         value={searchValue}
         onChange={onSearchChange}
         placeholder={searchPlaceholder}
+        compact
       />
     </div>
   )
@@ -439,8 +480,8 @@ function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
 
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs */}
         <div style={{
-          marginTop: 8,
-          padding:   '0 var(--space-6) 12px',
+          marginTop: 6,
+          padding:   '0 var(--space-6) 10px',
         }}>
           {renderTabs(tabs, activeTab, onSelectTab)}
         </div>
@@ -572,8 +613,8 @@ export default function FavouritesScreen() {
           searchPlaceholder={heroSearchPlaceholder}
         />
 
-        {/* Symmetric pill tabs — equal width, centered, star icon */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        {/* Unified segmented control — equal width, sliding indicator */}
+        <div style={{ marginBottom: 'var(--space-2)' }}>
           {renderTabs(tabs, activeTab, setActiveTab)}
         </div>
 
