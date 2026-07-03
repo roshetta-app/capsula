@@ -1,5 +1,3 @@
-`src\pages\ConditionDetailScreen.jsx`:
-
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Share2 } from 'lucide-react'
