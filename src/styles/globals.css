@@ -205,7 +205,15 @@ html {
 
 body {
   margin: 0;
-  min-height: 100dvh;
+  /* Uses the live, JS-measured viewport height (set by useVisualViewport,
+     called once at the app root in App.jsx) instead of the browser's own
+     100dvh estimate. 100dvh and the real visual viewport height can
+     briefly disagree — most noticeably mid-scroll, exactly when the
+     mobile browser's address bar is animating away — which let a drag
+     find a sliver of extra document height and scroll the whole page.
+     The var() fallback covers the brief window before the hook's first
+     effect runs. */
+  min-height: var(--viewport-height, 100dvh);
   background-color: var(--color-bg);
   overscroll-behavior-y: none;
 }
@@ -676,4 +684,3 @@ body {
 .dark .personal-note-card {
   background: #12100A;
   border-color: #6B6010;
-}

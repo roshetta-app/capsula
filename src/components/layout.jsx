@@ -37,7 +37,10 @@ export default function Layout({ children }) {
 
   return (
     <div style={{
-      minHeight:       '100dvh',
+      // Live, JS-measured viewport height (see useVisualViewport, called
+      // once in App.jsx) instead of the browser's own 100dvh estimate —
+      // same fix as body in globals.css, for the same reason.
+      minHeight:       'var(--viewport-height, 100dvh)',
       backgroundColor: 'var(--color-bg)',
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
