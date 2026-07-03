@@ -5,8 +5,11 @@ import NotificationsBanner from './ui/NotificationsBanner'
 
 /**
  * Routes that render their own top section and suppress the shared header.
+ * '/favourites' added — FavouritesScreen now renders its own hero (logo +
+ * heading) and sliding sticky header, same reason '/' and '/conditions'
+ * are suppressed here.
  */
-const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions']
+const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites']
 
 /**
  * Route prefixes that render their own top section and suppress the shared
