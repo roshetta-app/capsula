@@ -51,19 +51,59 @@
  *    don't yet justify the abstraction; avoids touching a working screen).
  *  - IntersectionObserver watches the hero ref (heroRef) the same way
  *    ConditionsScreen watches brandRowRef.
+ *
+ * Phase 2M — spec compliance pass (favourites-as-personal-library):
+ *  - Logo removed from both the hero and the sticky header — this screen is
+ *    title-first, not brand-first (logo stays reserved for Home). Hero is
+ *    now: large "Favourites" title → small "Your saved references"
+ *    subtitle → search → tabs. Sticky header is a compact text-only title
+ *    bar ("Favourites", no logo, no back arrow — Favourites is a bottom-nav
+ *    tab, there's no "back" destination that makes sense here).
+ *  - Search added: reuses SearchBar as-is, placeholder "Search favourites…".
+ *    Wired via useConditionSearch(savedConditions) — the hook's own pool is
+ *    the FAVOURITED conditions array, not the full ConditionContext catalog,
+ *    so results are scoped to the user's saved items automatically (the
+ *    hook needs no new filtering logic for this). savedConditions/savedDrugs
+ *    are now wrapped in useMemo — without it, .map().filter() built a new
+ *    array reference every render, which would re-trigger
+ *    useConditionSearch's internal "rebuild index" effect (keyed on that
+ *    array reference) on every render.
+ *  - Search is scoped to the Conditions tab only this session — the Drugs
+ *    tab has no star/remove control yet (explicit decision, deferred) and
+ *    wiring search there too was deferred with it to avoid a half-built
+ *    control. The hero's SearchBar is only rendered while the Conditions
+ *    tab is active, rather than always-visible-regardless-of-tab, so there's
+ *    no inert search box sitting over the Drugs list. Revisit when Drugs-tab
+ *    search is implemented — original spec intent (favourites-in-general)
+ *    keeps it always visible once both tabs support it.
+ *  - Segmented control count badges de-emphasized (opacity ~0.7, weight 500)
+ *    so tab labels stay the primary read.
+ *  - RowStarButton icon 16px → 13px (already-44px tap target via padding is
+ *    unaffected — only the icon shrinks).
+ *  - Empty state redesigned: accent-tinted circular icon background + Star
+ *    icon, "Nothing saved yet" headline, one-line body, verb-first CTA
+ *    ("Browse conditions" / "Browse drugs") navigating to /conditions or
+ *    /drugs. Separate, simpler empty state added for the Conditions tab
+ *    when a search query matches none of the user's saved conditions:
+ *    "No results for "{query}"" + "Clear search" — no browse CTA, since the
+ *    user already has favourites.
+ *  - Spacing tightened: hero top padding space-5 → space-4, hero-to-tabs gap
+ *    reduced, sticky header internal padding reduced.
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Star } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
+import SearchBar from '../components/ui/SearchBar'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
+import { useConditionSearch } from '../hooks/useConditionSearch'
 
 // ─── Snackbar ─────────────────────────────────────────────────────────────────
 
@@ -95,26 +135,104 @@ function Snackbar({ visible, message }) {
   )
 }
 
-// ─── Empty state ──────────────────────────────────────────────────────────────
+// ─── Empty state: nothing saved yet ─────────────────────────────────────────
+// Replaces the old generic "No saved X yet" text block. Accent-tinted
+// circular icon background, short body copy, verb-first CTA to go save
+// something. Shared between both tabs — only the label/destination differ.
 
-function EmptyState({ label }) {
+function NothingSavedEmptyState({ label }) {
+  const navigate = useNavigate()
+  const isConditions = label === 'conditions'
+
   return (
     <div style={{
-      display:        'flex',
-      flexDirection:  'column',
-      alignItems:     'center',
-      justifyContent: 'center',
-      padding:        'var(--space-12) var(--space-4)',
-      gap:            'var(--space-3)',
-      color:          'var(--color-text-tertiary)',
+      display:       'flex',
+      flexDirection: 'column',
+      alignItems:    'center',
+      textAlign:     'center',
+      padding:       'var(--space-12) var(--space-4)',
+      gap:           'var(--space-3)',
     }}>
-      <Star size={36} style={{ opacity: 0.25 }} />
+      <div style={{
+        width:           64,
+        height:          64,
+        borderRadius:    '50%',
+        backgroundColor: 'var(--color-accent-light)',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+      }}>
+        <Star size={28} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
+      </div>
+
+      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+        Nothing saved yet
+      </div>
+
+      <div style={{
+        fontSize:   13,
+        color:      'var(--color-text-tertiary)',
+        lineHeight: 1.5,
+        maxWidth:   240,
+      }}>
+        {isConditions
+          ? 'Save conditions you want to find quickly later.'
+          : 'Save drugs you want to find quickly later.'}
+      </div>
+
+      <button
+        onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
+        style={{
+          marginTop:       4,
+          padding:         '10px 20px',
+          borderRadius:    'var(--radius-full)',
+          border:          'none',
+          backgroundColor: 'var(--color-accent)',
+          color:           '#fff',
+          fontSize:        13,
+          fontWeight:      600,
+          fontFamily:      'var(--font-body)',
+          cursor:          'pointer',
+        }}
+      >
+        {isConditions ? 'Browse conditions' : 'Browse drugs'}
+      </button>
+    </div>
+  )
+}
+
+// ─── Empty state: search matched nothing ────────────────────────────────────
+// Distinct from NothingSavedEmptyState — the user DOES have favourites,
+// their search just didn't match any of them. Simpler, no browse CTA.
+
+function NoSearchResultsState({ query, onClear }) {
+  return (
+    <div style={{
+      display:       'flex',
+      flexDirection: 'column',
+      alignItems:    'center',
+      textAlign:     'center',
+      padding:       'var(--space-12) var(--space-4)',
+      gap:           'var(--space-2)',
+    }}>
       <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-        No saved {label} yet
+        No results for "{query}"
       </div>
-      <div style={{ fontSize: 13, textAlign: 'center' }}>
-        Tap the star on any {label === 'conditions' ? 'condition' : 'drug'} to save it here
-      </div>
+      <button
+        onClick={onClear}
+        style={{
+          fontSize:       13,
+          color:          'var(--color-accent)',
+          background:     'none',
+          border:         'none',
+          cursor:         'pointer',
+          textDecoration: 'underline',
+          fontFamily:     'var(--font-body)',
+          padding:        '4px 0',
+        }}
+      >
+        Clear search
+      </button>
     </div>
   )
 }
@@ -123,6 +241,8 @@ function EmptyState({ label }) {
 // Local (not InlineStarButton) so it can open a confirm step instead of
 // toggling immediately on tap. Rendered into ConditionCard's trailing slot,
 // so it sits right before the chevron and shares its vertical centering.
+// Icon shrunk 16→13px (Phase 2M) — integrated row action, not a floating
+// decoration. Tap target stays 44px via the button's own padding.
 
 function RowStarButton({ onPress }) {
   function handleTap(e) {
@@ -148,7 +268,7 @@ function RowStarButton({ onPress }) {
         color:                   '#F59E0B',
       }}
     >
-      <Star size={16} fill="#F59E0B" strokeWidth={1.8} />
+      <Star size={13} fill="#F59E0B" strokeWidth={1.8} />
     </button>
   )
 }
@@ -156,6 +276,8 @@ function RowStarButton({ onPress }) {
 // ─── Pill tabs ────────────────────────────────────────────────────────────────
 // Shared between the in-page tab row and the sticky header's copy, so the two
 // never visually diverge. Pure render function of (tabs, activeTab, onSelect).
+// Phase 2M — count badge de-emphasized (opacity ~0.7, weight 500) so the
+// segment label stays the primary read; the count is supporting metadata.
 
 function renderTabs(tabs, activeTab, onSelect) {
   return (
@@ -203,7 +325,8 @@ function renderTabs(tabs, activeTab, onSelect) {
             {tab.count > 0 && (
               <span style={{
                 fontSize:        11,
-                fontWeight:      600,
+                fontWeight:      500,
+                opacity:         0.7,
                 backgroundColor: isActive
                   ? 'rgba(255,255,255,0.25)'
                   : 'var(--color-accent-light)',
@@ -222,32 +345,20 @@ function renderTabs(tabs, activeTab, onSelect) {
   )
 }
 
-// ─── Hero: logo + heading ───────────────────────────────────────────────────
-// Matches ConditionsScreen's BrandRow spacing/logo sizing, minus the
-// tagline and dark-mode toggle (this screen has neither today).
+// ─── Hero: title + subtitle + search ───────────────────────────────────────
+// Phase 2M — logo removed (title-first hierarchy, per spec: Favourites
+// prioritizes content/page identity over branding — logo stays reserved
+// for Home). Search is only rendered while the Conditions tab is active
+// (Drugs-tab search wiring deferred this session — see file header).
 
-function FavouritesHero({ heroRef }) {
+function FavouritesHero({ heroRef, showSearch, searchValue, onSearchChange }) {
   return (
     <div ref={heroRef} style={{
-      paddingTop:    'var(--space-5)',
-      paddingBottom: 'calc(var(--space-3) - 4px)',
+      paddingTop:    'var(--space-4)',
+      paddingBottom: 'var(--space-2)',
     }}>
-      <div style={{
-        display:      'flex',
-        alignItems:   'center',
-        gap:          'var(--space-2)',
-        marginBottom: 8,
-      }}>
-        <img
-          src="/capsula/logo.svg"
-          alt="Capsula"
-          className="capsula-logo"
-          style={{ display: 'block', height: 30, width: 'auto' }}
-        />
-      </div>
-
       <h1 style={{
-        fontSize:      20,
+        fontSize:      22,
         fontWeight:    700,
         color:         'var(--color-text-primary)',
         margin:        0,
@@ -255,15 +366,33 @@ function FavouritesHero({ heroRef }) {
       }}>
         Favourites
       </h1>
+
+      <div style={{
+        fontSize:     13,
+        color:        'var(--color-text-tertiary)',
+        marginTop:    2,
+        marginBottom: 'var(--space-3)',
+      }}>
+        Your saved references
+      </div>
+
+      {showSearch && (
+        <SearchBar
+          value={searchValue}
+          onChange={onSearchChange}
+          placeholder="Search favourites…"
+        />
+      )}
     </div>
   )
 }
 
 // ─── Sliding sticky header ──────────────────────────────────────────────────
-// Appears once FavouritesHero's logo scrolls out of view. Visual shell
+// Appears once FavouritesHero scrolls out of view. Visual shell
 // (position/zIndex/shadow/border-radius/transition) matches ConditionsScreen's
-// StickyLogoHeader; content below the logo row is this screen's own tabs
-// instead of a specialty pill + search icon.
+// StickyLogoHeader; Phase 2M replaces the logo row with a plain "Favourites"
+// text label (no logo, no back arrow — Favourites is a bottom-nav tab, there's
+// no "back" destination that makes sense here). Internal padding tightened.
 
 function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
   return (
@@ -286,24 +415,24 @@ function StickyFavouritesHeader({ visible, tabs, activeTab, onSelectTab }) {
     >
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
-        {/* Logo row */}
+        {/* Title row — text only, no logo, no back arrow */}
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          padding:    '16px var(--space-6) 0',
+          padding: '14px var(--space-6) 0',
         }}>
-          <img
-            src="/capsula/logo.svg"
-            alt="Capsula"
-            className="capsula-logo"
-            style={{ display: 'block', height: 27, width: 'auto', flexShrink: 0 }}
-          />
+          <div style={{
+            fontSize:      15,
+            fontWeight:    700,
+            color:         'var(--color-text-primary)',
+            letterSpacing: '-0.2px',
+          }}>
+            Favourites
+          </div>
         </div>
 
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs */}
         <div style={{
-          marginTop: 10,
-          padding:   '0 var(--space-6) 14px',
+          marginTop: 8,
+          padding:   '0 var(--space-6) 12px',
         }}>
           {renderTabs(tabs, activeTab, onSelectTab)}
         </div>
@@ -334,14 +463,31 @@ export default function FavouritesScreen() {
   const { drugs }      = useDrugContext()
   const { stockMap }   = useStock(drugs)
 
-  // Look up full objects from context
-  const savedConditions = favourites.conditions
-    .map(id => conditions.find(c => c.id === id))
-    .filter(Boolean)
+  // Look up full objects from context. Memoized — without this, a new array
+  // reference was created every render, which re-triggered
+  // useConditionSearch's "rebuild index" effect (keyed on this array's
+  // identity) on every render instead of only when favourites/catalog change.
+  const savedConditions = useMemo(
+    () => favourites.conditions.map(id => conditions.find(c => c.id === id)).filter(Boolean),
+    [favourites.conditions, conditions]
+  )
 
-  const savedDrugs = favourites.drugs
-    .map(id => drugs.find(d => d.id === id))
-    .filter(Boolean)
+  const savedDrugs = useMemo(
+    () => favourites.drugs.map(id => drugs.find(d => d.id === id)).filter(Boolean),
+    [favourites.drugs, drugs]
+  )
+
+  // Conditions-tab search — scoped to the user's saved conditions only (not
+  // the full catalog). Own query state, independent of any other search on
+  // the app. Drugs-tab search is deferred this session (see file header).
+  const {
+    query:   conditionQuery,
+    setQuery: setConditionQuery,
+    results: conditionResults,
+  } = useConditionSearch(savedConditions)
+
+  const isSearchingConditions = conditionQuery.trim().length > 0
+  const conditionSearchEmpty  = isSearchingConditions && conditionResults.length === 0
 
   // Wrapper that also triggers the snackbar (called on remove = already favourited)
   const handleRemoveDrug = useCallback((id) => {
@@ -364,7 +510,7 @@ export default function FavouritesScreen() {
     { key: 'drugs',      label: 'Drugs',      count: savedDrugs.length      },
   ]
 
-  // ── Sliding sticky header: visible once the hero logo leaves viewport ──────
+  // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
   const heroRef = useRef(null)
@@ -397,36 +543,44 @@ export default function FavouritesScreen() {
 
       <div>
 
-        <FavouritesHero heroRef={heroRef} />
+        <FavouritesHero
+          heroRef={heroRef}
+          showSearch={activeTab === 'conditions'}
+          searchValue={conditionQuery}
+          onSearchChange={setConditionQuery}
+        />
 
         {/* Symmetric pill tabs — equal width, centered, star icon */}
-        <div style={{ marginBottom: 'var(--space-4)' }}>
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           {renderTabs(tabs, activeTab, setActiveTab)}
         </div>
 
         {/* ── Conditions tab ── */}
         {activeTab === 'conditions' && (
           savedConditions.length === 0
-            ? <EmptyState label="conditions" />
-            : savedConditions.map((condition, i) => (
-                <ConditionCard
-                  key={condition.id}
-                  condition={condition}
-                  isLast={i === savedConditions.length - 1}
-                  onTap={() => navigate(`/conditions/${condition.slug}`)}
-                  trailing={
-                    <RowStarButton
-                      onPress={() => setConfirmingCondition(condition)}
-                    />
-                  }
-                />
-              ))
+            ? <NothingSavedEmptyState label="conditions" />
+            : conditionSearchEmpty
+              ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
+              : conditionResults.map((condition, i) => (
+                  <ConditionCard
+                    key={condition.id}
+                    condition={condition}
+                    isLast={i === conditionResults.length - 1}
+                    highlight={conditionQuery}
+                    onTap={() => navigate(`/conditions/${condition.slug}`)}
+                    trailing={
+                      <RowStarButton
+                        onPress={() => setConfirmingCondition(condition)}
+                      />
+                    }
+                  />
+                ))
         )}
 
         {/* ── Drugs tab ── */}
         {activeTab === 'drugs' && (
           savedDrugs.length === 0
-            ? <EmptyState label="drugs" />
+            ? <NothingSavedEmptyState label="drugs" />
             : savedDrugs.map(drug => (
                 <DrugCard
                   key={drug.id}
