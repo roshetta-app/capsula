@@ -534,12 +534,16 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                     {label}
                   </span>
                 </button>
-                {/* Underline — full width of the tab cell, flush edge-to-edge */}
+                {/* Underline — full width of the tab cell, flush edge-to-edge.
+                    Thickness/radius kept in lockstep with FavouritesScreen's
+                    renderTabs underline — the two are required to be
+                    pixel-identical, so any change here must be mirrored there. */}
                 <span style={{
                   display: 'block',
-                  height: 1.5,
+                  height: 2,
                   width: '100%',
-                  borderRadius: '1px 1px 0 0',
+                  marginTop: 4,
+                  borderRadius: 'var(--radius-full)',
                   backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
                   transition: 'background-color 0.15s ease',
                 }} />

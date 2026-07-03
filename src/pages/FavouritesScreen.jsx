@@ -159,6 +159,30 @@
  *    true rounded ends, still exactly matches the active cell's width.
  *  - No sort control added (none existed before — already compliant).
  *  - switchTab/touch handlers/slide-keyframe mechanism unchanged.
+ *
+ * Phase 5 — header composition/spacing/tab polish pass (refine, don't
+ *  redesign), per updated design brief:
+ *  - FavouritesHero rebuilt into one unified lockup: icon is now centered
+ *    against the combined title+subtitle stack (previously centered against
+ *    the title alone, with the subtitle sitting outside that row). Icon
+ *    bumped 20→28px to read as the screen's visual identifier; hero
+ *    paddingBottom trimmed 6→4.
+ *  - Tabs-wrapper marginBottom trimmed 10→6 so the tab row sits closer to
+ *    the hero. Search-wrapper spacing/order unchanged (search-bar sizing
+ *    itself is explicitly out of scope this pass — lives in the shared
+ *    SearchBar.jsx component).
+ *  - renderTabs: active label weight 600→700 (labels stay the dominant
+ *    element), icon-label gap 8→10.
+ *  - renderTabs underline: height 3.5→2, added marginTop:4 for clearer
+ *    separation below the label. This spec is now intentionally identical
+ *    to ConditionDetailScreen's DetailHeader tab underline (also updated
+ *    this pass, from 1.5px/square corners to the same 2px/rounded-full/
+ *    marginTop:4 spec) — the brief required the two to match exactly, which
+ *    the two screens' pre-existing specs did not.
+ *  - StickyFavouritesHeader: icon 14→16, title fontSize 15→16, so page
+ *    identity stays strong once scrolled. Tabs continue to render via the
+ *    shared renderTabs, so they inherit the same underline change above
+ *    automatically — no separate edit needed there.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -393,7 +417,7 @@ function renderTabs(activeTab, onSelect) {
                 flexDirection:  'row',
                 alignItems:     'center',
                 justifyContent: 'center',
-                gap:            8,
+                gap:            10,
                 height:         50,
                 paddingLeft:    'var(--space-2)',
                 paddingRight:   'var(--space-2)',
@@ -408,17 +432,20 @@ function renderTabs(activeTab, onSelect) {
               }}
             >
               {tab.renderIcon(fg)}
-              <span style={{ fontSize: 14, fontWeight: isActive ? 600 : 500, color: fg }}>
+              <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500, color: fg }}>
                 {tab.label}
               </span>
             </button>
             {/* Underline — full width of this 50% cell, exactly matching the
                 active tab's rendered width; rounded ends; visible only
-                beneath the active tab */}
+                beneath the active tab. Spec kept in lockstep with
+                ConditionDetailScreen's DetailHeader underline — required to
+                be pixel-identical, so any change here must be mirrored there. */}
             <span style={{
               display:         'block',
-              height:          3.5,
+              height:          2,
               width:           '100%',
+              marginTop:       4,
               borderRadius:    'var(--radius-full)',
               backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               transition:      'background-color 0.15s ease',
@@ -447,28 +474,33 @@ function FavouritesHero({ heroRef }) {
   return (
     <div ref={heroRef} style={{
       paddingTop:    'var(--space-4)',
-      paddingBottom: 6,
+      paddingBottom: 4,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Star size={20} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
-        <h1 style={{
-          fontSize:      22,
-          fontWeight:    700,
-          color:         'var(--color-text-primary)',
-          margin:        0,
-          letterSpacing: '-0.3px',
-        }}>
-          Favourites
-        </h1>
-      </div>
-
-      <div style={{
-        fontSize:     13,
-        color:        'var(--color-text-tertiary)',
-        marginTop:    2,
-        marginBottom: 5,
-      }}>
-        Your saved references
+      {/* Single lockup: icon on the left, centered against the combined
+          title+subtitle stack (not against the title alone) — one cohesive
+          unit rather than icon+title as one row and subtitle as a separate
+          block underneath. Icon bumped 20→28px so it reads as the screen's
+          visual identifier. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Star size={28} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
+        <div>
+          <h1 style={{
+            fontSize:      22,
+            fontWeight:    700,
+            color:         'var(--color-text-primary)',
+            margin:        0,
+            letterSpacing: '-0.3px',
+          }}>
+            Favourites
+          </h1>
+          <div style={{
+            fontSize:  13,
+            color:     'var(--color-text-tertiary)',
+            marginTop: 2,
+          }}>
+            Your saved references
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -513,9 +545,9 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab }) {
           gap:        6,
           padding:    '14px var(--space-6) 0',
         }}>
-          <Star size={14} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
+          <Star size={16} fill="var(--color-accent)" strokeWidth={0} style={{ flexShrink: 0 }} />
           <div style={{
-            fontSize:      15,
+            fontSize:      16,
             fontWeight:    700,
             color:         'var(--color-text-primary)',
             letterSpacing: '-0.2px',
@@ -702,7 +734,7 @@ export default function FavouritesScreen() {
         <FavouritesHero heroRef={heroRef} />
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
-        <div style={{ marginBottom: 10 }}>
+        <div style={{ marginBottom: 6 }}>
           {renderTabs(activeTab, switchTab)}
         </div>
 
