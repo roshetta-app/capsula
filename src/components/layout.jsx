@@ -13,19 +13,6 @@ const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions']
  * header. Condition detail screens (/conditions/:slug) render their own
  * DetailHeader (back/share/favourite + tab strip) — without this, Layout's
  * shared header rendered on top of it as a second header bar.
- *
- * Phase 19 — these routes are now fully self-managed, not just for the
- * header: ConditionDetailScreen sizes its own root to the exact remaining
- * viewport space, reserves its own BottomNav clearance internally, and
- * renders its own <BottomNav/>. Layout was still adding its normal
- * bottom-nav-clearance padding to <main> AND rendering a second <BottomNav/>
- * on top of that. Neither added visible height on its own — the duplicate
- * nav is position:fixed (no layout impact) — but the leftover main padding
- * sat below ConditionDetailScreen's already-viewport-filling root, making
- * the real document taller than the viewport. That's what let a drag past
- * the tab box's bottom edge become a genuine whole-page scroll (dragging
- * the sticky header off-screen with it) instead of stopping at the box's
- * own edge. Suppressing both here removes that extra height at the source.
  */
 const HEADER_SUPPRESSED_PREFIXES = ['/conditions/']
 
@@ -75,26 +62,16 @@ export default function Layout({ children }) {
 
       {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
           keyboard resizing is handled natively via interactive-widget=resizes-content
-          on the viewport meta tag, so no JS-computed height is needed here.
-          Phase 19: on condition-detail routes, ConditionDetailScreen already
-          reserves its own BottomNav clearance internally (keyboard-aware),
-          so this padding is dropped there entirely rather than stacking a
-          second reservation on top of it. */}
+          on the viewport meta tag, so no JS-computed height is needed here. */}
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
-        padding:  suppressHeader
-          ? '0 var(--space-6)'
-          : '0 var(--space-6) calc(var(--space-12) + 60px)',
+        padding:  '0 var(--space-6) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>
 
-      {/* Phase 19: not rendered on condition-detail routes — those screens
-          render their own <BottomNav/> already; mounting a second one here
-          was harmless visually (fixed position, no layout impact) but dead
-          duplication. */}
-      {!suppressHeader && <BottomNav />}
+      <BottomNav />
     </div>
   )
 }
