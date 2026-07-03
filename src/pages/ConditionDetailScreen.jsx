@@ -221,7 +221,19 @@ export default function ConditionDetailScreen() {
       <div
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
-        style={{ touchAction: 'pan-y', flex: 1 }}
+        style={{
+          touchAction: 'pan-y',
+          flex: 1,
+          // Stable compositing layer boundary. The child below is fully
+          // destroyed and recreated on every tab switch (key={activeTab}),
+          // which is what actually churns WebKit's compositing tree — not
+          // just the transform animation itself. Isolating BottomNav alone
+          // (Phase 17) wasn't enough to stop that churn from reaching it;
+          // this contains it at the source instead, on the one wrapper
+          // that never remounts.
+          transform: 'translateZ(0)',
+          willChange: 'transform',
+        }}
       >
         <div
           key={activeTab}
@@ -232,10 +244,7 @@ export default function ConditionDetailScreen() {
             paddingBottom: 'calc(60px + env(safe-area-inset-bottom) + var(--space-4))',
             // Only animate on a real tab switch (tap or swipe), never on
             // mount/refresh — hasSwitchedRef stays false through the first
-            // render. Direction picks which side the incoming tab slides
-            // in from. Safe to animate with transform here: BottomNav is
-            // forced onto its own compositing layer (see BottomNav.jsx,
-            // Phase 17), so it no longer jumps when this transform runs.
+            // render. Direction picks which side the incoming tab slides in from.
             animation: hasSwitchedRef.current
               ? `${tabDirection.current === 1 ? 'conditionTabSlideFromRight' : 'conditionTabSlideFromLeft'} 0.3s cubic-bezier(0.25, 0.1, 0.25, 1)`
               : 'none',
