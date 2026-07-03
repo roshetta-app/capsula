@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.deployment2.outputs.page_url || steps.deployment3.outputs.page_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,6 +41,23 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-      - name: Deploy to GitHub Pages
+      # GitHub's Pages deployment backend has a known, unresolved intermittent
+      # bug (github.com/actions/deploy-pages issues #406, #418) where it fails
+      # with "Deployment failed, try again later." for no fault in this repo's
+      # build. Since it isn't something we can fix here, this just retries the
+      # deploy step automatically instead of requiring a manual re-run each time.
+      - name: Deploy to GitHub Pages (attempt 1)
         id: deployment
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: deployment3
+        if: steps.deployment.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         uses: actions/deploy-pages@v4
