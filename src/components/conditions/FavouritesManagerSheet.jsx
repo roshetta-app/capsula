@@ -28,11 +28,12 @@
  *   onSetSortMode       (mode: string) => void
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
  *   onOpenSpecialties   () => void  — called after this sheet closes
+ *   onClearSpecialty    () => void  — resets specialty to 'all'; sheet stays open
  *   onManage            () => void  — called after this sheet closes
  */
 
 import { useEffect, useState }          from 'react'
-import { ListFilter, ListChecks }       from 'lucide-react'
+import { ListFilter, Settings, X }      from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
@@ -44,6 +45,7 @@ export default function FavouritesManagerSheet({
   onSetSortMode,
   activeSpecialtyObj,
   onOpenSpecialties,
+  onClearSpecialty,
   onManage,
 }) {
   const isDark = useIsDark()
@@ -137,6 +139,48 @@ export default function FavouritesManagerSheet({
             margin:          '0 auto var(--space-5)',
           }} />
 
+          {/* Header — title + explicit close control. Bottom sheets
+              elsewhere in the app (SpecialtiesBottomSheet) rely on
+              backdrop-tap/Escape alone, but this sheet groups three
+              distinct controls rather than a single pick-one list, so it
+              gets its own dismiss affordance instead of relying on an
+              implicit gesture. */}
+          <div style={{
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'space-between',
+            marginBottom:   'var(--space-4)',
+          }}>
+            <span style={{
+              fontSize:   15,
+              fontWeight: 700,
+              fontFamily: 'var(--font-body)',
+              color:      'var(--color-text-primary)',
+            }}>
+              Manage Favourites
+            </span>
+            <button
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                flexShrink:              0,
+                width:                   28,
+                height:                  28,
+                borderRadius:            '50%',
+                border:                  'none',
+                backgroundColor:         'var(--color-border-subtle)',
+                cursor:                  'pointer',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <X size={15} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+            </button>
+          </div>
+
           {/* Sort */}
           <div style={{
             fontSize:      11,
@@ -146,7 +190,7 @@ export default function FavouritesManagerSheet({
             letterSpacing: '0.06em',
             marginBottom:  8,
           }}>
-            Sort
+            Sort by
           </div>
           <div style={{
             display:         'flex',
@@ -185,49 +229,90 @@ export default function FavouritesManagerSheet({
             })}
           </div>
 
-          {/* Specialty */}
-          <button
-            onClick={handleOpenSpecialties}
-            style={{
-              width:                   '100%',
-              display:                 'flex',
-              alignItems:              'center',
-              gap:                     10,
-              padding:                 '12px 10px',
-              marginBottom:            6,
-              background:              'none',
-              border:                  'none',
-              borderRadius:            'var(--radius-md)',
-              textAlign:               'left',
-              cursor:                  'pointer',
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {hasSpecialty ? (
-              <SpecialtyIcon
-                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={17}
-                color={specialtyIconColor}
-              />
-            ) : (
-              <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
+          {/* Specialty — split into two adjacent controls rather than one
+              button: the label area still opens SpecialtiesBottomSheet,
+              while an inline X (only rendered once a specialty is active)
+              resets straight to 'all' without leaving this sheet. A
+              clickable clear control can't be nested inside the label's
+              own <button>, hence the wrapping row here. */}
+          <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            marginBottom: 6,
+          }}>
+            <button
+              onClick={handleOpenSpecialties}
+              style={{
+                flex:                    1,
+                minWidth:                0,
+                display:                 'flex',
+                alignItems:              'center',
+                gap:                     10,
+                padding:                 '12px 10px',
+                background:              'none',
+                border:                  'none',
+                borderRadius:            'var(--radius-md)',
+                textAlign:               'left',
+                cursor:                  'pointer',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {hasSpecialty ? (
+                <SpecialtyIcon
+                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                  size={17}
+                  color={specialtyIconColor}
+                />
+              ) : (
+                <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
+              )}
+              <span style={{
+                flex:         1,
+                minWidth:     0,
+                overflow:     'hidden',
+                whiteSpace:   'nowrap',
+                textOverflow: 'ellipsis',
+                fontSize:     14,
+                fontFamily:   'var(--font-body)',
+                color:        'var(--color-text-primary)',
+              }}>
+                {hasSpecialty ? activeSpecialtyObj.name : 'Filter by specialty'}
+              </span>
+              {!hasSpecialty && (
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+                  style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+                  <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+
+            {hasSpecialty && (
+              <button
+                onClick={onClearSpecialty}
+                aria-label="Clear specialty filter"
+                style={{
+                  display:                 'flex',
+                  alignItems:              'center',
+                  justifyContent:          'center',
+                  flexShrink:              0,
+                  width:                   28,
+                  height:                  28,
+                  marginRight:             6,
+                  borderRadius:            '50%',
+                  border:                  'none',
+                  background:              'none',
+                  cursor:                  'pointer',
+                  outline:                 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <X size={15} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
+              </button>
             )}
-            <span style={{
-              flex:       1,
-              fontSize:   14,
-              fontFamily: 'var(--font-body)',
-              color:      'var(--color-text-primary)',
-            }}>
-              {hasSpecialty ? activeSpecialtyObj.name : 'All specialties'}
-            </span>
-            <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-              style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
-              <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
-                strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          </div>
 
           <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
 
@@ -249,7 +334,7 @@ export default function FavouritesManagerSheet({
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <ListChecks size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+            <Settings size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
             <span style={{
               fontSize:   14,
               fontFamily: 'var(--font-body)',

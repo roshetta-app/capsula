@@ -1,5 +1,3 @@
-/**
- * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
  *
  * Changes from stub:
@@ -694,6 +692,45 @@ function NoSearchResultsState({ query, onClear }) {
   )
 }
 
+// ─── Empty state: specialty filter matched nothing ──────────────────────────
+// Distinct from both states above — the user has favourites and isn't
+// searching by text, but the active specialty filter (set via
+// FavouritesManagerSheet) doesn't match any of their saved conditions.
+// Previously this case fell through to an empty .map() and rendered a
+// blank list with no explanation or way out.
+
+function SpecialtyEmptyState({ specialtyName, onClear }) {
+  return (
+    <div style={{
+      display:       'flex',
+      flexDirection: 'column',
+      alignItems:    'center',
+      textAlign:     'center',
+      padding:       'var(--space-12) var(--space-4)',
+      gap:           'var(--space-2)',
+    }}>
+      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+        No saved conditions{specialtyName ? ` in ${specialtyName}` : ''}
+      </div>
+      <button
+        onClick={onClear}
+        style={{
+          fontSize:       13,
+          color:          'var(--color-accent)',
+          background:     'none',
+          border:         'none',
+          cursor:         'pointer',
+          textDecoration: 'underline',
+          fontFamily:     'var(--font-body)',
+          padding:        '4px 0',
+        }}
+      >
+        Clear filter
+      </button>
+    </div>
+  )
+}
+
 // ─── Row star button ────────────────────────────────────────────────────────
 // Local (not InlineStarButton) so it can open a confirm step instead of
 // toggling immediately on tap. Rendered into ConditionCard's trailing slot,
@@ -1336,7 +1373,10 @@ export default function FavouritesScreen() {
     ? specialties.find(s => s.id === activeSpecialty) ?? null
     : null
 
-  const hasActiveFilters = activeSpecialty !== 'all' || sortMode !== 'recent'
+  // Sort is a standing list-order preference, not a temporary filter — it
+  // shouldn't light the manager button's dot. Only an active specialty
+  // (a genuine narrowing of what's shown) counts as a filter here.
+  const hasActiveFilters = activeSpecialty !== 'all'
 
   // Drugs-tab search box — placeholder only (Phase 2N). Local, unwired state
   // just so the input is controlled/typeable. Do NOT connect this to
@@ -1537,7 +1577,9 @@ export default function FavouritesScreen() {
                 ? <NothingSavedEmptyState label="conditions" />
                 : conditionSearchEmpty
                   ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
-                  : conditionResults.map((condition, i) => (
+                  : (!isSearchingConditions && activeSpecialty !== 'all' && conditionResults.length === 0)
+                    ? <SpecialtyEmptyState specialtyName={activeSpecialtyObj?.name} onClear={() => setActiveSpecialty('all')} />
+                    : conditionResults.map((condition, i) => (
                       <ConditionCard
                         key={condition.id}
                         condition={condition}
@@ -1630,6 +1672,7 @@ export default function FavouritesScreen() {
         onSetSortMode={setSortMode}
         activeSpecialtyObj={activeSpecialtyObj}
         onOpenSpecialties={() => setShowSpecialtySheet(true)}
+        onClearSpecialty={() => setActiveSpecialty('all')}
         onManage={toggleManage}
       />
 
@@ -1665,4 +1708,3 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
-
