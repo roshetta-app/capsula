@@ -273,6 +273,25 @@
  *    sticky variant) — the app's existing blue design-system token, already
  *    dark-mode aware. FAV_ACCENT itself (badge/buttons/underline) is
  *    unchanged; this is a background-only recolor of the two header shells.
+ *
+ * Phase 9 — corrections to Phase 8, from further live-device feedback:
+ *  - Sticky-header suppression during search reverted — StickyFavouritesHeader
+ *    goes back to visible={showStickyHeader} with no isSearching gate; it
+ *    behaves exactly as it did before Phase 8's "lock in place" change.
+ *  - Root-caused the header height shift Phase 8 didn't actually fix:
+ *    minHeight:44 is only a floor, and the title/subtitle text had no
+ *    explicit lineHeight, so it rendered at the font's default line-height —
+ *    taller than 44px — while the search state (SearchBar, height fixed at
+ *    44px) stayed exactly 44px. Toggling into search still visibly shrank
+ *    the row. Fixed by switching both header rows from minHeight to a hard
+ *    height: 44, and giving the title/subtitle explicit lineHeight so their
+ *    natural stack genuinely fits under 44px instead of overflowing it.
+ *  - Title/subtitle sizes trimmed (22→19 / 13→12) as part of the same fix,
+ *    both to make the height math work and to better match the visual
+ *    weight of the 38px badge / 36px buttons beside them.
+ *  - StickyFavouritesHeader's background changed again, amber→blue→white
+ *    (var(--color-surface), globals.css) — the hero panel keeps its blue
+ *    tint from Phase 8; only the sticky/collapsed variant is now white.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -669,11 +688,16 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           <style> block); the badge hides (frees full width for the input,
           keeps the placeholder legible) and manage hides too, so only the
           search icon flips to ArrowLeft while the input is showing.
-          minHeight: 44 matches SearchBar's own compact height exactly, so
-          this row's height never changes between the two states — without
-          it, the title+subtitle stack and the SearchBar resolved to
-          different natural heights, shifting the tabs/list below on toggle. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44 }}>
+          height: 44 (not minHeight) is a hard lock matching SearchBar's own
+          compact height exactly. minHeight alone wasn't enough — the title/
+          subtitle text had no explicit lineHeight, so it rendered at the
+          font's default line-height (taller than 44px), while the search
+          state is pinned exactly at 44px; toggling between them still
+          visibly shrank the row. Title/subtitle sizes below are trimmed and
+          given explicit lineHeight so their natural stack actually fits
+          under 44px instead of overflowing it, and so their visual weight
+          better matches the 38px badge / 36px buttons beside them. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 44 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           {!isSearching && (
             <div style={{
@@ -704,18 +728,20 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
             : (
                 <div key="title" style={{ minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
                   <h1 style={{
-                    fontSize:      22,
+                    fontSize:      19,
+                    lineHeight:    1.15,
                     fontWeight:    700,
                     color:         'var(--color-text-primary)',
                     margin:        0,
-                    letterSpacing: '-0.3px',
+                    letterSpacing: '-0.2px',
                   }}>
                     Favourites
                   </h1>
                   <div style={{
-                    fontSize:  13,
-                    color:     'var(--color-text-tertiary)',
-                    marginTop: 2,
+                    fontSize:   12,
+                    lineHeight: 1.2,
+                    color:      'var(--color-text-tertiary)',
+                    marginTop:  1,
                   }}>
                     Your saved references
                   </div>
@@ -814,16 +840,15 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
             When isSearching, the title text is replaced in-place by the
             SearchBar (crossfade via key + favHeaderCrossfade); the badge
             hides and manage hides too, same treatment as the hero.
-            minHeight: 44 matches SearchBar's compact height so this row
-            never changes height between the two states (see Phase 8 note
-            on FavouritesHero for why). */}
+            height: 44 (not minHeight) hard-locks this row to SearchBar's
+            compact height, same reasoning as FavouritesHero above. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
           padding:        '14px var(--space-6) 0',
-          minHeight:      44,
+          height:         44,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
@@ -1120,12 +1145,9 @@ export default function FavouritesScreen() {
   return (
     <Layout>
 
-      {/* Sliding sticky header — appears once FavouritesHero scrolls out of
-          view. Suppressed entirely while isSearching (visible forced false)
-          so the header stays locked in place for the whole search, whatever
-          is technically driving the observer's signal underneath. */}
+      {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
-        visible={showStickyHeader && !isSearching}
+        visible={showStickyHeader}
         activeTab={activeTab}
         onSelectTab={switchTab}
         isManaging={isManaging}
