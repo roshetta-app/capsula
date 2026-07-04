@@ -685,3 +685,16 @@ body {
   background: #12100A;
   border-color: #6B6010;
 }
+
+/* ─── Favourites sticky header — solid, faintly-tinted amber ─────────────
+   Was a translucent rgba() amber (8% alpha), which let scrolled content
+   show through since this header is position: fixed. Swapped for a solid
+   color so nothing bleeds through, reusing the exact hex pair the app
+   already uses for its warning-card palette (.dir-card-warning) instead
+   of inventing a new dark-mode-unaware color. ───────────────────────── */
+.fav-sticky-header {
+  background: #FFFBEB;
+}
+.dark .fav-sticky-header {
+  background: #1C1400;
+}

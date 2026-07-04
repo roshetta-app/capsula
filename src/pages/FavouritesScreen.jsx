@@ -241,7 +241,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2 } from 'lucide-react'
+import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2, Search } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -538,7 +538,7 @@ function renderTabs(activeTab, onSelect, counts) {
     <div style={{ display: 'flex' }}>
       {FAVOURITES_TABS.map(tab => {
         const isActive = activeTab === tab.key
-        const fg = isActive ? FAV_ACCENT : 'var(--color-text-secondary)'
+        const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
         const count = counts ? counts[tab.key] : undefined
 
         return (
@@ -586,9 +586,9 @@ function renderTabs(activeTab, onSelect, counts) {
               display:         'block',
               height:          2,
               width:           '100%',
-              marginTop:       4,
+              marginTop:       3,
               borderRadius:    'var(--radius-full)',
-              backgroundColor: isActive ? FAV_ACCENT : 'transparent',
+              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               transition:      'background-color 0.15s ease',
             }} />
           </div>
@@ -611,12 +611,12 @@ function renderTabs(activeTab, onSelect, counts) {
 // in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
 // 8→6, subtitle marginBottom 6→5.
 
-function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton }) {
+function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton, isSearching, onToggleSearch }) {
   return (
     <div ref={heroRef} style={{
       backgroundColor: FAV_ACCENT_BG,
       borderRadius:    16,
-      padding:         '14px 14px 4px',
+      padding:         '14px 14px 14px',
       marginTop:       'var(--space-4)',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
@@ -658,16 +658,16 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton 
           </div>
         </div>
 
-        {showManageButton && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           <button
-            onClick={onToggleManage}
-            aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+            onClick={onToggleSearch}
+            aria-label={isSearching ? 'Close search' : 'Search favourites'}
             style={{
               width:                   36,
               height:                  36,
               borderRadius:            '50%',
               border:                  'none',
-              backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+              backgroundColor:         isSearching ? FAV_ACCENT : 'var(--color-surface)',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
@@ -677,11 +677,36 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton 
               outline:                 'none',
             }}
           >
-            {isManaging
+            {isSearching
               ? <X size={17} color="#fff" strokeWidth={2} />
-              : <ListChecks size={17} color="#412402" strokeWidth={1.8} />}
+              : <Search size={17} color="#412402" strokeWidth={1.8} />}
           </button>
-        )}
+
+          {showManageButton && (
+            <button
+              onClick={onToggleManage}
+              aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+              style={{
+                width:                   36,
+                height:                  36,
+                borderRadius:            '50%',
+                border:                  'none',
+                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                flexShrink:              0,
+                cursor:                  'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline:                 'none',
+              }}
+            >
+              {isManaging
+                ? <X size={17} color="#fff" strokeWidth={2} />
+                : <ListChecks size={17} color="#412402" strokeWidth={1.8} />}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -698,17 +723,17 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton 
 // header, not a cropped one. Still icon + title + tabs only — no subtitle,
 // no search, per spec.
 
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, onToggleManage, showManageButton, counts }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, onToggleManage, showManageButton, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
+      className="fav-sticky-header"
       style={{
         position:                'fixed',
         top:                     0,
         left:                    0,
         right:                   0,
         zIndex:                  50,
-        backgroundColor:         FAV_ACCENT_BG,
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
@@ -751,16 +776,16 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
             </div>
           </div>
 
-          {showManageButton && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button
-              onClick={onToggleManage}
-              aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+              onClick={onToggleSearch}
+              aria-label={isSearching ? 'Close search' : 'Search favourites'}
               style={{
                 width:                   28,
                 height:                  28,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                backgroundColor:         isSearching ? FAV_ACCENT : 'var(--color-surface)',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -770,19 +795,71 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 outline:                 'none',
               }}
             >
-              {isManaging
+              {isSearching
                 ? <X size={13} color="#fff" strokeWidth={2} />
-                : <ListChecks size={13} color="#412402" strokeWidth={1.8} />}
+                : <Search size={13} color="#412402" strokeWidth={1.8} />}
             </button>
-          )}
+
+            {showManageButton && (
+              <button
+                onClick={onToggleManage}
+                aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+                style={{
+                  width:                   28,
+                  height:                  28,
+                  borderRadius:            '50%',
+                  border:                  'none',
+                  backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                  display:                 'flex',
+                  alignItems:              'center',
+                  justifyContent:          'center',
+                  flexShrink:              0,
+                  cursor:                  'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  outline:                 'none',
+                }}
+              >
+                {isManaging
+                  ? <X size={13} color="#fff" strokeWidth={2} />
+                  : <ListChecks size={13} color="#412402" strokeWidth={1.8} />}
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Tabs — same content as the in-page row, kept in sync via renderTabs */}
+        {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
+            position: relative so the overlay search row (rendered from the
+            main FavouritesScreen body) can anchor flush beneath this tab
+            row when opened while the sticky header is active. */}
         <div style={{
+          position:  'relative',
           marginTop: 6,
           padding:   '0 var(--space-6) 10px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
+
+          {isSearching && (
+            <div style={{
+              position:        'absolute',
+              top:             '100%',
+              left:            'var(--space-6)',
+              right:           'var(--space-6)',
+              paddingTop:      8,
+              paddingBottom:   10,
+              backgroundColor: 'var(--color-surface)',
+              boxShadow:       '0 4px 12px rgba(0, 0, 0, 0.08)',
+              borderBottomLeftRadius:  12,
+              borderBottomRightRadius: 12,
+              zIndex:          1,
+            }}>
+              <SearchBar
+                value={searchValue}
+                onChange={onSearchChange}
+                placeholder={searchPlaceholder}
+                compact
+              />
+            </div>
+          )}
         </div>
 
       </div>
@@ -807,6 +884,19 @@ export default function FavouritesScreen() {
     setSnackMessage(message)
     setSnackVisible(true)
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
+  }
+
+  // ── Search overlay (icon-triggered, replaces the old always-visible bar) ──
+  // Opening scrolls to top ONCE so the overlay never hides cards it covers —
+  // it does not push content down, so anything already scrolled past the
+  // header would otherwise sit hidden underneath it.
+  const [isSearching, setIsSearching] = useState(false)
+
+  function toggleSearch() {
+    setIsSearching(prev => {
+      if (!prev) window.scrollTo({ top: 0, behavior: 'auto' })
+      return !prev
+    })
   }
 
   // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
@@ -969,6 +1059,11 @@ export default function FavouritesScreen() {
         onToggleManage={toggleManage}
         showManageButton={savedConditions.length > 0}
         counts={{ conditions: savedConditions.length, drugs: savedDrugs.length }}
+        isSearching={isSearching}
+        onToggleSearch={toggleSearch}
+        searchValue={heroSearchValue}
+        onSearchChange={heroSearchOnChange}
+        searchPlaceholder={heroSearchPlaceholder}
       />
 
       {/* Local keyframes for the tab-switch transition — same technique as
@@ -993,21 +1088,41 @@ export default function FavouritesScreen() {
           isManaging={isManaging}
           onToggleManage={toggleManage}
           showManageButton={savedConditions.length > 0}
+          isSearching={isSearching}
+          onToggleSearch={toggleSearch}
         />
 
-        {/* Tab bar — chooses which collection (Conditions/Drugs) is being browsed */}
-        <div style={{ marginBottom: 6 }}>
+        {/* Tab bar — chooses which collection (Conditions/Drugs) is being
+            browsed. position: relative so the overlay search row below can
+            anchor flush beneath it. The old always-visible SearchBar block
+            that used to sit here has been removed — search is now
+            icon-triggered from the header (see FavouritesHero/
+            StickyFavouritesHeader) and renders as this overlay instead. */}
+        <div style={{ position: 'relative', marginBottom: 8 }}>
           {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
-        </div>
 
-        {/* Search — filters only the currently selected collection */}
-        <div style={{ marginBottom: 10 }}>
-          <SearchBar
-            value={heroSearchValue}
-            onChange={heroSearchOnChange}
-            placeholder={heroSearchPlaceholder}
-            compact
-          />
+          {isSearching && (
+            <div style={{
+              position:        'absolute',
+              top:             '100%',
+              left:            0,
+              right:           0,
+              paddingTop:      8,
+              paddingBottom:   10,
+              backgroundColor: 'var(--color-surface)',
+              boxShadow:       '0 4px 12px rgba(0, 0, 0, 0.08)',
+              borderBottomLeftRadius:  12,
+              borderBottomRightRadius: 12,
+              zIndex:          1,
+            }}>
+              <SearchBar
+                value={heroSearchValue}
+                onChange={heroSearchOnChange}
+                placeholder={heroSearchPlaceholder}
+                compact
+              />
+            </div>
+          )}
         </div>
 
         {/* Swipeable content area — tap OR swipe switches tabs, mirroring
@@ -1041,9 +1156,18 @@ export default function FavouritesScreen() {
                         }
                         trailing={
                           isManaging
-                            ? (selectedIds.has(condition.id)
-                                ? <CheckCircle2 size={20} color="#fff" fill={FAV_ACCENT} strokeWidth={2} />
-                                : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />)
+                            ? (
+                                <span style={{
+                                  padding:        '14px 8px',   // matches RowStarButton's footprint
+                                  display:        'flex',       // so row height stays constant across modes
+                                  alignItems:     'center',
+                                  justifyContent: 'center',
+                                }}>
+                                  {selectedIds.has(condition.id)
+                                    ? <CheckCircle2 size={20} color="#fff" fill={FAV_ACCENT} strokeWidth={2} />
+                                    : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />}
+                                </span>
+                              )
                             : (
                                 <RowStarButton
                                   onPress={() => setConfirmingCondition(condition)}
