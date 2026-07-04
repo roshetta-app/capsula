@@ -85,11 +85,11 @@
 
   /* Hero panel — ConditionsScreen two-tone redesign. Deliberately distinct
      from both --color-surface (too close to --color-bg to read as a
-     separate zone) and --color-bg itself. Warm neutral greige, matching
-     the undertone of --color-border-subtle/--color-note-bg — a cool
-     blue-grey was tried first (#EEF1F5) and read as a mismatched foreign
-     color against this palette's warm tokens, so this stays in-family. */
-  --color-hero-bg:          #F3F1EC;
+     separate zone) and --color-bg itself. Barely tints away from white —
+     two earlier attempts (#EEF1F5 cool blue-grey, #F3F1EC warm greige)
+     both read as a dull/muddy color choice; this leans on the curve radius
+     and lift shadow to do the separating instead of a strong color jump. */
+  --color-hero-bg:          #FCFAF7;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;

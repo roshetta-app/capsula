@@ -27,6 +27,16 @@
  *             --color-border-subtle/--color-note-bg. Content panel gained
  *             paddingTop — the sort row previously sat flush against the
  *             curve with no buffer.
+ * Phase 18 — Feedback pass on Phase 17: warm greige (#F3F1EC) still read as
+ *             a dull/muddy color choice. Settled on a crisper near-white
+ *             (#FCFAF7, in globals.css) after visualizing three options
+ *             side by side — this one leans on the curve radius and lift
+ *             shadow to read as a separate zone rather than a strong color
+ *             jump. Also fixed a spacing bug: the specialty selector's
+ *             wrapper still carried its own 20px marginBottom on top of the
+ *             hero's 24px paddingBottom, double-stacking into a 44px gap —
+ *             removed the wrapper's margin so paddingBottom (now 12px) is
+ *             the single source of that spacing.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -728,24 +738,22 @@ export default function ConditionsScreen() {
 
       {/* ─── Hero panel ───────────────────────────────────────────────────────
           var(--color-hero-bg) — a dedicated tint distinct from both
-          --color-surface and --color-bg (those two sit only ~1% apart in
-          lightness, which made the seam with the content panel below
-          invisible in light mode). Bled edge-to-edge past Layout's <main>
-          side padding (negative margin equal to that padding, restored as
-          this panel's own padding for its children). Contains everything
-          above the sort row: brand row, search, recently-viewed, specialty
-          selector. paddingBottom adds explicit breathing room below the
-          selector — previously the hero ended right at the selector's own
-          20px margin, with the content panel's curve immediately eating
-          into that, so there was no visible hero color left below the
-          selector before the overlap started. */}
+          --color-surface and --color-bg. Bled edge-to-edge past Layout's
+          <main> side padding (negative margin equal to that padding,
+          restored as this panel's own padding for its children). Contains
+          everything above the sort row: brand row, search, recently-viewed,
+          specialty selector. paddingBottom is the single source of bottom
+          spacing before the curve — the selector's own wrapper previously
+          also carried a 20px marginBottom, double-stacking with this
+          padding into a 44px gap that read as too roomy; removed so there's
+          one deliberate 12px gap instead. */}
       <div style={{
         backgroundColor: 'var(--color-hero-bg)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
-        paddingBottom:   'var(--space-6)',
+        paddingBottom:   'var(--space-3)',
       }}>
 
         {/* 1. Brand row + tagline + dark mode toggle */}
@@ -772,7 +780,7 @@ export default function ConditionsScreen() {
         />
 
         {/* 4. Full-width specialty selector — same width as search bar */}
-        <div style={{ marginBottom: 'var(--space-5)' }}>
+        <div>
           <SpecialtySelector
             activeSpecialtyObj={activeSpecialtyObj}
             onOpen={() => setBottomSheetOpen(true)}
