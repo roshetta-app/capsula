@@ -1578,10 +1578,27 @@ export default function FavouritesScreen() {
 
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
+  // Bulk removal (manage mode) — mirrors the single-item removal paths'
+  // undo shape: capture each id's original index in favourites.conditions
+  // before removing any of them, then Undo restores every id at its
+  // original index. Order matters here: indices are captured against the
+  // pre-removal array, so restoring must happen lowest-index-first — each
+  // restoreConditionAt splices into the array as it stands after the prior
+  // restores in this same batch, and only ascending order reconstructs the
+  // original array correctly (a descending or unsorted order would insert
+  // into positions that have already shifted from earlier restores).
   function handleConfirmBulkRemove() {
     const ids = Array.from(selectedIds)
+    const restoreEntries = ids
+      .map(id => ({ id, index: favourites.conditions.indexOf(id) }))
+      .sort((a, b) => a.index - b.index)
     ids.forEach(id => toggleCondition(id))
-    showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`)
+    showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`, {
+      label: 'Undo',
+      onAction: () => {
+        restoreEntries.forEach(({ id, index }) => restoreConditionAt(id, index))
+      },
+    })
     toggleManage()
   }
 
