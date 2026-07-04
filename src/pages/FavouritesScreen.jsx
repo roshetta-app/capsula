@@ -1062,10 +1062,7 @@ function renderTabs(activeTab, onSelect, counts) {
 function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenManager, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
-      // Turns blue while searching (per request) — search-toggle button
-      // and the search bar itself invert to white for contrast against
-      // this background (see below).
-      backgroundColor: isSearching ? 'var(--color-accent)' : 'var(--color-surface)',
+      backgroundColor: 'var(--color-surface)',
       borderRadius:    16,
       padding:         '14px 14px 14px',
       marginTop:       'var(--space-4)',
@@ -1075,7 +1072,6 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
       // drop shadow. Offset/opacity trimmed further (8px→4px, 0.06→0.045)
       // so the card still lifts off the page without reading as heavy.
       boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
-      transition:      'background-color 0.2s ease',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
@@ -1116,7 +1112,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
             ? (
                 <div
                   key="search"
-                  className="fav-search-micro fav-search-on-blue"
+                  className="fav-search-micro"
                   style={{
                     flex:            1,
                     minWidth:        0,
@@ -1166,11 +1162,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
               height:                  isSearching ? 40 : 36,
               borderRadius:            '50%',
               border:                  'none',
-              // Was blue-bg/white-icon in both states here — now that the
-              // header itself turns blue while searching, this flips to
-              // white-bg/blue-icon instead, or it would disappear into the
-              // background.
-              backgroundColor:         isSearching ? '#fff' : 'transparent',
+              backgroundColor:         isSearching ? 'var(--color-accent)' : 'transparent',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
@@ -1182,7 +1174,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
             }}
           >
             {isSearching
-              ? <ArrowLeft size={17} color="var(--color-accent)" strokeWidth={2} />
+              ? <ArrowLeft size={17} color="#fff" strokeWidth={2} />
               : <Search size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
           </button>
 
@@ -1293,12 +1285,6 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
           height:         44,
           boxSizing:      'border-box',
           marginTop:      5,
-          // Per request: only this top row turns blue while searching —
-          // the tabs row below is untouched. Row sits at the very top of
-          // the panel (square corners here; rounding is bottom-only on
-          // the outer panel), so a solid fill needs no extra radius work.
-          backgroundColor: isSearching ? 'var(--color-accent)' : 'transparent',
-          transition:      'background-color 0.2s ease',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
@@ -1319,7 +1305,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
               ? (
                   <div
                     key="search"
-                    className="fav-search-micro fav-search-on-blue fav-sticky-search-height"
+                    className="fav-search-micro fav-sticky-search-height"
                     style={{
                       flex:            1,
                       minWidth:        0,
@@ -1362,10 +1348,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
                 height:                  isSearching ? 36 : 32,
                 borderRadius:            '50%',
                 border:                  'none',
-                // Was blue-bg/white-icon in both states here — now that
-                // the row itself turns blue while searching, this flips
-                // to white-bg/blue-icon instead, matching the hero.
-                backgroundColor:         isSearching ? '#fff' : 'var(--color-surface)',
+                backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-surface)',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -1377,7 +1360,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
               }}
             >
               {isSearching
-                ? <ArrowLeft size={17} color="var(--color-accent)" strokeWidth={2.2} />
+                ? <ArrowLeft size={17} color="#fff" strokeWidth={2.2} />
                 : <Search size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
             </button>
 
@@ -1763,21 +1746,6 @@ export default function FavouritesScreen() {
         }
         .fav-sticky-search-height input {
           height: 36px !important;
-        }
-        /* Both headers turn blue while searching (see FavouritesHero /
-           StickyFavouritesHeader) — this forces the input itself to a
-           solid white regardless of light/dark mode, since SearchBar's
-           own background (var(--color-surface)) would otherwise render
-           dark in dark mode and disappear against the blue. !important
-           needed because SearchBar.jsx's border-color is also set
-           imperatively on focus/blur (inline style, not a class) — a
-           plain rule here would lose to that on focus without it. */
-        .fav-search-on-blue input {
-          background-color: #fff !important;
-          border-color: rgba(255, 255, 255, 0.5) !important;
-        }
-        .fav-search-on-blue input:focus {
-          border-color: #fff !important;
         }
       `}</style>
 
