@@ -11,6 +11,16 @@
  * Phase 14 — StickyLogoHeader specialty pill redesign: merged single pill mirrors
  *             SpecialtySelector pattern — ListFilter icon (idle) or specialty icon
  *             (active) + name + chevron + inline ✕ to clear without opening sheet.
+ * Phase 16 — Hero/content seam fix: the hero panel's white background
+ *             (var(--color-surface)) sat only ~1% apart in lightness from
+ *             the content panel's background (var(--color-bg)), so the
+ *             rounded overlap between them was invisible in light mode.
+ *             Hero now uses a dedicated var(--color-hero-bg) tint. Content
+ *             panel's curve radius bumped 16px → 24px (locally scoped, not
+ *             the shared --radius-lg token) with a lifted box-shadow added
+ *             above it, so the seam reads via elevation as well as color.
+ *             Hero panel also gained paddingBottom so its color visibly
+ *             extends past the specialty selector before the curve begins.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -711,18 +721,25 @@ export default function ConditionsScreen() {
       />
 
       {/* ─── Hero panel ───────────────────────────────────────────────────────
-          White (var(--color-surface)) background, bled edge-to-edge past
-          Layout's <main> side padding (negative margin equal to that
-          padding, restored as this panel's own padding for its children) —
-          previously these sections just sat directly on the page background
-          with no visual grouping. Contains everything above the sort row:
-          brand row, search, recently-viewed, specialty selector. */}
+          var(--color-hero-bg) — a dedicated tint distinct from both
+          --color-surface and --color-bg (those two sit only ~1% apart in
+          lightness, which made the seam with the content panel below
+          invisible in light mode). Bled edge-to-edge past Layout's <main>
+          side padding (negative margin equal to that padding, restored as
+          this panel's own padding for its children). Contains everything
+          above the sort row: brand row, search, recently-viewed, specialty
+          selector. paddingBottom adds explicit breathing room below the
+          selector — previously the hero ended right at the selector's own
+          20px margin, with the content panel's curve immediately eating
+          into that, so there was no visible hero color left below the
+          selector before the overlap started. */}
       <div style={{
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: 'var(--color-hero-bg)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
+        paddingBottom:   'var(--space-6)',
       }}>
 
         {/* 1. Brand row + tagline + dark mode toggle */}
@@ -763,18 +780,27 @@ export default function ConditionsScreen() {
           Same page background as before (var(--color-bg)) — visually
           unchanged from the rest of the page — but pulled up over the hero
           panel's bottom edge by exactly its own corner radius, so the
-          rounded top corners cut a visible curve into the white hero above
+          rounded top corners cut a visible curve into the hero above
           instead of sitting flush against it. Same edge-to-edge bleed as
-          the hero panel, for the same reason. */}
+          the hero panel, for the same reason.
+          Radius bumped from --radius-lg (16px) to a locally-scoped 24px —
+          intentionally NOT changed via the shared --radius-lg token, since
+          that's used elsewhere in this file and across the app; this curve
+          needed more visual weight than the token's other use cases.
+          boxShadow added above the panel (negative y-offset) so the curve
+          reads as a lifted edge via elevation, not color contrast alone —
+          the reference image's actual cue was a card shadow, not just a
+          color jump. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  'var(--radius-lg)',
-        borderTopRightRadius: 'var(--radius-lg)',
-        marginTop:       'calc(var(--radius-lg) * -1)',
+        borderTopLeftRadius:  '24px',
+        borderTopRightRadius: '24px',
+        marginTop:       '-24px',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
+        boxShadow:       '0 -6px 16px rgba(0, 0, 0, 0.06)',
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
@@ -815,5 +841,3 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
-
-
