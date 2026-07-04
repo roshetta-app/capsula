@@ -789,7 +789,7 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
 // from SpecialtyEmptyState above: this renders whenever the filter is on,
 // regardless of whether it happens to match zero, one, or many conditions.
 
-function SpecialtyFilterBanner({ specialty, count, onClear }) {
+function SpecialtyFilterBanner({ specialty, count, onOpenSpecialties, onClear }) {
   const isDark = useIsDark()
   if (!specialty) return null
 
@@ -831,26 +831,55 @@ function SpecialtyFilterBanner({ specialty, count, onClear }) {
           · {count} {count === 1 ? 'result' : 'results'}
         </span>
       </div>
-      <button
-        onClick={onClear}
-        aria-label="Clear specialty filter"
-        style={{
-          display:                 'flex',
-          alignItems:              'center',
-          justifyContent:          'center',
-          flexShrink:              0,
-          width:                   22,
-          height:                  22,
-          borderRadius:            '50%',
-          border:                  'none',
-          background:              'none',
-          cursor:                  'pointer',
-          outline:                 'none',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <X size={13} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        <button
+          onClick={onOpenSpecialties}
+          aria-label="Change specialty filter"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            flexShrink:              0,
+            width:                   22,
+            height:                  22,
+            borderRadius:            '50%',
+            border:                  'none',
+            background:              'none',
+            cursor:                  'pointer',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {/* Same drill-in chevron FavouritesManagerSheet uses for its own
+              specialty row (rotated to point right), so this reads as the
+              same "opens the specialty picker" affordance in both places. */}
+          <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+            style={{ color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+            <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
+              strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <button
+          onClick={onClear}
+          aria-label="Clear specialty filter"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            flexShrink:              0,
+            width:                   22,
+            height:                  22,
+            borderRadius:            '50%',
+            border:                  'none',
+            background:              'none',
+            cursor:                  'pointer',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <X size={13} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
+        </button>
+      </div>
     </div>
   )
 }
@@ -1733,6 +1762,7 @@ export default function FavouritesScreen() {
                   <SpecialtyFilterBanner
                     specialty={activeSpecialtyObj}
                     count={conditionResults.length}
+                    onOpenSpecialties={() => setShowSpecialtySheet(true)}
                     onClear={() => setActiveSpecialty('all')}
                   />
                 )}
