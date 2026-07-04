@@ -86,8 +86,11 @@ export default function BottomNav() {
     // Favourites gets its own red identity color + fills when active,
     // matching the heart used elsewhere for favourited state (title badge,
     // condition-card row icon, detail-screen toggle) — Conditions/Drugs
-    // keep the shared blue accent and stay outline-only.
-    { path: '/favourites', label: 'Favourites', Icon: Heart, activeColor: 'var(--color-danger)', fillWhenActive: true },
+    // keep the shared blue accent and stay outline-only. Uses the
+    // dedicated var(--color-favourite) token (globals.css), not the
+    // shared destructive-action var(--color-danger) — favouriting isn't
+    // a warning, so it shouldn't be tied to the alarm-red used elsewhere.
+    { path: '/favourites', label: 'Favourites', Icon: Heart, activeColor: 'var(--color-favourite)', fillWhenActive: true },
   ]
 
   return (

@@ -461,7 +461,11 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  color: isFav ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
+                  // Uses the dedicated var(--color-favourite) token
+                  // (globals.css), not the shared destructive-action
+                  // var(--color-danger) — favouriting isn't a warning, so
+                  // it shouldn't be tied to the alarm-red used elsewhere.
+                  color: isFav ? 'var(--color-favourite)' : 'var(--color-text-tertiary)',
                   transition: 'color 0.15s ease',
                   WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}

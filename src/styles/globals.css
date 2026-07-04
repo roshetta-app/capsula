@@ -48,6 +48,11 @@
   --color-success:       #059669;
   --color-success-light: #D1FAE5;
 
+  /* Favourites — separate from danger. Favouriting isn't a warning, so it
+     no longer aliases the destructive-action red; this is its own tone. */
+  --color-favourite:       #FF375F;
+  --color-favourite-light: #FFE4E9;
+
   /* Text — light */
   --color-ink:           #1A1916;
   --color-ink-muted:     #6B7280;
@@ -93,6 +98,11 @@
   --color-warning-light:    #FEF3C7;
   --color-success:          #059669;
   --color-success-light:    #D1FAE5;
+
+  /* Favourites — separate from danger. Favouriting isn't a warning, so it
+     no longer aliases the destructive-action red; this is its own tone. */
+  --color-favourite:        #FF375F;
+  --color-favourite-light:  #FFE4E9;
 
   --color-instock:          #16A34A;
   --color-instock-bg:       #F0FDF4;
@@ -158,6 +168,12 @@
   --color-warning-light:    #451A03;
   --color-success:          #34D399;
   --color-success-light:    #064E3B;
+
+  /* Favourites — separate from danger. Favouriting isn't a warning, so it
+     no longer aliases the destructive-action red; this is its own tone.
+     Lightened for dark-background contrast, same treatment as danger above. */
+  --color-favourite:        #FF6B8A;
+  --color-favourite-light:  #450A17;
 
   --color-instock:          #34D399;
   --color-instock-bg:       #064E3B;

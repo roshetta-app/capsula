@@ -460,12 +460,16 @@ import { useSortToggle } from '../hooks/useSortToggle'
 // destructive-action red (e.g. the Remove button below) — decoupled here:
 // favouriting is an affectionate/positive action, not a warning, so it
 // shouldn't dilute or be tied to the alarm-red used for destructive UI.
-// Literal hex (not a shared token) closer to Apple Health's heart-rate
-// pink-red, softer/warmer than the iOS system alarm-red. Not
-// var(--color-accent) — that's the app's blue, used throughout Home/
-// ConditionDetail for unrelated things. Remove/destructive buttons below
-// still reference var(--color-danger) directly and are unaffected.
-const FAV_ACCENT = '#FF375F'
+// Now a real global token (var(--color-favourite), defined in
+// globals.css next to --color-danger, with its own dark-mode variant) so
+// BottomNav's Favourites tab and ConditionDetailScreen's heart toggle can
+// share the exact same color instead of each hardcoding their own hex.
+// Closer to Apple Health's heart-rate pink-red, softer/warmer than the iOS
+// system alarm-red. Not var(--color-accent) — that's the app's blue, used
+// throughout Home/ConditionDetail for unrelated things. Remove/destructive
+// buttons below still reference var(--color-danger) directly and are
+// unaffected.
+const FAV_ACCENT = 'var(--color-favourite)'
 
 // Sort labels for this screen's own useSortToggle instance (separate
 // storage key from ConditionsScreen — see Phase 14 note below). 'recent'
@@ -662,11 +666,10 @@ function NothingSavedEmptyState({ label }) {
         height:          64,
         borderRadius:    '50%',
         // Light red tint mirroring the role var(--color-accent-light) used
-        // to play here — no var(--color-danger-light) token exists to reuse,
-        // so this is a literal soft-red hex (Tailwind red-100) paired with
-        // FAV_ACCENT below, matching the heart identity elsewhere on this
-        // screen rather than the old blue.
-        backgroundColor: '#FEE2E2',
+        // to play here — now var(--color-favourite-light), the dedicated
+        // tint paired with FAV_ACCENT above, matching the heart identity
+        // elsewhere on this screen rather than the old blue.
+        backgroundColor: 'var(--color-favourite-light)',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
@@ -1736,7 +1739,7 @@ export default function FavouritesScreen() {
              filled variant). The rule below re-scopes the clear-text (X)
              button's icon back to its original neutral color, since this
              selector would otherwise catch it too. */
-          color: #FF375F !important;
+          color: var(--color-favourite) !important;
         }
         .fav-search-micro button svg {
           color: var(--color-text-tertiary) !important;
