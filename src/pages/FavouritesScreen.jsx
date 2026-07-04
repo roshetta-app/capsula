@@ -455,13 +455,17 @@ import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 
-// Favourites' own identity color for the heart badge/star icon — was amber
-// ('#F59E0B') until this pass, now reuses var(--color-danger) so "favourited
-// = red heart" maps onto the same red the app already uses elsewhere
-// (e.g. the Remove button below), rather than introducing a new hex. Not
+// Favourites' own identity color for the heart badge/star icon. Previously
+// aliased var(--color-danger) so "favourited = red heart" shared the exact
+// destructive-action red (e.g. the Remove button below) — decoupled here:
+// favouriting is an affectionate/positive action, not a warning, so it
+// shouldn't dilute or be tied to the alarm-red used for destructive UI.
+// Literal hex (not a shared token) closer to Apple Health's heart-rate
+// pink-red, softer/warmer than the iOS system alarm-red. Not
 // var(--color-accent) — that's the app's blue, used throughout Home/
-// ConditionDetail for unrelated things.
-const FAV_ACCENT = 'var(--color-danger)'
+// ConditionDetail for unrelated things. Remove/destructive buttons below
+// still reference var(--color-danger) directly and are unaffected.
+const FAV_ACCENT = '#FF375F'
 
 // Sort labels for this screen's own useSortToggle instance (separate
 // storage key from ConditionsScreen — see Phase 14 note below). 'recent'
@@ -660,14 +664,14 @@ function NothingSavedEmptyState({ label }) {
         // Light red tint mirroring the role var(--color-accent-light) used
         // to play here — no var(--color-danger-light) token exists to reuse,
         // so this is a literal soft-red hex (Tailwind red-100) paired with
-        // var(--color-danger) below, matching the heart identity elsewhere
-        // on this screen rather than the old blue.
+        // FAV_ACCENT below, matching the heart identity elsewhere on this
+        // screen rather than the old blue.
         backgroundColor: '#FEE2E2',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
       }}>
-        <Heart size={28} strokeWidth={1.5} style={{ color: 'var(--color-danger)' }} />
+        <Heart size={28} strokeWidth={1.5} style={{ color: FAV_ACCENT }} />
       </div>
 
       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
@@ -800,16 +804,29 @@ function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, on
   const { bg, fg } = resolveToken(tokenKey, isDark)
 
   return (
-    <div style={{
-      display:         'flex',
-      alignItems:      'center',
-      justifyContent:  'space-between',
-      gap:             10,
-      padding:         '8px 10px',
-      marginBottom:    10,
-      backgroundColor: tintedBg(bg, isDark),
-      borderRadius:    'var(--radius-md)',
-    }}>
+    <div
+      onClick={onOpenSpecialties}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onOpenSpecialties()
+        }
+      }}
+      aria-label="Change specialty filter"
+      style={{
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'space-between',
+        gap:             10,
+        padding:         '8px 10px',
+        marginBottom:    10,
+        backgroundColor: tintedBg(bg, isDark),
+        borderRadius:    'var(--radius-md)',
+        cursor:          'pointer',
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <SpecialtyIcon
           iconType={specialty.iconType   ?? 'lucide'}
@@ -832,29 +849,24 @@ function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, on
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-        <button
-          onClick={onOpenSpecialties}
-          aria-label="Change specialty filter"
+        {/* Now purely a visual indicator — the whole row (outer div above)
+            is the actual tap target that opens the specialty selector.
+            Unrotated, this path is a down-pointing chevron — that's the
+            idle state (matches the standard "opens a picker" affordance).
+            Flips to point up while SpecialtiesBottomSheet is actually
+            open, rather than staying rotated -90° to always point right
+            like FavouritesManagerSheet's own (non-toggling) drill-in row. */}
+        <span
+          aria-hidden="true"
           style={{
-            display:                 'flex',
-            alignItems:              'center',
-            justifyContent:          'center',
-            flexShrink:              0,
-            width:                   22,
-            height:                  22,
-            borderRadius:            '50%',
-            border:                  'none',
-            background:              'none',
-            cursor:                  'pointer',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'center',
+            flexShrink:     0,
+            width:          22,
+            height:         22,
           }}
         >
-          {/* Unrotated, this path is a down-pointing chevron — that's the
-              idle state (matches the standard "opens a picker" affordance).
-              Flips to point up while SpecialtiesBottomSheet is actually
-              open, rather than staying rotated -90° to always point right
-              like FavouritesManagerSheet's own (non-toggling) drill-in row. */}
           <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
             style={{
               color:      'var(--color-text-tertiary)',
@@ -864,9 +876,16 @@ function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, on
             <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </button>
+        </span>
         <button
-          onClick={onClear}
+          onClick={(e) => {
+            // Row above also has onClick={onOpenSpecialties} — without
+            // stopping propagation here, clearing the filter would
+            // immediately re-open the specialty selector via the bubbled
+            // click, which defeats the point of a dedicated clear button.
+            e.stopPropagation()
+            onClear()
+          }}
           aria-label="Clear specialty filter"
           style={{
             display:                 'flex',
@@ -1711,13 +1730,13 @@ export default function FavouritesScreen() {
           width: 14px !important;
           height: 14px !important;
           /* Leading icon (the Heart, via SearchBar's 'icon' prop) recolored
-             red, filled (Lucide's default fill:none is untouched by the
-             color property, so this only changes the stroke — see the
-             Heart's own fill prop usage elsewhere for the filled variant).
-             The rule below re-scopes the clear-text (X) button's icon back
-             to its original neutral color, since this selector would
-             otherwise catch it too. */
-          color: var(--color-danger) !important;
+             to the favourites accent, filled (Lucide's default fill:none is
+             untouched by the color property, so this only changes the
+             stroke — see the Heart's own fill prop usage elsewhere for the
+             filled variant). The rule below re-scopes the clear-text (X)
+             button's icon back to its original neutral color, since this
+             selector would otherwise catch it too. */
+          color: #FF375F !important;
         }
         .fav-search-micro button svg {
           color: var(--color-text-tertiary) !important;
