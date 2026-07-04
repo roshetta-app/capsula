@@ -376,6 +376,37 @@
  *    var(--color-text-primary), strokeWidth 2→2.2 — bigger and higher
  *    contrast, per feedback that they read as too faint. Idle button
  *    circle sizes (32px) are unchanged; only the icon inside grew.
+ *
+ * Phase 13 — spacing redistribution, shadow, and manage-mode color pass:
+ *  - StickyFavouritesHeader: added marginTop:5 above the title row for
+ *    breathing room under the panel's top edge, funded by removing it
+ *    elsewhere rather than growing the panel — tabs-wrapper marginTop 3→0
+ *    and its bottom padding 5→3 (net -5), so total sticky-header height is
+ *    unchanged. The title row's own height:44/boxSizing:border-box content
+ *    math from Phase 12 is untouched.
+ *  - renderTabs underline: marginTop 3→2, tightening the label-to-indicator
+ *    gap in both headers (shared function). This breaks the previous
+ *    explicit pixel-parity with ConditionDetailScreen's DetailHeader
+ *    underline — that file wasn't in this task's context, so it's now out
+ *    of sync until updated to match, if still desired.
+ *  - FavouritesHero card shadow: 0 1px 2px rgba(0,0,0,0.04) → 0 8px 24px
+ *    rgba(0, 0, 0, 0.08) — a softer, more diffused blur with more visual
+ *    weight, so the card reads as lifted off the page background rather
+ *    than nearly flush with it.
+ *  - Manage mode recolored amber → blue for its interactive controls:
+ *    both headers' manage-button active background (FAV_ACCENT → var(
+ *    --color-accent)), and the row checkbox's checked-state fill (FAV_ACCENT
+ *    → var(--color-accent)). The Star identity badge stays amber — FAV_ACCENT
+ *    remains this screen's identity color, this pass only touches manage
+ *    mode's own interactive color.
+ *  - Row checkbox height fix: the trailing checkbox's padding (14px top/
+ *    bottom) was a copy of RowStarButton's padding, but paired with a
+ *    bigger icon (20px vs the star's 13px) — so despite the comment saying
+ *    it "matches RowStarButton's footprint," it actually rendered 7px
+ *    taller (48px vs 41px), which is what visibly changed the condition
+ *    card's row height when manage mode toggled on. Fixed by recalculating
+ *    the padding for the checkbox's actual icon size (10.5px, not 14px) so
+ *    both controls render at the same 41px total footprint.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -726,14 +757,18 @@ function renderTabs(activeTab, onSelect, counts) {
             </button>
             {/* Underline — full width of this 50% cell, exactly matching the
                 active tab's rendered width; rounded ends; visible only
-                beneath the active tab. Spec kept in lockstep with
-                ConditionDetailScreen's DetailHeader underline — required to
-                be pixel-identical, so any change here must be mirrored there. */}
+                beneath the active tab. marginTop trimmed 3→2 per request to
+                tighten the label-to-indicator gap in both headers (shared
+                via this one function). NOTE: this spec was previously kept
+                pixel-identical to ConditionDetailScreen's DetailHeader
+                underline by explicit prior decision — that file wasn't part
+                of this task's context, so it's now out of sync with this
+                2px value until/unless it's updated to match. */}
             <span style={{
               display:         'block',
               height:          2,
               width:           '100%',
-              marginTop:       3,
+              marginTop:       2,
               borderRadius:    'var(--radius-full)',
               backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
               transition:      'background-color 0.15s ease',
@@ -774,7 +809,11 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
       borderRadius:    16,
       padding:         '14px 14px 14px',
       marginTop:       'var(--space-4)',
-      boxShadow:       '0 1px 2px rgba(0,0,0,0.04)',
+      // Diffused, soft-blur shadow — previous 0 1px 2px hairline read as
+      // nearly flush with the page background and needed more definition.
+      // Larger blur radius + low spread keeps it soft rather than a hard
+      // drop shadow.
+      boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.08)',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
@@ -890,7 +929,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
                 height:                  36,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isManaging ? FAV_ACCENT : 'transparent',
+                backgroundColor:         isManaging ? 'var(--color-accent)' : 'transparent',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -977,6 +1016,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
           padding:        '8px var(--space-6) 0',
           height:         44,
           boxSizing:      'border-box',
+          marginTop:      5,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
@@ -1065,7 +1105,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                   height:                  32,
                   borderRadius:            '50%',
                   border:                  'none',
-                  backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                  backgroundColor:         isManaging ? 'var(--color-accent)' : 'var(--color-surface)',
                   display:                 'flex',
                   alignItems:              'center',
                   justifyContent:          'center',
@@ -1086,16 +1126,18 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
             No longer needs position: relative — the search input now swaps
             in-place with the title above instead of overlaying below the
-            tabs. Margin/padding trimmed further (6→3 / 9→5) alongside the
-            title row's border-box fix above, closing the remaining gap
-            toward ConditionsScreen's StickyLogoHeader height. The 50px tab
-            button height itself (inside renderTabs) is untouched — it's
-            intentionally kept pixel-identical to ConditionDetailScreen's
-            DetailHeader tabs (see renderTabs comment), so the only levers
-            left here are the wrapper's own margin/padding. */}
+            tabs. Spacing redistributed (not just trimmed) per request to add
+            breathing room above the title row without growing the panel:
+            marginTop 3→0 and bottom padding 5→3 here exactly offset the
+            +5px marginTop added to the title row above, so total sticky-
+            header height is unchanged. The 50px tab button height itself
+            (inside renderTabs) is untouched — it's intentionally kept
+            pixel-identical to ConditionDetailScreen's DetailHeader tabs (see
+            renderTabs comment), so the wrapper's own margin/padding are the
+            only levers available here. */}
         <div style={{
-          marginTop: 3,
-          padding:   '0 var(--space-6) 5px',
+          marginTop: 0,
+          padding:   '0 var(--space-6) 3px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
         </div>
@@ -1403,13 +1445,23 @@ export default function FavouritesScreen() {
                           isManaging
                             ? (
                                 <span style={{
-                                  padding:        '14px 8px',   // matches RowStarButton's footprint
+                                  // RowStarButton's total footprint is
+                                  // 13px icon + 14px padding top/bottom = 41px.
+                                  // This checkbox's icon is bigger (20px), so
+                                  // matching that same 41px total requires
+                                  // less padding here (10.5px, not 14px) —
+                                  // the previous 14px padding + 20px icon
+                                  // actually rendered at 48px, 7px taller,
+                                  // which is what was visibly changing the
+                                  // card row's height when manage mode
+                                  // toggled on.
+                                  padding:        '10.5px 8px',
                                   display:        'flex',       // so row height stays constant across modes
                                   alignItems:     'center',
                                   justifyContent: 'center',
                                 }}>
                                   {selectedIds.has(condition.id)
-                                    ? <CheckCircle2 size={20} color="#fff" fill={FAV_ACCENT} strokeWidth={2} />
+                                    ? <CheckCircle2 size={20} color="#fff" fill="var(--color-accent)" strokeWidth={2} />
                                     : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />}
                                 </span>
                               )
