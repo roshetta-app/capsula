@@ -9,6 +9,12 @@
  *             (ConditionsScreen, DrugsScreen) renders unchanged. Filter button
  *             sizing follows the same height for visual consistency if it's
  *             ever paired with compact elsewhere.
+ * Phase 8  — optional `icon` prop added (used by FavouritesScreen to show a
+ *             Star instead of the generic magnifying glass, reading as
+ *             "search favourites" rather than a generic search). Defaults to
+ *             the existing Search glyph, so every other call site is
+ *             unaffected. The built-in clear-text button (X, shown only when
+ *             value is non-empty) is unrelated to this and unchanged.
  *
  * Props:
  *   value            string
@@ -17,6 +23,7 @@
  *   onFilter         () => void | undefined  — if provided, shows filter icon
  *   hasActiveFilters boolean                 — highlights filter icon when true
  *   compact          boolean                 — slightly shorter variant (44px vs 46px)
+ *   icon             Component               — icon rendered at the input's left edge, defaults to Search
  */
 
 import { forwardRef }                    from 'react'
@@ -29,6 +36,7 @@ const SearchBar = forwardRef(function SearchBar({
   onFilter,
   hasActiveFilters = false,
   compact = false,
+  icon: Icon = Search,
 }, ref) {
   const height = compact ? 44 : 46
 
@@ -39,7 +47,7 @@ const SearchBar = forwardRef(function SearchBar({
       alignItems: 'center',
     }}>
       <div style={{ flex: 1, position: 'relative' }}>
-        <Search
+        <Icon
           size={16}
           style={{
             position:      'absolute',

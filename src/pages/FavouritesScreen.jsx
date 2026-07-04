@@ -237,11 +237,47 @@
  *    visible in manage mode even though tapping now selects instead of
  *    navigating. Removing it would mean editing ConditionCard.jsx's
  *    fixed markup, which was kept out of scope for this pass.
+ *
+ * Phase 7 — search redesign: icon-triggered, in-place header swap. The
+ *  search input no longer overlays below the tabs; it swaps directly into
+ *  the title/subtitle's own slot inside FavouritesHero/StickyFavouritesHeader
+ *  when active. toggleSearch's old scroll-to-top-on-open call removed (dead
+ *  code under this approach — the overlay it protected against no longer
+ *  exists). Manage button hides while searching; badge stays visible.
+ *  Crossfade keyframe (favHeaderCrossfade) added alongside the existing
+ *  tab-slide keyframes.
+ *
+ * Phase 8 — follow-up fixes to Phase 7, from live-device feedback:
+ *  - Header row given an explicit minHeight matching SearchBar's own height,
+ *    so swapping title↔search never changes the row's height — previously
+ *    the shorter/taller content shift pushed the tabs and list below it.
+ *  - Star badge now hidden while searching (reverses Phase 7's "badge stays
+ *    visible" call) — two adjacent filled-orange circles plus a compressed
+ *    input read as cluttered on real phones, and hiding it gives the input
+ *    the full width it needs for its placeholder to stay legible.
+ *  - SearchBar's internal icon swapped from the generic magnifying glass to
+ *    a Star via SearchBar's new optional `icon` prop (see SearchBar.jsx) —
+ *    reads as "search favourites" rather than a generic search.
+ *  - Close-search icon changed from X to ArrowLeft. SearchBar already
+ *    renders its own inline clear-text X once there's a query; keeping the
+ *    header's toggle as an X too put two visually-identical X icons right
+ *    next to each other. ArrowLeft reads unambiguously as "exit search."
+ *  - toggleSearch now clears both conditionQuery and drugQuery on close, so
+ *    reopening search doesn't resurrect a stale query from last time.
+ *  - StickyFavouritesHeader's slide-down transition is suppressed entirely
+ *    while isSearching (visible={showStickyHeader && !isSearching}) — the
+ *    header stays locked in place for the full duration of a search,
+ *    regardless of what's technically driving the scroll/resize signal.
+ *  - FavouritesHero and StickyFavouritesHeader's panel backgrounds changed
+ *    from an amber tint to var(--color-accent-light) (globals.css for the
+ *    sticky variant) — the app's existing blue design-system token, already
+ *    dark-mode aware. FAV_ACCENT itself (badge/buttons/underline) is
+ *    unchanged; this is a background-only recolor of the two header shells.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2, Search } from 'lucide-react'
+import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2, Search, ArrowLeft } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -253,13 +289,17 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 
-// Favourites' own identity color — not var(--color-accent) (that's the app's
-// blue, used throughout Home/ConditionDetail). This is the exact hex
-// RowStarButton already uses for a favourited star, so promoting it to this
-// screen's accent reuses a meaning the app already teaches ("amber = saved"),
-// rather than introducing an arbitrary new color.
+// Favourites' own identity color for badges/buttons/underline — not
+// var(--color-accent) (that's the app's blue, used throughout Home/
+// ConditionDetail). This is the exact hex RowStarButton already uses for a
+// favourited star, so promoting it to this screen's accent reuses a meaning
+// the app already teaches ("amber = saved"), rather than introducing an
+// arbitrary new color.
+// FAV_ACCENT_BG is separate — it's only the header panel background (hero +
+// sticky), and per Phase 8 now reuses the app's existing blue
+// accent-light token instead of an amber tint, already dark-mode aware.
 const FAV_ACCENT    = '#F59E0B'
-const FAV_ACCENT_BG = 'rgba(245, 158, 11, 0.08)'
+const FAV_ACCENT_BG = 'var(--color-accent-light)'
 
 // Static tab order/labels/icons — no longer carries per-render count data, so
 // this can live outside the component. Order matters: switchTab() below uses
@@ -626,22 +666,29 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           same visual slot Home's dark-mode toggle occupies.
           When isSearching, the title/subtitle stack is replaced in-place by
           the SearchBar (crossfade via key + favHeaderCrossfade, see the local
-          <style> block) — badge stays visible, manage button hides so only
-          the search icon flips to X while the input is showing. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <style> block); the badge hides (frees full width for the input,
+          keeps the placeholder legible) and manage hides too, so only the
+          search icon flips to ArrowLeft while the input is showing.
+          minHeight: 44 matches SearchBar's own compact height exactly, so
+          this row's height never changes between the two states — without
+          it, the title+subtitle stack and the SearchBar resolved to
+          different natural heights, shifting the tabs/list below on toggle. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-          <div style={{
-            width:           38,
-            height:          38,
-            borderRadius:    '50%',
-            backgroundColor: FAV_ACCENT,
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            flexShrink:      0,
-          }}>
-            <Star size={18} fill="#fff" color="#fff" strokeWidth={0} />
-          </div>
+          {!isSearching && (
+            <div style={{
+              width:           38,
+              height:          38,
+              borderRadius:    '50%',
+              backgroundColor: FAV_ACCENT,
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+            }}>
+              <Star size={18} fill="#fff" color="#fff" strokeWidth={0} />
+            </div>
+          )}
           {isSearching
             ? (
                 <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
@@ -649,6 +696,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
                     value={searchValue}
                     onChange={onSearchChange}
                     placeholder={searchPlaceholder}
+                    icon={Star}
                     compact
                   />
                 </div>
@@ -695,7 +743,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
             }}
           >
             {isSearching
-              ? <X size={17} color="#fff" strokeWidth={2} />
+              ? <ArrowLeft size={17} color="#fff" strokeWidth={2} />
               : <Search size={17} color="#412402" strokeWidth={1.8} />}
           </button>
 
@@ -764,28 +812,34 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         {/* Title row — badge icon + text on the left, manage toggle on the
             right, same lockup as the expanded hero at a smaller scale.
             When isSearching, the title text is replaced in-place by the
-            SearchBar (crossfade via key + favHeaderCrossfade) — badge stays
-            visible, manage button hides. */}
+            SearchBar (crossfade via key + favHeaderCrossfade); the badge
+            hides and manage hides too, same treatment as the hero.
+            minHeight: 44 matches SearchBar's compact height so this row
+            never changes height between the two states (see Phase 8 note
+            on FavouritesHero for why). */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
           padding:        '14px var(--space-6) 0',
+          minHeight:      44,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-            <div style={{
-              width:           26,
-              height:          26,
-              borderRadius:    '50%',
-              backgroundColor: FAV_ACCENT,
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-            }}>
-              <Star size={13} fill="#fff" color="#fff" strokeWidth={0} />
-            </div>
+            {!isSearching && (
+              <div style={{
+                width:           26,
+                height:          26,
+                borderRadius:    '50%',
+                backgroundColor: FAV_ACCENT,
+                display:         'flex',
+                alignItems:      'center',
+                justifyContent:  'center',
+                flexShrink:      0,
+              }}>
+                <Star size={13} fill="#fff" color="#fff" strokeWidth={0} />
+              </div>
+            )}
             {isSearching
               ? (
                   <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
@@ -793,6 +847,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                       value={searchValue}
                       onChange={onSearchChange}
                       placeholder={searchPlaceholder}
+                      icon={Star}
                       compact
                     />
                   </div>
@@ -834,7 +889,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
               }}
             >
               {isSearching
-                ? <X size={13} color="#fff" strokeWidth={2} />
+                ? <ArrowLeft size={13} color="#fff" strokeWidth={2} />
                 : <Search size={13} color="#412402" strokeWidth={1.8} />}
             </button>
 
@@ -904,7 +959,14 @@ export default function FavouritesScreen() {
   const [isSearching, setIsSearching] = useState(false)
 
   function toggleSearch() {
-    setIsSearching(prev => !prev)
+    setIsSearching(prev => {
+      const next = !prev
+      if (!next) {
+        setConditionQuery('')
+        setDrugQuery('')
+      }
+      return next
+    })
   }
 
   // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
@@ -1058,9 +1120,12 @@ export default function FavouritesScreen() {
   return (
     <Layout>
 
-      {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
+      {/* Sliding sticky header — appears once FavouritesHero scrolls out of
+          view. Suppressed entirely while isSearching (visible forced false)
+          so the header stays locked in place for the whole search, whatever
+          is technically driving the observer's signal underneath. */}
       <StickyFavouritesHeader
-        visible={showStickyHeader}
+        visible={showStickyHeader && !isSearching}
         activeTab={activeTab}
         onSelectTab={switchTab}
         isManaging={isManaging}
