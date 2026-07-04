@@ -441,6 +441,7 @@ import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
+import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
 import DrugCard from '../components/DrugCard'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
@@ -501,7 +502,7 @@ const FAVOURITES_TABS = [
 
 // ─── Snackbar ─────────────────────────────────────────────────────────────────
 
-function Snackbar({ visible, message }) {
+function Snackbar({ visible, message, actionLabel, onAction }) {
   return (
     <div
       aria-live="polite"
@@ -520,11 +521,38 @@ function Snackbar({ visible, message }) {
         borderRadius:    'var(--radius-full)',
         boxShadow:       'var(--shadow-elevated)',
         whiteSpace:      'nowrap',
-        pointerEvents:   'none',
+        display:         'flex',
+        alignItems:      'center',
+        gap:             14,
+        // Only interactive (and hit-testable) while visible, and only when
+        // there's actually an action to tap — a plain message toast stays
+        // fully inert so it never blocks touches to whatever's behind it.
+        pointerEvents:   visible && onAction ? 'auto' : 'none',
         zIndex:          9999,
       }}
     >
-      {message}
+      <span>{message}</span>
+      {actionLabel && onAction && (
+        <button
+          onClick={onAction}
+          style={{
+            background:              'none',
+            border:                  'none',
+            padding:                 0,
+            margin:                  0,
+            color:                   'var(--color-favourite)',
+            fontSize:                13,
+            fontWeight:              700,
+            fontFamily:              'var(--font-body)',
+            cursor:                  'pointer',
+            whiteSpace:              'nowrap',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {actionLabel}
+        </button>
+      )}
     </div>
   )
 }
@@ -1431,17 +1459,31 @@ export default function FavouritesScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('conditions')
 
-  // Snackbar state — message is now dynamic (bulk-remove needs a count-aware
-  // string; single-item remove keeps its original fixed message).
+  // Snackbar state — message is dynamic (bulk-remove needs a count-aware
+  // string; single-item remove keeps its original fixed message). Action
+  // (actionLabel/onAction) is optional — only the swipe-to-remove flow uses
+  // it, for Undo; the confirm-modal-based remove flows pass no action.
   const [snackVisible, setSnackVisible] = useState(false)
   const [snackMessage, setSnackMessage] = useState('')
+  const [snackAction, setSnackAction]   = useState(null) // { label, onAction } | null
   const snackTimer = useRef(null)
 
-  function showSnack(message) {
+  function showSnack(message, action = null) {
     if (snackTimer.current) clearTimeout(snackTimer.current)
     setSnackMessage(message)
+    setSnackAction(action)
     setSnackVisible(true)
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
+  }
+
+  // Tapping Undo dismisses the snackbar immediately (clearing the auto-hide
+  // timer) in addition to running the caller's restore logic — otherwise a
+  // fast tap could still see the toast linger for its full 2s.
+  function handleSnackAction() {
+    if (!snackAction) return
+    snackAction.onAction()
+    if (snackTimer.current) clearTimeout(snackTimer.current)
+    setSnackVisible(false)
   }
 
   // ── Search (icon-triggered, swaps in-place with the header title) ──────────
@@ -1616,6 +1658,20 @@ export default function FavouritesScreen() {
     if (!confirmingCondition) return
     toggleCondition(confirmingCondition.id)
     showSnack('Removed from favourites')
+  }
+
+  // Swipe-to-remove path (SwipeToRemoveRow) — deliberately skips ConfirmSheet.
+  // The reveal-then-tap gesture is itself the deliberate step; the safety
+  // net here is Undo in the snackbar instead of a confirm modal. Re-favouriting
+  // via toggleCondition appends the id back to the end of favourites.conditions
+  // (see useFavourites.js), so an undone item reappears at the top of the
+  // default 'recent' sort — expected, since the user just touched it.
+  function handleSwipeRemoveCondition(condition) {
+    toggleCondition(condition.id)
+    showSnack('Removed from favourites', {
+      label: 'Undo',
+      onAction: () => toggleCondition(condition.id),
+    })
   }
 
   // ── Tab switching + swipe (Phase 3) ─────────────────────────────────────────
@@ -1801,49 +1857,65 @@ export default function FavouritesScreen() {
                     ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
                     : (!isSearchingConditions && activeSpecialty !== 'all' && conditionResults.length === 0)
                       ? <SpecialtyEmptyState specialtyName={activeSpecialtyObj?.name} onClear={() => setActiveSpecialty('all')} />
-                      : conditionResults.map((condition, i) => (
-                      <ConditionCard
-                        key={condition.id}
-                        condition={condition}
-                        isLast={i === conditionResults.length - 1}
-                        highlight={conditionQuery}
-                        onTap={
-                          isManaging
-                            ? () => toggleSelectCondition(condition.id)
-                            : () => navigate(`/conditions/${condition.slug}`)
-                        }
-                        trailing={
-                          isManaging
-                            ? (
-                                <span style={{
-                                  // RowStarButton's total footprint is
-                                  // 13px icon + 14px padding top/bottom = 41px.
-                                  // This checkbox's icon is bigger (20px), so
-                                  // matching that same 41px total requires
-                                  // less padding here (10.5px, not 14px) —
-                                  // the previous 14px padding + 20px icon
-                                  // actually rendered at 48px, 7px taller,
-                                  // which is what was visibly changing the
-                                  // card row's height when manage mode
-                                  // toggled on.
-                                  padding:        '10.5px 8px',
-                                  display:        'flex',       // so row height stays constant across modes
-                                  alignItems:     'center',
-                                  justifyContent: 'center',
-                                }}>
-                                  {selectedIds.has(condition.id)
-                                    ? <CheckCircle2 size={20} color="#fff" fill="var(--color-accent)" strokeWidth={2} />
-                                    : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />}
-                                </span>
-                              )
-                            : (
-                                <RowStarButton
-                                  onPress={() => setConfirmingCondition(condition)}
-                                />
-                              )
-                        }
-                      />
-                    ))}
+                      : conditionResults.map((condition, i) => {
+                        const card = (
+                          <ConditionCard
+                            key={condition.id}
+                            condition={condition}
+                            isLast={i === conditionResults.length - 1}
+                            highlight={conditionQuery}
+                            onTap={
+                              isManaging
+                                ? () => toggleSelectCondition(condition.id)
+                                : () => navigate(`/conditions/${condition.slug}`)
+                            }
+                            trailing={
+                              isManaging
+                                ? (
+                                    <span style={{
+                                      // RowStarButton's total footprint is
+                                      // 13px icon + 14px padding top/bottom = 41px.
+                                      // This checkbox's icon is bigger (20px), so
+                                      // matching that same 41px total requires
+                                      // less padding here (10.5px, not 14px) —
+                                      // the previous 14px padding + 20px icon
+                                      // actually rendered at 48px, 7px taller,
+                                      // which is what was visibly changing the
+                                      // card row's height when manage mode
+                                      // toggled on.
+                                      padding:        '10.5px 8px',
+                                      display:        'flex',       // so row height stays constant across modes
+                                      alignItems:     'center',
+                                      justifyContent: 'center',
+                                    }}>
+                                      {selectedIds.has(condition.id)
+                                        ? <CheckCircle2 size={20} color="#fff" fill="var(--color-accent)" strokeWidth={2} />
+                                        : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />}
+                                    </span>
+                                  )
+                                : (
+                                    <RowStarButton
+                                      onPress={() => setConfirmingCondition(condition)}
+                                    />
+                                  )
+                            }
+                          />
+                        )
+                        // Swipe-to-remove only outside manage mode — manage mode
+                        // already has its own removal path (checkboxes + bulk
+                        // action bar), and dragging a row while selecting would
+                        // conflict with tap-to-select.
+                        return isManaging
+                          ? card
+                          : (
+                              <SwipeToRemoveRow
+                                key={condition.id}
+                                onRemove={() => handleSwipeRemoveCondition(condition)}
+                              >
+                                {card}
+                              </SwipeToRemoveRow>
+                            )
+                      })}
               </>
             )}
 
@@ -1928,7 +2000,12 @@ export default function FavouritesScreen() {
         destructive
       />
 
-      <Snackbar visible={snackVisible} message={snackMessage} />
+      <Snackbar
+        visible={snackVisible}
+        message={snackMessage}
+        actionLabel={snackAction?.label}
+        onAction={snackAction ? handleSnackAction : undefined}
+      />
     </Layout>
   )
 }
