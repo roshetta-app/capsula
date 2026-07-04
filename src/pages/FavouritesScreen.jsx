@@ -143,6 +143,14 @@
  *    since it no longer carries per-render count data — renderTabs and
  *    StickyFavouritesHeader no longer take a `tabs` prop.
  *
+ * Phase 4 — the horizontal swipe-to-switch-tabs gesture (added in Phase 3,
+ *  above) removed. It listened on the same wrapper div that every
+ *  SwipeToRemoveRow now lives inside, so a swipe starting on a row fired
+ *  both gesture systems at once — sometimes switching tabs mid swipe-to-
+ *  reveal. Tab switching is tap-only now (switchTab, via the tab bar).
+ *  tabDirection/hasSwitchedRef are unchanged — still needed for the slide
+ *  animation, which switchTab still drives.
+ *
  * Phase 4 — header/tab polish pass (premium, cohesive, own identity),
  *  interaction model from Phase 3 untouched:
  *  - Hero and StickyFavouritesHeader both gain a small filled Star icon
@@ -438,7 +446,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
+import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
@@ -540,6 +548,9 @@ function Snackbar({ visible, message, actionLabel, onAction }) {
             border:                  'none',
             padding:                 0,
             margin:                  0,
+            display:                 'flex',
+            alignItems:              'center',
+            gap:                     4,
             color:                   'var(--color-favourite)',
             fontSize:                13,
             fontWeight:              700,
@@ -550,6 +561,7 @@ function Snackbar({ visible, message, actionLabel, onAction }) {
             WebkitTapHighlightColor: 'transparent',
           }}
         >
+          <Undo2 size={14} strokeWidth={2.2} />
           {actionLabel}
         </button>
       )}
@@ -1565,7 +1577,7 @@ export default function FavouritesScreen() {
     toggleManage()
   }
 
-  const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()
+  const { favourites, toggleDrug, toggleCondition, restoreConditionAt } = useFavouritesContext()
   const { conditions, specialties } = useConditionContext()
   const { drugs }      = useDrugContext()
   const { stockMap }   = useStock(drugs)
@@ -1654,35 +1666,42 @@ export default function FavouritesScreen() {
   // Condition removal confirms first — see ConfirmSheet below.
   const [confirmingCondition, setConfirmingCondition] = useState(null)
 
+  // Both condition-removal paths below share the same undo shape: capture
+  // the id's index in favourites.conditions *before* removing it, then Undo
+  // calls restoreConditionAt(id, index) — a splice-back-in, not toggleCondition
+  // — so the item reappears exactly where it was instead of jumping to the
+  // end (which is what plain toggleCondition would do, since it's append-only;
+  // see useFavourites.js).
   function handleConfirmRemoveCondition() {
     if (!confirmingCondition) return
-    toggleCondition(confirmingCondition.id)
-    showSnack('Removed from favourites')
+    const id = confirmingCondition.id
+    const index = favourites.conditions.indexOf(id)
+    toggleCondition(id)
+    showSnack('Removed from favourites', {
+      label: 'Undo',
+      onAction: () => restoreConditionAt(id, index),
+    })
   }
 
   // Swipe-to-remove path (SwipeToRemoveRow) — deliberately skips ConfirmSheet.
   // The reveal-then-tap gesture is itself the deliberate step; the safety
-  // net here is Undo in the snackbar instead of a confirm modal. Re-favouriting
-  // via toggleCondition appends the id back to the end of favourites.conditions
-  // (see useFavourites.js), so an undone item reappears at the top of the
-  // default 'recent' sort — expected, since the user just touched it.
+  // net here is Undo in the snackbar instead of a confirm modal.
   function handleSwipeRemoveCondition(condition) {
-    toggleCondition(condition.id)
+    const id = condition.id
+    const index = favourites.conditions.indexOf(id)
+    toggleCondition(id)
     showSnack('Removed from favourites', {
       label: 'Undo',
-      onAction: () => toggleCondition(condition.id),
+      onAction: () => restoreConditionAt(id, index),
     })
   }
 
-  // ── Tab switching + swipe (Phase 3) ─────────────────────────────────────────
-  // Ports ConditionDetailScreen's exact swipe mechanism: touch-threshold
-  // detection (not continuous finger-tracked dragging), a direction ref so
-  // the incoming tab's CSS keyframe slides in from the correct side, and a
-  // "has switched yet" guard so the animation never plays on mount/refresh.
-  // Deliberately NOT ported: ConditionDetailScreen's internal fixed-height
-  // scroll box + per-tab scrollTop memory — see file header Phase 3 note.
-  const touchStartX = useRef(null)
-  const touchStartY = useRef(null)
+  // ── Tab switching (Phase 3, swipe removed) ──────────────────────────────────
+  // Tap-only now — the swipe-to-switch-tabs gesture was removed because it
+  // conflicted with SwipeToRemoveRow's own swipe (a touch starting on a row
+  // could fire both gesture systems at once). tabDirection is still needed:
+  // it decides which side the incoming tab's CSS keyframe slides in from,
+  // and hasSwitchedRef still guards against the animation playing on mount.
   const tabDirection = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
   const hasSwitchedRef = useRef(false)
 
@@ -1693,23 +1712,6 @@ export default function FavouritesScreen() {
     tabDirection.current = toIndex > fromIndex ? 1 : -1
     hasSwitchedRef.current = true
     setActiveTab(key)
-  }
-
-  function handleTouchStart(e) {
-    touchStartX.current = e.touches[0].clientX
-    touchStartY.current = e.touches[0].clientY
-  }
-
-  function handleTouchEnd(e) {
-    if (touchStartX.current === null) return
-    const dx = e.changedTouches[0].clientX - touchStartX.current
-    const dy = e.changedTouches[0].clientY - touchStartY.current
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-      if (dx < 0 && activeTab === 'conditions') switchTab('drugs')
-      if (dx > 0 && activeTab === 'drugs')      switchTab('conditions')
-    }
-    touchStartX.current = null
-    touchStartY.current = null
   }
 
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
@@ -1827,10 +1829,10 @@ export default function FavouritesScreen() {
           {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
         </div>
 
-        {/* Swipeable content area — tap OR swipe switches tabs, mirroring
-            ConditionDetailScreen's Treatment/Clinical interaction. Keyed by
-            activeTab so the slide animation replays on every real switch. */}
-        <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+        {/* Tab content area — tap-only tab switching now (see switchTab
+            above). Keyed by activeTab so the slide animation replays on
+            every real switch. */}
+        <div>
           <div
             key={activeTab}
             style={{
