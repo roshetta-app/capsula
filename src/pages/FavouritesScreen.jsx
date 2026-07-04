@@ -480,6 +480,14 @@ import { useSortToggle } from '../hooks/useSortToggle'
 // unaffected.
 const FAV_ACCENT = 'var(--color-favourite)'
 
+// Row remove/restore animation durations — must match the @keyframes
+// durations declared in the local <style> block below exactly, since the
+// setTimeout that actually mutates favourites (on remove) or clears the
+// animation flag (on restore) is what keeps state changes in sync with what
+// the animation visually shows.
+const ROW_EXIT_MS  = 220
+const ROW_ENTER_MS = 280
+
 // Sort labels for this screen's own useSortToggle instance (separate
 // storage key from ConditionsScreen — see Phase 14 note below). 'recent'
 // means "recently added to favourites" here, not "recently viewed", so it
@@ -1666,20 +1674,78 @@ export default function FavouritesScreen() {
   // Condition removal confirms first — see ConfirmSheet below.
   const [confirmingCondition, setConfirmingCondition] = useState(null)
 
+  // Row exit/enter animation tracking — Sets (not a single id) so more than
+  // one row can animate at once if removals happen in quick succession.
+  // 'exiting' rows are still in savedConditions/conditionResults (the actual
+  // toggleCondition/array mutation is deliberately delayed until the exit
+  // animation finishes — see below), so this only controls which className
+  // a row renders with, not whether it renders at all.
+  const [exitingConditionIds, setExitingConditionIds] = useState(() => new Set())
+  const [restoredConditionIds, setRestoredConditionIds] = useState(() => new Set())
+
+  function beginRowExit(id) {
+    setExitingConditionIds(prev => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }
+
+  function endRowExit(id) {
+    setExitingConditionIds(prev => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  function beginRowRestore(id) {
+    setRestoredConditionIds(prev => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    setTimeout(() => {
+      setRestoredConditionIds(prev => {
+        if (!prev.has(id)) return prev
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+    }, ROW_ENTER_MS)
+  }
+
   // Both condition-removal paths below share the same undo shape: capture
   // the id's index in favourites.conditions *before* removing it, then Undo
   // calls restoreConditionAt(id, index) — a splice-back-in, not toggleCondition
   // — so the item reappears exactly where it was instead of jumping to the
   // end (which is what plain toggleCondition would do, since it's append-only;
   // see useFavourites.js).
+  //
+  // Both paths also now play an exit animation before the actual removal:
+  // beginRowExit(id) flags the row so it renders with the 'favRowExit'
+  // animation while it's still in the list, and only after ROW_EXIT_MS does
+  // toggleCondition actually remove it from favourites.conditions — so the
+  // row has already faded/collapsed out visually by the time it unmounts,
+  // instead of vanishing instantly. Undo mirrors this: restoreConditionAt
+  // splices the id back in immediately (so sort/position is correct right
+  // away), and beginRowRestore(id) flags it to play the entrance animation.
   function handleConfirmRemoveCondition() {
     if (!confirmingCondition) return
     const id = confirmingCondition.id
     const index = favourites.conditions.indexOf(id)
-    toggleCondition(id)
+    beginRowExit(id)
+    setTimeout(() => {
+      toggleCondition(id)
+      endRowExit(id)
+    }, ROW_EXIT_MS)
     showSnack('Removed from favourites', {
       label: 'Undo',
-      onAction: () => restoreConditionAt(id, index),
+      onAction: () => {
+        restoreConditionAt(id, index)
+        beginRowRestore(id)
+      },
     })
   }
 
@@ -1689,10 +1755,17 @@ export default function FavouritesScreen() {
   function handleSwipeRemoveCondition(condition) {
     const id = condition.id
     const index = favourites.conditions.indexOf(id)
-    toggleCondition(id)
+    beginRowExit(id)
+    setTimeout(() => {
+      toggleCondition(id)
+      endRowExit(id)
+    }, ROW_EXIT_MS)
     showSnack('Removed from favourites', {
       label: 'Undo',
-      onAction: () => restoreConditionAt(id, index),
+      onAction: () => {
+        restoreConditionAt(id, index)
+        beginRowRestore(id)
+      },
     })
   }
 
@@ -1779,6 +1852,14 @@ export default function FavouritesScreen() {
         @keyframes favSearchExpand {
           from { opacity: 0; transform: scaleX(0.85); }
           to   { opacity: 1; transform: scaleX(1); }
+        }
+        @keyframes favRowExit {
+          from { opacity: 1; max-height: 120px; transform: scale(1); }
+          to   { opacity: 0; max-height: 0; transform: scale(0.96); }
+        }
+        @keyframes favRowEnter {
+          from { opacity: 0; max-height: 0; transform: translateY(-6px); }
+          to   { opacity: 1; max-height: 120px; transform: translateY(0); }
         }
         .fav-search-micro input {
           padding-left: 34px !important;
@@ -1907,16 +1988,28 @@ export default function FavouritesScreen() {
                         // already has its own removal path (checkboxes + bulk
                         // action bar), and dragging a row while selecting would
                         // conflict with tap-to-select.
-                        return isManaging
-                          ? card
-                          : (
-                              <SwipeToRemoveRow
-                                key={condition.id}
-                                onRemove={() => handleSwipeRemoveCondition(condition)}
-                              >
-                                {card}
-                              </SwipeToRemoveRow>
-                            )
+                        if (isManaging) return card
+
+                        const isExiting  = exitingConditionIds.has(condition.id)
+                        const isEntering = restoredConditionIds.has(condition.id)
+
+                        return (
+                          <div
+                            key={condition.id}
+                            style={{
+                              overflow: 'hidden',
+                              animation: isExiting
+                                ? `favRowExit ${ROW_EXIT_MS}ms cubic-bezier(0.4, 0, 1, 1) forwards`
+                                : isEntering
+                                  ? `favRowEnter ${ROW_ENTER_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
+                                  : undefined,
+                            }}
+                          >
+                            <SwipeToRemoveRow onRemove={() => handleSwipeRemoveCondition(condition)}>
+                              {card}
+                            </SwipeToRemoveRow>
+                          </div>
+                        )
                       })}
               </>
             )}
