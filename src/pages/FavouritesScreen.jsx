@@ -188,21 +188,13 @@
  *  (Favourites needed its own visual identity distinct from Home/
  *  ConditionDetail's blue, plus a functional reason for a header utility
  *  icon):
- *  - New module-level FAV_ACCENT ('#F59E0B') and FAV_ACCENT_BG (its 8%
- *    tint) replace var(--color-accent) throughout this screen's icon,
- *    active tab, underline, and badge. Not an arbitrary new color —
- *    it's the exact hex RowStarButton already used for a favourited
- *    star, promoted to this screen's identity color. ConditionDetailScreen
- *    is untouched by this — it keeps var(--color-accent) blue; only the
- *    underline *geometry* (height/radius) stays shared between the two
- *    screens, per Phase 5's decision, not the color.
- *  - FavouritesHero and StickyFavouritesHeader both wrapped in a
- *    FAV_ACCENT_BG panel (rounded 16px / 18px respectively), so the
- *    screen reads as a distinct "shelf" from first paint instead of a
- *    continuation of Home's plain white scroll. Star icon moved from a
- *    bare icon into a solid FAV_ACCENT circular badge (white icon on
- *    top) — mirrors the tinted specialty-icon-bubble pattern already
- *    used in ConditionCard, rather than introducing a new visual motif.
+ *  - New module-level FAV_ACCENT ('#F59E0B') replaces var(--color-accent)
+ *    throughout this screen's icon, active tab, underline, and badge. Not
+ *    an arbitrary new color — it's the exact hex RowStarButton already
+ *    used for a favourited star, promoted to this screen's identity color.
+ *    ConditionDetailScreen is untouched by this — it keeps var(--color-accent)
+ *    blue; only the underline *geometry* (height/radius) stays shared
+ *    between the two screens, per Phase 5's decision, not the color.
  *  - renderTabs takes a new `counts` param and shows each tab's live
  *    favourited count (e.g. "Conditions 8") next to its label.
  *  - New manage mode, Conditions-tab only (explicit scope decision —
@@ -292,6 +284,45 @@
  *  - StickyFavouritesHeader's background changed again, amber→blue→white
  *    (var(--color-surface), globals.css) — the hero panel keeps its blue
  *    tint from Phase 8; only the sticky/collapsed variant is now white.
+ *
+ * Phase 10 — header restyle pass (surface/shadow/sizing refinement, per
+ *  updated design brief):
+ *  - Both header panels moved off tinted backgrounds onto
+ *    var(--color-surface), with a hairline boxShadow (0 1px 2px
+ *    rgba(0,0,0,0.04)) replacing the previous flat tint / heavier drop
+ *    shadow — reads as a subtly elevated white shelf rather than a colored
+ *    banner. FAV_ACCENT_BG constant removed (no remaining consumers).
+ *  - StickyFavouritesHeader's title row grown 44→48 (padding-top 14→16) to
+ *    fix the cramped badge/button spacing the old 44px box left almost no
+ *    room for; clawed back partially by trimming the tab-row's own bottom
+ *    padding 10→9 and the badge 26→25, so the panel's total footprint
+ *    doesn't grow by the full 4px.
+ *  - Sticky search-toggle button stays at its existing 28px idle size
+ *    (previously slated to grow — reverted per the above clawback) and
+ *    now animates to 32px only while isSearching, so it matches the
+ *    compact SearchBar's height exactly without inflating idle chrome.
+ *    Manage button is unaffected (hidden during search).
+ *  - Hero action buttons: search-toggle grows 36→44 while searching
+ *    (matches the hero's own compact SearchBar at 44); idle backgrounds on
+ *    both hero buttons move from var(--color-surface) to
+ *    var(--color-accent-light) so they read as soft filled pills instead of
+ *    outline buttons; active search-button background moves from FAV_ACCENT
+ *    to var(--color-accent). Manage button's active background is
+ *    unaddressed by the brief and stays FAV_ACCENT.
+ *  - New scoped classes (fav-search-micro / fav-sticky-search-height) trim
+ *    the shared SearchBar's placeholder size, leading-icon size, and
+ *    left-padding when it's rendered inside either header, and lock the
+ *    sticky variant's input height to 32px to match the expanded back
+ *    button — all via !important overrides since SearchBar's own sizing is
+ *    inline. SearchBar.jsx itself is untouched.
+ *  - Search-open transition swapped from the plain favHeaderCrossfade to a
+ *    new favSearchExpand keyframe (opacity + scaleX from the left edge,
+ *    transform-origin: left center) so the field visibly grows out of the
+ *    icon instead of just fading in. The title side keeps the original
+ *    favHeaderCrossfade.
+ *  - renderTabs's bare count text is now a small rounded pill — accent-
+ *    filled when its tab is active, var(--color-border-subtle) otherwise —
+ *    instead of plain de-emphasized text.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -314,11 +345,7 @@ import { useConditionSearch } from '../hooks/useConditionSearch'
 // favourited star, so promoting it to this screen's accent reuses a meaning
 // the app already teaches ("amber = saved"), rather than introducing an
 // arbitrary new color.
-// FAV_ACCENT_BG is separate — it's only the header panel background (hero +
-// sticky), and per Phase 8 now reuses the app's existing blue
-// accent-light token instead of an amber tint, already dark-mode aware.
-const FAV_ACCENT    = '#F59E0B'
-const FAV_ACCENT_BG = 'var(--color-accent-light)'
+const FAV_ACCENT = '#F59E0B'
 
 // Static tab order/labels/icons — no longer carries per-render count data, so
 // this can live outside the component. Order matters: switchTab() below uses
@@ -591,6 +618,9 @@ function RowStarButton({ onPress }) {
 // vs the previous 10px-padding-derived height), larger icon/label, wider
 // icon-label gap, fully-rounded thicker underline for true "rounded ends."
 // Active: semibold + accent blue. Inactive: medium weight (500) + secondary gray.
+// Phase 10 — count badge rebuilt from de-emphasized plain text into a small
+// rounded pill (accent-filled when active, neutral track otherwise), matching
+// the treatment already used for the sticky/expanded header's own badges.
 
 function renderTabs(activeTab, onSelect, counts) {
   return (
@@ -631,7 +661,15 @@ function renderTabs(activeTab, onSelect, counts) {
                 {tab.label}
               </span>
               {typeof count === 'number' && (
-                <span style={{ fontSize: 12, fontWeight: 500, color: fg, opacity: 0.75 }}>
+                <span style={{
+                  fontSize:        11,
+                  fontWeight:      600,
+                  color:           isActive ? '#fff' : 'var(--color-text-secondary)',
+                  backgroundColor: isActive ? FAV_ACCENT : 'var(--color-border-subtle)',
+                  borderRadius:    'var(--radius-full)',
+                  padding:         '1px 7px',
+                  lineHeight:      1.4,
+                }}>
                   {count}
                 </span>
               )}
@@ -669,14 +707,24 @@ function renderTabs(activeTab, onSelect, counts) {
 // a glance, per the "header identity" requirement) — same treatment mirrored
 // in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
 // 8→6, subtitle marginBottom 6→5.
+// Phase 10 — panel background moved from the blue accent-light tint to
+// var(--color-surface) with a hairline boxShadow, matching the sticky
+// header's own white-shelf treatment (see file header Phase 10 note). Action
+// buttons: search-toggle grows 36→44 while searching; both buttons' idle
+// background moves from var(--color-surface) to var(--color-accent-light);
+// active search-button background moves from FAV_ACCENT to
+// var(--color-accent). Search wrapper's crossfade swapped for the new
+// favSearchExpand keyframe and given the fav-search-micro scoped class (see
+// local <style> block in FavouritesScreen below).
 
 function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
-      backgroundColor: FAV_ACCENT_BG,
+      backgroundColor: 'var(--color-surface)',
       borderRadius:    16,
       padding:         '14px 14px 14px',
       marginTop:       'var(--space-4)',
+      boxShadow:       '0 1px 2px rgba(0,0,0,0.04)',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
@@ -684,8 +732,8 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           block underneath. Manage toggle sits on the right, filling the
           same visual slot Home's dark-mode toggle occupies.
           When isSearching, the title/subtitle stack is replaced in-place by
-          the SearchBar (crossfade via key + favHeaderCrossfade, see the local
-          <style> block); the badge hides (frees full width for the input,
+          the SearchBar (favSearchExpand via key, see the local <style>
+          block); the badge hides (frees full width for the input,
           keeps the placeholder legible) and manage hides too, so only the
           search icon flips to ArrowLeft while the input is showing.
           height: 44 (not minHeight) is a hard lock matching SearchBar's own
@@ -715,7 +763,16 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           )}
           {isSearching
             ? (
-                <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
+                <div
+                  key="search"
+                  className="fav-search-micro"
+                  style={{
+                    flex:            1,
+                    minWidth:        0,
+                    animation:       'favSearchExpand 0.2s ease',
+                    transformOrigin: 'left center',
+                  }}
+                >
                   <SearchBar
                     value={searchValue}
                     onChange={onSearchChange}
@@ -754,11 +811,11 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
             onClick={onToggleSearch}
             aria-label={isSearching ? 'Close search' : 'Search favourites'}
             style={{
-              width:                   36,
-              height:                  36,
+              width:                   isSearching ? 44 : 36,
+              height:                  isSearching ? 44 : 36,
               borderRadius:            '50%',
               border:                  'none',
-              backgroundColor:         isSearching ? FAV_ACCENT : 'var(--color-surface)',
+              backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-accent-light)',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
@@ -766,6 +823,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
               cursor:                  'pointer',
               WebkitTapHighlightColor: 'transparent',
               outline:                 'none',
+              transition:              'width 0.2s ease, height 0.2s ease, background-color 0.15s ease',
             }}
           >
             {isSearching
@@ -782,7 +840,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
                 height:                  36,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
+                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-accent-light)',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -813,6 +871,15 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
 // down) so the collapsed state reads as an intentionally-designed compact
 // header, not a cropped one. Still icon + title + tabs only — no subtitle,
 // no search, per spec.
+// Phase 10 — panel given an explicit white backgroundColor + hairline
+// boxShadow (was the heavier 0 4px 12px shadow). Title row grown 44→48
+// (padding-top 14→16) for breathing room around the badge/buttons, clawed
+// back partially via the tab-row's bottom padding (10→9) and a 1px badge
+// trim (26→25) so the panel doesn't grow by the full 4px. Search-toggle
+// button stays 28px idle and only grows to 32px while isSearching, wrapped
+// together with the compact SearchBar in the fav-search-micro /
+// fav-sticky-search-height scoped classes (see FavouritesScreen's local
+// <style> block) so the input's own height matches the expanded button.
 
 function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, onToggleManage, showManageButton, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
@@ -825,9 +892,10 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         left:                    0,
         right:                   0,
         zIndex:                  50,
+        backgroundColor:         'var(--color-surface)',
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
-        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
+        boxShadow:               '0 1px 2px rgba(0,0,0,0.04)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:              'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
@@ -838,23 +906,25 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         {/* Title row — badge icon + text on the left, manage toggle on the
             right, same lockup as the expanded hero at a smaller scale.
             When isSearching, the title text is replaced in-place by the
-            SearchBar (crossfade via key + favHeaderCrossfade); the badge
-            hides and manage hides too, same treatment as the hero.
-            height: 44 (not minHeight) hard-locks this row to SearchBar's
-            compact height, same reasoning as FavouritesHero above. */}
+            SearchBar (favSearchExpand via key); the badge hides and manage
+            hides too, same treatment as the hero.
+            height: 48 (not minHeight) hard-locks this row to a fixed size —
+            grown from 44 for breathing room around the badge/buttons, same
+            reasoning as FavouritesHero above but with more headroom needed
+            at this smaller badge/button scale. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
-          padding:        '14px var(--space-6) 0',
-          height:         44,
+          padding:        '16px var(--space-6) 0',
+          height:         48,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
               <div style={{
-                width:           26,
-                height:          26,
+                width:           25,
+                height:          25,
                 borderRadius:    '50%',
                 backgroundColor: FAV_ACCENT,
                 display:         'flex',
@@ -867,7 +937,16 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
             )}
             {isSearching
               ? (
-                  <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
+                  <div
+                    key="search"
+                    className="fav-search-micro fav-sticky-search-height"
+                    style={{
+                      flex:            1,
+                      minWidth:        0,
+                      animation:       'favSearchExpand 0.2s ease',
+                      transformOrigin: 'left center',
+                    }}
+                  >
                     <SearchBar
                       value={searchValue}
                       onChange={onSearchChange}
@@ -899,8 +978,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
               onClick={onToggleSearch}
               aria-label={isSearching ? 'Close search' : 'Search favourites'}
               style={{
-                width:                   28,
-                height:                  28,
+                width:                   isSearching ? 32 : 28,
+                height:                  isSearching ? 32 : 28,
                 borderRadius:            '50%',
                 border:                  'none',
                 backgroundColor:         isSearching ? FAV_ACCENT : 'var(--color-surface)',
@@ -911,6 +990,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 cursor:                  'pointer',
                 WebkitTapHighlightColor: 'transparent',
                 outline:                 'none',
+                transition:              'width 0.2s ease, height 0.2s ease',
               }}
             >
               {isSearching
@@ -948,10 +1028,12 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
             No longer needs position: relative — the search input now swaps
             in-place with the title above instead of overlaying below the
-            tabs. */}
+            tabs. Bottom padding trimmed 10→9 (Phase 10 clawback — see file
+            header) so the title row's +4px growth doesn't fully carry
+            through to the panel's total height. */}
         <div style={{
           marginTop: 6,
-          padding:   '0 var(--space-6) 10px',
+          padding:   '0 var(--space-6) 9px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
         </div>
@@ -1164,7 +1246,13 @@ export default function FavouritesScreen() {
       {/* Local keyframes for the tab-switch transition — same technique as
           ConditionDetailScreen, distinct names to avoid any collision.
           Direction-aware slide+fade, only ever plays after a real switch
-          (see hasSwitchedRef), never on mount/refresh. */}
+          (see hasSwitchedRef), never on mount/refresh. favSearchExpand
+          (Phase 10) replaces favHeaderCrossfade on the search-side wrapper
+          only — the title side keeps the original crossfade. The
+          fav-search-micro / fav-sticky-search-height rules trim the shared
+          SearchBar's placeholder/icon/left-padding and (sticky only) lock
+          its input height to 32px, all via !important since SearchBar's own
+          sizing is inline — SearchBar.jsx itself is untouched. */}
       <style>{`
         @keyframes favTabSlideFromRight {
           from { opacity: 0; transform: translateX(16px); }
@@ -1177,6 +1265,23 @@ export default function FavouritesScreen() {
         @keyframes favHeaderCrossfade {
           from { opacity: 0; }
           to   { opacity: 1; }
+        }
+        @keyframes favSearchExpand {
+          from { opacity: 0; transform: scaleX(0.85); }
+          to   { opacity: 1; transform: scaleX(1); }
+        }
+        .fav-search-micro input {
+          padding-left: 34px !important;
+        }
+        .fav-search-micro input::placeholder {
+          font-size: 12.5px;
+        }
+        .fav-search-micro svg {
+          width: 14px !important;
+          height: 14px !important;
+        }
+        .fav-sticky-search-height input {
+          height: 32px !important;
         }
       `}</style>
 
