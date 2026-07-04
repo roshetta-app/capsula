@@ -37,6 +37,15 @@
  *             hero's 24px paddingBottom, double-stacking into a 44px gap —
  *             removed the wrapper's margin so paddingBottom (now 12px) is
  *             the single source of that spacing.
+ * Phase 19 — Bug fix on Phase 18: shrinking the hero's paddingBottom to
+ *             12px without also shrinking the content panel's overlap
+ *             (still 24px from Phase 16) meant the curve ate 12px further
+ *             up than the hero's padding allowed, burying the bottom of
+ *             the specialty selector. Overlap radius/marginTop brought
+ *             down to 12px to match paddingBottom exactly — the two must
+ *             always be kept equal, or the curve buries whatever sits
+ *             above it. Also tightened the search-bar → selector gap
+ *             16px → 12px per feedback.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -765,7 +774,7 @@ export default function ConditionsScreen() {
         />
 
         {/* 2. Search bar */}
-        <div style={{ marginBottom: 'var(--space-4)' }}>
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           <SearchBar
             ref={searchInputRef}
             value={query}
@@ -797,19 +806,19 @@ export default function ConditionsScreen() {
           rounded top corners cut a visible curve into the hero above
           instead of sitting flush against it. Same edge-to-edge bleed as
           the hero panel, for the same reason.
-          Radius bumped from --radius-lg (16px) to a locally-scoped 24px —
-          intentionally NOT changed via the shared --radius-lg token, since
-          that's used elsewhere in this file and across the app; this curve
-          needed more visual weight than the token's other use cases.
+          IMPORTANT: this overlap amount (marginTop / radius) must never
+          exceed the hero panel's paddingBottom above — if it does, the
+          curve eats past the hero's own bottom spacing and buries whatever
+          sits just above it (this broke the specialty selector in Phase 18,
+          when paddingBottom shrank to 12px but this stayed at 24px). Both
+          are now 12px, kept in lockstep.
           boxShadow added above the panel (negative y-offset) so the curve
-          reads as a lifted edge via elevation, not color contrast alone —
-          the reference image's actual cue was a card shadow, not just a
-          color jump. */}
+          reads as a lifted edge via elevation, not color contrast alone. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  '24px',
-        borderTopRightRadius: '24px',
-        marginTop:       '-24px',
+        borderTopLeftRadius:  '12px',
+        borderTopRightRadius: '12px',
+        marginTop:       '-12px',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
