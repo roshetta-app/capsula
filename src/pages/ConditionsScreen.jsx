@@ -34,7 +34,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, Search, ListFilter } from 'lucide-react'
+import { ArrowUp, Search, ListFilter, Heart } from 'lucide-react'
 import Layout                  from '../components/layout'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -45,6 +45,7 @@ import ConditionsEmptyState    from '../components/conditions/ConditionsEmptySta
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
 import SpecialtySelector       from '../components/conditions/SpecialtySelector'
 import { useConditionContext }  from '../context/ConditionContext'
+import { useFavouritesContext } from '../context/FavouritesContext'
 import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
@@ -542,6 +543,7 @@ function BackToTopButton({ visible, onClick }) {
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
+  const { isConditionFavourited }             = useFavouritesContext()
   const { recentlyViewed, recentOrder }      = useRecentlyViewed()
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
   const { isDark, toggleDark }               = useDarkMode()
@@ -669,6 +671,25 @@ export default function ConditionsScreen() {
     if (showStickyHeader) setTimeout(snapToListHeader, 50)
   }
 
+  // Static (non-interactive) favourite indicator for the trailing slot —
+  // shown only when the condition is already favourited, matching the
+  // heart used on the Favourites screen's RowStarButton (Heart, 13px,
+  // var(--color-favourite) fill/stroke). Not tappable: no button wrapper,
+  // no onClick, no tap padding — display-only.
+  function renderFavouriteHeart(condition) {
+    return isConditionFavourited(condition.id)
+      ? (
+          <Heart
+            size={13}
+            fill="var(--color-favourite)"
+            strokeWidth={1.8}
+            style={{ color: 'var(--color-favourite)' }}
+            aria-hidden="true"
+          />
+        )
+      : null
+  }
+
   // ── List rendering ───────────────────────────────────────────────────────────
 
   function renderList() {
@@ -693,6 +714,7 @@ export default function ConditionsScreen() {
           highlight={isSearching ? query : ''}
           activeSpecialty={activeSpecialty}
           isLast={i === results.length - 1}
+          trailing={renderFavouriteHeart(condition)}
         />
       ))
     }
@@ -711,6 +733,7 @@ export default function ConditionsScreen() {
               highlight=""
               activeSpecialty={activeSpecialty}
               isLast={isLastGroup && i === items.length - 1}
+              trailing={renderFavouriteHeart(condition)}
             />
           ))}
         </div>
