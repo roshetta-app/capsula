@@ -34,8 +34,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUp, Search, ListFilter, Heart } from 'lucide-react'
+import { Search, ListFilter, Heart } from 'lucide-react'
 import Layout                  from '../components/layout'
+import BackToTopButton         from '../components/ui/BackToTopButton'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
 import RecentlyViewedChips     from '../components/conditions/RecentlyViewedChips'
@@ -50,6 +51,7 @@ import { useConditionSearch }  from '../hooks/useConditionSearch'
 import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
+import { useBackToTop }        from '../hooks/useBackToTop'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -498,46 +500,6 @@ function StickyLogoHeader({
   )
 }
 
-// ─── Back-to-top floating button ───────────────────────────────────────────────
-
-const BACK_TO_TOP_THRESHOLD = 400 // px scrolled before the button appears
-
-function BackToTopButton({ visible, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-label="Back to top"
-      aria-hidden={!visible}
-      tabIndex={visible ? 0 : -1}
-      style={{
-        position:                'fixed',
-        right:                   'var(--space-5)',
-        bottom:                  'calc(96px + env(safe-area-inset-bottom))',
-        width:                   50,
-        height:                  50,
-        borderRadius:            'var(--radius-full)',
-        border:                  'none',
-        backgroundColor:         'var(--color-accent)',
-        color:                   '#ffffff',
-        boxShadow:               'var(--shadow-elevated)',
-        display:                 'flex',
-        alignItems:              'center',
-        justifyContent:          'center',
-        cursor:                  'pointer',
-        zIndex:                  60,
-        opacity:                 visible ? 1 : 0,
-        transform:               visible ? 'translateY(0)' : 'translateY(8px)',
-        pointerEvents:           visible ? 'auto' : 'none',
-        transition:              'opacity 0.2s ease, transform 0.2s ease',
-        outline:                 'none',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <ArrowUp size={20} strokeWidth={2.5} />
-    </button>
-  )
-}
-
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
 export default function ConditionsScreen() {
@@ -549,22 +511,11 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
-  const [showBackToTop, setShowBackToTop]         = useState(false)
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
+  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
-
-  // ── Back-to-top visibility ───────────────────────────────────────────────────
-
-  useEffect(() => {
-    function onScroll() {
-      setShowBackToTop(window.scrollY > BACK_TO_TOP_THRESHOLD)
-    }
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
 
   // ── Sliding sticky header: visible once BrandRow logo leaves viewport ────────
   // IntersectionObserver fires when brandRowRef crosses the top of the viewport.
@@ -592,26 +543,6 @@ export default function ConditionsScreen() {
     searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     // Small delay so scroll completes before focus pulls the keyboard up
     setTimeout(() => searchInputRef.current?.focus(), 300)
-  }
-
-  function handleBackToTop() {
-    const start    = window.scrollY
-    if (start === 0) return
-
-    const duration = 350 // ms — constant regardless of scroll distance
-    const startTime = performance.now()
-
-    // easeOutCubic — fast start, gentle landing
-    const ease = t => 1 - Math.pow(1 - t, 3)
-
-    function step(now) {
-      const elapsed  = now - startTime
-      const progress = Math.min(elapsed / duration, 1)
-      window.scrollTo(0, start * (1 - ease(progress)))
-      if (progress < 1) requestAnimationFrame(step)
-    }
-
-    requestAnimationFrame(step)
   }
 
   const {
@@ -849,3 +780,5 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
+

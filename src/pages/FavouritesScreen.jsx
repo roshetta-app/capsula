@@ -448,6 +448,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import Layout from '../components/layout'
+import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
 import DrugCard from '../components/DrugCard'
@@ -463,6 +464,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
+import { useBackToTop } from '../hooks/useBackToTop'
 
 // Favourites' own identity color for the heart badge/star icon. Previously
 // aliased var(--color-danger) so "favourited = red heart" shared the exact
@@ -1479,6 +1481,11 @@ export default function FavouritesScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('conditions')
 
+  // Back-to-top — shared with ConditionsScreen via useBackToTop/BackToTopButton
+  // (see src/hooks/useBackToTop.js), same 400px threshold and easeOutCubic
+  // smooth-scroll behavior, instead of duplicating that logic here.
+  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
+
   // Snackbar state — message is dynamic (bulk-remove needs a count-aware
   // string; single-item remove keeps its original fixed message). Action
   // (actionLabel/onAction) is optional — only the swipe-to-remove flow uses
@@ -2084,6 +2091,9 @@ export default function FavouritesScreen() {
         </div>
 
       </div>
+
+      {/* Back to top */}
+      <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {isManaging && (
         <ManageActionBar
