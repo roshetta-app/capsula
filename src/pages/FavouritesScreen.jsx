@@ -323,6 +323,36 @@
  *  - renderTabs's bare count text is now a small rounded pill — accent-
  *    filled when its tab is active, var(--color-border-subtle) otherwise —
  *    instead of plain de-emphasized text.
+ *
+ * Phase 11 — single-anchor pass: the amber badge is this screen's one
+ *  visual identity mark; everything else de-emphasized so it doesn't
+ *  compete:
+ *  - renderTabs: Phase 10's accent-filled count pill reverted — count is
+ *    now plain muted text (var(--color-text-secondary)), no background,
+ *    same look whether its tab is active or not.
+ *  - FavouritesHero, idle state: search-toggle and manage buttons drop
+ *    their var(--color-accent-light) circle fill entirely — bare icons,
+ *    strokeWidth bumped (1.8→2.2) for boldness, tap area unchanged at
+ *    36×36 so the touch target doesn't shrink. Idle icon color switched to
+ *    var(--color-text-secondary) (the old #412402 was tuned to sit on a
+ *    light-blue fill that no longer exists). This leaves the amber badge
+ *    as the only filled color shape in the row. Manage's active
+ *    (isManaging) amber-filled state is untouched — that's a real toggle
+ *    state, not one of the idle circles being quieted here.
+ *  - FavouritesHero, searching state: back button and the compact
+ *    SearchBar both trimmed 44px → 40px (new height rule on
+ *    .fav-search-micro input, see local <style> block). Blue fill on the
+ *    back button is unchanged — it's a functional state, not decorative.
+ *  - StickyFavouritesHeader: title bumped 16→18px so it clearly outranks
+ *    the 14px tab labels at a glance. Badge grown 25→28px (icon 13→15).
+ *    Idle search/manage icons grown 13→15px, strokeWidth 1.8→2.0 — no bg
+ *    change needed since their idle background already matches the panel
+ *    (var(--color-surface)). Idle button box grown 28→32px; the
+ *    searching-state (back) button grown 32→36px and its background
+ *    swapped FAV_ACCENT → var(--color-accent), matching the hero's blue
+ *    instead of amber. .fav-sticky-search-height input grown 32px→36px to
+ *    match the new back-button size. Manage's active box stays at the new
+ *    32px idle size — it never had its own separate active size.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -662,13 +692,10 @@ function renderTabs(activeTab, onSelect, counts) {
               </span>
               {typeof count === 'number' && (
                 <span style={{
-                  fontSize:        11,
-                  fontWeight:      600,
-                  color:           isActive ? '#fff' : 'var(--color-text-secondary)',
-                  backgroundColor: isActive ? FAV_ACCENT : 'var(--color-border-subtle)',
-                  borderRadius:    'var(--radius-full)',
-                  padding:         '1px 7px',
-                  lineHeight:      1.4,
+                  fontSize:   11,
+                  fontWeight: 600,
+                  color:      'var(--color-text-secondary)',
+                  lineHeight: 1.4,
                 }}>
                   {count}
                 </span>
@@ -811,11 +838,11 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
             onClick={onToggleSearch}
             aria-label={isSearching ? 'Close search' : 'Search favourites'}
             style={{
-              width:                   isSearching ? 44 : 36,
-              height:                  isSearching ? 44 : 36,
+              width:                   isSearching ? 40 : 36,
+              height:                  isSearching ? 40 : 36,
               borderRadius:            '50%',
               border:                  'none',
-              backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-accent-light)',
+              backgroundColor:         isSearching ? 'var(--color-accent)' : 'transparent',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
@@ -828,7 +855,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           >
             {isSearching
               ? <ArrowLeft size={17} color="#fff" strokeWidth={2} />
-              : <Search size={17} color="#412402" strokeWidth={1.8} />}
+              : <Search size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
           </button>
 
           {showManageButton && !isSearching && (
@@ -840,7 +867,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
                 height:                  36,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-accent-light)',
+                backgroundColor:         isManaging ? FAV_ACCENT : 'transparent',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -852,7 +879,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
             >
               {isManaging
                 ? <X size={17} color="#fff" strokeWidth={2} />
-                : <ListChecks size={17} color="#412402" strokeWidth={1.8} />}
+                : <ListChecks size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
             </button>
           )}
         </div>
@@ -923,8 +950,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
               <div style={{
-                width:           25,
-                height:          25,
+                width:           28,
+                height:          28,
                 borderRadius:    '50%',
                 backgroundColor: FAV_ACCENT,
                 display:         'flex',
@@ -932,7 +959,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 justifyContent:  'center',
                 flexShrink:      0,
               }}>
-                <Star size={13} fill="#fff" color="#fff" strokeWidth={0} />
+                <Star size={15} fill="#fff" color="#fff" strokeWidth={0} />
               </div>
             )}
             {isSearching
@@ -960,7 +987,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                   <div
                     key="title"
                     style={{
-                      fontSize:      16,
+                      fontSize:      18,
                       fontWeight:    700,
                       color:         'var(--color-text-primary)',
                       letterSpacing: '-0.2px',
@@ -978,11 +1005,11 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
               onClick={onToggleSearch}
               aria-label={isSearching ? 'Close search' : 'Search favourites'}
               style={{
-                width:                   isSearching ? 32 : 28,
-                height:                  isSearching ? 32 : 28,
+                width:                   isSearching ? 36 : 32,
+                height:                  isSearching ? 36 : 32,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isSearching ? FAV_ACCENT : 'var(--color-surface)',
+                backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-surface)',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -994,8 +1021,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
               }}
             >
               {isSearching
-                ? <ArrowLeft size={13} color="#fff" strokeWidth={2} />
-                : <Search size={13} color="#412402" strokeWidth={1.8} />}
+                ? <ArrowLeft size={15} color="#fff" strokeWidth={2} />
+                : <Search size={15} color="var(--color-text-secondary)" strokeWidth={2} />}
             </button>
 
             {showManageButton && !isSearching && (
@@ -1003,8 +1030,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 onClick={onToggleManage}
                 aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
                 style={{
-                  width:                   28,
-                  height:                  28,
+                  width:                   32,
+                  height:                  32,
                   borderRadius:            '50%',
                   border:                  'none',
                   backgroundColor:         isManaging ? FAV_ACCENT : 'var(--color-surface)',
@@ -1018,8 +1045,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 }}
               >
                 {isManaging
-                  ? <X size={13} color="#fff" strokeWidth={2} />
-                  : <ListChecks size={13} color="#412402" strokeWidth={1.8} />}
+                  ? <X size={15} color="#fff" strokeWidth={2} />
+                  : <ListChecks size={15} color="var(--color-text-secondary)" strokeWidth={2} />}
               </button>
             )}
           </div>
@@ -1272,6 +1299,7 @@ export default function FavouritesScreen() {
         }
         .fav-search-micro input {
           padding-left: 34px !important;
+          height: 40px !important;
         }
         .fav-search-micro input::placeholder {
           font-size: 12.5px;
@@ -1281,7 +1309,7 @@ export default function FavouritesScreen() {
           height: 14px !important;
         }
         .fav-sticky-search-height input {
-          height: 32px !important;
+          height: 36px !important;
         }
       `}</style>
 
@@ -1424,3 +1452,4 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
+
