@@ -1,3 +1,5 @@
+/**
+ * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
  *
  * Changes from stub:
