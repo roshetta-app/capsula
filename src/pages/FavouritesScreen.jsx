@@ -407,21 +407,51 @@
  *    card's row height when manage mode toggled on. Fixed by recalculating
  *    the padding for the checkbox's actual icon size (10.5px, not 14px) so
  *    both controls render at the same 41px total footprint.
+ *
+ * Phase 14 — Conditions-tab sort + specialty filter, grouped behind one
+ *  manager entry point (Conditions tab only — Drugs deferred, same scope as
+ *  manage mode):
+ *  - FavouritesHero/StickyFavouritesHeader's standalone Manage button
+ *    replaced with a single SlidersHorizontal trigger (showManagerButton/
+ *    hasActiveFilters/onOpenManager props) that opens the new
+ *    FavouritesManagerSheet (src/components/conditions/FavouritesManagerSheet.jsx)
+ *    — a bottom sheet grouping Sort, Specialty, and Manage, matching the
+ *    existing SpecialtiesBottomSheet/ConfirmSheet visual idiom. A small dot
+ *    badge appears on the trigger when a non-default sort or specialty is
+ *    active, so filter state is never silently invisible.
+ *  - Sort: useSortToggle (src/hooks/useSortToggle.js) generalized to accept
+ *    an optional (storageKey, labels, defaultMode) so this screen can run
+ *    its own instance under 'capsula_favourites_sort' — separate from
+ *    ConditionsScreen's 'capsula_conditions_sort' key, since 'recent' means
+ *    "recently added" here vs "recently viewed" there. Defaults to 'recent'
+ *    on this screen per explicit product decision (ConditionsScreen still
+ *    defaults to 'az', unaffected). "Recently added" ordering reuses
+ *    favourites.conditions' existing append-only insertion order (reversed)
+ *    as the id-priority array useConditionSearch's sort step already
+ *    accepts — no changes to useConditionSearch.js were needed.
+ *  - Specialty: useConditionSearch's existing (unused until now) specialty
+ *    filter step is wired up via activeSpecialty/setActiveSpecialty; the
+ *    existing SpecialtySelector/SpecialtiesBottomSheet components are reused
+ *    as-is (opened by the manager sheet's Specialty row) — no new specialty
+ *    UI built from scratch.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill, ListChecks, X, Circle, CheckCircle2, Search, ArrowLeft } from 'lucide-react'
+import { Star, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
+import SpecialtiesBottomSheet from '../components/conditions/SpecialtiesBottomSheet'
+import FavouritesManagerSheet from '../components/conditions/FavouritesManagerSheet'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
+import { useSortToggle } from '../hooks/useSortToggle'
 
 // Favourites' own identity color for badges/buttons/underline — not
 // var(--color-accent) (that's the app's blue, used throughout Home/
@@ -430,6 +460,15 @@ import { useConditionSearch } from '../hooks/useConditionSearch'
 // the app already teaches ("amber = saved"), rather than introducing an
 // arbitrary new color.
 const FAV_ACCENT = '#F59E0B'
+
+// Sort labels for this screen's own useSortToggle instance (separate
+// storage key from ConditionsScreen — see Phase 14 note below). 'recent'
+// means "recently added to favourites" here, not "recently viewed", so it
+// gets its own label rather than reusing useSortToggle's exported default.
+const FAV_SORT_LABELS = {
+  az:     'A – Z',
+  recent: 'Recently added',
+}
 
 // Static tab order/labels/icons — no longer carries per-render count data, so
 // this can live outside the component. Order matters: switchTab() below uses
@@ -802,7 +841,7 @@ function renderTabs(activeTab, onSelect, counts) {
 // favSearchExpand keyframe and given the fav-search-micro scoped class (see
 // local <style> block in FavouritesScreen below).
 
-function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenManager, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
       backgroundColor: 'var(--color-surface)',
@@ -921,16 +960,17 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
               : <Search size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
           </button>
 
-          {showManageButton && !isSearching && (
+          {showManagerButton && !isSearching && (
             <button
-              onClick={onToggleManage}
-              aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+              onClick={onOpenManager}
+              aria-label="Sort, filter, and manage favourites"
               style={{
+                position:                'relative',
                 width:                   36,
                 height:                  36,
                 borderRadius:            '50%',
                 border:                  'none',
-                backgroundColor:         isManaging ? 'var(--color-accent)' : 'transparent',
+                backgroundColor:         'transparent',
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
@@ -940,9 +980,18 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
                 outline:                 'none',
               }}
             >
-              {isManaging
-                ? <X size={17} color="#fff" strokeWidth={2} />
-                : <ListChecks size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
+              <SlidersHorizontal size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />
+              {hasActiveFilters && (
+                <span aria-hidden="true" style={{
+                  position:        'absolute',
+                  top:             6,
+                  right:           6,
+                  width:           7,
+                  height:          7,
+                  borderRadius:    '50%',
+                  backgroundColor: 'var(--color-accent)',
+                }} />
+              )}
             </button>
           )}
         </div>
@@ -971,7 +1020,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
 // fav-sticky-search-height scoped classes (see FavouritesScreen's local
 // <style> block) so the input's own height matches the expanded button.
 
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, onToggleManage, showManageButton, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
@@ -1097,16 +1146,17 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 : <Search size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
             </button>
 
-            {showManageButton && !isSearching && (
+            {showManagerButton && !isSearching && (
               <button
-                onClick={onToggleManage}
-                aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
+                onClick={onOpenManager}
+                aria-label="Sort, filter, and manage favourites"
                 style={{
+                  position:                'relative',
                   width:                   32,
                   height:                  32,
                   borderRadius:            '50%',
                   border:                  'none',
-                  backgroundColor:         isManaging ? 'var(--color-accent)' : 'var(--color-surface)',
+                  backgroundColor:         'var(--color-surface)',
                   display:                 'flex',
                   alignItems:              'center',
                   justifyContent:          'center',
@@ -1116,9 +1166,18 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                   outline:                 'none',
                 }}
               >
-                {isManaging
-                  ? <X size={17} color="#fff" strokeWidth={2.2} />
-                  : <ListChecks size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
+                <SlidersHorizontal size={17} color="var(--color-text-primary)" strokeWidth={2.2} />
+                {hasActiveFilters && (
+                  <span aria-hidden="true" style={{
+                    position:        'absolute',
+                    top:             5,
+                    right:           5,
+                    width:           7,
+                    height:          7,
+                    borderRadius:    '50%',
+                    backgroundColor: 'var(--color-accent)',
+                  }} />
+                )}
               </button>
             )}
           </div>
@@ -1200,6 +1259,13 @@ export default function FavouritesScreen() {
     })
   }
 
+  // ── Manager sheet (sort + specialty + manage entry point) — Conditions
+  // tab only, same scope as manage mode above. The specialty sheet is a
+  // separate piece of state so the two never render stacked/simultaneously —
+  // opening one always closes the other first (see handlers below).
+  const [showManagerSheet, setShowManagerSheet] = useState(false)
+  const [showSpecialtySheet, setShowSpecialtySheet] = useState(false)
+
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
   function handleConfirmBulkRemove() {
@@ -1211,7 +1277,7 @@ export default function FavouritesScreen() {
   }
 
   const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()
-  const { conditions } = useConditionContext()
+  const { conditions, specialties } = useConditionContext()
   const { drugs }      = useDrugContext()
   const { stockMap }   = useStock(drugs)
 
@@ -1229,17 +1295,48 @@ export default function FavouritesScreen() {
     [favourites.drugs, drugs]
   )
 
+  // Sort (Phase 14) — own storage key ('capsula_favourites_sort'), separate
+  // from ConditionsScreen's 'capsula_conditions_sort' key, since 'recent'
+  // means a different thing on each screen (viewed vs added). Defaults to
+  // 'recent' here per explicit product decision, vs ConditionsScreen's 'az'.
+  const { sortMode, setSortMode } = useSortToggle('capsula_favourites_sort', FAV_SORT_LABELS, 'recent')
+
+  // favourites.conditions is append-only (toggleCondition always appends the
+  // newly-favourited id to the end — see useFavourites.js), so it's already
+  // in oldest-added → newest-added order. Reversed, it's a ready-made
+  // "recently added first" ranking — exactly the shape useConditionSearch's
+  // sort step already expects (it ranks by indexOf in whatever id array is
+  // passed as its third argument), so no changes to that hook were needed.
+  const recentlyAddedOrder = useMemo(
+    () => [...favourites.conditions].reverse(),
+    [favourites.conditions]
+  )
+
   // Conditions-tab search — scoped to the user's saved conditions only (not
   // the full catalog). Own query state, independent of any other search on
   // the app. Drugs-tab search is deferred this session (see file header).
+  // sortMode/recentlyAddedOrder (Phase 14) feed the hook's existing sort
+  // step; activeSpecialty/setActiveSpecialty feed its existing specialty
+  // filter step — both were already built into useConditionSearch, just
+  // unused by this screen until now.
   const {
     query:   conditionQuery,
     setQuery: setConditionQuery,
+    activeSpecialty,
+    setActiveSpecialty,
     results: conditionResults,
-  } = useConditionSearch(savedConditions)
+  } = useConditionSearch(savedConditions, sortMode, recentlyAddedOrder)
 
   const isSearchingConditions = conditionQuery.trim().length > 0
   const conditionSearchEmpty  = isSearchingConditions && conditionResults.length === 0
+
+  // Active specialty object + filter/sort summary for the manager button's
+  // dot badge — same lookup pattern as ConditionsScreen.
+  const activeSpecialtyObj = activeSpecialty !== 'all'
+    ? specialties.find(s => s.id === activeSpecialty) ?? null
+    : null
+
+  const hasActiveFilters = activeSpecialty !== 'all' || sortMode !== 'recent'
 
   // Drugs-tab search box — placeholder only (Phase 2N). Local, unwired state
   // just so the input is controlled/typeable. Do NOT connect this to
@@ -1337,9 +1434,9 @@ export default function FavouritesScreen() {
         visible={showStickyHeader}
         activeTab={activeTab}
         onSelectTab={switchTab}
-        isManaging={isManaging}
-        onToggleManage={toggleManage}
-        showManageButton={savedConditions.length > 0}
+        showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
+        hasActiveFilters={hasActiveFilters}
+        onOpenManager={() => setShowManagerSheet(true)}
         counts={{ conditions: savedConditions.length, drugs: savedDrugs.length }}
         isSearching={isSearching}
         onToggleSearch={toggleSearch}
@@ -1404,9 +1501,9 @@ export default function FavouritesScreen() {
 
         <FavouritesHero
           heroRef={heroRef}
-          isManaging={isManaging}
-          onToggleManage={toggleManage}
-          showManageButton={savedConditions.length > 0}
+          showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
+          hasActiveFilters={hasActiveFilters}
+          onOpenManager={() => setShowManagerSheet(true)}
           isSearching={isSearching}
           onToggleSearch={toggleSearch}
           searchValue={heroSearchValue}
@@ -1524,6 +1621,25 @@ export default function FavouritesScreen() {
           onRemove={() => setShowBulkConfirm(true)}
         />
       )}
+
+      <FavouritesManagerSheet
+        isOpen={showManagerSheet}
+        onClose={() => setShowManagerSheet(false)}
+        sortMode={sortMode}
+        sortLabels={FAV_SORT_LABELS}
+        onSetSortMode={setSortMode}
+        activeSpecialtyObj={activeSpecialtyObj}
+        onOpenSpecialties={() => setShowSpecialtySheet(true)}
+        onManage={toggleManage}
+      />
+
+      <SpecialtiesBottomSheet
+        isOpen={showSpecialtySheet}
+        specialties={specialties}
+        activeSpecialty={activeSpecialty}
+        onSelect={setActiveSpecialty}
+        onClose={() => setShowSpecialtySheet(false)}
+      />
 
       <ConfirmSheet
         isOpen={!!confirmingCondition}

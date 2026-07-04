@@ -1,0 +1,265 @@
+/**
+ * src/components/conditions/FavouritesManagerSheet.jsx
+ *
+ * Bottom sheet grouping the three Favourites-Conditions controls (sort,
+ * specialty filter, manage mode) behind a single entry point, instead of
+ * three separate header buttons. Visual shell (backdrop fade, slide-up
+ * transition, mount/unmount timing, Escape key, body-scroll lock) is copied
+ * from SpecialtiesBottomSheet so it reads as the same "extra controls"
+ * pattern already established there and in ConfirmSheet — no new UI
+ * language introduced.
+ *
+ * Layout:
+ *   1. Sort       — two-way segmented control (A-Z / Recently added labels
+ *                   are caller-supplied via sortLabels, not hardcoded here,
+ *                   since Favourites' 'recent' means "recently added" while
+ *                   ConditionsScreen's own sort toggle means "recently
+ *                   viewed" — this component has no opinion on that).
+ *   2. Specialty  — a drill-in row. Tapping it closes this sheet and opens
+ *                   SpecialtiesBottomSheet (unchanged, reused as-is) — the
+ *                   two sheets are never shown stacked/simultaneously.
+ *   3. Manage     — tapping it calls onManage() and closes this sheet.
+ *
+ * Props:
+ *   isOpen              boolean
+ *   onClose             () => void
+ *   sortMode            string  — 'az' | 'recent'
+ *   sortLabels          { az: string, recent: string }
+ *   onSetSortMode       (mode: string) => void
+ *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
+ *   onOpenSpecialties   () => void  — called after this sheet closes
+ *   onManage            () => void  — called after this sheet closes
+ */
+
+import { useEffect, useState }          from 'react'
+import { ListFilter, ListChecks }       from 'lucide-react'
+import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+
+export default function FavouritesManagerSheet({
+  isOpen,
+  onClose,
+  sortMode,
+  sortLabels,
+  onSetSortMode,
+  activeSpecialtyObj,
+  onOpenSpecialties,
+  onManage,
+}) {
+  const isDark = useIsDark()
+
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true)
+      requestAnimationFrame(() => setAnimateIn(true))
+    } else {
+      setAnimateIn(false)
+      const t = setTimeout(() => setShouldRender(false), 320)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isOpen, onClose])
+
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  if (!shouldRender) return null
+
+  const hasSpecialty = !!activeSpecialtyObj
+  const tokenKey      = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
+  const specialtyIconColor = hasSpecialty
+    ? resolveToken(tokenKey, isDark).fg
+    : 'var(--color-text-secondary)'
+
+  function handleOpenSpecialties() {
+    onClose()
+    onOpenSpecialties()
+  }
+
+  function handleManage() {
+    onClose()
+    onManage()
+  }
+
+  return (
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position:        'fixed',
+          inset:           0,
+          zIndex:          200,
+          backgroundColor: 'rgba(0,0,0,0.35)',
+          opacity:         animateIn ? 1 : 0,
+          transition:      animateIn
+            ? 'opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
+            : 'opacity 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
+        }}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage favourites"
+        style={{
+          position:        'fixed',
+          bottom:          0,
+          left:            0,
+          right:           0,
+          zIndex:          201,
+          backgroundColor: 'var(--color-surface)',
+          borderRadius:    '16px 16px 0 0',
+          paddingBottom:   'env(safe-area-inset-bottom)',
+          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
+          transition:      animateIn
+            ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
+            : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+        }}
+      >
+        <div style={{ padding: 'var(--space-5) var(--space-4)' }}>
+          {/* Drag handle */}
+          <div style={{
+            width:           40,
+            height:          4,
+            borderRadius:    2,
+            backgroundColor: 'var(--color-border)',
+            margin:          '0 auto var(--space-5)',
+          }} />
+
+          {/* Sort */}
+          <div style={{
+            fontSize:      11,
+            fontWeight:    500,
+            color:         'var(--color-text-tertiary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            marginBottom:  8,
+          }}>
+            Sort
+          </div>
+          <div style={{
+            display:         'flex',
+            backgroundColor: 'var(--color-border-subtle)',
+            borderRadius:    'var(--radius-md)',
+            padding:         3,
+            gap:             3,
+            marginBottom:    'var(--space-4)',
+          }}>
+            {['az', 'recent'].map(mode => {
+              const isActive = sortMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => onSetSortMode(mode)}
+                  style={{
+                    flex:                    1,
+                    padding:                 '9px 0',
+                    borderRadius:            'var(--radius-sm)',
+                    border:                  'none',
+                    backgroundColor:         isActive ? 'var(--color-surface)' : 'transparent',
+                    boxShadow:               isActive ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
+                    fontSize:                13,
+                    fontFamily:              'var(--font-body)',
+                    fontWeight:              isActive ? 600 : 400,
+                    color:                   isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                    cursor:                  'pointer',
+                    outline:                 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition:              'background-color 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                >
+                  {sortLabels[mode]}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Specialty */}
+          <button
+            onClick={handleOpenSpecialties}
+            style={{
+              width:                   '100%',
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     10,
+              padding:                 '12px 10px',
+              marginBottom:            6,
+              background:              'none',
+              border:                  'none',
+              borderRadius:            'var(--radius-md)',
+              textAlign:               'left',
+              cursor:                  'pointer',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {hasSpecialty ? (
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={17}
+                color={specialtyIconColor}
+              />
+            ) : (
+              <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
+            )}
+            <span style={{
+              flex:       1,
+              fontSize:   14,
+              fontFamily: 'var(--font-body)',
+              color:      'var(--color-text-primary)',
+            }}>
+              {hasSpecialty ? activeSpecialtyObj.name : 'All specialties'}
+            </span>
+            <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+              style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+              <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
+                strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+
+          <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
+
+          {/* Manage */}
+          <button
+            onClick={handleManage}
+            style={{
+              width:                   '100%',
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     10,
+              padding:                 '12px 10px',
+              background:              'none',
+              border:                  'none',
+              borderRadius:            'var(--radius-md)',
+              textAlign:               'left',
+              cursor:                  'pointer',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <ListChecks size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+            <span style={{
+              fontSize:   14,
+              fontFamily: 'var(--font-body)',
+              color:      'var(--color-text-primary)',
+            }}>
+              Manage favourites
+            </span>
+          </button>
+        </div>
+      </div>
+    </>
+  )
+}
