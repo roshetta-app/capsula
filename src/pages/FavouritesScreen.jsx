@@ -438,7 +438,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
+import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -657,12 +657,17 @@ function NothingSavedEmptyState({ label }) {
         width:           64,
         height:          64,
         borderRadius:    '50%',
-        backgroundColor: 'var(--color-accent-light)',
+        // Light red tint mirroring the role var(--color-accent-light) used
+        // to play here — no var(--color-danger-light) token exists to reuse,
+        // so this is a literal soft-red hex (Tailwind red-100) paired with
+        // var(--color-danger) below, matching the heart identity elsewhere
+        // on this screen rather than the old blue.
+        backgroundColor: '#FEE2E2',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
       }}>
-        <Star size={28} strokeWidth={1.5} style={{ color: 'var(--color-accent)' }} />
+        <Heart size={28} strokeWidth={1.5} style={{ color: 'var(--color-danger)' }} />
       </div>
 
       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
