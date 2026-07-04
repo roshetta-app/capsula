@@ -1676,11 +1676,12 @@ export default function FavouritesScreen() {
           width: 14px !important;
           height: 14px !important;
           /* Leading icon (the Heart, via SearchBar's 'icon' prop) recolored
-             red, filled (Lucide's default fill:none is untouched by `color`,
-             so this only changes the stroke — see the Heart's own `fill`
-             prop usage elsewhere for the filled variant). The rule below
-             re-scopes the clear-text (X) button's icon back to its original
-             neutral color, since this selector would otherwise catch it too. */
+             red, filled (Lucide's default fill:none is untouched by the
+             color property, so this only changes the stroke — see the
+             Heart's own fill prop usage elsewhere for the filled variant).
+             The rule below re-scopes the clear-text (X) button's icon back
+             to its original neutral color, since this selector would
+             otherwise catch it too. */
           color: var(--color-danger) !important;
         }
         .fav-search-micro button svg {
