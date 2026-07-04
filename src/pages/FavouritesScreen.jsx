@@ -438,7 +438,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
+import { Star, Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -455,13 +455,13 @@ import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 
-// Favourites' own identity color for badges/buttons/underline — not
-// var(--color-accent) (that's the app's blue, used throughout Home/
-// ConditionDetail). This is the exact hex RowStarButton already uses for a
-// favourited star, so promoting it to this screen's accent reuses a meaning
-// the app already teaches ("amber = saved"), rather than introducing an
-// arbitrary new color.
-const FAV_ACCENT = '#F59E0B'
+// Favourites' own identity color for the heart badge/star icon — was amber
+// ('#F59E0B') until this pass, now reuses var(--color-danger) so "favourited
+// = red heart" maps onto the same red the app already uses elsewhere
+// (e.g. the Remove button below), rather than introducing a new hex. Not
+// var(--color-accent) — that's the app's blue, used throughout Home/
+// ConditionDetail for unrelated things.
+const FAV_ACCENT = 'var(--color-danger)'
 
 // Sort labels for this screen's own useSortToggle instance (separate
 // storage key from ConditionsScreen — see Phase 14 note below). 'recent'
@@ -596,7 +596,11 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCa
                 border:         'none',
                 cursor:         'pointer',
                 fontSize:       13,
-                color:          FAV_ACCENT,
+                // Frozen at the previous FAV_ACCENT amber, deliberately not
+                // following that constant's move to red — this link's color
+                // was incidental reuse, unrelated to the favourite/heart
+                // identity color being changed here.
+                color:          '#F59E0B',
                 fontFamily:     'var(--font-body)',
                 padding:        0,
                 whiteSpace:     'nowrap',
@@ -874,10 +878,10 @@ function RowStarButton({ onPress }) {
         flexShrink:              0,
         WebkitTapHighlightColor: 'transparent',
         outline:                 'none',
-        color:                   '#F59E0B',
+        color:                   FAV_ACCENT,
       }}
     >
-      <Star size={13} fill="#F59E0B" strokeWidth={1.8} />
+      <Heart size={13} fill={FAV_ACCENT} strokeWidth={1.8} />
     </button>
   )
 }
@@ -1039,7 +1043,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
               justifyContent:  'center',
               flexShrink:      0,
             }}>
-              <Star size={18} fill="#fff" color="#fff" strokeWidth={0} />
+              <Heart size={18} fill="#fff" color="#fff" strokeWidth={0} />
             </div>
           )}
           {isSearching
@@ -1058,7 +1062,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
                     value={searchValue}
                     onChange={onSearchChange}
                     placeholder={searchPlaceholder}
-                    icon={Star}
+                    icon={Heart}
                     compact
                   />
                 </div>
@@ -1232,7 +1236,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
                 justifyContent:  'center',
                 flexShrink:      0,
               }}>
-                <Star size={15} fill="#fff" color="#fff" strokeWidth={0} />
+                <Heart size={15} fill="#fff" color="#fff" strokeWidth={0} />
               </div>
             )}
             {isSearching
@@ -1251,7 +1255,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
                       value={searchValue}
                       onChange={onSearchChange}
                       placeholder={searchPlaceholder}
-                      icon={Star}
+                      icon={Heart}
                       compact
                     />
                   </div>
@@ -1666,12 +1670,13 @@ export default function FavouritesScreen() {
         .fav-search-micro svg {
           width: 14px !important;
           height: 14px !important;
-          /* Leading icon (the Star, via SearchBar's 'icon' prop) recolored
-             amber/yellow, outlined (Lucide's default fill:none is untouched,
-             so this only changes the stroke color). The rule below re-scopes
-             the clear-text (X) button's icon back to its original neutral
-             color, since this selector would otherwise catch it too. */
-          color: #F59E0B !important;
+          /* Leading icon (the Heart, via SearchBar's 'icon' prop) recolored
+             red, filled (Lucide's default fill:none is untouched by `color`,
+             so this only changes the stroke — see the Heart's own `fill`
+             prop usage elsewhere for the filled variant). The rule below
+             re-scopes the clear-text (X) button's icon back to its original
+             neutral color, since this selector would otherwise catch it too. */
+          color: var(--color-danger) !important;
         }
         .fav-search-micro button svg {
           color: var(--color-text-tertiary) !important;
