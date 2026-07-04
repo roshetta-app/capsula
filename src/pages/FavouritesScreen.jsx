@@ -446,7 +446,8 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
 import SpecialtiesBottomSheet from '../components/conditions/SpecialtiesBottomSheet'
 import FavouritesManagerSheet from '../components/conditions/FavouritesManagerSheet'
-import { SpecialtyIcon } from '../utils/specialtyIcon'
+import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN, tintedBg } from '../utils/specialtyTokens'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -780,7 +781,15 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
 // regardless of whether it happens to match zero, one, or many conditions.
 
 function SpecialtyFilterBanner({ specialty, count, onClear }) {
+  const isDark = useIsDark()
   if (!specialty) return null
+
+  // Same token → background-wash pattern used by SpecialtySelector's active
+  // card and ConditionCard's icon bubble elsewhere in the app — tintedBg()
+  // keeps the wash math identical instead of hand-rolling a new opacity here.
+  const tokenKey = specialty.colorToken ?? FALLBACK_TOKEN
+  const { bg, fg } = resolveToken(tokenKey, isDark)
+
   return (
     <div style={{
       display:         'flex',
@@ -789,7 +798,7 @@ function SpecialtyFilterBanner({ specialty, count, onClear }) {
       gap:             10,
       padding:         '8px 10px',
       marginBottom:    10,
-      backgroundColor: 'var(--color-border-subtle)',
+      backgroundColor: tintedBg(bg, isDark),
       borderRadius:    'var(--radius-md)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -797,12 +806,12 @@ function SpecialtyFilterBanner({ specialty, count, onClear }) {
           iconType={specialty.iconType   ?? 'lucide'}
           iconValue={specialty.iconValue ?? 'Stethoscope'}
           size={15}
-          color="var(--color-text-secondary)"
+          color={fg}
         />
         <span style={{
           fontSize:     13,
           fontWeight:   600,
-          color:        'var(--color-text-primary)',
+          color:        fg,
           overflow:     'hidden',
           textOverflow: 'ellipsis',
           whiteSpace:   'nowrap',
