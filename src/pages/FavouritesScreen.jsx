@@ -390,7 +390,7 @@
  *    underline — that file wasn't in this task's context, so it's now out
  *    of sync until updated to match, if still desired.
  *  - FavouritesHero card shadow: 0 1px 2px rgba(0,0,0,0.04) → 0 8px 24px
- *    rgba(0, 0, 0, 0.08) — a softer, more diffused blur with more visual
+ *    rgba(0, 0, 0, 0.06) — a softer, more diffused blur with more visual
  *    weight, so the card reads as lifted off the page background rather
  *    than nearly flush with it.
  *  - Manage mode recolored amber → blue for its interactive controls:
@@ -813,7 +813,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
       // nearly flush with the page background and needed more definition.
       // Larger blur radius + low spread keeps it soft rather than a hard
       // drop shadow.
-      boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.08)',
+      boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.06)',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
@@ -1384,6 +1384,15 @@ export default function FavouritesScreen() {
         .fav-search-micro svg {
           width: 14px !important;
           height: 14px !important;
+          /* Leading icon (the Star, via SearchBar's `icon` prop) recolored
+             amber/yellow, outlined (Lucide's default fill:none is untouched,
+             so this only changes the stroke color). The rule below re-scopes
+             the clear-text (X) button's icon back to its original neutral
+             color, since this selector would otherwise catch it too. */
+          color: #F59E0B !important;
+        }
+        .fav-search-micro button svg {
+          color: var(--color-text-tertiary) !important;
         }
         .fav-sticky-search-height input {
           height: 36px !important;
