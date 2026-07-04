@@ -710,60 +710,95 @@ export default function ConditionsScreen() {
         onSearchTap={handleSearchTap}
       />
 
-      {/* 1. Brand row + tagline + dark mode toggle */}
-      <BrandRow
-        isSearching={isSearching}
-        isDark={isDark}
-        onToggleDark={toggleDark}
-        brandRowRef={brandRowRef}
-      />
+      {/* ─── Hero panel ───────────────────────────────────────────────────────
+          White (var(--color-surface)) background, bled edge-to-edge past
+          Layout's <main> side padding (negative margin equal to that
+          padding, restored as this panel's own padding for its children) —
+          previously these sections just sat directly on the page background
+          with no visual grouping. Contains everything above the sort row:
+          brand row, search, recently-viewed, specialty selector. */}
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        marginLeft:      'calc(var(--space-6) * -1)',
+        marginRight:     'calc(var(--space-6) * -1)',
+        paddingLeft:     'var(--space-6)',
+        paddingRight:    'var(--space-6)',
+      }}>
 
-      {/* 2. Search bar */}
-      <div style={{ marginBottom: 'var(--space-4)' }}>
-        <SearchBar
-          ref={searchInputRef}
-          value={query}
-          onChange={val => setQuery(val)}
-        />
-      </div>
-
-      {/* 3. Recently viewed — temporarily hidden (set hidden={isSearching} to re-enable) */}
-      <RecentlyViewedChips
-        recentlyViewed={recentlyViewed}
-        hidden={true}
-      />
-
-      {/* 4. Full-width specialty selector — same width as search bar */}
-      <div style={{ marginBottom: 'var(--space-5)' }}>
-        <SpecialtySelector
-          activeSpecialtyObj={activeSpecialtyObj}
-          onOpen={() => setBottomSheetOpen(true)}
-          onClear={handleClearFilter}
-          isOpen={bottomSheetOpen}
-        />
-      </div>
-
-      {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
-      <div ref={listHeaderRef}>
-        <ConditionListHeader
-          totalCount={totalCount}
-          resultCount={resultCount}
-          activeSpecialty={activeSpecialty}
-          specialtyName={specialtyName}
+        {/* 1. Brand row + tagline + dark mode toggle */}
+        <BrandRow
           isSearching={isSearching}
-          sortMode={sortMode}
-          onSortToggle={cycleSortMode}
-          SORT_LABELS={SORT_LABELS}
-          firstLetter={
-            !isSearching && sortMode === 'az' && resultCount > 0
-              ? alphabetGroup(results)[0]?.letter
-              : undefined
-          }
+          isDark={isDark}
+          onToggleDark={toggleDark}
+          brandRowRef={brandRowRef}
         />
+
+        {/* 2. Search bar */}
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <SearchBar
+            ref={searchInputRef}
+            value={query}
+            onChange={val => setQuery(val)}
+          />
+        </div>
+
+        {/* 3. Recently viewed — temporarily hidden (set hidden={isSearching} to re-enable) */}
+        <RecentlyViewedChips
+          recentlyViewed={recentlyViewed}
+          hidden={true}
+        />
+
+        {/* 4. Full-width specialty selector — same width as search bar */}
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <SpecialtySelector
+            activeSpecialtyObj={activeSpecialtyObj}
+            onOpen={() => setBottomSheetOpen(true)}
+            onClear={handleClearFilter}
+            isOpen={bottomSheetOpen}
+          />
+        </div>
       </div>
 
-      {/* 6. Condition list */}
-      {renderList()}
+      {/* ─── Content panel ────────────────────────────────────────────────────
+          Same page background as before (var(--color-bg)) — visually
+          unchanged from the rest of the page — but pulled up over the hero
+          panel's bottom edge by exactly its own corner radius, so the
+          rounded top corners cut a visible curve into the white hero above
+          instead of sitting flush against it. Same edge-to-edge bleed as
+          the hero panel, for the same reason. */}
+      <div style={{
+        backgroundColor: 'var(--color-bg)',
+        borderTopLeftRadius:  'var(--radius-lg)',
+        borderTopRightRadius: 'var(--radius-lg)',
+        marginTop:       'calc(var(--radius-lg) * -1)',
+        marginLeft:      'calc(var(--space-6) * -1)',
+        marginRight:     'calc(var(--space-6) * -1)',
+        paddingLeft:     'var(--space-6)',
+        paddingRight:    'var(--space-6)',
+      }}>
+
+        {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
+        <div ref={listHeaderRef}>
+          <ConditionListHeader
+            totalCount={totalCount}
+            resultCount={resultCount}
+            activeSpecialty={activeSpecialty}
+            specialtyName={specialtyName}
+            isSearching={isSearching}
+            sortMode={sortMode}
+            onSortToggle={cycleSortMode}
+            SORT_LABELS={SORT_LABELS}
+            firstLetter={
+              !isSearching && sortMode === 'az' && resultCount > 0
+                ? alphabetGroup(results)[0]?.letter
+                : undefined
+            }
+          />
+        </div>
+
+        {/* 6. Condition list */}
+        {renderList()}
+      </div>
 
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />

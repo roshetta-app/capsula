@@ -38,6 +38,11 @@
  * Phase 14 — Idle icon swapped from inline Stethoscope SVG to ListFilter
  *            (lucide-react) — consistent with the sticky header pill idle state.
  *            Stethoscope is reserved for the Internal Medicine specialty icon.
+ * Phase 15 — Idle state gains a 1px var(--color-border) hairline border
+ *            (was 'none', relying only on a 4%-opacity shadow). Needed once
+ *            ConditionsScreen wrapped this card in a white hero panel — the
+ *            idle white fill had nothing to separate it from that background.
+ *            Active state (already a colored tint) is untouched.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -102,7 +107,14 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         alignItems:      'stretch',
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
-        border:          'none',
+        // Idle state now gets a hairline border — previously 'none', relying
+        // solely on a 4%-opacity shadow to separate the card from the page.
+        // That was enough against the old plain page background, but once
+        // ConditionsScreen's hero panel became white this card's white idle
+        // fill would otherwise blend straight into it. Active state is
+        // untouched — its colored tint background already stays visible
+        // regardless of what's behind it.
+        border:          isActive ? 'none' : '1px solid var(--color-border)',
         borderRadius:    '16px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
