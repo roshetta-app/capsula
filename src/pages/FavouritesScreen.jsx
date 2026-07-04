@@ -611,7 +611,7 @@ function renderTabs(activeTab, onSelect, counts) {
 // in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
 // 8→6, subtitle marginBottom 6→5.
 
-function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton, isSearching, onToggleSearch }) {
+function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div ref={heroRef} style={{
       backgroundColor: FAV_ACCENT_BG,
@@ -623,9 +623,13 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           title+subtitle stack (not against the title alone) — one cohesive
           unit rather than icon+title as one row and subtitle as a separate
           block underneath. Manage toggle sits on the right, filling the
-          same visual slot Home's dark-mode toggle occupies. */}
+          same visual slot Home's dark-mode toggle occupies.
+          When isSearching, the title/subtitle stack is replaced in-place by
+          the SearchBar (crossfade via key + favHeaderCrossfade, see the local
+          <style> block) — badge stays visible, manage button hides so only
+          the search icon flips to X while the input is showing. */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <div style={{
             width:           38,
             height:          38,
@@ -638,24 +642,37 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
           }}>
             <Star size={18} fill="#fff" color="#fff" strokeWidth={0} />
           </div>
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{
-              fontSize:      22,
-              fontWeight:    700,
-              color:         'var(--color-text-primary)',
-              margin:        0,
-              letterSpacing: '-0.3px',
-            }}>
-              Favourites
-            </h1>
-            <div style={{
-              fontSize:  13,
-              color:     'var(--color-text-tertiary)',
-              marginTop: 2,
-            }}>
-              Your saved references
-            </div>
-          </div>
+          {isSearching
+            ? (
+                <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
+                  <SearchBar
+                    value={searchValue}
+                    onChange={onSearchChange}
+                    placeholder={searchPlaceholder}
+                    compact
+                  />
+                </div>
+              )
+            : (
+                <div key="title" style={{ minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
+                  <h1 style={{
+                    fontSize:      22,
+                    fontWeight:    700,
+                    color:         'var(--color-text-primary)',
+                    margin:        0,
+                    letterSpacing: '-0.3px',
+                  }}>
+                    Favourites
+                  </h1>
+                  <div style={{
+                    fontSize:  13,
+                    color:     'var(--color-text-tertiary)',
+                    marginTop: 2,
+                  }}>
+                    Your saved references
+                  </div>
+                </div>
+              )}
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -682,7 +699,7 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
               : <Search size={17} color="#412402" strokeWidth={1.8} />}
           </button>
 
-          {showManageButton && (
+          {showManageButton && !isSearching && (
             <button
               onClick={onToggleManage}
               aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
@@ -745,7 +762,10 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
 
         {/* Title row — badge icon + text on the left, manage toggle on the
-            right, same lockup as the expanded hero at a smaller scale */}
+            right, same lockup as the expanded hero at a smaller scale.
+            When isSearching, the title text is replaced in-place by the
+            SearchBar (crossfade via key + favHeaderCrossfade) — badge stays
+            visible, manage button hides. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
@@ -753,7 +773,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
           gap:            8,
           padding:        '14px var(--space-6) 0',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             <div style={{
               width:           26,
               height:          26,
@@ -766,14 +786,32 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
             }}>
               <Star size={13} fill="#fff" color="#fff" strokeWidth={0} />
             </div>
-            <div style={{
-              fontSize:      16,
-              fontWeight:    700,
-              color:         'var(--color-text-primary)',
-              letterSpacing: '-0.2px',
-            }}>
-              Favourites
-            </div>
+            {isSearching
+              ? (
+                  <div key="search" style={{ flex: 1, minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
+                    <SearchBar
+                      value={searchValue}
+                      onChange={onSearchChange}
+                      placeholder={searchPlaceholder}
+                      compact
+                    />
+                  </div>
+                )
+              : (
+                  <div
+                    key="title"
+                    style={{
+                      fontSize:      16,
+                      fontWeight:    700,
+                      color:         'var(--color-text-primary)',
+                      letterSpacing: '-0.2px',
+                      minWidth:      0,
+                      animation:     'favHeaderCrossfade 0.2s ease',
+                    }}
+                  >
+                    Favourites
+                  </div>
+                )}
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -800,7 +838,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 : <Search size={13} color="#412402" strokeWidth={1.8} />}
             </button>
 
-            {showManageButton && (
+            {showManageButton && !isSearching && (
               <button
                 onClick={onToggleManage}
                 aria-label={isManaging ? 'Exit manage mode' : 'Manage favourites'}
@@ -828,38 +866,14 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         </div>
 
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
-            position: relative so the overlay search row (rendered from the
-            main FavouritesScreen body) can anchor flush beneath this tab
-            row when opened while the sticky header is active. */}
+            No longer needs position: relative — the search input now swaps
+            in-place with the title above instead of overlaying below the
+            tabs. */}
         <div style={{
-          position:  'relative',
           marginTop: 6,
           padding:   '0 var(--space-6) 10px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
-
-          {isSearching && (
-            <div style={{
-              position:        'absolute',
-              top:             '100%',
-              left:            'var(--space-6)',
-              right:           'var(--space-6)',
-              paddingTop:      8,
-              paddingBottom:   10,
-              backgroundColor: 'var(--color-surface)',
-              boxShadow:       '0 4px 12px rgba(0, 0, 0, 0.08)',
-              borderBottomLeftRadius:  12,
-              borderBottomRightRadius: 12,
-              zIndex:          1,
-            }}>
-              <SearchBar
-                value={searchValue}
-                onChange={onSearchChange}
-                placeholder={searchPlaceholder}
-                compact
-              />
-            </div>
-          )}
         </div>
 
       </div>
@@ -886,17 +900,11 @@ export default function FavouritesScreen() {
     snackTimer.current = setTimeout(() => setSnackVisible(false), 2000)
   }
 
-  // ── Search overlay (icon-triggered, replaces the old always-visible bar) ──
-  // Opening scrolls to top ONCE so the overlay never hides cards it covers —
-  // it does not push content down, so anything already scrolled past the
-  // header would otherwise sit hidden underneath it.
+  // ── Search (icon-triggered, swaps in-place with the header title) ──────────
   const [isSearching, setIsSearching] = useState(false)
 
   function toggleSearch() {
-    setIsSearching(prev => {
-      if (!prev) window.scrollTo({ top: 0, behavior: 'auto' })
-      return !prev
-    })
+    setIsSearching(prev => !prev)
   }
 
   // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
@@ -1079,6 +1087,10 @@ export default function FavouritesScreen() {
           from { opacity: 0; transform: translateX(-16px); }
           to   { opacity: 1; transform: translateX(0); }
         }
+        @keyframes favHeaderCrossfade {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
       `}</style>
 
       <div>
@@ -1090,39 +1102,17 @@ export default function FavouritesScreen() {
           showManageButton={savedConditions.length > 0}
           isSearching={isSearching}
           onToggleSearch={toggleSearch}
+          searchValue={heroSearchValue}
+          onSearchChange={heroSearchOnChange}
+          searchPlaceholder={heroSearchPlaceholder}
         />
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being
-            browsed. position: relative so the overlay search row below can
-            anchor flush beneath it. The old always-visible SearchBar block
-            that used to sit here has been removed — search is now
-            icon-triggered from the header (see FavouritesHero/
-            StickyFavouritesHeader) and renders as this overlay instead. */}
-        <div style={{ position: 'relative', marginBottom: 8 }}>
+            browsed. Search is icon-triggered from the header (see
+            FavouritesHero/StickyFavouritesHeader) and now swaps in-place
+            with the header title itself — no overlay panel here anymore. */}
+        <div style={{ marginBottom: 8 }}>
           {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
-
-          {isSearching && (
-            <div style={{
-              position:        'absolute',
-              top:             '100%',
-              left:            0,
-              right:           0,
-              paddingTop:      8,
-              paddingBottom:   10,
-              backgroundColor: 'var(--color-surface)',
-              boxShadow:       '0 4px 12px rgba(0, 0, 0, 0.08)',
-              borderBottomLeftRadius:  12,
-              borderBottomRightRadius: 12,
-              zIndex:          1,
-            }}>
-              <SearchBar
-                value={heroSearchValue}
-                onChange={heroSearchOnChange}
-                placeholder={heroSearchPlaceholder}
-                compact
-              />
-            </div>
-          )}
         </div>
 
         {/* Swipeable content area — tap OR swipe switches tabs, mirroring
