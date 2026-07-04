@@ -1384,7 +1384,7 @@ export default function FavouritesScreen() {
         .fav-search-micro svg {
           width: 14px !important;
           height: 14px !important;
-          /* Leading icon (the Star, via SearchBar's `icon` prop) recolored
+          /* Leading icon (the Star, via SearchBar's 'icon' prop) recolored
              amber/yellow, outlined (Lucide's default fill:none is untouched,
              so this only changes the stroke color). The rule below re-scopes
              the clear-text (X) button's icon back to its original neutral
