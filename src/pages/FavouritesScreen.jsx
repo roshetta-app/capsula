@@ -812,8 +812,9 @@ function FavouritesHero({ heroRef, isManaging, onToggleManage, showManageButton,
       // Diffused, soft-blur shadow — previous 0 1px 2px hairline read as
       // nearly flush with the page background and needed more definition.
       // Larger blur radius + low spread keeps it soft rather than a hard
-      // drop shadow.
-      boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.06)',
+      // drop shadow. Offset/opacity trimmed further (8px→4px, 0.06→0.045)
+      // so the card still lifts off the page without reading as heavy.
+      boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
     }}>
       {/* Single lockup: badge icon on the left, centered against the combined
           title+subtitle stack (not against the title alone) — one cohesive
