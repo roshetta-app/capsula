@@ -21,6 +21,12 @@
  *             above it, so the seam reads via elevation as well as color.
  *             Hero panel also gained paddingBottom so its color visibly
  *             extends past the specialty selector before the curve begins.
+ * Phase 17 — Feedback pass on Phase 16: hero tint (#EEF1F5, cool blue-grey)
+ *             clashed against this palette's warm undertone — swapped to a
+ *             warm greige (#F3F1EC, in globals.css) matching
+ *             --color-border-subtle/--color-note-bg. Content panel gained
+ *             paddingTop — the sort row previously sat flush against the
+ *             curve with no buffer.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -800,6 +806,7 @@ export default function ConditionsScreen() {
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
+        paddingTop:      'var(--space-5)',
         boxShadow:       '0 -6px 16px rgba(0, 0, 0, 0.06)',
       }}>
 

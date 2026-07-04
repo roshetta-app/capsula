@@ -85,10 +85,11 @@
 
   /* Hero panel — ConditionsScreen two-tone redesign. Deliberately distinct
      from both --color-surface (too close to --color-bg to read as a
-     separate zone) and --color-bg itself. Cool, faint grey-blue wash —
-     enough lightness/hue delta to be visible on-device without reading
-     as a brand color block. */
-  --color-hero-bg:          #EEF1F5;
+     separate zone) and --color-bg itself. Warm neutral greige, matching
+     the undertone of --color-border-subtle/--color-note-bg — a cool
+     blue-grey was tried first (#EEF1F5) and read as a mismatched foreign
+     color against this palette's warm tokens, so this stays in-family. */
+  --color-hero-bg:          #F3F1EC;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
