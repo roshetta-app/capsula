@@ -2,7 +2,7 @@
  * src/components/BottomNav.jsx
  * Phase 2B — Navigation & Routing Overhaul
  * Phase 10 — Icon system overhaul: replaced custom FA SVG paths with Lucide
- *             icons (House, Pill, Heart) consistent with the rest of the app.
+ *             icons (BookOpen, Pill, Heart) consistent with the rest of the app.
  *             Active = filled (fill='currentColor'), inactive = stroke only.
  *             Favourites icon now follows active-tab state only — removed
  *             hasFavourites fill logic and gold label treatment.
@@ -37,7 +37,8 @@
  *             ConditionDetailScreen can share the same signal.
  *
  * Changes from previous version:
- *  - Tab 1: Conditions — House (Lucide)
+ *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
+ *           own Conditions tab icon
  *  - Tab 2: Drugs      — Pill (Lucide)
  *  - Tab 3: Favourites — Heart (Lucide), red identity when active
  *  - Active tab: filled icon + brand color. Inactive: stroke only + muted.
@@ -48,7 +49,7 @@
  */
 
 import { useLocation, useNavigate } from 'react-router-dom'
-import { House, Pill, Heart }        from 'lucide-react'
+import { BookOpen, Pill, Heart }     from 'lucide-react'
 import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
@@ -76,7 +77,11 @@ export default function BottomNav() {
   }
 
   const TABS = [
-    { path: '/conditions', label: 'Conditions', Icon: House },
+    // BookOpen — matches the Conditions tab icon already used inside
+    // FavouritesScreen's own Conditions/Drugs tab bar, so "Conditions"
+    // reads as the same icon everywhere in the app instead of House here
+    // and BookOpen there.
+    { path: '/conditions', label: 'Conditions', Icon: BookOpen },
     { path: '/drugs',      label: 'Drugs',      Icon: Pill  },
     // Favourites gets its own red identity color + fills when active,
     // matching the heart used elsewhere for favourited state (title badge,
