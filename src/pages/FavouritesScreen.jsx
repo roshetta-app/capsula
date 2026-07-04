@@ -446,6 +446,7 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
 import SpecialtiesBottomSheet from '../components/conditions/SpecialtiesBottomSheet'
 import FavouritesManagerSheet from '../components/conditions/FavouritesManagerSheet'
+import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -765,6 +766,72 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
         }}
       >
         Clear filter
+      </button>
+    </div>
+  )
+}
+
+// ─── Active specialty filter banner ─────────────────────────────────────────
+// Sits between the tab bar and the results list whenever a specialty filter
+// is active on the Conditions tab — a standing reminder of what's currently
+// narrowing the list (and how many results that leaves), with its own X so
+// clearing it doesn't require reopening FavouritesManagerSheet. Distinct
+// from SpecialtyEmptyState above: this renders whenever the filter is on,
+// regardless of whether it happens to match zero, one, or many conditions.
+
+function SpecialtyFilterBanner({ specialty, count, onClear }) {
+  if (!specialty) return null
+  return (
+    <div style={{
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'space-between',
+      gap:             10,
+      padding:         '8px 10px',
+      marginBottom:    10,
+      backgroundColor: 'var(--color-border-subtle)',
+      borderRadius:    'var(--radius-md)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <SpecialtyIcon
+          iconType={specialty.iconType   ?? 'lucide'}
+          iconValue={specialty.iconValue ?? 'Stethoscope'}
+          size={15}
+          color="var(--color-text-secondary)"
+        />
+        <span style={{
+          fontSize:     13,
+          fontWeight:   600,
+          color:        'var(--color-text-primary)',
+          overflow:     'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace:   'nowrap',
+        }}>
+          {specialty.name}
+        </span>
+        <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+          · {count} {count === 1 ? 'result' : 'results'}
+        </span>
+      </div>
+      <button
+        onClick={onClear}
+        aria-label="Clear specialty filter"
+        style={{
+          display:                 'flex',
+          alignItems:              'center',
+          justifyContent:          'center',
+          flexShrink:              0,
+          width:                   22,
+          height:                  22,
+          borderRadius:            '50%',
+          border:                  'none',
+          background:              'none',
+          cursor:                  'pointer',
+          outline:                 'none',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        <X size={13} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
       </button>
     </div>
   )
@@ -1641,13 +1708,21 @@ export default function FavouritesScreen() {
           >
             {/* ── Conditions tab ── */}
             {activeTab === 'conditions' && (
-              savedConditions.length === 0
-                ? <NothingSavedEmptyState label="conditions" />
-                : conditionSearchEmpty
-                  ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
-                  : (!isSearchingConditions && activeSpecialty !== 'all' && conditionResults.length === 0)
-                    ? <SpecialtyEmptyState specialtyName={activeSpecialtyObj?.name} onClear={() => setActiveSpecialty('all')} />
-                    : conditionResults.map((condition, i) => (
+              <>
+                {activeSpecialty !== 'all' && savedConditions.length > 0 && (
+                  <SpecialtyFilterBanner
+                    specialty={activeSpecialtyObj}
+                    count={conditionResults.length}
+                    onClear={() => setActiveSpecialty('all')}
+                  />
+                )}
+                {savedConditions.length === 0
+                  ? <NothingSavedEmptyState label="conditions" />
+                  : conditionSearchEmpty
+                    ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
+                    : (!isSearchingConditions && activeSpecialty !== 'all' && conditionResults.length === 0)
+                      ? <SpecialtyEmptyState specialtyName={activeSpecialtyObj?.name} onClear={() => setActiveSpecialty('all')} />
+                      : conditionResults.map((condition, i) => (
                       <ConditionCard
                         key={condition.id}
                         condition={condition}
@@ -1689,7 +1764,8 @@ export default function FavouritesScreen() {
                               )
                         }
                       />
-                    ))
+                    ))}
+              </>
             )}
 
             {/* ── Drugs tab ── */}
