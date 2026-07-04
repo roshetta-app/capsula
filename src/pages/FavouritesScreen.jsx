@@ -438,7 +438,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Star, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft } from 'lucide-react'
+import { Star, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X } from 'lucide-react'
 import Layout from '../components/layout'
 import ConditionCard from '../components/ConditionCard'
 import DrugCard from '../components/DrugCard'
@@ -524,9 +524,12 @@ function Snackbar({ visible, message }) {
 // is selected) so there's always an inline way out — previously, entering
 // manage mode with nothing selected left no visible bar and no way to leave
 // it without reopening FavouritesManagerSheet and tapping its toggle again.
-// Cancel reuses toggleManage directly (same function the sheet's own toggle
-// row calls), so behavior is identical either way. Remove only appears once
-// something is actually selected — nothing to act on otherwise.
+// Cancel is an icon-button (matches the sheet's own close-X pattern) rather
+// than a text link, so it reads as a distinct dismiss action instead of
+// competing with "Select all" for attention — count and Select all are
+// grouped together with a middle dot since they're both about the current
+// selection, while Remove stays anchored on its own at the far right as the
+// one destructive action in the bar.
 
 function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCancel }) {
   return (
@@ -556,37 +559,51 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCa
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
           <button
             onClick={onCancel}
+            aria-label="Cancel selection"
             style={{
-              background:  'none',
-              border:      'none',
-              cursor:      'pointer',
-              fontSize:    13,
-              fontWeight:  500,
-              color:       'var(--color-text-secondary)',
-              fontFamily:  'var(--font-body)',
-              padding:     0,
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              flexShrink:              0,
+              width:                   28,
+              height:                  28,
+              borderRadius:            '50%',
+              border:                  'none',
+              backgroundColor:         'var(--color-border-subtle)',
+              cursor:                  'pointer',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
-            Cancel
+            <X size={15} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
           </button>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            {count} selected
-          </span>
-          <button
-            onClick={onToggleSelectAll}
-            style={{
-              background:     'none',
-              border:         'none',
-              cursor:         'pointer',
-              fontSize:       13,
-              color:          FAV_ACCENT,
-              fontFamily:     'var(--font-body)',
-              padding:        0,
-              textDecoration: 'underline',
-            }}
-          >
-            {allSelected ? 'Deselect all' : 'Select all'}
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <span style={{
+              fontSize:   13,
+              fontWeight: 600,
+              color:      'var(--color-text-primary)',
+              whiteSpace: 'nowrap',
+            }}>
+              {count} selected
+            </span>
+            <span aria-hidden="true" style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>·</span>
+            <button
+              onClick={onToggleSelectAll}
+              style={{
+                background:     'none',
+                border:         'none',
+                cursor:         'pointer',
+                fontSize:       13,
+                color:          FAV_ACCENT,
+                fontFamily:     'var(--font-body)',
+                padding:        0,
+                whiteSpace:     'nowrap',
+                textDecoration: 'underline',
+              }}
+            >
+              {allSelected ? 'Deselect all' : 'Select all'}
+            </button>
+          </div>
         </div>
         {count > 0 && (
           <button
@@ -1304,9 +1321,39 @@ export default function FavouritesScreen() {
   const [isManaging, setIsManaging] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
 
+  // Entering manage mode pushes a throwaway history entry (same URL, no
+  // navigation) so the phone's back gesture/button has something of ours to
+  // consume first — without this, back would leave the whole screen instead
+  // of just closing the selector, which isn't what a bottom-sheet-adjacent
+  // control should do. Popping that entry (whether via toggleManage's own
+  // exit branch or a real back gesture) fires 'popstate', and this listener
+  // is the single place that actually closes manage mode — so both exit
+  // paths behave identically.
+  useEffect(() => {
+    function handlePopState() {
+      setIsManaging(false)
+      setSelectedIds(new Set())
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
+
   function toggleManage() {
-    setIsManaging(prev => !prev)
-    setSelectedIds(new Set())
+    if (isManaging) {
+      // Exiting — if we're still sitting on the history entry pushed below,
+      // pop it via back() so the stack stays balanced; handlePopState above
+      // does the actual state cleanup. Otherwise (entry already consumed by
+      // a real back-gesture) just close directly.
+      if (window.history.state?.favouritesManaging) {
+        window.history.back()
+      } else {
+        setIsManaging(false)
+        setSelectedIds(new Set())
+      }
+    } else {
+      window.history.pushState({ favouritesManaging: true }, '')
+      setIsManaging(true)
+    }
   }
 
   function toggleSelectCondition(id) {
@@ -1331,8 +1378,7 @@ export default function FavouritesScreen() {
     const ids = Array.from(selectedIds)
     ids.forEach(id => toggleCondition(id))
     showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`)
-    setSelectedIds(new Set())
-    setIsManaging(false)
+    toggleManage()
   }
 
   const { favourites, toggleDrug, toggleCondition } = useFavouritesContext()

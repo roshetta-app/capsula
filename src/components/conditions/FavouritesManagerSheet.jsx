@@ -33,7 +33,7 @@
  */
 
 import { useEffect, useState }          from 'react'
-import { ListFilter, Settings, X }      from 'lucide-react'
+import { ListFilter, ListChecks, ArrowUpDown, X } from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
@@ -181,33 +181,37 @@ export default function FavouritesManagerSheet({
             </button>
           </div>
 
-          {/* Sort — label and control share one row now (previously stacked
-              on two rows); buttons are hug-content rather than flex:1 so the
-              row stays compact instead of stretching a two-word toggle
+          {/* Sort — icon + label now match the visual language of the
+              Filter/Select rows below it (was previously a small uppercase
+              section label, inconsistent with the rest of the sheet).
+              Label and control still share one row, buttons stay
+              hug-content so the row doesn't stretch a two-word toggle
               across the sheet's full width. */}
           <div style={{
             display:        'flex',
             alignItems:     'center',
             justifyContent: 'space-between',
             gap:            10,
-            marginBottom:   'var(--space-4)',
+            padding:        '12px 10px',
+            marginBottom:   6,
           }}>
-            <span style={{
-              fontSize:      11,
-              fontWeight:    500,
-              color:         'var(--color-text-tertiary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.06em',
-              flexShrink:    0,
-            }}>
-              Sort by
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <ArrowUpDown size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+              <span style={{
+                fontSize:   14,
+                fontFamily: 'var(--font-body)',
+                color:      'var(--color-text-primary)',
+              }}>
+                Sort by
+              </span>
+            </div>
             <div style={{
               display:         'flex',
               backgroundColor: 'var(--color-border-subtle)',
               borderRadius:    'var(--radius-md)',
               padding:         2,
               gap:             2,
+              flexShrink:      0,
             }}>
               {['az', 'recent'].map(mode => {
                 const isActive = sortMode === mode
@@ -344,7 +348,7 @@ export default function FavouritesManagerSheet({
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <Settings size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+            <ListChecks size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
             <span style={{
               fontSize:   14,
               fontFamily: 'var(--font-body)',
