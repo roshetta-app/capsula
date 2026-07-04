@@ -25,6 +25,15 @@
  *     whenever the row is open, or whenever the gesture that just ended was
  *     a real drag — this is what stops a swipe from also firing navigation
  *     via the browser's synthetic click-after-touch.
+ *   - Every touch handler below calls e.stopPropagation() unconditionally
+ *     (not just once axis-locked to 'x'). FavouritesScreen wraps its entire
+ *     tab content in its own touchstart/touchend pair to handle tab-switch
+ *     swipes, and since this row covers almost the full list, without this
+ *     stop a swipe starting on a row would bubble up and fire both gesture
+ *     systems at once — sometimes revealing Remove AND switching tabs from
+ *     the same swipe. The row now always owns a gesture that starts on it;
+ *     switching tabs by swipe still works from any empty space outside a
+ *     row, and tapping the tab button always works regardless.
  */
 
 import { useRef, useState } from 'react'
@@ -46,6 +55,7 @@ export default function SwipeToRemoveRow({ children, onRemove }) {
   const suppressClickRef = useRef(false)
 
   function handleTouchStart(e) {
+    e.stopPropagation() // keep FavouritesScreen's tab-swipe handler from also seeing this gesture
     startX.current      = e.touches[0].clientX
     startY.current       = e.touches[0].clientY
     startOffset.current  = offset
@@ -54,6 +64,7 @@ export default function SwipeToRemoveRow({ children, onRemove }) {
   }
 
   function handleTouchMove(e) {
+    e.stopPropagation() // same reason as handleTouchStart
     if (startX.current === null) return
     const dx = e.touches[0].clientX - startX.current
     const dy = e.touches[0].clientY - startY.current
@@ -68,7 +79,8 @@ export default function SwipeToRemoveRow({ children, onRemove }) {
     setOffset(Math.min(0, Math.max(-ACTION_WIDTH, startOffset.current + dx)))
   }
 
-  function handleTouchEnd() {
+  function handleTouchEnd(e) {
+    e.stopPropagation() // same reason as handleTouchStart
     if (startX.current === null) return
 
     if (axisLocked.current === 'x' && Math.abs(offset - startOffset.current) > TAP_SLOP) {
