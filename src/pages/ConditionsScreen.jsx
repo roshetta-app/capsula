@@ -46,6 +46,17 @@
  *             always be kept equal, or the curve buries whatever sits
  *             above it. Also tightened the search-bar → selector gap
  *             16px → 12px per feedback.
+ * Phase 20 — Bug fix on Phase 19: "kept equal" in the note above was
+ *             itself wrong — matching paddingBottom to the overlap exactly
+ *             zeroes the visible gap out completely (visible gap =
+ *             paddingBottom MINUS overlap, not paddingBottom alone), so
+ *             the curve started right at the selector's edge with zero
+ *             breathing room. Corrected: paddingBottom back to 24px
+ *             (--space-6), overlap back to --radius-lg (16px, the
+ *             original shared token — restored instead of a scoped
+ *             magic number since 16px was always fine, invisibility
+ *             was a color/shadow problem fixed in Phase 18/16). This
+ *             leaves a deliberate 8px flat gap before the curve.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -751,18 +762,17 @@ export default function ConditionsScreen() {
           <main> side padding (negative margin equal to that padding,
           restored as this panel's own padding for its children). Contains
           everything above the sort row: brand row, search, recently-viewed,
-          specialty selector. paddingBottom is the single source of bottom
-          spacing before the curve — the selector's own wrapper previously
-          also carried a 20px marginBottom, double-stacking with this
-          padding into a 44px gap that read as too roomy; removed so there's
-          one deliberate 12px gap instead. */}
+          specialty selector. paddingBottom (24px) combines with the content
+          panel's 16px curve overlap below to leave an 8px flat visible gap
+          before the curve starts — see the content panel's comment for the
+          full spacing math (padding minus overlap = visible gap). */}
       <div style={{
         backgroundColor: 'var(--color-hero-bg)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
-        paddingBottom:   'var(--space-3)',
+        paddingBottom:   'var(--space-6)',
       }}>
 
         {/* 1. Brand row + tagline + dark mode toggle */}
@@ -806,19 +816,23 @@ export default function ConditionsScreen() {
           rounded top corners cut a visible curve into the hero above
           instead of sitting flush against it. Same edge-to-edge bleed as
           the hero panel, for the same reason.
-          IMPORTANT: this overlap amount (marginTop / radius) must never
-          exceed the hero panel's paddingBottom above — if it does, the
-          curve eats past the hero's own bottom spacing and buries whatever
-          sits just above it (this broke the specialty selector in Phase 18,
-          when paddingBottom shrank to 12px but this stayed at 24px). Both
-          are now 12px, kept in lockstep.
-          boxShadow added above the panel (negative y-offset) so the curve
-          reads as a lifted edge via elevation, not color contrast alone. */}
+          SPACING MATH (got this wrong twice — writing it out in full):
+          the visible flat gap of hero color below the selector is
+          paddingBottom MINUS this overlap amount, not paddingBottom alone.
+          Phase 19 set both to 12px, which zeroes the gap out entirely (the
+          curve starts right at the selector's edge — "horrendous", no
+          breathing room). Phase 20: hero paddingBottom is 24px
+          (--space-6), this overlap is 16px (--radius-lg, the original
+          shared token — 16px was never too small, invisibility in Phase 16
+          was a color/shadow problem, now fixed), leaving a deliberate 8px
+          flat gap before the curve begins. paddingBottom must always stay
+          strictly greater than this overlap value, or the curve either
+          disappears into zero gap or buries the selector above it. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  '12px',
-        borderTopRightRadius: '12px',
-        marginTop:       '-12px',
+        borderTopLeftRadius:  'var(--radius-lg)',
+        borderTopRightRadius: 'var(--radius-lg)',
+        marginTop:       'calc(var(--radius-lg) * -1)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
