@@ -789,7 +789,7 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
 // from SpecialtyEmptyState above: this renders whenever the filter is on,
 // regardless of whether it happens to match zero, one, or many conditions.
 
-function SpecialtyFilterBanner({ specialty, count, onOpenSpecialties, onClear }) {
+function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, onClear }) {
   const isDark = useIsDark()
   if (!specialty) return null
 
@@ -850,11 +850,17 @@ function SpecialtyFilterBanner({ specialty, count, onOpenSpecialties, onClear })
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          {/* Same drill-in chevron FavouritesManagerSheet uses for its own
-              specialty row (rotated to point right), so this reads as the
-              same "opens the specialty picker" affordance in both places. */}
+          {/* Unrotated, this path is a down-pointing chevron — that's the
+              idle state (matches the standard "opens a picker" affordance).
+              Flips to point up while SpecialtiesBottomSheet is actually
+              open, rather than staying rotated -90° to always point right
+              like FavouritesManagerSheet's own (non-toggling) drill-in row. */}
           <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-            style={{ color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+            style={{
+              color:      'var(--color-text-tertiary)',
+              transform:  isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.15s ease',
+            }}>
             <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
               strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -1762,6 +1768,7 @@ export default function FavouritesScreen() {
                   <SpecialtyFilterBanner
                     specialty={activeSpecialtyObj}
                     count={conditionResults.length}
+                    isOpen={showSpecialtySheet}
                     onOpenSpecialties={() => setShowSpecialtySheet(true)}
                     onClear={() => setActiveSpecialty('all')}
                   />
