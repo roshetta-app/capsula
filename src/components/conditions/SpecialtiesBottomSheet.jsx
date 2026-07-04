@@ -37,6 +37,7 @@
  */
 
 import { useEffect, useState }          from 'react'
+import { LayoutGrid }                   from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
@@ -154,19 +155,27 @@ export default function SpecialtiesBottomSheet({
           </div>
 
           {/* All conditions — first row, distinct from the specialty rows
-              below it: bolder weight always (not just when active) so it
-              reads as a standout reset action rather than just another
-              idle list item. Same tinted-background treatment when
-              selected, using the neutral fallback token since 'all' has
-              no specialty color of its own. No divider — divider style
-              removed sheet-wide; the weight/size difference plus the
-              margin below it is what separates it from the list. */}
+              below it: a grid icon (colored in the same neutral token used
+              for its own background tint, since 'all' has no specialty
+              color of its own — mirrors how each specialty row's icon is
+              always colored in its own accent below) plus weight 600
+              (was 700 — matches an actively-selected specialty row's
+              weight rather than sitting a full step heavier than it) so
+              it reads as related to the list but still the standout reset
+              action, per the "different but the same" brief. Same
+              tinted-background treatment when selected as before —
+              unchanged, since that's the only cue confirming 'All
+              conditions' is the current choice, same as every specialty
+              row below it. No divider — divider style removed sheet-wide;
+              the icon/weight/size difference plus the margin below it is
+              what separates it from the list. */}
           <button
             onClick={() => handleSelect('all')}
             style={{
               width:                   '100%',
               display:                 'flex',
               alignItems:              'center',
+              gap:                     'var(--space-3)',
               textAlign:               'left',
               padding:                 '12px 14px',
               marginBottom:            'var(--space-2)',
@@ -177,7 +186,7 @@ export default function SpecialtiesBottomSheet({
               border:                  'none',
               fontSize:                16,
               fontFamily:              'var(--font-body)',
-              fontWeight:              700,
+              fontWeight:              600,
               color:                   activeSpecialty === 'all'
                 ? resolveToken(FALLBACK_TOKEN, isDark).fg
                 : 'var(--color-text-primary)',
@@ -186,6 +195,10 @@ export default function SpecialtiesBottomSheet({
               outline:                 'none',
             }}
           >
+            <LayoutGrid
+              size={18}
+              color={resolveToken(FALLBACK_TOKEN, isDark).fg}
+            />
             All conditions
           </button>
         </div>
