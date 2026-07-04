@@ -57,6 +57,18 @@
  *             magic number since 16px was always fine, invisibility
  *             was a color/shadow problem fixed in Phase 18/16). This
  *             leaves a deliberate 8px flat gap before the curve.
+ * Phase 21 — Structural fix, not just another number tweak: three rounds
+ *             (19/20/this one) kept drifting because paddingBottom and the
+ *             curve overlap were two independently hardcoded values that
+ *             happened to need a fixed relationship. Added --radius-xl
+ *             (24px) to globals.css, extending the existing sm/md/lg
+ *             radius scale rather than another one-off number. Hero
+ *             paddingBottom is now calc(var(--space-3) + var(--radius-xl))
+ *             — the 12px visible gap (matching the search→selector gap,
+ *             as requested) and the curve radius are the same two tokens
+ *             the content panel uses for its own radius/marginTop, so they
+ *             cannot drift apart again. Content panel paddingTop trimmed
+ *             --space-5 → --space-4 (20px → 16px) above the sort row.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -762,17 +774,23 @@ export default function ConditionsScreen() {
           <main> side padding (negative margin equal to that padding,
           restored as this panel's own padding for its children). Contains
           everything above the sort row: brand row, search, recently-viewed,
-          specialty selector. paddingBottom (24px) combines with the content
-          panel's 16px curve overlap below to leave an 8px flat visible gap
-          before the curve starts — see the content panel's comment for the
-          full spacing math (padding minus overlap = visible gap). */}
+          specialty selector.
+          paddingBottom is intentionally a calc() of two named tokens, not
+          a standalone value — visible gap (var(--space-3), matching the
+          search-bar → selector gap above it) plus the content panel's
+          curve radius (var(--radius-lg... now --radius-xl, see content
+          panel comment) below it. Writing it this way makes it structurally
+          impossible for the gap and the curve to drift out of sync the way
+          they did in Phase 19/20, since paddingBottom is defined *in terms
+          of* the same --radius-xl the content panel uses for its overlap —
+          change the radius token once and both update together. */}
       <div style={{
         backgroundColor: 'var(--color-hero-bg)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
-        paddingBottom:   'var(--space-6)',
+        paddingBottom:   'calc(var(--space-3) + var(--radius-xl))',
       }}>
 
         {/* 1. Brand row + tagline + dark mode toggle */}
@@ -816,28 +834,28 @@ export default function ConditionsScreen() {
           rounded top corners cut a visible curve into the hero above
           instead of sitting flush against it. Same edge-to-edge bleed as
           the hero panel, for the same reason.
-          SPACING MATH (got this wrong twice — writing it out in full):
-          the visible flat gap of hero color below the selector is
-          paddingBottom MINUS this overlap amount, not paddingBottom alone.
-          Phase 19 set both to 12px, which zeroes the gap out entirely (the
-          curve starts right at the selector's edge — "horrendous", no
-          breathing room). Phase 20: hero paddingBottom is 24px
-          (--space-6), this overlap is 16px (--radius-lg, the original
-          shared token — 16px was never too small, invisibility in Phase 16
-          was a color/shadow problem, now fixed), leaving a deliberate 8px
-          flat gap before the curve begins. paddingBottom must always stay
-          strictly greater than this overlap value, or the curve either
-          disappears into zero gap or buries the selector above it. */}
+          Curve bumped var(--radius-lg) → var(--radius-xl) (16px → 24px, a
+          new token added to the existing sm/md/lg radius scale rather than
+          a one-off magic number) for a more visible curve. The hero
+          panel's paddingBottom is written as a calc() of this same
+          --radius-xl plus var(--space-3), so the 12px visible gap and this
+          24px curve can never drift out of sync again (see hero panel
+          comment) — this was the actual root cause of the last two rounds
+          of spacing bugs, not the specific numbers chosen.
+          paddingTop trimmed var(--space-5) → var(--space-4) — the sort row
+          had slightly more clearance than needed above it.
+          boxShadow added above the panel (negative y-offset) so the curve
+          reads as a lifted edge via elevation, not color contrast alone. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  'var(--radius-lg)',
-        borderTopRightRadius: 'var(--radius-lg)',
-        marginTop:       'calc(var(--radius-lg) * -1)',
+        borderTopLeftRadius:  'var(--radius-xl)',
+        borderTopRightRadius: 'var(--radius-xl)',
+        marginTop:       'calc(var(--radius-xl) * -1)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
-        paddingTop:      'var(--space-5)',
+        paddingTop:      'var(--space-4)',
         boxShadow:       '0 -6px 16px rgba(0, 0, 0, 0.06)',
       }}>
 
