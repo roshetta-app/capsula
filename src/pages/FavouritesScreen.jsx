@@ -520,12 +520,15 @@ function Snackbar({ visible, message }) {
 }
 
 // ─── Manage-mode bulk action bar ─────────────────────────────────────────────
-// Fixed above the bottom nav (same 80px offset Snackbar already uses for the
-// same purpose). Only ever shown while managing AND at least one condition is
-// selected — the Drugs tab has no selection mechanism yet (deferred, see file
-// header), so this bar only ever reflects Conditions-tab selections.
+// Now rendered for the full duration of manage mode (not just once something
+// is selected) so there's always an inline way out — previously, entering
+// manage mode with nothing selected left no visible bar and no way to leave
+// it without reopening FavouritesManagerSheet and tapping its toggle again.
+// Cancel reuses toggleManage directly (same function the sheet's own toggle
+// row calls), so behavior is identical either way. Remove only appears once
+// something is actually selected — nothing to act on otherwise.
 
-function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove }) {
+function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCancel }) {
   return (
     <div style={{
       position:        'fixed',
@@ -551,6 +554,21 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove }) {
         gap:             10,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              background:  'none',
+              border:      'none',
+              cursor:      'pointer',
+              fontSize:    13,
+              fontWeight:  500,
+              color:       'var(--color-text-secondary)',
+              fontFamily:  'var(--font-body)',
+              padding:     0,
+            }}
+          >
+            Cancel
+          </button>
           <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             {count} selected
           </span>
@@ -570,23 +588,25 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove }) {
             {allSelected ? 'Deselect all' : 'Select all'}
           </button>
         </div>
-        <button
-          onClick={onRemove}
-          style={{
-            padding:         '8px 16px',
-            borderRadius:    'var(--radius-full)',
-            border:          'none',
-            backgroundColor: 'var(--color-danger)',
-            color:           '#fff',
-            fontSize:        13,
-            fontWeight:      600,
-            fontFamily:      'var(--font-body)',
-            cursor:          'pointer',
-            flexShrink:      0,
-          }}
-        >
-          Remove
-        </button>
+        {count > 0 && (
+          <button
+            onClick={onRemove}
+            style={{
+              padding:         '8px 16px',
+              borderRadius:    'var(--radius-full)',
+              border:          'none',
+              backgroundColor: 'var(--color-danger)',
+              color:           '#fff',
+              fontSize:        13,
+              fontWeight:      600,
+              fontFamily:      'var(--font-body)',
+              cursor:          'pointer',
+              flexShrink:      0,
+            }}
+          >
+            Remove
+          </button>
+        )}
       </div>
     </div>
   )
@@ -1651,7 +1671,7 @@ export default function FavouritesScreen() {
 
       </div>
 
-      {isManaging && selectedIds.size > 0 && (
+      {isManaging && (
         <ManageActionBar
           count={selectedIds.size}
           allSelected={selectedIds.size === conditionResults.length}
@@ -1663,6 +1683,7 @@ export default function FavouritesScreen() {
             )
           }}
           onRemove={() => setShowBulkConfirm(true)}
+          onCancel={toggleManage}
         />
       )}
 

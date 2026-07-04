@@ -181,52 +181,62 @@ export default function FavouritesManagerSheet({
             </button>
           </div>
 
-          {/* Sort */}
+          {/* Sort — label and control share one row now (previously stacked
+              on two rows); buttons are hug-content rather than flex:1 so the
+              row stays compact instead of stretching a two-word toggle
+              across the sheet's full width. */}
           <div style={{
-            fontSize:      11,
-            fontWeight:    500,
-            color:         'var(--color-text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            marginBottom:  8,
+            display:        'flex',
+            alignItems:     'center',
+            justifyContent: 'space-between',
+            gap:            10,
+            marginBottom:   'var(--space-4)',
           }}>
-            Sort by
-          </div>
-          <div style={{
-            display:         'flex',
-            backgroundColor: 'var(--color-border-subtle)',
-            borderRadius:    'var(--radius-md)',
-            padding:         3,
-            gap:             3,
-            marginBottom:    'var(--space-4)',
-          }}>
-            {['az', 'recent'].map(mode => {
-              const isActive = sortMode === mode
-              return (
-                <button
-                  key={mode}
-                  onClick={() => onSetSortMode(mode)}
-                  style={{
-                    flex:                    1,
-                    padding:                 '9px 0',
-                    borderRadius:            'var(--radius-sm)',
-                    border:                  'none',
-                    backgroundColor:         isActive ? 'var(--color-surface)' : 'transparent',
-                    boxShadow:               isActive ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
-                    fontSize:                13,
-                    fontFamily:              'var(--font-body)',
-                    fontWeight:              isActive ? 600 : 400,
-                    color:                   isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                    cursor:                  'pointer',
-                    outline:                 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    transition:              'background-color 0.15s ease, box-shadow 0.15s ease',
-                  }}
-                >
-                  {sortLabels[mode]}
-                </button>
-              )
-            })}
+            <span style={{
+              fontSize:      11,
+              fontWeight:    500,
+              color:         'var(--color-text-tertiary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              flexShrink:    0,
+            }}>
+              Sort by
+            </span>
+            <div style={{
+              display:         'flex',
+              backgroundColor: 'var(--color-border-subtle)',
+              borderRadius:    'var(--radius-md)',
+              padding:         2,
+              gap:             2,
+            }}>
+              {['az', 'recent'].map(mode => {
+                const isActive = sortMode === mode
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => onSetSortMode(mode)}
+                    style={{
+                      padding:                 '6px 10px',
+                      borderRadius:            'var(--radius-sm)',
+                      border:                  'none',
+                      backgroundColor:         isActive ? 'var(--color-surface)' : 'transparent',
+                      boxShadow:               isActive ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
+                      fontSize:                12,
+                      fontFamily:              'var(--font-body)',
+                      fontWeight:              isActive ? 600 : 400,
+                      color:                   isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                      cursor:                  'pointer',
+                      outline:                 'none',
+                      whiteSpace:              'nowrap',
+                      WebkitTapHighlightColor: 'transparent',
+                      transition:              'background-color 0.15s ease, box-shadow 0.15s ease',
+                    }}
+                  >
+                    {sortLabels[mode]}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Specialty — split into two adjacent controls rather than one
@@ -340,7 +350,7 @@ export default function FavouritesManagerSheet({
               fontFamily: 'var(--font-body)',
               color:      'var(--color-text-primary)',
             }}>
-              Manage favourites
+              Select favourites
             </span>
           </button>
         </div>
