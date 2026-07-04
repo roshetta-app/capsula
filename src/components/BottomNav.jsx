@@ -2,7 +2,7 @@
  * src/components/BottomNav.jsx
  * Phase 2B — Navigation & Routing Overhaul
  * Phase 10 — Icon system overhaul: replaced custom FA SVG paths with Lucide
- *             icons (House, Pill, Star) consistent with the rest of the app.
+ *             icons (House, Pill, Heart) consistent with the rest of the app.
  *             Active = filled (fill='currentColor'), inactive = stroke only.
  *             Favourites icon now follows active-tab state only — removed
  *             hasFavourites fill logic and gold label treatment.
@@ -39,7 +39,7 @@
  * Changes from previous version:
  *  - Tab 1: Conditions — House (Lucide)
  *  - Tab 2: Drugs      — Pill (Lucide)
- *  - Tab 3: Favourites — Star (Lucide)
+ *  - Tab 3: Favourites — Heart (Lucide), red identity when active
  *  - Active tab: filled icon + brand color. Inactive: stroke only + muted.
  *  - Each tab takes exactly 1/3 width (flex:1 with equal flex-basis).
  *  - Safe-area bottom padding for iPhone notch.
@@ -48,7 +48,7 @@
  */
 
 import { useLocation, useNavigate } from 'react-router-dom'
-import { House, Pill, Star }        from 'lucide-react'
+import { House, Pill, Heart }        from 'lucide-react'
 import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
@@ -78,7 +78,11 @@ export default function BottomNav() {
   const TABS = [
     { path: '/conditions', label: 'Conditions', Icon: House },
     { path: '/drugs',      label: 'Drugs',      Icon: Pill  },
-    { path: '/favourites', label: 'Favourites', Icon: Star  },
+    // Favourites gets its own red identity color + fills when active,
+    // matching the heart used elsewhere for favourited state (title badge,
+    // condition-card row icon, detail-screen toggle) — Conditions/Drugs
+    // keep the shared blue accent and stay outline-only.
+    { path: '/favourites', label: 'Favourites', Icon: Heart, activeColor: 'var(--color-danger)', fillWhenActive: true },
   ]
 
   return (
@@ -100,7 +104,7 @@ export default function BottomNav() {
         alignItems: 'stretch',
         height:     60,
       }}>
-        {TABS.map(({ path, label, Icon }) => {
+        {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
           const active = isActive(path)
           return (
             <button
@@ -118,9 +122,10 @@ export default function BottomNav() {
                 border:                  'none',
                 background:              'none',
                 cursor:                  'pointer',
-                // Active: accent. Inactive: text-secondary (was text-tertiary —
-                // increased contrast so tabs are clearly readable at rest).
-                color:                   active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                // Active: accent (or a tab's own activeColor override).
+                // Inactive: text-secondary (was text-tertiary — increased
+                // contrast so tabs are clearly readable at rest).
+                color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
                 transition:              'color 0.15s ease',
                 fontFamily:              'var(--font-body)',
                 padding:                 '8px 0',
@@ -131,7 +136,7 @@ export default function BottomNav() {
               <Icon
                 size={22}
                 strokeWidth={active ? 2.5 : 2.0}
-                fill="none"
+                fill={active && fillWhenActive ? 'currentColor' : 'none'}
               />
               <span style={{
                 fontSize:      10,

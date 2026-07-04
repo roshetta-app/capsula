@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Share2 } from 'lucide-react'
+import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
@@ -461,16 +461,17 @@ function DetailHeader({ onBack, condition, isFav, onFavToggle, onShare, activeTa
                 aria-label={isFav ? 'Remove from favourites' : 'Add to favourites'}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  color: isFav ? '#F59E0B' : 'var(--color-text-tertiary)',
+                  color: isFav ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
                   transition: 'color 0.15s ease',
                   WebkitTapHighlightColor: 'transparent', outline: 'none',
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24"
-                  fill={isFav ? 'currentColor' : 'none'}
-                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
+                {/* Was a hand-rolled star <polygon> — swapped for lucide's
+                    Heart so this matches the Heart used everywhere else the
+                    favourite identity appears (FavouritesScreen's title
+                    badge and condition-card row icon), instead of a
+                    one-off custom shape. */}
+                <Heart size={20} strokeWidth={2} fill={isFav ? 'currentColor' : 'none'} />
               </button>
             </div>
           )}
