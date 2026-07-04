@@ -679,13 +679,15 @@ export default function ConditionsScreen() {
   function renderFavouriteHeart(condition) {
     return isConditionFavourited(condition.id)
       ? (
-          <Heart
-            size={13}
-            fill="var(--color-favourite)"
-            strokeWidth={1.8}
-            style={{ color: 'var(--color-favourite)' }}
-            aria-hidden="true"
-          />
+          <span style={{ display: 'flex', alignItems: 'center', paddingRight: 8 }}>
+            <Heart
+              size={13}
+              fill="var(--color-favourite)"
+              strokeWidth={1.8}
+              style={{ color: 'var(--color-favourite)' }}
+              aria-hidden="true"
+            />
+          </span>
         )
       : null
   }
