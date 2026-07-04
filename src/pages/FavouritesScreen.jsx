@@ -353,6 +353,29 @@
  *    instead of amber. .fav-sticky-search-height input grown 32px→36px to
  *    match the new back-button size. Manage's active box stays at the new
  *    32px idle size — it never had its own separate active size.
+ *
+ * Phase 12 — StickyFavouritesHeader height fix + match to ConditionsScreen's
+ *  StickyLogoHeader, per report of excess whitespace:
+ *  - Root cause: the title row set BOTH height:48 and paddingTop:16 with no
+ *    boxSizing — content-box default meant these stacked, so the row
+ *    actually rendered at 64px, not 48. Fixed with boxSizing:'border-box',
+ *    height:44, paddingTop:8 (36px content area — exactly fits the
+ *    searching-state 36px back button/SearchBar with no clipping; idle
+ *    28px badge / 32px buttons center within it fine).
+ *  - Tabs-row wrapper's marginTop (6→3) and bottom padding (9→5) trimmed
+ *    further on top of that fix to close the remaining gap toward
+ *    ConditionsScreen's total sticky-header height. The 50px tab button
+ *    height itself (inside renderTabs) is untouched — kept intentionally
+ *    identical to ConditionDetailScreen's DetailHeader tabs (see renderTabs
+ *    comment) — so the wrapper's own spacing was the only lever available.
+ *  - boxShadow changed from the Phase 10 hairline (0 1px 2px
+ *    rgba(0,0,0,0.04)) to ConditionsScreen's StickyLogoHeader shadow exactly
+ *    (0 4px 12px rgba(0, 0, 0, 0.06)), per explicit request to match it.
+ *    FavouritesHero's own shadow is untouched — this is sticky-only.
+ *  - Search/manage icons: size 15→17, color var(--color-text-secondary) →
+ *    var(--color-text-primary), strokeWidth 2→2.2 — bigger and higher
+ *    contrast, per feedback that they read as too faint. Idle button
+ *    circle sizes (32px) are unchanged; only the icon inside grew.
  */
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
@@ -922,7 +945,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         backgroundColor:         'var(--color-surface)',
         borderBottomLeftRadius:  18,
         borderBottomRightRadius: 18,
-        boxShadow:               '0 1px 2px rgba(0,0,0,0.04)',
+        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
         transition:              'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
@@ -935,17 +958,25 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
             When isSearching, the title text is replaced in-place by the
             SearchBar (favSearchExpand via key); the badge hides and manage
             hides too, same treatment as the hero.
-            height: 48 (not minHeight) hard-locks this row to a fixed size —
-            grown from 44 for breathing room around the badge/buttons, same
-            reasoning as FavouritesHero above but with more headroom needed
-            at this smaller badge/button scale. */}
+            boxSizing: 'border-box' + height: 44 (not minHeight) hard-locks
+            this row to a fixed, PADDING-INCLUSIVE size. Previous version set
+            height:48 alongside paddingTop:16 with no boxSizing — content-box
+            default meant those stacked (48 + 16 = 64px actual rendered
+            height), which was the real source of the "too much whitespace /
+            header too tall" report, on top of the tabs row's own generous
+            margins below. 44px border-box, 8px top padding, gives a 36px
+            content area — exactly enough for the searching-state back
+            button / SearchBar (36px, see fav-sticky-search-height) with no
+            clipping, while idle content (28px badge, 32px buttons) sits
+            centered within it. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
-          padding:        '16px var(--space-6) 0',
-          height:         48,
+          padding:        '8px var(--space-6) 0',
+          height:         44,
+          boxSizing:      'border-box',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             {!isSearching && (
@@ -1021,8 +1052,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
               }}
             >
               {isSearching
-                ? <ArrowLeft size={15} color="#fff" strokeWidth={2} />
-                : <Search size={15} color="var(--color-text-secondary)" strokeWidth={2} />}
+                ? <ArrowLeft size={17} color="#fff" strokeWidth={2.2} />
+                : <Search size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
             </button>
 
             {showManageButton && !isSearching && (
@@ -1045,8 +1076,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
                 }}
               >
                 {isManaging
-                  ? <X size={15} color="#fff" strokeWidth={2} />
-                  : <ListChecks size={15} color="var(--color-text-secondary)" strokeWidth={2} />}
+                  ? <X size={17} color="#fff" strokeWidth={2.2} />
+                  : <ListChecks size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
               </button>
             )}
           </div>
@@ -1055,12 +1086,16 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, isManaging, o
         {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
             No longer needs position: relative — the search input now swaps
             in-place with the title above instead of overlaying below the
-            tabs. Bottom padding trimmed 10→9 (Phase 10 clawback — see file
-            header) so the title row's +4px growth doesn't fully carry
-            through to the panel's total height. */}
+            tabs. Margin/padding trimmed further (6→3 / 9→5) alongside the
+            title row's border-box fix above, closing the remaining gap
+            toward ConditionsScreen's StickyLogoHeader height. The 50px tab
+            button height itself (inside renderTabs) is untouched — it's
+            intentionally kept pixel-identical to ConditionDetailScreen's
+            DetailHeader tabs (see renderTabs comment), so the only levers
+            left here are the wrapper's own margin/padding. */}
         <div style={{
-          marginTop: 6,
-          padding:   '0 var(--space-6) 9px',
+          marginTop: 3,
+          padding:   '0 var(--space-6) 5px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
         </div>
