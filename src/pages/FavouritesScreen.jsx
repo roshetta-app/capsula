@@ -1691,27 +1691,49 @@ export default function FavouritesScreen() {
   // Condition removal confirms first — see ConfirmSheet below.
   const [confirmingCondition, setConfirmingCondition] = useState(null)
 
-  // Row exit/enter animation tracking — Sets (not a single id) so more than
-  // one row can animate at once if removals happen in quick succession.
-  // 'exiting' rows are still in savedConditions/conditionResults (the actual
-  // toggleCondition/array mutation is deliberately delayed until the exit
-  // animation finishes — see below), so this only controls which className
-  // a row renders with, not whether it renders at all.
-  const [exitingConditionIds, setExitingConditionIds] = useState(() => new Set())
+  // Row exit animation tracking — id -> { height, collapsed }. 'height' is
+  // the row's own measured height (via rowNodeRefs), captured the instant
+  // removal starts; 'collapsed' flips to true one frame later so max-height
+  // actually transitions from that exact measured value down to 0.
+  //
+  // This used to animate max-height from a fixed guessed value instead of
+  // a measurement. A guess doesn't match every row's real height, so the
+  // animated max-height crosses below the row's actual content height at a
+  // different point in the animation depending on the row — either nothing
+  // visibly happens for part of the duration and then it clips suddenly
+  // (guess too tall), or the row is clipped immediately at the start before
+  // any smooth shrink (guess too short). Either way that reads as glitchy.
+  // Measuring the real height at trigger time removes the mismatch, so the
+  // collapse is a uniform shrink for any row height.
+  const rowNodeRefs = useRef(new Map())
+  const [exitingRows, setExitingRows] = useState(() => new Map())
   const [restoredConditionIds, setRestoredConditionIds] = useState(() => new Set())
 
   function beginRowExit(id) {
-    setExitingConditionIds(prev => {
-      const next = new Set(prev)
-      next.add(id)
+    const el = rowNodeRefs.current.get(id)
+    const height = el ? el.getBoundingClientRect().height : 0
+    setExitingRows(prev => {
+      const next = new Map(prev)
+      next.set(id, { height, collapsed: false })
       return next
+    })
+    // One frame later: flip to collapsed. Setting height+collapsed in the
+    // same render would give the transition no starting value to animate
+    // from — it'd just render already-collapsed.
+    requestAnimationFrame(() => {
+      setExitingRows(prev => {
+        if (!prev.has(id)) return prev
+        const next = new Map(prev)
+        next.set(id, { height, collapsed: true })
+        return next
+      })
     })
   }
 
   function endRowExit(id) {
-    setExitingConditionIds(prev => {
+    setExitingRows(prev => {
       if (!prev.has(id)) return prev
-      const next = new Set(prev)
+      const next = new Map(prev)
       next.delete(id)
       return next
     })
@@ -1741,7 +1763,7 @@ export default function FavouritesScreen() {
   // see useFavourites.js).
   //
   // Both paths also now play an exit animation before the actual removal:
-  // beginRowExit(id) flags the row so it renders with the 'favRowExit'
+  // beginRowExit(id) measures the row and flags it to collapse via inline
   // animation while it's still in the list, and only after ROW_EXIT_MS does
   // toggleCondition actually remove it from favourites.conditions — so the
   // row has already faded/collapsed out visually by the time it unmounts,
@@ -1869,10 +1891,6 @@ export default function FavouritesScreen() {
         @keyframes favSearchExpand {
           from { opacity: 0; transform: scaleX(0.85); }
           to   { opacity: 1; transform: scaleX(1); }
-        }
-        @keyframes favRowExit {
-          from { opacity: 1; max-height: 120px; transform: scale(1); }
-          to   { opacity: 0; max-height: 0; transform: scale(0.96); }
         }
         @keyframes favRowEnter {
           from { opacity: 0; max-height: 0; transform: translateY(-6px); }
@@ -2007,20 +2025,31 @@ export default function FavouritesScreen() {
                         // conflict with tap-to-select.
                         if (isManaging) return card
 
-                        const isExiting  = exitingConditionIds.has(condition.id)
+                        const exitState  = exitingRows.get(condition.id)
                         const isEntering = restoredConditionIds.has(condition.id)
 
                         return (
                           <div
                             key={condition.id}
-                            style={{
-                              overflow: 'hidden',
-                              animation: isExiting
-                                ? `favRowExit ${ROW_EXIT_MS}ms cubic-bezier(0.4, 0, 1, 1) forwards`
-                                : isEntering
-                                  ? `favRowEnter ${ROW_ENTER_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
-                                  : undefined,
+                            ref={el => {
+                              if (el) rowNodeRefs.current.set(condition.id, el)
+                              else rowNodeRefs.current.delete(condition.id)
                             }}
+                            style={exitState
+                              ? {
+                                  overflow:   'hidden',
+                                  maxHeight:  exitState.collapsed ? 0 : exitState.height,
+                                  opacity:    exitState.collapsed ? 0 : 1,
+                                  transform:  exitState.collapsed ? 'scale(0.96)' : 'scale(1)',
+                                  transition: `max-height ${ROW_EXIT_MS}ms cubic-bezier(0.4, 0, 1, 1), opacity ${ROW_EXIT_MS}ms ease, transform ${ROW_EXIT_MS}ms ease`,
+                                }
+                              : {
+                                  overflow: 'hidden',
+                                  animation: isEntering
+                                    ? `favRowEnter ${ROW_ENTER_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
+                                    : undefined,
+                                }
+                            }
                           >
                             <SwipeToRemoveRow onRemove={() => handleSwipeRemoveCondition(condition)}>
                               {card}
