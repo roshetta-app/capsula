@@ -2,9 +2,12 @@
  * src/App.jsx
  * Phase 3A addition: wrapped with ToastProvider (global toast system for CMS)
  * Phase 3K addition: wrapped with ErrorBoundary (global crash logger)
+ * sticky-header-permanent-mount-fix: wrapped with RecentlyViewedProvider so
+ * ConditionsScreen and ConditionDetailScreen share one live recently-viewed
+ * list instead of each reading their own private copy.
  *
  * Provider order (outermost → innermost):
- *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → OnboardingGate → AppRoutes
+ *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → RecentlyViewedProvider → OnboardingGate → AppRoutes
  */
 
 import { useEffect } from 'react'
@@ -14,6 +17,7 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
+import { RecentlyViewedProvider } from './context/RecentlyViewedContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useDarkMode } from './hooks/useDarkMode'
@@ -47,9 +51,11 @@ export default function App() {
           <ConditionProvider>
             <DrugProvider>
               <FavouritesProvider>
-                <OnboardingGate>
-                  <AppRoutes />
-                </OnboardingGate>
+                <RecentlyViewedProvider>
+                  <OnboardingGate>
+                    <AppRoutes />
+                  </OnboardingGate>
+                </RecentlyViewedProvider>
               </FavouritesProvider>
             </DrugProvider>
           </ConditionProvider>
