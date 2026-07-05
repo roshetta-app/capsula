@@ -150,7 +150,7 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart } from 'lucide-react'
 import Layout                  from '../components/layout'
@@ -170,6 +170,7 @@ import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
+import { useStickyHeaderScroll } from '../hooks/useStickyHeaderScroll'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -700,22 +701,14 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
-  // showStickyHeader: plain boolean, flips once the BrandRow (logo) leaves
-  // the viewport. Same approach as FavouritesScreen's showStickyHeader —
-  // no continuous signal, no derived opacity/lift/shadow values. The base
-  // layer and panel are a static two-tone look now, not a scroll-driven
-  // animation, so a single fire-once boolean is all the header needs.
-  const [showStickyHeader, setShowStickyHeader]   = useState(false)
-  // Guards the sticky header's slide transition for a brief window right
-  // after mount. Whatever exactly settles the scroll position on return
-  // navigation (browser back/forward restoration, layout settling, etc.),
-  // any correction to showStickyHeader during this window should snap
-  // into place, not replay the slide-down animation. Two animation frames
-  // is the standard "let layout/paint settle" grace period — real,
-  // user-driven scrolling only ever happens after that.
-  const [transitionsReady, setTransitionsReady] = useState(false)
+  // Sticky header visibility, restored/remembered per-screen (not shared
+  // with FavouritesScreen's own sticky header) — see useStickyHeaderScroll.
+  const {
+    elementRef: brandRowRef,
+    visible: showStickyHeader,
+    readyToAnimate: transitionsReady,
+  } = useStickyHeaderScroll('conditions')
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
-  const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
@@ -770,45 +763,6 @@ export default function ConditionsScreen() {
       setIsListFading(false)
     }, 100)
   }
-
-  // Sets the sticky header's correct state before the browser paints, so
-  // navigating back to this screen already scrolled down (BrandRow already
-  // out of view) shows it already in place instead of replaying the
-  // slide-down animation. Without this, showStickyHeader always starts
-  // false on remount regardless of actual scroll position, and the
-  // IntersectionObserver effect below only corrects it after the first
-  // paint — by then the false→true flip has already animated visibly.
-  useLayoutEffect(() => {
-    const el = brandRowRef.current
-    if (!el) return
-    setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
-  }, [])
-
-  useEffect(() => {
-    let raf2
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setTransitionsReady(true))
-    })
-    return () => {
-      cancelAnimationFrame(raf1)
-      if (raf2) cancelAnimationFrame(raf2)
-    }
-  }, [])
-
-  useEffect(() => {
-    const el = brandRowRef.current
-    if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyHeader(!entry.isIntersecting)
-      },
-      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
 
   // Waits for the cold-start skeleton to clear before triggering the fade —
   // flipping entranceIn as soon as this effect first ran (ignoring loading)
@@ -1151,4 +1105,6 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
+
 

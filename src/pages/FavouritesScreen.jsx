@@ -444,7 +444,7 @@
  *    UI built from scratch.
  */
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import Layout from '../components/layout'
@@ -465,6 +465,7 @@ import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
+import { useStickyHeaderScroll } from '../hooks/useStickyHeaderScroll'
 
 // Favourites' own identity color for the heart badge/star icon. Previously
 // aliased var(--color-danger) so "favourited = red heart" shared the exact
@@ -1836,50 +1837,13 @@ export default function FavouritesScreen() {
   }
 
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
-  // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
-  const [showStickyHeader, setShowStickyHeader] = useState(false)
-  const heroRef = useRef(null)
-
-  // Sets the sticky header's correct state before the browser paints — same
-  // fix as ConditionsScreen's brandRowRef watch. Without this, returning to
-  // this screen already scrolled down (hero already out of view) replays
-  // the slide-down animation instead of showing it already in place.
-  useLayoutEffect(() => {
-    const el = heroRef.current
-    if (!el) return
-    setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
-  }, [])
-
-  // Guards the sticky header's slide transition for a brief window right
-  // after mount — same safety net as ConditionsScreen's StickyLogoHeader.
-  // Any correction to showStickyHeader during this window snaps into
-  // place instead of replaying the slide-down animation.
-  const [transitionsReady, setTransitionsReady] = useState(false)
-  useEffect(() => {
-    let raf2
-    const raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => setTransitionsReady(true))
-    })
-    return () => {
-      cancelAnimationFrame(raf1)
-      if (raf2) cancelAnimationFrame(raf2)
-    }
-  }, [])
-
-  useEffect(() => {
-    const el = heroRef.current
-    if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyHeader(!entry.isIntersecting)
-      },
-      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
+  // Visibility restored/remembered per-screen (not shared with
+  // ConditionsScreen's own sticky header) — see useStickyHeaderScroll.
+  const {
+    elementRef: heroRef,
+    visible: showStickyHeader,
+    readyToAnimate: transitionsReady,
+  } = useStickyHeaderScroll('favourites')
 
   return (
     <Layout>
@@ -2189,4 +2153,6 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
+
+
 
