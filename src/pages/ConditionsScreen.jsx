@@ -93,6 +93,33 @@
  *             background shows between the sticky header and the panel.
  *             Duration tightened 250ms → 180ms so the larger move still
  *             reads as fast, not slow.
+ * Phase 23 — Hard two-view dock (replaces Phase 22's transform nudge): the
+ *             content panel's small translateY(-20px) nudge only closed
+ *             the visible seam between it and the hero — the hero itself
+ *             (BrandRow, SearchBar, SpecialtySelector, hero-bg) stayed
+ *             fully visible underneath, since the panel was still a normal
+ *             in-flow sibling of the hero. Replaced with position: sticky
+ *             on the content panel (top pinned to the sticky header's
+ *             live-measured height, via ResizeObserver — no more hardcoded
+ *             90px assumption) plus a JS-animated window.scrollTo (same
+ *             requestAnimationFrame pattern as useBackToTop, eased with a
+ *             cubicBezierEase(0.4, 0, 0.2, 1) matching the app's existing
+ *             "fast-out-slow-in" CSS curve) that snaps the scroll position
+ *             straight to where the panel sits flush under the header the
+ *             instant the same single IntersectionObserver fires — rather
+ *             than waiting for native sticky's own continuous scroll-linked
+ *             behavior, which would only reach that point once the user
+ *             had genuinely scrolled past the hero's full height. Reverses
+ *             the same way on the observer's falling edge: an animated
+ *             scrollTo(0) snaps straight back to the top so the hero is
+ *             instantly fully visible again. No scroll-lock, no fixed
+ *             positioning, no gesture capture — window scroll stays real
+ *             throughout, so useBackToTop and BackToTopButton are
+ *             unaffected. snapToListHeader (and listHeaderRef, which only
+ *             existed to support it) removed — it existed to re-align the
+ *             list under the sticky header after a filter change while
+ *             scrolled down, but sticky positioning keeps the panel flush
+ *             at all times now, so there's nothing left to re-align.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -114,7 +141,7 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart } from 'lucide-react'
 import Layout                  from '../components/layout'
@@ -381,6 +408,7 @@ function StickyLogoHeader({
   onClearSpecialty,
   onOpenSpecialties,
   onSearchTap,
+  headerRef,
 }) {
   const isDark    = useIsDark()
   const hasFilter = !!activeSpecialtyObj
@@ -406,6 +434,7 @@ function StickyLogoHeader({
 
   return (
     <div
+      ref={headerRef}
       aria-hidden="true"
       style={{
         position:               'fixed',
@@ -587,6 +616,36 @@ function StickyLogoHeader({
   )
 }
 
+// ─── Cubic-bezier easing (matches CSS cubic-bezier(0.4, 0, 0.2, 1),
+//     the app's existing "fast-out-slow-in" curve) ─────────────────────────────
+// Standard Newton-Raphson bezier solver — solves for t given x (elapsed
+// progress 0–1), then evaluates y at that t. Used to drive the JS scrollTo
+// dock/undock snap below, so the forced scroll matches the same curve the
+// panel's box-shadow transition already uses, rather than a different feel.
+
+function cubicBezierEase(p1x, p1y, p2x, p2y) {
+  const a = (a1, a2) => 1.0 - 3.0 * a2 + 3.0 * a1
+  const b = (a1, a2) => 3.0 * a2 - 6.0 * a1
+  const c = a1        => 3.0 * a1
+
+  const calcBezier = (t, a1, a2) => ((a(a1, a2) * t + b(a1, a2)) * t + c(a1)) * t
+  const getSlope    = (t, a1, a2) => 3.0 * a(a1, a2) * t * t + 2.0 * b(a1, a2) * t + c(a1)
+
+  function getTForX(x) {
+    let t = x
+    for (let i = 0; i < 8; i++) {
+      const slope = getSlope(t, p1x, p2x)
+      if (slope === 0) return t
+      t -= (calcBezier(t, p1x, p2x) - x) / slope
+    }
+    return t
+  }
+
+  return x => calcBezier(getTForX(x), p1y, p2y)
+}
+
+const DOCK_EASE = cubicBezierEase(0.4, 0, 0.2, 1)
+
 // ─── ConditionsScreen ─────────────────────────────────────────────────────────
 
 export default function ConditionsScreen() {
@@ -603,23 +662,84 @@ export default function ConditionsScreen() {
   // reverted from a continuous logoVisibility float (0–1, driven by a
   // 21-step IntersectionObserver threshold array) back to this simple
   // boolean — nothing downstream should scroll-link to a continuous
-  // signal anymore (see BrandRow hard-toggle and panel glide below), so a
-  // single fire-on-cross boolean is the right shape for this state again.
+  // signal anymore (see BrandRow hard-toggle below), so a single
+  // fire-on-cross boolean is the right shape for this state again.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
-  const listHeaderRef  = useRef(null)
+  // Phase 23 additions — sticky-header height measurement and dock/undock
+  // scroll-snap bookkeeping. stickyHeaderRef is attached to StickyLogoHeader's
+  // own root div so its real rendered height can be measured (translateY
+  // doesn't affect getBoundingClientRect's height, so this works even while
+  // the header is off-screen). contentPanelRef is the content panel itself,
+  // used to compute the exact scroll offset where its sticky point meets the
+  // header. dockedRef mirrors showStickyHeader in a ref (not state) purely so
+  // the observer callback can detect the rising/falling edge without an
+  // impure side effect inside a setState updater. scrollAnimRef holds the
+  // in-flight requestAnimationFrame id so a new dock/undock snap (or a real
+  // user scroll) can cancel a still-running one instead of fighting it.
+  const stickyHeaderRef = useRef(null)
+  const contentPanelRef = useRef(null)
+  const dockedRef       = useRef(false)
+  const scrollAnimRef   = useRef(null)
+  const [headerHeight, setHeaderHeight] = useState(90) // fallback matches the old hardcoded snap value until measured
 
-  // ── Sliding sticky header + floating panel glide: both driven by the same
+  // Measure the sticky header's real height (ResizeObserver keeps it correct
+  // across viewport/content changes) rather than assuming a fixed number —
+  // the content panel's sticky 'top' must match it exactly for the panel to
+  // sit flush with zero gap once docked.
+  useLayoutEffect(() => {
+    const el = stickyHeaderRef.current
+    if (!el) return
+
+    function measure() {
+      setHeaderHeight(el.getBoundingClientRect().height)
+    }
+    measure()
+
+    const resizeObserver = new ResizeObserver(measure)
+    resizeObserver.observe(el)
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  // Animates window scroll from its current position to 'target' over
+  // 'duration'ms using DOCK_EASE, cancelling any animation already in
+  // flight first so a rapid dock/undock/dock sequence (or a real user
+  // scroll) never fights a stale one.
+  function animateScrollTo(target, duration = 240) {
+    if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current)
+
+    const start    = window.scrollY
+    const distance = target - start
+    if (distance === 0) return
+
+    const startTime = performance.now()
+
+    function step(now) {
+      const elapsed  = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      window.scrollTo(0, start + distance * DOCK_EASE(progress))
+      scrollAnimRef.current = progress < 1 ? requestAnimationFrame(step) : null
+    }
+
+    scrollAnimRef.current = requestAnimationFrame(step)
+  }
+
+  // ── Sliding sticky header + docked content panel: both driven by the same
   //    showStickyHeader boolean, sourced from one IntersectionObserver on
   //    the BrandRow (logo) — single source of truth, no separate scroll
-  //    listener. Feedback pass: threshold changed from [0, 1] (fired only
-  //    once the logo had fully left view) to [1] — this fires the instant
-  //    the logo drops below 100% visible, i.e. on the very first pixel of
-  //    scroll, rather than waiting for it to fully scroll out. Still a
-  //    single IntersectionObserver, still no independent scroll-distance
-  //    threshold.
+  //    listener. Threshold [1] fires the instant the logo drops below 100%
+  //    visible, i.e. on the very first pixel of scroll.
+  //
+  //    Phase 23: the same fire also drives an animated window.scrollTo —
+  //    on the rising edge (docking), straight to where the content panel's
+  //    'position: sticky' point sits flush under the header; on the falling
+  //    edge (undocking), straight back to 0. Native sticky positioning alone
+  //    would only reach the flush point once the user had actually scrolled
+  //    past the hero's full height — the forced scrollTo is what makes the
+  //    switch instant and "first pixel"-triggered instead of a slow
+  //    continuous scroll-linked drag.
 
   useEffect(() => {
     const el = brandRowRef.current
@@ -627,14 +747,26 @@ export default function ConditionsScreen() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setShowStickyHeader(entry.intersectionRatio < 1)
+        const nextDocked = entry.intersectionRatio < 1
+
+        if (nextDocked !== dockedRef.current) {
+          dockedRef.current = nextDocked
+          if (nextDocked) {
+            const panelEl = contentPanelRef.current
+            if (panelEl) animateScrollTo(panelEl.offsetTop - headerHeight)
+          } else {
+            animateScrollTo(0)
+          }
+        }
+
+        setShowStickyHeader(nextDocked)
       },
       { threshold: [1] }
     )
 
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [headerHeight])
 
   function handleSearchTap() {
     searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -658,15 +790,6 @@ export default function ConditionsScreen() {
   const specialtyName      = activeSpecialtyObj?.name ?? ''
   const totalCount         = conditions.length
 
-  // Bugfix pass: the continuously-interpolated brandRowOpacity/
-  // panelLiftExtra/panelShadowOpacity values (derived from logoVisibility,
-  // recalculated on every ~5% IntersectionObserver step) are removed
-  // entirely. BrandRow visibility is now a hard toggle on showStickyHeader
-  // (see BrandRow render below) and the content panel's lift/shadow are
-  // two fixed states switched by showStickyHeader and animated with a real
-  // CSS transition (see content panel style below) — neither is scroll- or
-  // intersection-ratio-linked anymore.
-
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function handleCardTap(condition) {
@@ -677,35 +800,12 @@ export default function ConditionsScreen() {
     setQuery('')
   }
 
-  function snapToListHeader() {
-    if (!listHeaderRef.current) return
-    const el            = listHeaderRef.current
-    const STICKY_HEIGHT = 90
-    const GAP           = 28
-    const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
-    const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
-    // Temporarily disable CSS scroll-behavior: smooth so the jump is truly instant
-    document.documentElement.style.scrollBehavior = 'auto'
-    if (targetScroll > 0 && maxScroll >= targetScroll) {
-      window.scrollTo(0, targetScroll)
-    } else {
-      window.scrollTo(0, 0)
-    }
-    document.documentElement.style.scrollBehavior = ''
-  }
-
   function handleClearFilter() {
     setActiveSpecialty('all')
-    if (showStickyHeader) snapToListHeader()
   }
 
-  // When a specialty is chosen via the sticky header (user is scrolled down),
-  // snap instantly so the list header sits just below the sticky header with
-  // a small gap. If the page isn't tall enough to reach that scroll position
-  // (filtered list is short), snap to top instead so the sticky header hides.
   function handleSelectSpecialty(id) {
     setActiveSpecialty(id)
-    if (showStickyHeader) setTimeout(snapToListHeader, 50)
   }
 
   // Static (non-interactive) favourite indicator for the trailing slot —
@@ -814,6 +914,7 @@ export default function ConditionsScreen() {
         onSortToggle={cycleSortMode}
         SORT_LABELS={SORT_LABELS}
         onSearchTap={handleSearchTap}
+        headerRef={stickyHeaderRef}
       />
 
       {/* ─── Hero panel ───────────────────────────────────────────────────────
@@ -886,6 +987,16 @@ export default function ConditionsScreen() {
       </div>
 
       {/* ─── Content panel ────────────────────────────────────────────────────
+          Phase 23: position: sticky (top pinned to the live-measured sticky
+          header height) replaces the old transform nudge. Sticky alone would
+          only reach its flush position once the user had scrolled past the
+          hero's full height — the IntersectionObserver-driven animateScrollTo
+          above is what makes it snap there the instant showStickyHeader flips,
+          so the hero is either fully visible (View A, at rest) or fully
+          covered (View B, docked) with no partial states in between. Because
+          this stays in normal document flow (never position: fixed), window
+          scroll stays real throughout, and Layout's existing bottom-nav
+          padding on <main> keeps applying with no extra handling needed.
           Same page background as before (var(--color-bg)) — visually
           unchanged from the rest of the page — but pulled up over the hero
           panel's bottom edge by exactly its own corner radius, so the
@@ -904,63 +1015,52 @@ export default function ConditionsScreen() {
           had slightly more clearance than needed above it.
           boxShadow added above the panel (negative y-offset) so the curve
           reads as a lifted edge via elevation, not color contrast alone. */}
-      <div style={{
-        backgroundColor: 'var(--color-bg)',
-        borderTopLeftRadius:  'var(--radius-xl)',
-        borderTopRightRadius: 'var(--radius-xl)',
-        // Base --radius-xl overlap — fixed at rest, no longer a scroll-linked
-        // calc(). The panel stays completely still during normal scrolling;
-        // see transform below for the one glide it makes.
-        marginTop:       'calc(var(--radius-xl) * -1)',
-        marginLeft:      'calc(var(--space-6) * -1)',
-        marginRight:     'calc(var(--space-6) * -1)',
-        paddingLeft:     'var(--space-6)',
-        paddingRight:    'var(--space-6)',
-        paddingTop:      'var(--space-4)',
-        // Feedback pass: slide distance increased from a flat 12px (barely
-        // visible) to exactly var(--space-5) — the hero panel's flat
-        // visible gap before its curve begins (paddingBottom is
-        // calc(var(--space-5) + var(--radius-xl)); the panel's resting
-        // marginTop above only accounts for --radius-xl of that). Sliding
-        // the extra --space-5 on attach brings the total overlap to
-        // --radius-xl + --space-5 — exactly the hero's full paddingBottom
-        // — so none of the hero background shows between the sticky
-        // header and the panel once attached. Duration tightened
-        // 250ms → 180ms so the larger, now-clearly-visible move reads as
-        // fast/snappy rather than slow; same fast-out-slow-in curve, no
-        // spring/overshoot.
-        transform:       showStickyHeader ? 'translateY(calc(var(--space-5) * -1))' : 'translateY(0)',
-        // Feedback pass: added --shadow-panel-top as a second, always-on
-        // layer alongside the existing floating/attached ambient shadow —
-        // CSS box-shadow supports multiple comma-separated shadows on one
-        // element. This one is a soft, diffused, low-opacity shadow cast
-        // upward into the hero above the curve (see globals.css comment),
-        // constant across both panel states — it's a fixed accent on the
-        // seam itself, not part of the floating/attached interpolation.
-        boxShadow:       showStickyHeader
-          ? 'var(--shadow-panel-top), var(--shadow-ambient-panel-attached)'
-          : 'var(--shadow-panel-top), var(--shadow-ambient-panel-full)',
-        transition:      'transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms ease-out',
-      }}>
+      <div
+        ref={contentPanelRef}
+        style={{
+          backgroundColor: 'var(--color-bg)',
+          borderTopLeftRadius:  'var(--radius-xl)',
+          borderTopRightRadius: 'var(--radius-xl)',
+          position:        'sticky',
+          top:             `${headerHeight}px`,
+          // Base --radius-xl overlap — fixed at rest, matching the hero's
+          // paddingBottom relationship described above.
+          marginTop:       'calc(var(--radius-xl) * -1)',
+          marginLeft:      'calc(var(--space-6) * -1)',
+          marginRight:     'calc(var(--space-6) * -1)',
+          paddingLeft:     'var(--space-6)',
+          paddingRight:    'var(--space-6)',
+          paddingTop:      'var(--space-4)',
+          // Feedback pass: added --shadow-panel-top as a second, always-on
+          // layer alongside the existing floating/attached ambient shadow —
+          // CSS box-shadow supports multiple comma-separated shadows on one
+          // element. This one is a soft, diffused, low-opacity shadow cast
+          // upward into the hero above the curve (see globals.css comment),
+          // constant across both panel states — it's a fixed accent on the
+          // seam itself, not part of the floating/attached interpolation.
+          boxShadow:       showStickyHeader
+            ? 'var(--shadow-panel-top), var(--shadow-ambient-panel-attached)'
+            : 'var(--shadow-panel-top), var(--shadow-ambient-panel-full)',
+          transition:      'box-shadow 180ms ease-out',
+        }}
+      >
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
-        <div ref={listHeaderRef}>
-          <ConditionListHeader
-            totalCount={totalCount}
-            resultCount={resultCount}
-            activeSpecialty={activeSpecialty}
-            specialtyName={specialtyName}
-            isSearching={isSearching}
-            sortMode={sortMode}
-            onSortToggle={cycleSortMode}
-            SORT_LABELS={SORT_LABELS}
-            firstLetter={
-              !isSearching && sortMode === 'az' && resultCount > 0
-                ? alphabetGroup(results)[0]?.letter
-                : undefined
-            }
-          />
-        </div>
+        <ConditionListHeader
+          totalCount={totalCount}
+          resultCount={resultCount}
+          activeSpecialty={activeSpecialty}
+          specialtyName={specialtyName}
+          isSearching={isSearching}
+          sortMode={sortMode}
+          onSortToggle={cycleSortMode}
+          SORT_LABELS={SORT_LABELS}
+          firstLetter={
+            !isSearching && sortMode === 'az' && resultCount > 0
+              ? alphabetGroup(results)[0]?.letter
+              : undefined
+          }
+        />
 
         {/* 6. Condition list */}
         {renderList()}
