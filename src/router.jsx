@@ -4,13 +4,21 @@
  * Phase 3J — Added /admin/analytics route
  * Phase 3K — Added /admin/crash-logs and /admin/notifications routes
  * Phase 3L — Added /admin/audit-log route
+ * Phase 7  — Permanent-mount tab switcher (sticky-header-permanent-mount-fix)
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
  * AppRoutes renders the <Routes> tree — drop it inside <BrowserRouter>.
  */
 
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, useLocation } from 'react-router-dom'
+
+// ─── Shared chrome ─────────────────────────────────────────────────────────────
+
+import Layout             from './components/layout'
+import BottomNav          from './components/BottomNav'
+import OfflineBanner      from './components/ui/OfflineBanner'
+import NotificationsBanner from './components/ui/NotificationsBanner'
 
 // ─── Public screens ───────────────────────────────────────────────────────────
 
@@ -62,64 +70,113 @@ export const ROUTES = {
   ADMIN_AUDIT_LOG:        '/admin/audit-log',
 }
 
+/**
+ * Pane style for the permanently-mounted Conditions/Drugs/Favourites trio.
+ *
+ * Deliberately NOT display:none for the inactive case. useStickyHeaderScroll's
+ * IntersectionObserver measures the tracked header element's bounding rect —
+ * display:none zeroes that rect out, which can make the observer report a
+ * spurious visible/hidden state that's still wrong once the tab is shown
+ * again. position:absolute + visibility:hidden keeps the pane fully laid out
+ * (real, non-zero rects) while making it invisible and non-interactive.
+ */
+function panePosition(active) {
+  return active
+    ? { position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }
+    : { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none' }
+}
+
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
 
 export default function AppRoutes() {
+  const { pathname } = useLocation()
+
+  const isConditionsTab  = pathname === '/' || pathname === '/conditions'
+  const isDrugsTab       = pathname === '/drugs'
+  const isFavouritesTab  = pathname === '/favourites'
+  const isTabRoute       = isConditionsTab || isDrugsTab || isFavouritesTab
+
+  // Conditions and Favourites render their own hero + sliding sticky header;
+  // Drugs uses the shared Layout header. Passed explicitly rather than
+  // derived inside Layout, since Layout no longer maps 1:1 to a single route
+  // once these three stay permanently mounted side by side.
+  const suppressHeader = isConditionsTab || isFavouritesTab
+
   return (
-    <Routes>
+    <>
+      <OfflineBanner />
 
-      {/* ── Public routes ────────────────────────────────────────────────── */}
+      {/* Same permanently-mounted-but-hidden treatment as the individual
+          tab panes below, applied one level up: detail/admin routes must
+          not disturb the trio's mounted state, but they also shouldn't
+          visually overlap it, so the whole trio is hidden (not unmounted)
+          while a detail/admin route is active. */}
+      <div style={panePosition(isTabRoute)}>
+        <Layout suppressHeader={suppressHeader}>
+          <div style={panePosition(isConditionsTab)}>
+            <ConditionsScreen />
+          </div>
+          <div style={panePosition(isDrugsTab)}>
+            <DrugsScreen />
+          </div>
+          <div style={panePosition(isFavouritesTab)}>
+            <FavouritesScreen />
+          </div>
+        </Layout>
+      </div>
 
-      <Route path="/"                    element={<ConditionsScreen />} />
-      <Route path="/conditions"          element={<ConditionsScreen />} />
-      <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
+      {/* Detail and admin screens continue to mount/unmount normally —
+          only the Conditions/Drugs/Favourites trio needs to stay warm.
+          Each of these still wraps itself in its own Layout instance,
+          unchanged from before this task. */}
+      {!isTabRoute && (
+        <Routes>
+          <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
+          <Route path="/drugs/:slug"         element={<DrugDetailScreen />} />
 
-      <Route path="/drugs"               element={<DrugsScreen />} />
-      <Route path="/drugs/:slug"         element={<DrugDetailScreen />} />
+          <Route path="/admin/login"         element={<AdminLogin />} />
 
-      <Route path="/favourites"          element={<FavouritesScreen />} />
+          <Route path="/admin"
+            element={<AuthGuard><AdminDashboard /></AuthGuard>}
+          />
+          <Route path="/admin/drugs"
+            element={<AuthGuard><DrugCMS /></AuthGuard>}
+          />
+          <Route path="/admin/drugs/new"
+            element={<AuthGuard><AddDrugFlow /></AuthGuard>}
+          />
+          <Route path="/admin/drugs/generic/:genericId"
+            element={<AuthGuard><DrugEditor /></AuthGuard>}
+          />
+          <Route path="/admin/conditions"
+            element={<AuthGuard><ConditionsCMS /></AuthGuard>}
+          />
+          <Route path="/admin/conditions/new"
+            element={<AuthGuard><ConditionEditor /></AuthGuard>}
+          />
+          <Route path="/admin/conditions/:id"
+            element={<AuthGuard><ConditionEditor /></AuthGuard>}
+          />
+          <Route path="/admin/specialties"
+            element={<AuthGuard><SpecialtiesManager /></AuthGuard>}
+          />
+          <Route path="/admin/analytics"
+            element={<AuthGuard><AnalyticsDashboard /></AuthGuard>}
+          />
+          <Route path="/admin/crash-logs"
+            element={<AuthGuard><CrashLogs /></AuthGuard>}
+          />
+          <Route path="/admin/notifications"
+            element={<AuthGuard><NotificationsPanel /></AuthGuard>}
+          />
+          <Route path="/admin/audit-log"
+            element={<AuthGuard><AuditLog /></AuthGuard>}
+          />
+        </Routes>
+      )}
 
-      {/* ── Admin routes ─────────────────────────────────────────────────── */}
-
-      <Route path="/admin/login"         element={<AdminLogin />} />
-
-      <Route path="/admin"
-        element={<AuthGuard><AdminDashboard /></AuthGuard>}
-      />
-      <Route path="/admin/drugs"
-        element={<AuthGuard><DrugCMS /></AuthGuard>}
-      />
-      <Route path="/admin/drugs/new"
-        element={<AuthGuard><AddDrugFlow /></AuthGuard>}
-      />
-      <Route path="/admin/drugs/generic/:genericId"
-        element={<AuthGuard><DrugEditor /></AuthGuard>}
-      />
-      <Route path="/admin/conditions"
-        element={<AuthGuard><ConditionsCMS /></AuthGuard>}
-      />
-      <Route path="/admin/conditions/new"
-        element={<AuthGuard><ConditionEditor /></AuthGuard>}
-      />
-      <Route path="/admin/conditions/:id"
-        element={<AuthGuard><ConditionEditor /></AuthGuard>}
-      />
-      <Route path="/admin/specialties"
-        element={<AuthGuard><SpecialtiesManager /></AuthGuard>}
-      />
-      <Route path="/admin/analytics"
-        element={<AuthGuard><AnalyticsDashboard /></AuthGuard>}
-      />
-      <Route path="/admin/crash-logs"
-        element={<AuthGuard><CrashLogs /></AuthGuard>}
-      />
-      <Route path="/admin/notifications"
-        element={<AuthGuard><NotificationsPanel /></AuthGuard>}
-      />
-      <Route path="/admin/audit-log"
-        element={<AuthGuard><AuditLog /></AuthGuard>}
-      />
-
-    </Routes>
+      <NotificationsBanner />
+      <BottomNav />
+    </>
   )
 }
