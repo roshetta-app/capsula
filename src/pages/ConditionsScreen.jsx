@@ -150,10 +150,9 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart } from 'lucide-react'
-import Layout                  from '../components/layout'
 import BackToTopButton         from '../components/ui/BackToTopButton'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -166,7 +165,7 @@ import SpecialtySelector       from '../components/conditions/SpecialtySelector'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useConditionSearch }  from '../hooks/useConditionSearch'
-import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
+import { useRecentlyViewedContext } from '../context/RecentlyViewedContext'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
@@ -186,6 +185,31 @@ import { ROUTES }                                  from '../router'
 
 const ENTRANCE_SESSION_KEY = 'capsula_conditions_entrance_played'
 const ENTRANCE_STAGGER_MS  = 40 // gap between each stage's transitionDelay
+
+// Used only by the cold-start skeleton below — that state has no scrollable
+// content, so it doesn't need the self-contained scroll box the real screen
+// uses. Matches ConditionDetailScreen's own simplePageStyle convention.
+const simplePageStyle = {
+  minHeight: '100svh',
+  display: 'flex',
+  flexDirection: 'column',
+  backgroundColor: 'var(--color-bg)',
+  fontFamily: 'var(--font-body)',
+  color: 'var(--color-text-primary)',
+}
+
+// Used by the real screen. height is set dynamically per-render (see
+// availableHeight in the component) — overflow: hidden means this root
+// itself never scrolls, so window.scrollY can never move on this screen.
+// Matches ConditionDetailScreen's own rootStyle exactly.
+const rootStyle = {
+  display: 'flex',
+  flexDirection: 'column',
+  overflow: 'hidden',
+  backgroundColor: 'var(--color-bg)',
+  fontFamily: 'var(--font-body)',
+  color: 'var(--color-text-primary)',
+}
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -696,7 +720,7 @@ export default function ConditionsScreen() {
   const navigate = useNavigate()
   const { conditions, specialties, loading } = useConditionContext()
   const { isConditionFavourited }             = useFavouritesContext()
-  const { recentlyViewed, recentOrder }      = useRecentlyViewed()
+  const { recentlyViewed, recentOrder }      = useRecentlyViewedContext()
   const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
   const { isDark, toggleDark }               = useDarkMode()
 
@@ -707,10 +731,39 @@ export default function ConditionsScreen() {
     elementRef: brandRowRef,
     visible: showStickyHeader,
     readyToAnimate: transitionsReady,
-  } = useStickyHeaderScroll('conditions')
-  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
+  } = useStickyHeaderScroll()
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
+
+  // ── Self-contained scroll box — sticky-header-permanent-mount-fix ──────────
+  // Same technique ConditionDetailScreen already uses: the root measures its
+  // own distance from the top of the viewport and gets an explicit height,
+  // and only the box inside it (scrollBoxRef) actually scrolls. That's what
+  // lets this screen stay permanently mounted and be shown/hidden by
+  // router.jsx without window.scrollY leaking between screens.
+  const rootRef = useRef(null)
+  const [availableHeight, setAvailableHeight] = useState(null)
+  const scrollBoxRef = useRef(null)
+  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop(scrollBoxRef)
+
+  useLayoutEffect(() => {
+    function measure() {
+      if (!rootRef.current) return
+      const vv = window.visualViewport
+      const viewportHeight = vv?.height ?? window.innerHeight
+      const top = rootRef.current.getBoundingClientRect().top
+      setAvailableHeight(Math.max(viewportHeight - top, 0))
+    }
+
+    measure()
+    const vv = window.visualViewport
+    window.addEventListener('resize', measure)
+    vv?.addEventListener('resize', measure)
+    return () => {
+      window.removeEventListener('resize', measure)
+      vv?.removeEventListener('resize', measure)
+    }
+  }, [])
 
   // ── Entrance stagger — conditions-screen-polish-master-plan Phase 11.
   // playEntrance is decided once, on first mount: false if this session has
@@ -824,20 +877,24 @@ export default function ConditionsScreen() {
   }
 
   function snapToListHeader() {
-    if (!listHeaderRef.current) return
+    if (!listHeaderRef.current || !scrollBoxRef.current) return
+    const box           = scrollBoxRef.current
     const el            = listHeaderRef.current
     const STICKY_HEIGHT = 90
     const GAP           = 28
+    // el.offsetTop is measured relative to the scroll box now (the box has
+    // position: relative — see its style below), instead of the whole
+    // document — same math as before, just scoped to this screen's own box.
     const targetScroll  = el.offsetTop - STICKY_HEIGHT - GAP
-    const maxScroll     = document.documentElement.scrollHeight - window.innerHeight
+    const maxScroll     = box.scrollHeight - box.clientHeight
     // Temporarily disable CSS scroll-behavior: smooth so the jump is truly instant
-    document.documentElement.style.scrollBehavior = 'auto'
+    box.style.scrollBehavior = 'auto'
     if (targetScroll > 0 && maxScroll >= targetScroll) {
-      window.scrollTo(0, targetScroll)
+      box.scrollTop = targetScroll
     } else {
-      window.scrollTo(0, 0)
+      box.scrollTop = 0
     }
-    document.documentElement.style.scrollBehavior = ''
+    box.style.scrollBehavior = ''
   }
 
   function handleClearFilter() {
@@ -930,26 +987,42 @@ export default function ConditionsScreen() {
 
   if (loading && conditions.length === 0) {
     return (
-      <Layout>
-        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
+      <div style={simplePageStyle}>
+        {/* Same maxWidth/padding Layout's <main> used to provide — this
+            screen no longer wraps in Layout, so it reproduces that spacing
+            itself. Bottom padding reserves BottomNav clearance the same way
+            Layout always did for this route. */}
+        <div style={{ maxWidth: 680, margin: '0 auto', width: '100%', padding: '0 var(--space-6) calc(var(--space-12) + 60px)' }}>
+          <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+              <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
+            </div>
+            <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
           </div>
-          <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
+          <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
+          <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
+          {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
         </div>
-        <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
-        <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
-        {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
-      </Layout>
+      </div>
     )
   }
 
   // ── Main render ──────────────────────────────────────────────────────────────
 
   return (
-    <Layout>
+    <div
+      ref={rootRef}
+      style={{
+        ...rootStyle,
+        height: availableHeight != null ? availableHeight : '100svh',
+      }}
+    >
 
-      {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
+      {/* Sliding sticky logo header — appears once BrandRow scrolls out of
+          view. Uses position: fixed (see StickyLogoHeader below) so it sits
+          outside the scroll box exactly like DetailHeader does in
+          ConditionDetailScreen — its own positioning doesn't depend on
+          being physically inside the scrolling content. */}
       <StickyLogoHeader
         visible={showStickyHeader}
         readyToAnimate={transitionsReady}
@@ -963,12 +1036,34 @@ export default function ConditionsScreen() {
         onSearchTap={handleSearchTap}
       />
 
+      {/* The box that actually scrolls for this screen — same technique as
+          ConditionDetailScreen's scrollBoxRef. position: relative so
+          listHeaderRef's offsetTop (used by snapToListHeader) measures
+          against this box instead of the whole document. */}
+      <div
+        ref={scrollBoxRef}
+        style={{
+          position: 'relative',
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+      {/* Same maxWidth/padding Layout's <main> used to provide — this screen
+          no longer wraps in Layout, so it reproduces that spacing itself.
+          Bottom padding reserves BottomNav clearance the same way Layout
+          always did for this route. */}
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 var(--space-6) calc(var(--space-12) + 60px)' }}>
+
       {/* ─── Base layer ───────────────────────────────────────────────────────
           Static flat background, var(--color-hero-bg) — now a distinct,
           non-animated color (#FAFAFA light) from the panel's var(--color-bg)
-          (#F7F8FA light), see globals.css. Bled edge-to-edge past Layout's
-          <main> side padding (negative margin equal to that padding,
-          restored as this panel's own padding for its children). Contains
+          (#F7F8FA light), see globals.css. Bled edge-to-edge past this
+          screen's own wrapper padding above (negative margin equal to that
+          padding, restored as this panel's own padding for its children —
+          previously that padding came from Layout's <main>, now reproduced
+          directly here since this screen owns its own scroll box). Contains
           everything above the sort row: brand row, search, recently-viewed,
           specialty selector.
           paddingBottom is a calc() of two named tokens — visible gap
@@ -1090,7 +1185,12 @@ export default function ConditionsScreen() {
         </div>
       </div>
 
-      {/* Back to top */}
+      </div>
+      </div>
+      {/* ↑ closes: maxWidth content wrapper, then the scroll box itself */}
+
+      {/* Back to top — position: fixed, so it can sit outside the scroll box
+          the same way BackToTopButton always has. */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {/* Specialties bottom sheet */}
@@ -1102,9 +1202,6 @@ export default function ConditionsScreen() {
         isOpen={bottomSheetOpen}
       />
 
-    </Layout>
+    </div>
   )
 }
-
-
-
