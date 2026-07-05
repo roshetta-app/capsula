@@ -8,6 +8,14 @@
  * token language (surface / radius-lg / border) but is sized and
  * interaction-styled for the mobile app instead.
  *
+ * Phase 10 — Added the same shouldRender/animateIn delayed-unmount
+ *            pattern used by SpecialtiesBottomSheet, but with a fade +
+ *            scale(0.96 -> 1) entrance instead of a slide, since this is
+ *            a centered dialog rather than a bottom-anchored sheet. Uses
+ *            --motion-base (200ms) rather than --motion-screen, since
+ *            this is a small transient dialog, not a full-screen-level
+ *            transition.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -18,7 +26,7 @@
  *   destructive   boolean  (default false)
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export default function ConfirmSheet({
@@ -32,6 +40,25 @@ export default function ConfirmSheet({
 }) {
   const overlayRef = useRef(null)
 
+  // shouldRender keeps the DOM present during the exit transition.
+  // animateIn drives the CSS open/closed visual state.
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      // Mount first, then flip animateIn on the next frame so the
+      // browser has painted the start-position before transitioning.
+      setShouldRender(true)
+      requestAnimationFrame(() => setAnimateIn(true))
+    } else {
+      // Start exit transition immediately; unmount after it finishes.
+      setAnimateIn(false)
+      const t = setTimeout(() => setShouldRender(false), 220)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen])
+
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return
@@ -40,7 +67,7 @@ export default function ConfirmSheet({
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
 
-  if (!isOpen) return null
+  if (!shouldRender) return null
 
   function handleConfirm() {
     onConfirm()
@@ -66,6 +93,8 @@ export default function ConfirmSheet({
         alignItems:      'center',
         justifyContent:  'center',
         padding:         'var(--space-4)',
+        opacity:         animateIn ? 1 : 0,
+        transition:      'opacity var(--motion-base) var(--ease-reveal)',
       }}
     >
       <div
@@ -80,6 +109,9 @@ export default function ConfirmSheet({
           boxShadow:       '0 24px 64px rgba(0,0,0,0.18)',
           padding:         'var(--space-5)',
           fontFamily:      'var(--font-body)',
+          opacity:         animateIn ? 1 : 0,
+          transform:       animateIn ? 'scale(1)' : 'scale(0.96)',
+          transition:      'opacity var(--motion-base) var(--ease-reveal), transform var(--motion-base) var(--ease-settle)',
         }}
       >
         {title && (

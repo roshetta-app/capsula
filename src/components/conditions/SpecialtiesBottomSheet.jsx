@@ -24,6 +24,12 @@
  * Phase 9 — Open/close animation: sheet slides up from bottom (translateY)
  *           and backdrop fades in/out. Uses shouldRender + animateIn state
  *           to delay unmount until the exit transition completes (~320 ms).
+ * Phase 10 — Swapped hardcoded transition timings for Phase 2's shared
+ *            motion tokens (--motion-base / --motion-screen +
+ *            --ease-reveal / --ease-settle) so open and close each use one
+ *            duration per property instead of a longer/shorter pair, and
+ *            reduced-motion is respected automatically. Exit unmount delay
+ *            shortened from 320ms to 280ms to match --motion-screen.
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -65,7 +71,7 @@ export default function SpecialtiesBottomSheet({
     } else {
       // Start exit transition immediately; unmount after it finishes.
       setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 320)
+      const t = setTimeout(() => setShouldRender(false), 280)
       return () => clearTimeout(t)
     }
   }, [isOpen])
@@ -100,9 +106,7 @@ export default function SpecialtiesBottomSheet({
           zIndex:          200,
           backgroundColor: 'rgba(0,0,0,0.35)',
           opacity:         animateIn ? 1 : 0,
-          transition:      animateIn
-            ? 'opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-            : 'opacity 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
+          transition:      'opacity var(--motion-base) var(--ease-reveal)',
         }}
       />
       <div
@@ -122,9 +126,7 @@ export default function SpecialtiesBottomSheet({
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
           transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      animateIn
-            ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
-            : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+          transition:      'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
         {/* Fixed header — drag handle, label, and the 'All conditions' row.
