@@ -73,17 +73,26 @@
  *             16-21's continuous-interpolation approach): the 21-step
  *             IntersectionObserver threshold array and the logoVisibility
  *             float it drove are reverted back to a single-purpose
- *             boolean (showStickyHeader), threshold [0, 1]. BrandRow's
- *             fade (brandRowOpacity) is now a hard opacity toggle with no
- *             transition — the continuous fade caused a React re-render on
- *             every ~5% scroll step, reading as glitchy/sluggish rather
- *             than smooth. The content panel's glide (panelLiftExtra) and
- *             ambient shadow (panelShadowOpacity) are no longer
- *             recalculated per intersection step either — the panel now
- *             sits still at rest and makes exactly one CSS-transitioned
- *             transform+shadow move (250ms cubic-bezier(0.4,0,0.2,1)) the
+ *             boolean (showStickyHeader). BrandRow's fade (brandRowOpacity)
+ *             is now a hard opacity toggle with no transition — the
+ *             continuous fade caused a React re-render on every ~5% scroll
+ *             step, reading as glitchy/sluggish rather than smooth. The
+ *             content panel's glide (panelLiftExtra) and ambient shadow
+ *             (panelShadowOpacity) are no longer recalculated per
+ *             intersection step either — the panel sits still at rest and
+ *             makes exactly one CSS-transitioned transform+shadow move the
  *             instant showStickyHeader flips, coordinated with the sticky
  *             header and BrandRow toggle in the same render.
+ *             Feedback pass on Phase 22: threshold changed [0,1] → [1] so
+ *             showStickyHeader flips on the very first pixel of scroll
+ *             instead of waiting for the logo to fully leave view. Slide
+ *             distance increased from a flat 12px to var(--space-5) —
+ *             exactly the hero panel's flat visible gap before its curve —
+ *             so the panel's total attached overlap (--radius-xl +
+ *             --space-5) matches the hero's full paddingBottom and no hero
+ *             background shows between the sticky header and the panel.
+ *             Duration tightened 250ms → 180ms so the larger move still
+ *             reads as fast, not slow.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -605,11 +614,12 @@ export default function ConditionsScreen() {
   // ── Sliding sticky header + floating panel glide: both driven by the same
   //    showStickyHeader boolean, sourced from one IntersectionObserver on
   //    the BrandRow (logo) — single source of truth, no separate scroll
-  //    listener. threshold reverted to [0, 1] (was a 21-step array used to
-  //    report continuous intersectionRatio) since nothing needs the
-  //    continuous value anymore. rootMargin: '-1px' preserved from the
-  //    original — showStickyHeader flips to true the moment the last pixel
-  //    of the logo crosses the viewport top.
+  //    listener. Feedback pass: threshold changed from [0, 1] (fired only
+  //    once the logo had fully left view) to [1] — this fires the instant
+  //    the logo drops below 100% visible, i.e. on the very first pixel of
+  //    scroll, rather than waiting for it to fully scroll out. Still a
+  //    single IntersectionObserver, still no independent scroll-distance
+  //    threshold.
 
   useEffect(() => {
     const el = brandRowRef.current
@@ -617,9 +627,9 @@ export default function ConditionsScreen() {
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setShowStickyHeader(entry.intersectionRatio === 0)
+        setShowStickyHeader(entry.intersectionRatio < 1)
       },
-      { threshold: [0, 1], rootMargin: '-1px 0px 0px 0px' }
+      { threshold: [1] }
     )
 
     observer.observe(el)
@@ -907,22 +917,23 @@ export default function ConditionsScreen() {
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
         paddingTop:      'var(--space-4)',
-        // Bugfix pass: panelLiftExtra/panelShadowOpacity (continuously
-        // recalculated on every IntersectionObserver step) are gone. The
-        // panel now has exactly two states, switched by the same
-        // showStickyHeader boolean that drives the sticky header and
-        // BrandRow above — a single coordinated transition, not three
-        // separately-timed ones. transform does the upward glide (GPU-
-        // friendly, unlike animating margin-top); boxShadow switches
-        // between the two fixed ambient-shadow tokens already defined in
-        // globals.css (--shadow-ambient-panel-full / -attached) instead of
-        // an inline-computed rgba. Standard ease-out curve, ~250ms, no
-        // spring/overshoot, per spec.
-        transform:       showStickyHeader ? 'translateY(-12px)' : 'translateY(0)',
+        // Feedback pass: slide distance increased from a flat 12px (barely
+        // visible) to exactly var(--space-5) — the hero panel's flat
+        // visible gap before its curve begins (paddingBottom is
+        // calc(var(--space-5) + var(--radius-xl)); the panel's resting
+        // marginTop above only accounts for --radius-xl of that). Sliding
+        // the extra --space-5 on attach brings the total overlap to
+        // --radius-xl + --space-5 — exactly the hero's full paddingBottom
+        // — so none of the hero background shows between the sticky
+        // header and the panel once attached. Duration tightened
+        // 250ms → 180ms so the larger, now-clearly-visible move reads as
+        // fast/snappy rather than slow; same fast-out-slow-in curve, no
+        // spring/overshoot.
+        transform:       showStickyHeader ? 'translateY(calc(var(--space-5) * -1))' : 'translateY(0)',
         boxShadow:       showStickyHeader
           ? 'var(--shadow-ambient-panel-attached)'
           : 'var(--shadow-ambient-panel-full)',
-        transition:      'transform 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms ease-out',
+        transition:      'transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms ease-out',
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}

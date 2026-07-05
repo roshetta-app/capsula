@@ -94,15 +94,14 @@
      SpecialtySelector.jsx), so these fixed one-color tokens are unused. */
   --color-search-border:         #E8EBF0;
 
-  /* Hero panel — bugfix pass: restored a distinct near-white tint instead
-     of sharing --color-bg exactly. With both flat at #F7F8FA, the content
-     panel's curve/overlap had no color contrast to help it read as a
-     separate surface — only shadow was doing that work. #FCFAF7 sits
-     between --color-surface (#FFFFFF) and --color-bg (#F7F8FA), leaning
-     warm to match this palette's other neutrals (--color-note-bg,
-     --font-body) rather than the cooler-toned option tried and rejected
-     during the original Phase 16/17 exploration. */
-  --color-hero-bg:          #FCFAF7;
+  /* Hero panel — feedback pass: warm near-white (#FCFAF7) didn't read
+     right in practice — swapped to a neutral, very light grey with no
+     warm/cool hue bias. #FAFAFA sits between --color-surface (#FFFFFF)
+     and --color-bg (#F7F8FA), lighter than both so it still reads as the
+     "elevated" surface in the stack, but flat neutral grey rather than
+     leaning into either the blue-grey of --color-bg or the warm undertone
+     tried previously. */
+  --color-hero-bg:          #FAFAFA;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
