@@ -171,6 +171,29 @@
   --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
   --space-4: 16px; --space-5: 20px;  --space-6: 24px;
   --space-8: 32px; --space-10: 40px; --space-12: 48px;
+
+  /* Motion vocabulary - conditions-screen-polish-master-plan Phase 2
+     Shared duration/easing tokens so Phases 3-11 reference these instead
+     of hardcoding their own numbers per component. */
+  --motion-fast:   100ms;
+  --motion-base:   200ms;
+  --motion-screen: 280ms;
+
+  --ease-settle:   cubic-bezier(0.22, 1, 0.36, 1); /* decelerate, no overshoot - press, collapse, dismiss */
+  --ease-reveal:   cubic-bezier(0.4, 0, 0.2, 1);   /* steady fade/crossfade - chip fade, sheet content reveal */
+}
+
+/* Reduced motion - collapses the motion tokens above so every consumer
+   (Phases 3-11) gets this for free with no per-component check. 0.01ms
+   instead of 0ms so transitionend still fires reliably in browsers that
+   skip the event for a literal zero-duration transition (relevant for
+   Phase 9's setTimeout-based class cleanup). */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast:   0.01ms;
+    --motion-base:   0.01ms;
+    --motion-screen: 0.01ms;
+  }
 }
 
 /* ─── Dark mode overrides — activated by .dark on <html> ────────────────────── */
@@ -757,4 +780,3 @@ body {
    token for consistency between the two header variants. ───────────── */
 .fav-sticky-header {
   background: var(--color-accent-light);
-}
