@@ -86,32 +86,40 @@ const SearchBar = forwardRef(function SearchBar({
             fontFamily:      'var(--font-body)',
             outline:         'none',
             boxShadow:       'var(--shadow-ambient-search)',
-            transition:      'border-color 0.15s ease',
+            transition:      'border-color var(--motion-fast) var(--ease-settle), box-shadow var(--motion-fast) var(--ease-settle)',
           }}
-          onFocus={e => e.target.style.borderColor = 'var(--color-accent)'}
-          onBlur={e  => e.target.style.borderColor  = 'var(--color-border)'}
+          onFocus={e => {
+            e.target.style.borderColor = 'var(--color-accent)'
+            e.target.style.boxShadow   = '0 0 0 3px var(--color-accent-light), var(--shadow-ambient-search)'
+          }}
+          onBlur={e => {
+            e.target.style.borderColor = 'var(--color-border)'
+            e.target.style.boxShadow   = 'var(--shadow-ambient-search)'
+          }}
         />
-        {value && (
-          <button
-            onClick={() => onChange('')}
-            aria-label="Clear search"
-            style={{
-              position:  'absolute',
-              right:     'var(--space-3)',
-              top:       '50%',
-              transform: 'translateY(-50%)',
-              background:'none',
-              border:    'none',
-              cursor:    'pointer',
-              padding:   4,
-              color:     'var(--color-text-tertiary)',
-              display:   'flex',
-              alignItems:'center',
-            }}
-          >
-            <X size={15} />
-          </button>
-        )}
+        <button
+          onClick={() => onChange('')}
+          aria-label="Clear search"
+          tabIndex={value ? 0 : -1}
+          style={{
+            position:      'absolute',
+            right:         'var(--space-3)',
+            top:           '50%',
+            transform:     'translateY(-50%)',
+            background:    'none',
+            border:        'none',
+            cursor:        'pointer',
+            padding:       4,
+            color:         'var(--color-text-tertiary)',
+            display:       'flex',
+            alignItems:    'center',
+            opacity:       value ? 1 : 0,
+            pointerEvents: value ? 'auto' : 'none',
+            transition:    'opacity var(--motion-fast) var(--ease-reveal)',
+          }}
+        >
+          <X size={15} />
+        </button>
       </div>
 
       {onFilter && (
