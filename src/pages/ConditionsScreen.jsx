@@ -101,6 +101,21 @@
  *             tagline itself had become under-noticeable rather than
  *             balanced — this raises it one step without reintroducing
  *             competition with the search bar below it.
+ * Phase 6 (conditions-screen-polish-master-plan) — Sort interaction
+ *             crossfade: toggling sortMode no longer hard-cuts between
+ *             A–Z and Recent. handleSortToggle intercepts the tap, fades
+ *             the currently-rendered list out over --motion-fast, swaps
+ *             sortMode (and therefore the underlying results/tree shape)
+ *             only once fully faded, then fades the new list in over
+ *             --motion-fast. No FLIP/position animation — letter dividers
+ *             appear/disappear between modes, so only the container-level
+ *             opacity handoff is animated, never row position. Respects
+ *             prefers-reduced-motion by skipping the delay and swapping
+ *             instantly. Scoped to this file only — useSortToggle.js,
+ *             ConditionCard.jsx, and alphabetGroup.js are unchanged; row
+ *             identity (condition.id key) and grouping logic were already
+ *             correct, and the visible "hard cut" was the container tree
+ *             reshaping between flat/grouped layouts, not a per-card issue.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -645,9 +660,40 @@ export default function ConditionsScreen() {
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
-  // ── Sliding sticky header: visible once the BrandRow leaves the viewport.
-  //    Same IntersectionObserver approach as FavouritesScreen's heroRef
-  //    watch — single threshold, plain boolean.
+  // ── Sort crossfade — conditions-screen-polish-master-plan Phase 6.
+  // isListFading drives an opacity handoff on the list container:
+  // handleSortToggle fades the currently-shown list out first, then only
+  // flips sortMode (and lets results/renderList recompute) once fully
+  // faded, then fades the new list in. No FLIP/position animation — just
+  // a container-level opacity swap, since the tree shape (flat vs.
+  // grouped-with-dividers) changes between modes anyway.
+  const [isListFading, setIsListFading] = useState(false)
+  const fadeTimeoutRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current)
+    }
+  }, [])
+
+  function handleSortToggle() {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (prefersReducedMotion) {
+      cycleSortMode()
+      return
+    }
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current)
+    setIsListFading(true)
+    // Matches --motion-fast (100ms, Phase 2) — kept as a JS constant since
+    // this delay gates *when* sortMode actually flips, not just a CSS
+    // transition duration a stylesheet-level reduced-motion rule could
+    // shrink on its own.
+    fadeTimeoutRef.current = setTimeout(() => {
+      cycleSortMode()
+      setIsListFading(false)
+    }, 100)
+  }
+
   useEffect(() => {
     const el = brandRowRef.current
     if (!el) return
@@ -829,7 +875,7 @@ export default function ConditionsScreen() {
         onClearSpecialty={handleClearFilter}
         onOpenSpecialties={() => setBottomSheetOpen(true)}
         sortMode={sortMode}
-        onSortToggle={cycleSortMode}
+        onSortToggle={handleSortToggle}
         SORT_LABELS={SORT_LABELS}
         onSearchTap={handleSearchTap}
       />
@@ -931,7 +977,7 @@ export default function ConditionsScreen() {
             specialtyName={specialtyName}
             isSearching={isSearching}
             sortMode={sortMode}
-            onSortToggle={cycleSortMode}
+            onSortToggle={handleSortToggle}
             SORT_LABELS={SORT_LABELS}
             firstLetter={
               !isSearching && sortMode === 'az' && resultCount > 0
@@ -941,8 +987,16 @@ export default function ConditionsScreen() {
           />
         </div>
 
-        {/* 6. Condition list */}
-        {renderList()}
+        {/* 6. Condition list — wrapped for the sort-toggle crossfade
+            (conditions-screen-polish-master-plan Phase 6). Opacity-only;
+            no position/FLIP animation, since the tree shape (flat vs.
+            grouped-with-dividers) changes between modes anyway. */}
+        <div style={{
+          opacity:    isListFading ? 0 : 1,
+          transition: 'opacity var(--motion-fast) var(--ease-settle)',
+        }}>
+          {renderList()}
+        </div>
       </div>
 
       {/* Back to top */}
