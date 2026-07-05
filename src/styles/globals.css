@@ -334,9 +334,15 @@ body {
    under-noticeable next to the raised tagline weight above it. Scoped to
    .search-input (SearchBar.jsx's <input>) rather than the global
    ::placeholder rule, so every other input in the app keeps its existing
-   weight — only doesn't repeat color/opacity, already inherited. */
+   weight — only doesn't repeat color/opacity, already inherited.
+   conditions-screen-polish-master-plan, Phase 10 — reverted 500 → 400
+   (the font's own regular weight). Now that the specialty selector's idle
+   text sits at 400/tertiary right below it, keeping the placeholder at 500
+   made the two harder to tell apart than intended; the placeholder is
+   meant to read as the lighter, secondary-to-input text it always was.
+   Applies to every SearchBar call site (Conditions, Drugs, Favourites). */
 .search-input::placeholder {
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* ─── Shimmer animation (used in skeleton loaders) ───────────────────────────── */

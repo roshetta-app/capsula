@@ -69,6 +69,12 @@
  *            background/border/box-shadow swap already faded via its
  *            existing 0.12s ease transition — left untouched, it already
  *            met the spec.
+ * Phase 10 (conditions-screen-polish-master-plan) — Follow-up on Phase 9:
+ *            idle name color reverted from text-tertiary back to
+ *            text-primary (near-black) — kept the 400 weight from Phase 9.
+ *            Distinction from the search placeholder now comes from the
+ *            placeholder's own weight dropping to 400 in globals.css
+ *            (previously 500), not from dimming this text.
  * Phase 9 (conditions-screen-polish-master-plan) — Idle-state
  *            differentiation from the search bar above it, which had
  *            drifted to look nearly identical (same card size, same bg/
@@ -264,11 +270,13 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
 
           {/* Specialty name — the dominant element on this control when
               active (semibold, tinted with the specialty's accent color,
-              unchanged since Phase 12/17). Idle state lightened in Phase 9
-              (conditions-screen-polish-master-plan) from 500/text-secondary
-              to 400/text-tertiary so it visually recedes next to the
-              search placeholder above, which sits at 500/text-secondary —
-              the two no longer read as the same weight of text. */}
+              unchanged since Phase 12/17). Idle state weight lightened in
+              Phase 9 (conditions-screen-polish-master-plan) from 500 to
+              400, kept here — but idle color reverted from text-tertiary
+              back to text-primary (Phase 10) so the name itself reads as
+              near-black. Distinction from the search placeholder above is
+              now carried by the placeholder's own lighter weight
+              (globals.css, same phase) rather than by dimming this text. */}
           <span style={{
             flex:         1,
             minWidth:     0,
@@ -278,7 +286,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             fontSize:     14,
             fontWeight:   isActive ? 600 : 400,
             fontFamily:   'var(--font-body)',
-            color:        isActive ? iconColor : 'var(--color-text-tertiary)',
+            color:        isActive ? iconColor : 'var(--color-text-primary)',
             letterSpacing: '-0.2px',
             transition:   'color 0.2s ease',
           }}>
