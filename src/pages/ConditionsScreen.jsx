@@ -530,8 +530,18 @@ function StickyLogoHeader({
             style={{
               display:         'inline-flex',
               alignItems:      'center',
-              background:      specialtyPressed ? pressedPillBg : (hasFilter ? activePillBg : idlePillBg),
-              border:          hasFilter ? 'none' : idlePillBorder,
+              // Active tint is layered over idlePillBg (not left to composite
+              // against this header's own backgroundColor, which is
+              // var(--color-surface) — a different backdrop than the white
+              // hero panel SpecialtySelector's card sits on). Same alpha
+              // wash, baked onto the same backdrop, so both read as the
+              // identical tint instead of "same hue, different shade."
+              background:      specialtyPressed
+                ? pressedPillBg
+                : hasFilter
+                  ? `linear-gradient(${activePillBg}, ${activePillBg}), ${idlePillBg}`
+                  : idlePillBg,
+              border:          hasFilter ? `1px solid rgba(${r}, ${g}, ${b}, 0.3)` : idlePillBorder,
               borderRadius:    'var(--radius-full)',
               overflow:        'hidden',
               flex:            1,
@@ -626,10 +636,9 @@ function StickyLogoHeader({
               >
                 <svg width="16" height="16" viewBox="0 0 14 14" fill="none"
                   aria-hidden="true" style={{ display: 'block' }}>
-                  <circle cx="7" cy="7" r="7" fill="currentColor" opacity="0.15" />
                   <path d="M4.5 4.5L9.5 9.5M9.5 4.5L4.5 9.5"
                     stroke="currentColor"
-                    strokeWidth="1.5" strokeLinecap="round" />
+                    strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
             )}
