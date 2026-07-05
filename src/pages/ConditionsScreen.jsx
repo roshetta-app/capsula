@@ -425,6 +425,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 
 function StickyLogoHeader({
   visible,
+  skipEntrance,
   isSearching,
   activeSpecialtyObj,
   onClearSpecialty,
@@ -490,7 +491,7 @@ function StickyLogoHeader({
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
+        transition:              skipEntrance ? 'none' : 'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -700,6 +701,13 @@ export default function ConditionsScreen() {
   // layer and panel are a static two-tone look now, not a scroll-driven
   // animation, so a single fire-once boolean is all the header needs.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
+  // skipStickyEntrance: true only for the very first observer callback after
+  // mount. That first callback just restores whatever state the scroll
+  // position already implies (e.g. coming back to a screen left scrolled
+  // down) — it isn't a live scroll gesture, so it shouldn't replay the
+  // slide-down transition. Every callback after that is a real scroll event
+  // and animates normally.
+  const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
@@ -761,9 +769,12 @@ export default function ConditionsScreen() {
     const el = brandRowRef.current
     if (!el) return
 
+    let isFirstCallback = true
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
+        if (!isFirstCallback) setSkipStickyEntrance(false)
+        isFirstCallback = false
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
@@ -960,6 +971,7 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
+        skipEntrance={skipStickyEntrance}
         isSearching={isSearching}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
@@ -1112,4 +1124,5 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 

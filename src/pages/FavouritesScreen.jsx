@@ -1288,7 +1288,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
 // fav-sticky-search-height scoped classes (see FavouritesScreen's local
 // <style> block) so the input's own height matches the expanded button.
 
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function StickyFavouritesHeader({ visible, skipEntrance, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
@@ -1304,7 +1304,7 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
+        transition:              skipEntrance ? 'none' : 'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -1836,15 +1836,25 @@ export default function FavouritesScreen() {
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
+  // skipStickyEntrance: true only for the very first observer callback after
+  // mount. That first callback just restores whatever state the scroll
+  // position already implies (e.g. coming back to this screen left scrolled
+  // down) — it isn't a live scroll gesture, so it shouldn't replay the
+  // slide-down transition. Every callback after that is a real scroll event
+  // and animates normally.
+  const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const heroRef = useRef(null)
 
   useEffect(() => {
     const el = heroRef.current
     if (!el) return
 
+    let isFirstCallback = true
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
+        if (!isFirstCallback) setSkipStickyEntrance(false)
+        isFirstCallback = false
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
@@ -1859,6 +1869,7 @@ export default function FavouritesScreen() {
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
         visible={showStickyHeader}
+        skipEntrance={skipStickyEntrance}
         activeTab={activeTab}
         onSelectTab={switchTab}
         showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
@@ -2160,4 +2171,3 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
-
