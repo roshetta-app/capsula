@@ -61,6 +61,14 @@
  *            away from search on first load. Active state (600, accent
  *            color) is untouched — a selected specialty should still read
  *            as the dominant signal.
+ * Phase 8 (conditions-screen-polish-master-plan) — Idle↔active icon swap
+ *            (ListFilter → specialty icon) crossfades instead of hard-
+ *            cutting: both icons now sit stacked in a fixed 16x16px
+ *            wrapper and cross-fade opacity over --motion-fast, using the
+ *            same --ease-settle curve as the rest of the screen. The
+ *            background/border/box-shadow swap already faded via its
+ *            existing 0.12s ease transition — left untouched, it already
+ *            met the spec.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -168,25 +176,53 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           minWidth:   0,
         }}>
           {/* Icon — ListFilter when idle (consistent with sticky header pill),
-              specialty icon when active. No container box or halo. */}
+              specialty icon when active. No container box or halo.
+              Both icons are stacked in a fixed-size wrapper and cross-fade
+              via opacity instead of hard-swapping on isActive change —
+              conditions-screen-polish-master-plan Phase 8. Color stays on
+              this outer wrapper (inherited via currentColor) so the
+              existing per-specialty color transition keeps working
+              unchanged. */}
           <span style={{
-            display:        'flex',
+            position:        'relative',
+            display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
+            width:           16,
+            height:          16,
             color:           iconColor,
             transition:      'color 0.2s ease',
           }}>
-            {isActive ? (
-              <SpecialtyIcon
-                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={16}
-                color={iconColor}
-              />
-            ) : (
+            <span style={{
+              position:   'absolute',
+              inset:      0,
+              display:    'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity:    isActive ? 0 : 1,
+              transition: 'opacity var(--motion-fast) var(--ease-settle)',
+            }}>
               <ListFilter size={16} strokeWidth={1.75} aria-hidden="true" />
-            )}
+            </span>
+            <span style={{
+              position:   'absolute',
+              inset:      0,
+              display:    'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              opacity:    isActive ? 1 : 0,
+              transition: 'opacity var(--motion-fast) var(--ease-settle)',
+            }}>
+              {isActive && (
+                <SpecialtyIcon
+                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                  size={16}
+                  color={iconColor}
+                />
+              )}
+            </span>
           </span>
 
           {/* Specialty name — the dominant element on this control.
