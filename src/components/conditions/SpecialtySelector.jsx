@@ -43,6 +43,18 @@
  *            ConditionsScreen wrapped this card in a white hero panel — the
  *            idle white fill had nothing to separate it from that background.
  *            Active state (already a colored tint) is untouched.
+ * Phase 16 — Active state now follows the specialty token color system
+ *            instead of a fixed premium pink tint. Background uses
+ *            tintedBg(colors.bg, isDark) — the same soft per-specialty wash
+ *            StickyLogoHeader already uses for its active pill — instead of
+ *            the hard-coded var(--color-selector-active-bg). Border uses a
+ *            low-alpha rgba() of the specialty's own fg color instead of
+ *            var(--color-selector-active-border), so both the wash and its
+ *            edge now change per specialty, matching the icon/name/chevron/
+ *            clear button, which already carried the token color. Local
+ *            hexToRgb() removed in favor of the shared one now exported
+ *            from specialtyTokens.js (identical implementation — this file
+ *            no longer needs its own copy).
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -51,21 +63,10 @@
  *   isOpen              boolean     — rotates the chevron when true
  */
 
-import { useState }                     from 'react'
-import { ListFilter }                   from 'lucide-react'
-import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-
-// Parses a '#RRGGBB' token color into an [r, g, b] triple so the ambient
-// halo can be built as a low-opacity rgba() spread shadow. Specialty
-// tokens are always 6-digit hex (see specialtyTokens.js).
-function hexToRgb(hex) {
-  const clean = hex.replace('#', '')
-  const r = parseInt(clean.slice(0, 2), 16)
-  const g = parseInt(clean.slice(2, 4), 16)
-  const b = parseInt(clean.slice(4, 6), 16)
-  return [r, g, b]
-}
+import { useState }                                  from 'react'
+import { ListFilter }                                from 'lucide-react'
+import { SpecialtyIcon, useIsDark }                  from '../../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN, tintedBg, hexToRgb } from '../../utils/specialtyTokens'
 
 export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear, isOpen }) {
   const isDark   = useIsDark()
@@ -73,21 +74,6 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const tokenKey = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors   = resolveToken(tokenKey, isDark)
   const isActive = !!activeSpecialtyObj
-
-  // Idle surface stays clean white (light) / elevated surface (dark) — no tint.
-  // Active surface now uses a fixed premium selected-state background
-  // (--color-selector-active-bg) instead of a per-specialty computed tint —
-  // icon/text color below still carries the specialty's own accent color,
-  // so identity isn't lost, but the container itself reads as one
-  // consistent "selected" surface across every specialty.
-  const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
-  const surfaceBg = isActive ? 'var(--color-selector-active-bg)' : idleSurfaceBg
-  const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
-
-  // Ambient elevation — Premium polish pass. Single diffused shadow shared
-  // by idle/active/pressed states, matching the search field's ambient
-  // treatment so both controls read as the same elevation system.
-  const containerShadow = 'var(--shadow-ambient-selector)'
 
   // Icon color — accent token color when a specialty is active, neutral
   // tertiary text color when idle.
@@ -99,6 +85,20 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const [r, g, b] = hexToRgb(colors.fg)
   const controlTint = isActive ? `rgba(${r}, ${g}, ${b}, 0.65)` : 'var(--color-text-tertiary)'
 
+  // Idle surface stays clean white (light) / elevated surface (dark) — no tint.
+  // Active surface now follows the specialty token color system: a soft
+  // per-specialty wash (tintedBg, same helper/alpha StickyLogoHeader's
+  // active pill already uses) instead of one fixed premium tint shared by
+  // every specialty.
+  const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  const surfaceBg = isActive ? tintedBg(colors.bg, isDark) : idleSurfaceBg
+  const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
+
+  // Ambient elevation — Premium polish pass. Single diffused shadow shared
+  // by idle/active/pressed states, matching the search field's ambient
+  // treatment so both controls read as the same elevation system.
+  const containerShadow = 'var(--shadow-ambient-selector)'
+
   return (
     <div
       style={{
@@ -107,17 +107,16 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
         // Idle state gets a hairline border in the shared border color;
-        // active state now gets its own dedicated selected-border token
-        // (previously 'none', relying only on the background tint) so the
-        // selected surface reads as border-defined first, matching the
-        // search field's elevation treatment.
+        // active state now gets a low-alpha border of the specialty's own
+        // fg color instead of one fixed selected-border token, so the
+        // border tints per specialty along with everything else.
         border:          isActive
-          ? '1px solid var(--color-selector-active-border)'
+          ? `1px solid rgba(${r}, ${g}, ${b}, 0.3)`
           : '1px solid var(--color-border)',
         borderRadius:    '16px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
-        transition:      'background-color 0.12s ease, box-shadow 0.12s ease',
+        transition:      'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
       }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
@@ -266,4 +265,3 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
     </div>
   )
 }
-
