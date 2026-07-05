@@ -797,8 +797,11 @@ export default function ConditionsScreen() {
           everything above the sort row: brand row, search, recently-viewed,
           specialty selector.
           paddingBottom is a calc() of two named tokens — visible gap
-          (var(--space-3)) plus the panel's curve radius (var(--radius-xl))
-          below it — so the gap and the curve can't drift out of sync. */}
+          (var(--space-5), 20px) plus the panel's curve radius
+          (var(--radius-xl)) below it — so the gap and the curve can't drift
+          out of sync. (Previously documented here as var(--space-3)/12px —
+          that was stale; the actual token has been --space-5 since Phase 21
+          and the current 20px gap is the intended look, kept as-is.) */}
       <div style={{
         backgroundColor: 'var(--color-hero-bg)',
         marginLeft:      'calc(var(--space-6) * -1)',
@@ -862,8 +865,8 @@ export default function ConditionsScreen() {
         borderTopLeftRadius:  'var(--radius-xl)',
         borderTopRightRadius: 'var(--radius-xl)',
         borderTop:       isDark
-          ? '1px solid rgba(255, 255, 255, 0.08)'
-          : '1px solid rgba(15, 23, 42, 0.06)',
+          ? '1px solid rgba(255, 255, 255, 0.11)'
+          : '1px solid rgba(15, 23, 42, 0.09)',
         marginTop:       'calc(var(--radius-xl) * -1)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
