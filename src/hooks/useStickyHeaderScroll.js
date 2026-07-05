@@ -2,58 +2,37 @@
  * src/hooks/useStickyHeaderScroll.js
  *
  * Shared logic behind the sliding sticky headers on ConditionsScreen and
- * FavouritesScreen. Previously each screen carried its own near-identical
- * copy of this; folded into one hook so both screens behave identically
+ * FavouritesScreen. Folded into one hook so both screens behave identically
  * and can't drift out of sync.
  *
- * What it does:
- *  - Remembers how far down each screen was scrolled, keyed by a
- *    `screenKey` the caller provides (e.g. 'conditions', 'favourites').
- *    The memory lives only in memory for as long as the app stays open —
- *    a full close/reopen starts everything fresh at the top again.
- *  - The moment a screen mounts, restores its own remembered scroll
- *    position before anything is painted, and sets the sticky header's
- *    starting state to match. This is what stops one screen's leftover
- *    scroll spot from leaking into a different screen when switching
- *    tabs, and what stops the header from replaying its slide-down
- *    animation when you return to a screen you'd already scrolled down.
- *  - After that, only real, user-driven scrolling (watched via an
- *    IntersectionObserver on the element you pass back the ref for) is
- *    ever allowed to change whether the header shows.
+ * Phase: sticky-header-permanent-mount-fix
+ * The scroll-position "remember and restore" logic that used to live here
+ * has been removed. It existed to fake continuity across a full
+ * unmount/remount of the screen — now that Conditions/Drugs/Favourites stay
+ * permanently mounted and are only shown/hidden, React's own state already
+ * preserves everything needed, and the manual memory was a second source of
+ * truth that could fight with real scroll position. The `screenKey` param
+ * that keyed that memory is gone too, since there's nothing left to key.
+ *
+ * What it still does:
+ *  - Watches the tracked element (brand row / hero) for real scroll-driven
+ *    changes via IntersectionObserver — the only trigger that flips the
+ *    sticky header's visibility.
+ *  - Suppresses the slide transition for a brief window right after mount
+ *    (two animation frames), so the very first paint never animates.
  */
 
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
-// One shared, in-memory record of each screen's own scroll position.
-// Deliberately not sessionStorage/localStorage — this is meant to reset
-// to fresh/top on a full app close-and-reopen, not persist across it.
-const scrollMemory = {}
-
-export function useStickyHeaderScroll(screenKey) {
+export function useStickyHeaderScroll() {
   const elementRef = useRef(null)
   const [visible, setVisible] = useState(false)
   const [readyToAnimate, setReadyToAnimate] = useState(false)
 
-  // Restore this screen's own remembered scroll position, then set the
-  // sticky header's correct starting state to match — both before the
-  // browser paints. Without the restore, a screen just reads whatever
-  // scroll position is currently sitting on the window (which may belong
-  // to whichever screen was visited previously) instead of its own.
-  useLayoutEffect(() => {
-    const rememberedY = scrollMemory[screenKey] ?? 0
-    window.scrollTo(0, rememberedY)
-
-    const el = elementRef.current
-    if (el) {
-      setVisible(el.getBoundingClientRect().bottom <= 0)
-    }
-  }, [screenKey])
-
   // Suppresses the slide transition for a brief window right after mount —
   // two animation frames is the standard "let layout/paint settle" grace
-  // period. Any correction to `visible` inside that window (e.g. the
-  // restore above) snaps into place instead of animating. Only real,
-  // user-driven scrolling after that point should ever animate the header.
+  // period. Only real, user-driven scrolling after that point should ever
+  // animate the header.
   useEffect(() => {
     let raf2
     const raf1 = requestAnimationFrame(() => {
@@ -66,8 +45,7 @@ export function useStickyHeaderScroll(screenKey) {
   }, [])
 
   // Watches the tracked element (brand row / hero) for real scroll-driven
-  // changes — the only trigger that flips the header after the initial
-  // restore above.
+  // changes — the only trigger that flips the header's visibility.
   useEffect(() => {
     const el = elementRef.current
     if (!el) return
@@ -82,23 +60,6 @@ export function useStickyHeaderScroll(screenKey) {
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
-
-  // Saves this screen's own scroll position continuously while it's the
-  // active screen, not just at the moment it's left. Leaving a screen can
-  // happen in more than one way (tab switch, opening a detail page,
-  // browser back) — saving continuously means whichever way it happens,
-  // the number left behind is always accurate, rather than depending on
-  // exactly when a one-time "on unmount" save happens to run.
-  useEffect(() => {
-    function saveScrollPosition() {
-      scrollMemory[screenKey] = window.scrollY
-    }
-    window.addEventListener('scroll', saveScrollPosition, { passive: true })
-    return () => {
-      saveScrollPosition()
-      window.removeEventListener('scroll', saveScrollPosition)
-    }
-  }, [screenKey])
 
   return { elementRef, visible, readyToAnimate }
 }
