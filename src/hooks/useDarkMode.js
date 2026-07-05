@@ -16,10 +16,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
  */
 
 const STORAGE_KEY = 'capsula-dark-mode'
-const TRANSITION_CLASS = 'theme-transitioning'
-// Buffer above --motion-screen (280ms) so the fallback never fires before
-// the real transitionend on a normal run, only when it's genuinely missing.
-const TRANSITION_FALLBACK_MS = 350
 
 function getInitialDark() {
   try {
@@ -36,50 +32,31 @@ export function useDarkMode() {
   // Apply class to <html> and persist whenever isDark changes
   useEffect(() => {
     const root = document.documentElement
-
-    // Skip the crossfade on initial mount - animating colors in from
-    // nothing on first paint isn't useful and can look like a flash.
-    if (isFirstRun.current) {
-      isFirstRun.current = false
+    const applyClass = () => {
       if (isDark) {
         root.classList.add('dark')
       } else {
         root.classList.remove('dark')
       }
-      try {
-        localStorage.setItem(STORAGE_KEY, String(isDark))
-      } catch {}
-      return
     }
 
-    root.classList.add(TRANSITION_CLASS)
-
-    let fallbackTimer = null
-    const cleanup = () => {
-      root.classList.remove(TRANSITION_CLASS)
-      root.removeEventListener('transitionend', onTransitionEnd)
-      if (fallbackTimer) clearTimeout(fallbackTimer)
-    }
-    const onTransitionEnd = (e) => {
-      if (e.target !== root) return
-      cleanup()
-    }
-    root.addEventListener('transitionend', onTransitionEnd)
-    fallbackTimer = setTimeout(cleanup, TRANSITION_FALLBACK_MS)
-
-    if (isDark) {
-      root.classList.add('dark')
+    // Skip the crossfade on initial mount - animating colors in from
+    // nothing on first paint isn't useful and can look like a flash.
+    if (isFirstRun.current) {
+      isFirstRun.current = false
+      applyClass()
+    } else if (document.startViewTransition) {
+      // Native View Transitions: browser cross-fades a single before/after
+      // screenshot, so cost is constant regardless of DOM size or list length.
+      document.startViewTransition(applyClass)
     } else {
-      root.classList.remove('dark')
+      // No support (older Safari/Firefox) - instant switch, no fade.
+      applyClass()
     }
+
     try {
       localStorage.setItem(STORAGE_KEY, String(isDark))
     } catch {}
-
-    return () => {
-      root.removeEventListener('transitionend', onTransitionEnd)
-      if (fallbackTimer) clearTimeout(fallbackTimer)
-    }
   }, [isDark])
 
   // On first visit (no stored pref), follow OS changes automatically

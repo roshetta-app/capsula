@@ -184,10 +184,8 @@
 }
 
 /* Reduced motion - collapses the motion tokens above so every consumer
-   (Phases 3-11) gets this for free with no per-component check. 0.01ms
-   instead of 0ms so transitionend still fires reliably in browsers that
-   skip the event for a literal zero-duration transition (relevant for
-   Phase 9's setTimeout-based class cleanup). */
+   (Phases 3-11) gets this for free with no per-component check, including
+   Phase 9's view-transition animation-duration below. */
 @media (prefers-reduced-motion: reduce) {
   :root {
     --motion-fast:   0.01ms;
@@ -197,23 +195,21 @@
 }
 
 /* ─── Phase 9: theme crossfade ──────────────────────────────────────────────
-   Forces background-color/color/border-color/box-shadow to animate on every
-   element while <html> carries this class, so the light↔dark toggle reads
-   as one continuous crossfade instead of a hard cut. Scoped + !important
-   because individual components already set their own --motion-fast
-   transitions for unrelated interactions (press feedback, focus), which
-   would otherwise win and leave the crossfade patchy. Class is added/
-   removed by useDarkMode.js around the .dark toggle only — never present
-   on first paint, so nothing fades in from nothing on load. */
-html.theme-transitioning,
-html.theme-transitioning :where(
-  body, div, section, article, header, footer, nav, aside, main,
-  button, a, li, ul, ol, table, thead, tbody, tr, td, th,
-  input, textarea, select, label, form, p, span, h1, h2, h3, h4, h5, h6
-) {
-  transition: background-color var(--motion-screen) var(--ease-reveal),
-              color var(--motion-screen) var(--ease-reveal),
-              border-color var(--motion-screen) var(--ease-reveal) !important;
+   Uses the native View Transitions API instead of transitioning every DOM
+   node's colors individually — the browser takes one before/after
+   screenshot and cross-fades them as a single GPU-composited layer, so the
+   cost is constant no matter how many elements or how long a list is on
+   screen. Duration/easing driven by the existing --motion-screen /
+   --ease-reveal tokens, so it collapses to near-instant under
+   prefers-reduced-motion automatically, same as every other Phase 3-11
+   consumer of these tokens. The .dark class toggle itself lives in
+   useDarkMode.js, wrapped in document.startViewTransition() when supported;
+   browsers without support (older Safari/Firefox) just apply the class
+   change instantly with no fade — acceptable graceful degradation. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--motion-screen);
+  animation-timing-function: var(--ease-reveal);
 }
 
 /* ─── Dark mode overrides — activated by .dark on <html> ────────────────────── */
