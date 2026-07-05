@@ -441,6 +441,13 @@ function StickyLogoHeader({
   // accent while pressed, releasing right as onSearchTap's scroll begins.
   const [searchPressed, setSearchPressed] = useState(false)
 
+  // Specialty pill press feedback — matches SpecialtySelector's own pressed
+  // state exactly (same pressedBg swap + scale(0.985) + --motion-fast/
+  // --ease-settle transition), so tapping the pill in the sticky header
+  // feels identical to tapping the standalone card in the page body.
+  const [specialtyPressed, setSpecialtyPressed] = useState(false)
+  const pressedPillBg = isDark ? '#262D3A' : '#F5F4F2'
+
   // Pill background: tinted wash when active; neutral card surface + hairline
   // border when idle — matches the idle treatment already used by the
   // standalone SpecialtySelector card, and pairs with the search icon's
@@ -516,17 +523,22 @@ function StickyLogoHeader({
         }}>
 
           {/* Specialty pill — flex:1 so it fills all space left of the search icon */}
-          <div style={{
-            display:         'inline-flex',
-            alignItems:      'center',
-            background:      hasFilter ? activePillBg : idlePillBg,
-            border:          hasFilter ? 'none' : idlePillBorder,
-            borderRadius:    'var(--radius-full)',
-            overflow:        'hidden',
-            flex:            1,
-            minWidth:        0,
-            transition:      'background 0.2s ease, border-color 0.2s ease',
-          }}>
+          <div
+            onPointerDown={() => setSpecialtyPressed(true)}
+            onPointerUp={() => setSpecialtyPressed(false)}
+            onPointerLeave={() => setSpecialtyPressed(false)}
+            style={{
+              display:         'inline-flex',
+              alignItems:      'center',
+              background:      specialtyPressed ? pressedPillBg : (hasFilter ? activePillBg : idlePillBg),
+              border:          hasFilter ? 'none' : idlePillBorder,
+              borderRadius:    'var(--radius-full)',
+              overflow:        'hidden',
+              flex:            1,
+              minWidth:        0,
+              transform:       specialtyPressed ? 'scale(0.985)' : 'scale(1)',
+              transition:      'background 0.2s ease, border-color 0.2s ease, transform var(--motion-fast) var(--ease-settle)',
+            }}>
 
             {/* Main tap area: icon + name + chevron — flex:1 so name can truncate */}
             <button
