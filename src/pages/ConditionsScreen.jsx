@@ -120,6 +120,53 @@
  *             list under the sticky header after a filter change while
  *             scrolled down, but sticky positioning keeps the panel flush
  *             at all times now, so there's nothing left to re-align.
+ * Phase 24 — Feedback pass on Phase 23's dock/undock snap:
+ *             1. Stutter on real scroll gestures: while a trackpad/wheel/
+ *                touch gesture was still in flight, the browser kept
+ *                feeding its own native scroll on top of our forced
+ *                animateScrollTo for the ~240ms the animation ran — two
+ *                competing scroll sources at once, reading as a stutter/
+ *                fight rather than one clean motion. Fixed by
+ *                suppressScrollInput: a short-lived, non-passive wheel/
+ *                touchmove blocker installed only for the duration of each
+ *                animateScrollTo call, removed the instant it finishes (or
+ *                is superseded by a new call). Scroll stays real and
+ *                unblocked at every other time — this is not the
+ *                permanent scroll-lock Phase 23 deliberately avoided.
+ *             2. Asymmetric dock/undock: the single IntersectionObserver
+ *                watched BrandRow at threshold [1], which only reports
+ *                "undocked" once BrandRow is back to 100% visible — i.e.
+ *                scrollY ~ 0. But the content panel's position: sticky
+ *                naturally starts un-sticking the moment the user scrolls
+ *                up past its own stick point, which happens before BrandRow
+ *                (sitting above the search bar and specialty selector)
+ *                reaches full visibility again. That left a real window,
+ *                scrolling up, where the hero was already showing through
+ *                but the sticky header hadn't disappeared yet — the exact
+ *                "partial coexist" state Phase 23 was meant to eliminate,
+ *                just on the way up instead of the way down. Fixed by
+ *                retargeting the observer from BrandRow to a thin,
+ *                zero-height sentinel (panelSentinelRef) placed in normal
+ *                flow immediately before the content panel — i.e. sitting
+ *                exactly at the panel's sticky boundary. Observed with
+ *                rootMargin equal to -headerHeight, its isIntersecting flip
+ *                fires the instant that exact boundary is crossed in either
+ *                direction, so dock and undock are now symmetric "first
+ *                pixel" triggers with no reveal window between them. Still
+ *                one single IntersectionObserver — only the watched node
+ *                and threshold/rootMargin changed. brandRowRef (and its
+ *                wiring into BrandRow) removed as dead code now that
+ *                nothing observes it — same cleanup precedent as this
+ *                phase's removal of snapToListHeader/listHeaderRef.
+ *             3. Specialty-pick re-snap: restored a defensive re-snap
+ *                (resnapIfDocked, using animateScrollTo — not the old
+ *                instant snapToListHeader) that fires whenever a specialty
+ *                is picked or cleared while docked, landing back on the
+ *                exact same dock position. The sticky panel doesn't
+ *                actually move when the filter changes, but this guards
+ *                against any incidental scroll (e.g. focus/layout shifts
+ *                from the bottom sheet closing) knocking it out of the
+ *                flush position.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -345,9 +392,9 @@ function RotatingTagline({
 
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
-function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
+function BrandRow({ isSearching, isDark, onToggleDark }) {
   return (
-    <div ref={brandRowRef} style={{
+    <div style={{
       paddingTop:    'var(--space-5)',
       // Tagline → search gap increased ~8px → 20px per premium polish pass
       // (was calc(var(--space-3) - 4px)). Uses the --space-5 token rather
@@ -666,7 +713,6 @@ export default function ConditionsScreen() {
   // fire-on-cross boolean is the right shape for this state again.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
-  const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
   // Phase 23 additions — sticky-header height measurement and dock/undock
   // scroll-snap bookkeeping. stickyHeaderRef is attached to StickyLogoHeader's
@@ -679,10 +725,18 @@ export default function ConditionsScreen() {
   // impure side effect inside a setState updater. scrollAnimRef holds the
   // in-flight requestAnimationFrame id so a new dock/undock snap (or a real
   // user scroll) can cancel a still-running one instead of fighting it.
-  const stickyHeaderRef = useRef(null)
-  const contentPanelRef = useRef(null)
-  const dockedRef       = useRef(false)
-  const scrollAnimRef   = useRef(null)
+  // Phase 24 additions: panelSentinelRef is a thin, zero-height marker sitting
+  // in normal flow immediately before the content panel — i.e. exactly at its
+  // sticky boundary — and is what the single IntersectionObserver below now
+  // watches (replacing BrandRow, see Phase 24 docblock note). suppressCleanupRef
+  // holds the teardown function for the short-lived wheel/touchmove blocker
+  // installed for the duration of each animateScrollTo call.
+  const stickyHeaderRef   = useRef(null)
+  const contentPanelRef   = useRef(null)
+  const panelSentinelRef  = useRef(null)
+  const dockedRef         = useRef(false)
+  const scrollAnimRef     = useRef(null)
+  const suppressCleanupRef = useRef(null)
   const [headerHeight, setHeaderHeight] = useState(90) // fallback matches the old hardcoded snap value until measured
 
   // Measure the sticky header's real height (ResizeObserver keeps it correct
@@ -703,16 +757,41 @@ export default function ConditionsScreen() {
     return () => resizeObserver.disconnect()
   }, [])
 
+  // Installs a short-lived, non-passive wheel/touchmove blocker so a real
+  // trackpad/wheel/touch gesture still in flight can't keep feeding the
+  // browser's native scroll on top of the forced animateScrollTo below —
+  // without this, both sources push the scroll position at once for the
+  // animation's duration, reading as stutter rather than one clean motion.
+  // Returns a teardown function; scroll is untouched at every other time,
+  // this is not a persistent scroll-lock.
+  function suppressScrollInput() {
+    function block(e) { e.preventDefault() }
+    window.addEventListener('wheel', block, { passive: false })
+    window.addEventListener('touchmove', block, { passive: false })
+    return () => {
+      window.removeEventListener('wheel', block)
+      window.removeEventListener('touchmove', block)
+    }
+  }
+
   // Animates window scroll from its current position to 'target' over
   // 'duration'ms using DOCK_EASE, cancelling any animation already in
   // flight first so a rapid dock/undock/dock sequence (or a real user
-  // scroll) never fights a stale one.
+  // scroll) never fights a stale one. Scroll input is suppressed for the
+  // duration of the animation (see suppressScrollInput above) and restored
+  // the instant it finishes or is superseded by a new call.
   function animateScrollTo(target, duration = 240) {
     if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current)
+    if (suppressCleanupRef.current) {
+      suppressCleanupRef.current()
+      suppressCleanupRef.current = null
+    }
 
     const start    = window.scrollY
     const distance = target - start
     if (distance === 0) return
+
+    suppressCleanupRef.current = suppressScrollInput()
 
     const startTime = performance.now()
 
@@ -720,17 +799,43 @@ export default function ConditionsScreen() {
       const elapsed  = now - startTime
       const progress = Math.min(elapsed / duration, 1)
       window.scrollTo(0, start + distance * DOCK_EASE(progress))
-      scrollAnimRef.current = progress < 1 ? requestAnimationFrame(step) : null
+      if (progress < 1) {
+        scrollAnimRef.current = requestAnimationFrame(step)
+      } else {
+        scrollAnimRef.current = null
+        if (suppressCleanupRef.current) {
+          suppressCleanupRef.current()
+          suppressCleanupRef.current = null
+        }
+      }
     }
 
     scrollAnimRef.current = requestAnimationFrame(step)
   }
 
+  // Unmount safety: cancel any in-flight scroll animation and remove a
+  // still-installed scroll-input blocker if the screen unmounts mid-animation.
+  useEffect(() => {
+    return () => {
+      if (scrollAnimRef.current) cancelAnimationFrame(scrollAnimRef.current)
+      if (suppressCleanupRef.current) suppressCleanupRef.current()
+    }
+  }, [])
+
   // ── Sliding sticky header + docked content panel: both driven by the same
-  //    showStickyHeader boolean, sourced from one IntersectionObserver on
-  //    the BrandRow (logo) — single source of truth, no separate scroll
-  //    listener. Threshold [1] fires the instant the logo drops below 100%
-  //    visible, i.e. on the very first pixel of scroll.
+  //    showStickyHeader boolean, sourced from one IntersectionObserver —
+  //    single source of truth, no separate scroll listener.
+  //
+  //    Phase 24: retargeted from BrandRow to panelSentinelRef, a thin
+  //    zero-height marker sitting in normal flow immediately before the
+  //    content panel — i.e. exactly at its sticky boundary. rootMargin
+  //    shrinks the observed root's top edge inward by headerHeight, so the
+  //    sentinel's isIntersecting flips false the instant it crosses that
+  //    exact line, in either scroll direction — a true symmetric "first
+  //    pixel" trigger for both dock and undock (BrandRow's threshold [1]
+  //    only reported "undocked" once the logo was back to 100% visible,
+  //    leaving a reveal window on the way up where the sticky panel had
+  //    already started un-sticking but the header hadn't disappeared yet).
   //
   //    Phase 23: the same fire also drives an animated window.scrollTo —
   //    on the rising edge (docking), straight to where the content panel's
@@ -742,12 +847,12 @@ export default function ConditionsScreen() {
   //    continuous scroll-linked drag.
 
   useEffect(() => {
-    const el = brandRowRef.current
+    const el = panelSentinelRef.current
     if (!el) return
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        const nextDocked = entry.intersectionRatio < 1
+        const nextDocked = !entry.isIntersecting
 
         if (nextDocked !== dockedRef.current) {
           dockedRef.current = nextDocked
@@ -761,7 +866,7 @@ export default function ConditionsScreen() {
 
         setShowStickyHeader(nextDocked)
       },
-      { threshold: [1] }
+      { threshold: [0], rootMargin: `-${headerHeight}px 0px 0px 0px` }
     )
 
     observer.observe(el)
@@ -800,12 +905,26 @@ export default function ConditionsScreen() {
     setQuery('')
   }
 
+  // Phase 24: defensive re-snap to the exact dock position, fired whenever a
+  // specialty is picked or cleared while docked. The sticky panel doesn't
+  // actually move when the filter changes, but this guards against any
+  // incidental scroll (e.g. focus/layout shifts as the bottom sheet closes)
+  // knocking it out of the flush position. Uses animateScrollTo, not the old
+  // instant snapToListHeader removed in Phase 23.
+  function resnapIfDocked() {
+    if (!dockedRef.current) return
+    const panelEl = contentPanelRef.current
+    if (panelEl) animateScrollTo(panelEl.offsetTop - headerHeight)
+  }
+
   function handleClearFilter() {
     setActiveSpecialty('all')
+    resnapIfDocked()
   }
 
   function handleSelectSpecialty(id) {
     setActiveSpecialty(id)
+    resnapIfDocked()
   }
 
   // Static (non-interactive) favourite indicator for the trailing slot —
@@ -947,16 +1066,16 @@ export default function ConditionsScreen() {
             intersectionRatio, which triggered a re-render on every ~5%
             scroll step) to a hard, instant toggle: opacity flips straight
             between 1 and 0 with no transition property, so there's no
-            in-between frame. BrandRow itself stays mounted at all times —
-            it must, since brandRowRef is the exact node the
-            IntersectionObserver above watches; unmounting it would break
-            re-entry detection when the user scrolls back up. */}
+            in-between frame. BrandRow stays mounted at all times so hiding
+            it via opacity doesn't shift the hero's layout. Phase 24: the
+            IntersectionObserver no longer watches this element (retargeted
+            to panelSentinelRef below), so brandRowRef was removed as dead
+            code — BrandRow needs no ref for this anymore. */}
         <div style={{ opacity: showStickyHeader ? 0 : 1 }}>
           <BrandRow
             isSearching={isSearching}
             isDark={isDark}
             onToggleDark={toggleDark}
-            brandRowRef={brandRowRef}
           />
         </div>
 
@@ -985,6 +1104,13 @@ export default function ConditionsScreen() {
           />
         </div>
       </div>
+
+      {/* Phase 24 sentinel — thin, zero-height marker sitting in normal flow
+          exactly at the content panel's sticky boundary. The IntersectionObserver
+          above watches this (not BrandRow) so dock/undock fires the instant this
+          precise line is crossed in either scroll direction, with no reveal
+          window on the way up (see Phase 24 docblock note). */}
+      <div ref={panelSentinelRef} style={{ height: 0 }} aria-hidden="true" />
 
       {/* ─── Content panel ────────────────────────────────────────────────────
           Phase 23: position: sticky (top pinned to the live-measured sticky
