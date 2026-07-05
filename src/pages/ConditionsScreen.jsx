@@ -116,6 +116,15 @@
  *             identity (condition.id key) and grouping logic were already
  *             correct, and the visible "hard cut" was the container tree
  *             reshaping between flat/grouped layouts, not a per-card issue.
+ * Phase 11 (conditions-screen-polish-master-plan) — Initial screen
+ *             entrance: header → search/specialty → list stagger, played
+ *             once per browser session the first time real content (not
+ *             the skeleton) renders, using a sessionStorage flag (session-
+ *             scoped, unlike OnboardingGate's permanent localStorage flag)
+ *             plus a prefers-reduced-motion check. Reuses Phase 2's
+ *             --motion-fast/--ease-settle tokens with a 70ms per-stage
+ *             delay, finishing at 240ms — under the 300ms budget. See
+ *             entranceStyle() below.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -161,6 +170,17 @@ import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
 import { ROUTES }                                  from '../router'
+
+// ─── Entrance stagger (session-scoped) ────────────────────────────────────────
+// conditions-screen-polish-master-plan Phase 11. Plays once per browser
+// session (sessionStorage flag — deliberately not OnboardingGate's permanent
+// localStorage flag, since this should replay on a future visit, just not a
+// return to this screen within the same session). Stage delays stack on top
+// of Phase 2's --motion-fast/--ease-settle tokens rather than inventing new
+// timing values.
+
+const ENTRANCE_SESSION_KEY = 'capsula_conditions_entrance_played'
+const ENTRANCE_STAGGER_MS  = 70 // gap between each stage's transitionDelay
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -660,6 +680,24 @@ export default function ConditionsScreen() {
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
+  // ── Entrance stagger — conditions-screen-polish-master-plan Phase 11.
+  // playEntrance is decided once, on first mount: false if this session has
+  // already shown the entrance, or if the user prefers reduced motion.
+  // entranceIn flips true (via rAF) only once real content is ready, so the
+  // fade genuinely starts from a hidden state instead of skipping straight
+  // to visible before the header/search/list ever paint.
+  const [playEntrance] = useState(() => {
+    try {
+      const alreadyPlayed = sessionStorage.getItem(ENTRANCE_SESSION_KEY) === 'true'
+      sessionStorage.setItem(ENTRANCE_SESSION_KEY, 'true')
+      if (alreadyPlayed) return false
+      return !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    } catch {
+      return false
+    }
+  })
+  const [entranceIn, setEntranceIn] = useState(false)
+
   // ── Sort crossfade — conditions-screen-polish-master-plan Phase 6.
   // isListFading drives an opacity handoff on the list container:
   // handleSortToggle fades the currently-shown list out first, then only
@@ -708,6 +746,31 @@ export default function ConditionsScreen() {
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
+
+  // Waits for the cold-start skeleton to clear before triggering the fade —
+  // flipping entranceIn as soon as this effect first ran (ignoring loading)
+  // would let it become true while the skeleton was still showing, so the
+  // header/search/list would already be at rest the moment they first paint.
+  useEffect(() => {
+    if (!playEntrance || loading) return
+    const raf = requestAnimationFrame(() => setEntranceIn(true))
+    return () => cancelAnimationFrame(raf)
+  }, [playEntrance, loading])
+
+  // Returns the fade/rise + stagger delay for entrance stage 0/1/2, or an
+  // empty object on any repeat visit within this session (or reduced
+  // motion) so nothing about normal rendering changes.
+  function entranceStyle(stageIndex) {
+    if (!playEntrance) return {}
+    return {
+      opacity:                  entranceIn ? 1 : 0,
+      transform:                entranceIn ? 'translateY(0)' : 'translateY(6px)',
+      transitionProperty:       'opacity, transform',
+      transitionDuration:       'var(--motion-fast)',
+      transitionTimingFunction: 'var(--ease-settle)',
+      transitionDelay:          `${stageIndex * ENTRANCE_STAGGER_MS}ms`,
+    }
+  }
 
   function handleSearchTap() {
     searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -903,17 +966,21 @@ export default function ConditionsScreen() {
         paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
       }}>
 
-        {/* 1. Brand row + tagline + dark mode toggle — no opacity animation;
-            renders at full opacity always, same as FavouritesHero. */}
-        <BrandRow
-          isSearching={isSearching}
-          isDark={isDark}
-          onToggleDark={toggleDark}
-          brandRowRef={brandRowRef}
-        />
+        {/* 1. Brand row + tagline + dark mode toggle — entrance stage 0
+            (Phase 11): fades/rises in first, on first load this session
+            only; otherwise renders at full opacity as before, no animation. */}
+        <div style={entranceStyle(0)}>
+          <BrandRow
+            isSearching={isSearching}
+            isDark={isDark}
+            onToggleDark={toggleDark}
+            brandRowRef={brandRowRef}
+          />
+        </div>
 
-        {/* 2. Search bar */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        {/* 2. Search bar — entrance stage 1 (Phase 11), grouped with the
+            specialty selector below as one "search/specialty" stage. */}
+        <div style={{ marginBottom: 'var(--space-3)', ...entranceStyle(1) }}>
           <SearchBar
             ref={searchInputRef}
             value={query}
@@ -927,8 +994,9 @@ export default function ConditionsScreen() {
           hidden={true}
         />
 
-        {/* 4. Full-width specialty selector — same width as search bar */}
-        <div>
+        {/* 4. Full-width specialty selector — same width as search bar.
+            Same entrance stage as the search bar above (Phase 11). */}
+        <div style={entranceStyle(1)}>
           <SpecialtySelector
             activeSpecialtyObj={activeSpecialtyObj}
             onOpen={() => setBottomSheetOpen(true)}
@@ -951,7 +1019,9 @@ export default function ConditionsScreen() {
           uses a negative y-offset with a tight blur/low opacity so the
           shadow only reads just above the curve, not around the whole
           panel — dark-mode-aware since a black shadow on the darker,
-          bleaker dark-mode base layer would be nearly invisible. */}
+          bleaker dark-mode base layer would be nearly invisible.
+          Entrance stage 2 (Phase 11) fades/rises this whole panel in last,
+          on first load this session only — see entranceStyle() above. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
         borderTopLeftRadius:  'var(--radius-xl)',
@@ -966,6 +1036,7 @@ export default function ConditionsScreen() {
         paddingRight:    'var(--space-6)',
         paddingTop:      'var(--space-4)',
         boxShadow:       '0 -6px 14px rgba(15, 23, 42, 0.035)',
+        ...entranceStyle(2),
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
