@@ -85,23 +85,18 @@
 
   /* Component-specific borders/backgrounds — Premium polish pass. Distinct
      from the shared --color-border/--color-bg tokens above; these are
-     deliberate one-off values for specific elevated surfaces (search field),
-     matching the existing pattern of dedicated tokens like --color-favourite
-     / --color-note-bg for single-purpose colors.
-     --color-selector-active-bg/-border removed here (bugfix pass) — the
-     active specialty selector now computes its background/border from
-     resolveToken(tokenKey, isDark) per specialty again (see
-     SpecialtySelector.jsx), so these fixed one-color tokens are unused. */
+     deliberate one-off values for specific elevated surfaces (search field,
+     active specialty selector), matching the existing pattern of dedicated
+     tokens like --color-favourite / --color-note-bg for single-purpose colors. */
   --color-search-border:         #E8EBF0;
+  --color-selector-active-bg:    #FFF7FA;
+  --color-selector-active-border: #F3DFE8;
 
-  /* Hero panel — feedback pass: warm near-white (#FCFAF7) didn't read
-     right in practice — swapped to a neutral, very light grey with no
-     warm/cool hue bias. #FAFAFA sits between --color-surface (#FFFFFF)
-     and --color-bg (#F7F8FA), lighter than both so it still reads as the
-     "elevated" surface in the stack, but flat neutral grey rather than
-     leaning into either the blue-grey of --color-bg or the warm undertone
-     tried previously. */
-  --color-hero-bg:          #FAFAFA;
+  /* Hero panel — palette update: hero/page background now share the same
+     flat --color-bg value (#F7F8FA) intentionally. Separation from the
+     white content panel below is carried entirely by the curve radius
+     (--radius-xl) and lift shadow, not by a color difference. */
+  --color-hero-bg:          #F7F8FA;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
@@ -164,26 +159,14 @@
   /* Ambient elevation — Premium polish pass. Large, diffused, low-opacity
      shadows (blur >> offset, no spread) instead of directional drop
      shadows, so surfaces read as gently lifted rather than obviously
-     floating. -full/-attached pair on the content panel switches between
-     floating (scrolled to top) and attached-under-sticky-header states,
-     both driven by the same showStickyHeader boolean in
-     ConditionsScreen.jsx. */
+     floating. -full/-attached pair on the content panel interpolates
+     between floating (scrolled to top) and attached-under-sticky-header
+     states, both driven by the same logoVisibility signal in
+     ConditionsScreen.jsx — not two independently timed animations. */
   --shadow-ambient-panel-full:     0 2px 28px rgba(15, 23, 42, 0.04);
   --shadow-ambient-panel-attached: 0 2px 28px rgba(15, 23, 42, 0.02);
   --shadow-ambient-search:         0 1px 12px rgba(15, 23, 42, 0.025);
   --shadow-ambient-selector:       0 1px 14px rgba(15, 23, 42, 0.03);
-
-  /* Panel top shadow — feedback pass. A second, negative-y-offset shadow
-     layered on top of --shadow-ambient-panel-full/-attached above.
-     Those two are symmetric ambient shadows (offset mostly cancelled out
-     by the large blur); this one is deliberately directional, offset
-     upward so it casts specifically into the hero panel above the curve,
-     reinforcing the "lifted edge" read at the seam. Very low opacity and
-     heavily diffused (blur >> offset, no spread) to stay soft rather than
-     reading as a hard drop shadow. Present at both panel states — it's
-     not part of the floating/attached interpolation, just a constant
-     soft accent on the curve itself. */
-  --shadow-panel-top: 0 -6px 20px rgba(15, 23, 42, 0.05);
 
   --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
   --space-4: 16px; --space-5: 20px;  --space-6: 24px;

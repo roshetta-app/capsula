@@ -43,16 +43,6 @@
  *            ConditionsScreen wrapped this card in a white hero panel — the
  *            idle white fill had nothing to separate it from that background.
  *            Active state (already a colored tint) is untouched.
- * Phase 22 — Bugfix revert on the "Premium Elevation & Scroll" pass: Phase
- *            16-21's active-state tint pass had temporarily swapped this
- *            component's active background/border to two fixed tokens
- *            (--color-selector-active-bg / --color-selector-active-border,
- *            same pink regardless of specialty). Reverted back to computing
- *            surfaceBg/border from resolveToken(tokenKey, isDark) per
- *            specialty, as in Phase 12/13 — the fixed color lost the
- *            per-specialty identity this control is meant to carry. Ambient
- *            shadow (--shadow-ambient-selector) is unaffected — that part of
- *            the pass was fine.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -84,25 +74,15 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const colors   = resolveToken(tokenKey, isDark)
   const isActive = !!activeSpecialtyObj
 
-  // Shared rgb triple from the active token's foreground color — used to
-  // build both the active border wash below and the chevron/clear control
-  // tint further down, so the two stay perfectly in sync per specialty.
-  const [r, g, b] = hexToRgb(colors.fg)
-
   // Idle surface stays clean white (light) / elevated surface (dark) — no tint.
-  // Active surface goes back to a per-specialty computed tint (colors.bg,
-  // resolved from resolveToken above) instead of a fixed selected-state
-  // background — restores the specialty identity that a single flat token
-  // color would otherwise erase.
+  // Active surface now uses a fixed premium selected-state background
+  // (--color-selector-active-bg) instead of a per-specialty computed tint —
+  // icon/text color below still carries the specialty's own accent color,
+  // so identity isn't lost, but the container itself reads as one
+  // consistent "selected" surface across every specialty.
   const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
-  const surfaceBg = isActive ? colors.bg : idleSurfaceBg
+  const surfaceBg = isActive ? 'var(--color-selector-active-bg)' : idleSurfaceBg
   const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
-
-  // Active border — a soft wash of the same token's foreground color
-  // (matching the tint treatment used for the chevron/clear controls
-  // below), rather than a single fixed border token shared across every
-  // specialty.
-  const activeBorder = `rgba(${r}, ${g}, ${b}, 0.35)`
 
   // Ambient elevation — Premium polish pass. Single diffused shadow shared
   // by idle/active/pressed states, matching the search field's ambient
@@ -116,6 +96,7 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   // Soft specialty tint for the chevron and clear button — a lighter touch
   // than the icon's full accent color, so these controls read as gently
   // tinted rather than fully colored. Falls back to neutral grey when idle.
+  const [r, g, b] = hexToRgb(colors.fg)
   const controlTint = isActive ? `rgba(${r}, ${g}, ${b}, 0.65)` : 'var(--color-text-tertiary)'
 
   return (
@@ -126,12 +107,12 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
         // Idle state gets a hairline border in the shared border color;
-        // active state gets a soft wash of the specialty's own accent
-        // color, matching the chevron/clear tint treatment, so the
-        // selected surface reads as border-defined and carries the right
-        // specialty identity at the same time.
+        // active state now gets its own dedicated selected-border token
+        // (previously 'none', relying only on the background tint) so the
+        // selected surface reads as border-defined first, matching the
+        // search field's elevation treatment.
         border:          isActive
-          ? `1px solid ${activeBorder}`
+          ? '1px solid var(--color-selector-active-border)'
           : '1px solid var(--color-border)',
         borderRadius:    '16px',
         overflow:        'hidden',
@@ -285,3 +266,4 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
     </div>
   )
 }
+
