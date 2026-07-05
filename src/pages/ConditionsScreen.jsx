@@ -930,9 +930,16 @@ export default function ConditionsScreen() {
         // fast/snappy rather than slow; same fast-out-slow-in curve, no
         // spring/overshoot.
         transform:       showStickyHeader ? 'translateY(calc(var(--space-5) * -1))' : 'translateY(0)',
+        // Feedback pass: added --shadow-panel-top as a second, always-on
+        // layer alongside the existing floating/attached ambient shadow —
+        // CSS box-shadow supports multiple comma-separated shadows on one
+        // element. This one is a soft, diffused, low-opacity shadow cast
+        // upward into the hero above the curve (see globals.css comment),
+        // constant across both panel states — it's a fixed accent on the
+        // seam itself, not part of the floating/attached interpolation.
         boxShadow:       showStickyHeader
-          ? 'var(--shadow-ambient-panel-attached)'
-          : 'var(--shadow-ambient-panel-full)',
+          ? 'var(--shadow-panel-top), var(--shadow-ambient-panel-attached)'
+          : 'var(--shadow-panel-top), var(--shadow-ambient-panel-full)',
         transition:      'transform 180ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 180ms ease-out',
       }}>
 
