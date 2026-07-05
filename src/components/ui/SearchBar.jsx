@@ -15,6 +15,13 @@
  *             the existing Search glyph, so every other call site is
  *             unaffected. The built-in clear-text button (X, shown only when
  *             value is non-empty) is unrelated to this and unchanged.
+ * conditions-screen-polish-master-plan Phase 1 — added className="search-input"
+ *             to the <input>. React's inline `style` prop can't target the
+ *             ::placeholder pseudo-element, so the placeholder font-weight
+ *             bump lives in a new `.search-input::placeholder` rule in
+ *             globals.css instead; this class is the only hook it needs.
+ *             Global change — every SearchBar call site (Conditions, Drugs,
+ *             Favourites) picks up the heavier placeholder.
  *
  * Props:
  *   value            string
@@ -61,6 +68,7 @@ const SearchBar = forwardRef(function SearchBar({
         <input
           ref={ref}
           type="text"
+          className="search-input"
           value={value}
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
@@ -139,4 +147,3 @@ const SearchBar = forwardRef(function SearchBar({
 })
 
 export default SearchBar
-

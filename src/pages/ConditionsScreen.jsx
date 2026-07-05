@@ -94,6 +94,13 @@
  *             color split from text color (iconGlyphColor vs textColor) so
  *             the idle ListFilter icon can go accent blue — matching the
  *             search icon glyph — without recoloring the specialty name.
+ * Phase 24 — Tagline weight bump (conditions-screen-polish-master-plan,
+ *             Phase 1): RotatingTagline's BrandRow call site fontWeight
+ *             400 → 500. Phase 23's hierarchy fix correctly quieted the
+ *             specialty label, but feedback afterward was that the
+ *             tagline itself had become under-noticeable rather than
+ *             balanced — this raises it one step without reintroducing
+ *             competition with the search bar below it.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -355,7 +362,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
       {!isSearching && (
         <RotatingTagline
           fontSize={13}
-          fontWeight={400}
+          fontWeight={500}
           color="var(--color-text-secondary)"
         />
       )}

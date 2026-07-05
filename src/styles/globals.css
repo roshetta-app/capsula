@@ -288,6 +288,18 @@ body {
   opacity: 1; /* Firefox sets opacity: 0.54 by default — override to honour our token */
 }
 
+/* ─── Search input placeholder weight ─────────────────────────────────────────
+   conditions-screen-polish-master-plan, Phase 1: the shared ::placeholder
+   rule above already sets color to --color-text-secondary at full opacity,
+   but SearchBar's placeholder (Conditions/Drugs/Favourites) still read as
+   under-noticeable next to the raised tagline weight above it. Scoped to
+   .search-input (SearchBar.jsx's <input>) rather than the global
+   ::placeholder rule, so every other input in the app keeps its existing
+   weight — only doesn't repeat color/opacity, already inherited. */
+.search-input::placeholder {
+  font-weight: 500;
+}
+
 /* ─── Shimmer animation (used in skeleton loaders) ───────────────────────────── */
 @keyframes shimmer {
   0%   { opacity: 1; }
