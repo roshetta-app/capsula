@@ -145,14 +145,14 @@
  *                but the sticky header hadn't disappeared yet — the exact
  *                "partial coexist" state Phase 23 was meant to eliminate,
  *                just on the way up instead of the way down. Fixed by
- *                retargeting the observer from BrandRow to a thin,
- *                zero-height sentinel (panelSentinelRef) placed in normal
- *                flow immediately before the content panel — i.e. sitting
- *                exactly at the panel's sticky boundary. Observed with
- *                rootMargin equal to -headerHeight, its isIntersecting flip
- *                fires the instant that exact boundary is crossed in either
- *                direction, so dock and undock are now symmetric "first
- *                pixel" triggers with no reveal window between them. Still
+ *                retargeting the observer from BrandRow to a thin sentinel
+ *                (panelSentinelRef) placed in normal flow immediately before
+ *                the content panel — i.e. sitting exactly at the panel's
+ *                sticky boundary. Observed with rootMargin equal to
+ *                -headerHeight, its isIntersecting flip fires the instant
+ *                that exact boundary is crossed in either direction, so
+ *                dock and undock are now symmetric "first pixel" triggers
+ *                with no reveal window between them. Still
  *                one single IntersectionObserver — only the watched node
  *                and threshold/rootMargin changed. brandRowRef (and its
  *                wiring into BrandRow) removed as dead code now that
@@ -167,6 +167,20 @@
  *                against any incidental scroll (e.g. focus/layout shifts
  *                from the bottom sheet closing) knocking it out of the
  *                flush position.
+ * Phase 24.1 — Bugfix on Phase 24 item 2: the sentinel was given
+ *             height: 0, which broke scrolling almost entirely — the page
+ *             could only move a few pixels before snapping back to the top.
+ *             Root cause: a zero-area element is an unreliable
+ *             IntersectionObserver target (a well-documented cross-browser
+ *             edge case) — its isIntersecting state doesn't settle
+ *             predictably, so the observer was firing on nearly every
+ *             scroll frame instead of only at the real sticky boundary,
+ *             and each spurious fire re-triggered animateScrollTo, with the
+ *             undock branch snapping straight back to 0. Fixed by giving
+ *             the sentinel a real 1px height, cancelled with an equal
+ *             marginBottom: -1 so it still contributes zero net height to
+ *             the document flow and the boundary position is unchanged —
+ *             only the observer now has a non-degenerate rect to test.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -725,7 +739,8 @@ export default function ConditionsScreen() {
   // impure side effect inside a setState updater. scrollAnimRef holds the
   // in-flight requestAnimationFrame id so a new dock/undock snap (or a real
   // user scroll) can cancel a still-running one instead of fighting it.
-  // Phase 24 additions: panelSentinelRef is a thin, zero-height marker sitting
+  // Phase 24 additions: panelSentinelRef is a thin (1px, net-zero via a
+  // matching negative margin) marker sitting
   // in normal flow immediately before the content panel — i.e. exactly at its
   // sticky boundary — and is what the single IntersectionObserver below now
   // watches (replacing BrandRow, see Phase 24 docblock note). suppressCleanupRef
@@ -826,8 +841,8 @@ export default function ConditionsScreen() {
   //    showStickyHeader boolean, sourced from one IntersectionObserver —
   //    single source of truth, no separate scroll listener.
   //
-  //    Phase 24: retargeted from BrandRow to panelSentinelRef, a thin
-  //    zero-height marker sitting in normal flow immediately before the
+  //    Phase 24: retargeted from BrandRow to panelSentinelRef, a thin (1px,
+  //    net-zero) marker sitting in normal flow immediately before the
   //    content panel — i.e. exactly at its sticky boundary. rootMargin
   //    shrinks the observed root's top edge inward by headerHeight, so the
   //    sentinel's isIntersecting flips false the instant it crosses that
@@ -1105,12 +1120,17 @@ export default function ConditionsScreen() {
         </div>
       </div>
 
-      {/* Phase 24 sentinel — thin, zero-height marker sitting in normal flow
+      {/* Phase 24 sentinel — 1px marker (net-zero via marginBottom: -1, see
+          Phase 24.1 fix note in docblock) sitting in normal flow
           exactly at the content panel's sticky boundary. The IntersectionObserver
           above watches this (not BrandRow) so dock/undock fires the instant this
           precise line is crossed in either scroll direction, with no reveal
           window on the way up (see Phase 24 docblock note). */}
-      <div ref={panelSentinelRef} style={{ height: 0 }} aria-hidden="true" />
+      <div
+        ref={panelSentinelRef}
+        style={{ height: 1, marginBottom: -1 }}
+        aria-hidden="true"
+      />
 
       {/* ─── Content panel ────────────────────────────────────────────────────
           Phase 23: position: sticky (top pinned to the live-measured sticky
