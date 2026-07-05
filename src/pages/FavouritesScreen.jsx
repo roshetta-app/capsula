@@ -444,7 +444,7 @@
  *    UI built from scratch.
  */
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import Layout from '../components/layout'
@@ -1837,6 +1837,16 @@ export default function FavouritesScreen() {
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
   const heroRef = useRef(null)
+
+  // Sets the sticky header's correct state before the browser paints — same
+  // fix as ConditionsScreen's brandRowRef watch. Without this, returning to
+  // this screen already scrolled down (hero already out of view) replays
+  // the slide-down animation instead of showing it already in place.
+  useLayoutEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+    setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
+  }, [])
 
   useEffect(() => {
     const el = heroRef.current

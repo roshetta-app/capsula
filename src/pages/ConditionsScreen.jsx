@@ -150,7 +150,7 @@
  *   sortMode === 'az'         → grouped by letter with AlphabetSectionDividers
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart } from 'lucide-react'
 import Layout                  from '../components/layout'
@@ -756,6 +756,19 @@ export default function ConditionsScreen() {
       setIsListFading(false)
     }, 100)
   }
+
+  // Sets the sticky header's correct state before the browser paints, so
+  // navigating back to this screen already scrolled down (BrandRow already
+  // out of view) shows it already in place instead of replaying the
+  // slide-down animation. Without this, showStickyHeader always starts
+  // false on remount regardless of actual scroll position, and the
+  // IntersectionObserver effect below only corrects it after the first
+  // paint — by then the false→true flip has already animated visibly.
+  useLayoutEffect(() => {
+    const el = brandRowRef.current
+    if (!el) return
+    setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
+  }, [])
 
   useEffect(() => {
     const el = brandRowRef.current
