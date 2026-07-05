@@ -43,6 +43,7 @@
  *                              vertically centered with it on the row.
  */
 
+import { useState }       from 'react'
 import { useNavigate }    from 'react-router-dom'
 import { Info }           from 'lucide-react'
 import { highlightMatch } from '../utils/highlightMatch'
@@ -62,6 +63,12 @@ export default function ConditionCard({
 }) {
   const navigate = useNavigate()
   const isDark = useIsDark()
+
+  // Press feedback — conditions-screen-polish-master-plan Phase 3. Same
+  // pointer-event pattern as Phase 5's sticky header search icon; pointer
+  // events are independent of SwipeToRemoveRow's touch-event gesture
+  // handling on the Favourites screen, so this coexists safely with swipe.
+  const [pressed, setPressed] = useState(false)
 
   const tokenKey  = condition.specialtyColorToken || FALLBACK_TOKEN
   const iconType  = condition.specialtyIconType   || 'lucide'
@@ -95,6 +102,10 @@ export default function ConditionCard({
       role="button"
       tabIndex={0}
       onKeyDown={e => e.key === 'Enter' && handleTap()}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         display:                 'flex',
         alignItems:              isMultiLine ? 'flex-start' : 'center',
@@ -104,7 +115,9 @@ export default function ConditionCard({
         cursor:                  'pointer',
         outline:                 'none',
         WebkitTapHighlightColor: 'transparent',
-        backgroundColor:         'transparent',
+        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
+        transform:               pressed ? 'scale(0.99)' : 'scale(1)',
+        transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
       {/* Left: specialty icon bubble — 32px, softer radius, lower visual weight
