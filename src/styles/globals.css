@@ -780,3 +780,4 @@ body {
    token for consistency between the two header variants. ───────────── */
 .fav-sticky-header {
   background: var(--color-accent-light);
+}
