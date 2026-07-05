@@ -83,12 +83,20 @@ export function useStickyHeaderScroll(screenKey) {
     return () => observer.disconnect()
   }, [])
 
-  // Saves this screen's own scroll position the moment it's left, so
-  // returning to it later restores exactly this spot. Scoped to
-  // `screenKey`, so this never touches any other screen's remembered spot.
+  // Saves this screen's own scroll position continuously while it's the
+  // active screen, not just at the moment it's left. Leaving a screen can
+  // happen in more than one way (tab switch, opening a detail page,
+  // browser back) — saving continuously means whichever way it happens,
+  // the number left behind is always accurate, rather than depending on
+  // exactly when a one-time "on unmount" save happens to run.
   useEffect(() => {
-    return () => {
+    function saveScrollPosition() {
       scrollMemory[screenKey] = window.scrollY
+    }
+    window.addEventListener('scroll', saveScrollPosition, { passive: true })
+    return () => {
+      saveScrollPosition()
+      window.removeEventListener('scroll', saveScrollPosition)
     }
   }, [screenKey])
 

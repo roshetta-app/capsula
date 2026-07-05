@@ -7,6 +7,7 @@
  *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → OnboardingGate → AppRoutes
  */
 
+import { useEffect } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
@@ -27,6 +28,17 @@ export default function App() {
   // of the browser's own 100dvh estimate, which can briefly disagree with
   // it during scroll/address-bar transitions.
   useVisualViewport()
+
+  // Turns off the browser's own automatic "remember where I scrolled to"
+  // behavior on back/forward navigation. Each screen now remembers and
+  // restores its own scroll position itself (see useStickyHeaderScroll) —
+  // leaving the browser's version switched on as well meant two separate
+  // things could both try to move the scroll position at slightly
+  // different times, which is what caused the sticky header to
+  // occasionally slide down again on its own after returning to a screen.
+  useEffect(() => {
+    history.scrollRestoration = 'manual'
+  }, [])
 
   return (
     <ErrorBoundary>
