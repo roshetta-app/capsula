@@ -83,6 +83,15 @@
   --color-border:           #E9ECF1;
   --color-border-subtle:    #EEF1F4;
 
+  /* Component-specific borders/backgrounds — Premium polish pass. Distinct
+     from the shared --color-border/--color-bg tokens above; these are
+     deliberate one-off values for specific elevated surfaces (search field,
+     active specialty selector), matching the existing pattern of dedicated
+     tokens like --color-favourite / --color-note-bg for single-purpose colors. */
+  --color-search-border:         #E8EBF0;
+  --color-selector-active-bg:    #FFF7FA;
+  --color-selector-active-border: #F3DFE8;
+
   /* Hero panel — palette update: hero/page background now share the same
      flat --color-bg value (#F7F8FA) intentionally. Separation from the
      white content panel below is carried entirely by the curve radius
@@ -146,6 +155,18 @@
 
   --shadow-card:            0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-elevated:        0 4px 12px rgba(0,0,0,0.08);
+
+  /* Ambient elevation — Premium polish pass. Large, diffused, low-opacity
+     shadows (blur >> offset, no spread) instead of directional drop
+     shadows, so surfaces read as gently lifted rather than obviously
+     floating. -full/-attached pair on the content panel interpolates
+     between floating (scrolled to top) and attached-under-sticky-header
+     states, both driven by the same logoVisibility signal in
+     ConditionsScreen.jsx — not two independently timed animations. */
+  --shadow-ambient-panel-full:     0 2px 28px rgba(15, 23, 42, 0.04);
+  --shadow-ambient-panel-attached: 0 2px 28px rgba(15, 23, 42, 0.02);
+  --shadow-ambient-search:         0 1px 12px rgba(15, 23, 42, 0.025);
+  --shadow-ambient-selector:       0 1px 14px rgba(15, 23, 42, 0.03);
 
   --space-1: 4px;  --space-2: 8px;   --space-3: 12px;
   --space-4: 16px; --space-5: 20px;  --space-6: 24px;

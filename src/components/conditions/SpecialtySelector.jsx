@@ -75,20 +75,19 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
   const isActive = !!activeSpecialtyObj
 
   // Idle surface stays clean white (light) / elevated surface (dark) — no tint.
-  // Active surface picks up a very light wash of the specialty's bg tint over
-  // that same base, so the card reads as gently colored rather than pure white.
+  // Active surface now uses a fixed premium selected-state background
+  // (--color-selector-active-bg) instead of a per-specialty computed tint —
+  // icon/text color below still carries the specialty's own accent color,
+  // so identity isn't lost, but the container itself reads as one
+  // consistent "selected" surface across every specialty.
   const idleSurfaceBg = isDark ? 'var(--color-surface)' : '#FFFFFF'
-  const [bgR, bgG, bgB] = hexToRgb(colors.bg)
-  const tintAlpha = isDark ? 0.16 : 0.35
-  const surfaceBg = isActive ? `rgba(${bgR}, ${bgG}, ${bgB}, ${tintAlpha})` : idleSurfaceBg
+  const surfaceBg = isActive ? 'var(--color-selector-active-bg)' : idleSurfaceBg
   const pressedBg = isDark ? '#262D3A' : '#F5F4F2'
 
-  // Subtle ambient shadow to lift container off page background without a border.
-  // Lighter than search bar's shadow so hierarchy is preserved. Reduced further
-  // (lower opacity, tighter blur) so the card reads as nearly flat.
-  const containerShadow = pressed
-    ? '0 1px 1px rgba(0,0,0,0.02)'
-    : '0 1px 2px rgba(0,0,0,0.04)'
+  // Ambient elevation — Premium polish pass. Single diffused shadow shared
+  // by idle/active/pressed states, matching the search field's ambient
+  // treatment so both controls read as the same elevation system.
+  const containerShadow = 'var(--shadow-ambient-selector)'
 
   // Icon color — accent token color when a specialty is active, neutral
   // tertiary text color when idle.
@@ -107,14 +106,14 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         alignItems:      'stretch',
         width:           '100%',
         backgroundColor: pressed ? pressedBg : surfaceBg,
-        // Idle state now gets a hairline border — previously 'none', relying
-        // solely on a 4%-opacity shadow to separate the card from the page.
-        // That was enough against the old plain page background, but once
-        // ConditionsScreen's hero panel became white this card's white idle
-        // fill would otherwise blend straight into it. Active state is
-        // untouched — its colored tint background already stays visible
-        // regardless of what's behind it.
-        border:          isActive ? 'none' : '1px solid var(--color-border)',
+        // Idle state gets a hairline border in the shared border color;
+        // active state now gets its own dedicated selected-border token
+        // (previously 'none', relying only on the background tint) so the
+        // selected surface reads as border-defined first, matching the
+        // search field's elevation treatment.
+        border:          isActive
+          ? '1px solid var(--color-selector-active-border)'
+          : '1px solid var(--color-border)',
         borderRadius:    '16px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
@@ -267,3 +266,4 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
     </div>
   )
 }
+

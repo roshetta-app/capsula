@@ -71,13 +71,13 @@ const SearchBar = forwardRef(function SearchBar({
             paddingRight:    value ? 40 : 16,
             height:          height,
             borderRadius:    'var(--radius-full)',
-            border:          '1.5px solid var(--color-border)',
+            border:          '1px solid var(--color-search-border)',
             backgroundColor: 'var(--color-surface)',
             fontSize:        14,
             color:           'var(--color-text-primary)',
             fontFamily:      'var(--font-body)',
             outline:         'none',
-            boxShadow:       'none',
+            boxShadow:       'var(--shadow-ambient-search)',
             transition:      'border-color 0.15s ease',
           }}
           onFocus={e => e.target.style.borderColor = 'var(--color-accent)'}
@@ -139,3 +139,4 @@ const SearchBar = forwardRef(function SearchBar({
 })
 
 export default SearchBar
+

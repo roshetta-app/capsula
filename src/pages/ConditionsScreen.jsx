@@ -298,13 +298,18 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   return (
     <div ref={brandRowRef} style={{
       paddingTop:    'var(--space-5)',
-      paddingBottom: 'calc(var(--space-3) - 4px)',
+      // Tagline → search gap increased ~8px → 20px per premium polish pass
+      // (was calc(var(--space-3) - 4px)). Uses the --space-5 token rather
+      // than a one-off magic number.
+      paddingBottom: 'var(--space-5)',
     }}>
       <div style={{
         display:      'flex',
         alignItems:   'center',
         gap:          'var(--space-2)',
-        marginBottom: isSearching ? 0 : 8,
+        // Logo → tagline gap increased 8px → 12px (--space-3) per premium
+        // polish pass — was a bare 8 magic number.
+        marginBottom: isSearching ? 0 : 12,
         transition:   'margin-bottom 0.15s ease',
       }}>
         {/* Logo wordmark */}
@@ -569,28 +574,44 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
-  const [showStickyHeader, setShowStickyHeader]   = useState(false)
+  // logoVisibility: 1 = BrandRow fully visible, 0 = fully scrolled out of
+  // view. Replaces the old boolean showStickyHeader state — Premium polish
+  // pass requires the sticky header AND the floating panel's glide/fade/
+  // shadow animation to be driven by one continuous signal instead of two
+  // independent mechanisms, per spec ("Do NOT introduce independent scroll
+  // thresholds"). showStickyHeader below is now a derived value, not state.
+  const [logoVisibility, setLogoVisibility]       = useState(1)
+  const showStickyHeader = logoVisibility === 0
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
-  // ── Sliding sticky header: visible once BrandRow logo leaves viewport ────────
-  // IntersectionObserver fires when brandRowRef crosses the top of the viewport.
-  // threshold: 0 means the moment any part of the element is out of view.
-  // rootMargin: '-1px' gives a 1px trigger zone so the header appears exactly
-  // as the last pixel of the brand row scrolls off the top.
+  // ── Sliding sticky header + floating panel glide: both driven by the same
+  //    logoVisibility signal, sourced from one IntersectionObserver on the
+  //    BrandRow (logo). threshold is now a 21-step array (0, 0.05, ...,
+  //    1) instead of a single [0] — this reports entry.intersectionRatio
+  //    at each 5% step as the logo crosses the viewport top, giving a
+  //    continuous 0–1 value instead of a single fire-once boolean. 21 steps
+  //    over the brand row's own scroll distance is smooth enough to read as
+  //    continuous while remaining a single IntersectionObserver (no
+  //    separate scroll listener, no independent threshold).
+  //    rootMargin: '-1px' preserved from the original — logoVisibility
+  //    reaches exactly 0 the moment the last pixel crosses the top, so
+  //    showStickyHeader's derived boolean fires at the same instant it
+  //    always did.
 
   useEffect(() => {
     const el = brandRowRef.current
     if (!el) return
 
+    const THRESHOLD_STEPS = Array.from({ length: 21 }, (_, i) => i / 20)
+
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // isIntersecting === false → element fully above viewport → show header
-        setShowStickyHeader(!entry.isIntersecting)
+        setLogoVisibility(entry.intersectionRatio)
       },
-      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+      { threshold: THRESHOLD_STEPS, rootMargin: '-1px 0px 0px 0px' }
     )
 
     observer.observe(el)
@@ -618,6 +639,34 @@ export default function ConditionsScreen() {
     : null
   const specialtyName      = activeSpecialtyObj?.name ?? ''
   const totalCount         = conditions.length
+
+  // ── Scroll-linked animation values — Premium polish pass ────────────────────
+  // All derived from the single logoVisibility signal (see IntersectionObserver
+  // above), not from independent scroll math, per spec.
+  //
+  // brandRowOpacity: fades the BrandRow (logo + tagline) itself as it leaves
+  // view — not the whole hero panel. The search bar and specialty selector
+  // stay fully opaque and usable throughout the scroll; only the "large
+  // title" portion softens away, matching the iOS large-title-collapse
+  // pattern this spec is going for. (Assumption: spec says "hero gradually
+  // fades" — read as the logo/tagline specifically, since fading the entire
+  // hero would visually hide the still-on-screen, still-functional search
+  // bar and selector mid-scroll. Flag if the full-hero-panel reading was
+  // intended instead.)
+  //
+  // panelLiftExtra: additional overlap (px) the content panel gains as it
+  // glides upward during the transition, on top of its resting --radius-xl
+  // overlap — 0 at rest (logoVisibility 1), up to 12px more by full attach
+  // (logoVisibility 0), so the glide reads as continuous motion rather than
+  // a snap once the sticky header appears.
+  //
+  // panelShadowOpacity: interpolates the panel's ambient shadow from the
+  // "floating" intensity (~4%, matches --shadow-ambient-panel-full) down to
+  // the "attached" intensity (~2%, matches --shadow-ambient-panel-attached)
+  // as the same signal moves from 1 to 0.
+  const brandRowOpacity    = logoVisibility
+  const panelLiftExtra     = (1 - logoVisibility) * 12
+  const panelShadowOpacity = 0.04 - (1 - logoVisibility) * 0.02
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -793,13 +842,19 @@ export default function ConditionsScreen() {
         paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
       }}>
 
-        {/* 1. Brand row + tagline + dark mode toggle */}
-        <BrandRow
-          isSearching={isSearching}
-          isDark={isDark}
-          onToggleDark={toggleDark}
-          brandRowRef={brandRowRef}
-        />
+        {/* 1. Brand row + tagline + dark mode toggle — opacity fades to 0 as
+            it scrolls out of view, driven by the same logoVisibility signal
+            that triggers the sticky header (see brandRowOpacity comment
+            above). transition smooths the 21 discrete IntersectionObserver
+            steps into what reads as continuous motion. */}
+        <div style={{ opacity: brandRowOpacity, transition: 'opacity 0.1s linear' }}>
+          <BrandRow
+            isSearching={isSearching}
+            isDark={isDark}
+            onToggleDark={toggleDark}
+            brandRowRef={brandRowRef}
+          />
+        </div>
 
         {/* 2. Search bar */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
@@ -850,13 +905,22 @@ export default function ConditionsScreen() {
         backgroundColor: 'var(--color-bg)',
         borderTopLeftRadius:  'var(--radius-xl)',
         borderTopRightRadius: 'var(--radius-xl)',
-        marginTop:       'calc(var(--radius-xl) * -1)',
+        // Base --radius-xl overlap at rest, plus up to 12px more as the
+        // panel glides upward during the scroll transition (panelLiftExtra),
+        // continuously driven by logoVisibility — not a separate animation.
+        marginTop:       `calc((var(--radius-xl) + ${panelLiftExtra}px) * -1)`,
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
         paddingTop:      'var(--space-4)',
-        boxShadow:       '0 -6px 16px rgba(0, 0, 0, 0.06)',
+        // Large diffused ambient shadow (Premium polish pass) — interpolates
+        // between the floating (~4%) and attached (~2%) intensities via
+        // panelShadowOpacity, matching --shadow-ambient-panel-full/-attached
+        // in globals.css. Computed inline (rather than switching between the
+        // two fixed tokens) so the transition is continuous, not a hard swap.
+        boxShadow:       `0 2px 28px rgba(15, 23, 42, ${panelShadowOpacity})`,
+        transition:      'margin-top 0.1s linear, box-shadow 0.1s linear',
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
