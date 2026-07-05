@@ -397,6 +397,11 @@ function StickyLogoHeader({
   const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors    = resolveToken(tokenKey, isDark)
 
+  // Search icon press feedback — conditions-screen-polish-master-plan Phase 5.
+  // Tracks pointer down/up so the icon can shrink slightly and tint toward
+  // accent while pressed, releasing right as onSearchTap's scroll begins.
+  const [searchPressed, setSearchPressed] = useState(false)
+
   // Pill background: tinted wash when active; neutral card surface + hairline
   // border when idle — matches the idle treatment already used by the
   // standalone SpecialtySelector card, and pairs with the search icon's
@@ -585,6 +590,10 @@ function StickyLogoHeader({
               consistent idle system, with blue reserved for the icon glyphs. */}
           <button
             onClick={onSearchTap}
+            onPointerDown={() => setSearchPressed(true)}
+            onPointerUp={() => setSearchPressed(false)}
+            onPointerLeave={() => setSearchPressed(false)}
+            onPointerCancel={() => setSearchPressed(false)}
             aria-label="Go to search"
             style={{
               display:                 'flex',
@@ -592,7 +601,7 @@ function StickyLogoHeader({
               justifyContent:          'center',
               width:                   38,
               height:                  38,
-              background:              idlePillBg,
+              background:              searchPressed ? 'var(--color-accent-light)' : idlePillBg,
               border:                  idlePillBorder,
               borderRadius:            'var(--radius-full)',
               cursor:                  'pointer',
@@ -601,6 +610,8 @@ function StickyLogoHeader({
               outline:                 'none',
               WebkitTapHighlightColor: 'transparent',
               flexShrink:              0,
+              transform:               searchPressed ? 'scale(0.99)' : 'scale(1)',
+              transition:              'background var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
             }}
           >
             <Search size={17} strokeWidth={2.1} aria-hidden="true" />
