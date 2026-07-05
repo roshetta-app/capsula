@@ -22,6 +22,13 @@
  *             globals.css instead; this class is the only hook it needs.
  *             Global change — every SearchBar call site (Conditions, Drugs,
  *             Favourites) picks up the heavier placeholder.
+ * conditions-screen-polish-master-plan Phase 11 — left-edge icon recolored
+ *             from var(--color-text-tertiary) (neutral grey) to
+ *             var(--color-accent) (brand blue) — the same blue used
+ *             elsewhere for active/interactive accents. Applies to every
+ *             call site (Conditions, Drugs, Favourites), including the
+ *             Star icon FavouritesScreen swaps in via the `icon` prop above,
+ *             since both icons share this one style object.
  *
  * Props:
  *   value            string
@@ -61,7 +68,7 @@ const SearchBar = forwardRef(function SearchBar({
             left:          'var(--space-4)',
             top:           '50%',
             transform:     'translateY(-50%)',
-            color:         'var(--color-text-tertiary)',
+            color:         'var(--color-accent)',
             pointerEvents: 'none',
           }}
         />
