@@ -83,6 +83,17 @@
  *             genuinely distinct static colors (#FAFAFA / #F7F8FA in light
  *             mode, see globals.css) instead of matching values relying on
  *             the curve + animated shadow alone for separation.
+ * Phase 23 — BrandRow gap tightening: logo→tagline 12px→8px, tagline→search
+ *             20px→12px, so the search bar reads as anchored to the brand
+ *             block instead of floating below it. StickyLogoHeader idle
+ *             pill: flat grey wash replaced with the same neutral
+ *             surface+hairline-border treatment SpecialtySelector's idle
+ *             card already uses; the search icon button picks up the same
+ *             idle surface/border (was a blue-tint fill) so the two
+ *             controls read as one consistent idle system. Icon glyph
+ *             color split from text color (iconGlyphColor vs textColor) so
+ *             the idle ListFilter icon can go accent blue — matching the
+ *             search icon glyph — without recoloring the specialty name.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -312,18 +323,20 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
   return (
     <div ref={brandRowRef} style={{
       paddingTop:    'var(--space-5)',
-      // Tagline → search gap increased ~8px → 20px per premium polish pass
-      // (was calc(var(--space-3) - 4px)). Uses the --space-5 token rather
-      // than a one-off magic number.
-      paddingBottom: 'var(--space-5)',
+      // Tagline → search gap. Was 20px (--space-5, premium polish pass);
+      // brought down to 12px (--space-3) per hierarchy pass — the search
+      // bar should feel anchored to the brand block, not floating below it.
+      paddingBottom: 'var(--space-3)',
     }}>
       <div style={{
         display:      'flex',
         alignItems:   'center',
         gap:          'var(--space-2)',
-        // Logo → tagline gap increased 8px → 12px (--space-3) per premium
-        // polish pass — was a bare 8 magic number.
-        marginBottom: isSearching ? 0 : 12,
+        // Logo → tagline gap. Was 12px (--space-3, premium polish pass);
+        // brought back down to 8px (--space-2) per hierarchy pass — the
+        // extra gap plus the tagline→search gap left the search bar
+        // feeling too far from the brand block above it.
+        marginBottom: isSearching ? 0 : 8,
         transition:   'margin-bottom 0.15s ease',
       }}>
         {/* Logo wordmark */}
@@ -377,12 +390,23 @@ function StickyLogoHeader({
   const tokenKey  = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
   const colors    = resolveToken(tokenKey, isDark)
 
-  // Pill background: tinted wash when active, plain muted surface when idle.
-  const idlePillBg   = 'rgba(0, 0, 0, 0.045)'
-  const activePillBg = tintedBg(colors.bg, isDark)
+  // Pill background: tinted wash when active; neutral card surface + hairline
+  // border when idle — matches the idle treatment already used by the
+  // standalone SpecialtySelector card, and pairs with the search icon's
+  // matching idle treatment below (Option A: same neutral chrome for both,
+  // rather than the flat grey wash this used to be).
+  const idlePillBg     = isDark ? 'var(--color-surface)' : '#FFFFFF'
+  const idlePillBorder = '1px solid var(--color-border)'
+  const activePillBg   = tintedBg(colors.bg, isDark)
 
-  // Icon + name color: accent fg when active, muted primary when idle.
-  const iconColor = hasFilter ? colors.fg : 'var(--color-text-primary)'
+  // Text color: accent fg when active, primary text when idle — unchanged,
+  // drives the button's base color and therefore the specialty name.
+  const textColor = hasFilter ? colors.fg : 'var(--color-text-primary)'
+
+  // Icon glyph color: accent fg when active (same as text), app blue when
+  // idle — the idle funnel icon now matches the search icon's blue glyph,
+  // set independently of textColor so the name stays its existing color.
+  const iconGlyphColor = hasFilter ? colors.fg : 'var(--color-accent)'
 
   // Chevron + clear button: slightly translucent accent when active, muted when idle.
   const [r, g, b]  = colors.fg.startsWith('rgba') ? [0, 0, 0] : (() => {
@@ -445,11 +469,12 @@ function StickyLogoHeader({
             display:         'inline-flex',
             alignItems:      'center',
             background:      hasFilter ? activePillBg : idlePillBg,
+            border:          hasFilter ? 'none' : idlePillBorder,
             borderRadius:    'var(--radius-full)',
             overflow:        'hidden',
             flex:            1,
             minWidth:        0,
-            transition:      'background 0.2s ease',
+            transition:      'background 0.2s ease, border-color 0.2s ease',
           }}>
 
             {/* Main tap area: icon + name + chevron — flex:1 so name can truncate */}
@@ -466,7 +491,7 @@ function StickyLogoHeader({
                 background:              'none',
                 border:                  'none',
                 cursor:                  'pointer',
-                color:                   iconColor,
+                color:                   textColor,
                 fontSize:                14,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
@@ -482,10 +507,10 @@ function StickyLogoHeader({
                     iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
                     iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
                     size={16}
-                    color={iconColor}
+                    color={iconGlyphColor}
                   />
                 ) : (
-                  <ListFilter size={16} strokeWidth={1.9} aria-hidden="true" />
+                  <ListFilter size={16} strokeWidth={1.9} color={iconGlyphColor} aria-hidden="true" />
                 )}
               </span>
 
@@ -547,7 +572,10 @@ function StickyLogoHeader({
             )}
           </div>
 
-          {/* Right: search icon — blue accent icon on light blue bg */}
+          {/* Right: search icon — same neutral idle surface as the specialty
+              pill (Option A), blue accent glyph. Was a blue-tint fill; now
+              matches the pill's chrome so the two controls read as one
+              consistent idle system, with blue reserved for the icon glyphs. */}
           <button
             onClick={onSearchTap}
             aria-label="Go to search"
@@ -557,8 +585,8 @@ function StickyLogoHeader({
               justifyContent:          'center',
               width:                   38,
               height:                  38,
-              background:              'color-mix(in srgb, var(--color-accent) 12%, transparent)',
-              border:                  'none',
+              background:              idlePillBg,
+              border:                  idlePillBorder,
               borderRadius:            'var(--radius-full)',
               cursor:                  'pointer',
               color:                   'var(--color-accent)',

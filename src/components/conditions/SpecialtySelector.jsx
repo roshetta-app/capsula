@@ -55,6 +55,12 @@
  *            hexToRgb() removed in favor of the shared one now exported
  *            from specialtyTokens.js (identical implementation — this file
  *            no longer needs its own copy).
+ * Phase 17 — Idle-state name weight reduced (600→500, text-primary→
+ *            text-secondary) — at 600/primary it outweighed the search
+ *            bar's placeholder and icon just above it, pulling attention
+ *            away from search on first load. Active state (600, accent
+ *            color) is untouched — a selected specialty should still read
+ *            as the dominant signal.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -195,9 +201,9 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             textOverflow: 'ellipsis',
             whiteSpace:   'nowrap',
             fontSize:     14,
-            fontWeight:   600,
+            fontWeight:   isActive ? 600 : 500,
             fontFamily:   'var(--font-body)',
-            color:        isActive ? iconColor : 'var(--color-text-primary)',
+            color:        isActive ? iconColor : 'var(--color-text-secondary)',
             letterSpacing: '-0.2px',
             transition:   'color 0.2s ease',
           }}>
