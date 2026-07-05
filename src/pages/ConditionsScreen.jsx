@@ -69,6 +69,21 @@
  *             the content panel uses for its own radius/marginTop, so they
  *             cannot drift apart again. Content panel paddingTop trimmed
  *             --space-5 → --space-4 (20px → 16px) above the sort row.
+ * Phase 22 — Bugfix pass on the "Premium Elevation & Scroll" work (Phases
+ *             16-21's continuous-interpolation approach): the 21-step
+ *             IntersectionObserver threshold array and the logoVisibility
+ *             float it drove are reverted back to a single-purpose
+ *             boolean (showStickyHeader), threshold [0, 1]. BrandRow's
+ *             fade (brandRowOpacity) is now a hard opacity toggle with no
+ *             transition — the continuous fade caused a React re-render on
+ *             every ~5% scroll step, reading as glitchy/sluggish rather
+ *             than smooth. The content panel's glide (panelLiftExtra) and
+ *             ambient shadow (panelShadowOpacity) are no longer
+ *             recalculated per intersection step either — the panel now
+ *             sits still at rest and makes exactly one CSS-transitioned
+ *             transform+shadow move (250ms cubic-bezier(0.4,0,0.2,1)) the
+ *             instant showStickyHeader flips, coordinated with the sticky
+ *             header and BrandRow toggle in the same render.
  *
  * Changes from previous:
  *   - AutocompleteDropdown removed; live list is the sole search UI
@@ -574,44 +589,37 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
-  // logoVisibility: 1 = BrandRow fully visible, 0 = fully scrolled out of
-  // view. Replaces the old boolean showStickyHeader state — Premium polish
-  // pass requires the sticky header AND the floating panel's glide/fade/
-  // shadow animation to be driven by one continuous signal instead of two
-  // independent mechanisms, per spec ("Do NOT introduce independent scroll
-  // thresholds"). showStickyHeader below is now a derived value, not state.
-  const [logoVisibility, setLogoVisibility]       = useState(1)
-  const showStickyHeader = logoVisibility === 0
+  // showStickyHeader: true once the in-page BrandRow logo has fully
+  // scrolled out of view, false while it's still visible. Bugfix pass:
+  // reverted from a continuous logoVisibility float (0–1, driven by a
+  // 21-step IntersectionObserver threshold array) back to this simple
+  // boolean — nothing downstream should scroll-link to a continuous
+  // signal anymore (see BrandRow hard-toggle and panel glide below), so a
+  // single fire-on-cross boolean is the right shape for this state again.
+  const [showStickyHeader, setShowStickyHeader]   = useState(false)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
   // ── Sliding sticky header + floating panel glide: both driven by the same
-  //    logoVisibility signal, sourced from one IntersectionObserver on the
-  //    BrandRow (logo). threshold is now a 21-step array (0, 0.05, ...,
-  //    1) instead of a single [0] — this reports entry.intersectionRatio
-  //    at each 5% step as the logo crosses the viewport top, giving a
-  //    continuous 0–1 value instead of a single fire-once boolean. 21 steps
-  //    over the brand row's own scroll distance is smooth enough to read as
-  //    continuous while remaining a single IntersectionObserver (no
-  //    separate scroll listener, no independent threshold).
-  //    rootMargin: '-1px' preserved from the original — logoVisibility
-  //    reaches exactly 0 the moment the last pixel crosses the top, so
-  //    showStickyHeader's derived boolean fires at the same instant it
-  //    always did.
+  //    showStickyHeader boolean, sourced from one IntersectionObserver on
+  //    the BrandRow (logo) — single source of truth, no separate scroll
+  //    listener. threshold reverted to [0, 1] (was a 21-step array used to
+  //    report continuous intersectionRatio) since nothing needs the
+  //    continuous value anymore. rootMargin: '-1px' preserved from the
+  //    original — showStickyHeader flips to true the moment the last pixel
+  //    of the logo crosses the viewport top.
 
   useEffect(() => {
     const el = brandRowRef.current
     if (!el) return
 
-    const THRESHOLD_STEPS = Array.from({ length: 21 }, (_, i) => i / 20)
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setLogoVisibility(entry.intersectionRatio)
+        setShowStickyHeader(entry.intersectionRatio === 0)
       },
-      { threshold: THRESHOLD_STEPS, rootMargin: '-1px 0px 0px 0px' }
+      { threshold: [0, 1], rootMargin: '-1px 0px 0px 0px' }
     )
 
     observer.observe(el)
@@ -640,33 +648,14 @@ export default function ConditionsScreen() {
   const specialtyName      = activeSpecialtyObj?.name ?? ''
   const totalCount         = conditions.length
 
-  // ── Scroll-linked animation values — Premium polish pass ────────────────────
-  // All derived from the single logoVisibility signal (see IntersectionObserver
-  // above), not from independent scroll math, per spec.
-  //
-  // brandRowOpacity: fades the BrandRow (logo + tagline) itself as it leaves
-  // view — not the whole hero panel. The search bar and specialty selector
-  // stay fully opaque and usable throughout the scroll; only the "large
-  // title" portion softens away, matching the iOS large-title-collapse
-  // pattern this spec is going for. (Assumption: spec says "hero gradually
-  // fades" — read as the logo/tagline specifically, since fading the entire
-  // hero would visually hide the still-on-screen, still-functional search
-  // bar and selector mid-scroll. Flag if the full-hero-panel reading was
-  // intended instead.)
-  //
-  // panelLiftExtra: additional overlap (px) the content panel gains as it
-  // glides upward during the transition, on top of its resting --radius-xl
-  // overlap — 0 at rest (logoVisibility 1), up to 12px more by full attach
-  // (logoVisibility 0), so the glide reads as continuous motion rather than
-  // a snap once the sticky header appears.
-  //
-  // panelShadowOpacity: interpolates the panel's ambient shadow from the
-  // "floating" intensity (~4%, matches --shadow-ambient-panel-full) down to
-  // the "attached" intensity (~2%, matches --shadow-ambient-panel-attached)
-  // as the same signal moves from 1 to 0.
-  const brandRowOpacity    = logoVisibility
-  const panelLiftExtra     = (1 - logoVisibility) * 12
-  const panelShadowOpacity = 0.04 - (1 - logoVisibility) * 0.02
+  // Bugfix pass: the continuously-interpolated brandRowOpacity/
+  // panelLiftExtra/panelShadowOpacity values (derived from logoVisibility,
+  // recalculated on every ~5% IntersectionObserver step) are removed
+  // entirely. BrandRow visibility is now a hard toggle on showStickyHeader
+  // (see BrandRow render below) and the content panel's lift/shadow are
+  // two fixed states switched by showStickyHeader and animated with a real
+  // CSS transition (see content panel style below) — neither is scroll- or
+  // intersection-ratio-linked anymore.
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -842,12 +831,16 @@ export default function ConditionsScreen() {
         paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
       }}>
 
-        {/* 1. Brand row + tagline + dark mode toggle — opacity fades to 0 as
-            it scrolls out of view, driven by the same logoVisibility signal
-            that triggers the sticky header (see brandRowOpacity comment
-            above). transition smooths the 21 discrete IntersectionObserver
-            steps into what reads as continuous motion. */}
-        <div style={{ opacity: brandRowOpacity, transition: 'opacity 0.1s linear' }}>
+        {/* 1. Brand row + tagline + dark mode toggle — bugfix pass: reverted
+            from a continuous opacity fade (tied to the 21-step
+            intersectionRatio, which triggered a re-render on every ~5%
+            scroll step) to a hard, instant toggle: opacity flips straight
+            between 1 and 0 with no transition property, so there's no
+            in-between frame. BrandRow itself stays mounted at all times —
+            it must, since brandRowRef is the exact node the
+            IntersectionObserver above watches; unmounting it would break
+            re-entry detection when the user scrolls back up. */}
+        <div style={{ opacity: showStickyHeader ? 0 : 1 }}>
           <BrandRow
             isSearching={isSearching}
             isDark={isDark}
@@ -905,22 +898,31 @@ export default function ConditionsScreen() {
         backgroundColor: 'var(--color-bg)',
         borderTopLeftRadius:  'var(--radius-xl)',
         borderTopRightRadius: 'var(--radius-xl)',
-        // Base --radius-xl overlap at rest, plus up to 12px more as the
-        // panel glides upward during the scroll transition (panelLiftExtra),
-        // continuously driven by logoVisibility — not a separate animation.
-        marginTop:       `calc((var(--radius-xl) + ${panelLiftExtra}px) * -1)`,
+        // Base --radius-xl overlap — fixed at rest, no longer a scroll-linked
+        // calc(). The panel stays completely still during normal scrolling;
+        // see transform below for the one glide it makes.
+        marginTop:       'calc(var(--radius-xl) * -1)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
         paddingTop:      'var(--space-4)',
-        // Large diffused ambient shadow (Premium polish pass) — interpolates
-        // between the floating (~4%) and attached (~2%) intensities via
-        // panelShadowOpacity, matching --shadow-ambient-panel-full/-attached
-        // in globals.css. Computed inline (rather than switching between the
-        // two fixed tokens) so the transition is continuous, not a hard swap.
-        boxShadow:       `0 2px 28px rgba(15, 23, 42, ${panelShadowOpacity})`,
-        transition:      'margin-top 0.1s linear, box-shadow 0.1s linear',
+        // Bugfix pass: panelLiftExtra/panelShadowOpacity (continuously
+        // recalculated on every IntersectionObserver step) are gone. The
+        // panel now has exactly two states, switched by the same
+        // showStickyHeader boolean that drives the sticky header and
+        // BrandRow above — a single coordinated transition, not three
+        // separately-timed ones. transform does the upward glide (GPU-
+        // friendly, unlike animating margin-top); boxShadow switches
+        // between the two fixed ambient-shadow tokens already defined in
+        // globals.css (--shadow-ambient-panel-full / -attached) instead of
+        // an inline-computed rgba. Standard ease-out curve, ~250ms, no
+        // spring/overshoot, per spec.
+        transform:       showStickyHeader ? 'translateY(-12px)' : 'translateY(0)',
+        boxShadow:       showStickyHeader
+          ? 'var(--shadow-ambient-panel-attached)'
+          : 'var(--shadow-ambient-panel-full)',
+        transition:      'transform 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms ease-out',
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
@@ -961,4 +963,3 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
-

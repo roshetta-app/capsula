@@ -85,18 +85,24 @@
 
   /* Component-specific borders/backgrounds — Premium polish pass. Distinct
      from the shared --color-border/--color-bg tokens above; these are
-     deliberate one-off values for specific elevated surfaces (search field,
-     active specialty selector), matching the existing pattern of dedicated
-     tokens like --color-favourite / --color-note-bg for single-purpose colors. */
+     deliberate one-off values for specific elevated surfaces (search field),
+     matching the existing pattern of dedicated tokens like --color-favourite
+     / --color-note-bg for single-purpose colors.
+     --color-selector-active-bg/-border removed here (bugfix pass) — the
+     active specialty selector now computes its background/border from
+     resolveToken(tokenKey, isDark) per specialty again (see
+     SpecialtySelector.jsx), so these fixed one-color tokens are unused. */
   --color-search-border:         #E8EBF0;
-  --color-selector-active-bg:    #FFF7FA;
-  --color-selector-active-border: #F3DFE8;
 
-  /* Hero panel — palette update: hero/page background now share the same
-     flat --color-bg value (#F7F8FA) intentionally. Separation from the
-     white content panel below is carried entirely by the curve radius
-     (--radius-xl) and lift shadow, not by a color difference. */
-  --color-hero-bg:          #F7F8FA;
+  /* Hero panel — bugfix pass: restored a distinct near-white tint instead
+     of sharing --color-bg exactly. With both flat at #F7F8FA, the content
+     panel's curve/overlap had no color contrast to help it read as a
+     separate surface — only shadow was doing that work. #FCFAF7 sits
+     between --color-surface (#FFFFFF) and --color-bg (#F7F8FA), leaning
+     warm to match this palette's other neutrals (--color-note-bg,
+     --font-body) rather than the cooler-toned option tried and rejected
+     during the original Phase 16/17 exploration. */
+  --color-hero-bg:          #FCFAF7;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
