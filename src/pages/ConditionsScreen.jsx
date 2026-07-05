@@ -791,7 +791,7 @@ export default function ConditionsScreen() {
     setActiveSpecialty,
     results,
     resultCount,
-  } = useConditionSearch(conditions, sortMode, recentOrder)
+  } = useConditionSearch(conditions, sortMode, recentOrder, 'capsula_conditions_specialty')
 
   const isSearching        = query.length >= 1
   const activeSpecialtyObj = activeSpecialty !== 'all'
@@ -1091,3 +1091,4 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+

@@ -29,9 +29,21 @@ function applySortMode(items, mode, recentIds) {
   return [...items].sort((a, b) => a.name.localeCompare(b.name))
 }
 
-export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedIds = []) {
+// Reads a previously-picked specialty for this browser session only (mirrors
+// the entrance-animation flag pattern in ConditionsScreen — sessionStorage,
+// not localStorage, so it clears on a fresh app open, not just a re-visit).
+function readStoredSpecialty(storageKey) {
+  if (!storageKey) return 'all'
+  try {
+    return sessionStorage.getItem(storageKey) ?? 'all'
+  } catch {
+    return 'all'
+  }
+}
+
+export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedIds = [], storageKey = null) {
   const [query,           setQuery]           = useState('')
-  const [activeSpecialty, setActiveSpecialty] = useState('all')
+  const [activeSpecialty, setActiveSpecialty] = useState(() => readStoredSpecialty(storageKey))
   const [results,         setResults]         = useState(conditions)
   const [suggestions,     setSuggestions]     = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -83,6 +95,18 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     return () => clearTimeout(timer)
   }, [query, activeSpecialty, sortMode, runSearch])
 
+  // Remember the chosen specialty for the rest of this browser session so it
+  // survives navigating away and back (e.g. opening a condition card and
+  // returning). Session-only by design — a fresh app open starts at 'all'.
+  useEffect(() => {
+    if (!storageKey) return
+    try {
+      sessionStorage.setItem(storageKey, activeSpecialty)
+    } catch {
+      // Storage unavailable (private browsing, quota) — filter just won't persist.
+    }
+  }, [storageKey, activeSpecialty])
+
   function clearSuggestions() {
     setShowSuggestions(false)
   }
@@ -99,3 +123,4 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     clearSuggestions,
   }
 }
+

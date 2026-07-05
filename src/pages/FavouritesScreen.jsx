@@ -1658,7 +1658,7 @@ export default function FavouritesScreen() {
     activeSpecialty,
     setActiveSpecialty,
     results: conditionResults,
-  } = useConditionSearch(savedConditions, sortMode, recentlyAddedOrder)
+  } = useConditionSearch(savedConditions, sortMode, recentlyAddedOrder, 'capsula_favourites_specialty')
 
   const isSearchingConditions = conditionQuery.trim().length > 0
   const conditionSearchEmpty  = isSearchingConditions && conditionResults.length === 0
@@ -2160,3 +2160,4 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
+
