@@ -206,11 +206,14 @@
    removed by useDarkMode.js around the .dark toggle only — never present
    on first paint, so nothing fades in from nothing on load. */
 html.theme-transitioning,
-html.theme-transitioning * {
+html.theme-transitioning :where(
+  body, div, section, article, header, footer, nav, aside, main,
+  button, a, li, ul, ol, table, thead, tbody, tr, td, th,
+  input, textarea, select, label, form, p, span, h1, h2, h3, h4, h5, h6
+) {
   transition: background-color var(--motion-screen) var(--ease-reveal),
               color var(--motion-screen) var(--ease-reveal),
-              border-color var(--motion-screen) var(--ease-reveal),
-              box-shadow var(--motion-screen) var(--ease-reveal) !important;
+              border-color var(--motion-screen) var(--ease-reveal) !important;
 }
 
 /* ─── Dark mode overrides — activated by .dark on <html> ────────────────────── */
