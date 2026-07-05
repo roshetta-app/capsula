@@ -92,11 +92,11 @@
   --color-selector-active-bg:    #FFF7FA;
   --color-selector-active-border: #F3DFE8;
 
-  /* Hero panel — palette update: hero/page background now share the same
-     flat --color-bg value (#F7F8FA) intentionally. Separation from the
-     white content panel below is carried entirely by the curve radius
-     (--radius-xl) and lift shadow, not by a color difference. */
-  --color-hero-bg:          #F7F8FA;
+  /* Base layer — distinct, static color from the panel's --color-bg
+     (#F7F8FA). Phase 22: the two layers are a flat, non-animated two-tone
+     look now, so they need a real color difference (not just curve +
+     shadow) to read as separate. */
+  --color-hero-bg:          #FAFAFA;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
