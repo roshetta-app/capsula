@@ -69,6 +69,30 @@
  *            background/border/box-shadow swap already faded via its
  *            existing 0.12s ease transition — left untouched, it already
  *            met the spec.
+ * Phase 9 (conditions-screen-polish-master-plan) — Idle-state
+ *            differentiation from the search bar above it, which had
+ *            drifted to look nearly identical (same card size, same bg/
+ *            border, same 14px/500/secondary text). Card size, background,
+ *            and border are unchanged; three idle-only cues were added
+ *            instead. Active state is untouched by all three:
+ *              1. Icon wrapper grew 16x16 → 26x26 and gained a soft
+ *                 var(--color-bg) circular badge behind the idle ListFilter
+ *                 glyph only (backgroundColor is 'transparent' when active,
+ *                 so the active specialty icon still sits bare as Phase 12
+ *                 established). The larger wrapper doesn't change the
+ *                 rendered icon size (still 16px, centered).
+ *              2. Idle 'All Specialties' text lightened from 500/
+ *                 text-secondary to 400/text-tertiary, so it visually
+ *                 recedes next to the search placeholder's 500/
+ *                 text-secondary weight instead of matching it stroke-
+ *                 for-stroke. Active name (600, accent color) unchanged.
+ *              3. Press feedback extended from a background-color swap
+ *                 alone to a subtle scale(0.985) on the whole card,
+ *                 reusing the existing `pressed` state and the shared
+ *                 --motion-fast / --ease-settle tokens already used for
+ *                 the icon crossfade above — gives opening the specialty
+ *                 sheet a tactile tap response instead of just a color
+ *                 change.
  *
  * Props:
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
@@ -130,7 +154,13 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
         borderRadius:    '16px',
         overflow:        'hidden',
         boxShadow:       containerShadow,
-        transition:      'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease',
+        // Phase 9 (conditions-screen-polish-master-plan): subtle press-scale
+        // added alongside the existing background swap, so tapping to open
+        // the specialty sheet gives a tactile response, not just a color
+        // change. Reuses the same `pressed` state and motion tokens as the
+        // icon crossfade below.
+        transform:       pressed ? 'scale(0.985)' : 'scale(1)',
+        transition:      'background-color 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, transform var(--motion-fast) var(--ease-settle)',
       }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
@@ -176,23 +206,30 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
           minWidth:   0,
         }}>
           {/* Icon — ListFilter when idle (consistent with sticky header pill),
-              specialty icon when active. No container box or halo.
-              Both icons are stacked in a fixed-size wrapper and cross-fade
-              via opacity instead of hard-swapping on isActive change —
-              conditions-screen-polish-master-plan Phase 8. Color stays on
-              this outer wrapper (inherited via currentColor) so the
-              existing per-specialty color transition keeps working
-              unchanged. */}
+              specialty icon when active. Both icons are stacked in a
+              fixed-size wrapper and cross-fade via opacity instead of
+              hard-swapping on isActive change — conditions-screen-polish-
+              master-plan Phase 8. Color stays on this outer wrapper
+              (inherited via currentColor) so the existing per-specialty
+              color transition keeps working unchanged.
+              Phase 9 (conditions-screen-polish-master-plan): wrapper grew
+              16x16 → 26x26 and gained a soft circular badge behind the
+              icon, idle only — backgroundColor is 'transparent' when
+              active, so the active specialty icon still sits bare exactly
+              as Phase 12 set it. The icons themselves stay 16px, still
+              centered, so neither state's rendered icon size changes. */}
           <span style={{
             position:        'relative',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
-            width:           16,
-            height:          16,
+            width:           26,
+            height:          26,
+            borderRadius:    'var(--radius-full)',
+            backgroundColor: isActive ? 'transparent' : 'var(--color-bg)',
             color:           iconColor,
-            transition:      'color 0.2s ease',
+            transition:      'color 0.2s ease, background-color 0.2s ease',
           }}>
             <span style={{
               position:   'absolute',
@@ -225,11 +262,13 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             </span>
           </span>
 
-          {/* Specialty name — the dominant element on this control.
-              Semibold, and tinted with the specialty's accent color
-              (same as the icon) when active, in a darker shade than
-              the card's background tint so it stays readable. Falls
-              back to neutral primary text color when idle. */}
+          {/* Specialty name — the dominant element on this control when
+              active (semibold, tinted with the specialty's accent color,
+              unchanged since Phase 12/17). Idle state lightened in Phase 9
+              (conditions-screen-polish-master-plan) from 500/text-secondary
+              to 400/text-tertiary so it visually recedes next to the
+              search placeholder above, which sits at 500/text-secondary —
+              the two no longer read as the same weight of text. */}
           <span style={{
             flex:         1,
             minWidth:     0,
@@ -237,9 +276,9 @@ export default function SpecialtySelector({ activeSpecialtyObj, onOpen, onClear,
             textOverflow: 'ellipsis',
             whiteSpace:   'nowrap',
             fontSize:     14,
-            fontWeight:   isActive ? 600 : 500,
+            fontWeight:   isActive ? 600 : 400,
             fontFamily:   'var(--font-body)',
-            color:        isActive ? iconColor : 'var(--color-text-secondary)',
+            color:        isActive ? iconColor : 'var(--color-text-tertiary)',
             letterSpacing: '-0.2px',
             transition:   'color 0.2s ease',
           }}>
