@@ -425,6 +425,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 
 function StickyLogoHeader({
   visible,
+  readyToAnimate,
   isSearching,
   activeSpecialtyObj,
   onClearSpecialty,
@@ -490,7 +491,12 @@ function StickyLogoHeader({
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
+        // Suppressed until readyToAnimate flips true (two frames after
+        // mount) — see the transitionsReady note in ConditionsScreen. Any
+        // correction to `visible` that happens in that brief window (e.g.
+        // the browser settling scroll position on return navigation) snaps
+        // into place instead of replaying the slide.
+        transition:              readyToAnimate ? 'transform 0.25s ease' : 'none',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -700,6 +706,14 @@ export default function ConditionsScreen() {
   // layer and panel are a static two-tone look now, not a scroll-driven
   // animation, so a single fire-once boolean is all the header needs.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
+  // Guards the sticky header's slide transition for a brief window right
+  // after mount. Whatever exactly settles the scroll position on return
+  // navigation (browser back/forward restoration, layout settling, etc.),
+  // any correction to showStickyHeader during this window should snap
+  // into place, not replay the slide-down animation. Two animation frames
+  // is the standard "let layout/paint settle" grace period — real,
+  // user-driven scrolling only ever happens after that.
+  const [transitionsReady, setTransitionsReady] = useState(false)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
@@ -768,6 +782,17 @@ export default function ConditionsScreen() {
     const el = brandRowRef.current
     if (!el) return
     setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
+  }, [])
+
+  useEffect(() => {
+    let raf2
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setTransitionsReady(true))
+    })
+    return () => {
+      cancelAnimationFrame(raf1)
+      if (raf2) cancelAnimationFrame(raf2)
+    }
   }, [])
 
   useEffect(() => {
@@ -973,6 +998,7 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
+        readyToAnimate={transitionsReady}
         isSearching={isSearching}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}

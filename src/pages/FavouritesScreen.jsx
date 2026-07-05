@@ -1288,7 +1288,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
 // fav-sticky-search-height scoped classes (see FavouritesScreen's local
 // <style> block) so the input's own height matches the expanded button.
 
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function StickyFavouritesHeader({ visible, readyToAnimate, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
@@ -1304,7 +1304,9 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
+        // Suppressed until readyToAnimate flips true (two frames after
+        // mount) — same safety net as ConditionsScreen's StickyLogoHeader.
+        transition:              readyToAnimate ? 'transform 0.25s ease' : 'none',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -1848,6 +1850,22 @@ export default function FavouritesScreen() {
     setShowStickyHeader(el.getBoundingClientRect().bottom <= 0)
   }, [])
 
+  // Guards the sticky header's slide transition for a brief window right
+  // after mount — same safety net as ConditionsScreen's StickyLogoHeader.
+  // Any correction to showStickyHeader during this window snaps into
+  // place instead of replaying the slide-down animation.
+  const [transitionsReady, setTransitionsReady] = useState(false)
+  useEffect(() => {
+    let raf2
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => setTransitionsReady(true))
+    })
+    return () => {
+      cancelAnimationFrame(raf1)
+      if (raf2) cancelAnimationFrame(raf2)
+    }
+  }, [])
+
   useEffect(() => {
     const el = heroRef.current
     if (!el) return
@@ -1869,6 +1887,7 @@ export default function FavouritesScreen() {
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
         visible={showStickyHeader}
+        readyToAnimate={transitionsReady}
         activeTab={activeTab}
         onSelectTab={switchTab}
         showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
