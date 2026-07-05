@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import { useRecentlyViewedContext } from '../context/RecentlyViewedContext'
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
@@ -52,7 +52,7 @@ export default function ConditionDetailScreen() {
   const navigate    = useNavigate()
   const { conditions, loading } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
-  const { addRecentlyViewed } = useRecentlyViewedContext()
+  const { addRecentlyViewed } = useRecentlyViewed()
 
   const [activeTab, setActiveTab] = useState(0)
   const touchStartX  = useRef(null)

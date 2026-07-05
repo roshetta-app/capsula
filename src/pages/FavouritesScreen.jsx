@@ -133,18 +133,12 @@
  *    ConditionDetailScreen's exact touch-threshold + direction-aware CSS
  *    keyframe slide mechanism (touchStartX/Y refs, tabDirection ref,
  *    hasSwitchedRef so mount never animates, switchTab() computing direction
- *    from tab order). Deliberately NOT ported at the time: ConditionDetailScreen's
- *    internal fixed-height scroll box + per-tab scrollTop memory — that was
+ *    from tab order). Deliberately NOT ported: ConditionDetailScreen's
+ *    internal fixed-height scroll box + per-tab scrollTop memory — that's
  *    tied to that screen's whole-page layout architecture, and adopting it
- *    here would have meant redesigning Favourites' overall scroll structure,
- *    which this task explicitly ruled out. Favourites kept ordinary page
- *    scroll; only the gesture + tab-switch + slide-transition parts were reused.
- *    SUPERSEDED by sticky-header-permanent-mount-fix, Phase 6: that old
- *    constraint no longer holds — Favourites now needs the same internal
- *    scroll box as Conditions/ConditionDetail, since keeping all three tabs
- *    permanently mounted requires each to own its own scroll position
- *    (window.scrollY is global to the page, not per-screen). See the
- *    rootRef/scrollBoxRef setup in the component body below.
+ *    here would mean redesigning Favourites' overall scroll structure, which
+ *    this task explicitly rules out. Favourites keeps ordinary page scroll;
+ *    only the gesture + tab-switch + slide-transition parts are reused.
  *  - Tab content array hoisted to a module-level constant (FAVOURITES_TABS)
  *    since it no longer carries per-render count data — renderTabs and
  *    StickyFavouritesHeader no longer take a `tabs` prop.
@@ -450,9 +444,10 @@
  *    UI built from scratch.
  */
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
+import Layout from '../components/layout'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
@@ -470,7 +465,6 @@ import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
-import { useStickyHeaderScroll } from '../hooks/useStickyHeaderScroll'
 
 // Favourites' own identity color for the heart badge/star icon. Previously
 // aliased var(--color-danger) so "favourited = red heart" shared the exact
@@ -487,20 +481,6 @@ import { useStickyHeaderScroll } from '../hooks/useStickyHeaderScroll'
 // buttons below still reference var(--color-danger) directly and are
 // unaffected.
 const FAV_ACCENT = 'var(--color-favourite)'
-
-// Root of the self-contained scroll box — sticky-header-permanent-mount-fix,
-// Phase 6. height is set dynamically per-render (see availableHeight in the
-// component) — overflow: hidden means this root itself never scrolls, so
-// window.scrollY can never move on this screen. Matches ConditionsScreen's/
-// ConditionDetailScreen's rootStyle exactly.
-const rootStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-  backgroundColor: 'var(--color-bg)',
-  fontFamily: 'var(--font-body)',
-  color: 'var(--color-text-primary)',
-}
 
 // Row remove/restore animation durations — must match the @keyframes
 // durations declared in the local <style> block below exactly, since the
@@ -1308,7 +1288,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
 // fav-sticky-search-height scoped classes (see FavouritesScreen's local
 // <style> block) so the input's own height matches the expanded button.
 
-function StickyFavouritesHeader({ visible, readyToAnimate, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
@@ -1324,9 +1304,7 @@ function StickyFavouritesHeader({ visible, readyToAnimate, activeTab, onSelectTa
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        // Suppressed until readyToAnimate flips true (two frames after
-        // mount) — same safety net as ConditionsScreen's StickyLogoHeader.
-        transition:              readyToAnimate ? 'transform 0.25s ease' : 'none',
+        transition:              'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -1503,40 +1481,10 @@ export default function FavouritesScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('conditions')
 
-  // ── Self-contained scroll box — sticky-header-permanent-mount-fix, Phase 6.
-  // Same technique ConditionsScreen/ConditionDetailScreen use: the root
-  // measures its own distance from the top of the viewport and gets an
-  // explicit height, and only the box inside it (scrollBoxRef) actually
-  // scrolls. Lets this screen stay permanently mounted and be shown/hidden
-  // by router.jsx without window.scrollY leaking between screens.
-  const rootRef = useRef(null)
-  const [availableHeight, setAvailableHeight] = useState(null)
-  const scrollBoxRef = useRef(null)
-
-  useLayoutEffect(() => {
-    function measure() {
-      if (!rootRef.current) return
-      const vv = window.visualViewport
-      const viewportHeight = vv?.height ?? window.innerHeight
-      const top = rootRef.current.getBoundingClientRect().top
-      setAvailableHeight(Math.max(viewportHeight - top, 0))
-    }
-
-    measure()
-    const vv = window.visualViewport
-    window.addEventListener('resize', measure)
-    vv?.addEventListener('resize', measure)
-    return () => {
-      window.removeEventListener('resize', measure)
-      vv?.removeEventListener('resize', measure)
-    }
-  }, [])
-
   // Back-to-top — shared with ConditionsScreen via useBackToTop/BackToTopButton
   // (see src/hooks/useBackToTop.js), same 400px threshold and easeOutCubic
-  // smooth-scroll behavior, instead of duplicating that logic here. Now
-  // targets this screen's own scroll box instead of window (Phase 6).
-  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop(scrollBoxRef)
+  // smooth-scroll behavior, instead of duplicating that logic here.
+  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
 
   // Snackbar state — message is dynamic (bulk-remove needs a count-aware
   // string; single-item remove keeps its original fixed message). Action
@@ -1886,30 +1834,31 @@ export default function FavouritesScreen() {
   }
 
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
-  // Visibility restored/remembered per-screen (not shared with
-  // ConditionsScreen's own sticky header) — see useStickyHeaderScroll.
-  const {
-    elementRef: heroRef,
-    visible: showStickyHeader,
-    readyToAnimate: transitionsReady,
-  } = useStickyHeaderScroll()
+  // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
+  const [showStickyHeader, setShowStickyHeader] = useState(false)
+  const heroRef = useRef(null)
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting)
+      },
+      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   return (
-    <div
-      ref={rootRef}
-      style={{
-        ...rootStyle,
-        height: availableHeight != null ? availableHeight : '100svh',
-      }}
-    >
+    <Layout>
 
-      {/* Sliding sticky header — position: fixed, so it sits outside the
-          scroll box exactly like ConditionsScreen's StickyLogoHeader does —
-          its own positioning doesn't depend on being physically inside the
-          scrolling content. Appears once FavouritesHero scrolls out of view. */}
+      {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
         visible={showStickyHeader}
-        readyToAnimate={transitionsReady}
         activeTab={activeTab}
         onSelectTab={switchTab}
         showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
@@ -1981,22 +1930,7 @@ export default function FavouritesScreen() {
         }
       `}</style>
 
-      {/* The box that actually scrolls for this screen — same technique as
-          ConditionsScreen's/ConditionDetailScreen's scrollBoxRef. */}
-      <div
-        ref={scrollBoxRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-      {/* Same maxWidth/padding Layout's <main> used to provide — this screen
-          no longer wraps in Layout, so it reproduces that spacing itself.
-          Bottom padding reserves BottomNav clearance the same way Layout
-          always did for this route. */}
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 var(--space-6) calc(var(--space-12) + 60px)' }}>
+      <div>
 
         <FavouritesHero
           heroRef={heroRef}
@@ -2157,11 +2091,8 @@ export default function FavouritesScreen() {
         </div>
 
       </div>
-      </div>
-      {/* ↑ closes: maxWidth content wrapper, then the scroll box itself */}
 
-      {/* Back to top — position: fixed, so it can sit outside the scroll box
-          the same way BackToTopButton always has. */}
+      {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {isManaging && (
@@ -2226,6 +2157,7 @@ export default function FavouritesScreen() {
         actionLabel={snackAction?.label}
         onAction={snackAction ? handleSnackAction : undefined}
       />
-    </div>
+    </Layout>
   )
 }
+

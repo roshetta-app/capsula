@@ -7,18 +7,11 @@
  *  - Inline SearchBar → shared src/components/ui/SearchBar
  *  - AutocompleteDropdown added below search bar in results view
  *  - Autocomplete: tap suggestion → navigate directly to /drugs/:slug
- *
- * sticky-header-permanent-mount-fix, Phase 5 — stopped wrapping in Layout.
- * Both return branches (search-results view, category-list view) now use
- * the same self-contained scroll box ConditionsScreen/ConditionDetailScreen
- * use: the root measures its own distance from the top of the viewport and
- * gets an explicit height, and only the box inside it (scrollBoxRef)
- * actually scrolls. No scroll-position memory, sticky header, or
- * back-to-top logic here — this screen never had any.
  */
 
-import { useState, useEffect, useRef, useLayoutEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import Layout from '../components/layout'
 import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
 import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
@@ -31,19 +24,6 @@ import { ROUTES } from '../router'
 
 const RECENT_KEY = 'capsula_recent_drugs'
 const MAX_RECENT = 5
-
-// Root of the self-contained scroll box. height is set dynamically per-render
-// (see availableHeight in the component) — overflow: hidden means this root
-// itself never scrolls, so window.scrollY can never move on this screen.
-// Matches ConditionsScreen's/ConditionDetailScreen's rootStyle exactly.
-const rootStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  overflow: 'hidden',
-  backgroundColor: 'var(--color-bg)',
-  fontFamily: 'var(--font-body)',
-  color: 'var(--color-text-primary)',
-}
 
 // ─── Recently viewed drugs (localStorage) ────────────────────────────────────
 
@@ -114,35 +94,6 @@ export default function DrugsScreen() {
     setRecentDrugs(readRecentDrugs())
   }, [])
 
-  // ── Self-contained scroll box — sticky-header-permanent-mount-fix ──────────
-  // Same technique ConditionsScreen/ConditionDetailScreen use: the root
-  // measures its own distance from the top of the viewport and gets an
-  // explicit height, and only the box inside it (scrollBoxRef) actually
-  // scrolls. Lets this screen stay permanently mounted and be shown/hidden
-  // by router.jsx without window.scrollY leaking between screens.
-  const rootRef = useRef(null)
-  const [availableHeight, setAvailableHeight] = useState(null)
-  const scrollBoxRef = useRef(null)
-
-  useLayoutEffect(() => {
-    function measure() {
-      if (!rootRef.current) return
-      const vv = window.visualViewport
-      const viewportHeight = vv?.height ?? window.innerHeight
-      const top = rootRef.current.getBoundingClientRect().top
-      setAvailableHeight(Math.max(viewportHeight - top, 0))
-    }
-
-    measure()
-    const vv = window.visualViewport
-    window.addEventListener('resize', measure)
-    vv?.addEventListener('resize', measure)
-    return () => {
-      window.removeEventListener('resize', measure)
-      vv?.removeEventListener('resize', measure)
-    }
-  }, [])
-
   function handleDrugTap(drug) {
     addRecentDrug(drug)
     setRecentDrugs(readRecentDrugs())
@@ -175,93 +126,69 @@ export default function DrugsScreen() {
       .sort((a, b) => a.genericName.localeCompare(b.genericName))
 
     return (
-      <div
-        ref={rootRef}
-        style={{
-          ...rootStyle,
-          height: availableHeight != null ? availableHeight : '100svh',
-        }}
-      >
-        {/* The box that actually scrolls for this screen — same technique
-            as ConditionsScreen's/ConditionDetailScreen's scrollBoxRef. */}
-        <div
-          ref={scrollBoxRef}
-          style={{
-            flex: 1,
-            minHeight: 0,
-            overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch',
-          }}
-        >
-          {/* Same maxWidth/padding Layout's <main> used to provide — this
-              screen no longer wraps in Layout, so it reproduces that spacing
-              itself. Bottom padding reserves BottomNav clearance the same
-              way Layout always did for this route. */}
-          <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 var(--space-6) calc(var(--space-12) + 60px)' }}>
-            <div style={{ paddingTop: 'var(--space-5)' }}>
-            {/* Search bar + autocomplete */}
-            <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-              <SearchBar
-                value={query}
-                onChange={(val) => {
-                  setQuery(val)
-                  if (!val) clearSuggestions()
-                }}
-                placeholder="Search drugs…"
-                onFilter={() => setFilterOpen(true)}
-                hasActiveFilters={hasFilters}
-              />
-              {showSuggestions && (
-                <AutocompleteDropdown
-                  suggestions={suggestions}
-                  onSelect={handleSuggestionSelect}
-                  onDismiss={clearSuggestions}
-                />
-              )}
-            </div>
+      <Layout>
+        <div style={{ paddingTop: 'var(--space-5)' }}>
+        {/* Search bar + autocomplete */}
+        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+          <SearchBar
+            value={query}
+            onChange={(val) => {
+              setQuery(val)
+              if (!val) clearSuggestions()
+            }}
+            placeholder="Search drugs…"
+            onFilter={() => setFilterOpen(true)}
+            hasActiveFilters={hasFilters}
+          />
+          {showSuggestions && (
+            <AutocompleteDropdown
+              suggestions={suggestions}
+              onSelect={handleSuggestionSelect}
+              onDismiss={clearSuggestions}
+            />
+          )}
+        </div>
 
-              {/* Back to categories button (only when in a category, not searching) */}
-              {!hasQuery && activeCategory !== null && (
-                <button
-                  onClick={() => setActiveCategory(null)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6,
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                    fontFamily: 'var(--font-body)', padding: '4px 0',
-                    marginBottom: 'var(--space-3)',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6"/>
-                  </svg>
-                  {activeCategory === '__all'
-                    ? 'All Drugs'
-                    : (DRUG_CATEGORIES.find(c => c.value === activeCategory)?.label ?? activeCategory)
-                  }
-                </button>
-              )}
+          {/* Back to categories button (only when in a category, not searching) */}
+          {!hasQuery && activeCategory !== null && (
+            <button
+              onClick={() => setActiveCategory(null)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                fontFamily: 'var(--font-body)', padding: '4px 0',
+                marginBottom: 'var(--space-3)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              {activeCategory === '__all'
+                ? 'All Drugs'
+                : (DRUG_CATEGORIES.find(c => c.value === activeCategory)?.label ?? activeCategory)
+              }
+            </button>
+          )}
 
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
-                {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
-                {query && ` for "${query}"`}
-              </div>
-
-              {displayed.length === 0 ? (
-                <EmptyState query={query} />
-              ) : (
-                displayed.map(drug => (
-                  <DrugListRow
-                    key={drug.id}
-                    drug={drug}
-                    isInStock={stockMap[drug.id] ?? true}
-                    onTap={handleDrugTap}
-                  />
-                ))
-              )}
-            </div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
+            {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+            {query && ` for "${query}"`}
           </div>
+
+          {displayed.length === 0 ? (
+            <EmptyState query={query} />
+          ) : (
+            displayed.map(drug => (
+              <DrugListRow
+                key={drug.id}
+                drug={drug}
+                isInStock={stockMap[drug.id] ?? true}
+                onTap={handleDrugTap}
+              />
+            ))
+          )}
         </div>
 
         <DrugFilterPanel
@@ -269,7 +196,7 @@ export default function DrugsScreen() {
           onClose={() => setFilterOpen(false)}
           onApply={handleApplyFilters}
         />
-      </div>
+      </Layout>
     )
   }
 
@@ -282,123 +209,99 @@ export default function DrugsScreen() {
     .filter(c => c.count > 0)
 
   return (
-    <div
-      ref={rootRef}
-      style={{
-        ...rootStyle,
-        height: availableHeight != null ? availableHeight : '100svh',
-      }}
-    >
-      {/* The box that actually scrolls for this screen — same technique as
-          ConditionsScreen's/ConditionDetailScreen's scrollBoxRef. */}
-      <div
-        ref={scrollBoxRef}
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {/* Same maxWidth/padding Layout's <main> used to provide — this
-            screen no longer wraps in Layout, so it reproduces that spacing
-            itself. Bottom padding reserves BottomNav clearance the same way
-            Layout always did for this route. */}
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: '0 var(--space-6) calc(var(--space-12) + 60px)' }}>
-          <div style={{ paddingTop: 'var(--space-5)' }}>
-            <SearchBar
-              value={query}
-              onChange={(val) => {
-                setQuery(val)
-                if (!val) clearSuggestions()
-              }}
-              placeholder="Search drugs…"
-              onFilter={() => setFilterOpen(true)}
-              hasActiveFilters={hasFilters}
+    <Layout>
+      <div style={{ paddingTop: 'var(--space-5)' }}>
+        <SearchBar
+          value={query}
+          onChange={(val) => {
+            setQuery(val)
+            if (!val) clearSuggestions()
+          }}
+          placeholder="Search drugs…"
+          onFilter={() => setFilterOpen(true)}
+          hasActiveFilters={hasFilters}
+        />
+
+        {/* Recently viewed chips */}
+        {recentDrugs.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+            overflowX: 'auto', paddingBottom: 'var(--space-1)',
+            marginBottom: 'var(--space-3)',
+            scrollbarWidth: 'none', msOverflowStyle: 'none',
+          }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+              flexShrink: 0, paddingRight: 'var(--space-1)',
+            }}>
+              Recent
+            </span>
+            {recentDrugs.map(d => (
+              <button
+                key={d.id}
+                onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
+                style={{
+                  flexShrink: 0, padding: '5px 12px',
+                  borderRadius: 'var(--radius-full)',
+                  fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  border: '1.5px solid var(--color-border)',
+                  backgroundColor: 'var(--color-surface)',
+                  color: 'var(--color-text-secondary)',
+                  fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                {d.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Loading skeleton */}
+        {loading && drugs.length === 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} style={{
+                height: 64,
+                backgroundColor: 'var(--color-border)',
+                borderRadius: 'var(--radius-lg)',
+                animation: 'shimmer 1.4s ease-in-out infinite',
+              }} />
+            ))}
+          </div>
+        )}
+
+        {/* "All Drugs" row */}
+        {!loading && (
+          <>
+            <CategoryRow
+              label="All Drugs"
+              count={drugs.length}
+              icon="fa-pills"
+              color="#F3F4F6"
+              textColor="#374151"
+              onTap={() => setActiveCategory('__all')}
             />
 
-            {/* Recently viewed chips */}
-            {recentDrugs.length > 0 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-                overflowX: 'auto', paddingBottom: 'var(--space-1)',
-                marginBottom: 'var(--space-3)',
-                scrollbarWidth: 'none', msOverflowStyle: 'none',
-              }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-                  textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-                  flexShrink: 0, paddingRight: 'var(--space-1)',
-                }}>
-                  Recent
-                </span>
-                {recentDrugs.map(d => (
-                  <button
-                    key={d.id}
-                    onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
-                    style={{
-                      flexShrink: 0, padding: '5px 12px',
-                      borderRadius: 'var(--radius-full)',
-                      fontSize: 12, fontWeight: 500,
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                      border: '1.5px solid var(--color-border)',
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text-secondary)',
-                      fontFamily: 'var(--font-body)',
-                      WebkitTapHighlightColor: 'transparent', outline: 'none',
-                    }}
-                  >
-                    {d.name}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Loading skeleton */}
-            {loading && drugs.length === 0 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {[1, 2, 3, 4, 5].map(i => (
-                  <div key={i} style={{
-                    height: 64,
-                    backgroundColor: 'var(--color-border)',
-                    borderRadius: 'var(--radius-lg)',
-                    animation: 'shimmer 1.4s ease-in-out infinite',
-                  }} />
-                ))}
-              </div>
-            )}
-
-            {/* "All Drugs" row */}
-            {!loading && (
-              <>
+            {/* Category rows */}
+            {categoriesWithCounts.map(cat => {
+              const meta = getCategoryMeta(cat.value)
+              return (
                 <CategoryRow
-                  label="All Drugs"
-                  count={drugs.length}
-                  icon="fa-pills"
-                  color="#F3F4F6"
-                  textColor="#374151"
-                  onTap={() => setActiveCategory('__all')}
+                  key={cat.value}
+                  label={cat.label}
+                  count={cat.count}
+                  icon={meta.icon}
+                  color={meta.color}
+                  textColor={meta.textColor}
+                  onTap={() => setActiveCategory(cat.value)}
                 />
-
-                {/* Category rows */}
-                {categoriesWithCounts.map(cat => {
-                  const meta = getCategoryMeta(cat.value)
-                  return (
-                    <CategoryRow
-                      key={cat.value}
-                      label={cat.label}
-                      count={cat.count}
-                      icon={meta.icon}
-                      color={meta.color}
-                      textColor={meta.textColor}
-                      onTap={() => setActiveCategory(cat.value)}
-                    />
-                  )
-                })}
-              </>
-            )}
-          </div>
-        </div>
+              )
+            })}
+          </>
+        )}
       </div>
 
       <DrugFilterPanel
@@ -406,7 +309,7 @@ export default function DrugsScreen() {
         onClose={() => setFilterOpen(false)}
         onApply={handleApplyFilters}
       />
-    </div>
+    </Layout>
   )
 }
 
@@ -526,3 +429,6 @@ function EmptyState({ query }) {
     </div>
   )
 }
+
+
+

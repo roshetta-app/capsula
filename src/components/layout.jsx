@@ -1,40 +1,55 @@
 import { useLocation } from 'react-router-dom'
+import BottomNav from './BottomNav'
+import OfflineBanner from './ui/OfflineBanner'
+import NotificationsBanner from './ui/NotificationsBanner'
+
+/**
+ * Routes that render their own top section and suppress the shared header.
+ * '/favourites' added — FavouritesScreen now renders its own hero (logo +
+ * heading) and sliding sticky header, same reason '/' and '/conditions'
+ * are suppressed here.
+ */
+const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites']
 
 /**
  * Route prefixes that render their own top section and suppress the shared
  * header. Condition detail screens (/conditions/:slug) render their own
  * DetailHeader (back/share/favourite + tab strip) — without this, Layout's
  * shared header rendered on top of it as a second header bar.
- *
- * Note: the Conditions/Drugs/Favourites tabs used to be suppressed here too
- * via a pathname array, but router.jsx now renders those three permanently
- * mounted side-by-side inside one shared Layout instance, so pathname alone
- * can't tell Layout which tab is "active" for header purposes. router.jsx
- * passes that down explicitly via the `suppressHeader` prop instead. Detail
- * routes still mount/unmount normally through <Routes> (each wrapping its
- * own Layout instance), so pathname-based suppression still works fine for
- * them and is kept as-is.
  */
 const HEADER_SUPPRESSED_PREFIXES = ['/conditions/']
 
-export default function Layout({ children, suppressHeader: suppressHeaderProp = false }) {
+/**
+ * Route prefixes whose screens size and scroll themselves internally.
+ * ConditionDetailScreen measures its own height to exactly fill the
+ * viewport and already reserves its own bottom-nav clearance inside its
+ * internal scroll box. If Layout also adds its usual bottom-nav padding
+ * on <main> for these routes, the real page becomes taller than the
+ * viewport (permanently, not just briefly) — enough for a touch-drag to
+ * scroll the whole document instead of just the screen's internal box,
+ * dragging the screen's own sticky header along with it. Skip the padding
+ * here so this screen's self-managed spacing is the only spacing that applies.
+ */
+const SELF_CONTAINED_SCROLL_PREFIXES = ['/conditions/']
+
+export default function Layout({ children }) {
   const { pathname } = useLocation()
-  const suppressHeader = suppressHeaderProp ||
+  const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname) ||
     HEADER_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
+  const suppressBottomPadding = SELF_CONTAINED_SCROLL_PREFIXES.some(prefix => pathname.startsWith(prefix))
 
   return (
     <div style={{
-      // Fixed, JS-measured viewport height (see useVisualViewport, called
-      // once in App.jsx) instead of a percentage or minHeight — this div is
-      // now the flex column parent that <main> fills via flex:1, so it needs
-      // a bounded height, not just a floor.
-      display:         'flex',
-      flexDirection:   'column',
-      height:          'var(--viewport-height, 100dvh)',
+      // Live, JS-measured viewport height (see useVisualViewport, called
+      // once in App.jsx) instead of the browser's own 100dvh estimate —
+      // same fix as body in globals.css, for the same reason.
+      minHeight:       'var(--viewport-height, 100dvh)',
       backgroundColor: 'var(--color-bg)',
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
     }}>
+      <OfflineBanner />
+
       {!suppressHeader && (
         <header style={{
           position:        'sticky',
@@ -63,28 +78,26 @@ export default function Layout({ children, suppressHeader: suppressHeaderProp = 
         </header>
       )}
 
-      {/* No more bottom-nav padding calc — every screen rendered inside
-          here now owns its own internal scroll box (same pattern as
-          ConditionDetailScreen) and reserves its own bottom-nav clearance
-          internally. flex:1 + minHeight:0 + overflow:hidden lets whichever
-          screen sits inside fill this box and own its own scrolling, rather
-          than this <main> scrolling the whole document. position:relative
-          gives absolutely-positioned hidden panes (used by router.jsx to
-          keep inactive tabs mounted-but-hidden) a containing block. */}
+      <NotificationsBanner />
+
+      {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
+          keyboard resizing is handled natively via interactive-widget=resizes-content
+          on the viewport meta tag, so no JS-computed height is needed here.
+          Skipped on self-contained-scroll routes (see
+          SELF_CONTAINED_SCROLL_PREFIXES above) — those screens already
+          reserve their own bottom-nav clearance internally, and adding it
+          again here would make the document taller than the viewport. */}
       <main style={{
-        display:       'flex',
-        flexDirection: 'column',
-        flex:          1,
-        minHeight:     0,
-        overflow:      'hidden',
-        position:      'relative',
-        maxWidth:      680,
-        width:         '100%',
-        margin:        '0 auto',
-        padding:       '0 var(--space-6)',
+        maxWidth: 680,
+        margin:   '0 auto',
+        padding:  suppressBottomPadding
+          ? '0 var(--space-6) 0'
+          : '0 var(--space-6) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>
+
+      <BottomNav />
     </div>
   )
 }
