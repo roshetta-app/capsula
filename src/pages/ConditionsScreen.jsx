@@ -850,20 +850,27 @@ export default function ConditionsScreen() {
           of sitting flush against it. Same edge-to-edge bleed as the base
           layer, for the same reason. Extends from here to the bottom of
           the page — no separate wrapper below it.
-          No scroll-driven animation: marginTop overlap and boxShadow are
-          both fixed values now (var(--shadow-ambient-panel-attached), the
-          existing "attached"/non-floating intensity token). */}
+          No scroll-driven animation: border and shadow are both fixed
+          values. borderTop (not a full border) traces the rounded top
+          corners so the curve itself has a visible hairline edge. boxShadow
+          uses a negative y-offset with a tight blur/low opacity so the
+          shadow only reads just above the curve, not around the whole
+          panel — dark-mode-aware since a black shadow on the darker,
+          bleaker dark-mode base layer would be nearly invisible. */}
       <div style={{
         backgroundColor: 'var(--color-bg)',
         borderTopLeftRadius:  'var(--radius-xl)',
         borderTopRightRadius: 'var(--radius-xl)',
+        borderTop:       isDark
+          ? '1px solid rgba(255, 255, 255, 0.08)'
+          : '1px solid rgba(15, 23, 42, 0.06)',
         marginTop:       'calc(var(--radius-xl) * -1)',
         marginLeft:      'calc(var(--space-6) * -1)',
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
         paddingTop:      'var(--space-4)',
-        boxShadow:       'var(--shadow-ambient-panel-attached)',
+        boxShadow:       '0 -6px 14px rgba(15, 23, 42, 0.035)',
       }}>
 
         {/* 5. Count + sort row — in A-Z mode, the first letter is shown inline on the left */}
