@@ -196,6 +196,23 @@
   }
 }
 
+/* ─── Phase 9: theme crossfade ──────────────────────────────────────────────
+   Forces background-color/color/border-color/box-shadow to animate on every
+   element while <html> carries this class, so the light↔dark toggle reads
+   as one continuous crossfade instead of a hard cut. Scoped + !important
+   because individual components already set their own --motion-fast
+   transitions for unrelated interactions (press feedback, focus), which
+   would otherwise win and leave the crossfade patchy. Class is added/
+   removed by useDarkMode.js around the .dark toggle only — never present
+   on first paint, so nothing fades in from nothing on load. */
+html.theme-transitioning,
+html.theme-transitioning * {
+  transition: background-color var(--motion-screen) var(--ease-reveal),
+              color var(--motion-screen) var(--ease-reveal),
+              border-color var(--motion-screen) var(--ease-reveal),
+              box-shadow var(--motion-screen) var(--ease-reveal) !important;
+}
+
 /* ─── Dark mode overrides — activated by .dark on <html> ────────────────────── */
 .dark {
   --color-bg:               #111827;
