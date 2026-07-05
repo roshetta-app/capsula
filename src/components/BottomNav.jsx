@@ -35,6 +35,17 @@
  *             nothing left for a compositing layer to isolate here.
  *             Keyboard detection also extracted to useKeyboardOpen() so
  *             ConditionDetailScreen can share the same signal.
+ * Phase 19 — Tapping the tab you're already on now scrolls the screen back
+ *             to top (reuses useBackToTop's scrollToTop — same animation
+ *             the Back-to-Top button already uses) instead of doing
+ *             nothing. Only fires when you're on that tab's own screen
+ *             already (not a nested detail route under it, e.g.
+ *             /conditions/:slug) — tapping Conditions from a condition's
+ *             detail page still navigates back to the list as before.
+ *             Also added press feedback (scale down on pointer-down) to
+ *             every tab button, whether re-tapping the active tab or
+ *             switching to another one — same --motion-fast/--ease-settle
+ *             tokens used for press feedback elsewhere in the app.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
@@ -46,11 +57,15 @@
  *  - Safe-area bottom padding for iPhone notch.
  *  - Hidden on all /admin/* routes.
  *  - Hidden while an on-screen keyboard is open (see Phase 16 note above).
+ *  - Re-tapping the active tab scrolls to top; every tap gets press feedback
+ *    (see Phase 19 note above).
  */
 
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState }                  from 'react'
+import { useLocation, useNavigate }  from 'react-router-dom'
 import { BookOpen, Pill, Heart }     from 'lucide-react'
 import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
+import { useBackToTop }             from '../hooks/useBackToTop'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -59,6 +74,13 @@ export default function BottomNav() {
   const navigate = useNavigate()
 
   const keyboardOpen = useKeyboardOpen()
+  const { scrollToTop } = useBackToTop()
+
+  // Press feedback — which tab (by path) is currently being pressed, if any.
+  // Same scale-down-on-pointer-down pattern used elsewhere in the app
+  // (SpecialtySelector, sticky specialty pill), just tracked per-tab here
+  // since only one button in the row can be pressed at a time.
+  const [pressedPath, setPressedPath] = useState(null)
 
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
@@ -74,6 +96,25 @@ export default function BottomNav() {
     }
     return location.pathname === tabPath ||
            location.pathname.startsWith(tabPath + '/')
+  }
+
+  // Distinct from isActive above: true only when the user is already on
+  // that tab's own top-level screen, not a nested detail route underneath
+  // it. Drives whether a tap scrolls to top (already there) or navigates
+  // (still needs to land on the list first).
+  function isExactScreen(tabPath) {
+    if (tabPath === '/conditions') {
+      return location.pathname === '/' || location.pathname === '/conditions'
+    }
+    return location.pathname === tabPath
+  }
+
+  function handleTabTap(path) {
+    if (isExactScreen(path)) {
+      scrollToTop()
+    } else {
+      navigate(path)
+    }
   }
 
   const TABS = [
@@ -113,11 +154,15 @@ export default function BottomNav() {
         height:     60,
       }}>
         {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
-          const active = isActive(path)
+          const active  = isActive(path)
+          const pressed = pressedPath === path
           return (
             <button
               key={path}
-              onClick={() => navigate(path)}
+              onClick={() => handleTabTap(path)}
+              onPointerDown={() => setPressedPath(path)}
+              onPointerUp={() => setPressedPath(null)}
+              onPointerLeave={() => setPressedPath(null)}
               aria-label={label}
               aria-current={active ? 'page' : undefined}
               style={{
@@ -134,7 +179,8 @@ export default function BottomNav() {
                 // Inactive: text-secondary (was text-tertiary — increased
                 // contrast so tabs are clearly readable at rest).
                 color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
-                transition:              'color 0.15s ease',
+                transform:               pressed ? 'scale(0.92)' : 'scale(1)',
+                transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
                 fontFamily:              'var(--font-body)',
                 padding:                 '8px 0',
                 outline:                 'none',
