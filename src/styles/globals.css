@@ -34,11 +34,11 @@
   --color-accent-light:  #BAE6FD;
 
   /* Surfaces — light */
-  --color-bg:            #FAFAF9;
+  --color-bg:            #F7F8FA;
   --color-surface:       #FFFFFF;
   --color-surface-muted: #F9FAFB;
-  --color-border:        #E8E6E1;
-  --color-border-subtle: #F0EEE9;
+  --color-border:        #E9ECF1;
+  --color-border-subtle: #EEF1F4;
 
   /* Semantic */
   --color-danger:        #DC2626;
@@ -77,19 +77,17 @@
 
 /* ─── CSS custom properties — light mode (root) ──────────────────────────────── */
 :root {
-  --color-bg:               #FAFAF9;
+  --color-bg:               #F7F8FA;
   --color-surface:          #FFFFFF;
   --color-surface-muted:    #F9FAFB;
-  --color-border:           #E8E6E1;
-  --color-border-subtle:    #F0EEE9;
+  --color-border:           #E9ECF1;
+  --color-border-subtle:    #EEF1F4;
 
-  /* Hero panel — ConditionsScreen two-tone redesign. Deliberately distinct
-     from both --color-surface (too close to --color-bg to read as a
-     separate zone) and --color-bg itself. Barely tints away from white —
-     two earlier attempts (#EEF1F5 cool blue-grey, #F3F1EC warm greige)
-     both read as a dull/muddy color choice; this leans on the curve radius
-     and lift shadow to do the separating instead of a strong color jump. */
-  --color-hero-bg:          #FCFAF7;
+  /* Hero panel — palette update: hero/page background now share the same
+     flat --color-bg value (#F7F8FA) intentionally. Separation from the
+     white content panel below is carried entirely by the curve radius
+     (--radius-xl) and lift shadow, not by a color difference. */
+  --color-hero-bg:          #F7F8FA;
 
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;

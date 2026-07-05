@@ -790,7 +790,7 @@ export default function ConditionsScreen() {
         marginRight:     'calc(var(--space-6) * -1)',
         paddingLeft:     'var(--space-6)',
         paddingRight:    'var(--space-6)',
-        paddingBottom:   'calc(var(--space-3) + var(--radius-xl))',
+        paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
       }}>
 
         {/* 1. Brand row + tagline + dark mode toggle */}
@@ -897,3 +897,4 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
