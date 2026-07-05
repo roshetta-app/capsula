@@ -122,8 +122,12 @@
  *             the skeleton) renders, using a sessionStorage flag (session-
  *             scoped, unlike OnboardingGate's permanent localStorage flag)
  *             plus a prefers-reduced-motion check. Reuses Phase 2's
- *             --motion-fast/--ease-settle tokens with a 70ms per-stage
- *             delay, finishing at 240ms — under the 300ms budget. See
+ *             --motion-base/--ease-reveal (opacity) and --ease-settle
+ *             (transform) tokens — same split-curve pattern as the sheet
+ *             components' fade+scale — with a 40ms per-stage delay,
+ *             finishing at 280ms — under the 300ms budget. First pass used
+ *             --motion-fast (100ms) with one shared curve, which read as
+ *             an abrupt snap rather than a smooth glide. See
  *             entranceStyle() below.
  *
  * Changes from previous:
@@ -180,7 +184,7 @@ import { ROUTES }                                  from '../router'
 // timing values.
 
 const ENTRANCE_SESSION_KEY = 'capsula_conditions_entrance_played'
-const ENTRANCE_STAGGER_MS  = 70 // gap between each stage's transitionDelay
+const ENTRANCE_STAGGER_MS  = 40 // gap between each stage's transitionDelay
 
 // ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
@@ -759,16 +763,18 @@ export default function ConditionsScreen() {
 
   // Returns the fade/rise + stagger delay for entrance stage 0/1/2, or an
   // empty object on any repeat visit within this session (or reduced
-  // motion) so nothing about normal rendering changes.
+  // motion) so nothing about normal rendering changes. Opacity and
+  // transform get separate curves (--ease-reveal / --ease-settle) rather
+  // than one shared transition — same split used by the sheet components'
+  // fade+scale — so the motion reads as a smooth glide instead of a snap.
   function entranceStyle(stageIndex) {
     if (!playEntrance) return {}
+    const delay = `${stageIndex * ENTRANCE_STAGGER_MS}ms`
     return {
-      opacity:                  entranceIn ? 1 : 0,
-      transform:                entranceIn ? 'translateY(0)' : 'translateY(6px)',
-      transitionProperty:       'opacity, transform',
-      transitionDuration:       'var(--motion-fast)',
-      transitionTimingFunction: 'var(--ease-settle)',
-      transitionDelay:          `${stageIndex * ENTRANCE_STAGGER_MS}ms`,
+      opacity:    entranceIn ? 1 : 0,
+      transform:  entranceIn ? 'translateY(0)' : 'translateY(6px)',
+      transition: `opacity var(--motion-base) var(--ease-reveal) ${delay}, `
+                 + `transform var(--motion-base) var(--ease-settle) ${delay}`,
     }
   }
 
