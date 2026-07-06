@@ -465,7 +465,6 @@ import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
-import { useScrollRestoration } from '../hooks/useScrollRestoration'
 
 // Favourites' own identity color for the heart badge/star icon. Previously
 // aliased var(--color-danger) so "favourited = red heart" shared the exact
@@ -1289,7 +1288,7 @@ function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenMa
 // fav-sticky-search-height scoped classes (see FavouritesScreen's local
 // <style> block) so the input's own height matches the expanded button.
 
-function StickyFavouritesHeader({ visible, skipEntrance, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
+function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
   return (
     <div
       aria-hidden="true"
@@ -1305,7 +1304,7 @@ function StickyFavouritesHeader({ visible, skipEntrance, activeTab, onSelectTab,
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              skipEntrance ? 'none' : 'transform 0.25s ease',
+        transition:              'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -1675,13 +1674,6 @@ export default function FavouritesScreen() {
   // (a genuine narrowing of what's shown) counts as a filter here.
   const hasActiveFilters = activeSpecialty !== 'all'
 
-  // Remembers/restores scroll position per tab + specialty filter — either
-  // one changes what the list underneath actually contains, so a switch
-  // starts at the top instead of restoring a scroll offset that belonged
-  // to a different list.
-  useScrollRestoration(`favourites:${activeTab}:${activeSpecialty}`)
-
-
   // Drugs-tab search box — placeholder only (Phase 2N). Local, unwired state
   // just so the input is controlled/typeable. Do NOT connect this to
   // filtering, a search hook, or ConditionCard/DrugCard's highlight prop —
@@ -1844,27 +1836,15 @@ export default function FavouritesScreen() {
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
-  // skipStickyEntrance: true only for the very first observer callback
-  // after mount. Restoration to the correct scroll position now happens
-  // synchronously, before this component's effects even run (see
-  // useScrollRestoration above), so that first callback is guaranteed to
-  // reflect the final, settled state — not an intermediate one that's
-  // about to jump. It's safe to treat it as "just restoring", never a
-  // live scroll gesture. Every callback after that is a real scroll event
-  // and animates normally.
-  const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const heroRef = useRef(null)
 
   useEffect(() => {
     const el = heroRef.current
     if (!el) return
 
-    let isFirstCallback = true
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
-        if (!isFirstCallback) setSkipStickyEntrance(false)
-        isFirstCallback = false
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
@@ -1879,7 +1859,6 @@ export default function FavouritesScreen() {
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
         visible={showStickyHeader}
-        skipEntrance={skipStickyEntrance}
         activeTab={activeTab}
         onSelectTab={switchTab}
         showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
@@ -2181,3 +2160,4 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
+

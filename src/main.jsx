@@ -3,18 +3,6 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 
-// Hands scroll-position restoration over to the app instead of leaving it
-// to the browser's default behavior. The browser's own restoration runs
-// asynchronously after mount and fires an ordinary 'scroll' event when it
-// jumps the page — indistinguishable from a real user scroll to anything
-// downstream (e.g. ConditionsScreen/FavouritesScreen's sticky headers).
-// useScrollRestoration (src/hooks/useScrollRestoration.js) does the actual
-// remembering/restoring per screen, synchronously, before paint.
-if ('scrollRestoration' in window.history) {
-  window.history.scrollRestoration = 'manual'
-}
-
-
 // Module executed successfully — clear the boot-retry counter from
 // index.html's __mainLoadFailed fallback, so a genuine future load
 // failure (not this one) gets the full retry budget again.

@@ -170,7 +170,6 @@ import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
-import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -426,7 +425,6 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
 
 function StickyLogoHeader({
   visible,
-  skipEntrance,
   isSearching,
   activeSpecialtyObj,
   onClearSpecialty,
@@ -492,7 +490,7 @@ function StickyLogoHeader({
         borderBottomRightRadius: 18,
         boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
         transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              skipEntrance ? 'none' : 'transform 0.25s ease',
+        transition:              'transform 0.25s ease',
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
@@ -702,15 +700,6 @@ export default function ConditionsScreen() {
   // layer and panel are a static two-tone look now, not a scroll-driven
   // animation, so a single fire-once boolean is all the header needs.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
-  // skipStickyEntrance: true only for the very first observer callback
-  // after mount. Restoration to the correct scroll position now happens
-  // synchronously, before this component's effects even run (see
-  // useScrollRestoration below), so that first callback is guaranteed to
-  // reflect the final, settled state — not an intermediate one that's
-  // about to jump. It's safe to treat it as "just restoring", never a
-  // live scroll gesture. Every callback after that is a real scroll event
-  // and animates normally.
-  const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
   const searchInputRef = useRef(null)
@@ -772,12 +761,9 @@ export default function ConditionsScreen() {
     const el = brandRowRef.current
     if (!el) return
 
-    let isFirstCallback = true
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
-        if (!isFirstCallback) setSkipStickyEntrance(false)
-        isFirstCallback = false
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
@@ -834,14 +820,6 @@ export default function ConditionsScreen() {
     : null
   const specialtyName      = activeSpecialtyObj?.name ?? ''
   const totalCount         = conditions.length
-
-  // Remembers/restores scroll position per specialty filter. Keyed by
-  // activeSpecialty (not just the screen) so switching filters — which
-  // changes what the list underneath actually contains — starts at the
-  // top instead of restoring a scroll offset that belonged to a
-  // different list.
-  useScrollRestoration(!loading ? `conditions:${activeSpecialty}` : null)
-
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -982,7 +960,6 @@ export default function ConditionsScreen() {
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
         visible={showStickyHeader}
-        skipEntrance={skipStickyEntrance}
         isSearching={isSearching}
         activeSpecialtyObj={activeSpecialtyObj}
         onClearSpecialty={handleClearFilter}
@@ -1135,6 +1112,4 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
-
-
 
