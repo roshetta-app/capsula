@@ -170,6 +170,7 @@ import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
 import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
+import { useScrollRestoration } from '../hooks/useScrollRestoration'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -701,12 +702,14 @@ export default function ConditionsScreen() {
   // layer and panel are a static two-tone look now, not a scroll-driven
   // animation, so a single fire-once boolean is all the header needs.
   const [showStickyHeader, setShowStickyHeader]   = useState(false)
-  // skipStickyEntrance: true until either a short settle window after mount
-  // has closed, or a real scroll/touch event has happened — whichever comes
-  // first (see the observer effect below). Covers scroll-position
-  // restoration on return visits (e.g. coming back to a screen left
-  // scrolled down), which can otherwise get animated as if it were a live
-  // scroll gesture.
+  // skipStickyEntrance: true only for the very first observer callback
+  // after mount. Restoration to the correct scroll position now happens
+  // synchronously, before this component's effects even run (see
+  // useScrollRestoration below), so that first callback is guaranteed to
+  // reflect the final, settled state — not an intermediate one that's
+  // about to jump. It's safe to treat it as "just restoring", never a
+  // live scroll gesture. Every callback after that is a real scroll event
+  // and animates normally.
   const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const brandRowRef    = useRef(null)
@@ -769,39 +772,18 @@ export default function ConditionsScreen() {
     const el = brandRowRef.current
     if (!el) return
 
-    // Settle window (2nd attempt): callback COUNT doesn't reliably tell a
-    // programmatic scroll restoration apart from a genuine user scroll —
-    // both can legitimately be the 2nd+ observer callback. Instead, gate
-    // on real evidence: a short window after mount during which the
-    // transition stays suppressed no matter how the observer fires or the
-    // scroll position jumps (covers restoration on return visits), ended
-    // early the moment an actual scroll/touch happens.
-    let settled = false
-    const settleTimer = setTimeout(() => { settled = true }, 300)
-
-    function endSettleWindow() {
-      settled = true
-      window.removeEventListener('scroll', endSettleWindow)
-      window.removeEventListener('touchmove', endSettleWindow)
-    }
-    window.addEventListener('scroll', endSettleWindow, { passive: true })
-    window.addEventListener('touchmove', endSettleWindow, { passive: true })
-
+    let isFirstCallback = true
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
-        if (settled) setSkipStickyEntrance(false)
+        if (!isFirstCallback) setSkipStickyEntrance(false)
+        isFirstCallback = false
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
 
     observer.observe(el)
-    return () => {
-      observer.disconnect()
-      clearTimeout(settleTimer)
-      window.removeEventListener('scroll', endSettleWindow)
-      window.removeEventListener('touchmove', endSettleWindow)
-    }
+    return () => observer.disconnect()
   }, [])
 
   // Waits for the cold-start skeleton to clear before triggering the fade —
@@ -852,6 +834,14 @@ export default function ConditionsScreen() {
     : null
   const specialtyName      = activeSpecialtyObj?.name ?? ''
   const totalCount         = conditions.length
+
+  // Remembers/restores scroll position per specialty filter. Keyed by
+  // activeSpecialty (not just the screen) so switching filters — which
+  // changes what the list underneath actually contains — starts at the
+  // top instead of restoring a scroll offset that belonged to a
+  // different list.
+  useScrollRestoration(!loading ? `conditions:${activeSpecialty}` : null)
+
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
