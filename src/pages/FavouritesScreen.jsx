@@ -1836,12 +1836,12 @@ export default function FavouritesScreen() {
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
-  // skipStickyEntrance: true only for the very first observer callback after
-  // mount. That first callback just restores whatever state the scroll
-  // position already implies (e.g. coming back to this screen left scrolled
-  // down) — it isn't a live scroll gesture, so it shouldn't replay the
-  // slide-down transition. Every callback after that is a real scroll event
-  // and animates normally.
+  // skipStickyEntrance: true until either a short settle window after mount
+  // has closed, or a real scroll/touch event has happened — whichever comes
+  // first (see the observer effect below). Covers scroll-position
+  // restoration on return visits (e.g. coming back to this screen left
+  // scrolled down), which can otherwise get animated as if it were a live
+  // scroll gesture.
   const [skipStickyEntrance, setSkipStickyEntrance] = useState(true)
   const heroRef = useRef(null)
 
@@ -1849,18 +1849,39 @@ export default function FavouritesScreen() {
     const el = heroRef.current
     if (!el) return
 
-    let isFirstCallback = true
+    // Settle window (2nd attempt): callback COUNT doesn't reliably tell a
+    // programmatic scroll restoration apart from a genuine user scroll —
+    // both can legitimately be the 2nd+ observer callback. Instead, gate
+    // on real evidence: a short window after mount during which the
+    // transition stays suppressed no matter how the observer fires or the
+    // scroll position jumps (covers restoration on return visits), ended
+    // early the moment an actual scroll/touch happens.
+    let settled = false
+    const settleTimer = setTimeout(() => { settled = true }, 300)
+
+    function endSettleWindow() {
+      settled = true
+      window.removeEventListener('scroll', endSettleWindow)
+      window.removeEventListener('touchmove', endSettleWindow)
+    }
+    window.addEventListener('scroll', endSettleWindow, { passive: true })
+    window.addEventListener('touchmove', endSettleWindow, { passive: true })
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         setShowStickyHeader(!entry.isIntersecting)
-        if (!isFirstCallback) setSkipStickyEntrance(false)
-        isFirstCallback = false
+        if (settled) setSkipStickyEntrance(false)
       },
       { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
     )
 
     observer.observe(el)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      clearTimeout(settleTimer)
+      window.removeEventListener('scroll', endSettleWindow)
+      window.removeEventListener('touchmove', endSettleWindow)
+    }
   }, [])
 
   return (
