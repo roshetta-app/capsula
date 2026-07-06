@@ -107,7 +107,7 @@ export default function DrugEditor() {
       .from('formulations')
       .select(`
         id, concentration, form, route,
-        doses, doses_structured, default_dose_override, is_published,
+        doses_structured, default_dose_override, is_published,
         brands ( id, name, name_ar, manufacturer, source, is_published )
       `)
       .eq('generic_id', genericId)
@@ -117,7 +117,7 @@ export default function DrugEditor() {
 
     setFormulations(fData.map(f => ({
       ...f,
-      doses: f.doses_structured ?? f.doses ?? [],
+      doses: f.doses_structured ?? [],
       brands: (f.brands ?? []).map(b => ({ ...b })),
     })))
 
