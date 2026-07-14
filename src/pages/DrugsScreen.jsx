@@ -2,11 +2,15 @@
  * src/pages/DrugsScreen.jsx
  * Phase 2I — adds fuzzy search + autocomplete dropdown.
  * 1A.5 — swapped the static DRUG_CATEGORIES/getCategoryMeta pair for the
- *        live useCategories() hook. Category matching now keys off the
- *        category's name_en (the plain-text label stored on generics.category)
- *        instead of a hardcoded slug. Icon/color rendering now goes through
- *        the same SpecialtyIcon + color-token system the specialties feature
- *        already uses, since drug_categories was built as a twin of it.
+ *        live useCategories() hook. Category matching keys off the
+ *        category's slug (the plan's decided design: generics.category is
+ *        plain text but stores the stable slug, not the editable name_en
+ *        label). Icon/color rendering now goes through the same
+ *        SpecialtyIcon + color-token system the specialties feature already
+ *        uses, since drug_categories was built as a twin of it.
+ *        Note: today's live data still holds old-taxonomy values until
+ *        Phase 1B's rebuild lands, so most categories show 0 drugs for now
+ *        — see GFB_STEPS.md 1A.5.
  *
  * Changes from 2F:
  *  - useSearch (simple includes) → useDrugSearch (Fuse.js fuzzy, gap logging)
@@ -174,10 +178,14 @@ export default function DrugsScreen() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
-              {/* activeCategory already holds the category's display name
-                  (name_en) once set, since matching now keys off that
-                  instead of a separate slug — no lookup needed here. */}
-              {activeCategory === '__all' ? 'All Drugs' : activeCategory}
+              {/* activeCategory holds the category's stable slug once set
+                  (see plan's decided design — generics.category stores a
+                  drug_categories.slug, not the display name), so the
+                  display label needs a lookup back to name_en. */}
+              {activeCategory === '__all'
+                ? 'All Drugs'
+                : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
+              }
             </button>
           )}
 
@@ -212,12 +220,15 @@ export default function DrugsScreen() {
   }
 
   // ── Category list view ────────────────────────────────────────────────────
-  // Matched by name_en — a generic's category is stored as the plain-text
-  // label itself, not a foreign key (see adminQueries.js 1A.2 note).
+  // Matched by slug, the category's stable internal code — not name_en,
+  // which is just the editable display label. This is the plan's decided
+  // design (a generic's category is stored as a drug_categories.slug, kept
+  // as plain text rather than a foreign key, but still the stable code, not
+  // the human-facing name that can be renamed later).
   const categoriesWithCounts = categories
     .map(cat => ({
       ...cat,
-      count: drugs.filter(d => d.category === cat.name_en).length,
+      count: drugs.filter(d => d.category === cat.slug).length,
     }))
     .filter(c => c.count > 0)
 
@@ -315,7 +326,7 @@ export default function DrugsScreen() {
                   iconValue={iconValue}
                   color={colors.bg}
                   textColor={colors.fg}
-                  onTap={() => setActiveCategory(cat.name_en)}
+                  onTap={() => setActiveCategory(cat.slug)}
                 />
               )
             })}
@@ -382,9 +393,11 @@ function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTa
 
 function DrugListRow({ drug, isInStock, onTap, categories, isDark }) {
   const brandNames = drug.brands?.map(b => b.name) ?? []
-  // drug.category already holds the display label directly (see note above),
-  // so this lookup is only needed to resolve its color token.
-  const matchedCategory = categories.find(c => c.name_en === drug.category)
+  // drug.category holds the category's stable slug, not its display name —
+  // look up the matching category record for both the label and its color.
+  // Falls back to the raw stored value if it doesn't match any category
+  // that exists today (e.g. old-taxonomy data pre-Phase-1B).
+  const matchedCategory = categories.find(c => c.slug === drug.category)
   const colors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
   return (
@@ -428,7 +441,7 @@ function DrugListRow({ drug, isInStock, onTap, categories, isDark }) {
         borderRadius: 'var(--radius-full)', padding: '2px 8px',
         letterSpacing: '0.03em',
       }}>
-        {drug.category}
+        {matchedCategory?.name_en ?? drug.category}
       </span>
     </div>
   )
