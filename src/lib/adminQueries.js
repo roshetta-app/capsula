@@ -16,6 +16,8 @@
  *   3.8 — fetchConditionForEdit updated (condition_blocks join), saveConditionBlocks (new)
  *         toggleFormulationPublished, toggleBrandPublished (new)
  *   3.10 — fetchAllTags, fetchTagsForCondition, syncConditionTags (new)
+ *   1A.2 — fetchAllCategories, fetchCategoriesForCMS, insertCategory, updateCategory,
+ *           deleteCategory, reorderCategories, toggleCategoryActive
  */
 
 import { supabase }  from './supabase'
@@ -282,6 +284,121 @@ export async function deleteSpecialty(id, name = null) {
 export async function reorderSpecialties(items) {
   const updates = items.map(({ id, sort_order }) =>
     supabase.from('specialties').update({ sort_order }).eq('id', id)
+  )
+  const results = await Promise.all(updates)
+  const firstError = results.find(r => r.error)?.error ?? null
+  return { error: firstError }
+}
+
+// ─── Drug categories (1A.2) ───────────────────────────────────────────────────
+//
+// Twin of the specialties CRUD above. Unlike specialties, a generic's category
+// is stored as a plain text label (generics.category) rather than a foreign
+// key, so there is no "Uncategorized" reassignment step on deactivate — see
+// GENERIC_FORMULATION_BRAND_MAPPING_PLAN.md ADR-039. Category names feed the
+// drugs list/filter UI, so mutations bump 'drugs_updated_at', not
+// 'conditions_updated_at'.
+
+export async function insertCategory(data) {
+  const { data: row, error } = await supabase
+    .from('drug_categories')
+    .insert(data)
+    .select('id, slug')
+    .single()
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'drug_categories', row.id, data.name_en ?? null, data)
+  await touchAppMetadata('drugs_updated_at')
+  return { data: row, error: null }
+}
+
+export async function updateCategory(id, data) {
+  const { error } = await supabase
+    .from('drug_categories')
+    .update(data)
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit('update', 'drug_categories', id, data.name_en ?? null, data)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Fetch all ACTIVE categories for CMS dropdowns (drug editor's category field).
+ */
+export async function fetchCategoriesForCMS() {
+  const { data, error } = await supabase
+    .from('drug_categories')
+    .select('id, name_en, slug, icon_name, icon_type, icon_url, color_token, color_hex, sort_order, is_active')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  return { data: data ?? [], error }
+}
+
+/**
+ * Fetch all categories (active + inactive) with a generic count per category,
+ * for the admin CategoriesManager list. Category is a text label on generics,
+ * not a foreign key, so the count is matched by name_en rather than joined.
+ */
+export async function fetchAllCategories() {
+  const { data, error } = await supabase
+    .from('drug_categories')
+    .select('id, name_en, name_ar, slug, icon_name, icon_type, icon_url, color_token, color_hex, sort_order, is_active, created_at')
+    .order('sort_order', { ascending: true })
+
+  if (error) return { data: null, error }
+
+  const { data: generics, error: genericsError } = await supabase
+    .from('generics')
+    .select('category')
+
+  if (genericsError) return { data: null, error: genericsError }
+
+  const counts = {}
+  for (const g of generics ?? []) {
+    if (g.category) counts[g.category] = (counts[g.category] ?? 0) + 1
+  }
+
+  const mapped = data.map(c => ({
+    ...c,
+    genericCount: counts[c.name_en] ?? 0,
+  }))
+
+  return { data: mapped, error: null }
+}
+
+/**
+ * Toggle is_active on a category. Simple flip only — no reassignment of
+ * affected generics (see file-header note above).
+ */
+export async function toggleCategoryActive(id, isActive, name = null) {
+  const { error } = await supabase
+    .from('drug_categories')
+    .update({ is_active: isActive })
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit(isActive ? 'publish' : 'unpublish', 'drug_categories', id, name)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Delete a category.
+ */
+export async function deleteCategory(id, name = null) {
+  const { error } = await supabase
+    .from('drug_categories')
+    .delete()
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit('delete', 'drug_categories', id, name)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Batch-update sort_order for reordering categories via drag-and-drop.
+ * @param {{ id: string, sort_order: number }[]} items
+ */
+export async function reorderCategories(items) {
+  const updates = items.map(({ id, sort_order }) =>
+    supabase.from('drug_categories').update({ sort_order }).eq('id', id)
   )
   const results = await Promise.all(updates)
   const firstError = results.find(r => r.error)?.error ?? null
@@ -873,6 +990,3 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
-
-
-
