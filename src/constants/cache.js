@@ -11,6 +11,7 @@ export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 export const CACHE_KEYS = {
   DRUGS:      'capsula_drugs_cache',
   CONDITIONS: 'capsula_conditions_cache',
+  CATEGORIES: 'capsula_categories_cache',
 }
 
 /** Supabase table used for cache invalidation timestamps */
