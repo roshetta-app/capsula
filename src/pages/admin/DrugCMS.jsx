@@ -153,7 +153,7 @@ export default function DrugCMS() {
         >
           <option value="">All categories</option>
           {categories.map(c => (
-            <option key={c.id} value={c.name_en}>{c.name_en}</option>
+            <option key={c.id} value={c.slug}>{c.name_en}</option>
           ))}
         </select>
       )}
