@@ -18,6 +18,7 @@
  *   3.10 — fetchAllTags, fetchTagsForCondition, syncConditionTags (new)
  *   1A.2 — fetchAllCategories, fetchCategoriesForCMS, insertCategory, updateCategory,
  *           deleteCategory, reorderCategories, toggleCategoryActive
+ *   1A.3 — uploadCategoryIcon (new, reuses specialty-icons bucket)
  */
 
 import { supabase }  from './supabase'
@@ -390,6 +391,31 @@ export async function deleteCategory(id, name = null) {
   if (error) return { error }
   await logAudit('delete', 'drug_categories', id, name)
   return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Upload a custom category icon (SVG). Reuses the specialty-icons storage
+ * bucket — same generic SVG storage, no functional reason to split it.
+ */
+export async function uploadCategoryIcon(file) {
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.svg`
+  const path     = `public/${filename}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('specialty-icons')
+    .upload(path, file, {
+      cacheControl: '3600',
+      upsert:       false,
+      contentType:  'image/svg+xml',
+    })
+
+  if (uploadError) return { url: null, error: uploadError }
+
+  const { data } = supabase.storage
+    .from('specialty-icons')
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, error: null }
 }
 
 /**
