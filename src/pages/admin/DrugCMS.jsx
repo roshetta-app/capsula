@@ -9,16 +9,20 @@
  *   - Delete → ConfirmModal
  *   - "Forms" count → navigates to DrugEditor
  *   - "+ Add New" → navigates to AddDrugFlow (/admin/drugs/new)
- *   - Search (name_en, name_ar) + category filter pills
+ *   - Search (name_en, name_ar) + category filter, both querying the live
+ *     database directly (debounced, capped at 50 rows) — never a client-side
+ *     re-filter of a preloaded list. Category options come from the real
+ *     drug_categories table via useCategories, shown as a full-width dropdown.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
+import { useCategories } from '../../hooks/useCategories'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import {
-  fetchAllGenerics,
+  fetchGenericsPage,
   toggleGenericPublished,
   deleteGeneric,
 } from '../../lib/adminQueries'
@@ -37,47 +41,44 @@ export default function DrugCMS() {
   const { toast }   = useToast()
 
   const [generics,     setGenerics]     = useState([])
+  const [totalCount,   setTotalCount]   = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [loadError,    setLoadError]    = useState(null)
 
   const [query,           setQuery]           = useState('')
+  const [debouncedQuery,  setDebouncedQuery]  = useState('')
   const [activeCategory,  setActiveCategory]  = useState(null)
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
   const [actionId,     setActionId]     = useState(null)
 
-  // ── Load ────────────────────────────────────────────────────────────────────
+  // Real, admin-curated category list (drug_categories table), not scanned
+  // from whatever text happens to be sitting on generics right now.
+  const { categories } = useCategories()
+
+  // ── Debounce search input — one query per pause-in-typing, not per keystroke ──
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(t)
+  }, [query])
+
+  // ── Load — always a real, filtered, capped query against the live DB ─────────
   async function load() {
     setLoading(true)
     setLoadError(null)
-    const { data, error } = await fetchAllGenerics()
+    const { data, count, error } = await fetchGenericsPage({
+      query: debouncedQuery,
+      category: activeCategory,
+      limit: 50,
+    })
     setLoading(false)
     if (error) { setLoadError(error.message); return }
     setGenerics(data)
+    setTotalCount(count)
   }
 
-  useEffect(() => { load() }, [])
-
-  // ── Derived category list ───────────────────────────────────────────────────
-  const categories = useMemo(() => {
-    const cats = [...new Set(generics.map(g => g.category).filter(Boolean))].sort()
-    return cats
-  }, [generics])
-
-  // ── Filter ──────────────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    let list = generics
-    if (activeCategory) list = list.filter(g => g.category === activeCategory)
-    if (query.trim()) {
-      const q = query.toLowerCase()
-      list = list.filter(g =>
-        g.name_en?.toLowerCase().includes(q) ||
-        (g.name_ar && g.name_ar.includes(query))
-      )
-    }
-    return list
-  }, [generics, query, activeCategory])
+  useEffect(() => { load() }, [debouncedQuery, activeCategory])
 
   // ── Publish toggle ──────────────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
@@ -143,39 +144,18 @@ export default function DrugCMS() {
         )}
       </div>
 
-      {/* Category pills */}
+      {/* Category filter */}
       {categories.length > 0 && (
-        <div style={{
-          display: 'flex', gap: 'var(--space-2)',
-          overflowX: 'auto', paddingBottom: 'var(--space-2)',
-          marginBottom: 'var(--space-4)', scrollbarWidth: 'none',
-        }}>
-          {[{ value: null, label: 'All' }, ...categories.map(c => ({ value: c, label: c }))].map(cat => {
-            const active = activeCategory === cat.value
-            return (
-              <button
-                key={cat.value ?? 'all'}
-                onClick={() => setActiveCategory(cat.value)}
-                style={{
-                  flexShrink: 0,
-                  padding: '5px 14px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: 12,
-                  fontWeight: active ? 600 : 400,
-                  fontFamily: 'var(--font-body)',
-                  cursor: 'pointer',
-                  border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-                  backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
-                  color: active ? '#fff' : 'var(--color-text-secondary)',
-                  transition: 'all 0.15s ease',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {cat.label}
-              </button>
-            )
-          })}
-        </div>
+        <select
+          value={activeCategory ?? ''}
+          onChange={e => setActiveCategory(e.target.value || null)}
+          style={categorySelectStyle}
+        >
+          <option value="">All categories</option>
+          {categories.map(c => (
+            <option key={c.id} value={c.name_en}>{c.name_en}</option>
+          ))}
+        </select>
       )}
 
       {/* Count */}
@@ -183,7 +163,11 @@ export default function DrugCMS() {
         fontSize: 12, color: 'var(--color-text-tertiary)',
         fontFamily: 'var(--font-mono)', marginBottom: 'var(--space-3)',
       }}>
-        {loading ? 'Loading…' : `${filtered.length} generic${filtered.length !== 1 ? 's' : ''}`}
+        {loading
+          ? 'Loading…'
+          : totalCount > generics.length
+            ? `Showing ${generics.length} of ${totalCount} matches — narrow your search to see more`
+            : `${totalCount} generic${totalCount !== 1 ? 's' : ''}`}
         {query && ` for "${query}"`}
       </div>
 
@@ -193,7 +177,7 @@ export default function DrugCMS() {
       )}
 
       {/* Table */}
-      {!loading && filtered.length === 0 ? (
+      {!loading && generics.length === 0 ? (
         <EmptyState query={query} />
       ) : (
         <div style={{
@@ -214,8 +198,8 @@ export default function DrugCMS() {
 
           {loading
             ? [1,2,3,4].map(i => <SkeletonRow key={i} />)
-            : filtered.map((g, idx) => {
-                const isLast   = idx === filtered.length - 1
+            : generics.map((g, idx) => {
+                const isLast   = idx === generics.length - 1
                 const isActing = actionId === g.id
 
                 return (
@@ -235,15 +219,20 @@ export default function DrugCMS() {
                   >
                     {/* Name + meta */}
                     <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                        <span style={{
-                          fontSize: 14, fontWeight: 600,
-                          color: g.is_published ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
-                        }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <span
+                          title={g.name_en}
+                          style={{
+                            fontSize: 14, fontWeight: 600,
+                            color: g.is_published ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                            minWidth: 0, flex: '1 1 auto',
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}
+                        >
                           {g.name_en}
                         </span>
                         {!g.is_published && (
-                          <span style={draftBadgeStyle}>Draft</span>
+                          <span style={{ ...draftBadgeStyle, flexShrink: 0 }}>Draft</span>
                         )}
                       </div>
                       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -528,6 +517,22 @@ const searchInputStyle = {
   color: 'var(--color-text-primary)',
   outline: 'none',
   boxShadow: 'var(--shadow-card)',
+}
+
+const categorySelectStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: 'var(--space-2) var(--space-3)',
+  fontSize: 14,
+  fontFamily: 'var(--font-body)',
+  backgroundColor: 'var(--color-surface)',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-lg)',
+  color: 'var(--color-text-primary)',
+  outline: 'none',
+  boxShadow: 'var(--shadow-card)',
+  marginBottom: 'var(--space-4)',
+  cursor: 'pointer',
 }
 
 const clearBtnStyle = {

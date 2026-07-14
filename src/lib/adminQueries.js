@@ -19,6 +19,8 @@
  *   1A.2 — fetchAllCategories, fetchCategoriesForCMS, insertCategory, updateCategory,
  *           deleteCategory, reorderCategories, toggleCategoryActive
  *   1A.3 — uploadCategoryIcon (new, reuses specialty-icons bucket)
+ *   DrugCMS fix — fetchGenericsPage (new, added alongside fetchAllGenerics):
+ *           real server-side search/category-filter/50-cap query for the CMS list
  */
 
 import { supabase }  from './supabase'
@@ -798,6 +800,48 @@ export async function fetchAllGenerics() {
   }))
 
   return { data: mapped, error: null }
+}
+
+/**
+ * Fetch one page of generics for the admin CMS list, always querying the
+ * live database directly (never a client-side re-filter of a preloaded
+ * list) — so search and category filtering reach every row, not just
+ * whatever happened to load first.
+ *
+ * Search matches name_en/name_ar via ilike. Category matches generics.category
+ * as free text against the drug_categories.name_en value the caller passes in
+ * (same text-matching approach fetchAllCategories already uses for counts —
+ * generics.category is not a foreign key). With no query and no category,
+ * returns the first `limit` generics alphabetically.
+ *
+ * @param {{ query?: string, category?: string|null, limit?: number }} params
+ * @returns {Promise<{ data: object[]|null, count: number, error: object|null }>}
+ */
+export async function fetchGenericsPage({ query = '', category = null, limit = 50 } = {}) {
+  let q = supabase
+    .from('generics')
+    .select(`
+      id, name_en, name_ar, category, class,
+      is_published, updated_at,
+      formulations ( id )
+    `, { count: 'exact' })
+    .order('name_en', { ascending: true })
+    .limit(limit)
+
+  if (category) q = q.eq('category', category)
+
+  const term = query.trim()
+  if (term) q = q.or(`name_en.ilike.%${term}%,name_ar.ilike.%${term}%`)
+
+  const { data, error, count } = await q
+  if (error) return { data: null, count: 0, error }
+
+  const mapped = data.map(g => ({
+    ...g,
+    formulationCount: (g.formulations ?? []).length,
+  }))
+
+  return { data: mapped, count: count ?? 0, error: null }
 }
 
 // ─── Promote-to-library matching (Phase 2, masterplan §2.5) ──────────────────
