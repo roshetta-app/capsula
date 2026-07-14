@@ -1,6 +1,12 @@
 /**
  * src/pages/DrugsScreen.jsx
  * Phase 2I — adds fuzzy search + autocomplete dropdown.
+ * 1A.5 — swapped the static DRUG_CATEGORIES/getCategoryMeta pair for the
+ *        live useCategories() hook. Category matching now keys off the
+ *        category's name_en (the plain-text label stored on generics.category)
+ *        instead of a hardcoded slug. Icon/color rendering now goes through
+ *        the same SpecialtyIcon + color-token system the specialties feature
+ *        already uses, since drug_categories was built as a twin of it.
  *
  * Changes from 2F:
  *  - useSearch (simple includes) → useDrugSearch (Fuse.js fuzzy, gap logging)
@@ -18,8 +24,9 @@ import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import { useDrugContext } from '../context/DrugContext'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useStock } from '../hooks/useStock'
-import { DRUG_CATEGORIES } from '../config/categories'
-import { getCategoryMeta } from '../constants/drugCategories'
+import { useCategories } from '../hooks/useCategories'
+import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 
 const RECENT_KEY = 'capsula_recent_drugs'
@@ -83,6 +90,8 @@ export default function DrugsScreen() {
     clearSuggestions,
   } = useDrugSearch(drugs)
   const { stockMap, toggleStock } = useStock(drugs)
+  const { categories } = useCategories()
+  const isDark = useIsDark()
 
   const [activeCategory, setActiveCategory] = useState(null) // null = category list
   const [filterOpen,     setFilterOpen]     = useState(false)
@@ -165,10 +174,10 @@ export default function DrugsScreen() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
-              {activeCategory === '__all'
-                ? 'All Drugs'
-                : (DRUG_CATEGORIES.find(c => c.value === activeCategory)?.label ?? activeCategory)
-              }
+              {/* activeCategory already holds the category's display name
+                  (name_en) once set, since matching now keys off that
+                  instead of a separate slug — no lookup needed here. */}
+              {activeCategory === '__all' ? 'All Drugs' : activeCategory}
             </button>
           )}
 
@@ -186,6 +195,8 @@ export default function DrugsScreen() {
                 drug={drug}
                 isInStock={stockMap[drug.id] ?? true}
                 onTap={handleDrugTap}
+                categories={categories}
+                isDark={isDark}
               />
             ))
           )}
@@ -201,12 +212,16 @@ export default function DrugsScreen() {
   }
 
   // ── Category list view ────────────────────────────────────────────────────
-  const categoriesWithCounts = DRUG_CATEGORIES
+  // Matched by name_en — a generic's category is stored as the plain-text
+  // label itself, not a foreign key (see adminQueries.js 1A.2 note).
+  const categoriesWithCounts = categories
     .map(cat => ({
       ...cat,
-      count: drugs.filter(d => d.category === cat.value).length,
+      count: drugs.filter(d => d.category === cat.name_en).length,
     }))
     .filter(c => c.count > 0)
+
+  const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
 
   return (
     <Layout>
@@ -279,24 +294,28 @@ export default function DrugsScreen() {
             <CategoryRow
               label="All Drugs"
               count={drugs.length}
-              icon="fa-pills"
-              color="#F3F4F6"
-              textColor="#374151"
+              iconType="lucide"
+              iconValue="Pill"
+              color={allDrugsColors.bg}
+              textColor={allDrugsColors.fg}
               onTap={() => setActiveCategory('__all')}
             />
 
             {/* Category rows */}
             {categoriesWithCounts.map(cat => {
-              const meta = getCategoryMeta(cat.value)
+              const iconType  = cat.icon_type || 'lucide'
+              const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
+              const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
               return (
                 <CategoryRow
-                  key={cat.value}
-                  label={cat.label}
+                  key={cat.id}
+                  label={cat.name_en}
                   count={cat.count}
-                  icon={meta.icon}
-                  color={meta.color}
-                  textColor={meta.textColor}
-                  onTap={() => setActiveCategory(cat.value)}
+                  iconType={iconType}
+                  iconValue={iconValue}
+                  color={colors.bg}
+                  textColor={colors.fg}
+                  onTap={() => setActiveCategory(cat.name_en)}
                 />
               )
             })}
@@ -315,7 +334,7 @@ export default function DrugsScreen() {
 
 // ─── CategoryRow ──────────────────────────────────────────────────────────────
 
-function CategoryRow({ label, count, icon, color, textColor, onTap }) {
+function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTap }) {
   return (
     <div
       onClick={onTap}
@@ -338,7 +357,7 @@ function CategoryRow({ label, count, icon, color, textColor, onTap }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <i className={`fa-solid ${icon}`} style={{ color: textColor, fontSize: 16 }} />
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={16} color={textColor} />
       </div>
 
       {/* Name + count */}
@@ -361,9 +380,12 @@ function CategoryRow({ label, count, icon, color, textColor, onTap }) {
 
 // ─── DrugListRow ──────────────────────────────────────────────────────────────
 
-function DrugListRow({ drug, isInStock, onTap }) {
+function DrugListRow({ drug, isInStock, onTap, categories, isDark }) {
   const brandNames = drug.brands?.map(b => b.name) ?? []
-  const meta = getCategoryMeta(drug.category)
+  // drug.category already holds the display label directly (see note above),
+  // so this lookup is only needed to resolve its color token.
+  const matchedCategory = categories.find(c => c.name_en === drug.category)
+  const colors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
   return (
     <div
@@ -402,11 +424,11 @@ function DrugListRow({ drug, isInStock, onTap }) {
       {/* Category pill */}
       <span style={{
         fontSize: 11, fontWeight: 500, flexShrink: 0,
-        backgroundColor: meta.color, color: meta.textColor,
+        backgroundColor: colors.bg, color: colors.fg,
         borderRadius: 'var(--radius-full)', padding: '2px 8px',
         letterSpacing: '0.03em',
       }}>
-        {DRUG_CATEGORIES.find(c => c.value === drug.category)?.label ?? drug.category}
+        {drug.category}
       </span>
     </div>
   )
@@ -429,6 +451,3 @@ function EmptyState({ query }) {
     </div>
   )
 }
-
-
-
