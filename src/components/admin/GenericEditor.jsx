@@ -11,9 +11,9 @@
  *   disabled  boolean
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
-import { DRUG_CATEGORIES } from '../../config/categories'
+import { fetchCategoriesForCMS } from '../../lib/adminQueries'
 import TagInput   from './TagInput'
 import DoseRowList from './DoseRowList'
 
@@ -29,6 +29,15 @@ const DOSE_ADJ_CONDITIONS = ['renal', 'hepatic', 'elderly', 'pediatric']
 
 export default function GenericEditor({ generic = {}, onChange, disabled = false }) {
   const [pkOpen, setPkOpen] = useState(false)
+  const [categories, setCategories] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCategoriesForCMS().then(({ data }) => {
+      if (!cancelled) setCategories(data ?? [])
+    })
+    return () => { cancelled = true }
+  }, [])
 
   function set(field, value) {
     onChange({ [field]: value })
@@ -123,8 +132,8 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
               style={inputStyle}
             >
               <option value="" disabled>Select category…</option>
-              {DRUG_CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+              {categories.map(c => (
+                <option key={c.id} value={c.slug}>{c.name_en}</option>
               ))}
             </select>
           </Field>
