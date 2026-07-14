@@ -29,6 +29,8 @@ import {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 50
+
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: '2-digit' })
@@ -48,6 +50,7 @@ export default function DrugCMS() {
   const [query,           setQuery]           = useState('')
   const [debouncedQuery,  setDebouncedQuery]  = useState('')
   const [activeCategory,  setActiveCategory]  = useState(null)
+  const [page,            setPage]            = useState(0)
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
@@ -63,14 +66,19 @@ export default function DrugCMS() {
     return () => clearTimeout(t)
   }, [query])
 
-  // ── Load — always a real, filtered, capped query against the live DB ─────────
+  // A new search or category always starts back at page 1 — the old page
+  // number wouldn't mean anything against a different result set.
+  useEffect(() => { setPage(0) }, [debouncedQuery, activeCategory])
+
+  // ── Load — always a real, filtered, paginated query against the live DB ──────
   async function load() {
     setLoading(true)
     setLoadError(null)
     const { data, count, error } = await fetchGenericsPage({
       query: debouncedQuery,
       category: activeCategory,
-      limit: 50,
+      limit: PAGE_SIZE,
+      page,
     })
     setLoading(false)
     if (error) { setLoadError(error.message); return }
@@ -78,7 +86,7 @@ export default function DrugCMS() {
     setTotalCount(count)
   }
 
-  useEffect(() => { load() }, [debouncedQuery, activeCategory])
+  useEffect(() => { load() }, [debouncedQuery, activeCategory, page])
 
   // ── Publish toggle ──────────────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
@@ -165,9 +173,9 @@ export default function DrugCMS() {
       }}>
         {loading
           ? 'Loading…'
-          : totalCount > generics.length
-            ? `Showing ${generics.length} of ${totalCount} matches — narrow your search to see more`
-            : `${totalCount} generic${totalCount !== 1 ? 's' : ''}`}
+          : totalCount === 0
+            ? '0 generics'
+            : `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + generics.length} of ${totalCount}`}
         {query && ` for "${query}"`}
       </div>
 
@@ -311,6 +319,33 @@ export default function DrugCMS() {
                 )
               })
           }
+        </div>
+      )}
+
+      {/* Pager */}
+      {!loading && totalCount > PAGE_SIZE && (
+        <div style={pagerStyle}>
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            style={{ ...pagerBtnStyle, opacity: page === 0 ? 0.4 : 1, cursor: page === 0 ? 'default' : 'pointer' }}
+          >
+            ‹ Prev
+          </button>
+          <span style={pagerLabelStyle}>
+            Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+          </span>
+          <button
+            onClick={() => setPage(p => (p + 1) * PAGE_SIZE < totalCount ? p + 1 : p)}
+            disabled={(page + 1) * PAGE_SIZE >= totalCount}
+            style={{
+              ...pagerBtnStyle,
+              opacity: (page + 1) * PAGE_SIZE >= totalCount ? 0.4 : 1,
+              cursor: (page + 1) * PAGE_SIZE >= totalCount ? 'default' : 'pointer',
+            }}
+          >
+            Next ›
+          </button>
         </div>
       )}
 
@@ -517,6 +552,25 @@ const searchInputStyle = {
   color: 'var(--color-text-primary)',
   outline: 'none',
   boxShadow: 'var(--shadow-card)',
+}
+
+const pagerStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-4)',
+  marginTop: 'var(--space-4)',
+}
+
+const pagerBtnStyle = {
+  padding: 'var(--space-2) var(--space-3)',
+  borderRadius: 'var(--radius-sm)',
+  border: '1px solid var(--color-border)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-secondary)',
+  fontSize: 13, fontWeight: 500,
+  fontFamily: 'var(--font-body)',
+}
+
+const pagerLabelStyle = {
+  fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)',
 }
 
 const categorySelectStyle = {

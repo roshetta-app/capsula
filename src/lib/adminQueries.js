@@ -808,16 +808,23 @@ export async function fetchAllGenerics() {
  * list) — so search and category filtering reach every row, not just
  * whatever happened to load first.
  *
- * Search matches name_en/name_ar via ilike. Category matches generics.category
- * as free text against the drug_categories.name_en value the caller passes in
- * (same text-matching approach fetchAllCategories already uses for counts —
- * generics.category is not a foreign key). With no query and no category,
- * returns the first `limit` generics alphabetically.
+ * Search matches at the START of each ingredient, not anywhere inside a
+ * word — combo generic names are plain text like "achillea + anise + basil",
+ * so a match is either the very start of the name, or right after a
+ * " + " separator. name_ar still matches anywhere (kept as a plain
+ * substring match, unchanged). Category matches generics.category as
+ * free text against the drug_categories.slug value the caller passes in
+ * (generics.category stores the slug, not the display label — confirmed
+ * against live data).
  *
- * @param {{ query?: string, category?: string|null, limit?: number }} params
+ * `page` is 0-indexed; combined with `limit` via .range() for real
+ * server-side pagination — flipping pages re-queries the DB, it doesn't
+ * page through an already-fetched list.
+ *
+ * @param {{ query?: string, category?: string|null, limit?: number, page?: number }} params
  * @returns {Promise<{ data: object[]|null, count: number, error: object|null }>}
  */
-export async function fetchGenericsPage({ query = '', category = null, limit = 50 } = {}) {
+export async function fetchGenericsPage({ query = '', category = null, limit = 50, page = 0 } = {}) {
   let q = supabase
     .from('generics')
     .select(`
@@ -826,12 +833,14 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
       formulations ( id )
     `, { count: 'exact' })
     .order('name_en', { ascending: true })
-    .limit(limit)
+    .range(page * limit, page * limit + limit - 1)
 
   if (category) q = q.eq('category', category)
 
   const term = query.trim()
-  if (term) q = q.or(`name_en.ilike.%${term}%,name_ar.ilike.%${term}%`)
+  if (term) {
+    q = q.or(`name_en.ilike.${term}%,name_en.ilike.%+ ${term}%,name_ar.ilike.%${term}%`)
+  }
 
   const { data, error, count } = await q
   if (error) return { data: null, count: 0, error }
