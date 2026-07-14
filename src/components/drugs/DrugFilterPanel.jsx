@@ -15,17 +15,21 @@ import { useState } from 'react'
  *   onApply   (filters) => void   filters: { forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
  */
 
+// Each chip's `matches` list is the full set of real raw form values (from
+// src/config/forms.js) it should catch. `value` stays the chip's own stable
+// id used for selection state - it is not necessarily a raw form value
+// itself anymore now that Tab/Capsule and Drops each cover several.
 const FORM_OPTIONS = [
-  { value: 'all',         label: 'All' },
-  { value: 'tablet',      label: 'Tab / Cap' },
-  { value: 'capsule',     label: 'Capsule' },
-  { value: 'syrup',       label: 'Syrup / Drops' },
-  { value: 'injection',   label: 'Injection' },
-  { value: 'suppository', label: 'Suppository' },
-  { value: 'sachet',      label: 'Sachet' },
-  { value: 'inhaler',     label: 'Inhaled' },
-  { value: 'cream',       label: 'Topical' },
-  { value: 'other',       label: 'Other' },
+  { value: 'all',         label: 'All',          matches: [] },
+  { value: 'tablet',      label: 'Tab / Capsule', matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
+  { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops'] },
+  { value: 'syrup',       label: 'Syrup',         matches: ['syrup', 'suspension', 'solution'] },
+  { value: 'injection',   label: 'Injection',     matches: ['injection', 'vial', 'ampoule', 'syringe', 'pen', 'vaccine'] },
+  { value: 'suppository', label: 'Suppository',   matches: ['suppository', 'enema', 'vaginal douche'] },
+  { value: 'sachet',      label: 'Sachet',        matches: ['sachet', 'powder'] },
+  { value: 'inhaler',     label: 'Inhaled',       matches: ['inhaler', 'inhalation solution'] },
+  { value: 'cream',       label: 'Topical',       matches: ['cream', 'ointment', 'gel', 'lotion', 'shampoo', 'soap', 'antiseptic solution', 'facial wash', 'conditioner', 'foam', 'paint', 'hair oil', 'oil', 'serum', 'patch', 'wipes', 'gauze dressing'] },
+  { value: 'other',       label: 'Other',         matches: ['piece', 'mouth wash', 'film', 'bottle', 'other'] },
 ]
 
 const EMPTY = {
