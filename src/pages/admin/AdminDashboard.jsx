@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faCapsules, faNotesMedical, faStethoscope,
+  faCapsules, faNotesMedical, faStethoscope, faTags,
   faChartBar, faBug, faBell, faClipboardList,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth'
  * AdminDashboard — /admin
  *
  * Nav cards: Drug Library → /admin/drugs
+ *            Categories   → /admin/categories    (added 1A.7)
  *            Conditions   → /admin/conditions
  *            Specialties  → /admin/specialties   (added 3H)
  *            Analytics    → /admin/analytics     (added 3J)
@@ -26,6 +27,12 @@ const NAV_CARDS = [
     label:  'Drug Library',
     sub:    'Manage generics, formulations & stock',
     faIcon: faCapsules,
+  },
+  {
+    path:   '/admin/categories',
+    label:  'Categories',
+    sub:    'Manage drug category list, icons & order',
+    faIcon: faTags,
   },
   {
     path:   '/admin/conditions',
