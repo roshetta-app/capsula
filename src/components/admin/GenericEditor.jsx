@@ -132,6 +132,9 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
               style={inputStyle}
             >
               <option value="" disabled>Select category…</option>
+              {generic.category && !categories.some(c => c.slug === generic.category) && (
+                <option value={generic.category}>{generic.category} (not yet migrated)</option>
+              )}
               {categories.map(c => (
                 <option key={c.id} value={c.slug}>{c.name_en}</option>
               ))}
