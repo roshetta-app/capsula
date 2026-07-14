@@ -1,36 +1,99 @@
-import { DRUG_FORMS, DRUG_ROUTES } from '../../config/forms'
+import { DRUG_FORMS, DRUG_ROUTES, INJECTION_ROUTE_DETAILS } from '../../config/forms'
 import DoseRowList from './DoseRowList'
+import TagInput from './TagInput'
 
 /**
  * FormulationEditor — edit fields on a formulation row.
  * Phase 3F — added is_published toggle + default_dose_override field.
+ * 2A.2 — added strength value/unit/basis (single-ingredient formulations only),
+ *   form modifier tags, device type, injection route-details tick-list, and the
+ *   Formulation Note field (renamed from restricted_dispensing).
  *
  * Props:
- *   formulation  { concentration, form, route, doses, default_dose_override, is_published }
+ *   formulation  {
+ *     concentration, form, route, doses, default_dose_override, is_published,
+ *     strength_value, strength_unit, strength_basis, strength_structured,
+ *     form_modifier, device_type, route_details, formulation_note
+ *   }
  *   onChange     (patch) => void
  *   disabled     boolean
+ *
+ * strength_structured is read-only here — when it's present, the formulation is
+ * a combo (more than one active ingredient) and keeps the plain-text Concentration
+ * box. When it's absent, the formulation is single-ingredient and gets the three
+ * structured strength boxes instead; Concentration is then generated from them.
  */
 export default function FormulationEditor({ formulation, onChange, disabled = false }) {
+
+  const isCombo = Boolean(formulation.strength_structured)
 
   function set(field, value) {
     onChange({ [field]: value })
   }
 
+  function setStrength(field, value) {
+    const next = {
+      strength_value: formulation.strength_value,
+      strength_unit:  formulation.strength_unit,
+      strength_basis: formulation.strength_basis,
+      [field]: value,
+    }
+    onChange({
+      [field]: value,
+      concentration: buildConcentration(next.strength_value, next.strength_unit, next.strength_basis),
+    })
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-      {/* Concentration */}
-      <Field label="Concentration" required>
-        <input
-          type="text"
-          value={formulation.concentration ?? ''}
-          onChange={e => set('concentration', e.target.value)}
-          placeholder="e.g. 500mg, 250mg/5ml, standard"
-          disabled={disabled}
-          required
-          style={inputStyle}
-        />
-      </Field>
+      {/* Strength */}
+      {isCombo ? (
+        <Field label="Concentration" required>
+          <input
+            type="text"
+            value={formulation.concentration ?? ''}
+            onChange={e => set('concentration', e.target.value)}
+            placeholder="e.g. 500mg, 250mg/5ml, standard"
+            disabled={disabled}
+            required
+            style={inputStyle}
+          />
+        </Field>
+      ) : (
+        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+          <Field label="Strength Value" style={{ flex: 1 }}>
+            <input
+              type="text"
+              value={formulation.strength_value ?? ''}
+              onChange={e => setStrength('strength_value', e.target.value || null)}
+              placeholder="e.g. 250"
+              disabled={disabled}
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Strength Unit" style={{ flex: 1 }}>
+            <input
+              type="text"
+              value={formulation.strength_unit ?? ''}
+              onChange={e => setStrength('strength_unit', e.target.value || null)}
+              placeholder="e.g. mg"
+              disabled={disabled}
+              style={inputStyle}
+            />
+          </Field>
+          <Field label="Strength Basis" style={{ flex: 1 }}>
+            <input
+              type="text"
+              value={formulation.strength_basis ?? ''}
+              onChange={e => setStrength('strength_basis', e.target.value || null)}
+              placeholder="e.g. per_5ml"
+              disabled={disabled}
+              style={inputStyle}
+            />
+          </Field>
+        </div>
+      )}
 
       {/* Form + Route row */}
       <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -65,6 +128,65 @@ export default function FormulationEditor({ formulation, onChange, disabled = fa
         </Field>
       </div>
 
+      {/* Route Details — only when Route = Injection */}
+      {formulation.route === 'injection' && (
+        <Field label="Route Details" hint="Select all that apply">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
+            {INJECTION_ROUTE_DETAILS.map(opt => {
+              const checked = (formulation.route_details ?? []).includes(opt.value)
+              return (
+                <label
+                  key={opt.value}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontSize: 13, fontFamily: 'var(--font-body)',
+                    color: 'var(--color-text-primary)',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => {
+                      const current = formulation.route_details ?? []
+                      const next = checked
+                        ? current.filter(v => v !== opt.value)
+                        : [...current, opt.value]
+                      set('route_details', next)
+                    }}
+                  />
+                  {opt.label}
+                </label>
+              )
+            })}
+          </div>
+        </Field>
+      )}
+
+      {/* Form Modifier + Device Type row */}
+      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+        <Field label="Form Modifier" hint="e.g. chewable, extended-release" style={{ flex: 1 }}>
+          <TagInput
+            tags={formulation.form_modifier ?? []}
+            onChange={tags => set('form_modifier', tags)}
+            placeholder="Type and press Enter…"
+            disabled={disabled}
+          />
+        </Field>
+
+        <Field label="Device Type" hint="e.g. inhaler, pen, patch" style={{ flex: 1 }}>
+          <input
+            type="text"
+            value={formulation.device_type ?? ''}
+            onChange={e => set('device_type', e.target.value || null)}
+            placeholder="e.g. inhaler"
+            disabled={disabled}
+            style={inputStyle}
+          />
+        </Field>
+      </div>
+
       {/* Practical doses */}
       <Field label="Practical doses" hint="Patient-friendly doses shown for this formulation">
         <DoseRowList
@@ -81,6 +203,18 @@ export default function FormulationEditor({ formulation, onChange, disabled = fa
           value={formulation.default_dose_override ?? ''}
           onChange={e => set('default_dose_override', e.target.value || null)}
           placeholder="e.g. Reduce dose in renal impairment"
+          disabled={disabled}
+          style={inputStyle}
+        />
+      </Field>
+
+      {/* Formulation Note */}
+      <Field label="Formulation Note" hint="Optional free-text note about this formulation">
+        <input
+          type="text"
+          value={formulation.formulation_note ?? ''}
+          onChange={e => set('formulation_note', e.target.value || null)}
+          placeholder="e.g. Hospital only"
           disabled={disabled}
           style={inputStyle}
         />
@@ -124,6 +258,22 @@ export default function FormulationEditor({ formulation, onChange, disabled = fa
 
     </div>
   )
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+// Builds the display-string Concentration value from the three structured
+// strength fields, e.g. ('250', 'mg', 'per_5ml') -> '250mg / 5ml'.
+// Used only for single-ingredient formulations (isCombo === false); combo
+// formulations keep Concentration as direct free text.
+function buildConcentration(value, unit, basis) {
+  const v = value?.trim() ?? ''
+  const u = unit?.trim() ?? ''
+  const base = `${v}${u}`.trim()
+  const b = basis?.trim()
+  if (!b) return base
+  const readable = b.replace(/^per_/, '').replace(/_/g, ' ')
+  return base ? `${base} / ${readable}` : `/ ${readable}`
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────

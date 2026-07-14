@@ -49,6 +49,13 @@ const EMPTY_FORMULATION = {
   doses: [],
   default_dose_override: null,
   is_published: true,
+  strength_value: null,
+  strength_unit: null,
+  strength_basis: null,
+  form_modifier: [],
+  device_type: null,
+  route_details: [],
+  formulation_note: null,
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -107,6 +114,8 @@ export default function DrugEditor() {
       .from('formulations')
       .select(`
         id, concentration, form, route,
+        strength_value, strength_unit, strength_basis, strength_structured,
+        form_modifier, device_type, route_details, formulation_note,
         doses_structured, default_dose_override, is_published,
         brands ( id, name, name_ar, manufacturer, source, is_published )
       `)
@@ -173,6 +182,13 @@ export default function DrugEditor() {
       concentration:        f.concentration.trim(),
       form:                 f.form,
       route:                f.route,
+      strength_value:       f.strength_value?.trim() || null,
+      strength_unit:        f.strength_unit?.trim() || null,
+      strength_basis:       f.strength_basis?.trim() || null,
+      form_modifier:        f.form_modifier ?? [],
+      device_type:          f.device_type?.trim() || null,
+      route_details:        f.route_details ?? [],
+      formulation_note:     f.formulation_note?.trim() || null,
       doses_structured:     f.doses,
       default_dose_override: f.default_dose_override || null,
       is_published:         f.is_published ?? true,
@@ -236,6 +252,13 @@ export default function DrugEditor() {
       form:          'tablet',
       route:         'oral',
       slug,
+      strength_value:    null,
+      strength_unit:     null,
+      strength_basis:    null,
+      form_modifier:     [],
+      device_type:       null,
+      route_details:     [],
+      formulation_note:  null,
       doses_structured: [],
       is_published:  false,
     })
@@ -356,7 +379,8 @@ export default function DrugEditor() {
           const isSaving  = savingFormId === f.id
           const isSaved   = savedFormId === f.id
           const visibleBrands = f.brands.filter(b => !b._deleted)
-          const formValid = f.concentration?.trim() && f.form && f.route
+          const isCombo = Boolean(f.strength_structured)
+          const formValid = f.form && f.route && (!isCombo || f.concentration?.trim())
 
           return (
             <SectionCard
@@ -393,6 +417,14 @@ export default function DrugEditor() {
                   doses:                f.doses,
                   default_dose_override: f.default_dose_override,
                   is_published:         f.is_published,
+                  strength_value:       f.strength_value,
+                  strength_unit:        f.strength_unit,
+                  strength_basis:       f.strength_basis,
+                  strength_structured:  f.strength_structured,
+                  form_modifier:        f.form_modifier,
+                  device_type:          f.device_type,
+                  route_details:        f.route_details,
+                  formulation_note:     f.formulation_note,
                 }}
                 onChange={patch => patchFormulation(f.id, patch)}
                 disabled={isSaving}
