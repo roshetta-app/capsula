@@ -1,3 +1,15 @@
+
+
+```txt
+capsula
+└── src
+    └── pages
+        └── FavouritesScreen.jsx
+
+```
+
+`src\pages\FavouritesScreen.jsx`:
+
 /**
  * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
@@ -461,7 +473,6 @@ import { resolveToken, FALLBACK_TOKEN, tintedBg } from '../utils/specialtyTokens
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import { useStock } from '../hooks/useStock'
 import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
@@ -1612,7 +1623,6 @@ export default function FavouritesScreen() {
   const { favourites, toggleDrug, toggleCondition, restoreConditionAt } = useFavouritesContext()
   const { conditions, specialties } = useConditionContext()
   const { drugs }      = useDrugContext()
-  const { stockMap }   = useStock(drugs)
 
   // Look up full objects from context. Memoized — without this, a new array
   // reference was created every render, which re-triggered
@@ -2082,7 +2092,6 @@ export default function FavouritesScreen() {
                     <DrugCard
                       key={drug.id}
                       drug={drug}
-                      isInStock={stockMap[drug.id] ?? drug.inStock}
                       onTap={() => navigate(`/drugs/${drug.slug}`)}
                     />
                   ))
@@ -2160,4 +2169,3 @@ export default function FavouritesScreen() {
     </Layout>
   )
 }
-
