@@ -30,9 +30,13 @@ export default function DrugCard({ drug, onTap }) {
   const { isDrugFavourited, toggleDrug } = useFavouritesContext()
   const isFavourited = isDrugFavourited(drug.id)
 
-  const chipStyle  = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
-  const label      = CATEGORY_LABELS[drug.category]  || drug.category
-  const brandNames = drug.brands?.map(b => b.name) ?? []
+  const chipStyle = CATEGORY_COLORS[drug.category] || { bg: '#F3F4F6', color: '#374151' }
+  const label     = CATEGORY_LABELS[drug.category]  || drug.category
+
+  // Item's own concentration/form, e.g. "500mg · Tablet" — either piece can be
+  // blank (not every item has strength data), so build it defensively and
+  // only show what's actually there.
+  const itemDetails = [drug.concentration, drug.form].filter(Boolean).join(' · ')
 
   function handleBookmark(e) {
     e.stopPropagation()
@@ -104,13 +108,33 @@ export default function DrugCard({ drug, onTap }) {
         </button>
       </div>
 
-      {/* English generic name */}
+      {/* Item name (+ concentration/form) — primary, per ADR-029 */}
       <div style={{
         fontSize: 16,
         fontWeight: 600,
         color: 'var(--color-text-primary)',
         marginBottom: 'var(--space-1)',
         lineHeight: 1.3,
+      }}>
+        {drug.name}
+        {itemDetails && (
+          <span style={{
+            fontWeight: 400,
+            fontSize: 13,
+            color: 'var(--color-text-tertiary)',
+          }}>
+            {' '}{itemDetails}
+          </span>
+        )}
+      </div>
+
+      {/* Generic name — secondary */}
+      <div style={{
+        fontSize: 13,
+        color: 'var(--color-accent)',
+        fontWeight: 500,
+        lineHeight: 1.4,
+        marginBottom: 'var(--space-1)',
       }}>
         {drug.genericName}
       </div>
@@ -123,23 +147,9 @@ export default function DrugCard({ drug, onTap }) {
         textAlign: 'right',
         direction: 'rtl',
         lineHeight: 1.4,
-        marginBottom: brandNames.length > 0 ? 'var(--space-1)' : 0,
       }}>
         {drug.arabicName}
       </div>
-
-      {/* Brand names */}
-      {brandNames.length > 0 && (
-        <div style={{
-          fontSize: 12,
-          color: 'var(--color-accent)',
-          fontWeight: 500,
-          lineHeight: 1.4,
-          wordBreak: 'break-word',
-        }}>
-          {brandNames.join(' · ')}
-        </div>
-      )}
     </div>
   )
 }

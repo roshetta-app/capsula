@@ -440,7 +440,10 @@ function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTa
 // ─── DrugListRow ──────────────────────────────────────────────────────────────
 
 function DrugListRow({ drug, onTap, categories, isDark }) {
-  const brandNames = drug.brands?.map(b => b.name) ?? []
+  // Item's own concentration/form, e.g. "500mg · Tablet" — either piece can
+  // be blank (not every item has strength data), so build it defensively
+  // and only show what's actually there.
+  const itemDetails = [drug.concentration, drug.form].filter(Boolean).join(' · ')
   // drug.category holds the category's stable slug, not its display name —
   // look up the matching category record for both the label and its color.
   // Falls back to the raw stored value if it doesn't match any category
@@ -463,16 +466,19 @@ function DrugListRow({ drug, onTap, categories, isDark }) {
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {/* Name + brands */}
+      {/* Item name (+ concentration/form), generic name secondary — per ADR-029 */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+          {drug.name}
+          {itemDetails && (
+            <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--color-text-tertiary)' }}>
+              {' '}{itemDetails}
+            </span>
+          )}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 500, marginTop: 1, lineHeight: 1.3 }}>
           {drug.genericName}
         </div>
-        {brandNames.length > 0 && (
-          <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 500, marginTop: 1, lineHeight: 1.3 }}>
-            {brandNames.slice(0, 4).join(' · ')}{brandNames.length > 4 ? ' …' : ''}
-          </div>
-        )}
       </div>
 
       {/* Category pill */}
