@@ -377,7 +377,6 @@ export default function DrugPickerModal({
           manufacturer: null,
           source: SOURCE_FLAG_VALUE,
           is_published: true,
-          is_available: true,
         })
         if (insertErr) throw new Error(insertErr.message)
         brandRow = { id: created.id, name, name_ar: null }
@@ -651,5 +650,3 @@ export default function DrugPickerModal({
     </Modal>
   )
 }
-
-
