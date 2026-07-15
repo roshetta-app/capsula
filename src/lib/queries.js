@@ -37,7 +37,7 @@ export async function fetchFlatDrugs(supabase) {
         pharmacokinetics, textbook_doses, textbook_dose_notes,
         mechanism_of_action, card_tagline, is_published
       ),
-      brands ( id, name, name_ar, manufacturer, source, is_available, is_published )
+      brands ( id, name, name_ar, manufacturer, source, is_published )
     `)
     .eq('is_published', true)
     .order('name_en', { referencedTable: 'generics' })
@@ -78,16 +78,16 @@ export async function fetchFlatDrugs(supabase) {
       route:                f.route,
       doses:                f.doses_structured ?? [],
       defaultDoseOverride:  f.default_dose_override,
-      // Brands (published only, available only)
+      // Brands (published only)
       brands: (f.brands ?? [])
-        .filter(b => b.is_published && b.is_available)
+        .filter(b => b.is_published)
         .map(b => ({
           id:           b.id,
           name:         b.name,
           nameAr:       b.name_ar,
           manufacturer: b.manufacturer,
           source:       b.source,
-          isAvailable:  b.is_available,
+          isAvailable:  true,
         })),
     }))
 }
