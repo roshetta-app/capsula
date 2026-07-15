@@ -14,7 +14,6 @@ import DoseTable                         from '../components/drugs/DoseTable'
 import BrandsList                        from '../components/drugs/BrandsList'
 import DrugInfoSections                  from '../components/drugs/DrugInfoSections'
 import { useDrugContext }                from '../context/DrugContext'
-import { useStock }                      from '../hooks/useStock'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { logUsageEvent }                 from '../analytics/usageEvents'
 
@@ -23,7 +22,6 @@ export default function DrugDetailScreen() {
   const navigate   = useNavigate()
 
   const { drugs, loading }          = useDrugContext()
-  const { stockMap, toggleStock }   = useStock(drugs)
   const { isDrugFavourited, toggleDrug } = useFavouritesContext()
 
   // Match by formulation slug first, fall back to id
@@ -99,17 +97,6 @@ export default function DrugDetailScreen() {
     )
   }
 
-  // ── Per-brand stock toggle ─────────────────────────────────────────────────
-  const brandStockMap = {}
-  drug.brands?.forEach(b => {
-    brandStockMap[b.id] = stockMap[b.id] !== false
-  })
-
-  function handleBrandStockToggle(brandId) {
-    const current = brandStockMap[brandId]
-    toggleStock(brandId, !current)
-  }
-
   // ── Detail ─────────────────────────────────────────────────────────────────
   return (
     <Layout>
@@ -141,8 +128,6 @@ export default function DrugDetailScreen() {
             brands={drug.brands}
             concentration={drug.concentration}
             form={drug.form}
-            stockMap={brandStockMap}
-            onToggleStock={handleBrandStockToggle}
           />
 
           <DrugInfoSections drug={drug} />
