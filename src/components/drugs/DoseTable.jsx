@@ -3,14 +3,10 @@
  * Phase 2G — Drug Detail Screen
  *
  * Props:
- *   doses               — array of dose rows (doses_structured) from formulation
  *   defaultDoseOverride — string | null — override note shown below table
- *   textbookDoses       — array of textbook dose rows
+ *   textbookDoses       — array of textbook dose rows — the only dose table shown
  *   textbookDoseNotes   — string | null
  */
-
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
 
 /** Map raw 'who' values to readable display labels */
 const WHO_LABELS = {
@@ -33,9 +29,10 @@ function formatWho(who) {
   return WHO_LABELS[who.toLowerCase().replace(/\s+/g, '-')] ?? who
 }
 
-function DoseRowLine({ row, i }) {
+function DoseRowLine({ row, i, id }) {
   return (
     <tr
+      id={id}
       key={i}
       style={{ borderBottom: '1px solid var(--color-border-subtle)' }}
     >
@@ -80,20 +77,30 @@ function DoseRowLine({ row, i }) {
 }
 
 export default function DoseTable({
-  doses = [],
   defaultDoseOverride,
   textbookDoses = [],
   textbookDoseNotes,
 }) {
-  const [refOpen, setRefOpen] = useState(false)
+  const hasTextbook = textbookDoses.length > 0
 
-  const hasPractical  = doses.length > 0
-  const hasTextbook   = textbookDoses.length > 0
-  const hasAnything   = hasPractical || hasTextbook
+  if (!hasTextbook) return null
 
-  if (!hasAnything) return null
+  /* Quick-jump nav (ADR-032): one entry per distinct who/group label, in the
+   * order it first appears — links to that row's id, table stays continuous
+   * and always visible, nothing is hidden or collapsed. */
+  const jumpGroups = []
+  const seenLabels = new Set()
+  textbookDoses.forEach((row, i) => {
+    const label = formatWho(row.who ?? row.group)
+    if (label && !seenLabels.has(label)) {
+      seenLabels.add(label)
+      jumpGroups.push({ label, id: `dose-row-${i}` })
+    }
+  })
 
-  const primaryDoses = hasPractical ? doses : textbookDoses
+  const scrollToRow = (id) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -109,11 +116,43 @@ export default function DoseTable({
         Dose
       </div>
 
-      {/* Practical dose table */}
+      {/* Quick-jump nav — only useful when there's more than one group */}
+      {jumpGroups.length > 1 && (
+        <div style={{
+          display:      'flex',
+          gap:          'var(--space-2)',
+          overflowX:    'auto',
+          marginBottom: 'var(--space-3)',
+        }}>
+          {jumpGroups.map(group => (
+            <button
+              key={group.id}
+              onClick={() => scrollToRow(group.id)}
+              style={{
+                flexShrink:   0,
+                background:   'transparent',
+                border:       '1px solid var(--color-border-subtle)',
+                borderRadius: 'var(--radius-sm)',
+                padding:      '4px 10px',
+                fontSize:     12,
+                fontWeight:   600,
+                color:        'var(--color-text-secondary)',
+                fontFamily:   'var(--font-body)',
+                cursor:       'pointer',
+                whiteSpace:   'nowrap',
+              }}
+            >
+              {group.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Textbook dose table — always visible, continuous */}
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <tbody>
-          {primaryDoses.map((row, i) => (
-            <DoseRowLine key={i} row={row} i={i} />
+          {textbookDoses.map((row, i) => (
+            <DoseRowLine key={i} row={row} i={i} id={`dose-row-${i}`} />
           ))}
         </tbody>
       </table>
@@ -131,51 +170,16 @@ export default function DoseTable({
         </div>
       )}
 
-      {/* Reference dose collapsible — only show if we have practical doses AND textbook doses */}
-      {hasPractical && hasTextbook && (
-        <div style={{ marginTop: 'var(--space-4)' }}>
-          <button
-            onClick={() => setRefOpen(o => !o)}
-            style={{
-              display:        'flex',
-              alignItems:     'center',
-              gap:            'var(--space-1)',
-              background:     'none',
-              border:         'none',
-              cursor:         'pointer',
-              color:          'var(--color-accent)',
-              fontSize:       13,
-              fontWeight:     500,
-              fontFamily:     'var(--font-body)',
-              padding:        0,
-            }}
-          >
-            {refOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            Reference Dose
-          </button>
-
-          {refOpen && (
-            <div style={{ marginTop: 'var(--space-3)' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <tbody>
-                  {textbookDoses.map((row, i) => (
-                    <DoseRowLine key={i} row={row} i={i} />
-                  ))}
-                </tbody>
-              </table>
-              {textbookDoseNotes && (
-                <div style={{
-                  fontSize:   13,
-                  fontStyle:  'italic',
-                  color:      'var(--color-text-tertiary)',
-                  marginTop:  'var(--space-2)',
-                  lineHeight: 1.5,
-                }}>
-                  {textbookDoseNotes}
-                </div>
-              )}
-            </div>
-          )}
+      {/* Textbook dose notes */}
+      {textbookDoseNotes && (
+        <div style={{
+          fontSize:   13,
+          fontStyle:  'italic',
+          color:      'var(--color-text-tertiary)',
+          marginTop:  'var(--space-2)',
+          lineHeight: 1.5,
+        }}>
+          {textbookDoseNotes}
         </div>
       )}
 
