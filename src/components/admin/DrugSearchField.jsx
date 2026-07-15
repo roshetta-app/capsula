@@ -116,6 +116,15 @@
  *   (a different concept — whether the name navigates to Drug Detail on
  *   the app side) up next to the pencil instead of sitting separately
  *   below all the row's fields.
+ *
+ * BUG FIX (2026-07-16, GFB step 3.2):
+ *   Both private search queries below (searchFormulations, searchBrands)
+ *   could surface unpublished brands — searchFormulations built its
+ *   brand-name list from every nested brand regardless of publish state,
+ *   and searchBrands filtered on the parent formulation's publish state
+ *   but never checked the brand row's own is_published flag. Both now
+ *   filter out unpublished brands, matching the same published-only rule
+ *   already enforced by fetchFlatDrugs in queries.js.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -140,7 +149,7 @@ async function searchFormulations(query) {
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
       generics ( id, name_en, name_ar, slug, category ),
-      brands ( id, name, name_ar )
+      brands ( id, name, name_ar, is_published )
     `)
     .eq('is_published', true)
     .order('concentration')
@@ -153,7 +162,7 @@ async function searchFormulations(query) {
     const genericName   = (f.generics?.name_en ?? '').toLowerCase()
     const concentration = (f.concentration ?? '').toLowerCase()
     const form          = (f.form ?? '').toLowerCase()
-    const brandNames    = (f.brands ?? []).map(b => b.name.toLowerCase()).join(' ')
+    const brandNames    = (f.brands ?? []).filter(b => b.is_published).map(b => b.name.toLowerCase()).join(' ')
     return (
       genericName.includes(q) ||
       concentration.includes(q) ||
@@ -169,13 +178,14 @@ async function searchBrands(query) {
   const { data, error } = await supabase
     .from('brands')
     .select(`
-      id, name, name_ar,
+      id, name, name_ar, is_published,
       formulations (
         id, concentration, form, route,
         doses_structured, default_dose_override,
         generics ( id, name_en, name_ar, slug, category )
       )
     `)
+    .eq('is_published', true)
     .eq('formulations.is_published', true)
     .order('name')
 
@@ -214,7 +224,7 @@ function toSuggestion(result, mode) {
   }
   const g = result.generics
   const detail = [result.concentration, result.form].filter(Boolean).join(' ')
-  const brandNames = (result.brands ?? []).map(b => b.name).join(', ')
+  const brandNames = (result.brands ?? []).filter(b => b.is_published).map(b => b.name).join(', ')
   const label = [g?.name_en ?? 'Unknown generic', detail].filter(Boolean).join(' ')
   return { id: result.id, name: brandNames ? `${label} (${brandNames})` : label, _raw: result }
 }
@@ -759,8 +769,3 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
-
-
-
-
-
