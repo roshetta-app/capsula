@@ -5,6 +5,11 @@
  * Mirrors useConditionSearch but for flat drug objects.
  * Does NOT replace useSearch.js — that hook stays for backward compat.
  *
+ * GFB step 3.5.5 (2026-07-16): now takes an explicit mode: 'brand'|'generic'
+ * param (per plan §5/§10 Section 2, ADR-042). Both split indexes (from step
+ * 3.3) are built once per drugs load; switching mode re-runs search against
+ * the already-built index for that mode — no index rebuild on toggle.
+ *
  * Exposes:
  *   query            — current search string
  *   setQuery         — setter
@@ -16,33 +21,39 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  buildDrugIndex,
+  buildDrugBrandIndex,
+  buildDrugGenericIndex,
   fuzzySearchDrugs,
-  getDrugAutocompleteSuggestions,
+  getDrugAutocompleteSuggestionsByMode,
 } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
-export function useDrugSearch(drugs) {
+export function useDrugSearch(drugs, mode = 'brand') {
   const [query,           setQuery]           = useState('')
   const [results,         setResults]         = useState(drugs)
   const [suggestions,     setSuggestions]     = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
-  // Build Fuse index when drugs load or change (cache refresh)
-  const fuseRef = useRef(null)
+  // Both split indexes are built once per drugs load — mode toggling below
+  // just picks which already-built index to search against.
+  const brandIndexRef   = useRef(null)
+  const genericIndexRef = useRef(null)
+
   useEffect(() => {
-    fuseRef.current = buildDrugIndex(drugs)
-    runSearch(query)
+    brandIndexRef.current   = buildDrugBrandIndex(drugs)
+    genericIndexRef.current = buildDrugGenericIndex(drugs)
+    runSearch(query, mode)
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const runSearch = useCallback((q) => {
-    if (!fuseRef.current) return
+  const runSearch = useCallback((q, currentMode) => {
+    const fuseIndex = currentMode === 'brand' ? brandIndexRef.current : genericIndexRef.current
+    if (!fuseIndex) return
 
     const trimmed = q.trim()
 
     // Fuzzy match
     const matched = trimmed.length >= 2
-      ? (fuzzySearchDrugs(fuseRef.current, trimmed) ?? drugs)
+      ? (fuzzySearchDrugs(fuseIndex, trimmed) ?? drugs)
       : drugs
 
     setResults(matched)
@@ -54,7 +65,7 @@ export function useDrugSearch(drugs) {
 
     // Autocomplete suggestions
     if (trimmed.length >= 2) {
-      const sug = getDrugAutocompleteSuggestions(fuseRef.current, trimmed)
+      const sug = getDrugAutocompleteSuggestionsByMode(fuseIndex, trimmed, 5, currentMode)
       setSuggestions(sug)
       setShowSuggestions(sug.length > 0)
     } else {
@@ -63,11 +74,13 @@ export function useDrugSearch(drugs) {
     }
   }, [drugs])
 
-  // 150ms debounce
+  // 150ms debounce — reacts to query typing AND mode toggling. No index
+  // rebuild happens here either way (both indexes are already built above),
+  // so a toggle just re-scores against the other already-built index.
   useEffect(() => {
-    const timer = setTimeout(() => runSearch(query), 150)
+    const timer = setTimeout(() => runSearch(query, mode), 150)
     return () => clearTimeout(timer)
-  }, [query, runSearch])
+  }, [query, mode, runSearch])
 
   function clearSuggestions() {
     setShowSuggestions(false)
