@@ -2,7 +2,7 @@
  * adminQueries.js — Supabase write operations for the admin CMS.
  *
  * Sessions:
- *   5.2 — updateBrandStock, deleteFormulation
+ *   5.2 — deleteFormulation
  *   5.3 — insertGeneric, updateGeneric, insertFormulation, updateFormulation,
  *           insertBrand, updateBrand, deleteBrand, fetchFormulationWithGeneric
  *   5.4 — insertSpecialty, updateSpecialty, insertCondition, updateCondition,
@@ -37,16 +37,6 @@ function tagNameToSlug(name) {
     .replace(/^-|-$/g, '')
   if (latin.length >= 2) return latin
   return `tag-${Math.random().toString(36).slice(2, 6)}`
-}
-
-// ─── Brands — stock toggles (5.2) ────────────────────────────────────────────
-
-export async function updateBrandStock(id, field, value) {
-  const { error } = await supabase
-    .from('brands')
-    .update({ [field]: value })
-    .eq('id', id)
-  return { error }
 }
 
 // ─── Formulations — delete (5.2) ─────────────────────────────────────────────
