@@ -748,7 +748,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
             manufacturer: null,
             source: SOURCE_FLAG_VALUE,
             is_published: true,
-            is_available: true,
           })
           if (bErr) throw new Error(`Creating brand "${brandName}": ${bErr.message}`)
           brandId = newBrand.id
@@ -1711,5 +1710,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
-
-
