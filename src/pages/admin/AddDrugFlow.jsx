@@ -41,8 +41,6 @@ const EMPTY_BRAND = {
   name:         '',
   name_ar:      null,
   manufacturer: null,
-  in_stock:     true,
-  is_available: true,
 }
 
 export default function AddDrugFlow() {
@@ -113,8 +111,6 @@ export default function AddDrugFlow() {
           name:           brand.name.trim(),
           name_ar:        brand.name_ar?.trim() || null,
           manufacturer:   brand.manufacturer?.trim() || null,
-          in_stock:       brand.in_stock,
-          is_available:   brand.is_available,
         })
         if (bErr) throw new Error(`Brand "${brand.name}": ${bErr.message}`)
       }
@@ -315,5 +311,3 @@ function primaryBtn(disabled) {
     transition: 'background-color 0.15s ease',
   }
 }
-
-
