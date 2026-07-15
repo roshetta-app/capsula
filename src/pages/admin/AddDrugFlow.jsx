@@ -25,22 +25,30 @@ const EMPTY_GENERIC = {
   name_ar:  '',
   category: '',
   class:    '',
-  uses:     [],
-  warnings: [],
-  doses:    [],
 }
 
 const EMPTY_FORMULATION = {
-  concentration: '',
-  form:          '',
-  route:         '',
-  doses:         [],
+  concentration:          '',
+  form:                   '',
+  route:                  '',
+  doses:                  [],
+  default_dose_override:  null,
+  is_published:           true,
+  strength_value:         null,
+  strength_unit:          null,
+  strength_basis:         null,
+  form_modifier:          [],
+  device_type:            null,
+  route_details:          [],
+  formulation_note:       null,
 }
 
 const EMPTY_BRAND = {
   name:         '',
   name_ar:      null,
   manufacturer: null,
+  source:       'manual',
+  is_published: true,
 }
 
 export default function AddDrugFlow() {
@@ -84,23 +92,52 @@ export default function AddDrugFlow() {
 
       const { data: newGeneric, error: gErr } = await insertGeneric({
         slug,
-        name_en:  generic.name_en.trim(),
-        name_ar:  generic.name_ar?.trim() || '',
-        category: generic.category,
-        class:    generic.class?.trim()   || null,
-        uses:     generic.uses,
-        warnings: generic.warnings,
-        doses:    generic.doses,
+        name_en:              generic.name_en.trim(),
+        name_ar:              generic.name_ar?.trim() || '',
+        category:             generic.category,
+        class:                generic.class?.trim()   || null,
+        is_published:         generic.is_published ?? true,
+        card_tagline:         generic.card_tagline?.trim() || null,
+        mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
+        uses_structured:      generic.uses_structured ?? null,
+        uses_legacy:          [],
+        warnings_legacy:      [],
+        side_effects_common:  generic.side_effects_common  ?? [],
+        side_effects_serious: generic.side_effects_serious ?? [],
+        pregnancy_category:   generic.pregnancy_category   || null,
+        breastfeeding_safety: generic.breastfeeding_safety || null,
+        crosses_placenta:     generic.crosses_placenta     || null,
+        crosses_bbb:          generic.crosses_bbb          || null,
+        contraindications:    generic.contraindications    ?? [],
+        drug_interactions:    generic.drug_interactions    ?? [],
+        dose_adjustments:     generic.dose_adjustments     ?? [],
+        pharmacokinetics:     generic.pharmacokinetics     ?? null,
+        textbook_doses:       generic.textbook_doses       ?? [],
+        textbook_dose_notes:  generic.textbook_dose_notes?.trim() || null,
       })
       if (gErr) throw new Error(`Generic: ${gErr.message}`)
 
-      // 2. Insert formulation
+      // 2. Insert formulation — slug generated the same way DrugEditor.jsx does
+      //    when adding a formulation: generic slug + timestamp for uniqueness.
+      const formulationSlug = `${slug}-${Date.now()}`
+
       const { data: newFormulation, error: fErr } = await insertFormulation({
-        generic_id:    newGeneric.id,
-        concentration: formulation.concentration.trim(),
-        form:          formulation.form,
-        route:         formulation.route,
-        doses:         formulation.doses,
+        generic_id:            newGeneric.id,
+        slug:                  formulationSlug,
+        concentration:         formulation.concentration.trim(),
+        form:                  formulation.form,
+        route:                 formulation.route,
+        strength_value:        formulation.strength_value?.trim() || null,
+        strength_unit:         formulation.strength_unit?.trim()  || null,
+        strength_basis:        formulation.strength_basis?.trim() || null,
+        strength_structured:   formulation.strength_structured ?? null,
+        form_modifier:         formulation.form_modifier ?? [],
+        device_type:           formulation.device_type?.trim() || null,
+        route_details:         formulation.route_details ?? [],
+        formulation_note:      formulation.formulation_note?.trim() || null,
+        doses_structured:      formulation.doses,
+        default_dose_override: formulation.default_dose_override || null,
+        is_published:          formulation.is_published ?? true,
       })
       if (fErr) throw new Error(`Formulation: ${fErr.message}`)
 
@@ -111,6 +148,8 @@ export default function AddDrugFlow() {
           name:           brand.name.trim(),
           name_ar:        brand.name_ar?.trim() || null,
           manufacturer:   brand.manufacturer?.trim() || null,
+          source:         brand.source ?? 'manual',
+          is_published:   brand.is_published ?? true,
         })
         if (bErr) throw new Error(`Brand "${brand.name}": ${bErr.message}`)
       }
@@ -238,7 +277,12 @@ export default function AddDrugFlow() {
             <GenericEditor generic={generic} onChange={patchGeneric} disabled={saving} />
           )}
           {step === 1 && (
-            <FormulationEditor formulation={formulation} onChange={patchFormulation} disabled={saving} />
+            <FormulationEditor
+              formulation={formulation}
+              genericName={generic.name_en}
+              onChange={patchFormulation}
+              disabled={saving}
+            />
           )}
           {step === 2 && (
             <BrandEditor brands={brands} onChange={setBrands} disabled={saving} />
