@@ -1,15 +1,3 @@
-
-
-```txt
-capsula
-└── src
-    └── pages
-        └── FavouritesScreen.jsx
-
-```
-
-`src\pages\FavouritesScreen.jsx`:
-
 /**
  * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
