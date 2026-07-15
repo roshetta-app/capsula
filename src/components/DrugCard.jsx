@@ -26,7 +26,7 @@ const CATEGORY_COLORS = {
   'other':                   { bg: '#FEE2E2', color: '#7F1D1D' },
 }
 
-export default function DrugCard({ drug, onTap, isInStock = true }) {
+export default function DrugCard({ drug, onTap }) {
   const { isDrugFavourited, toggleDrug } = useFavouritesContext()
   const isFavourited = isDrugFavourited(drug.id)
 
@@ -43,13 +43,12 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
     <div
       onClick={() => onTap(drug)}
       style={{
-        backgroundColor: isInStock ? 'var(--color-surface)' : 'var(--color-outstock-bg)',
+        backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-3) var(--space-4)',
         marginBottom: 'var(--space-2)',
         cursor: 'pointer',
-        opacity: isInStock ? 1 : 0.5,
         transition: 'box-shadow 0.15s ease, transform 0.1s ease',
         boxShadow: 'var(--shadow-card)',
       }}
@@ -62,7 +61,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
         e.currentTarget.style.transform = 'translateY(0)'
       }}
     >
-      {/* Top row: chip + bookmark + stock dot */}
+      {/* Top row: chip + bookmark */}
       <div style={{
         display: 'flex',
         justifyContent: 'space-between',
@@ -82,45 +81,34 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
           {label}
         </span>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          {/* Bookmark button */}
-          <button
-            onClick={handleBookmark}
-            aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: isFavourited ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-              transition: 'color 0.15s ease',
-              flexShrink: 0,
-            }}
-          >
-            {isFavourited
-              ? <BookmarkCheck size={16} />
-              : <Bookmark size={16} />
-            }
-          </button>
-
-          {/* Stock dot */}
-          <div style={{
-            width: 8,
-            height: 8,
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: isInStock ? 'var(--color-instock)' : 'var(--color-outstock)',
+        {/* Bookmark button */}
+        <button
+          onClick={handleBookmark}
+          aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            color: isFavourited ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+            transition: 'color 0.15s ease',
             flexShrink: 0,
-          }} />
-        </div>
+          }}
+        >
+          {isFavourited
+            ? <BookmarkCheck size={16} />
+            : <Bookmark size={16} />
+          }
+        </button>
       </div>
 
       {/* English generic name */}
       <div style={{
         fontSize: 16,
         fontWeight: 600,
-        color: isInStock ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+        color: 'var(--color-text-primary)',
         marginBottom: 'var(--space-1)',
         lineHeight: 1.3,
       }}>
@@ -130,7 +118,7 @@ export default function DrugCard({ drug, onTap, isInStock = true }) {
       {/* Arabic name */}
       <div style={{
         fontSize: 13,
-        color: isInStock ? 'var(--color-text-arabic)' : 'var(--color-text-tertiary)',
+        color: 'var(--color-text-arabic)',
         fontFamily: 'var(--font-arabic)',
         textAlign: 'right',
         direction: 'rtl',
