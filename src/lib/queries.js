@@ -128,19 +128,6 @@ const CONDITIONS_SELECT = `
   patient_instructions, clinical_blocks, is_published,
   specialties!conditions_specialty_id_fkey ( id, name_en, slug, icon_name, icon_type, icon_url, color_hex, color_token, sort_order ),
   condition_images ( id, url, caption, sort_order ),
-  prescriptions (
-    id, label, sort_order,
-    prescription_items (
-      id, type, content, sort_order,
-      dose_override, drug_note, drug_note_ar, show_generic_link,
-      prescription_drug_alternatives (
-        id, dose_instruction, sort_order,
-        brands ( id, name, name_ar, is_published,
-          formulations ( id, slug, concentration, form, route )
-        )
-      )
-    )
-  ),
   condition_blocks ( id, block_type, order_index, data, created_at, updated_at ),
   condition_tags ( tags ( name ) )
 `
@@ -187,37 +174,6 @@ function mapConditions(data) {
     tags: (c.condition_tags ?? [])
       .map(ct => ct.tags?.name)
       .filter(Boolean),
-    prescriptions: (c.prescriptions ?? [])
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(rx => ({
-        id:    rx.id,
-        label: rx.label,
-        items: (rx.prescription_items ?? [])
-          .sort((a, b) => a.sort_order - b.sort_order)
-          .map(item => ({
-            id:              item.id,
-            type:            item.type,
-            content:         item.content,
-            doseOverride:    item.dose_override,
-            drugNote:        item.drug_note,
-            drugNoteAr:      item.drug_note_ar,
-            showGenericLink: item.show_generic_link ?? true,
-            alternatives: (item.prescription_drug_alternatives ?? [])
-              .filter(alt => alt.brands?.is_published !== false)
-              .sort((a, b) => a.sort_order - b.sort_order)
-              .map(alt => ({
-                id:              alt.id,
-                doseInstruction: alt.dose_instruction,
-                brandId:         alt.brands?.id,
-                brandName:       alt.brands?.name,
-                brandNameAr:     alt.brands?.name_ar,
-                formulationSlug: alt.brands?.formulations?.slug,
-                concentration:   alt.brands?.formulations?.concentration,
-                form:            alt.brands?.formulations?.form,
-                route:           alt.brands?.formulations?.route,
-              })),
-          })),
-      })),
   }))
 }
 
