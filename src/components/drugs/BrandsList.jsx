@@ -6,11 +6,9 @@
  *   brands        — array of brand objects { id, name, nameAr }
  *   concentration — string from parent formulation
  *   form          — string from parent formulation
- *   stockMap      — { [brandId]: boolean } — true = in stock
- *   onToggleStock — (brandId) => void
  */
 
-export default function BrandsList({ brands = [], concentration, form, stockMap = {}, onToggleStock }) {
+export default function BrandsList({ brands = [], concentration, form }) {
   if (brands.length === 0) return null
 
   const subtitle = [concentration, form].filter(Boolean).join(' · ')
@@ -30,62 +28,40 @@ export default function BrandsList({ brands = [], concentration, form, stockMap 
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {brands.map(brand => {
-          const inStock = stockMap[brand.id] !== false  // default = in stock
-
-          return (
-            <div
-              key={brand.id}
-              style={{
-                display:         'flex',
-                alignItems:      'center',
-                justifyContent:  'space-between',
-                backgroundColor: 'var(--color-bg)',
-                border:          '1px solid var(--color-border-subtle)',
-                borderRadius:    'var(--radius-sm)',
-                padding:         'var(--space-3) var(--space-4)',
-              }}
-            >
-              {/* Brand info */}
-              <div>
+        {brands.map(brand => (
+          <div
+            key={brand.id}
+            style={{
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'space-between',
+              backgroundColor: 'var(--color-bg)',
+              border:          '1px solid var(--color-border-subtle)',
+              borderRadius:    'var(--radius-sm)',
+              padding:         'var(--space-3) var(--space-4)',
+            }}
+          >
+            {/* Brand info */}
+            <div>
+              <span style={{
+                fontSize:   14,
+                fontWeight: 600,
+                color:      'var(--color-text-primary)',
+              }}>
+                {brand.name}
+              </span>
+              {subtitle && (
                 <span style={{
-                  fontSize:   14,
-                  fontWeight: 600,
-                  color:      'var(--color-text-primary)',
+                  fontSize:   12,
+                  color:      'var(--color-text-tertiary)',
+                  marginLeft: 'var(--space-2)',
                 }}>
-                  {brand.name}
+                  {subtitle}
                 </span>
-                {subtitle && (
-                  <span style={{
-                    fontSize:   12,
-                    color:      'var(--color-text-tertiary)',
-                    marginLeft: 'var(--space-2)',
-                  }}>
-                    {subtitle}
-                  </span>
-                )}
-              </div>
-
-              {/* Stock dot toggle */}
-              <button
-                onClick={() => onToggleStock(brand.id)}
-                title={inStock ? 'In stock — tap to mark out of stock' : 'Out of stock — tap to mark in stock'}
-                aria-label={inStock ? 'In stock' : 'Out of stock'}
-                style={{
-                  width:        12,
-                  height:       12,
-                  borderRadius: '50%',
-                  backgroundColor: inStock ? '#22C55E' : '#9CA3AF',
-                  border:       'none',
-                  cursor:       'pointer',
-                  flexShrink:   0,
-                  padding:      0,
-                  transition:   'background-color 0.15s',
-                }}
-              />
+              )}
             </div>
-          )
-        })}
+          </div>
+        ))}
       </div>
 
       <div style={{
