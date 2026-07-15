@@ -310,13 +310,13 @@ export default function DrugEditor() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <Shell name="Loading…" onBack={() => navigate('/admin/drugs')}>
+    <Shell name="Loading…" onBack={() => navigate(-1)}>
       <LoadingSkeleton />
     </Shell>
   )
 
   if (fetchErr) return (
-    <Shell name="Error" onBack={() => navigate('/admin/drugs')}>
+    <Shell name="Error" onBack={() => navigate(-1)}>
       <ErrorBanner message={fetchErr} />
     </Shell>
   )
@@ -324,7 +324,7 @@ export default function DrugEditor() {
   const genericValid = generic?.name_en?.trim() && generic?.category
 
   return (
-    <Shell name={generic?.name_en ?? 'Drug'} onBack={() => navigate('/admin/drugs')}>
+    <Shell name={generic?.name_en ?? 'Drug'} onBack={() => navigate(-1)}>
 
       {globalError && (
         <ErrorBanner message={globalError} onDismiss={() => setGlobalError(null)} />
