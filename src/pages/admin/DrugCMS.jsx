@@ -50,6 +50,7 @@ export default function DrugCMS() {
   const [query,           setQuery]           = useState('')
   const [debouncedQuery,  setDebouncedQuery]  = useState('')
   const [activeCategory,  setActiveCategory]  = useState(null)
+  const [sortBy,          setSortBy]          = useState('name') // 'name' | 'common'
   const [page,            setPage]            = useState(0)
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
@@ -66,17 +67,18 @@ export default function DrugCMS() {
     return () => clearTimeout(t)
   }, [query])
 
-  // A new search or category always starts back at page 1 — the old page
-  // number wouldn't mean anything against a different result set.
-  useEffect(() => { setPage(0) }, [debouncedQuery, activeCategory])
+  // A new search, category, or sort order always starts back at page 1 —
+  // the old page number wouldn't mean anything against a different result set.
+  useEffect(() => { setPage(0) }, [debouncedQuery, activeCategory, sortBy])
 
-  // ── Load — always a real, filtered, paginated query against the live DB ──────
+  // ── Load — always a real, filtered, sorted, paginated query against the live DB ──
   async function load() {
     setLoading(true)
     setLoadError(null)
     const { data, count, error } = await fetchGenericsPage({
       query: debouncedQuery,
       category: activeCategory,
+      sortBy,
       limit: PAGE_SIZE,
       page,
     })
@@ -86,7 +88,7 @@ export default function DrugCMS() {
     setTotalCount(count)
   }
 
-  useEffect(() => { load() }, [debouncedQuery, activeCategory, page])
+  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, page])
 
   // ── Publish toggle ──────────────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
@@ -165,6 +167,22 @@ export default function DrugCMS() {
           ))}
         </select>
       )}
+
+      {/* Sort toggle */}
+      <div style={sortToggleWrapStyle}>
+        <button
+          onClick={() => setSortBy('name')}
+          style={{ ...sortToggleBtnStyle, ...(sortBy === 'name' ? sortToggleBtnActiveStyle : {}) }}
+        >
+          Alphabetical
+        </button>
+        <button
+          onClick={() => setSortBy('common')}
+          style={{ ...sortToggleBtnStyle, ...(sortBy === 'common' ? sortToggleBtnActiveStyle : {}) }}
+        >
+          Most Common
+        </button>
+      </div>
 
       {/* Count */}
       <div style={{
@@ -552,6 +570,32 @@ const searchInputStyle = {
   color: 'var(--color-text-primary)',
   outline: 'none',
   boxShadow: 'var(--shadow-card)',
+}
+
+const sortToggleWrapStyle = {
+  display: 'flex', gap: 'var(--space-2)',
+  marginBottom: 'var(--space-3)',
+}
+
+const sortToggleBtnStyle = {
+  flex: 1,
+  padding: '6px 14px',
+  borderRadius: 'var(--radius-full)',
+  fontSize: 12,
+  fontWeight: 500,
+  fontFamily: 'var(--font-body)',
+  cursor: 'pointer',
+  border: '1.5px solid var(--color-border)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-secondary)',
+  transition: 'all 0.15s ease',
+}
+
+const sortToggleBtnActiveStyle = {
+  fontWeight: 600,
+  border: '1.5px solid var(--color-accent)',
+  backgroundColor: 'var(--color-accent)',
+  color: '#fff',
 }
 
 const pagerStyle = {

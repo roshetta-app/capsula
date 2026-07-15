@@ -821,19 +821,26 @@ export async function fetchAllGenerics() {
  * server-side pagination — flipping pages re-queries the DB, it doesn't
  * page through an already-fetched list.
  *
- * @param {{ query?: string, category?: string|null, limit?: number, page?: number }} params
+ * `sortBy` picks the ordering: 'name' (default, alphabetical) or 'common'
+ * (generics.brand_count descending, alphabetical as the tiebreaker) — that
+ * column is a real, trigger-maintained count, not computed here.
+ *
+ * @param {{ query?: string, category?: string|null, limit?: number, page?: number, sortBy?: 'name'|'common' }} params
  * @returns {Promise<{ data: object[]|null, count: number, error: object|null }>}
  */
-export async function fetchGenericsPage({ query = '', category = null, limit = 50, page = 0 } = {}) {
+export async function fetchGenericsPage({ query = '', category = null, limit = 50, page = 0, sortBy = 'name' } = {}) {
   let q = supabase
     .from('generics')
     .select(`
       id, name_en, name_ar, category, class,
-      is_published, updated_at,
+      is_published, updated_at, brand_count,
       formulations ( id )
     `, { count: 'exact' })
-    .order('name_en', { ascending: true })
     .range(page * limit, page * limit + limit - 1)
+
+  q = sortBy === 'common'
+    ? q.order('brand_count', { ascending: false }).order('name_en', { ascending: true })
+    : q.order('name_en', { ascending: true })
 
   if (category) q = q.eq('category', category)
 
