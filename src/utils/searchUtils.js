@@ -28,6 +28,14 @@
  * read the nested `brands` array that no longer exists after the Phase
  * 3.1 reshape (each row is now a single item, not a formulation with a
  * brands array), so that key silently matched nothing anyway.
+ *
+ * GFB step 3.5.3 (2026-07-16): DRUG_GENERIC_FUSE_OPTIONS now also scores
+ * `ingredients` (per ADR-042) — the per-ingredient text array on combo
+ * generics, backfilled in 3.5.1 and returned by fetchFlatDrugs in 3.5.2.
+ * Lets a search like "amoxicillin" surface a combo generic such as
+ * "amoxicillin + clavulanic acid" even when the combined name alone
+ * wouldn't score well. Plain single-ingredient generics have a null
+ * ingredients array and just keep matching on genericName as before.
  */
 
 import Fuse from 'fuse.js'
@@ -187,7 +195,8 @@ const DRUG_BRAND_FUSE_OPTIONS = {
 
 const DRUG_GENERIC_FUSE_OPTIONS = {
   keys: [
-    { name: 'genericName', weight: 0.7 },
+    { name: 'genericName', weight: 0.5 },
+    { name: 'ingredients', weight: 0.2 },
     { name: 'arabicName',  weight: 0.2 },
     { name: 'category',    weight: 0.1 },
   ],
