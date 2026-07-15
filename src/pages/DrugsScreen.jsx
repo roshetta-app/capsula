@@ -27,7 +27,6 @@ import SearchBar from '../components/ui/SearchBar'
 import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import { useDrugContext } from '../context/DrugContext'
 import { useDrugSearch } from '../hooks/useDrugSearch'
-import { useStock } from '../hooks/useStock'
 import { useCategories } from '../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -93,7 +92,6 @@ export default function DrugsScreen() {
     showSuggestions,
     clearSuggestions,
   } = useDrugSearch(drugs)
-  const { stockMap, toggleStock } = useStock(drugs)
   const { categories } = useCategories()
   const isDark = useIsDark()
 
@@ -201,7 +199,6 @@ export default function DrugsScreen() {
               <DrugListRow
                 key={drug.id}
                 drug={drug}
-                isInStock={stockMap[drug.id] ?? true}
                 onTap={handleDrugTap}
                 categories={categories}
                 isDark={isDark}
@@ -391,7 +388,7 @@ function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTa
 
 // ─── DrugListRow ──────────────────────────────────────────────────────────────
 
-function DrugListRow({ drug, isInStock, onTap, categories, isDark }) {
+function DrugListRow({ drug, onTap, categories, isDark }) {
   const brandNames = drug.brands?.map(b => b.name) ?? []
   // drug.category holds the category's stable slug, not its display name —
   // look up the matching category record for both the label and its color.
@@ -411,17 +408,10 @@ function DrugListRow({ drug, isInStock, onTap, categories, isDark }) {
         padding: 'var(--space-3) var(--space-4)',
         marginBottom: 'var(--space-2)',
         cursor: 'pointer',
-        opacity: isInStock ? 1 : 0.55,
         boxShadow: 'var(--shadow-card)',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {/* Stock dot */}
-      <div style={{
-        width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-        backgroundColor: isInStock ? 'var(--color-instock, #10B981)' : 'var(--color-outstock, #9CA3AF)',
-      }} />
-
       {/* Name + brands */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
