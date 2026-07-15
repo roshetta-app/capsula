@@ -15,8 +15,8 @@
  *     drug_categories table via useCategories, shown as a full-width dropdown.
  */
 
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
@@ -39,8 +39,9 @@ function formatDate(iso) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DrugCMS() {
-  const navigate    = useNavigate()
-  const { toast }   = useToast()
+  const navigate      = useNavigate()
+  const { toast }     = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [generics,     setGenerics]     = useState([])
   const [totalCount,   setTotalCount]   = useState(0)
@@ -49,9 +50,25 @@ export default function DrugCMS() {
 
   const [query,           setQuery]           = useState('')
   const [debouncedQuery,  setDebouncedQuery]  = useState('')
-  const [activeCategory,  setActiveCategory]  = useState(null)
-  const [sortBy,          setSortBy]          = useState('name') // 'name' | 'common'
-  const [page,            setPage]            = useState(0)
+
+  // Category, sort, and page live in the URL — not component state — so they
+  // survive a refresh and restore correctly on browser back/forward after
+  // opening a generic. A brand-new session (no params in the URL yet) falls
+  // through to sort='common' by default, per request.
+  const activeCategory = searchParams.get('category') || null
+  const sortBy         = searchParams.get('sort') || 'common' // 'name' | 'common'
+  const page            = Number(searchParams.get('page') || '0')
+
+  function updateSearchParams(patch) {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      Object.entries(patch).forEach(([key, value]) => {
+        if (value === null || value === undefined || value === '') next.delete(key)
+        else next.set(key, String(value))
+      })
+      return next
+    }, { replace: true })
+  }
 
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
@@ -67,9 +84,14 @@ export default function DrugCMS() {
     return () => clearTimeout(t)
   }, [query])
 
-  // A new search, category, or sort order always starts back at page 1 —
-  // the old page number wouldn't mean anything against a different result set.
-  useEffect(() => { setPage(0) }, [debouncedQuery, activeCategory, sortBy])
+  // A new search always starts back at page 1 — the old page number wouldn't
+  // mean anything against a different result set. Skips the very first
+  // render so a deep-linked/persisted page number isn't immediately wiped.
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    updateSearchParams({ page: 0 })
+  }, [debouncedQuery])
 
   // ── Load — always a real, filtered, sorted, paginated query against the live DB ──
   async function load() {
@@ -158,7 +180,7 @@ export default function DrugCMS() {
       {categories.length > 0 && (
         <select
           value={activeCategory ?? ''}
-          onChange={e => setActiveCategory(e.target.value || null)}
+          onChange={e => updateSearchParams({ category: e.target.value || null, page: 0 })}
           style={categorySelectStyle}
         >
           <option value="">All categories</option>
@@ -171,13 +193,13 @@ export default function DrugCMS() {
       {/* Sort toggle */}
       <div style={sortToggleWrapStyle}>
         <button
-          onClick={() => setSortBy('name')}
+          onClick={() => updateSearchParams({ sort: 'name', page: 0 })}
           style={{ ...sortToggleBtnStyle, ...(sortBy === 'name' ? sortToggleBtnActiveStyle : {}) }}
         >
           Alphabetical
         </button>
         <button
-          onClick={() => setSortBy('common')}
+          onClick={() => updateSearchParams({ sort: 'common', page: 0 })}
           style={{ ...sortToggleBtnStyle, ...(sortBy === 'common' ? sortToggleBtnActiveStyle : {}) }}
         >
           Most Common
@@ -344,7 +366,7 @@ export default function DrugCMS() {
       {!loading && totalCount > PAGE_SIZE && (
         <div style={pagerStyle}>
           <button
-            onClick={() => setPage(p => Math.max(0, p - 1))}
+            onClick={() => updateSearchParams({ page: Math.max(0, page - 1) })}
             disabled={page === 0}
             style={{ ...pagerBtnStyle, opacity: page === 0 ? 0.4 : 1, cursor: page === 0 ? 'default' : 'pointer' }}
           >
@@ -354,7 +376,7 @@ export default function DrugCMS() {
             Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
           </span>
           <button
-            onClick={() => setPage(p => (p + 1) * PAGE_SIZE < totalCount ? p + 1 : p)}
+            onClick={() => updateSearchParams({ page: (page + 1) * PAGE_SIZE < totalCount ? page + 1 : page })}
             disabled={(page + 1) * PAGE_SIZE >= totalCount}
             style={{
               ...pagerBtnStyle,
