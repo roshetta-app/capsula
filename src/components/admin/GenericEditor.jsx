@@ -122,6 +122,15 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           />
         </Field>
 
+        <Field label="Ingredients" hint="Combo generics only — press Enter to add each active ingredient (e.g. Amoxicillin, Clavulanic acid). Leave empty for single-ingredient generics.">
+          <TagInput
+            tags={generic.ingredients ?? []}
+            onChange={tags => set('ingredients', tags)}
+            placeholder="Add active ingredient…"
+            disabled={disabled}
+          />
+        </Field>
+
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
           <Field label="Category" required style={{ flex: 1 }}>
             <select
