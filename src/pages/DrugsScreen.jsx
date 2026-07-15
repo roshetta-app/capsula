@@ -27,7 +27,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/layout'
-import DrugFilterPanel from '../components/drugs/DrugFilterPanel'
+import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
 import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import { useDrugContext } from '../context/DrugContext'
@@ -60,11 +60,16 @@ function applyFilters(drugs, filters) {
   if (!filters) return drugs
   let result = drugs
 
-  // Form
+  // Form — each selected chip covers a set of real raw form values (see
+  // DrugFilterPanel's FORM_OPTIONS), not a single value, so match against
+  // the combined set of raw values for every chip that's currently active.
   if (!filters.forms.includes('all')) {
-    result = result.filter(d =>
-      d.formulations?.some(f => filters.forms.includes(f.form?.toLowerCase()))
+    const activeFormMatches = new Set(
+      FORM_OPTIONS
+        .filter(opt => filters.forms.includes(opt.value))
+        .flatMap(opt => opt.matches)
     )
+    result = result.filter(d => activeFormMatches.has(d.form?.toLowerCase()))
   }
 
   // Pregnancy

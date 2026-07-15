@@ -19,7 +19,7 @@ import { useState } from 'react'
 // src/config/forms.js) it should catch. `value` stays the chip's own stable
 // id used for selection state - it is not necessarily a raw form value
 // itself anymore now that Tab/Capsule and Drops each cover several.
-const FORM_OPTIONS = [
+export const FORM_OPTIONS = [
   { value: 'all',         label: 'All',          matches: [] },
   { value: 'tablet',      label: 'Tab / Capsule', matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
   { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops'] },
