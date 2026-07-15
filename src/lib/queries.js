@@ -14,6 +14,8 @@
  *   - fetchFlatDrugs reshaped from formulation-per-row to item-per-row (Phase 3, step 3.1):
  *     base table is now brands, each brand/item is its own row, formulationId/
  *     formulationSlug added since top-level id/slug now belong to the brand
+ *   - fetchFlatDrugs now also returns the generic's ingredients array (step 3.5.2) —
+ *     populated only for combo generics (2+ active ingredients), null otherwise
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -40,7 +42,7 @@ export async function fetchFlatDrugs(supabase) {
           crosses_placenta, crosses_bbb,
           contraindications, drug_interactions, dose_adjustments,
           pharmacokinetics, textbook_doses, textbook_dose_notes,
-          mechanism_of_action, card_tagline, is_published
+          mechanism_of_action, card_tagline, is_published, ingredients
         )
       )
     `)
@@ -77,6 +79,10 @@ export async function fetchFlatDrugs(supabase) {
         genericSlug:          g.slug,
         genericName:          g.name_en,
         arabicName:           g.name_ar,
+        // Combo generics only (2+ active ingredients) — null for plain generics.
+        // Populated 2026-07-16 (step 3.5.1) from raw_drug_import, lets generic-mode
+        // search match a combo by any one of its ingredients, not just the whole name.
+        ingredients:          g.ingredients ?? null,
         category:             g.category,
         class:                g.class,
         cardTagline:          g.card_tagline,
