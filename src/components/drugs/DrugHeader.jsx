@@ -15,7 +15,7 @@ import { DRUG_CATEGORIES }  from '../../config/categories'
 const CATEGORY_COLORS = {
   'antibiotic':               { bg: '#FEF3C7', color: '#92400E' },
   'antiviral':                { bg: '#DBEAFE', color: '#1E40AF' },
-  'antifungal':               { bg: '#EDE9FE', color: '#5B21B6' },
+  'antifungal':                { bg: '#EDE9FE', color: '#5B21B6' },
   'antiparasitic':            { bg: '#D1FAE5', color: '#065F46' },
   'analgesic-nsaid':          { bg: '#F0FDF4', color: '#166534' },
   'cardiovascular':           { bg: '#FFF1F2', color: '#9F1239' },
@@ -39,6 +39,11 @@ const CATEGORY_LABELS = Object.fromEntries(
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
   const chipStyle = CATEGORY_COLORS[drug.category] ?? { bg: '#F3F4F6', color: '#374151' }
   const label     = CATEGORY_LABELS[drug.category]  ?? drug.category ?? ''
+
+  // Manufacturer / price / pack size — price and pack size are display-only,
+  // relative-ranking info (may be outdated), not a live price feed. Any
+  // piece can be blank, so build the line defensively.
+  const metaLine = [drug.manufacturer, drug.price, drug.packSize].filter(Boolean).join(' · ')
 
   return (
     <div style={{
@@ -98,7 +103,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
         </button>
       </div>
 
-      {/* Generic name */}
+      {/* Item's own name — primary, per ADR-029 */}
       <h1 style={{
         fontSize:   22,
         fontWeight: 700,
@@ -106,7 +111,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
         margin:     '0 0 var(--space-1)',
         lineHeight: 1.2,
       }}>
-        {drug.genericName}
+        {drug.name}
       </h1>
 
       {/* Concentration · Form */}
@@ -115,9 +120,30 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
           fontSize:     14,
           fontWeight:   500,
           color:        'var(--color-text-secondary)',
-          marginBottom: 'var(--space-3)',
+          marginBottom: 'var(--space-1)',
         }}>
           {[drug.concentration, drug.form].filter(Boolean).join(' · ')}
+        </div>
+      )}
+
+      {/* Generic name — secondary */}
+      <div style={{
+        fontSize:     14,
+        color:        'var(--color-accent)',
+        fontWeight:   500,
+        marginBottom: 'var(--space-2)',
+      }}>
+        {drug.genericName}
+      </div>
+
+      {/* Manufacturer · Price · Pack size */}
+      {metaLine && (
+        <div style={{
+          fontSize:     13,
+          color:        'var(--color-text-tertiary)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          {metaLine}
         </div>
       )}
 
