@@ -11,85 +11,93 @@
  *   - Added icon_name, color_hex on specialties (added in 1E)
  *   - fetchConditions picks up new clinical fields from 1D
  *   - fetchAllConditions (no is_published filter) added for admin CMS
+ *   - fetchFlatDrugs reshaped from formulation-per-row to item-per-row (Phase 3, step 3.1):
+ *     base table is now brands, each brand/item is its own row, formulationId/
+ *     formulationSlug added since top-level id/slug now belong to the brand
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
 
 /**
  * Fetch all published drugs as a flat list ready for the drug library UI.
- * Primary key is formulation UUID (one row per formulation).
+ * Primary key is brand (item) UUID (one row per item — brand + strength + form).
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @returns {Promise<FlatDrug[]>}
  */
 export async function fetchFlatDrugs(supabase) {
   const { data, error } = await supabase
-    .from('formulations')
+    .from('brands')
     .select(`
-      id, slug, concentration, form, route, doses_structured, default_dose_override,
-      generics (
-        id, slug, name_en, name_ar, category, class,
-        uses_legacy, uses_structured, warnings_legacy,
-        side_effects_common, side_effects_serious,
-        pregnancy_category, breastfeeding_safety,
-        crosses_placenta, crosses_bbb,
-        contraindications, drug_interactions, dose_adjustments,
-        pharmacokinetics, textbook_doses, textbook_dose_notes,
-        mechanism_of_action, card_tagline, is_published
-      ),
-      brands ( id, name, name_ar, manufacturer, source, is_published )
+      id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+      formulations (
+        id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
+        generics (
+          id, slug, name_en, name_ar, category, class,
+          uses_legacy, uses_structured, warnings_legacy,
+          side_effects_common, side_effects_serious,
+          pregnancy_category, breastfeeding_safety,
+          crosses_placenta, crosses_bbb,
+          contraindications, drug_interactions, dose_adjustments,
+          pharmacokinetics, textbook_doses, textbook_dose_notes,
+          mechanism_of_action, card_tagline, is_published
+        )
+      )
     `)
     .eq('is_published', true)
-    .order('name_en', { referencedTable: 'generics' })
+    .order('name_en', { referencedTable: 'formulations.generics' })
 
   if (error) throw error
 
   return data
-    .filter(f => f.generics?.is_published === true)
-    .map(f => ({
-      id:                   f.id,
-      slug:                 f.slug,
-      genericId:            f.generics.id,
-      genericSlug:          f.generics.slug,
-      genericName:          f.generics.name_en,
-      arabicName:           f.generics.name_ar,
-      category:             f.generics.category,
-      class:                f.generics.class,
-      cardTagline:          f.generics.card_tagline,
-      mechanismOfAction:    f.generics.mechanism_of_action,
-      // Uses: prefer structured, fall back to legacy
-      uses:                 f.generics.uses_structured ?? (f.generics.uses_legacy ?? []).map(u => ({ use_name: u, context: '' })),
-      warnings:             f.generics.warnings_legacy ?? [],
-      sideEffectsCommon:    f.generics.side_effects_common   ?? [],
-      sideEffectsSerious:   f.generics.side_effects_serious  ?? [],
-      pregnancyCategory:    f.generics.pregnancy_category,
-      breastfeedingSafety:  f.generics.breastfeeding_safety,
-      crossesPlacenta:      f.generics.crosses_placenta,
-      crossesBbb:           f.generics.crosses_bbb,
-      contraindications:    f.generics.contraindications     ?? [],
-      drugInteractions:     f.generics.drug_interactions     ?? [],
-      doseAdjustments:      f.generics.dose_adjustments      ?? [],
-      pharmacokinetics:     f.generics.pharmacokinetics,
-      textbookDoses:        f.generics.textbook_doses        ?? [],
-      textbookDoseNotes:    f.generics.textbook_dose_notes,
-      // Formulation fields
-      concentration:        f.concentration,
-      form:                 f.form,
-      route:                f.route,
-      doses:                f.doses_structured ?? [],
-      defaultDoseOverride:  f.default_dose_override,
-      // Brands (published only)
-      brands: (f.brands ?? [])
-        .filter(b => b.is_published)
-        .map(b => ({
-          id:           b.id,
-          name:         b.name,
-          nameAr:       b.name_ar,
-          manufacturer: b.manufacturer,
-          source:       b.source,
-          isAvailable:  true,
-        })),
-    }))
+    .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
+    .map(b => {
+      const f = b.formulations
+      const g = f.generics
+
+      return {
+        id:                   b.id,
+        slug:                 b.slug,
+        name:                 b.name,
+        nameAr:               b.name_ar,
+        manufacturer:         b.manufacturer,
+        source:               b.source,
+        price:                b.price,
+        packSize:             b.pack_size,
+        // Formulation this item belongs to
+        formulationId:        f.id,
+        formulationSlug:      f.slug,
+        concentration:        f.concentration,
+        form:                 f.form,
+        route:                f.route,
+        doses:                f.doses_structured ?? [],
+        defaultDoseOverride:  f.default_dose_override,
+        // Generic this item belongs to
+        genericId:            g.id,
+        genericSlug:          g.slug,
+        genericName:          g.name_en,
+        arabicName:           g.name_ar,
+        category:             g.category,
+        class:                g.class,
+        cardTagline:          g.card_tagline,
+        mechanismOfAction:    g.mechanism_of_action,
+        // Uses: prefer structured, fall back to legacy
+        uses:                 g.uses_structured ?? (g.uses_legacy ?? []).map(u => ({ use_name: u, context: '' })),
+        warnings:             g.warnings_legacy ?? [],
+        sideEffectsCommon:    g.side_effects_common   ?? [],
+        sideEffectsSerious:   g.side_effects_serious  ?? [],
+        pregnancyCategory:    g.pregnancy_category,
+        breastfeedingSafety:  g.breastfeeding_safety,
+        crossesPlacenta:      g.crosses_placenta,
+        crossesBbb:           g.crosses_bbb,
+        contraindications:    g.contraindications     ?? [],
+        drugInteractions:     g.drug_interactions     ?? [],
+        doseAdjustments:      g.dose_adjustments      ?? [],
+        pharmacokinetics:     g.pharmacokinetics,
+        textbookDoses:        g.textbook_doses        ?? [],
+        textbookDoseNotes:    g.textbook_dose_notes,
+      }
+    })
 }
 
 /**
