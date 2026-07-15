@@ -5,9 +5,19 @@ import TagInput from './TagInput'
 /**
  * FormulationEditor — edit fields on a formulation row.
  * Phase 3F — added is_published toggle + default_dose_override field.
- * 2A.2 — added strength value/unit/basis (single-ingredient formulations only),
- *   form modifier tags, device type, injection route-details tick-list, and the
- *   Formulation Note field (renamed from restricted_dispensing).
+ * 2A.2 — added strength value/unit/basis, form modifier tags, device type,
+ *   injection route-details tick-list, and the Formulation Note field
+ *   (renamed from restricted_dispensing).
+ * DrugCMS fix — strength is now always shown as one Value/Unit/Basis row
+ *   PER INGREDIENT (strength_structured.ingredients), for single-ingredient
+ *   and combo formulations alike — replacing the old split where singles got
+ *   3 boxes and combos got one free-text Concentration blob. Concentration
+ *   is derived automatically from the ingredient rows and shown read-only.
+ *   The flat strength_value/strength_unit/strength_basis columns are kept in
+ *   sync FROM the structured ingredients (not the other way around) — exactly
+ *   for single-ingredient formulations (one ingredient, one value == no
+ *   ambiguity), and cleared to null for combos, since three single-value
+ *   columns can't honestly hold two or more ingredients' numbers.
  *
  * Props:
  *   formulation  {
@@ -15,85 +25,100 @@ import TagInput from './TagInput'
  *     strength_value, strength_unit, strength_basis, strength_structured,
  *     form_modifier, device_type, route_details, formulation_note
  *   }
+ *   genericName  string  — the parent generic's name_en. Only used to derive
+ *     ingredient names (splitting on " + ") for a brand-new formulation that
+ *     doesn't have strength_structured yet.
  *   onChange     (patch) => void
  *   disabled     boolean
- *
- * strength_structured is read-only here — when it's present, the formulation is
- * a combo (more than one active ingredient) and keeps the plain-text Concentration
- * box. When it's absent, the formulation is single-ingredient and gets the three
- * structured strength boxes instead; Concentration is then generated from them.
  */
-export default function FormulationEditor({ formulation, onChange, disabled = false }) {
+export default function FormulationEditor({ formulation, genericName = '', onChange, disabled = false }) {
 
-  const isCombo = Boolean(formulation.strength_structured)
+  const ingredients = getIngredients(formulation, genericName)
 
   function set(field, value) {
     onChange({ [field]: value })
   }
 
-  function setStrength(field, value) {
-    const next = {
-      strength_value: formulation.strength_value,
-      strength_unit:  formulation.strength_unit,
-      strength_basis: formulation.strength_basis,
-      [field]: value,
+  function setIngredient(idx, field, value) {
+    const nextIngredients = ingredients.map((ing, i) =>
+      i === idx ? { ...ing, [field]: value } : ing
+    )
+    const patch = {
+      strength_structured: { ingredients: nextIngredients },
+      concentration: buildConcentration(nextIngredients),
     }
-    onChange({
-      [field]: value,
-      concentration: buildConcentration(next.strength_value, next.strength_unit, next.strength_basis),
-    })
+    if (nextIngredients.length === 1) {
+      patch.strength_value = nextIngredients[0].value || null
+      patch.strength_unit  = nextIngredients[0].unit  || null
+      patch.strength_basis = nextIngredients[0].basis || null
+    } else {
+      patch.strength_value = null
+      patch.strength_unit  = null
+      patch.strength_basis = null
+    }
+    onChange(patch)
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-      {/* Strength */}
-      {isCombo ? (
-        <Field label="Concentration" required>
-          <input
-            type="text"
-            value={formulation.concentration ?? ''}
-            onChange={e => set('concentration', e.target.value)}
-            placeholder="e.g. 500mg, 250mg/5ml, standard"
-            disabled={disabled}
-            required
-            style={inputStyle}
-          />
-        </Field>
-      ) : (
-        <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <Field label="Strength Value" style={{ flex: 1 }}>
-            <input
-              type="text"
-              value={formulation.strength_value ?? ''}
-              onChange={e => setStrength('strength_value', e.target.value || null)}
-              placeholder="e.g. 250"
-              disabled={disabled}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label="Strength Unit" style={{ flex: 1 }}>
-            <input
-              type="text"
-              value={formulation.strength_unit ?? ''}
-              onChange={e => setStrength('strength_unit', e.target.value || null)}
-              placeholder="e.g. mg"
-              disabled={disabled}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label="Strength Basis" style={{ flex: 1 }}>
-            <input
-              type="text"
-              value={formulation.strength_basis ?? ''}
-              onChange={e => setStrength('strength_basis', e.target.value || null)}
-              placeholder="e.g. per_5ml"
-              disabled={disabled}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-      )}
+      {/* Strength — one Value/Unit/Basis row per ingredient */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {ingredients.map((ing, idx) => (
+          <div key={idx}>
+            {ingredients.length > 1 && (
+              <div style={{
+                fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)',
+                marginBottom: 4, textTransform: 'capitalize',
+              }}>
+                {ing.ingredient || `Ingredient ${idx + 1}`}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+              <Field label="Strength Value" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={ing.value ?? ''}
+                  onChange={e => setIngredient(idx, 'value', e.target.value || null)}
+                  placeholder="e.g. 250"
+                  disabled={disabled}
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="Strength Unit" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={ing.unit ?? ''}
+                  onChange={e => setIngredient(idx, 'unit', e.target.value || null)}
+                  placeholder="e.g. mg"
+                  disabled={disabled}
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="Strength Basis" style={{ flex: 1 }}>
+                <input
+                  type="text"
+                  value={ing.basis ?? ''}
+                  onChange={e => setIngredient(idx, 'basis', e.target.value || null)}
+                  placeholder="e.g. per_5ml"
+                  disabled={disabled}
+                  style={inputStyle}
+                />
+              </Field>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Concentration — built automatically from the ingredient rows above */}
+      <Field label="Concentration" hint="Built automatically from the strength fields above — not editable directly">
+        <input
+          type="text"
+          value={formulation.concentration ?? ''}
+          disabled
+          style={{ ...inputStyle, backgroundColor: 'var(--color-bg)', color: 'var(--color-text-tertiary)', cursor: 'not-allowed' }}
+        />
+      </Field>
 
       {/* Form + Route row */}
       <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -262,18 +287,38 @@ export default function FormulationEditor({ formulation, onChange, disabled = fa
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-// Builds the display-string Concentration value from the three structured
-// strength fields, e.g. ('250', 'mg', 'per_5ml') -> '250mg / 5ml'.
-// Used only for single-ingredient formulations (isCombo === false); combo
-// formulations keep Concentration as direct free text.
-function buildConcentration(value, unit, basis) {
-  const v = value?.trim() ?? ''
-  const u = unit?.trim() ?? ''
-  const base = `${v}${u}`.trim()
-  const b = basis?.trim()
-  if (!b) return base
-  const readable = b.replace(/^per_/, '').replace(/_/g, ' ')
-  return base ? `${base} / ${readable}` : `/ ${readable}`
+// Real ingredient rows to render: the existing strength_structured.ingredients
+// if present, otherwise one blank row per ingredient parsed from the generic's
+// name (splitting on " + ") — for a brand-new formulation that hasn't had its
+// strength filled in yet.
+function getIngredients(formulation, genericName) {
+  const existing = formulation.strength_structured?.ingredients
+  if (Array.isArray(existing) && existing.length > 0) return existing
+  return deriveIngredientsFromName(genericName)
+}
+
+function deriveIngredientsFromName(genericName) {
+  const parts = (genericName || '').split(' + ').map(s => s.trim()).filter(Boolean)
+  if (parts.length === 0) return [{ ingredient: genericName || '', value: null, unit: null, basis: null }]
+  return parts.map(name => ({ ingredient: name, value: null, unit: null, basis: null }))
+}
+
+// Builds the display-string Concentration value from the ingredient rows,
+// e.g. single ingredient ('250', 'mg', 'per_5ml') -> '250mg / 5ml';
+// combo [{10,mg},{20,mg}] -> '10mg/20mg' (matches the existing data format).
+// Basis is rare on combos, but if any ingredient has one, it's appended once.
+function buildConcentration(ingredients) {
+  if (!ingredients || ingredients.length === 0) return ''
+  const parts = ingredients.map(ing => {
+    const v = (ing.value ?? '').toString().trim()
+    const u = (ing.unit ?? '').trim()
+    return `${v}${u}`.trim()
+  })
+  const joined = parts.join('/')
+  const basis = ingredients.map(i => i.basis).find(b => b && b.trim())
+  if (!basis) return joined
+  const readable = basis.replace(/^per_/, '').replace(/_/g, ' ')
+  return joined ? `${joined} / ${readable}` : `/ ${readable}`
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
@@ -318,3 +363,4 @@ const inputStyle = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
+

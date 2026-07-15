@@ -185,6 +185,7 @@ export default function DrugEditor() {
       strength_value:       f.strength_value?.trim() || null,
       strength_unit:        f.strength_unit?.trim() || null,
       strength_basis:       f.strength_basis?.trim() || null,
+      strength_structured:  f.strength_structured ?? null,
       form_modifier:        f.form_modifier ?? [],
       device_type:          f.device_type?.trim() || null,
       route_details:        f.route_details ?? [],
@@ -255,6 +256,7 @@ export default function DrugEditor() {
       strength_value:    null,
       strength_unit:     null,
       strength_basis:    null,
+      strength_structured: null,
       form_modifier:     [],
       device_type:       null,
       route_details:     [],
@@ -379,8 +381,7 @@ export default function DrugEditor() {
           const isSaving  = savingFormId === f.id
           const isSaved   = savedFormId === f.id
           const visibleBrands = f.brands.filter(b => !b._deleted)
-          const isCombo = Boolean(f.strength_structured)
-          const formValid = f.form && f.route && (!isCombo || f.concentration?.trim())
+          const formValid = f.form && f.route
 
           return (
             <SectionCard
@@ -426,6 +427,7 @@ export default function DrugEditor() {
                   route_details:        f.route_details,
                   formulation_note:     f.formulation_note,
                 }}
+                genericName={generic?.name_en}
                 onChange={patch => patchFormulation(f.id, patch)}
                 disabled={isSaving}
               />
