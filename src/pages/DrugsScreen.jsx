@@ -17,6 +17,11 @@
  *  - Inline SearchBar → shared src/components/ui/SearchBar
  *  - AutocompleteDropdown added below search bar in results view
  *  - Autocomplete: tap suggestion → navigate directly to /drugs/:slug
+ *
+ * GFB step 3.5.6 (2026-07-16): added a Brand/Generic segmented toggle next
+ * to the search bar, shown only while a query is active — category
+ * browsing is untouched. `mode` is lifted here and passed into
+ * useDrugSearch, which already builds both split indexes per step 3.5.5.
  */
 
 import { useState, useEffect } from 'react'
@@ -84,6 +89,7 @@ function applyFilters(drugs, filters) {
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { drugs, loading } = useDrugContext()
+  const [mode, setMode] = useState('brand')
   const {
     query,
     setQuery,
@@ -91,7 +97,7 @@ export default function DrugsScreen() {
     suggestions,
     showSuggestions,
     clearSuggestions,
-  } = useDrugSearch(drugs)
+  } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
   const isDark = useIsDark()
 
@@ -139,18 +145,25 @@ export default function DrugsScreen() {
     return (
       <Layout>
         <div style={{ paddingTop: 'var(--space-5)' }}>
-        {/* Search bar + autocomplete */}
+        {/* Search bar + mode toggle + autocomplete */}
         <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
-          <SearchBar
-            value={query}
-            onChange={(val) => {
-              setQuery(val)
-              if (!val) clearSuggestions()
-            }}
-            placeholder="Search drugs…"
-            onFilter={() => setFilterOpen(true)}
-            hasActiveFilters={hasFilters}
-          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <SearchBar
+                value={query}
+                onChange={(val) => {
+                  setQuery(val)
+                  if (!val) clearSuggestions()
+                }}
+                placeholder="Search drugs…"
+                onFilter={() => setFilterOpen(true)}
+                hasActiveFilters={hasFilters}
+              />
+            </div>
+            {hasQuery && (
+              <ModeToggle mode={mode} onChange={setMode} />
+            )}
+          </div>
           {showSuggestions && (
             <AutocompleteDropdown
               suggestions={suggestions}
@@ -337,6 +350,44 @@ export default function DrugsScreen() {
         onApply={handleApplyFilters}
       />
     </Layout>
+  )
+}
+
+// ─── ModeToggle ───────────────────────────────────────────────────────────────
+// Segmented Brand/Generic control. Only rendered by the caller while a
+// query is active — category browsing never shows this (GFB step 3.5.6).
+
+function ModeToggle({ mode, onChange }) {
+  return (
+    <div style={{
+      display: 'flex', flexShrink: 0,
+      border: '1.5px solid var(--color-border)',
+      borderRadius: 'var(--radius-full)',
+      padding: 2,
+      backgroundColor: 'var(--color-surface)',
+    }}>
+      {['brand', 'generic'].map(m => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          style={{
+            padding: '5px 12px',
+            borderRadius: 'var(--radius-full)',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 12, fontWeight: 600,
+            fontFamily: 'var(--font-body)',
+            backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
+            color: mode === m ? '#fff' : 'var(--color-text-secondary)',
+            WebkitTapHighlightColor: 'transparent', outline: 'none',
+            transition: 'background-color 0.15s, color 0.15s',
+          }}
+        >
+          {m === 'brand' ? 'Brand' : 'Generic'}
+        </button>
+      ))}
+    </div>
   )
 }
 
