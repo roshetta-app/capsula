@@ -9,6 +9,25 @@
  *
  * This matches the behaviour of Epocrates and Medscape:
  * immediate, accurate single-char results without noise.
+ *
+ * GFB step 3.3 (2026-07-16): drug search index split into two independent
+ * indexes — a brand index (item's own name/nameAr primary, form/
+ * concentration secondary) and a generic index (genericName/arabicName
+ * primary, category secondary) — so brand and generic results are never
+ * scored against each other, per ADR-033.
+ *
+ * `buildDrugIndex`/`DRUG_FUSE_OPTIONS`/`getDrugAutocompleteSuggestions`
+ * below are kept as-is (legacy, single merged index) because
+ * `useDrugSearch.js` still calls them and hasn't been switched over yet —
+ * that hook's API shape (mode param vs. two result sets) is a deferred
+ * design decision, step 3.5. Once 3.5 wires the hook onto the new
+ * `buildDrugBrandIndex`/`buildDrugGenericIndex`/
+ * `getDrugAutocompleteSuggestionsByMode` functions below, the legacy trio
+ * has no remaining callers and can be deleted. The one change made to the
+ * legacy `DRUG_FUSE_OPTIONS` here is removing the `brands.name` key — it
+ * read the nested `brands` array that no longer exists after the Phase
+ * 3.1 reshape (each row is now a single item, not a formulation with a
+ * brands array), so that key silently matched nothing anyway.
  */
 
 import Fuse from 'fuse.js'
@@ -108,7 +127,10 @@ export function fuzzySearchConditions(fuseIndex, query) {
   return results.map(r => r.item)
 }
 
-// ─── Drugs fuzzy search ───────────────────────────────────────────────────────
+// ─── Drugs fuzzy search — LEGACY, single merged index ─────────────────────────
+// Kept only until useDrugSearch.js (step 3.5) switches to the split indexes
+// below. See file-header note. brands.name key removed (2026-07-16, step
+// 3.3) — dead after the 3.1 reshape, matched nothing regardless.
 
 const DRUG_FUSE_OPTIONS = {
   keys: [
@@ -116,7 +138,6 @@ const DRUG_FUSE_OPTIONS = {
     { name: 'category',      weight: 0.2  },
     { name: 'concentration', weight: 0.1  },
     { name: 'form',          weight: 0.1  },
-    { name: 'brands.name',   weight: 0.1  },
   ],
   threshold:          0.35,
   minMatchCharLength: 2,
@@ -141,5 +162,65 @@ export function getDrugAutocompleteSuggestions(fuseIndex, query, limit = 5) {
     id:   r.item.id,
     name: r.item.genericName,
     slug: r.item.slug,
+  }))
+}
+
+// ─── Drugs fuzzy search — split indexes (Phase 3, step 3.3) ───────────────────
+// Brand index: searches by the item's own name first. Generic index:
+// searches by the underlying drug's generic name first. No shared scoring
+// between them — a query only ever matches within the mode it's run against.
+// `fuzzySearchDrugs` above is mode-agnostic (just runs whatever index it's
+// given) and is reused here rather than duplicated.
+
+const DRUG_BRAND_FUSE_OPTIONS = {
+  keys: [
+    { name: 'name',          weight: 0.6 },
+    { name: 'nameAr',        weight: 0.2 },
+    { name: 'form',          weight: 0.1 },
+    { name: 'concentration', weight: 0.1 },
+  ],
+  threshold:          0.35,
+  minMatchCharLength: 2,
+  includeScore:       true,
+  ignoreLocation:     true,
+}
+
+const DRUG_GENERIC_FUSE_OPTIONS = {
+  keys: [
+    { name: 'genericName', weight: 0.7 },
+    { name: 'arabicName',  weight: 0.2 },
+    { name: 'category',    weight: 0.1 },
+  ],
+  threshold:          0.35,
+  minMatchCharLength: 2,
+  includeScore:       true,
+  ignoreLocation:     true,
+}
+
+export function buildDrugBrandIndex(drugs) {
+  return new Fuse(drugs, DRUG_BRAND_FUSE_OPTIONS)
+}
+
+export function buildDrugGenericIndex(drugs) {
+  return new Fuse(drugs, DRUG_GENERIC_FUSE_OPTIONS)
+}
+
+/**
+ * Autocomplete suggestions for the split indexes. Unlike the legacy
+ * getDrugAutocompleteSuggestions above (always returns genericName), this
+ * returns the item's own name in brand mode, per plan §10 Section 2.
+ *
+ * @param {Fuse}   fuseIndex — built from buildDrugBrandIndex or buildDrugGenericIndex
+ * @param {string} query
+ * @param {number} limit
+ * @param {'brand'|'generic'} mode
+ */
+export function getDrugAutocompleteSuggestionsByMode(fuseIndex, query, limit = 5, mode = 'generic') {
+  if (!query || query.trim().length < 2) return []
+  const results = fuseIndex.search(query.trim(), { limit })
+  return results.map(r => ({
+    id:   r.item.id,
+    name: mode === 'brand' ? r.item.name : r.item.genericName,
+    slug: mode === 'brand' ? r.item.slug : r.item.genericSlug,
   }))
 }
