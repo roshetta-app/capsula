@@ -310,6 +310,12 @@ export default function DrugsScreen() {
         {/* Loading skeleton */}
         {loading && drugs.length === 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            <div style={{
+              fontSize: 12, color: 'var(--color-text-tertiary)',
+              textAlign: 'center', marginBottom: 'var(--space-1)',
+            }}>
+              Setting up your drug library — this only happens once
+            </div>
             {[1, 2, 3, 4, 5].map(i => (
               <div key={i} style={{
                 height: 64,
