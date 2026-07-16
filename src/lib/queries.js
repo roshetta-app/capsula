@@ -79,35 +79,50 @@ const LIGHT_BRAND_SELECT = `
 `
 
 /**
- * Page through the full `brands` table for a given select shape, looping
- * until a page comes back short of the page size — that's the signal
- * we've reached the end of the table. Shared by fetchFlatDrugs and
- * fetchFlatDrugsLight so both stay correct against the same 1,000-row
- * per-request cap.
+ * Page through the full `brands` table for a given select shape. Looks up
+ * the total row count first, then fires every page request at once instead
+ * of waiting for each one before starting the next — since range-based
+ * pages don't depend on each other, this cuts the real wait time down to
+ * roughly one round trip instead of twenty stacked back-to-back. Shared by
+ * fetchFlatDrugs and fetchFlatDrugsLight so both stay correct against the
+ * same 1,000-row per-request cap.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} selectString
+ * @param {(loaded: number, total: number) => void} [onProgress] — called
+ *   once up front with (0, totalPages), then again as each page lands.
  */
-async function fetchAllBrandRows(supabase, selectString) {
-  let allRows = []
-  let from = 0
+async function fetchAllBrandRows(supabase, selectString, onProgress) {
+  const { count, error: countError } = await supabase
+    .from('brands')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_published', true)
 
-  for (;;) {
-    const { data, error } = await supabase
+  if (countError) throw countError
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / SUPABASE_MAX_ROWS))
+  let loaded = 0
+  onProgress?.(0, totalPages)
+
+  const pagePromises = Array.from({ length: totalPages }, (_, i) => {
+    const from = i * SUPABASE_MAX_ROWS
+    const to   = from + SUPABASE_MAX_ROWS - 1
+    return supabase
       .from('brands')
       .select(selectString)
       .eq('is_published', true)
       .order('name_en', { referencedTable: 'formulations.generics' })
-      .range(from, from + SUPABASE_MAX_ROWS - 1)
+      .range(from, to)
+      .then(({ data, error }) => {
+        if (error) throw error
+        loaded += 1
+        onProgress?.(loaded, totalPages)
+        return data
+      })
+  })
 
-    if (error) throw error
-
-    allRows = allRows.concat(data)
-    if (data.length < SUPABASE_MAX_ROWS) break
-    from += SUPABASE_MAX_ROWS
-  }
-
-  return allRows
+  const pages = await Promise.all(pagePromises)
+  return pages.flat()
 }
 
 /**
@@ -115,10 +130,11 @@ async function fetchAllBrandRows(supabase, selectString) {
  * Primary key is brand (item) UUID (one row per item — brand + strength + form).
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {(loaded: number, total: number) => void} [onProgress]
  * @returns {Promise<FlatDrug[]>}
  */
-export async function fetchFlatDrugs(supabase) {
-  const allRows = await fetchAllBrandRows(supabase, FULL_BRAND_SELECT)
+export async function fetchFlatDrugs(supabase, onProgress) {
+  const allRows = await fetchAllBrandRows(supabase, FULL_BRAND_SELECT, onProgress)
 
   return allRows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
@@ -187,10 +203,11 @@ export async function fetchFlatDrugs(supabase) {
  * will be undefined until the full fetch completes.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {(loaded: number, total: number) => void} [onProgress]
  * @returns {Promise<FlatDrug[]>}
  */
-export async function fetchFlatDrugsLight(supabase) {
-  const allRows = await fetchAllBrandRows(supabase, LIGHT_BRAND_SELECT)
+export async function fetchFlatDrugsLight(supabase, onProgress) {
+  const allRows = await fetchAllBrandRows(supabase, LIGHT_BRAND_SELECT, onProgress)
 
   return allRows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
