@@ -6,6 +6,11 @@
  *   Mechanism · Uses · Side Effects · Pregnancy · Contraindications
  *   Drug Interactions · Dose Adjustments · Pharmacokinetics
  *
+ * Step 3.12 (generic_formulation_brand_mapping, ADR-035): every section shows an
+ * explicit "Not yet added" state instead of rendering nothing when it's empty. If a
+ * drug has no clinical content anywhere, the whole block is replaced with a single
+ * classification fallback (category/class) instead of eight stacked empty messages.
+ *
  * Props: drug — flat drug object from DrugContext
  */
 
@@ -65,6 +70,61 @@ function Collapsible({ title, children }) {
       </button>
       {open && <div style={{ marginTop: 'var(--space-2)' }}>{children}</div>}
       <Divider />
+    </div>
+  )
+}
+
+// ─── Empty-section state (ADR-035) ────────────────────────────────────────────
+
+function NotYetAdded() {
+  return (
+    <p style={{
+      fontSize:  13,
+      color:     'var(--color-text-tertiary)',
+      fontStyle: 'italic',
+      margin:    0,
+    }}>
+      Not yet added
+    </p>
+  )
+}
+
+function EmptySection({ title }) {
+  return (
+    <div style={{ marginBottom: 'var(--space-5)' }}>
+      <SectionHeader title={title} />
+      <NotYetAdded />
+      <Divider />
+    </div>
+  )
+}
+
+// ─── Whole-drug classification fallback (ADR-035) ─────────────────────────────
+
+function ClassificationFallback({ category, drugClass }) {
+  const classLabel = drugClass
+    ? drugClass.split('.').map(part => part.replace(/_/g, ' ')).join(' — ')
+    : null
+  const label = classLabel || category
+
+  return (
+    <div style={{
+      backgroundColor: 'var(--color-bg)',
+      border:          '1px solid var(--color-border-subtle)',
+      borderRadius:    'var(--radius-sm)',
+      padding:         'var(--space-4)',
+    }}>
+      <p style={{
+        fontSize:   14,
+        color:      'var(--color-text-secondary)',
+        lineHeight: 1.6,
+        margin:     0,
+      }}>
+        {label
+          ? <>This is classified as <strong style={{ color: 'var(--color-text-primary)' }}>{label}</strong>. Full clinical details haven&rsquo;t been added yet.</>
+          : <>Full clinical details haven&rsquo;t been added for this drug yet.</>
+        }
+      </p>
     </div>
   )
 }
@@ -169,13 +229,36 @@ export default function DrugInfoSections({ drug }) {
     drugInteractions = [],
     doseAdjustments = [],
     pharmacokinetics,
+    category,
+    class: drugClass,
   } = drug
+
+  const PK_KEYS = ['onset', 'peak', 'duration', 'half_life', 'bioavailability']
+  const hasPharmacokinetics = !!pharmacokinetics && PK_KEYS.some(key => pharmacokinetics[key])
+  const hasPregnancySection =
+    !!pregnancyCategory || !!breastfeedingSafety || crossesPlacenta != null || crossesBbb != null
+
+  const hasAnyContent =
+    !!mechanismOfAction ||
+    uses.length > 0 ||
+    sideEffectsCommon.length > 0 ||
+    sideEffectsSerious.length > 0 ||
+    hasPregnancySection ||
+    contraindications.length > 0 ||
+    drugInteractions.length > 0 ||
+    doseAdjustments.length > 0 ||
+    hasPharmacokinetics
+
+  // No clinical write-up at all — one classification message, not eight empty ones.
+  if (!hasAnyContent) {
+    return <ClassificationFallback category={category} drugClass={drugClass} />
+  }
 
   return (
     <div>
 
       {/* ── Mechanism of Action ── */}
-      {mechanismOfAction && (
+      {mechanismOfAction ? (
         <Collapsible title="Mechanism of Action">
           <p style={{
             fontSize:   14,
@@ -186,10 +269,12 @@ export default function DrugInfoSections({ drug }) {
             {mechanismOfAction}
           </p>
         </Collapsible>
+      ) : (
+        <EmptySection title="Mechanism of Action" />
       )}
 
       {/* ── Uses ── */}
-      {uses.length > 0 && (
+      {uses.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Uses" />
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -221,10 +306,12 @@ export default function DrugInfoSections({ drug }) {
           </ul>
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Uses" />
       )}
 
       {/* ── Side Effects ── */}
-      {(sideEffectsCommon.length > 0 || sideEffectsSerious.length > 0) && (
+      {(sideEffectsCommon.length > 0 || sideEffectsSerious.length > 0) ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           {sideEffectsCommon.length > 0 && (
             <>
@@ -280,10 +367,12 @@ export default function DrugInfoSections({ drug }) {
           )}
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Side Effects" />
       )}
 
       {/* ── Pregnancy & Breastfeeding ── */}
-      {(pregnancyCategory || breastfeedingSafety) && (
+      {hasPregnancySection ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Pregnancy & Breastfeeding" />
           {pregnancyCategory && <PregnancyBadge category={pregnancyCategory} />}
@@ -296,10 +385,12 @@ export default function DrugInfoSections({ drug }) {
           } />
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Pregnancy & Breastfeeding" />
       )}
 
       {/* ── Contraindications ── */}
-      {contraindications.length > 0 && (
+      {contraindications.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Contraindications" />
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -317,10 +408,12 @@ export default function DrugInfoSections({ drug }) {
           </ul>
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Contraindications" />
       )}
 
       {/* ── Drug Interactions ── */}
-      {drugInteractions.length > 0 && (
+      {drugInteractions.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Drug Interactions" />
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -345,10 +438,12 @@ export default function DrugInfoSections({ drug }) {
           </ul>
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Drug Interactions" />
       )}
 
       {/* ── Dose Adjustments ── */}
-      {doseAdjustments.length > 0 && (
+      {doseAdjustments.length > 0 ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Dose Adjustments" />
           <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
@@ -371,10 +466,12 @@ export default function DrugInfoSections({ drug }) {
           </ul>
           <Divider />
         </div>
+      ) : (
+        <EmptySection title="Dose Adjustments" />
       )}
 
       {/* ── Pharmacokinetics ── */}
-      {pharmacokinetics && (
+      {hasPharmacokinetics ? (
         <div style={{ marginBottom: 'var(--space-5)' }}>
           <SectionHeader title="Pharmacokinetics" />
           <div style={{
@@ -419,6 +516,8 @@ export default function DrugInfoSections({ drug }) {
             )}
           </div>
         </div>
+      ) : (
+        <EmptySection title="Pharmacokinetics" />
       )}
 
     </div>
