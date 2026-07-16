@@ -1,20 +1,9 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchFlatDrugs, fetchMetadataTimestamps } from '../lib/queries'
+import { fetchFlatDrugs, fetchFlatDrugsLight, fetchMetadataTimestamps } from '../lib/queries'
 import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../utils/cache'
 
-/**
- * useDrugs — cache-first drug data hook.
- *
- * On mount:
- *   1. Read cache synchronously → render immediately (zero delay)
- *   2. Fetch app_metadata.drugs_updated_at from Supabase
- *   3. If timestamp differs OR cache is older than 7 days → re-fetch silently
- *   4. Cold start (no cache, or cache contains empty array) → show loading, fetch, render, cache
- */
 export function useDrugs() {
-  // getCacheData returns null for missing OR empty-array caches,
-  // so an empty-poisoned cache is treated identically to a cold start.
   const cached = getCacheData('drugs')
 
   const [drugs,   setDrugs]   = useState(cached ?? [])
@@ -34,30 +23,63 @@ export function useDrugs() {
     }
   }
 
+  // Cold-start only: show the fast, list-only data as soon as it arrives,
+  // then keep loading the complete data (full clinical write-ups) behind
+  // the scenes and swap it in once ready. The list, search, and pregnancy/
+  // breastfeeding filter all work correctly on the light data already —
+  // only a drug's detail page briefly shows "not yet added" for sections
+  // that fill in a moment later. Every visit after this first one uses the
+  // plain fetchAndCache path above and is unaffected.
+  async function fetchLightThenFull() {
+    try {
+      const light = await fetchFlatDrugsLight(supabase)
+      setDrugs(light)
+      setLoading(false)
+    } catch (err) {
+      setError(err.message ?? 'Failed to load drugs')
+      setLoading(false)
+      return
+    }
+
+    // Full fetch continues in the background. If this fails, the light
+    // list stays in place and usable — the next normal app open retries
+    // via the regular cache/version-check path above.
+    try {
+      const fresh = await fetchFlatDrugs(supabase)
+      const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      setDrugs(fresh)
+      writeCache('drugs', fresh, drugsUpdatedAt)
+    } catch {
+      // Silent — see comment above
+    }
+  }
+
   useEffect(() => {
     async function init() {
       const cachedTs = getCacheTimestamp('drugs')
 
-      // Cold start — no cache at all, or cache was poisoned with empty data
+      // Cold start (nothing cached yet) — stage the load: fast list first,
+      // full detail fills in right after.
       if (!cachedTs || !cached) {
-        await fetchAndCache()
+        await fetchLightThenFull()
         return
       }
 
-      // TTL expired — re-fetch even if version matches
+      // Cache exists but has expired — re-fetch regardless of version match
       if (isCacheExpired('drugs')) {
         await fetchAndCache()
         return
       }
 
-      // Silently check if server version is newer
+      // Cache is fresh — just check in the background if the server's
+      // version has moved on, and only re-fetch if it has
       try {
         const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (drugsUpdatedAt !== cachedTs) {
           await fetchAndCache()
         }
       } catch {
-        // Network error — keep showing cached data, no error shown
+        // Network error on the background check — keep showing cached data
       }
     }
 
