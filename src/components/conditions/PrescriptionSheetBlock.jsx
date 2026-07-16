@@ -113,8 +113,12 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
     switch (row.row_type) {
       case 'drug': {
         const index = nextIndex()
+        // FIX (step 3.14): the drug list is item-per-row since the 3.1 reshape —
+        // `id` is now the item's own id, and the old formulation id lives at
+        // `formulationId` instead. Matching on `d.id` here silently found nothing
+        // for every row post-reshape.
         const formulation = row.formulation_id
-          ? drugs.find(d => d.id === row.formulation_id)
+          ? drugs.find(d => d.formulationId === row.formulation_id)
           : null
         return (
           <UnifiedDrugRow
@@ -334,7 +338,8 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   const findFormulation = (formulationId) => {
     if (!formulationId) return null
     if (formulationId === row.formulation_id) return mainFormulation ?? null
-    return (drugs ?? []).find(d => d.id === formulationId) ?? null
+    // FIX (step 3.14): same id/formulationId correction as the main lookup above.
+    return (drugs ?? []).find(d => d.formulationId === formulationId) ?? null
   }
 
   return groups.map(group => ({
@@ -737,4 +742,3 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
-
