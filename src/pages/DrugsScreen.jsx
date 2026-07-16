@@ -22,10 +22,20 @@
  * to the search bar, shown only while a query is active — category
  * browsing is untouched. `mode` is lifted here and passed into
  * useDrugSearch, which already builds both split indexes per step 3.5.5.
+ *
+ * 2026-07-16: the drug/search results list now renders through
+ * react-virtual's window virtualizer instead of a plain .map() — with the
+ * full catalog live (19,771 items) rendering every row as a real DOM node
+ * made "All Drugs" heavy. Layout renders <main> in normal page flow (no
+ * boxed scroll container) for this route, so the page's own window scroll
+ * is virtualized — scroll look and feel is unchanged. The category-picker
+ * list further down (~14 tiles) is short enough that it's left as a plain
+ * list.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
@@ -213,15 +223,12 @@ export default function DrugsScreen() {
           {displayed.length === 0 ? (
             <EmptyState query={query} />
           ) : (
-            displayed.map(drug => (
-              <DrugListRow
-                key={drug.id}
-                drug={drug}
-                onTap={handleDrugTap}
-                categories={categories}
-                isDark={isDark}
-              />
-            ))
+            <VirtualDrugList
+              drugs={displayed}
+              onTap={handleDrugTap}
+              categories={categories}
+              isDark={isDark}
+            />
           )}
         </div>
 
@@ -392,6 +399,48 @@ function ModeToggle({ mode, onChange }) {
           {m === 'brand' ? 'Brand' : 'Generic'}
         </button>
       ))}
+    </div>
+  )
+}
+
+// ─── VirtualDrugList ────────────────────────────────────────────────────────
+// Renders a long drug list against the page's own window scroll instead of
+// a plain .map() — only the rows actually on screen (plus a small overscan
+// buffer) exist as real DOM nodes at any moment. Row heights vary slightly
+// (the concentration/form line is optional), so real heights are measured
+// after each row renders rather than assumed.
+
+function VirtualDrugList({ drugs, onTap, categories, isDark }) {
+  const listRef = useRef(null)
+
+  const virtualizer = useWindowVirtualizer({
+    count: drugs.length,
+    estimateSize: () => 76,
+    overscan: 8,
+    scrollMargin: listRef.current?.offsetTop ?? 0,
+  })
+
+  return (
+    <div ref={listRef} style={{ position: 'relative', height: virtualizer.getTotalSize() }}>
+      {virtualizer.getVirtualItems().map(virtualRow => {
+        const drug = drugs[virtualRow.index]
+        return (
+          <div
+            key={drug.id}
+            ref={virtualizer.measureElement}
+            data-index={virtualRow.index}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
+            }}
+          >
+            <DrugListRow drug={drug} onTap={onTap} categories={categories} isDark={isDark} />
+          </div>
+        )
+      })}
     </div>
   )
 }

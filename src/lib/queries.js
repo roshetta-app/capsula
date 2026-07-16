@@ -16,9 +16,18 @@
  *     formulationSlug added since top-level id/slug now belong to the brand
  *   - fetchFlatDrugs now also returns the generic's ingredients array (step 3.5.2) —
  *     populated only for combo generics (2+ active ingredients), null otherwise
+ *   - fetchFlatDrugs now pages through the full brands table instead of a single
+ *     request, since Supabase/PostgREST caps any single request at 1,000 rows —
+ *     with the full catalog live (19,771 brands) a single request was silently
+ *     truncating the app's drug list.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
+
+// PostgREST's default per-request row cap. fetchFlatDrugs loops in pages of
+// this size until a page comes back short, which is how it knows it has
+// reached the end of the table.
+const SUPABASE_MAX_ROWS = 1000
 
 /**
  * Fetch all published drugs as a flat list ready for the drug library UI.
@@ -28,30 +37,42 @@
  * @returns {Promise<FlatDrug[]>}
  */
 export async function fetchFlatDrugs(supabase) {
-  const { data, error } = await supabase
-    .from('brands')
-    .select(`
-      id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
-      formulations (
-        id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
-        generics (
-          id, slug, name_en, name_ar, category, class,
-          uses_legacy, uses_structured, warnings_legacy,
-          side_effects_common, side_effects_serious,
-          pregnancy_category, breastfeeding_safety,
-          crosses_placenta, crosses_bbb,
-          contraindications, drug_interactions, dose_adjustments,
-          pharmacokinetics, textbook_doses, textbook_dose_notes,
-          mechanism_of_action, card_tagline, is_published, ingredients
+  let allRows = []
+  let from = 0
+
+  // Loop pages until a page comes back with fewer rows than the page size —
+  // that's the signal we've reached the end of the table.
+  for (;;) {
+    const { data, error } = await supabase
+      .from('brands')
+      .select(`
+        id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+        formulations (
+          id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
+          generics (
+            id, slug, name_en, name_ar, category, class,
+            uses_legacy, uses_structured, warnings_legacy,
+            side_effects_common, side_effects_serious,
+            pregnancy_category, breastfeeding_safety,
+            crosses_placenta, crosses_bbb,
+            contraindications, drug_interactions, dose_adjustments,
+            pharmacokinetics, textbook_doses, textbook_dose_notes,
+            mechanism_of_action, card_tagline, is_published, ingredients
+          )
         )
-      )
-    `)
-    .eq('is_published', true)
-    .order('name_en', { referencedTable: 'formulations.generics' })
+      `)
+      .eq('is_published', true)
+      .order('name_en', { referencedTable: 'formulations.generics' })
+      .range(from, from + SUPABASE_MAX_ROWS - 1)
 
-  if (error) throw error
+    if (error) throw error
 
-  return data
+    allRows = allRows.concat(data)
+    if (data.length < SUPABASE_MAX_ROWS) break
+    from += SUPABASE_MAX_ROWS
+  }
+
+  return allRows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
     .map(b => {
       const f = b.formulations
