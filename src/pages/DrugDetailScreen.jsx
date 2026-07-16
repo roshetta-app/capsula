@@ -16,6 +16,7 @@ import DrugInfoSections                  from '../components/drugs/DrugInfoSecti
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { logUsageEvent }                 from '../analytics/usageEvents'
+import { ROUTES }                        from '../router'
 
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
@@ -26,6 +27,17 @@ export default function DrugDetailScreen() {
 
   // Match by formulation slug first, fall back to id
   const drug = drugs.find(d => d.slug === slug || d.id === slug)
+
+  // Siblings for BrandsList (ADR-034): every other item sharing this drug's
+  // generic, across every form — not just this exact strength/form. The
+  // current item is excluded since it's already shown above in the header.
+  const siblings = drug
+    ? drugs.filter(d => d.genericId === drug.genericId && d.id !== drug.id)
+    : []
+
+  function handleSiblingTap(item) {
+    navigate(ROUTES.DRUG_DETAIL(item.slug || item.id))
+  }
 
   // Phase 3J — log drug view for analytics once drug is resolved
   // FIX: flat drug object uses `genericName`, not `name_en` or `name`
@@ -125,9 +137,8 @@ export default function DrugDetailScreen() {
           />
 
           <BrandsList
-            brands={drug.brands}
-            concentration={drug.concentration}
-            form={drug.form}
+            siblings={siblings}
+            onTap={handleSiblingTap}
           />
 
           <DrugInfoSections drug={drug} />
