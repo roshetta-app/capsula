@@ -20,6 +20,17 @@
  *     request, since Supabase/PostgREST caps any single request at 1,000 rows —
  *     with the full catalog live (19,771 brands) a single request was silently
  *     truncating the app's drug list.
+ *   - 2026-07-16 (cold-start speed): added fetchFlatDrugsLight, a trimmed
+ *     sibling of fetchFlatDrugs used only for the very first load on a
+ *     device with nothing cached yet. It fetches just what the list/search/
+ *     filter screens actually read (name, strength, form, category,
+ *     pregnancy/breastfeeding safety, search fields) and skips the heavy
+ *     per-drug clinical write-up fields (uses, side effects, interactions,
+ *     dosing table, etc.), which only the detail page needs. useDrugs shows
+ *     this light list immediately, then quietly runs the full fetchFlatDrugs
+ *     in the background and swaps it in once ready. Every visit after the
+ *     first (cache already warm) is unaffected — this only changes the very
+ *     first, nothing-cached-yet load.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -29,38 +40,62 @@
 // reached the end of the table.
 const SUPABASE_MAX_ROWS = 1000
 
+// Full select — every field either the list screens or the detail page
+// reads. Used by fetchFlatDrugs.
+const FULL_BRAND_SELECT = `
+  id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+  formulations (
+    id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
+    generics (
+      id, slug, name_en, name_ar, category, class,
+      uses_legacy, uses_structured, warnings_legacy,
+      side_effects_common, side_effects_serious,
+      pregnancy_category, breastfeeding_safety,
+      crosses_placenta, crosses_bbb,
+      contraindications, drug_interactions, dose_adjustments,
+      pharmacokinetics, textbook_doses, textbook_dose_notes,
+      mechanism_of_action, card_tagline, is_published, ingredients
+    )
+  )
+`
+
+// Light select — only what the list, search, and filter screens read.
+// Leaves out the per-drug clinical write-up fields (uses, side effects,
+// interactions, dosing table, etc.), which only the detail page needs.
+// pregnancy_category / breastfeeding_safety ARE included here even though
+// they're clinical fields, because the pregnancy/breastfeeding filter
+// checks every drug in the list at once — deferring those two would make
+// that filter briefly wrong right after a cold start.
+const LIGHT_BRAND_SELECT = `
+  id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+  formulations (
+    id, slug, concentration, form, route, is_published,
+    generics (
+      id, slug, name_en, name_ar, category, class,
+      pregnancy_category, breastfeeding_safety,
+      card_tagline, is_published, ingredients
+    )
+  )
+`
+
 /**
- * Fetch all published drugs as a flat list ready for the drug library UI.
- * Primary key is brand (item) UUID (one row per item — brand + strength + form).
+ * Page through the full `brands` table for a given select shape, looping
+ * until a page comes back short of the page size — that's the signal
+ * we've reached the end of the table. Shared by fetchFlatDrugs and
+ * fetchFlatDrugsLight so both stay correct against the same 1,000-row
+ * per-request cap.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @returns {Promise<FlatDrug[]>}
+ * @param {string} selectString
  */
-export async function fetchFlatDrugs(supabase) {
+async function fetchAllBrandRows(supabase, selectString) {
   let allRows = []
   let from = 0
 
-  // Loop pages until a page comes back with fewer rows than the page size —
-  // that's the signal we've reached the end of the table.
   for (;;) {
     const { data, error } = await supabase
       .from('brands')
-      .select(`
-        id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
-        formulations (
-          id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
-          generics (
-            id, slug, name_en, name_ar, category, class,
-            uses_legacy, uses_structured, warnings_legacy,
-            side_effects_common, side_effects_serious,
-            pregnancy_category, breastfeeding_safety,
-            crosses_placenta, crosses_bbb,
-            contraindications, drug_interactions, dose_adjustments,
-            pharmacokinetics, textbook_doses, textbook_dose_notes,
-            mechanism_of_action, card_tagline, is_published, ingredients
-          )
-        )
-      `)
+      .select(selectString)
       .eq('is_published', true)
       .order('name_en', { referencedTable: 'formulations.generics' })
       .range(from, from + SUPABASE_MAX_ROWS - 1)
@@ -71,6 +106,19 @@ export async function fetchFlatDrugs(supabase) {
     if (data.length < SUPABASE_MAX_ROWS) break
     from += SUPABASE_MAX_ROWS
   }
+
+  return allRows
+}
+
+/**
+ * Fetch all published drugs as a flat list ready for the drug library UI.
+ * Primary key is brand (item) UUID (one row per item — brand + strength + form).
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<FlatDrug[]>}
+ */
+export async function fetchFlatDrugs(supabase) {
+  const allRows = await fetchAllBrandRows(supabase, FULL_BRAND_SELECT)
 
   return allRows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
@@ -123,6 +171,57 @@ export async function fetchFlatDrugs(supabase) {
         pharmacokinetics:     g.pharmacokinetics,
         textbookDoses:        g.textbook_doses        ?? [],
         textbookDoseNotes:    g.textbook_dose_notes,
+      }
+    })
+}
+
+/**
+ * Fetch a trimmed, list-ready version of the drug catalog — used only for
+ * a device's very first load, before anything is cached, so the list can
+ * appear without waiting on the full per-drug clinical write-up. Every
+ * field the list, search, and filter screens actually read is included;
+ * fields only the detail page needs (uses, side effects, interactions,
+ * dosing table, etc.) are left out and filled in afterward by a normal
+ * fetchFlatDrugs call. Shape matches fetchFlatDrugs's output — callers
+ * don't need to know which one they got, except that detail-only fields
+ * will be undefined until the full fetch completes.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<FlatDrug[]>}
+ */
+export async function fetchFlatDrugsLight(supabase) {
+  const allRows = await fetchAllBrandRows(supabase, LIGHT_BRAND_SELECT)
+
+  return allRows
+    .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
+    .map(b => {
+      const f = b.formulations
+      const g = f.generics
+
+      return {
+        id:                   b.id,
+        slug:                 b.slug,
+        name:                 b.name,
+        nameAr:               b.name_ar,
+        manufacturer:         b.manufacturer,
+        source:               b.source,
+        price:                b.price,
+        packSize:             b.pack_size,
+        formulationId:        f.id,
+        formulationSlug:      f.slug,
+        concentration:        f.concentration,
+        form:                 f.form,
+        route:                f.route,
+        genericId:            g.id,
+        genericSlug:          g.slug,
+        genericName:          g.name_en,
+        arabicName:           g.name_ar,
+        ingredients:          g.ingredients ?? null,
+        category:             g.category,
+        class:                g.class,
+        cardTagline:          g.card_tagline,
+        pregnancyCategory:    g.pregnancy_category,
+        breastfeedingSafety:  g.breastfeeding_safety,
       }
     })
 }
