@@ -103,7 +103,7 @@ function applyFilters(drugs, filters) {
 
 export default function DrugsScreen() {
   const navigate           = useNavigate()
-  const { drugs, loading } = useDrugContext()
+  const { drugs, loading, progress } = useDrugContext()
   const [mode, setMode] = useState('brand')
   const {
     query,
@@ -307,24 +307,9 @@ export default function DrugsScreen() {
           </div>
         )}
 
-        {/* Loading skeleton */}
+        {/* Loading progress ring */}
         {loading && drugs.length === 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-            <div style={{
-              fontSize: 12, color: 'var(--color-text-tertiary)',
-              textAlign: 'center', marginBottom: 'var(--space-1)',
-            }}>
-              Setting up your drug library — this only happens once
-            </div>
-            {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} style={{
-                height: 64,
-                backgroundColor: 'var(--color-border)',
-                borderRadius: 'var(--radius-lg)',
-                animation: 'shimmer 1.4s ease-in-out infinite',
-              }} />
-            ))}
-          </div>
+          <LoadingProgress progress={progress} />
         )}
 
         {/* "All Drugs" row */}
@@ -368,6 +353,63 @@ export default function DrugsScreen() {
         onApply={handleApplyFilters}
       />
     </Layout>
+  )
+}
+
+// ─── LoadingProgress ──────────────────────────────────────────────────────────
+// Circular "X of Y" ring shown during the one-time cold-start load. Real
+// progress, not simulated — driven by page-by-page counts reported from
+// useDrugs as the parallel fetch completes each chunk.
+
+function LoadingProgress({ progress }) {
+  const total  = progress?.total  ?? 0
+  const loaded = progress?.loaded ?? 0
+  const pct    = total > 0 ? Math.min(1, loaded / total) : 0
+
+  const size          = 64
+  const strokeWidth   = 6
+  const radius        = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset        = circumference * (1 - pct)
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
+      padding: 'var(--space-6) var(--space-3)',
+    }}>
+      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke="var(--color-border)" strokeWidth={strokeWidth}
+          />
+          <circle
+            cx={size / 2} cy={size / 2} r={radius}
+            fill="none" stroke="var(--color-accent)" strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 0.25s ease' }}
+          />
+        </svg>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)',
+        }}>
+          {total > 0 ? `${loaded} of ${total}` : '···'}
+        </div>
+      </div>
+
+      <div>
+        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          Setting up your drug library
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+          This only happens once
+        </div>
+      </div>
+    </div>
   )
 }
 
