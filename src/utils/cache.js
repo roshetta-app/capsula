@@ -131,9 +131,99 @@ export function isCacheExpired(key) {
  */
 export function clearCache(key = 'all') {
   try {
-    if (key === 'all' || key === 'drugs')      localStorage.removeItem(CACHE_KEYS.DRUGS)
     if (key === 'all' || key === 'conditions') localStorage.removeItem(CACHE_KEYS.CONDITIONS)
     if (key === 'all' || key === 'categories') localStorage.removeItem(CACHE_KEYS.CATEGORIES)
+    if (key === 'all' || key === 'drugs') {
+      localStorage.removeItem(CACHE_KEYS.DRUGS) // legacy key from before the IndexedDB move — harmless no-op cleanup
+      clearDrugsCache() // fire-and-forget; the real drugs cache now lives in IndexedDB, see below
+    }
+  } catch {
+    // fail silently
+  }
+}
+
+// ─── IndexedDB (drugs slice only) ──────────────────────────────────────────
+//
+// 2026-07-16: localStorage caps out around 5 MB per site — far below the
+// real size of the full drug catalog (tens of MB as JSON) — so
+// writeCache('drugs', ...) above was silently failing every single time
+// (see its catch block), and every app open was secretly a full re-download.
+// IndexedDB has no such practical size limit, so the drugs slice's saved
+// copy lives here instead. conditions/categories are both small and were
+// never affected by this — they're untouched, still on localStorage above.
+
+const IDB_NAME    = 'capsula-cache'
+const IDB_VERSION = 1
+const IDB_STORE   = 'drugs'
+const IDB_KEY     = 'drugs'
+
+function openDrugsDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, IDB_VERSION)
+    req.onupgradeneeded = () => {
+      if (!req.result.objectStoreNames.contains(IDB_STORE)) {
+        req.result.createObjectStore(IDB_STORE)
+      }
+    }
+    req.onsuccess = () => resolve(req.result)
+    req.onerror   = () => reject(req.error)
+  })
+}
+
+/**
+ * Write the drugs cache to IndexedDB. Same record shape as writeCache:
+ * { data, version, fetchedAt }. Silently no-ops on empty data or any
+ * storage error, same guarding behavior as writeCache above.
+ * @param {Array}  data     — the full fetched drug list
+ * @param {string} version  — ISO timestamp from app_metadata
+ */
+export async function writeDrugsCache(data, version) {
+  if (!Array.isArray(data) || data.length === 0) return
+  try {
+    const db = await openDrugsDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite')
+      tx.objectStore(IDB_STORE).put({ data, version, fetchedAt: new Date().toISOString() }, IDB_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch {
+    // IndexedDB unavailable (rare — e.g. some private-browsing modes) — fail silently
+  }
+}
+
+/**
+ * Read the full stored drugs record — { data, version, fetchedAt } — or
+ * null if nothing valid is saved yet.
+ */
+export async function readDrugsCache() {
+  try {
+    const db = await openDrugsDB()
+    const record = await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readonly')
+      const req = tx.objectStore(IDB_STORE).get(IDB_KEY)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+    if (!record || !Array.isArray(record.data) || record.data.length === 0) return null
+    return record
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Clear the drugs IndexedDB cache.
+ */
+export async function clearDrugsCache() {
+  try {
+    const db = await openDrugsDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite')
+      tx.objectStore(IDB_STORE).delete(IDB_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
   } catch {
     // fail silently
   }
