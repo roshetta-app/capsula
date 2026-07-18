@@ -31,6 +31,14 @@
  *     in the background and swaps it in once ready. Every visit after the
  *     first (cache already warm) is unaffected — this only changes the very
  *     first, nothing-cached-yet load.
+ *   - 2026-07-18 (drug_library_ui_ux, plan §7 step 0a): added tradename_clean
+ *     (brands) and strength_value/strength_unit/strength_basis (formulations)
+ *     to BOTH the full and light selects/mappers — the new drug card and
+ *     drug detail header build their title text from these raw fields, and
+ *     they need to be present even on a device's very first, nothing-cached
+ *     load, not just once the full fetch lands. Existing concentration/form/
+ *     name fields are untouched and stay in use elsewhere (DrugCard.jsx,
+ *     DrugsScreen.jsx's list rows, etc.).
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -43,9 +51,9 @@ const SUPABASE_MAX_ROWS = 1000
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
 const FULL_BRAND_SELECT = `
-  id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, is_published,
   formulations (
-    id, slug, concentration, form, route, doses_structured, default_dose_override, is_published,
+    id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, doses_structured, default_dose_override, is_published,
     generics (
       id, slug, name_en, name_ar, category, class,
       uses_legacy, uses_structured, warnings_legacy,
@@ -65,11 +73,14 @@ const FULL_BRAND_SELECT = `
 // pregnancy_category / breastfeeding_safety ARE included here even though
 // they're clinical fields, because the pregnancy/breastfeeding filter
 // checks every drug in the list at once — deferring those two would make
-// that filter briefly wrong right after a cold start.
+// that filter briefly wrong right after a cold start. tradename_clean /
+// strength_value / strength_unit / strength_basis are included for the same
+// reason (plan §7 step 0a) — the drug card's title is built from these on
+// every screen that uses this light list, including the very first load.
 const LIGHT_BRAND_SELECT = `
-  id, slug, name, name_ar, manufacturer, source, price, pack_size, is_published,
+  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, is_published,
   formulations (
-    id, slug, concentration, form, route, is_published,
+    id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, is_published,
     generics (
       id, slug, name_en, name_ar, category, class,
       pregnancy_category, breastfeeding_safety,
@@ -147,6 +158,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         slug:                 b.slug,
         name:                 b.name,
         nameAr:               b.name_ar,
+        tradenameClean:       b.tradename_clean,
         manufacturer:         b.manufacturer,
         source:               b.source,
         price:                b.price,
@@ -155,6 +167,9 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         formulationId:        f.id,
         formulationSlug:      f.slug,
         concentration:        f.concentration,
+        strengthValue:        f.strength_value,
+        strengthUnit:         f.strength_unit,
+        strengthBasis:        f.strength_basis,
         form:                 f.form,
         route:                f.route,
         doses:                f.doses_structured ?? [],
@@ -220,6 +235,7 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         slug:                 b.slug,
         name:                 b.name,
         nameAr:               b.name_ar,
+        tradenameClean:       b.tradename_clean,
         manufacturer:         b.manufacturer,
         source:               b.source,
         price:                b.price,
@@ -227,6 +243,9 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         formulationId:        f.id,
         formulationSlug:      f.slug,
         concentration:        f.concentration,
+        strengthValue:        f.strength_value,
+        strengthUnit:         f.strength_unit,
+        strengthBasis:        f.strength_basis,
         form:                 f.form,
         route:                f.route,
         genericId:            g.id,
