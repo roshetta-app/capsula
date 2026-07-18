@@ -1,6 +1,5 @@
 /**
  * src/utils/searchUtils.js
- * Phase 2I — adds drug fuzzy search on top of existing condition search.
  *
  * Condition search uses a tiered strategy:
  *   1 char  — prefix match only (name starts with the letter)
@@ -36,6 +35,16 @@
  * "amoxicillin + clavulanic acid" even when the combined name alone
  * wouldn't score well. Plain single-ingredient generics have a null
  * ingredients array and just keep matching on genericName as before.
+ *
+ * drug_library_ui_ux step 1e.1 (2026-07-19, decision 4.17, plan §4B):
+ * added `searchDrugsTiered`/`getDrugAutocompleteSuggestionsTiered` below —
+ * the same 1/2/3+-char tiered ramp Conditions already uses, but field-
+ * scoped per mode rather than copying Conditions' multi-field weighted
+ * blend. `useDrugSearch.js` now calls these instead of `fuzzySearchDrugs`/
+ * `getDrugAutocompleteSuggestionsByMode` directly. Those two functions are
+ * left in place below (not deleted) since this session didn't check for
+ * other callers app-wide — flag and confirm before removing them in a
+ * future step if a full-repo check shows nothing else uses them.
  */
 
 import Fuse from 'fuse.js'
@@ -231,5 +240,103 @@ export function getDrugAutocompleteSuggestionsByMode(fuseIndex, query, limit = 5
     id:   r.item.id,
     name: mode === 'brand' ? r.item.name : r.item.genericName,
     slug: mode === 'brand' ? r.item.slug : r.item.genericSlug,
+  }))
+}
+
+// ─── Drugs — tiered search (Phase 1, step 1e.1, decision 4.17) ────────────────
+// Same 1/2/3+-char tiered ramp as searchConditions/getAutocompleteSuggestions
+// above, but field-scoped per mode instead of Conditions' multi-field weighted
+// blend: Brand mode checks `name` only (adding `form` would turn a short query
+// into an unintended form filter — a separate Form filter already exists for
+// that). Generic mode checks `genericName` only — confirmed live (plan §0,
+// 2026-07-19) that combo generics' genericName IS already
+// `ingredients.join(' + ')`, so every ingredient word is already inside
+// genericName; a separate ingredients check is redundant, not missing.
+//
+// MIN_WORD_TOKEN_LENGTH: at the 2-char word-start tier, single-character
+// tokens (the "a", "c", "d", "3" vitamin-shorthand tokens that pepper combo
+// generic names, e.g. "a + c + calcium + copper + e + iron ...") are ignored
+// as word-start candidates — otherwise a 2-letter query would match nearly
+// every multivitamin combo in the catalog regardless of what was typed.
+// Does not affect the 3+ char fuzzy tier, which is untouched here (relevance
+// floor for that tier is step 1e.2).
+
+const MIN_WORD_TOKEN_LENGTH = 2
+
+function drugFieldForMode(drug, mode) {
+  return (mode === 'brand' ? drug.name : drug.genericName) ?? ''
+}
+
+function wordTokens(text) {
+  return text.toLowerCase().split(/\s+/).filter(Boolean)
+}
+
+/**
+ * Tiered drug search — mirrors searchConditions' shape but field-scoped per mode.
+ *
+ * @param {Fuse}   fuseIndex — buildDrugBrandIndex or buildDrugGenericIndex output
+ * @param {object[]} pool    — the raw drugs array (needed for prefix tiers)
+ * @param {string} query
+ * @param {'brand'|'generic'} mode
+ * @returns {object[]|null}  — null means "show everything" (query too short)
+ */
+export function searchDrugsTiered(fuseIndex, pool, query, mode = 'brand') {
+  const q = query.trim()
+  if (q.length === 0) return null
+
+  if (q.length === 1) {
+    // Tier 1: field must START with the letter — fast, zero noise
+    const lower = q.toLowerCase()
+    return pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+  }
+
+  if (q.length === 2) {
+    // Tier 2: field starts with query OR any (non-trivial) word in field starts
+    // with query
+    const lower = q.toLowerCase()
+    return pool.filter(d => {
+      const field = drugFieldForMode(d, mode).toLowerCase()
+      if (field.startsWith(lower)) return true
+      return wordTokens(field).some(
+        word => word.length >= MIN_WORD_TOKEN_LENGTH && word.startsWith(lower)
+      )
+    })
+  }
+
+  // Tier 3: full fuzzy (3+ chars) — unchanged for now; relevance floor is 1e.2
+  const results = fuseIndex.search(q)
+  return results.map(r => r.item)
+}
+
+/**
+ * Autocomplete suggestions using searchDrugsTiered's same tier boundaries.
+ */
+export function getDrugAutocompleteSuggestionsTiered(fuseIndex, pool, query, limit = 5, mode = 'brand') {
+  const q = query.trim()
+  if (q.length === 0) return []
+
+  let candidates
+
+  if (q.length === 1) {
+    const lower = q.toLowerCase()
+    candidates = pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+  } else if (q.length === 2) {
+    const lower = q.toLowerCase()
+    candidates = pool.filter(d => {
+      const field = drugFieldForMode(d, mode).toLowerCase()
+      if (field.startsWith(lower)) return true
+      return wordTokens(field).some(
+        word => word.length >= MIN_WORD_TOKEN_LENGTH && word.startsWith(lower)
+      )
+    })
+  } else {
+    const raw = fuseIndex.search(q, { limit })
+    candidates = raw.map(r => r.item)
+  }
+
+  return candidates.slice(0, limit).map(d => ({
+    id:   d.id,
+    name: mode === 'brand' ? d.name : d.genericName,
+    slug: mode === 'brand' ? d.slug : d.genericSlug,
   }))
 }
