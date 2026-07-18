@@ -177,6 +177,11 @@ export default function DrugsScreen() {
     navigate(ROUTES.DRUG_DETAIL(suggestion.slug || suggestion.id))
   }
 
+  function handleQueryChange(val) {
+    setQuery(val)
+    if (!val) clearSuggestions()
+  }
+
   const hasQuery = query.trim().length > 0
   const hasFilters = !!activeFilters
 
@@ -190,9 +195,25 @@ export default function DrugsScreen() {
       .slice()
       .sort((a, b) => a.genericName.localeCompare(b.genericName))
 
+    // activeCategory holds the category's stable slug (see plan's decided
+    // design — generics.category stores a drug_categories.slug, not the
+    // display name), so both the back-button label and the sticky search
+    // bar's placeholder (1a.3, decision 4.6's correction) need this lookup.
+    const categoryLabel = activeCategory === '__all'
+      ? 'All Drugs'
+      : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
+
     return (
       <Layout>
-        <StickyDrugsHeader visible={showStickyHeader} isDark={isDark} />
+        <StickyDrugsHeader
+          visible={showStickyHeader}
+          isDark={isDark}
+          query={query}
+          onQueryChange={handleQueryChange}
+          placeholder={hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`}
+          onFilter={() => setFilterOpen(true)}
+          hasActiveFilters={hasFilters}
+        />
         <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         {/* Search bar + mode toggle + autocomplete */}
@@ -201,10 +222,7 @@ export default function DrugsScreen() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <SearchBar
                 value={query}
-                onChange={(val) => {
-                  setQuery(val)
-                  if (!val) clearSuggestions()
-                }}
+                onChange={handleQueryChange}
                 placeholder="Search drugs…"
                 onFilter={() => setFilterOpen(true)}
                 hasActiveFilters={hasFilters}
@@ -239,14 +257,9 @@ export default function DrugsScreen() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="15 18 9 12 15 6"/>
               </svg>
-              {/* activeCategory holds the category's stable slug once set
-                  (see plan's decided design — generics.category stores a
-                  drug_categories.slug, not the display name), so the
-                  display label needs a lookup back to name_en. */}
-              {activeCategory === '__all'
-                ? 'All Drugs'
-                : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
-              }
+              {/* categoryLabel computed above, shared with the sticky
+                  search bar's placeholder (1a.3). */}
+              {categoryLabel}
             </button>
           )}
 
@@ -293,15 +306,20 @@ export default function DrugsScreen() {
 
   return (
     <Layout>
-      <StickyDrugsHeader visible={showStickyHeader} isDark={isDark} />
+      <StickyDrugsHeader
+        visible={showStickyHeader}
+        isDark={isDark}
+        query={query}
+        onQueryChange={handleQueryChange}
+        placeholder="Search drugs…"
+        onFilter={() => setFilterOpen(true)}
+        hasActiveFilters={hasFilters}
+      />
       <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         <SearchBar
           value={query}
-          onChange={(val) => {
-            setQuery(val)
-            if (!val) clearSuggestions()
-          }}
+          onChange={handleQueryChange}
           placeholder="Search drugs…"
           onFilter={() => setFilterOpen(true)}
           hasActiveFilters={hasFilters}
@@ -464,21 +482,24 @@ function DrugsHero({ heroRef, isDark }) {
   )
 }
 
-// ─── StickyDrugsHeader: row 1 (icon badge + title) ───────────────────────────
-// New, 2026-07-18 (plan §7 step 1a.2, decision 4.6). Collapsed scroll-state
-// of DrugsHero. Shell (position/zIndex/shadow/radius/transition) and title-
-// row height math (44px border-box, 8px top padding, marginTop 5) are
-// copied directly from FavouritesScreen's StickyFavouritesHeader rather
-// than reinvented, so all three peer screens' sticky headers stay
-// pixel-matched — the height math was already solved and deliberately
-// trimmed to line up across screens, so there's nothing to re-derive here.
-// Badge reuses DrugsHero's own Pill icon + color token, scaled down the
-// same way Favourites' badge shrinks from hero to sticky state.
-// Row 2 (search bar + filter button, per 4.6's correction) is step 1a.3 —
-// not built yet, so this panel is title-row only for now; a small bottom
-// padding on the wrapper keeps it from looking cut off until row 2 lands.
+// ─── StickyDrugsHeader: row 1 (icon badge + title) + row 2 (search) ─────────
+// New, 2026-07-18 (plan §7 steps 1a.2/1a.3, decision 4.6). Collapsed
+// scroll-state of DrugsHero. Row 1's shell (position/zIndex/shadow/radius/
+// transition) and height math (44px border-box, 8px top padding, marginTop
+// 5) are copied directly from FavouritesScreen's StickyFavouritesHeader
+// rather than reinvented, so all three peer screens' sticky headers stay
+// pixel-matched. Badge reuses DrugsHero's own Pill icon + color token,
+// scaled down the same way Favourites' badge shrinks from hero to sticky
+// state.
+// Row 2 is the shared SearchBar itself (compact prop, per decision 4.6's
+// correction) with its own built-in filter button (onFilter/hasActiveFilters
+// — the same filter-sheet trigger the main header's search bar already
+// uses), not a new pill+icon piece. Placeholder swaps to name the active
+// category ("Search in {category}…") while browsing one with no typed
+// query — the caller computes and passes that text down, since only it
+// knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ visible, isDark }) {
+function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, hasActiveFilters }) {
   const colors = resolveToken(FALLBACK_TOKEN, isDark)
 
   return (
@@ -499,7 +520,7 @@ function StickyDrugsHeader({ visible, isDark }) {
         pointerEvents:           visible ? 'auto' : 'none',
       }}
     >
-      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', paddingBottom: 8 }}>
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
         <div style={{
           display:        'flex',
           alignItems:     'center',
@@ -533,10 +554,22 @@ function StickyDrugsHeader({ visible, isDark }) {
               Drugs
             </div>
           </div>
+        </div>
 
-          {/* Action-button slot — empty until row 2 (search + filter) lands
-              in step 1a.3, per decision 4.6. */}
-          <div style={{ flexShrink: 0 }} />
+        {/* Row 2 — near-full-width compact search bar with its built-in
+            filter button on the right (1a.3, decision 4.6's correction). */}
+        <div style={{
+          padding:      '6px var(--space-6) 8px',
+          boxSizing:    'border-box',
+        }}>
+          <SearchBar
+            value={query}
+            onChange={onQueryChange}
+            placeholder={placeholder}
+            onFilter={onFilter}
+            hasActiveFilters={hasActiveFilters}
+            compact
+          />
         </div>
       </div>
     </div>
