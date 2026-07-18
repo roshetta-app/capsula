@@ -928,3 +928,4 @@ function EmptyState({ query }) {
       <div style={{ fontSize: 13 }}>Try searching by generic name or brand name</div>
     </div>
   )
+}
