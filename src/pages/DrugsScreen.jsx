@@ -49,10 +49,18 @@
  * changed — only the extra overlay and its wiring (suggestions, showSuggestions,
  * clearSuggestions, handleSuggestionSelect) came out. Brings Drugs in line with
  * how Conditions already works.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1b.2, decision 4.8): restyled the
+ * recently-viewed row to match RecentlyViewedChips.jsx exactly — clock icon +
+ * "Recent" label, thin separator, plain-text drug-name links with · dots,
+ * single scrollable line, right-edge fade hint. Replaces the old pill-button
+ * chip row. Same recentDrugs data/localStorage source, navigation behavior
+ * unchanged — visual only.
  */
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Clock } from 'lucide-react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
@@ -314,40 +322,98 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters}
         />
 
-        {/* Recently viewed chips */}
+        {/* Recently viewed — matches RecentlyViewedChips.jsx exactly (plan
+            §7 step 1b.2, decision 4.8): clock icon + label, thin separator,
+            plain-text links with · dots, single scrollable line, right-edge
+            fade hint. Inlined here rather than importing the Conditions
+            component since it navigates to condition routes/props, not
+            drug ones — same visual pattern, different data shape. */}
         {recentDrugs.length > 0 && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-            overflowX: 'auto', paddingBottom: 'var(--space-1)',
+            position:     'relative',
             marginBottom: 'var(--space-3)',
-            scrollbarWidth: 'none', msOverflowStyle: 'none',
           }}>
-            <span style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-              textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-              flexShrink: 0, paddingRight: 'var(--space-1)',
+            <div style={{
+              display:                 'flex',
+              alignItems:              'center',
+              gap:                     'var(--space-2)',
+              overflowX:               'auto',
+              scrollbarWidth:          'none',
+              msOverflowStyle:         'none',
+              WebkitOverflowScrolling: 'touch',
+              whiteSpace:              'nowrap',
             }}>
-              Recent
-            </span>
-            {recentDrugs.map(d => (
-              <button
-                key={d.id}
-                onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
-                style={{
-                  flexShrink: 0, padding: '5px 12px',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                  border: '1.5px solid var(--color-border)',
-                  backgroundColor: 'var(--color-surface)',
-                  color: 'var(--color-text-secondary)',
-                  fontFamily: 'var(--font-body)',
-                  WebkitTapHighlightColor: 'transparent', outline: 'none',
-                }}
-              >
-                {d.name}
-              </button>
-            ))}
+              {/* Clock + label — fixed, never scrolls away */}
+              <div style={{
+                display:    'flex',
+                alignItems: 'center',
+                gap:        5,
+                flexShrink: 0,
+                color:      'var(--color-text-tertiary)',
+              }}>
+                <Clock size={12} strokeWidth={1.8} />
+                <span style={{
+                  fontSize:      11,
+                  fontWeight:    500,
+                  fontFamily:    'var(--font-body)',
+                  letterSpacing: '0.02em',
+                }}>
+                  Recent
+                </span>
+              </div>
+
+              {/* Separator line */}
+              <div style={{
+                width:           1,
+                height:          12,
+                backgroundColor: 'var(--color-border)',
+                flexShrink:      0,
+              }} />
+
+              {/* Drug names as inline text links with · separators */}
+              {recentDrugs.map((d, index) => (
+                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
+                  {index > 0 && (
+                    <span style={{
+                      color:      'var(--color-border)',
+                      fontSize:   12,
+                      userSelect: 'none',
+                    }}>·</span>
+                  )}
+                  <button
+                    onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
+                    style={{
+                      background:              'none',
+                      border:                  'none',
+                      padding:                 0,
+                      cursor:                  'pointer',
+                      fontSize:                13,
+                      fontFamily:              'var(--font-body)',
+                      color:                   'var(--color-text-secondary)',
+                      outline:                 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      whiteSpace:              'nowrap',
+                    }}
+                  >
+                    {d.name}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Right-edge fade — hints more items are off-screen */}
+            <div
+              aria-hidden="true"
+              style={{
+                position:      'absolute',
+                top:           0,
+                right:         0,
+                bottom:        0,
+                width:         32,
+                background:    'linear-gradient(to right, transparent, var(--color-bg))',
+                pointerEvents: 'none',
+              }}
+            />
           </div>
         )}
 
