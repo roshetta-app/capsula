@@ -56,6 +56,14 @@
  * single scrollable line, right-edge fade hint. Replaces the old pill-button
  * chip row. Same recentDrugs data/localStorage source, navigation behavior
  * unchanged — visual only.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.1, decision 4.9): fixed a real
+ * bug — typing a query while browsing inside a category searched the whole
+ * catalog instead of staying scoped to that category. The `hasQuery`/
+ * `activeCategory` branches were treated as mutually exclusive when they
+ * aren't; `base` now filters `searchResults` down to `activeCategory` too
+ * when both are active. Search index itself is unchanged (still built once
+ * against the full catalog for performance) — this only narrows its results.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -191,8 +199,14 @@ export default function DrugsScreen() {
 
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
+    // 1c.1 (decision 4.9): a query and an active category can both be true
+    // at once (typing while browsing inside a category) — search results
+    // need to stay scoped to that category too, the same way the no-query
+    // branch below already scopes the plain drug list.
     const base = hasQuery
-      ? searchResults
+      ? (activeCategory && activeCategory !== '__all'
+          ? searchResults.filter(d => d.category === activeCategory)
+          : searchResults)
       : drugs.filter(d => activeCategory === '__all' || d.category === activeCategory)
 
     const displayed = applyFilters(base, activeFilters)
