@@ -138,6 +138,27 @@ export default function DrugsScreen() {
     setRecentDrugs(readRecentDrugs())
   }, [])
 
+  // ── Sliding sticky header: visible once DrugsHero leaves viewport ────────
+  // Same IntersectionObserver approach as FavouritesScreen's heroRef watch
+  // (step 1a.2, decision 4.6). heroRef is the one already threaded through
+  // both view branches by step 1a.1.
+  const [showStickyHeader, setShowStickyHeader] = useState(false)
+
+  useEffect(() => {
+    const el = heroRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        setShowStickyHeader(!entry.isIntersecting)
+      },
+      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   function handleDrugTap(drug) {
     addRecentDrug(drug)
     setRecentDrugs(readRecentDrugs())
@@ -171,6 +192,7 @@ export default function DrugsScreen() {
 
     return (
       <Layout>
+        <StickyDrugsHeader visible={showStickyHeader} isDark={isDark} />
         <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         {/* Search bar + mode toggle + autocomplete */}
@@ -271,6 +293,7 @@ export default function DrugsScreen() {
 
   return (
     <Layout>
+      <StickyDrugsHeader visible={showStickyHeader} isDark={isDark} />
       <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         <SearchBar
@@ -436,6 +459,85 @@ function DrugsHero({ heroRef, isDark }) {
 
         {/* Action-button slot — intentionally empty, see note above. */}
         <div style={{ flexShrink: 0 }} />
+      </div>
+    </div>
+  )
+}
+
+// ─── StickyDrugsHeader: row 1 (icon badge + title) ───────────────────────────
+// New, 2026-07-18 (plan §7 step 1a.2, decision 4.6). Collapsed scroll-state
+// of DrugsHero. Shell (position/zIndex/shadow/radius/transition) and title-
+// row height math (44px border-box, 8px top padding, marginTop 5) are
+// copied directly from FavouritesScreen's StickyFavouritesHeader rather
+// than reinvented, so all three peer screens' sticky headers stay
+// pixel-matched — the height math was already solved and deliberately
+// trimmed to line up across screens, so there's nothing to re-derive here.
+// Badge reuses DrugsHero's own Pill icon + color token, scaled down the
+// same way Favourites' badge shrinks from hero to sticky state.
+// Row 2 (search bar + filter button, per 4.6's correction) is step 1a.3 —
+// not built yet, so this panel is title-row only for now; a small bottom
+// padding on the wrapper keeps it from looking cut off until row 2 lands.
+
+function StickyDrugsHeader({ visible, isDark }) {
+  const colors = resolveToken(FALLBACK_TOKEN, isDark)
+
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        position:                'fixed',
+        top:                     0,
+        left:                    0,
+        right:                   0,
+        zIndex:                  50,
+        backgroundColor:         'var(--color-surface)',
+        borderBottomLeftRadius:  18,
+        borderBottomRightRadius: 18,
+        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
+        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
+        transition:              'transform 0.25s ease',
+        pointerEvents:           visible ? 'auto' : 'none',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', paddingBottom: 8 }}>
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          gap:            8,
+          padding:        '8px var(--space-6) 0',
+          height:         44,
+          boxSizing:      'border-box',
+          marginTop:      5,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+            <div style={{
+              width:           28,
+              height:          28,
+              borderRadius:    '50%',
+              backgroundColor: colors.bg,
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+            }}>
+              <SpecialtyIcon iconType="lucide" iconValue="Pill" size={15} color={colors.fg} />
+            </div>
+            <div style={{
+              fontSize:      18,
+              fontWeight:    700,
+              color:         'var(--color-text-primary)',
+              letterSpacing: '-0.2px',
+              minWidth:      0,
+            }}>
+              Drugs
+            </div>
+          </div>
+
+          {/* Action-button slot — empty until row 2 (search + filter) lands
+              in step 1a.3, per decision 4.6. */}
+          <div style={{ flexShrink: 0 }} />
+        </div>
       </div>
     </div>
   )
