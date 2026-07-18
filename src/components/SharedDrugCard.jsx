@@ -16,12 +16,19 @@
  * (plan §0, 4.28's correction note). ROW_HEIGHT is a tentative value; it
  * may need revisiting once the real title/generic-line content lands.
  *
- * This step only builds the outer shell and its slot layout. Each slot's
- * real content lands in a later step:
+ * 1d.1 built the outer shell and its slot layout; 1d.2 fills in the title
+ * line. Remaining slots land in later steps:
  *   - icon-left badge   → 1d.4 (category icon, live drug_categories data)
- *   - title line        → 1d.2 (tradename_clean + strength + form)
- *   - generic line       → 1d.3 (first 2 ingredients + "+N")
+ *   - generic line      → 1d.3 (first 2 ingredients + "+N")
  *   - trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
+ *
+ * Title line (1d.2, decision 4.12): rebuilt fresh from three raw fields —
+ * tradenameClean + strength (strengthValue + strengthUnit, with strengthBasis
+ * appended after a "/" when present, e.g. "100mg/5ml") + form — replacing the
+ * old card's approach of appending a second, already-baked-in strength/form
+ * onto a pre-composed name string (which showed both twice). ~43% of
+ * published brands have no strength on file, so the fallback is tradename +
+ * form only, no gap left behind. `form` itself is never null.
  *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up):
  *   drug       FlatDrug
@@ -41,6 +48,13 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
   function handleTap() {
     onTap(drug)
   }
+
+  // Title line (4.12) — strength only renders when both value and unit are
+  // present; basis (e.g. "/5ml") only appends when it exists on top of that.
+  const strengthPart = drug.strengthValue && drug.strengthUnit
+    ? `${drug.strengthValue}${drug.strengthUnit}${drug.strengthBasis ? `/${drug.strengthBasis}` : ''}`
+    : null
+  const titleSuffix = strengthPart ? `${strengthPart} ${drug.form}` : drug.form
 
   return (
     <div
@@ -75,8 +89,29 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
         backgroundColor: 'var(--color-surface-muted)',
       }} />
 
-      {/* Middle: text content — title line lands in 1d.2, generic line in 1d.3 */}
-      <div style={{ flex: 1, minWidth: 0 }} />
+      {/* Middle: text content — title line (1d.2); generic line lands in 1d.3 */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{
+          fontSize:     16,
+          fontWeight:   600,
+          color:        'var(--color-text-primary)',
+          lineHeight:   1.3,
+          overflow:     'hidden',
+          whiteSpace:   'nowrap',
+          textOverflow: 'ellipsis',
+        }}>
+          {drug.tradenameClean}
+          {titleSuffix && (
+            <span style={{
+              fontWeight: 400,
+              fontSize:   13,
+              color:      'var(--color-text-tertiary)',
+            }}>
+              {' '}{titleSuffix}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 */}
       <div style={{ flexShrink: 0 }}>
