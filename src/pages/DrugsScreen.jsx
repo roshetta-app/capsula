@@ -31,6 +31,17 @@
  * is virtualized — scroll look and feel is unchanged. The category-picker
  * list further down (~14 tiles) is short enough that it's left as a plain
  * list.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1a.1): added DrugsHero — the
+ * new title-first main header (icon badge + "Drugs" + subtitle), replacing
+ * the previous bare shared-layout bar with no header of its own on this
+ * screen. Mounted at the top of both view states (search/category-results
+ * and the category-list view) since it's the same top-of-page header
+ * regardless of which one is showing. Action-button slot is intentionally
+ * left empty for now — decision 4.4, what goes there is area 2's call
+ * (steps 1a.2/1a.3), not this one. heroRef is threaded through now (unused
+ * so far) so step 1a.2's sticky-header scroll detection can measure this
+ * same element without another pass over this file.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -115,6 +126,7 @@ export default function DrugsScreen() {
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
   const isDark = useIsDark()
+  const heroRef = useRef(null)
 
   const [activeCategory, setActiveCategory] = useState(null) // null = category list
   const [filterOpen,     setFilterOpen]     = useState(false)
@@ -160,6 +172,7 @@ export default function DrugsScreen() {
     return (
       <Layout>
         <div style={{ paddingTop: 'var(--space-5)' }}>
+        <DrugsHero heroRef={heroRef} isDark={isDark} />
         {/* Search bar + mode toggle + autocomplete */}
         <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -259,6 +272,7 @@ export default function DrugsScreen() {
   return (
     <Layout>
       <div style={{ paddingTop: 'var(--space-5)' }}>
+        <DrugsHero heroRef={heroRef} isDark={isDark} />
         <SearchBar
           value={query}
           onChange={(val) => {
@@ -353,6 +367,77 @@ export default function DrugsScreen() {
         onApply={handleApplyFilters}
       />
     </Layout>
+  )
+}
+
+// ─── DrugsHero: title + subtitle ─────────────────────────────────────────────
+// New, 2026-07-18 (plan §7 step 1a.1, decision 4.4). Title-first header —
+// icon badge + "Drugs" + subtitle — no logo/wordmark, matching the rule
+// already established by FavouritesScreen (logo stays reserved for Home).
+// Shape (card padding/shadow, 38px badge, 44px title row, font sizes) is
+// copied directly from FavouritesScreen's FavouritesHero rather than
+// reinvented, so the two peer-tab headers stay visually identical apart
+// from icon/copy. Badge reuses the same Pill icon + color token already
+// used by this screen's own "All Drugs" row, per 4.4's instruction to reuse
+// what's already on the Drugs screen rather than introduce a new icon.
+// Action-button slot (right side) is intentionally left empty — decision
+// 4.4 defers that to area 2 (steps 1a.2/1a.3), not this step. heroRef is
+// accepted now, unused, so step 1a.2 can measure this element for its
+// sticky-header scroll trigger without another edit to this file.
+
+function DrugsHero({ heroRef, isDark }) {
+  const colors = resolveToken(FALLBACK_TOKEN, isDark)
+
+  return (
+    <div ref={heroRef} style={{
+      backgroundColor: 'var(--color-surface)',
+      borderRadius:    16,
+      padding:         '14px 14px 14px',
+      marginTop:       'var(--space-4)',
+      marginBottom:    'var(--space-4)',
+      boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 44 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+          <div style={{
+            width:           38,
+            height:          38,
+            borderRadius:    '50%',
+            backgroundColor: colors.bg,
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            flexShrink:      0,
+          }}>
+            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={18} color={colors.fg} />
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <h1 style={{
+              fontSize:      19,
+              lineHeight:    1.15,
+              fontWeight:    700,
+              color:         'var(--color-text-primary)',
+              margin:        0,
+              letterSpacing: '-0.2px',
+            }}>
+              Drugs
+            </h1>
+            <div style={{
+              fontSize:   12,
+              lineHeight: 1.2,
+              color:      'var(--color-text-tertiary)',
+              marginTop:  1,
+            }}>
+              Browse the drug library
+            </div>
+          </div>
+        </div>
+
+        {/* Action-button slot — intentionally empty, see note above. */}
+        <div style={{ flexShrink: 0 }} />
+      </div>
+    </div>
   )
 }
 
