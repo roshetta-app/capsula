@@ -17,9 +17,8 @@
  * may need revisiting once the real title/generic-line content lands.
  *
  * 1d.1 built the outer shell and its slot layout; 1d.2 filled in the title
- * line; 1d.3 fills in the generic/ingredient line. Remaining slots land in
- * later steps:
- *   - icon-left badge   → 1d.4 (category icon, live drug_categories data)
+ * line; 1d.3 filled in the generic/ingredient line; 1d.4 fills in the
+ * category icon badge. Remaining slot lands later:
  *   - trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
  * Title line (1d.2, decision 4.12): rebuilt fresh from three raw fields —
@@ -37,24 +36,52 @@
  * rows with up to 26 ingredients). For plain (non-combo) generics, `ingredients`
  * is null and the line just shows `drug.genericName` instead.
  *
- * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up):
- *   drug       FlatDrug
- *   onTap      (drug) => void   — required, matches old DrugCard.jsx's
- *                                 convention (no navigate fallback guessed)
- *   isLast     boolean          — suppresses the bottom divider on the last row
- *   trailing   ReactNode (optional) — rendered in the right-hand slot
+ * Category icon badge (1d.4, decisions 4.14/4.30): sources category data
+ * entirely from the live `categories` prop (from `useCategories()`, passed
+ * down by the screen) and the shared `resolveToken`/`FALLBACK_TOKEN`
+ * color-token system — the exact same pattern `DrugListRow`/`CategoryRow`
+ * already use in `DrugsScreen.jsx`, not `config/categories.js`'s static
+ * label list or `DrugCard.jsx`'s old hardcoded hex map (both go away once
+ * `1d.8` retires that file). `drug.category` holds the category's stable
+ * slug; matched against `categories` for its `icon_type`/`icon_name` and
+ * `color_token`. No separate icon-color column exists — `resolveToken`
+ * already derives the icon's foreground shade from the same token, so no
+ * new derivation logic was needed here.
+ *
+ * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
+ * and isLast were already in place from 1d.1):
+ *   drug        FlatDrug
+ *   categories  Category[]  — from useCategories(), passed down by the screen
+ *   isDark      boolean     — from useIsDark(), for resolveToken's dark-mode variant
+ *   onTap       (drug) => void   — required, matches old DrugCard.jsx's
+ *                                  convention (no navigate fallback guessed)
+ *   isLast      boolean          — suppresses the bottom divider on the last row
+ *   trailing    ReactNode (optional) — rendered in the right-hand slot
  */
 
 import { useState } from 'react'
+import { SpecialtyIcon } from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
-export default function SharedDrugCard({ drug, onTap, isLast = false, trailing = null }) {
+export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast = false, trailing = null }) {
   const [pressed, setPressed] = useState(false)
 
   function handleTap() {
     onTap(drug)
   }
+
+  // Category icon badge (4.14/4.30) — drug.category holds the stable slug;
+  // matched against the live categories list for its icon + color token,
+  // same lookup DrugListRow already does. Falls back to FALLBACK_TOKEN if
+  // the stored slug doesn't match any live category (e.g. stale data).
+  const matchedCategory = categories.find(c => c.slug === drug.category)
+  const iconType  = matchedCategory?.icon_type || 'lucide'
+  const iconValue = iconType === 'custom'
+    ? (matchedCategory?.icon_url  || '')
+    : (matchedCategory?.icon_name || 'Pill')
+  const categoryColors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
   // Title line (4.12) — strength only renders when both value and unit are
   // present; basis (e.g. "/5ml") only appends when it exists on top of that.
@@ -95,14 +122,19 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
         transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      {/* Left: category icon slot — filled by 1d.4 (icon-only, tinted square) */}
+      {/* Left: category icon badge (1d.4) — icon-only, tinted square, live drug_categories data */}
       <div style={{
         width:           36,
         height:          36,
         flexShrink:      0,
         borderRadius:    'var(--radius-md)',
-        backgroundColor: 'var(--color-surface-muted)',
-      }} />
+        backgroundColor: categoryColors.bg,
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+      }}>
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={16} color={categoryColors.fg} />
+      </div>
 
       {/* Middle: text content — title line (1d.2) + generic line (1d.3) */}
       <div style={{ flex: 1, minWidth: 0 }}>
