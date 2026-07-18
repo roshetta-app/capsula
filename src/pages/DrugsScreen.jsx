@@ -42,6 +42,13 @@
  * (steps 1a.2/1a.3), not this one. heroRef is threaded through now (unused
  * so far) so step 1a.2's sticky-header scroll detection can measure this
  * same element without another pass over this file.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1b.1, decision 4.7): removed the
+ * AutocompleteDropdown overlay. Typing already drove searchResults/the on-screen
+ * list independently of the suggestions dropdown, so nothing about filtering
+ * changed — only the extra overlay and its wiring (suggestions, showSuggestions,
+ * clearSuggestions, handleSuggestionSelect) came out. Brings Drugs in line with
+ * how Conditions already works.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -50,7 +57,6 @@ import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
-import AutocompleteDropdown from '../components/ui/AutocompleteDropdown'
 import { useDrugContext } from '../context/DrugContext'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useCategories } from '../hooks/useCategories'
@@ -120,9 +126,6 @@ export default function DrugsScreen() {
     query,
     setQuery,
     results:         searchResults,
-    suggestions,
-    showSuggestions,
-    clearSuggestions,
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
   const isDark = useIsDark()
@@ -171,15 +174,8 @@ export default function DrugsScreen() {
     setActiveFilters(hasActive ? filters : null)
   }
 
-  function handleSuggestionSelect(suggestion) {
-    clearSuggestions()
-    setQuery('')
-    navigate(ROUTES.DRUG_DETAIL(suggestion.slug || suggestion.id))
-  }
-
   function handleQueryChange(val) {
     setQuery(val)
-    if (!val) clearSuggestions()
   }
 
   const hasQuery = query.trim().length > 0
@@ -216,8 +212,8 @@ export default function DrugsScreen() {
         />
         <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
-        {/* Search bar + mode toggle + autocomplete */}
-        <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
+        {/* Search bar + mode toggle */}
+        <div style={{ marginBottom: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
             <div style={{ flex: 1, minWidth: 0 }}>
               <SearchBar
@@ -232,13 +228,6 @@ export default function DrugsScreen() {
               <ModeToggle mode={mode} onChange={setMode} />
             )}
           </div>
-          {showSuggestions && (
-            <AutocompleteDropdown
-              suggestions={suggestions}
-              onSelect={handleSuggestionSelect}
-              onDismiss={clearSuggestions}
-            />
-          )}
         </div>
 
           {/* Back to categories button (only when in a category, not searching) */}
