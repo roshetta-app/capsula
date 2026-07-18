@@ -90,6 +90,8 @@ import { useNavigate } from 'react-router-dom'
 import { Clock } from 'lucide-react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
+import SharedDrugCard from '../components/SharedDrugCard'
+import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
@@ -164,18 +166,15 @@ export default function DrugsScreen() {
     results:         searchResults,
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
-  const { toggleDrug } = useFavouritesContext()
+  const { toggleDrug, isDrugFavourited } = useFavouritesContext()
   const isDark = useIsDark()
   const heroRef = useRef(null)
 
   // Bookmark tap behavior (step 1d.6, decision 4.16 first half): on Drugs,
   // tapping the bookmark toggles favourite status right away — no confirm
   // step, unlike Favourites' remove flow. Screen-owned, not card-owned,
-  // mirroring ConditionCard's precedent. Not wired to a row yet — the rows
-  // still render through the old DrugListRow below, which has no bookmark
-  // slot; this becomes reachable once step 1d.8 swaps rendering over to
-  // SharedDrugCard's trailing prop.
-  // eslint-disable-next-line no-unused-vars
+  // mirroring ConditionCard's precedent. Wired to each row's trailing slot
+  // below (step 1d.8).
   function handleToggleDrugFavourite(id) {
     toggleDrug(id)
   }
@@ -337,6 +336,8 @@ export default function DrugsScreen() {
               onTap={handleDrugTap}
               categories={categories}
               isDark={isDark}
+              isDrugFavourited={isDrugFavourited}
+              onToggleFavourite={handleToggleDrugFavourite}
             />
           )}
         </div>
@@ -794,7 +795,7 @@ function ModeToggle({ mode, onChange }) {
 // (the concentration/form line is optional), so real heights are measured
 // after each row renders rather than assumed.
 
-function VirtualDrugList({ drugs, onTap, categories, isDark }) {
+function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite }) {
   const listRef = useRef(null)
 
   const virtualizer = useWindowVirtualizer({
@@ -821,7 +822,19 @@ function VirtualDrugList({ drugs, onTap, categories, isDark }) {
               transform: `translateY(${virtualRow.start - virtualizer.options.scrollMargin}px)`,
             }}
           >
-            <DrugListRow drug={drug} onTap={onTap} categories={categories} isDark={isDark} />
+            <SharedDrugCard
+              drug={drug}
+              onTap={onTap}
+              categories={categories}
+              isDark={isDark}
+              isLast={virtualRow.index === drugs.length - 1}
+              trailing={
+                <RowStarButton
+                  isFavourited={isDrugFavourited(drug.id)}
+                  onPress={() => onToggleFavourite(drug.id)}
+                />
+              }
+            />
           </div>
         )
       })}
@@ -873,63 +886,6 @@ function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
         <polyline points="9 18 15 12 9 6"/>
       </svg>
-    </div>
-  )
-}
-
-// ─── DrugListRow ──────────────────────────────────────────────────────────────
-
-function DrugListRow({ drug, onTap, categories, isDark }) {
-  // Item's own concentration/form, e.g. "500mg · Tablet" — either piece can
-  // be blank (not every item has strength data), so build it defensively
-  // and only show what's actually there.
-  const itemDetails = [drug.concentration, drug.form].filter(Boolean).join(' · ')
-  // drug.category holds the category's stable slug, not its display name —
-  // look up the matching category record for both the label and its color.
-  // Falls back to the raw stored value if it doesn't match any category
-  // that exists today (e.g. old-taxonomy data pre-Phase-1B).
-  const matchedCategory = categories.find(c => c.slug === drug.category)
-  const colors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
-
-  return (
-    <div
-      onClick={() => onTap(drug)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-3) var(--space-4)',
-        marginBottom: 'var(--space-2)',
-        cursor: 'pointer',
-        boxShadow: 'var(--shadow-card)',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      {/* Item name (+ concentration/form), generic name secondary — per ADR-029 */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-          {drug.name}
-          {itemDetails && (
-            <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--color-text-tertiary)' }}>
-              {' '}{itemDetails}
-            </span>
-          )}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 500, marginTop: 1, lineHeight: 1.3 }}>
-          {drug.genericName}
-        </div>
-      </div>
-
-      {/* Category pill */}
-      <span style={{
-        fontSize: 11, fontWeight: 500, flexShrink: 0,
-        backgroundColor: colors.bg, color: colors.fg,
-        borderRadius: 'var(--radius-full)', padding: '2px 8px',
-        letterSpacing: '0.03em',
-      }}>
-        {matchedCategory?.name_en ?? drug.category}
-      </span>
     </div>
   )
 }

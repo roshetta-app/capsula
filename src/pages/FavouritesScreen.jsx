@@ -451,7 +451,7 @@ import Layout from '../components/layout'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
-import DrugCard from '../components/DrugCard'
+import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
@@ -463,6 +463,7 @@ import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useConditionSearch } from '../hooks/useConditionSearch'
+import { useCategories } from '../hooks/useCategories'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
 
@@ -848,6 +849,7 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
 
 function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, onClear }) {
   const isDark = useIsDark()
+  const { categories } = useCategories()
   if (!specialty) return null
 
   // Same token → background-wash pattern used by SpecialtySelector's active
@@ -2050,20 +2052,28 @@ export default function FavouritesScreen() {
 
             {/* ── Drugs tab ── */}
             {/* Phase 6 — manage mode is Conditions-only this session (explicit
-                decision, deferred): DrugCard has no trailing/selection slot,
-                and this screen's Drugs tab has no per-row remove control at
-                all yet (see Phase 2M note above). Rows here render exactly
-                as before regardless of isManaging — no checkboxes, no
-                selection, nothing wired. Revisit once the Drugs screen/card
-                rework lands. */}
+                decision, deferred): this screen's Drugs tab has no per-row
+                remove control via manage mode, only the bookmark's own
+                confirm-then-undo flow (1d.6). Rows here render exactly as
+                before regardless of isManaging — no checkboxes, no
+                selection. Revisit if manage mode is ever extended to Drugs. */}
             {activeTab === 'drugs' && (
               savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
-                : savedDrugs.map(drug => (
-                    <DrugCard
+                : savedDrugs.map((drug, i) => (
+                    <SharedDrugCard
                       key={drug.id}
                       drug={drug}
+                      categories={categories}
+                      isDark={isDark}
+                      isLast={i === savedDrugs.length - 1}
                       onTap={() => navigate(`/drugs/${drug.slug}`)}
+                      trailing={
+                        <RowStarButton
+                          isFavourited
+                          onPress={() => setConfirmingDrug(drug)}
+                        />
+                      }
                     />
                   ))
             )}
