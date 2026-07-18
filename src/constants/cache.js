@@ -16,3 +16,14 @@ export const CACHE_KEYS = {
 
 /** Supabase table used for cache invalidation timestamps */
 export const METADATA_TABLE = 'app_metadata'
+
+/**
+ * Bump this whenever the SHAPE of what gets cached for the drugs slice
+ * changes on the app side (new fields added to the mapped drug object,
+ * fields renamed, etc.) — independent of the server-side data version
+ * (app_metadata timestamp). A device that already has a cached copy has
+ * no other way to know its saved objects are missing fields the current
+ * code expects, since the underlying database rows themselves may not
+ * have changed at all.
+ */
+export const DRUGS_CACHE_SCHEMA_VERSION = 1

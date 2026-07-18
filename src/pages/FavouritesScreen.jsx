@@ -849,7 +849,6 @@ function SpecialtyEmptyState({ specialtyName, onClear }) {
 
 function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, onClear }) {
   const isDark = useIsDark()
-  const { categories } = useCategories()
   if (!specialty) return null
 
   // Same token → background-wash pattern used by SpecialtySelector's active
@@ -1446,6 +1445,8 @@ function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerBu
 export default function FavouritesScreen() {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState('conditions')
+  const isDark = useIsDark()
+  const { categories } = useCategories()
 
   // Back-to-top — shared with ConditionsScreen via useBackToTop/BackToTopButton
   // (see src/hooks/useBackToTop.js), same 400px threshold and easeOutCubic

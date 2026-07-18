@@ -16,7 +16,7 @@
  * timestamp as 'drugs' (see useCategories.js) — no new app_metadata column.
  */
 
-import { CACHE_KEYS, CACHE_TTL_MS } from '../constants/cache'
+import { CACHE_KEYS, CACHE_TTL_MS, DRUGS_CACHE_SCHEMA_VERSION } from '../constants/cache'
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -171,9 +171,14 @@ function openDrugsDB() {
 }
 
 /**
- * Write the drugs cache to IndexedDB. Same record shape as writeCache:
- * { data, version, fetchedAt }. Silently no-ops on empty data or any
- * storage error, same guarding behavior as writeCache above.
+ * Write the drugs cache to IndexedDB. Same record shape as writeCache,
+ * plus schemaVersion (2026-07-18, drug_library_ui_ux bugfix): stamps the
+ * current DRUGS_CACHE_SCHEMA_VERSION on every write, so a later app-side
+ * shape change (new fields on the mapped drug object, independent of the
+ * server-side data version) can be detected and invalidated on read even
+ * when the underlying database rows themselves haven't changed. Silently
+ * no-ops on empty data or any storage error, same guarding behavior as
+ * writeCache above.
  * @param {Array}  data     — the full fetched drug list
  * @param {string} version  — ISO timestamp from app_metadata
  */
@@ -183,7 +188,7 @@ export async function writeDrugsCache(data, version) {
     const db = await openDrugsDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(IDB_STORE, 'readwrite')
-      tx.objectStore(IDB_STORE).put({ data, version, fetchedAt: new Date().toISOString() }, IDB_KEY)
+      tx.objectStore(IDB_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION }, IDB_KEY)
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
@@ -195,6 +200,13 @@ export async function writeDrugsCache(data, version) {
 /**
  * Read the full stored drugs record — { data, version, fetchedAt } — or
  * null if nothing valid is saved yet.
+ *
+ * Also returns null (forcing callers down their cold-start path) if the
+ * saved record predates DRUGS_CACHE_SCHEMA_VERSION or was written by an
+ * older version of it (2026-07-18 bugfix) — an outdated shape needs a
+ * real re-fetch, not just a "the data itself looks fine" pass-through,
+ * since the server-side version timestamp alone can't detect an app-side
+ * field change.
  */
 export async function readDrugsCache() {
   try {
@@ -206,6 +218,7 @@ export async function readDrugsCache() {
       req.onerror   = () => reject(req.error)
     })
     if (!record || !Array.isArray(record.data) || record.data.length === 0) return null
+    if (record.schemaVersion !== DRUGS_CACHE_SCHEMA_VERSION) return null
     return record
   } catch {
     return null
