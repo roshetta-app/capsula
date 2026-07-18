@@ -39,6 +39,7 @@ function writeStorage(favourites) {
  *   toggleDrug            (id: string) => void
  *   toggleCondition       (id: string) => void
  *   restoreConditionAt    (id: string, index: number) => void
+ *   restoreDrugAt         (id: string, index: number) => void
  *   isDrugFavourited      (id: string) => boolean
  *   isConditionFavourited (id: string) => boolean
  */
@@ -84,6 +85,23 @@ export function useFavourites() {
     })
   }, [])
 
+  // restoreDrugAt — mirrors restoreConditionAt exactly (see its comment
+  // above): reinserts a drug id at a specific index instead of appending it
+  // to the end, so Favourites' Undo-after-remove flow (decision 4.16) can
+  // put a drug back exactly where it was. No-ops if the id is already
+  // present, as a guard against a stray double-fire.
+  const restoreDrugAt = useCallback((id, index) => {
+    setFavourites(prev => {
+      if (prev.drugs.includes(id)) return prev
+      const drugs = [...prev.drugs]
+      const insertAt = Math.max(0, Math.min(index, drugs.length))
+      drugs.splice(insertAt, 0, id)
+      const next = { ...prev, drugs }
+      writeStorage(next)
+      return next
+    })
+  }, [])
+
   const isDrugFavourited = useCallback(
     (id) => favourites.drugs.includes(id),
     [favourites.drugs]
@@ -99,6 +117,7 @@ export function useFavourites() {
     toggleDrug,
     toggleCondition,
     restoreConditionAt,
+    restoreDrugAt,
     isDrugFavourited,
     isConditionFavourited,
   }

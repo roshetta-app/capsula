@@ -93,6 +93,7 @@ import Layout from '../components/layout'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
+import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useCategories } from '../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
@@ -163,8 +164,21 @@ export default function DrugsScreen() {
     results:         searchResults,
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
+  const { toggleDrug } = useFavouritesContext()
   const isDark = useIsDark()
   const heroRef = useRef(null)
+
+  // Bookmark tap behavior (step 1d.6, decision 4.16 first half): on Drugs,
+  // tapping the bookmark toggles favourite status right away — no confirm
+  // step, unlike Favourites' remove flow. Screen-owned, not card-owned,
+  // mirroring ConditionCard's precedent. Not wired to a row yet — the rows
+  // still render through the old DrugListRow below, which has no bookmark
+  // slot; this becomes reachable once step 1d.8 swaps rendering over to
+  // SharedDrugCard's trailing prop.
+  // eslint-disable-next-line no-unused-vars
+  function handleToggleDrugFavourite(id) {
+    toggleDrug(id)
+  }
 
   const [activeCategory, setActiveCategory] = useState(null) // null = category list
   const [filterOpen,     setFilterOpen]     = useState(false)
@@ -937,3 +951,4 @@ function EmptyState({ query }) {
     </div>
   )
 }
+

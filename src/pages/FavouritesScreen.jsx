@@ -444,7 +444,7 @@
  *    UI built from scratch.
  */
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import Layout from '../components/layout'
@@ -452,6 +452,7 @@ import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
 import DrugCard from '../components/DrugCard'
+import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
 import SpecialtiesBottomSheet from '../components/conditions/SpecialtiesBottomSheet'
@@ -958,42 +959,6 @@ function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, on
         </button>
       </div>
     </div>
-  )
-}
-
-// ─── Row star button ────────────────────────────────────────────────────────
-// Local (not InlineStarButton) so it can open a confirm step instead of
-// toggling immediately on tap. Rendered into ConditionCard's trailing slot,
-// so it sits right before the chevron and shares its vertical centering.
-// Icon shrunk 16→13px (Phase 2M) — integrated row action, not a floating
-// decoration. Tap target stays 44px via the button's own padding.
-
-function RowStarButton({ onPress }) {
-  function handleTap(e) {
-    e.stopPropagation()
-    onPress()
-  }
-
-  return (
-    <button
-      onClick={handleTap}
-      aria-label="Remove from favourites"
-      style={{
-        background:              'none',
-        border:                  'none',
-        cursor:                  'pointer',
-        padding:                 '14px 8px',   // 44px tap height
-        display:                 'flex',
-        alignItems:              'center',
-        justifyContent:          'center',
-        flexShrink:              0,
-        WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
-        color:                   FAV_ACCENT,
-      }}
-    >
-      <Heart size={13} fill={FAV_ACCENT} strokeWidth={1.8} />
-    </button>
   )
 }
 
@@ -1608,7 +1573,7 @@ export default function FavouritesScreen() {
     toggleManage()
   }
 
-  const { favourites, toggleDrug, toggleCondition, restoreConditionAt } = useFavouritesContext()
+  const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt } = useFavouritesContext()
   const { conditions, specialties } = useConditionContext()
   const { drugs }      = useDrugContext()
 
@@ -1686,15 +1651,13 @@ export default function FavouritesScreen() {
     ? 'Search favourite conditions…'
     : 'Search favourite drugs…'
 
-  // Wrapper that also triggers the snackbar (called on remove = already favourited)
-  const handleRemoveDrug = useCallback((id) => {
-    toggleDrug(id)
-    showSnack('Removed from favourites')
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [toggleDrug])
-
   // Condition removal confirms first — see ConfirmSheet below.
   const [confirmingCondition, setConfirmingCondition] = useState(null)
+
+  // Drug removal (step 1d.6, decision 4.16 second half): also confirms
+  // first, then Undo — mirrors the condition flow above exactly, not the
+  // old direct-toggle stub this replaces. See handleConfirmRemoveDrug below.
+  const [confirmingDrug, setConfirmingDrug] = useState(null)
 
   // Row exit animation tracking — id -> { height, collapsed }. 'height' is
   // the row's own measured height (via rowNodeRefs), captured the instant
@@ -1790,6 +1753,25 @@ export default function FavouritesScreen() {
         restoreConditionAt(id, index)
         beginRowRestore(id)
       },
+    })
+  }
+
+  // Drug removal (step 1d.6, decision 4.16 second half): mirrors
+  // handleConfirmRemoveCondition's confirm → remove → Undo-to-position
+  // shape exactly, using restoreDrugAt (step 1d.7) instead of
+  // restoreConditionAt. No row-exit animation here — decision 4.16 only
+  // calls for the confirm/undo behavior, and the animation's row
+  // measuring (rowNodeRefs) is set up on the row JSX itself, which this
+  // step doesn't touch (see SharedDrugCard note above — nothing renders
+  // this yet until step 1d.8 wires it to the trailing slot).
+  function handleConfirmRemoveDrug() {
+    if (!confirmingDrug) return
+    const id = confirmingDrug.id
+    const index = favourites.drugs.indexOf(id)
+    toggleDrug(id)
+    showSnack('Removed from favourites', {
+      label: 'Undo',
+      onAction: () => restoreDrugAt(id, index),
     })
   }
 
@@ -2018,6 +2000,7 @@ export default function FavouritesScreen() {
                                   )
                                 : (
                                     <RowStarButton
+                                      isFavourited
                                       onPress={() => setConfirmingCondition(condition)}
                                     />
                                   )
@@ -2134,6 +2117,16 @@ export default function FavouritesScreen() {
         onConfirm={handleConfirmRemoveCondition}
         title="Remove from favourites?"
         message={confirmingCondition ? `"${confirmingCondition.name}" will be removed from your favourites.` : ''}
+        confirmLabel="Remove"
+        destructive
+      />
+
+      <ConfirmSheet
+        isOpen={!!confirmingDrug}
+        onClose={() => setConfirmingDrug(null)}
+        onConfirm={handleConfirmRemoveDrug}
+        title="Remove from favourites?"
+        message={confirmingDrug ? `"${confirmingDrug.tradenameClean}" will be removed from your favourites.` : ''}
         confirmLabel="Remove"
         destructive
       />
