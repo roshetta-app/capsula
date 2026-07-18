@@ -75,6 +75,14 @@
  * result — a no-op if the user never touched the Category section, since
  * the sheet re-syncs its own category chip from `activeCategory` every time
  * it opens.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.3, decision 4.21): softened
+ * `CategoryRow`'s tile style — dropped the "N drugs" count line (and the
+ * `count` prop, now unused, from both call sites), lightened the border to
+ * `--color-border-subtle`, and moved the shadow to
+ * `--shadow-ambient-selector`. Radius unchanged. `categoriesWithCounts`'
+ * `count` field is still used to filter out empty categories — only the
+ * on-screen display of it is gone.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -466,7 +474,6 @@ export default function DrugsScreen() {
           <>
             <CategoryRow
               label="All Drugs"
-              count={drugs.length}
               iconType="lucide"
               iconValue="Pill"
               color={allDrugsColors.bg}
@@ -483,7 +490,6 @@ export default function DrugsScreen() {
                 <CategoryRow
                   key={cat.id}
                   label={cat.name_en}
-                  count={cat.count}
                   iconType={iconType}
                   iconValue={iconValue}
                   color={colors.bg}
@@ -810,20 +816,25 @@ function VirtualDrugList({ drugs, onTap, categories, isDark }) {
 }
 
 // ─── CategoryRow ──────────────────────────────────────────────────────────────
+// 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.3, decision 4.21): softened —
+// "N drugs" count removed (and the now-unused `count` prop dropped from both
+// call sites below), border lightened to --color-border-subtle, shadow moved
+// to --shadow-ambient-selector. Radius (--radius-lg) unchanged. Still a card,
+// unlike the flat drug row — kept deliberately distinct per 4.21.
 
-function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTap }) {
+function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
   return (
     <div
       onClick={onTap}
       style={{
         display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
         backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
+        border: '1px solid var(--color-border-subtle)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-3) var(--space-4)',
         marginBottom: 'var(--space-2)',
         cursor: 'pointer',
-        boxShadow: 'var(--shadow-card)',
+        boxShadow: 'var(--shadow-ambient-selector)',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
@@ -837,13 +848,10 @@ function CategoryRow({ label, count, iconType, iconValue, color, textColor, onTa
         <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={16} color={textColor} />
       </div>
 
-      {/* Name + count */}
+      {/* Name */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
           {label}
-        </div>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 1 }}>
-          {count} drug{count !== 1 ? 's' : ''}
         </div>
       </div>
 
