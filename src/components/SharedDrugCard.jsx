@@ -16,10 +16,10 @@
  * (plan §0, 4.28's correction note). ROW_HEIGHT is a tentative value; it
  * may need revisiting once the real title/generic-line content lands.
  *
- * 1d.1 built the outer shell and its slot layout; 1d.2 fills in the title
- * line. Remaining slots land in later steps:
+ * 1d.1 built the outer shell and its slot layout; 1d.2 filled in the title
+ * line; 1d.3 fills in the generic/ingredient line. Remaining slots land in
+ * later steps:
  *   - icon-left badge   → 1d.4 (category icon, live drug_categories data)
- *   - generic line      → 1d.3 (first 2 ingredients + "+N")
  *   - trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
  * Title line (1d.2, decision 4.12): rebuilt fresh from three raw fields —
@@ -29,6 +29,13 @@
  * onto a pre-composed name string (which showed both twice). ~43% of
  * published brands have no strength on file, so the fallback is tradename +
  * form only, no gap left behind. `form` itself is never null.
+ *
+ * Generic/ingredient line (1d.3, decision 4.13): `drug.ingredients` is only
+ * populated for combo generics (2+ active ingredients) — confirmed live, a
+ * plain array of lowercase ingredient-name strings, e.g. ["calcium", "vitamin
+ * a", "zinc"]. Shows the first 2, then "+N" for the rest (real data has combo
+ * rows with up to 26 ingredients). For plain (non-combo) generics, `ingredients`
+ * is null and the line just shows `drug.genericName` instead.
  *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up):
  *   drug       FlatDrug
@@ -55,6 +62,14 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
     ? `${drug.strengthValue}${drug.strengthUnit}${drug.strengthBasis ? `/${drug.strengthBasis}` : ''}`
     : null
   const titleSuffix = strengthPart ? `${strengthPart} ${drug.form}` : drug.form
+
+  // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
+  // + a "+N" count; plain generics just show the one genericName.
+  const genericLine = drug.ingredients
+    ? drug.ingredients.length > 2
+      ? `${drug.ingredients.slice(0, 2).join(', ')} +${drug.ingredients.length - 2}`
+      : drug.ingredients.join(', ')
+    : drug.genericName
 
   return (
     <div
@@ -89,7 +104,7 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
         backgroundColor: 'var(--color-surface-muted)',
       }} />
 
-      {/* Middle: text content — title line (1d.2); generic line lands in 1d.3 */}
+      {/* Middle: text content — title line (1d.2) + generic line (1d.3) */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize:     16,
@@ -111,6 +126,21 @@ export default function SharedDrugCard({ drug, onTap, isLast = false, trailing =
             </span>
           )}
         </div>
+
+        {genericLine && (
+          <div style={{
+            fontSize:     13,
+            fontWeight:   500,
+            color:        'var(--color-accent)',
+            lineHeight:   1.4,
+            marginTop:    2,
+            overflow:     'hidden',
+            whiteSpace:   'nowrap',
+            textOverflow: 'ellipsis',
+          }}>
+            {genericLine}
+          </div>
+        )}
       </div>
 
       {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 */}
