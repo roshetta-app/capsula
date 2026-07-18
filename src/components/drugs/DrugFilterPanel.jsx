@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -9,10 +9,21 @@ import { useState } from 'react'
  *  - Clear All + Apply Filters buttons
  *  - Filters do NOT persist between sessions
  *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.2, decision 4.10): added a
+ * Category section, single-select like the category tiles rather than
+ * multi-select like Form/Route. `activeCategory` keeps the sheet in sync
+ * with whichever tile is currently active — it re-syncs every time the
+ * sheet opens, so tapping a tile and then opening the sheet always shows
+ * the right chip already selected. Clear All intentionally leaves category
+ * untouched (user decision) — it only resets Form/Route, Pregnancy, and
+ * Breastfeeding.
+ *
  * Props:
- *   isOpen    boolean
- *   onClose   () => void
- *   onApply   (filters) => void   filters: { forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
+ *   isOpen         boolean
+ *   onClose        () => void
+ *   onApply        (filters) => void   filters: { category, forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
+ *   categories     array of { slug, name_en, ... } — already filtered to categories with drugs, same list the tiles use
+ *   activeCategory string | '__all' | null — the category currently active on the screen (tile-driven)
  */
 
 // Each chip's `matches` list is the full set of real raw form values (from
@@ -40,8 +51,16 @@ const EMPTY = {
   bfUnsafe:       false,
 }
 
-export default function DrugFilterPanel({ isOpen, onClose, onApply }) {
-  const [filters, setFilters] = useState(EMPTY)
+export default function DrugFilterPanel({ isOpen, onClose, onApply, categories = [], activeCategory = null }) {
+  const [filters, setFilters] = useState(() => ({ ...EMPTY, category: activeCategory }))
+
+  // Keep the sheet's category chip in sync with whichever tile is active
+  // every time the sheet is opened (decision 4.10 — "one thing, two doors").
+  useEffect(() => {
+    if (isOpen) {
+      setFilters(prev => ({ ...prev, category: activeCategory }))
+    }
+  }, [isOpen, activeCategory])
 
   if (!isOpen) return null
 
@@ -58,8 +77,17 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply }) {
     setFilters(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
+  // Category is a single-select, tile-mirroring choice, not a "filter" in
+  // the same sense as Form/Route — clicking a chip sets it directly rather
+  // than toggling membership in a set.
+  function toggleCategory(value) {
+    setFilters(prev => ({ ...prev, category: value }))
+  }
+
   function handleClear() {
-    setFilters(EMPTY)
+    // Clear All resets Form/Route, Pregnancy, and Breastfeeding only —
+    // category stays whatever it currently is (user decision, 2026-07-18).
+    setFilters(prev => ({ ...EMPTY, category: prev.category }))
   }
 
   function handleApply() {
@@ -99,6 +127,25 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply }) {
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-4)' }}>
           Filter Drugs
         </div>
+
+        {/* Category */}
+        <FilterSection label="Category">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+            <ToggleChip
+              label="All Drugs"
+              active={filters.category === '__all'}
+              onToggle={() => toggleCategory('__all')}
+            />
+            {categories.map(cat => (
+              <ToggleChip
+                key={cat.slug}
+                label={cat.name_en}
+                active={filters.category === cat.slug}
+                onToggle={() => toggleCategory(cat.slug)}
+              />
+            ))}
+          </div>
+        </FilterSection>
 
         {/* Form / Route */}
         <FilterSection label="Form / Route">
@@ -204,4 +251,3 @@ function ToggleChip({ label, active, onToggle }) {
       {label}
     </button>
   )
-}

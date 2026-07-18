@@ -64,6 +64,17 @@
  * aren't; `base` now filters `searchResults` down to `activeCategory` too
  * when both are active. Search index itself is unchanged (still built once
  * against the full catalog for performance) — this only narrows its results.
+ *
+ * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.2, decision 4.10): category
+ * is now also pickable from inside DrugFilterPanel, kept in sync with the
+ * category tiles — picking either one drives the same `activeCategory`
+ * state. `categoriesWithCounts` (the same list the tiles render from) is now
+ * computed once near the top of the component instead of only inside the
+ * category-list branch, since both DrugFilterPanel mounts need it too.
+ * `handleApplyFilters` now also calls `setActiveCategory` from the sheet's
+ * result — a no-op if the user never touched the Category section, since
+ * the sheet re-syncs its own category chip from `activeCategory` every time
+ * it opens.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -188,6 +199,13 @@ export default function DrugsScreen() {
     // Check if anything is actually active
     const hasActive = !filters.forms.includes('all') || filters.pregnancySafe || filters.pregnancyUnsafe || filters.bfSafe || filters.bfUnsafe
     setActiveFilters(hasActive ? filters : null)
+
+    // 1c.2 (decision 4.10): picking a category from the filter sheet drives
+    // the same activeCategory state a tile tap would. Harmless no-op if the
+    // user never touched the Category section — the sheet always re-syncs
+    // its chip from activeCategory when it opens, so filters.category will
+    // already match the current value in that case.
+    setActiveCategory(filters.category ?? null)
   }
 
   function handleQueryChange(val) {
@@ -196,6 +214,16 @@ export default function DrugsScreen() {
 
   const hasQuery = query.trim().length > 0
   const hasFilters = !!activeFilters
+
+  // Same list the category tiles render from (see the category-list view
+  // below) — hoisted here so both DrugFilterPanel mounts can also use it
+  // for the sheet's Category section (1c.2, decision 4.10).
+  const categoriesWithCounts = categories
+    .map(cat => ({
+      ...cat,
+      count: drugs.filter(d => d.category === cat.slug).length,
+    }))
+    .filter(c => c.count > 0)
 
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
@@ -295,6 +323,8 @@ export default function DrugsScreen() {
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}
           onApply={handleApplyFilters}
+          categories={categoriesWithCounts}
+          activeCategory={activeCategory}
         />
       </Layout>
     )
@@ -306,13 +336,8 @@ export default function DrugsScreen() {
   // design (a generic's category is stored as a drug_categories.slug, kept
   // as plain text rather than a foreign key, but still the stable code, not
   // the human-facing name that can be renamed later).
-  const categoriesWithCounts = categories
-    .map(cat => ({
-      ...cat,
-      count: drugs.filter(d => d.category === cat.slug).length,
-    }))
-    .filter(c => c.count > 0)
-
+  // categoriesWithCounts is now computed once above (1c.2) so both
+  // DrugFilterPanel mounts and this tile list share the exact same list.
   const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
 
   return (
@@ -475,6 +500,8 @@ export default function DrugsScreen() {
         isOpen={filterOpen}
         onClose={() => setFilterOpen(false)}
         onApply={handleApplyFilters}
+        categories={categoriesWithCounts}
+        activeCategory={activeCategory}
       />
     </Layout>
   )
@@ -901,4 +928,3 @@ function EmptyState({ query }) {
       <div style={{ fontSize: 13 }}>Try searching by generic name or brand name</div>
     </div>
   )
-}
