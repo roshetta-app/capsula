@@ -25,5 +25,15 @@ export const METADATA_TABLE = 'app_metadata'
  * no other way to know its saved objects are missing fields the current
  * code expects, since the underlying database rows themselves may not
  * have changed at all.
+ *
+ * 2026-07-20 (drug_card_title_suffix, steps A.1/A.2 follow-up): bumped
+ * 1 -> 2. A.1 added fillVolume and A.2 added formModifier to the mapped
+ * FlatDrug shape, but this version wasn't bumped alongside those two
+ * steps — so devices with a pre-existing cache kept passing the schema
+ * check and served the old-shaped data, silently missing both new fields
+ * (pack_size, an existing field, still worked fine, which is what made
+ * the gap visible: title suffixes showed pack size correctly but never
+ * showed fill volume or modifier abbreviations). This bump forces every
+ * device to re-fetch once, picking up both new fields.
  */
-export const DRUGS_CACHE_SCHEMA_VERSION = 1
+export const DRUGS_CACHE_SCHEMA_VERSION = 2
