@@ -150,6 +150,19 @@
  * ('searchGenericDrugsFuzzy' for Generic mode, plain 'fuseIndex.search' +
  * floor filter for Brand mode), just takes only the top-ranked result's name
  * instead of returning the whole list.
+ *
+ * drug_search_plan ingredient reorder-on-match (2026-07-19, later still, same
+ * day, DRUG_SEARCH_PLAN.md §6, decision 4.31, checklist 1e.3): when Generic
+ * mode's prefix check matches an ingredient that the card's "first 2 + N"
+ * truncation would otherwise hide (SharedDrugCard.jsx shows only the first 2
+ * entries of `drug.ingredients`), that ingredient is moved to the front of
+ * the array before the drug is returned from `searchDrugsTiered`, so it's
+ * never hidden behind "+N". Array order decides which ingredient wins if a
+ * query matches more than one on the same drug (first match in the original
+ * array order, no extra scoring). Applies uniformly to every generic-mode
+ * result, including a "Did you mean" tap-through rerun, since that goes
+ * through this same function. `SharedDrugCard.jsx` itself needs no changes —
+ * it already just renders whatever order `drug.ingredients` is in.
  */
 
 import Fuse from 'fuse.js'
@@ -387,6 +400,32 @@ function genericPrefixFields(drug) {
 }
 
 /**
+ * Ingredient reorder-on-match (2026-07-19, DRUG_SEARCH_PLAN.md §6, decision
+ * 4.31, checklist 1e.3). SharedDrugCard.jsx renders only the first 2 entries
+ * of `drug.ingredients` plus a "+N" count for the rest — so a query that only
+ * matches a buried ingredient (index 2+) would otherwise never be visible on
+ * the card. If the first ingredient (in original array order) that starts
+ * with the query is already within the visible first 2, nothing changes. If
+ * it's buried, this returns a shallow copy of the drug with that ingredient
+ * moved to the front, leaving every other ingredient in its original
+ * relative order. Drugs with no ingredient array, or no ingredient match at
+ * all, are returned unchanged (same reference — no unnecessary copies).
+ */
+function reorderIngredientsForMatch(drug, lower) {
+  if (!Array.isArray(drug.ingredients)) return drug
+
+  const idx = drug.ingredients.findIndex(ing => ing.toLowerCase().startsWith(lower))
+  if (idx < 2) return drug // -1 (no match) or already visible in the first 2 — nothing to do
+
+  const reordered = [
+    drug.ingredients[idx],
+    ...drug.ingredients.slice(0, idx),
+    ...drug.ingredients.slice(idx + 1),
+  ]
+  return { ...drug, ingredients: reordered }
+}
+
+/**
  * Drug search — strict "starts with" prefix match, every query length, no
  * fuzzy fallback baked in (see 'getDrugSearchSuggestion' for that). Field-
  * scoped per mode: Brand mode checks 'tradenameClean'; Generic mode checks
@@ -404,9 +443,9 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   const lower = q.toLowerCase()
 
   if (mode === 'generic') {
-    return pool.filter(d =>
-      genericPrefixFields(d).some(field => field.toLowerCase().startsWith(lower))
-    )
+    return pool
+      .filter(d => genericPrefixFields(d).some(field => field.toLowerCase().startsWith(lower)))
+      .map(d => reorderIngredientsForMatch(d, lower))
   }
 
   return pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
@@ -415,8 +454,8 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
 /**
  * Single best-guess "Did you mean" suggestion — only meant to be called when
  * 'searchDrugsTiered' comes back empty. Reuses the same fuzzy search and
- * 'RELEVANCE_FLOOR' cutoff the old auto-fuzzy results tier used; just takes
- * the top-ranked match's display name instead of returning the whole list.
+ * 'RELEVANCE_FLOOR' cutoff the old auto-fuzzy tier used; just takes the
+ * top-ranked match's display name instead of returning the whole list.
  *
  * @param {Fuse}   fuseIndex — buildDrugBrandIndex or buildDrugGenericIndex output
  * @param {string} query
