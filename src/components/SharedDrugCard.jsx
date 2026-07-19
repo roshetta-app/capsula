@@ -177,7 +177,7 @@ export default function SharedDrugCard({
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize:     16,
-          fontWeight:   600,
+          fontWeight:   500,
           color:        'var(--color-text-primary)',
           lineHeight:   1.3,
           overflow:     'hidden',
