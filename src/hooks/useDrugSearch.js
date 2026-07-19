@@ -22,6 +22,15 @@
  * result there just means nothing starts with those letters, not a search
  * quality problem.
  *
+ * drug_library_ui_ux step 1e.2 (2026-07-19, decisions 4.18/4.32, plan §4B):
+ * the 3+ char fuzzy tier now has a real relevance floor (weak/unrelated
+ * matches are dropped, not just ranked low), and Generic mode scores
+ * ingredients fairly regardless of how many a combo has (see searchUtils.js
+ * header for why that needed its own flattened index rather than Fuse's
+ * built-in array-field scoring). `ingredientIndexRef`/`drugsByIdRef` below
+ * are built once alongside the two mode indexes and passed through to
+ * generic-mode searches as `fuzzyExtras`; Brand mode ignores them.
+ *
  * Exposes:
  *   query            — current search string
  *   setQuery         — setter
@@ -35,6 +44,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import {
   buildDrugBrandIndex,
   buildDrugGenericIndex,
+  buildDrugIngredientIndex,
   searchDrugsTiered,
   getDrugAutocompleteSuggestionsTiered,
 } from '../utils/searchUtils'
@@ -47,13 +57,19 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   // Both split indexes are built once per drugs load — mode toggling below
-  // just picks which already-built index to search against.
-  const brandIndexRef   = useRef(null)
-  const genericIndexRef = useRef(null)
+  // just picks which already-built index to search against. ingredientIndexRef
+  // and drugsByIdRef (1e.2) support Generic mode's fair per-ingredient scoring;
+  // Brand mode never uses them.
+  const brandIndexRef      = useRef(null)
+  const genericIndexRef    = useRef(null)
+  const ingredientIndexRef = useRef(null)
+  const drugsByIdRef       = useRef(null)
 
   useEffect(() => {
-    brandIndexRef.current   = buildDrugBrandIndex(drugs)
-    genericIndexRef.current = buildDrugGenericIndex(drugs)
+    brandIndexRef.current      = buildDrugBrandIndex(drugs)
+    genericIndexRef.current    = buildDrugGenericIndex(drugs)
+    ingredientIndexRef.current = buildDrugIngredientIndex(drugs)
+    drugsByIdRef.current       = new Map(drugs.map(d => [d.id, d]))
     runSearch(query, mode)
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -62,11 +78,15 @@ export function useDrugSearch(drugs, mode = 'brand') {
     if (!fuseIndex) return
 
     const trimmed = q.trim()
+    const fuzzyExtras = currentMode === 'generic'
+      ? { ingredientIndex: ingredientIndexRef.current, drugsById: drugsByIdRef.current }
+      : {}
 
-    // Tiered match (1e.1): 1-char prefix-only, 2-char prefix-or-word-start,
-    // 3+ char fuzzy — replaces the old flat "fuzzy from 2 chars" behavior.
+    // Tiered match (1e.1/1e.2): 1-char prefix-only, 2-char prefix-or-word-start,
+    // 3+ char fuzzy with a real relevance floor — replaces the old flat "fuzzy
+    // from 2 chars, no floor" behavior.
     const matched = trimmed.length >= 1
-      ? (searchDrugsTiered(fuseIndex, drugs, trimmed, currentMode) ?? drugs)
+      ? (searchDrugsTiered(fuseIndex, drugs, trimmed, currentMode, fuzzyExtras) ?? drugs)
       : drugs
 
     setResults(matched)
@@ -80,7 +100,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
 
     // Autocomplete suggestions
     if (trimmed.length >= 1) {
-      const sug = getDrugAutocompleteSuggestionsTiered(fuseIndex, drugs, trimmed, 5, currentMode)
+      const sug = getDrugAutocompleteSuggestionsTiered(fuseIndex, drugs, trimmed, 5, currentMode, fuzzyExtras)
       setSuggestions(sug)
       setShowSuggestions(sug.length > 0)
     } else {

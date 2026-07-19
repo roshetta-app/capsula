@@ -45,6 +45,32 @@
  * left in place below (not deleted) since this session didn't check for
  * other callers app-wide — flag and confirm before removing them in a
  * future step if a full-repo check shows nothing else uses them.
+ *
+ * drug_library_ui_ux step 1e.2 (2026-07-19, decisions 4.18/4.32, plan §4B):
+ * added a real relevance floor to the 3+ char fuzzy tier, plus fair
+ * per-ingredient scoring for Generic mode. Confirmed via direct testing
+ * this session that Fuse.js's own score is unreliable across differently
+ * sized fields — the identical real typo match scores far worse when it's
+ * embedded in a long, glued-together combo generic name than when it's a
+ * short field on its own, purely from field length, not match quality.
+ * `DRUG_GENERIC_FUSE_OPTIONS`'s existing `ingredients` key (3.5.3) doesn't
+ * fix this — it blends into the same one combined record score. Brand mode
+ * names are short single fields with no such bias, so Brand mode's floor is
+ * a plain post-search score filter. Generic mode instead searches ingredients
+ * through a separate flattened index (one entry per ingredient, not per
+ * drug — see `buildDrugIngredientIndex`) so each ingredient is scored on its
+ * own merit regardless of how many others its parent drug has, then takes
+ * whichever of (genericName-level match, best individual ingredient match)
+ * scores best for that drug. Also folds in a small ranking nudge favoring
+ * drugs with fewer total ingredients, all else close to equal — a focused
+ * 2-3 ingredient combo should generally outrank a 15-ingredient multivitamin
+ * blend that happens to contain the same searched ingredient, without
+ * hard-excluding the multivitamin. `DRUG_GENERIC_FUSE_OPTIONS`'s own
+ * `ingredients` key is left as-is below (not removed) — it's likely now
+ * partially redundant given 1e.1's finding that genericName already
+ * contains every ingredient word, but that's an existing, dated (3.5.3)
+ * config and removing it wasn't part of this step's confirmed scope; flag
+ * for a future cleanup pass.
  */
 
 import Fuse from 'fuse.js'
@@ -263,6 +289,72 @@ export function getDrugAutocompleteSuggestionsByMode(fuseIndex, query, limit = 5
 
 const MIN_WORD_TOKEN_LENGTH = 2
 
+// ─── Fuzzy relevance floor (step 1e.2, decisions 4.18/4.32) ───────────────────
+const RELEVANCE_FLOOR = 0.3          // score above this = treated as noise, dropped entirely
+const INGREDIENT_COUNT_PENALTY = 0.01 // small nudge per extra ingredient — doesn't override real match-quality gaps
+
+/**
+ * Flattened ingredient index — one entry PER INGREDIENT, not per drug. This is
+ * what makes ingredient scoring fair regardless of how many ingredients a
+ * combo has (see file-header note, 1e.2). Only combo generics have a
+ * populated `ingredients` array; plain generics contribute nothing here and
+ * are matched purely at the genericName level, same as before.
+ */
+export function buildDrugIngredientIndex(drugs) {
+  const flattened = []
+  drugs.forEach(d => {
+    if (Array.isArray(d.ingredients)) {
+      d.ingredients.forEach(ingredient => {
+        flattened.push({ drugId: d.id, ingredient, totalIngredients: d.ingredients.length })
+      })
+    }
+  })
+  return new Fuse(flattened, {
+    keys:               ['ingredient'],
+    includeScore:       true,
+    ignoreLocation:     true,
+    minMatchCharLength: 2,
+    threshold:          0.4, // internal search bound only — RELEVANCE_FLOOR does the real filtering
+  })
+}
+
+/**
+ * Generic-mode fuzzy search with fair per-ingredient scoring. For each drug,
+ * takes whichever scores better: its genericName-level match (from
+ * genericIndex, which already covers plain generics fully) or its best
+ * individual ingredient match (from ingredientIndex, unaffected by how many
+ * ingredients the drug has). Drops anything scoring worse than
+ * RELEVANCE_FLOOR, then ranks with a small nudge toward fewer-ingredient
+ * drugs when scores are otherwise close.
+ */
+function searchGenericDrugsFuzzy(genericIndex, ingredientIndex, drugsById, query) {
+  const bestByDrugId = new Map()
+
+  for (const r of genericIndex.search(query)) {
+    bestByDrugId.set(r.item.id, { drug: r.item, score: r.score, totalIngredients: r.item.ingredients?.length })
+  }
+
+  for (const r of ingredientIndex.search(query)) {
+    const existing = bestByDrugId.get(r.item.drugId)
+    if (!existing || r.score < existing.score) {
+      const drug = drugsById.get(r.item.drugId)
+      if (drug) {
+        bestByDrugId.set(r.item.drugId, { drug, score: r.score, totalIngredients: r.item.totalIngredients })
+      }
+    }
+  }
+
+  const passed = [...bestByDrugId.values()].filter(v => v.score <= RELEVANCE_FLOOR)
+
+  passed.sort((a, b) => {
+    const aAdj = a.score + INGREDIENT_COUNT_PENALTY * Math.max((a.totalIngredients ?? 1) - 1, 0)
+    const bAdj = b.score + INGREDIENT_COUNT_PENALTY * Math.max((b.totalIngredients ?? 1) - 1, 0)
+    return aAdj - bAdj
+  })
+
+  return passed.map(v => v.drug)
+}
+
 function drugFieldForMode(drug, mode) {
   return (mode === 'brand' ? drug.name : drug.genericName) ?? ''
 }
@@ -278,9 +370,11 @@ function wordTokens(text) {
  * @param {object[]} pool    — the raw drugs array (needed for prefix tiers)
  * @param {string} query
  * @param {'brand'|'generic'} mode
+ * @param {object} [fuzzyExtras] — generic mode only, for fair ingredient scoring
+ *   (1e.2): { ingredientIndex: buildDrugIngredientIndex output, drugsById: Map }
  * @returns {object[]|null}  — null means "show everything" (query too short)
  */
-export function searchDrugsTiered(fuseIndex, pool, query, mode = 'brand') {
+export function searchDrugsTiered(fuseIndex, pool, query, mode = 'brand', fuzzyExtras = {}) {
   const q = query.trim()
   if (q.length === 0) return null
 
@@ -303,15 +397,23 @@ export function searchDrugsTiered(fuseIndex, pool, query, mode = 'brand') {
     })
   }
 
-  // Tier 3: full fuzzy (3+ chars) — unchanged for now; relevance floor is 1e.2
-  const results = fuseIndex.search(q)
-  return results.map(r => r.item)
+  // Tier 3: full fuzzy (3+ chars), with a real relevance floor (1e.2) —
+  // Generic mode uses fair per-ingredient scoring when the extras are
+  // available; Brand mode (and Generic as a fallback without extras) just
+  // filters the plain Fuse score against the floor.
+  if (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById) {
+    return searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, q)
+  }
+  return fuseIndex.search(q)
+    .filter(r => r.score <= RELEVANCE_FLOOR)
+    .map(r => r.item)
 }
 
 /**
- * Autocomplete suggestions using searchDrugsTiered's same tier boundaries.
+ * Autocomplete suggestions using searchDrugsTiered's same tier boundaries and
+ * relevance floor (1e.2).
  */
-export function getDrugAutocompleteSuggestionsTiered(fuseIndex, pool, query, limit = 5, mode = 'brand') {
+export function getDrugAutocompleteSuggestionsTiered(fuseIndex, pool, query, limit = 5, mode = 'brand', fuzzyExtras = {}) {
   const q = query.trim()
   if (q.length === 0) return []
 
@@ -329,8 +431,10 @@ export function getDrugAutocompleteSuggestionsTiered(fuseIndex, pool, query, lim
         word => word.length >= MIN_WORD_TOKEN_LENGTH && word.startsWith(lower)
       )
     })
+  } else if (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById) {
+    candidates = searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, q)
   } else {
-    const raw = fuseIndex.search(q, { limit })
+    const raw = fuseIndex.search(q).filter(r => r.score <= RELEVANCE_FLOOR)
     candidates = raw.map(r => r.item)
   }
 
