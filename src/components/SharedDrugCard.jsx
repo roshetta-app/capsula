@@ -186,8 +186,8 @@ export default function SharedDrugCard({
         }}>
           {titleSegments.map((seg, i) =>
             seg.bold
-              ? <strong key={i} style={{ fontWeight: 700 }}>{seg.text}</strong>
-              : <span key={i} style={{ fontWeight: 400 }}>{seg.text}</span>
+              ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+              : <span key={i}>{seg.text}</span>
           )}
           {titleSuffix && (
             <span style={{
@@ -213,8 +213,8 @@ export default function SharedDrugCard({
           }}>
             {genericSegments.map((seg, i) =>
               seg.bold
-                ? <strong key={i} style={{ fontWeight: 700 }}>{seg.text}</strong>
-                : <span key={i} style={{ fontWeight: 400 }}>{seg.text}</span>
+                ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+                : <span key={i}>{seg.text}</span>
             )}
           </div>
         )}
