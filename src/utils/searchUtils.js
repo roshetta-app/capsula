@@ -118,6 +118,21 @@
  * config — confirmed identical to `name` on every published brand today, so
  * it carried the same bug through a second key; flagged for a future data
  * pass once real Arabic brand names exist to search.
+ *
+ * drug_search_plan brand-secondary-fields fix (2026-07-19, later still, same
+ * day): confirmed directly against the live database that Brand mode's two
+ * remaining secondary fuzzy keys, `form` and `concentration`, are both
+ * low-cardinality values shared across thousands of unrelated brands —
+ * `form` has only ~45 distinct values total (e.g. "tablet"/"gel"/"syrup");
+ * common `concentration` values like "500mg"/"100mg" are each shared by
+ * 100-220+ brands. Scoring either as a secondary key meant a search for a
+ * common form or dose word could fuzzy-match brands with no real connection
+ * to the query — the same shared-field pattern behind decisions 4.33 and
+ * 4.34 above, just on a different pair of keys. Brand mode's fuzzy tier
+ * (`DRUG_BRAND_FUSE_OPTIONS`) now searches `tradenameClean` only, matching
+ * what the 2-3 char exact-prefix tier (`drugFieldForMode`) already did. Not
+ * yet logged as a numbered decision in DRUG_SEARCH_PLAN.md — flag for that
+ * file's next update.
  */
 
 import Fuse from 'fuse.js'
@@ -206,12 +221,20 @@ export function fuzzySearchConditions(fuseIndex, query) {
 // identical bug through a second key. Dropped rather than pointed at a
 // not-yet-existing clean-Arabic-name field; flagged below for a future data
 // pass once `name_ar` is actually populated with translated text.
+//
+// `form`/`concentration` dropped as well, 2026-07-19 (later still, same day) —
+// confirmed directly against the live database that both are low-cardinality
+// values shared across thousands of unrelated brands (`form` has only ~45
+// distinct values total, e.g. "tablet"/"gel"/"syrup"; common `concentration`
+// values like "500mg"/"100mg" are each shared by 100-220+ brands). Scoring
+// either as a secondary key meant a search for a common form or dose word
+// could fuzzy-match brands with no real connection to the query — same
+// shared-field pattern as the `name`/`nameAr` bug above and decision 4.33,
+// just on a different pair of keys. Brand mode's fuzzy tier now searches
+// `tradenameClean` only, matching what the 2-3 char exact-prefix tier
+// (`drugFieldForMode`, below) already did.
 const DRUG_BRAND_FUSE_OPTIONS = {
-  keys: [
-    { name: 'tradenameClean', weight: 0.7 },
-    { name: 'form',           weight: 0.15 },
-    { name: 'concentration',  weight: 0.15 },
-  ],
+  keys:               ['tradenameClean'],
   threshold:          0.35,
   minMatchCharLength: 2,
   includeScore:       true,
