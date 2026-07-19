@@ -17,9 +17,8 @@
  * may need revisiting once the real title/generic-line content lands.
  *
  * 1d.1 built the outer shell and its slot layout; 1d.2 filled in the title
- * line; 1d.3 filled in the generic/ingredient line; 1d.4 fills in the
- * category icon badge. Remaining slot lands later:
- *   - trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
+ *   line → 1d.3 / 1d.4 (generic line, category icon)
+ *   trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
  * Title line (1d.2, decision 4.12; corrected 2026-07-19): tradenameClean +
  * concentration + form — replacing the old card's approach of appending a
@@ -32,6 +31,26 @@
  * every basis type and still avoids the original double-display bug. ~43%
  * of published brands have no strength on file, so the fallback is
  * tradename + form only, no gap left behind. `form` itself is never null.
+ *
+ * Title suffix, extended (drug_card_title_suffix plan, step C.1, decisions
+ * 4.35-4.43, locked 2026-07-20): 4.12's suffix didn't show pack size or
+ * fill volume, so two real, different products (e.g. a 60ml and a 115ml
+ * bottle of the same brand/strength/form) rendered as identical cards.
+ * Now the suffix is built per form category:
+ *   - Solid/countable forms (tablet, capsule, sachet, etc.):
+ *     concentration + pack_size + form_modifier abbreviation(s) + form
+ *     abbreviation, e.g. "200mg 2 FC Tab."
+ *   - Liquid/topical forms, plus vial/ampoule (4.42):
+ *     concentration + form abbreviation + fill_volume, e.g.
+ *     "200mg / 5ml Susp. 30ml"
+ * Any field missing on a given drug is dropped silently (4.39) — never a
+ * blank gap or stray separator. Form abbreviations come from
+ * config/forms.js's DRUG_FORM_SUFFIXES (4.40); form_modifier abbreviations
+ * come from config/formModifiers.js's FORM_MODIFIER_ABBREVIATIONS — any
+ * form_modifier tag with no entry there (e.g. "scored") is dropped the same
+ * way (4.41). Multiple modifier abbreviations are comma-joined in the
+ * array's original order (4.43). `titleSegments` (the tradenameClean +
+ * highlightMatch logic, below) is untouched.
  *
  * Generic/ingredient line (1d.3, decision 4.13): `drug.ingredients` is only
  * populated for combo generics (2+ active ingredients) — confirmed live, a
@@ -77,8 +96,52 @@ import { useState } from 'react'
 import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
+import { DRUG_FORM_SUFFIXES } from '../config/forms'
+import { FORM_MODIFIER_ABBREVIATIONS } from '../config/formModifiers'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
+
+// Forms that use fill_volume in the title suffix instead of pack_size
+// (drug_card_title_suffix plan, decision 4.38 + 4.42, confirmed 2026-07-20).
+// Locked by the plan: the "drops" family, spray, cream/gel/ointment/lotion,
+// syrup/suspension/solution, and vial/ampoule (4.42's override). Everything
+// else not explicitly named there — confirmed with the user 2026-07-20 —
+// falls in here too where it's genuinely liquid/topical (eye ointment,
+// washes, oils, injection, vaccine, inhaler, etc.); every remaining form
+// defaults to the pack_size/solid formula below.
+const LIQUID_FORMS = new Set([
+  'syrup', 'suspension', 'solution',
+  'drops', 'eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops',
+  'spray', 'cream', 'gel', 'ointment', 'lotion',
+  'vial', 'ampoule', // 4.42 — always fill_volume, never pack_size
+  'eye ointment', 'shampoo', 'mouth wash', 'vaginal douche',
+  'serum', 'hair oil', 'oil',
+  'antiseptic solution', 'inhalation solution', 'paint', 'enema',
+  'facial wash', 'conditioner', 'foam',
+  'injection', 'vaccine', 'inhaler',
+])
+
+// Collapses redundant whitespace and normalizes spacing around "/" so
+// "200mg / 5ml"-style values render consistently regardless of how they
+// were entered (plan §2 — raw concentration/pack_size/fill_volume spacing
+// is inconsistent in the source data). Does not touch unit spelling
+// ("g" vs "gm") — that's a data question, not a formatting one.
+function normalizeSpacing(value) {
+  if (!value) return value
+  return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, ' / ')
+}
+
+// Comma-joins the known form_modifier abbreviations for a drug, in the
+// array's original order (4.43). Tags with no entry in
+// FORM_MODIFIER_ABBREVIATIONS (currently just "scored") are dropped
+// silently (4.41), same as any other missing field (4.39).
+function abbreviateFormModifiers(formModifier) {
+  if (!formModifier || formModifier.length === 0) return ''
+  return formModifier
+    .map(tag => FORM_MODIFIER_ABBREVIATIONS[tag])
+    .filter(Boolean)
+    .join(', ')
+}
 
 export default function SharedDrugCard({
   drug,
@@ -107,15 +170,22 @@ export default function SharedDrugCard({
     : (matchedCategory?.icon_name || 'Pill')
   const categoryColors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
-  // Title line (4.12, corrected 2026-07-19): the raw strengthValue/
-  // strengthUnit/strengthBasis rebuild printed strengthBasis's raw storage
-  // code literally (e.g. "100mg/per_5ml") — it's a storage key, not display
-  // text. `drug.concentration` is already the correctly-formatted value for
-  // every basis type (confirmed against live data: "100mg / 5ml" for
-  // liquids, "600mg" for per_unit tablets, "5%" for percentage, etc.), so
-  // using it directly here still avoids 4.12's original double-display bug
-  // — it replaces the raw fields rather than supplementing them.
-  const titleSuffix = drug.concentration ? `${drug.concentration} ${drug.form}` : drug.form
+  // Title suffix (4.38, locked) — built per form category. Solid/countable
+  // forms show pack_size + form_modifier abbreviations; liquid/topical
+  // forms (plus vial/ampoule, 4.42) show fill_volume instead. Any field
+  // missing on this particular drug drops out silently (4.39) via the
+  // .filter(Boolean) below — never a blank gap or stray separator.
+  const normalizedConcentration = normalizeSpacing(drug.concentration)
+  const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
+  const modifierAbbrev = abbreviateFormModifiers(drug.formModifier)
+
+  const titleSuffix = LIQUID_FORMS.has(drug.form)
+    ? [normalizedConcentration, formAbbrev, normalizeSpacing(drug.fillVolume)]
+        .filter(Boolean)
+        .join(' ')
+    : [normalizedConcentration, normalizeSpacing(drug.packSize), modifierAbbrev, formAbbrev]
+        .filter(Boolean)
+        .join(' ')
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
   // + a "+N" count; plain generics just show the one genericName.
