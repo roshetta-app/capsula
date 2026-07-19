@@ -18,12 +18,27 @@ import { useState, useEffect } from 'react'
  * untouched (user decision) — it only resets Form/Route, Pregnancy, and
  * Breastfeeding.
  *
+ * 2026-07-19 (Drugs search-bar polish) — added a "Search By" section
+ * holding the Brand/Generic switch, moved here from a segmented toggle that
+ * used to sit beside the search bar. Unlike every other section in this
+ * sheet, it is NOT part of 'filters' and is not gated by Apply — tapping
+ * Brand or Generic changes 'mode' immediately, the same instant-switch
+ * behavior the old toggle had (user decision, 2026-07-19). Only shown while
+ * 'showModeSection' is true — mirrors the old toggle's own scoping, which
+ * only appeared while a search query was active, since mode has no effect
+ * on plain category browsing. Section is omitted entirely if 'onModeChange'
+ * isn't passed, so this stays backward-compatible with any future caller
+ * that doesn't use Drugs' Brand/Generic concept.
+ *
  * Props:
- *   isOpen         boolean
- *   onClose        () => void
- *   onApply        (filters) => void   filters: { category, forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
- *   categories     array of { slug, name_en, ... } — already filtered to categories with drugs, same list the tiles use
- *   activeCategory string | '__all' | null — the category currently active on the screen (tile-driven)
+ *   isOpen           boolean
+ *   onClose          () => void
+ *   onApply          (filters) => void   filters: { category, forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
+ *   categories       array of { slug, name_en, ... } — already filtered to categories with drugs, same list the tiles use
+ *   activeCategory   string | '__all' | null — the category currently active on the screen (tile-driven)
+ *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
+ *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
+ *   showModeSection  boolean — whether to show the Search By section at all (only meaningful while searching)
  */
 
 // Each chip's `matches` list is the full set of real raw form values (from
@@ -51,7 +66,7 @@ const EMPTY = {
   bfUnsafe:       false,
 }
 
-export default function DrugFilterPanel({ isOpen, onClose, onApply, categories = [], activeCategory = null }) {
+export default function DrugFilterPanel({ isOpen, onClose, onApply, categories = [], activeCategory = null, mode, onModeChange, showModeSection = false }) {
   const [filters, setFilters] = useState(() => ({ ...EMPTY, category: activeCategory }))
 
   // Keep the sheet's category chip in sync with whichever tile is active
@@ -127,6 +142,15 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, categories =
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-4)' }}>
           Filter Drugs
         </div>
+
+        {/* Search By — Brand/Generic, instant-switch, not gated by Apply. See
+            file header note above for why this section is different from
+            every other one in this sheet. */}
+        {showModeSection && onModeChange && (
+          <FilterSection label="Search By">
+            <ModeToggle mode={mode} onChange={onModeChange} />
+          </FilterSection>
+        )}
 
         {/* Category */}
         <FilterSection label="Category">
@@ -226,6 +250,39 @@ function FilterSection({ label, children }) {
         {label}
       </div>
       {children}
+    </div>
+  )
+}
+
+// Segmented Brand/Generic control. Moved here from DrugsScreen.jsx
+// (2026-07-19) — same markup/logic as the old inline toggle, just full-width
+// to match this sheet's other rows instead of a compact pill-sized control.
+function ModeToggle({ mode, onChange }) {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+      {['brand', 'generic'].map(m => (
+        <button
+          key={m}
+          type="button"
+          onClick={() => onChange(m)}
+          style={{
+            flex: 1,
+            padding: '8px 14px',
+            borderRadius: 'var(--radius-full)',
+            fontSize: 13, fontWeight: mode === m ? 600 : 400,
+            cursor: 'pointer',
+            border: mode === m ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+            backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
+            color: mode === m ? '#fff' : 'var(--color-text-secondary)',
+            fontFamily: 'var(--font-body)',
+            transition: 'all 0.15s ease',
+            WebkitTapHighlightColor: 'transparent',
+            outline: 'none',
+          }}
+        >
+          {m === 'brand' ? 'Brand' : 'Generic'}
+        </button>
+      ))}
     </div>
   )
 }

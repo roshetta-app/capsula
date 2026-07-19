@@ -29,6 +29,23 @@
  *             call site (Conditions, Drugs, Favourites), including the
  *             Star icon FavouritesScreen swaps in via the `icon` prop above,
  *             since both icons share this one style object.
+ * 2026-07-19 (Drugs search-bar polish) — the filter trigger moved from a
+ *             separate bordered button beside the pill to an icon embedded
+ *             inside it, on the right edge, alongside the clear (X) button.
+ *             Reported bug: the row that used to hold this component plus a
+ *             sibling Brand/Generic toggle visibly squeezed the input once
+ *             that toggle appeared. Root cause was two things stacking: the
+ *             toggle's own width, and this component's filter button taking
+ *             a second full-height box next to the pill. Folding the filter
+ *             trigger into the pill removes its box entirely; the toggle
+ *             itself moved out of this row into DrugFilterPanel (see that
+ *             file and DrugsScreen.jsx). The outer flex/gap wrapper that
+ *             used to hold the pill + separate filter button is gone — the
+ *             component's root is now the pill's own relative container, so
+ *             every call site now gets a plain single element back instead
+ *             of a two-child flex row. No call site needs a code change:
+ *             the component still just fills whatever width its parent
+ *             gives it.
  *
  * Props:
  *   value            string
@@ -54,107 +71,108 @@ const SearchBar = forwardRef(function SearchBar({
 }, ref) {
   const height = compact ? 44 : 46
 
+  // Right-edge icon cluster, innermost first: the filter trigger always
+  // sits at the very edge when present; the clear button sits just inside
+  // it so the two never overlap. Input padding grows to match whichever of
+  // the two are actually present.
+  const filterEdge   = 6
+  const clearEdge    = onFilter ? filterEdge + 34 : 8
+  const paddingRight = 16 + (onFilter ? 34 : 0) + (value ? 30 : 0)
+
   return (
-    <div style={{
-      display:    'flex',
-      gap:        'var(--space-2)',
-      alignItems: 'center',
-    }}>
-      <div style={{ flex: 1, position: 'relative' }}>
-        <Icon
-          size={16}
-          style={{
-            position:      'absolute',
-            left:          'var(--space-4)',
-            top:           '50%',
-            transform:     'translateY(-50%)',
-            color:         'var(--color-accent)',
-            pointerEvents: 'none',
-          }}
-        />
-        <input
-          ref={ref}
-          type="text"
-          className="search-input"
-          value={value}
-          onChange={e => onChange(e.target.value)}
-          placeholder={placeholder}
-          style={{
-            width:           '100%',
-            boxSizing:       'border-box',
-            paddingLeft:     40,
-            paddingRight:    value ? 40 : 16,
-            height:          height,
-            borderRadius:    'var(--radius-full)',
-            border:          '1px solid var(--color-search-border)',
-            backgroundColor: 'var(--color-surface)',
-            fontSize:        14,
-            color:           'var(--color-text-primary)',
-            fontFamily:      'var(--font-body)',
-            outline:         'none',
-            boxShadow:       'var(--shadow-ambient-search)',
-            transition:      'border-color var(--motion-fast) var(--ease-settle), box-shadow var(--motion-fast) var(--ease-settle)',
-          }}
-          onFocus={e => {
-            e.target.style.borderColor = 'var(--color-accent)'
-            e.target.style.boxShadow   = '0 0 0 3px var(--color-accent-light), var(--shadow-ambient-search)'
-          }}
-          onBlur={e => {
-            e.target.style.borderColor = 'var(--color-border)'
-            e.target.style.boxShadow   = 'var(--shadow-ambient-search)'
-          }}
-        />
-        <button
-          onClick={() => onChange('')}
-          aria-label="Clear search"
-          tabIndex={value ? 0 : -1}
-          style={{
-            position:      'absolute',
-            right:         'var(--space-3)',
-            top:           '50%',
-            transform:     'translateY(-50%)',
-            background:    'none',
-            border:        'none',
-            cursor:        'pointer',
-            padding:       4,
-            color:         'var(--color-text-tertiary)',
-            display:       'flex',
-            alignItems:    'center',
-            opacity:       value ? 1 : 0,
-            pointerEvents: value ? 'auto' : 'none',
-            transition:    'opacity var(--motion-fast) var(--ease-reveal)',
-          }}
-        >
-          <X size={15} />
-        </button>
-      </div>
+    <div style={{ position: 'relative', width: '100%' }}>
+      <Icon
+        size={16}
+        style={{
+          position:      'absolute',
+          left:          'var(--space-4)',
+          top:           '50%',
+          transform:     'translateY(-50%)',
+          color:         'var(--color-accent)',
+          pointerEvents: 'none',
+        }}
+      />
+      <input
+        ref={ref}
+        type="text"
+        className="search-input"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width:           '100%',
+          boxSizing:       'border-box',
+          paddingLeft:     40,
+          paddingRight,
+          height:          height,
+          borderRadius:    'var(--radius-full)',
+          border:          '1px solid var(--color-search-border)',
+          backgroundColor: 'var(--color-surface)',
+          fontSize:        14,
+          color:           'var(--color-text-primary)',
+          fontFamily:      'var(--font-body)',
+          outline:         'none',
+          boxShadow:       'var(--shadow-ambient-search)',
+          transition:      'border-color var(--motion-fast) var(--ease-settle), box-shadow var(--motion-fast) var(--ease-settle)',
+        }}
+        onFocus={e => {
+          e.target.style.borderColor = 'var(--color-accent)'
+          e.target.style.boxShadow   = '0 0 0 3px var(--color-accent-light), var(--shadow-ambient-search)'
+        }}
+        onBlur={e => {
+          e.target.style.borderColor = 'var(--color-border)'
+          e.target.style.boxShadow   = 'var(--shadow-ambient-search)'
+        }}
+      />
+      <button
+        onClick={() => onChange('')}
+        aria-label="Clear search"
+        tabIndex={value ? 0 : -1}
+        style={{
+          position:      'absolute',
+          right:         clearEdge,
+          top:           '50%',
+          transform:     'translateY(-50%)',
+          background:    'none',
+          border:        'none',
+          cursor:        'pointer',
+          padding:       4,
+          color:         'var(--color-text-tertiary)',
+          display:       'flex',
+          alignItems:    'center',
+          opacity:       value ? 1 : 0,
+          pointerEvents: value ? 'auto' : 'none',
+          transition:    'opacity var(--motion-fast) var(--ease-reveal)',
+        }}
+      >
+        <X size={15} />
+      </button>
 
       {onFilter && (
         <button
           onClick={onFilter}
           aria-label="Filter"
           style={{
-            width:           height,
-            height:          height,
-            borderRadius:    'var(--radius-full)',
-            border:          hasActiveFilters
-              ? '1.5px solid var(--color-accent)'
-              : '1.5px solid var(--color-border)',
-            backgroundColor: hasActiveFilters
-              ? 'var(--color-accent)'
-              : 'var(--color-surface)',
+            position:        'absolute',
+            right:           filterEdge,
+            top:             '50%',
+            transform:       'translateY(-50%)',
+            width:           30,
+            height:          30,
+            borderRadius:    '50%',
+            border:          'none',
+            backgroundColor: hasActiveFilters ? 'var(--color-accent)' : 'transparent',
             color:           hasActiveFilters ? '#fff' : 'var(--color-text-secondary)',
             cursor:          'pointer',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
-            flexShrink:      0,
             outline:         'none',
             WebkitTapHighlightColor: 'transparent',
             transition:      'all 0.15s ease',
           }}
         >
-          <SlidersHorizontal size={16} />
+          <SlidersHorizontal size={15} />
         </button>
       )}
     </div>

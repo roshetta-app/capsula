@@ -83,6 +83,22 @@
  * `--shadow-ambient-selector`. Radius unchanged. `categoriesWithCounts`'
  * `count` field is still used to filter out empty categories — only the
  * on-screen display of it is gone.
+ *
+ * 2026-07-19 (Drugs search-bar polish) — fixed a real bug: typing the first
+ * character closed the on-screen keyboard, forcing a second tap into the
+ * search bar to keep typing. Root cause: the search-results view and the
+ * category-list view below are two separate early 'return's with genuinely
+ * different trees, and the search-results one used to wrap SearchBar in an
+ * extra flex row (to sit next to the Brand/Generic toggle) that the
+ * category-list view didn't have. The moment 'hasQuery' flipped true on the
+ * first keystroke, React saw a different element at that position and threw
+ * away the old input — including its focus — rather than reusing it. Fix:
+ * the Brand/Generic toggle moved out of this row entirely (now inside
+ * DrugFilterPanel — see that file), and both views now wrap SearchBar in
+ * the exact same single <div> at the exact same position, so React keeps
+ * the same input across the transition instead of remounting it. Also
+ * moved the filter trigger inside the search pill itself (see
+ * SearchBar.jsx) — the row no longer has anything squeezing the input.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -285,22 +301,19 @@ export default function DrugsScreen() {
         />
         <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
-        {/* Search bar + mode toggle */}
+        {/* Search bar — same single-wrapper shape as the category-list view's
+            copy below, on purpose (see 2026-07-19 note at the top of this
+            file): keeping both trees identical at this position is what
+            lets React preserve the input, and the keyboard with it, across
+            the hasQuery transition. */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <SearchBar
-                value={query}
-                onChange={handleQueryChange}
-                placeholder="Search drugs…"
-                onFilter={() => setFilterOpen(true)}
-                hasActiveFilters={hasFilters}
-              />
-            </div>
-            {hasQuery && (
-              <ModeToggle mode={mode} onChange={setMode} />
-            )}
-          </div>
+          <SearchBar
+            value={query}
+            onChange={handleQueryChange}
+            placeholder="Search drugs…"
+            onFilter={() => setFilterOpen(true)}
+            hasActiveFilters={hasFilters}
+          />
         </div>
 
           {/* Back to categories button (only when in a category, not searching) */}
@@ -366,6 +379,9 @@ export default function DrugsScreen() {
           onApply={handleApplyFilters}
           categories={categoriesWithCounts}
           activeCategory={activeCategory}
+          mode={mode}
+          onModeChange={setMode}
+          showModeSection={hasQuery}
         />
       </Layout>
     )
@@ -394,13 +410,17 @@ export default function DrugsScreen() {
       />
       <div style={{ paddingTop: 'var(--space-5)' }}>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
-        <SearchBar
-          value={query}
-          onChange={handleQueryChange}
-          placeholder="Search drugs…"
-          onFilter={() => setFilterOpen(true)}
-          hasActiveFilters={hasFilters}
-        />
+        {/* Same single-wrapper shape as the search-results view's copy
+            above, on purpose — see 2026-07-19 note at the top of this file. */}
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <SearchBar
+            value={query}
+            onChange={handleQueryChange}
+            placeholder="Search drugs…"
+            onFilter={() => setFilterOpen(true)}
+            hasActiveFilters={hasFilters}
+          />
+        </div>
 
         {/* Recently viewed — matches RecentlyViewedChips.jsx exactly (plan
             §7 step 1b.2, decision 4.8): clock icon + label, thin separator,
@@ -541,6 +561,8 @@ export default function DrugsScreen() {
         onApply={handleApplyFilters}
         categories={categoriesWithCounts}
         activeCategory={activeCategory}
+        mode={mode}
+        onModeChange={setMode}
       />
     </Layout>
   )
@@ -764,44 +786,6 @@ function LoadingProgress({ progress }) {
           This only happens once
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── ModeToggle ───────────────────────────────────────────────────────────────
-// Segmented Brand/Generic control. Only rendered by the caller while a
-// query is active — category browsing never shows this (GFB step 3.5.6).
-
-function ModeToggle({ mode, onChange }) {
-  return (
-    <div style={{
-      display: 'flex', flexShrink: 0,
-      border: '1.5px solid var(--color-border)',
-      borderRadius: 'var(--radius-full)',
-      padding: 2,
-      backgroundColor: 'var(--color-surface)',
-    }}>
-      {['brand', 'generic'].map(m => (
-        <button
-          key={m}
-          type="button"
-          onClick={() => onChange(m)}
-          style={{
-            padding: '5px 12px',
-            borderRadius: 'var(--radius-full)',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 12, fontWeight: 600,
-            fontFamily: 'var(--font-body)',
-            backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
-            color: mode === m ? '#fff' : 'var(--color-text-secondary)',
-            WebkitTapHighlightColor: 'transparent', outline: 'none',
-            transition: 'background-color 0.15s, color 0.15s',
-          }}
-        >
-          {m === 'brand' ? 'Brand' : 'Generic'}
-        </button>
-      ))}
     </div>
   )
 }
