@@ -21,13 +21,17 @@
  * category icon badge. Remaining slot lands later:
  *   - trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
- * Title line (1d.2, decision 4.12): rebuilt fresh from three raw fields —
- * tradenameClean + strength (strengthValue + strengthUnit, with strengthBasis
- * appended after a "/" when present, e.g. "100mg/5ml") + form — replacing the
- * old card's approach of appending a second, already-baked-in strength/form
- * onto a pre-composed name string (which showed both twice). ~43% of
- * published brands have no strength on file, so the fallback is tradename +
- * form only, no gap left behind. `form` itself is never null.
+ * Title line (1d.2, decision 4.12; corrected 2026-07-19): tradenameClean +
+ * concentration + form — replacing the old card's approach of appending a
+ * second, already-baked-in strength/form onto a pre-composed name string
+ * (which showed both twice). Originally rebuilt the suffix from the raw
+ * strengthValue/strengthUnit/strengthBasis fields instead of using
+ * `concentration`, which printed strengthBasis's raw storage code literally
+ * (e.g. "100mg/per_5ml" instead of "100mg / 5ml") — fixed by using
+ * `drug.concentration` directly, which is already correctly formatted for
+ * every basis type and still avoids the original double-display bug. ~43%
+ * of published brands have no strength on file, so the fallback is
+ * tradename + form only, no gap left behind. `form` itself is never null.
  *
  * Generic/ingredient line (1d.3, decision 4.13): `drug.ingredients` is only
  * populated for combo generics (2+ active ingredients) — confirmed live, a
@@ -83,12 +87,15 @@ export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast
     : (matchedCategory?.icon_name || 'Pill')
   const categoryColors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
-  // Title line (4.12) — strength only renders when both value and unit are
-  // present; basis (e.g. "/5ml") only appends when it exists on top of that.
-  const strengthPart = drug.strengthValue && drug.strengthUnit
-    ? `${drug.strengthValue}${drug.strengthUnit}${drug.strengthBasis ? `/${drug.strengthBasis}` : ''}`
-    : null
-  const titleSuffix = strengthPart ? `${strengthPart} ${drug.form}` : drug.form
+  // Title line (4.12, corrected 2026-07-19): the raw strengthValue/
+  // strengthUnit/strengthBasis rebuild printed strengthBasis's raw storage
+  // code literally (e.g. "100mg/per_5ml") — it's a storage key, not display
+  // text. `drug.concentration` is already the correctly-formatted value for
+  // every basis type (confirmed against live data: "100mg / 5ml" for
+  // liquids, "600mg" for per_unit tablets, "5%" for percentage, etc.), so
+  // using it directly here still avoids 4.12's original double-display bug
+  // — it replaces the raw fields rather than supplementing them.
+  const titleSuffix = drug.concentration ? `${drug.concentration} ${drug.form}` : drug.form
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
   // + a "+N" count; plain generics just show the one genericName.
