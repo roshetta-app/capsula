@@ -133,6 +133,23 @@
  * what the 2-3 char exact-prefix tier (`drugFieldForMode`) already did. Not
  * yet logged as a numbered decision in DRUG_SEARCH_PLAN.md — flag for that
  * file's next update.
+ *
+ * drug_search_plan final rebuild (2026-07-19, later still, same day,
+ * DRUG_SEARCH_PLAN.md §5 final form): the 2-3-char-only prefix tier and the
+ * separate 4+ char auto-fuzzy results tier are gone — 'searchDrugsTiered'
+ * now runs one strict "starts with" check at every query length, no ceiling,
+ * so it's no longer really "tiered" (name kept as-is to avoid an unrelated
+ * import-name churn in useDrugSearch.js). Generic mode's prefix check now
+ * also matches each of a drug's individual ingredients, not just the
+ * combined genericName — reuses the flattened ingredient list already built
+ * by 'buildDrugIngredientIndex', just checked with '.startsWith()' instead
+ * of through Fuse. When the prefix check comes back empty, the new
+ * 'getDrugSearchSuggestion' offers a single best-guess "Did you mean" name
+ * instead of ever showing an uncertain fuzzy list — it reuses the exact same
+ * fuzzy search + 'RELEVANCE_FLOOR' cutoff the old auto-fuzzy tier used
+ * ('searchGenericDrugsFuzzy' for Generic mode, plain 'fuseIndex.search' +
+ * floor filter for Brand mode), just takes only the top-ranked result's name
+ * instead of returning the whole list.
  */
 
 import Fuse from 'fuse.js'
@@ -267,15 +284,19 @@ export function buildDrugGenericIndex(drugs) {
   return new Fuse(drugs, DRUG_GENERIC_FUSE_OPTIONS)
 }
 
-// ─── Drugs — tiered search ─────────────────────────────────────────────────
-// Rebuilt 2026-07-19 per DRUG_SEARCH_PLAN.md §5 (supersedes decision 4.17's
-// original word-start-at-2-chars design). Brand mode checks `name` only
-// (adding `form` would turn a short query into an unintended form filter —
-// a separate Form filter already exists for that). Generic mode checks
-// `genericName` only — combo generics' genericName already contains every
-// ingredient word, so a separate ingredients check is redundant, not
-// missing. `getDrugAutocompleteSuggestionsByMode` (unused, confirmed no
-// callers) was removed in the same pass.
+// ─── Drugs — prefix-only search + single "Did you mean" fallback ──────────
+// Final rebuild 2026-07-19 per DRUG_SEARCH_PLAN.md §5 (supersedes decision
+// 4.17's original word-start-at-2-chars design, and the intermediate
+// 2-3-char-prefix/4+-char-fuzzy split noted above). Every query, any length,
+// now shows only "starts with" matches. Brand mode checks 'tradenameClean'
+// only (adding 'form' would turn a short query into an unintended form
+// filter — a separate Form filter already exists for that). Generic mode
+// checks 'genericName' plus each of the drug's individual 'ingredients' —
+// combo generics' genericName already contains every ingredient word in
+// most cases, but checking ingredients directly catches the rest without
+// requiring the words to appear in that exact combined string.
+// 'getDrugAutocompleteSuggestionsByMode' (unused, confirmed no callers) was
+// removed in an earlier pass of this same rebuild.
 
 // ─── Fuzzy relevance floor (step 1e.2, decisions 4.18/4.32) ───────────────────
 const RELEVANCE_FLOOR = 0.3          // score above this = treated as noise, dropped entirely
@@ -344,47 +365,74 @@ function searchGenericDrugsFuzzy(genericIndex, ingredientIndex, drugsById, query
 }
 
 function drugFieldForMode(drug, mode) {
-  // Brand mode reads tradenameClean (not the raw `name` field) so the 2-3
-  // char exact-prefix tier matches the same clean field as the 4+ char
-  // fuzzy tier above — see DRUG_GENERIC_FUSE_OPTIONS' neighbor for the
-  // 2026-07-19 fix note (decision 4.34).
+  // Brand mode reads tradenameClean (not the raw 'name' field) — see
+  // DRUG_GENERIC_FUSE_OPTIONS' neighbor for the 2026-07-19 fix note
+  // (decision 4.34). Used both as the prefix-check field (Brand mode; and
+  // Generic mode's base check alongside per-ingredient matching below) and
+  // as the display name returned by a "Did you mean" suggestion.
   return (mode === 'brand' ? drug.tradenameClean : drug.genericName) ?? ''
 }
 
+function genericPrefixFields(drug) {
+  // Generic mode's prefix check: the combined genericName, plus each
+  // individual ingredient on combo generics. Reuses the same 'ingredients'
+  // array 'buildDrugIngredientIndex' already flattens for fuzzy suggestion
+  // scoring — no new lookup structure, just a plain '.startsWith()' check
+  // here since this tier doesn't need fuzzy matching or an index at all.
+  const fields = [drug.genericName ?? '']
+  if (Array.isArray(drug.ingredients)) {
+    fields.push(...drug.ingredients)
+  }
+  return fields
+}
+
 /**
- * Tiered drug search — mirrors searchConditions' shape but field-scoped per mode.
+ * Drug search — strict "starts with" prefix match, every query length, no
+ * fuzzy fallback baked in (see 'getDrugSearchSuggestion' for that). Field-
+ * scoped per mode: Brand mode checks 'tradenameClean'; Generic mode checks
+ * 'genericName' plus each individual ingredient.
+ *
+ * @param {object[]} pool    — the raw drugs array to filter
+ * @param {string}   query
+ * @param {'brand'|'generic'} mode
+ * @returns {object[]|null}  — null means "show everything" (query too short)
+ */
+export function searchDrugsTiered(pool, query, mode = 'brand') {
+  const q = query.trim()
+  if (q.length === 0) return null
+
+  const lower = q.toLowerCase()
+
+  if (mode === 'generic') {
+    return pool.filter(d =>
+      genericPrefixFields(d).some(field => field.toLowerCase().startsWith(lower))
+    )
+  }
+
+  return pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+}
+
+/**
+ * Single best-guess "Did you mean" suggestion — only meant to be called when
+ * 'searchDrugsTiered' comes back empty. Reuses the same fuzzy search and
+ * 'RELEVANCE_FLOOR' cutoff the old auto-fuzzy results tier used; just takes
+ * the top-ranked match's display name instead of returning the whole list.
  *
  * @param {Fuse}   fuseIndex — buildDrugBrandIndex or buildDrugGenericIndex output
- * @param {object[]} pool    — the raw drugs array (needed for prefix tiers)
  * @param {string} query
  * @param {'brand'|'generic'} mode
  * @param {object} [fuzzyExtras] — generic mode only, for fair ingredient scoring
  *   (1e.2): { ingredientIndex: buildDrugIngredientIndex output, drugsById: Map }
- * @returns {object[]|null}  — null means "show everything" (query too short)
+ * @returns {string|null} — the suggested drug's display name, or null if
+ *   nothing scored within the relevance floor
  */
-export function searchDrugsTiered(fuseIndex, pool, query, mode = 'brand', fuzzyExtras = {}) {
+export function getDrugSearchSuggestion(fuseIndex, query, mode = 'brand', fuzzyExtras = {}) {
   const q = query.trim()
   if (q.length === 0) return null
 
-  if (q.length <= 3) {
-    // Tier: field must START with the query. The old "or any word in the
-    // field starts with it" rule is gone (DRUG_SEARCH_PLAN.md §5 point 2) —
-    // audited real data showed it was dominated by generic qualifier words
-    // ("plus", "forte", "d3", "sodium"...), not distinctive ones. A 1-char
-    // query is intercepted by the caller before this function is ever
-    // called (§5 point 1), so in practice this only runs for 2-3 chars.
-    const lower = q.toLowerCase()
-    return pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
-  }
+  const matches = (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById)
+    ? searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, q)
+    : fuseIndex.search(q).filter(r => r.score <= RELEVANCE_FLOOR).map(r => r.item)
 
-  // Tier: full fuzzy (4+ chars), with a real relevance floor (1e.2) —
-  // Generic mode uses fair per-ingredient scoring when the extras are
-  // available; Brand mode (and Generic as a fallback without extras) just
-  // filters the plain Fuse score against the floor.
-  if (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById) {
-    return searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, q)
-  }
-  return fuseIndex.search(q)
-    .filter(r => r.score <= RELEVANCE_FLOOR)
-    .map(r => r.item)
+  return matches.length > 0 ? drugFieldForMode(matches[0], mode) : null
 }

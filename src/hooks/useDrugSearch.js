@@ -26,22 +26,33 @@
  *
  * drug_search_plan rebuild (2026-07-19, DRUG_SEARCH_PLAN.md §5): a 1-char
  * query is now intercepted before it ever reaches a search tier — it just
- * sets `queryTooShort` and shows the full drug list unfiltered, since the
+ * sets 'queryTooShort' and shows the full drug list unfiltered, since the
  * caller shows a "type at least 2 characters" message instead of a results
- * list. The 2-char "or any word in the field starts with it" rule is gone
- * (audited data showed it was dominated by generic qualifier words, not
- * distinctive ones) — 2-3 chars now match only the start of the field, and
- * the fuzzy tier starts at 4 chars instead of 3. Also removed: `suggestions`/
- * `showSuggestions`/`clearSuggestions` and the `getDrugAutocompleteSuggestionsTiered`
- * call that fed them — dead computation left over from the autocomplete
- * dropdown UI, which was deleted app-wide earlier.
+ * list. Also removed: 'suggestions'/'showSuggestions'/'clearSuggestions' and
+ * the 'getDrugAutocompleteSuggestionsTiered' call that fed them — dead
+ * computation left over from the autocomplete dropdown UI, which was
+ * deleted app-wide earlier.
+ *
+ * drug_search_plan final rebuild (2026-07-19, later still, same day,
+ * DRUG_SEARCH_PLAN.md §5 final form): the 2-3-char-prefix/4+-char-fuzzy
+ * split above is gone — every query length (2+) now runs a single strict
+ * "starts with" check via the rewritten 'searchDrugsTiered', so a fuzzy
+ * results list is never shown. When that check comes back empty, a new
+ * 'suggestion' piece is computed via 'getDrugSearchSuggestion' — reuses the
+ * same indexes already built below, just returns one best-guess name
+ * instead of a list. The caller shows it as a "Did you mean" prompt; tapping
+ * it re-runs the query with that name, which then matches normally via the
+ * prefix check.
  *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
- *   results          — tiered-matched drug objects (or the full list)
+ *   results          — prefix-matched drug objects (or the full list)
  *   queryTooShort    — true for a 1-char query — caller shows a message,
  *                      not the results list
+ *   suggestion       — a single "Did you mean" drug name, or null — only
+ *                      ever set when results is empty and something close
+ *                      exists
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -50,6 +61,7 @@ import {
   buildDrugGenericIndex,
   buildDrugIngredientIndex,
   searchDrugsTiered,
+  getDrugSearchSuggestion,
 } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
@@ -57,6 +69,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const [query,          setQuery]          = useState('')
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
+  const [suggestion,     setSuggestion]     = useState(null)
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -88,6 +101,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     if (trimmed.length === 1) {
       setQueryTooShort(true)
       setResults(drugs)
+      setSuggestion(null)
       return
     }
     setQueryTooShort(false)
@@ -96,14 +110,21 @@ export function useDrugSearch(drugs, mode = 'brand') {
       ? { ingredientIndex: ingredientIndexRef.current, drugsById: drugsByIdRef.current }
       : {}
 
-    // Tiered match: 2-3 char start-of-field match, 4+ char fuzzy with a real
-    // relevance floor (1e.2) — replaces the old "prefix-or-word-start at
-    // 2 chars" behavior (drug_search_plan §5 point 2).
+    // Strict "starts with" match, every length — replaces the old
+    // 2-3-char-prefix/4+-char-fuzzy split (drug_search_plan §5 final form).
     const matched = trimmed.length >= 1
-      ? (searchDrugsTiered(fuseIndex, drugs, trimmed, currentMode, fuzzyExtras) ?? drugs)
+      ? (searchDrugsTiered(drugs, trimmed, currentMode) ?? drugs)
       : drugs
 
     setResults(matched)
+
+    // Only when the prefix check found nothing: offer a single best-guess
+    // "Did you mean" name, reusing the same fuzzy indexes built below.
+    setSuggestion(
+      trimmed.length >= 1 && matched.length === 0
+        ? getDrugSearchSuggestion(fuseIndex, trimmed, currentMode, fuzzyExtras)
+        : null
+    )
 
     // Zero-result gap logging — only meaningful at 4+ chars where fuzzy ran
     // (2-3 char tiers are exact start-of-field checks, so an empty result
@@ -126,5 +147,6 @@ export function useDrugSearch(drugs, mode = 'brand') {
     setQuery,
     results,
     queryTooShort,
+    suggestion,
   }
 }

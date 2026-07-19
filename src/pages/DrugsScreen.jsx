@@ -165,6 +165,7 @@ export default function DrugsScreen() {
     setQuery,
     results:         searchResults,
     queryTooShort,
+    suggestion,
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
@@ -334,7 +335,14 @@ export default function DrugsScreen() {
               </div>
 
               {displayed.length === 0 ? (
-                <EmptyState query={query} />
+                suggestion ? (
+                  <DidYouMeanState
+                    suggestion={suggestion}
+                    onSelect={() => handleQueryChange(suggestion)}
+                  />
+                ) : (
+                  <EmptyState query={query} onClear={() => handleQueryChange('')} />
+                )
               ) : (
                 <>
                   {displayed.length > 100 && <NarrowResultsHint />}
@@ -902,7 +910,7 @@ function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
-function EmptyState({ query }) {
+function EmptyState({ query, onClear }) {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
@@ -913,7 +921,51 @@ function EmptyState({ query }) {
       <div style={{ fontSize: 15, marginBottom: 'var(--space-2)', color: 'var(--color-text-secondary)' }}>
         No drugs found{query ? ` for "${query}"` : ''}
       </div>
-      <div style={{ fontSize: 13 }}>Try searching by generic name or brand name</div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)' }}>Try searching by generic name or brand name</div>
+      <button
+        onClick={onClear}
+        style={{
+          background: 'none', border: 'none', cursor: 'pointer',
+          color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+          fontFamily: 'var(--font-body)', padding: '4px 0',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        Clear search
+      </button>
+    </div>
+  )
+}
+
+// ─── DidYouMeanState ────────────────────────────────────────────────────────
+// Shown instead of EmptyState when the strict prefix check finds nothing but
+// getDrugSearchSuggestion (searchUtils.js) found one close-enough guess
+// (drug_search_plan §5 final form). Tapping the name just re-runs the search
+// with it, which then matches normally through the prefix check — no
+// separate navigation or lookup needed here.
+
+function DidYouMeanState({ suggestion, onSelect }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
+        Did you mean:{' '}
+        <button
+          onClick={onSelect}
+          style={{
+            background: 'none', border: 'none', cursor: 'pointer',
+            color: 'var(--color-accent)', fontSize: 15, fontWeight: 600,
+            fontFamily: 'var(--font-body)', padding: 0,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {suggestion}
+        </button>
+      </div>
     </div>
   )
 }
