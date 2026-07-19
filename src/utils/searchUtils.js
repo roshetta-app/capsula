@@ -106,6 +106,18 @@
  * flattened index (`buildDrugIngredientIndex` / `searchGenericDrugsFuzzy`),
  * never through this blended whole-record blob. genericName/arabicName/
  * category matching on the generic index is unaffected.
+ *
+ * drug_search_plan brand-name fix (2026-07-19, later same day, DRUG_SEARCH_PLAN.md
+ * §3c, decision 4.34): confirmed via live database that Brand mode's `name` key
+ * was the raw, un-cleaned brand row — dose/ingredient details glued onto the
+ * brand name — so a search like "zinc" was a real substring match against that
+ * glued text, not a fuzzy false positive. Brand mode now searches
+ * `tradenameClean` (the clean brand name, already used for display) instead,
+ * in both the fuzzy tier (`DRUG_BRAND_FUSE_OPTIONS`) and the 2-3 char
+ * exact-prefix tier (`drugFieldForMode`). `nameAr` was dropped from the same
+ * config — confirmed identical to `name` on every published brand today, so
+ * it carried the same bug through a second key; flagged for a future data
+ * pass once real Arabic brand names exist to search.
  */
 
 import Fuse from 'fuse.js'
@@ -179,12 +191,26 @@ export function fuzzySearchConditions(fuseIndex, query) {
 // searches by the underlying drug's generic name first. No shared scoring
 // between them — a query only ever matches within the mode it's run against.
 
+// `name` swapped for `tradenameClean`, and `nameAr` dropped, 2026-07-19 (later
+// same day, DRUG_SEARCH_PLAN.md §3c, decision 4.34) — confirmed against the
+// live database: `name` is the raw, un-cleaned brand row, which glues the full
+// dose/ingredient breakdown onto the brand name (e.g. "Veval 10mg/.../40 Mg
+// Zinc/Lactoferrin) — 15 Tablets"), so a search for any ingredient word inside
+// that string was a real (not fuzzy) match on Brand mode's primary field —
+// that's how "zinc" surfaced brands with no clean-name relationship to zinc at
+// all. `tradenameClean` (added step 0a, already used for card/header display)
+// is the actual short brand name and is populated on every published brand.
+// `nameAr` was also confirmed, via a full-table check, to be an exact
+// character-for-character duplicate of `name` on all 19,771 published brands
+// today — not real Arabic text — so keeping it would have reintroduced the
+// identical bug through a second key. Dropped rather than pointed at a
+// not-yet-existing clean-Arabic-name field; flagged below for a future data
+// pass once `name_ar` is actually populated with translated text.
 const DRUG_BRAND_FUSE_OPTIONS = {
   keys: [
-    { name: 'name',          weight: 0.6 },
-    { name: 'nameAr',        weight: 0.2 },
-    { name: 'form',          weight: 0.1 },
-    { name: 'concentration', weight: 0.1 },
+    { name: 'tradenameClean', weight: 0.7 },
+    { name: 'form',           weight: 0.15 },
+    { name: 'concentration',  weight: 0.15 },
   ],
   threshold:          0.35,
   minMatchCharLength: 2,
@@ -295,7 +321,11 @@ function searchGenericDrugsFuzzy(genericIndex, ingredientIndex, drugsById, query
 }
 
 function drugFieldForMode(drug, mode) {
-  return (mode === 'brand' ? drug.name : drug.genericName) ?? ''
+  // Brand mode reads tradenameClean (not the raw `name` field) so the 2-3
+  // char exact-prefix tier matches the same clean field as the 4+ char
+  // fuzzy tier above — see DRUG_GENERIC_FUSE_OPTIONS' neighbor for the
+  // 2026-07-19 fix note (decision 4.34).
+  return (mode === 'brand' ? drug.tradenameClean : drug.genericName) ?? ''
 }
 
 /**
