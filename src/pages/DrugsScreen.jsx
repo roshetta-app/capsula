@@ -380,6 +380,8 @@ export default function DrugsScreen() {
                     isDark={isDark}
                     isDrugFavourited={isDrugFavourited}
                     onToggleFavourite={handleToggleDrugFavourite}
+                    highlight={query}
+                    searchMode={mode}
                   />
                 </>
               )}
@@ -806,7 +808,7 @@ function LoadingProgress({ progress }) {
 // (the concentration/form line is optional), so real heights are measured
 // after each row renders rather than assumed.
 
-function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite }) {
+function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite, highlight = '', searchMode = 'brand' }) {
   const listRef = useRef(null)
 
   const virtualizer = useWindowVirtualizer({
@@ -839,6 +841,8 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
               categories={categories}
               isDark={isDark}
               isLast={virtualRow.index === drugs.length - 1}
+              highlight={highlight}
+              searchMode={searchMode}
               trailing={
                 <RowStarButton
                   isFavourited={isDrugFavourited(drug.id)}

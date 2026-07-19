@@ -61,15 +61,35 @@
  *                                  convention (no navigate fallback guessed)
  *   isLast      boolean          — suppresses the bottom divider on the last row
  *   trailing    ReactNode (optional) — rendered in the right-hand slot
+ *   highlight   string  (optional) — current search query; empty string when not
+ *                                     searching. Same convention as ConditionCard.jsx.
+ *   searchMode  string  (optional) — 'brand' | 'generic'. Scopes which line the
+ *                                     highlight applies to: Brand mode only ever
+ *                                     matches on tradenameClean, Generic mode only
+ *                                     ever matches on genericName or an individual
+ *                                     ingredient — so only that line gets bolded,
+ *                                     never both, to avoid bolding a coincidental
+ *                                     substring in a field that had nothing to do
+ *                                     with why the row actually matched.
  */
 
 import { useState } from 'react'
 import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
+import { highlightMatch } from '../utils/highlightMatch'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
-export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast = false, trailing = null }) {
+export default function SharedDrugCard({
+  drug,
+  categories,
+  isDark,
+  onTap,
+  isLast = false,
+  trailing = null,
+  highlight = '',
+  searchMode = 'brand',
+}) {
   const [pressed, setPressed] = useState(false)
 
   function handleTap() {
@@ -104,6 +124,16 @@ export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast
       ? `${drug.ingredients.slice(0, 2).join(', ')} +${drug.ingredients.length - 2}`
       : drug.ingredients.join(', ')
     : drug.genericName
+
+  // Search-match highlighting — scoped by mode (see prop doc above): Brand
+  // mode only ever matches tradenameClean, Generic mode only ever matches
+  // genericName/ingredients, so each line only asks highlightMatch to bold
+  // against the query when that's the mode actually in use. highlightMatch
+  // itself already returns a single, unbolded segment when passed an empty
+  // query, so passing '' for the non-active mode is enough — no extra
+  // branching needed here.
+  const titleSegments   = highlightMatch(drug.tradenameClean, searchMode === 'brand'   ? highlight : '')
+  const genericSegments = highlightMatch(genericLine || '',   searchMode === 'generic' ? highlight : '')
 
   return (
     <div
@@ -154,7 +184,11 @@ export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast
           whiteSpace:   'nowrap',
           textOverflow: 'ellipsis',
         }}>
-          {drug.tradenameClean}
+          {titleSegments.map((seg, i) =>
+            seg.bold
+              ? <strong key={i} style={{ fontWeight: 700 }}>{seg.text}</strong>
+              : <span key={i}>{seg.text}</span>
+          )}
           {titleSuffix && (
             <span style={{
               fontWeight: 400,
@@ -177,7 +211,11 @@ export default function SharedDrugCard({ drug, categories, isDark, onTap, isLast
             whiteSpace:   'nowrap',
             textOverflow: 'ellipsis',
           }}>
-            {genericLine}
+            {genericSegments.map((seg, i) =>
+              seg.bold
+                ? <strong key={i} style={{ fontWeight: 700 }}>{seg.text}</strong>
+                : <span key={i}>{seg.text}</span>
+            )}
           </div>
         )}
       </div>
