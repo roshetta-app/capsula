@@ -23,12 +23,12 @@ import { useState, useEffect } from 'react'
  * used to sit beside the search bar. Unlike every other section in this
  * sheet, it is NOT part of 'filters' and is not gated by Apply — tapping
  * Brand or Generic changes 'mode' immediately, the same instant-switch
- * behavior the old toggle had (user decision, 2026-07-19). Only shown while
- * 'showModeSection' is true — mirrors the old toggle's own scoping, which
- * only appeared while a search query was active, since mode has no effect
- * on plain category browsing. Section is omitted entirely if 'onModeChange'
- * isn't passed, so this stays backward-compatible with any future caller
- * that doesn't use Drugs' Brand/Generic concept.
+ * behavior the old toggle had (user decision, 2026-07-19). Always shown
+ * (category browsing included) — corrected same day after the old toggle's
+ * search-only scoping was carried over here by mistake; mode applies to
+ * the whole Drugs screen, not just active searches. Section is omitted
+ * entirely if 'onModeChange' isn't passed, so this stays backward-compatible
+ * with any future caller that doesn't use Drugs' Brand/Generic concept.
  *
  * Props:
  *   isOpen           boolean
@@ -38,7 +38,6 @@ import { useState, useEffect } from 'react'
  *   activeCategory   string | '__all' | null — the category currently active on the screen (tile-driven)
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
- *   showModeSection  boolean — whether to show the Search By section at all (only meaningful while searching)
  */
 
 // Each chip's `matches` list is the full set of real raw form values (from
@@ -66,7 +65,7 @@ const EMPTY = {
   bfUnsafe:       false,
 }
 
-export default function DrugFilterPanel({ isOpen, onClose, onApply, categories = [], activeCategory = null, mode, onModeChange, showModeSection = false }) {
+export default function DrugFilterPanel({ isOpen, onClose, onApply, categories = [], activeCategory = null, mode, onModeChange }) {
   const [filters, setFilters] = useState(() => ({ ...EMPTY, category: activeCategory }))
 
   // Keep the sheet's category chip in sync with whichever tile is active
@@ -146,7 +145,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, categories =
         {/* Search By — Brand/Generic, instant-switch, not gated by Apply. See
             file header note above for why this section is different from
             every other one in this sheet. */}
-        {showModeSection && onModeChange && (
+        {onModeChange && (
           <FilterSection label="Search By">
             <ModeToggle mode={mode} onChange={onModeChange} />
           </FilterSection>

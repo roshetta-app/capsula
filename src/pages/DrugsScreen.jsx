@@ -381,7 +381,6 @@ export default function DrugsScreen() {
           activeCategory={activeCategory}
           mode={mode}
           onModeChange={setMode}
-          showModeSection={hasQuery}
         />
       </Layout>
     )
