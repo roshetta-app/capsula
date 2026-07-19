@@ -10,34 +10,38 @@
  * 3.3) are built once per drugs load; switching mode re-runs search against
  * the already-built index for that mode — no index rebuild on toggle.
  *
- * drug_library_ui_ux step 1e.1 (2026-07-19, decision 4.17, plan §4B): search
- * now ramps through the same tiered strategy Conditions uses (1-char prefix,
- * 2-char prefix-or-word-start, 3+ char fuzzy) instead of going straight to
- * loose fuzzy matching at 2 characters. See searchUtils.js's
- * `searchDrugsTiered`/`getDrugAutocompleteSuggestionsTiered` for the field
- * scoping (name-only per mode) and word-token floor. Zero-result gap logging
- * now fires at the same 3+ char threshold Conditions uses, since that's the
- * only tier where a "gap" (nothing genuinely similar) is a meaningful signal
- * — the 1-2 char tiers are exact prefix/word-start checks, so an empty
- * result there just means nothing starts with those letters, not a search
- * quality problem.
+ * drug_library_ui_ux step 1e.1 (2026-07-19, decision 4.17, plan §4B, since
+ * superseded — see the drug_search_plan rebuild note below): search first
+ * ramped through a 1-char prefix / 2-char prefix-or-word-start / 3+ char
+ * fuzzy tier, mirroring Conditions.
  *
  * drug_library_ui_ux step 1e.2 (2026-07-19, decisions 4.18/4.32, plan §4B):
- * the 3+ char fuzzy tier now has a real relevance floor (weak/unrelated
- * matches are dropped, not just ranked low), and Generic mode scores
- * ingredients fairly regardless of how many a combo has (see searchUtils.js
- * header for why that needed its own flattened index rather than Fuse's
- * built-in array-field scoring). `ingredientIndexRef`/`drugsByIdRef` below
- * are built once alongside the two mode indexes and passed through to
- * generic-mode searches as `fuzzyExtras`; Brand mode ignores them.
+ * the fuzzy tier got a real relevance floor (weak/unrelated matches are
+ * dropped, not just ranked low), and Generic mode scores ingredients fairly
+ * regardless of how many a combo has (see searchUtils.js header for why
+ * that needed its own flattened index rather than Fuse's built-in
+ * array-field scoring). `ingredientIndexRef`/`drugsByIdRef` below are built
+ * once alongside the two mode indexes and passed through to generic-mode
+ * searches as `fuzzyExtras`; Brand mode ignores them. Still current.
+ *
+ * drug_search_plan rebuild (2026-07-19, DRUG_SEARCH_PLAN.md §5): a 1-char
+ * query is now intercepted before it ever reaches a search tier — it just
+ * sets `queryTooShort` and shows the full drug list unfiltered, since the
+ * caller shows a "type at least 2 characters" message instead of a results
+ * list. The 2-char "or any word in the field starts with it" rule is gone
+ * (audited data showed it was dominated by generic qualifier words, not
+ * distinctive ones) — 2-3 chars now match only the start of the field, and
+ * the fuzzy tier starts at 4 chars instead of 3. Also removed: `suggestions`/
+ * `showSuggestions`/`clearSuggestions` and the `getDrugAutocompleteSuggestionsTiered`
+ * call that fed them — dead computation left over from the autocomplete
+ * dropdown UI, which was deleted app-wide earlier.
  *
  * Exposes:
- *   query            — current search string
- *   setQuery         — setter
- *   results          — tiered-matched drug objects (null = show all)
- *   suggestions      — top 5 autocomplete matches [{ id, name, slug }]
- *   showSuggestions  — boolean
- *   clearSuggestions — () => void
+ *   query           — current search string
+ *   setQuery        — setter
+ *   results          — tiered-matched drug objects (or the full list)
+ *   queryTooShort    — true for a 1-char query — caller shows a message,
+ *                      not the results list
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -46,15 +50,13 @@ import {
   buildDrugGenericIndex,
   buildDrugIngredientIndex,
   searchDrugsTiered,
-  getDrugAutocompleteSuggestionsTiered,
 } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
 export function useDrugSearch(drugs, mode = 'brand') {
-  const [query,           setQuery]           = useState('')
-  const [results,         setResults]         = useState(drugs)
-  const [suggestions,     setSuggestions]     = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [query,          setQuery]          = useState('')
+  const [results,        setResults]        = useState(drugs)
+  const [queryTooShort,  setQueryTooShort]  = useState(false)
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -78,34 +80,36 @@ export function useDrugSearch(drugs, mode = 'brand') {
     if (!fuseIndex) return
 
     const trimmed = q.trim()
+
+    // A 1-char query is too short to search meaningfully (drug_search_plan
+    // §5 point 1) — skip the tier entirely rather than running a prefix
+    // filter that would return thousands of matches. The caller shows a
+    // "type at least 2 characters" message instead of a results list.
+    if (trimmed.length === 1) {
+      setQueryTooShort(true)
+      setResults(drugs)
+      return
+    }
+    setQueryTooShort(false)
+
     const fuzzyExtras = currentMode === 'generic'
       ? { ingredientIndex: ingredientIndexRef.current, drugsById: drugsByIdRef.current }
       : {}
 
-    // Tiered match (1e.1/1e.2): 1-char prefix-only, 2-char prefix-or-word-start,
-    // 3+ char fuzzy with a real relevance floor — replaces the old flat "fuzzy
-    // from 2 chars, no floor" behavior.
+    // Tiered match: 2-3 char start-of-field match, 4+ char fuzzy with a real
+    // relevance floor (1e.2) — replaces the old "prefix-or-word-start at
+    // 2 chars" behavior (drug_search_plan §5 point 2).
     const matched = trimmed.length >= 1
       ? (searchDrugsTiered(fuseIndex, drugs, trimmed, currentMode, fuzzyExtras) ?? drugs)
       : drugs
 
     setResults(matched)
 
-    // Zero-result gap logging — only meaningful at 3+ chars where fuzzy ran
-    // (same threshold Conditions uses; 1-2 char tiers are exact prefix/
-    // word-start checks, so an empty result there isn't a relevance gap).
-    if (trimmed.length >= 3 && matched.length === 0) {
+    // Zero-result gap logging — only meaningful at 4+ chars where fuzzy ran
+    // (2-3 char tiers are exact start-of-field checks, so an empty result
+    // there isn't a relevance gap).
+    if (trimmed.length >= 4 && matched.length === 0) {
       logSearchGap(trimmed, 'drugs')
-    }
-
-    // Autocomplete suggestions
-    if (trimmed.length >= 1) {
-      const sug = getDrugAutocompleteSuggestionsTiered(fuseIndex, drugs, trimmed, 5, currentMode, fuzzyExtras)
-      setSuggestions(sug)
-      setShowSuggestions(sug.length > 0)
-    } else {
-      setSuggestions([])
-      setShowSuggestions(false)
     }
   }, [drugs])
 
@@ -117,16 +121,10 @@ export function useDrugSearch(drugs, mode = 'brand') {
     return () => clearTimeout(timer)
   }, [query, mode, runSearch])
 
-  function clearSuggestions() {
-    setShowSuggestions(false)
-  }
-
   return {
     query,
     setQuery,
     results,
-    suggestions,
-    showSuggestions,
-    clearSuggestions,
+    queryTooShort,
   }
 }

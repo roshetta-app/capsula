@@ -8,11 +8,17 @@
  *
  * Exposes:
  *   query, setQuery, activeSpecialty, setActiveSpecialty,
- *   results, resultCount, suggestions, showSuggestions, clearSuggestions
+ *   results, resultCount
+ *
+ * drug_search_plan cleanup (2026-07-19, DRUG_SEARCH_PLAN.md §5): removed
+ * suggestions/showSuggestions/clearSuggestions — dead computation left over
+ * from the autocomplete dropdown UI, which was deleted app-wide earlier.
+ * Tier behavior itself (1-char prefix, 2-char prefix-or-word-start, 3+ char
+ * fuzzy) is unchanged — this file only drops the unused suggestion output.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { buildConditionIndex, searchConditions, getAutocompleteSuggestions } from '../utils/searchUtils'
+import { buildConditionIndex, searchConditions } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 
 function applySortMode(items, mode, recentIds) {
@@ -45,8 +51,6 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
   const [query,           setQuery]           = useState('')
   const [activeSpecialty, setActiveSpecialty] = useState(() => readStoredSpecialty(storageKey))
   const [results,         setResults]         = useState(conditions)
-  const [suggestions,     setSuggestions]     = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
 
   const fuseRef = useRef(null)
   useEffect(() => {
@@ -76,18 +80,6 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     if (q.trim().length >= 3 && matched.length === 0) {
       logSearchGap(q, 'conditions')
     }
-
-    // Autocomplete suggestions
-    if (q.trim().length >= 1) {
-      // Suggestions always search full conditions pool for discoverability,
-      // but filtered to active specialty when one is selected
-      const sug = getAutocompleteSuggestions(fuseRef.current, conditions, q, 5, specialty)
-      setSuggestions(sug)
-      setShowSuggestions(sug.length > 0)
-    } else {
-      setSuggestions([])
-      setShowSuggestions(false)
-    }
   }, [conditions, sortMode, recentlyViewedIds])
 
   useEffect(() => {
@@ -107,10 +99,6 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     }
   }, [storageKey, activeSpecialty])
 
-  function clearSuggestions() {
-    setShowSuggestions(false)
-  }
-
   return {
     query,
     setQuery,
@@ -118,9 +106,5 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     setActiveSpecialty,
     results,
     resultCount: results.length,
-    suggestions,
-    showSuggestions,
-    clearSuggestions,
   }
 }
-

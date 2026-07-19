@@ -164,6 +164,7 @@ export default function DrugsScreen() {
     query,
     setQuery,
     results:         searchResults,
+    queryTooShort,
   } = useDrugSearch(drugs, mode)
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
@@ -323,22 +324,31 @@ export default function DrugsScreen() {
             </button>
           )}
 
-          <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
-            {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
-            {query && ` for "${query}"`}
-          </div>
-
-          {displayed.length === 0 ? (
-            <EmptyState query={query} />
+          {hasQuery && queryTooShort ? (
+            <TooShortState />
           ) : (
-            <VirtualDrugList
-              drugs={displayed}
-              onTap={handleDrugTap}
-              categories={categories}
-              isDark={isDark}
-              isDrugFavourited={isDrugFavourited}
-              onToggleFavourite={handleToggleDrugFavourite}
-            />
+            <>
+              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
+                {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+                {query && ` for "${query}"`}
+              </div>
+
+              {displayed.length === 0 ? (
+                <EmptyState query={query} />
+              ) : (
+                <>
+                  {displayed.length > 100 && <NarrowResultsHint />}
+                  <VirtualDrugList
+                    drugs={displayed}
+                    onTap={handleDrugTap}
+                    categories={categories}
+                    isDark={isDark}
+                    isDrugFavourited={isDrugFavourited}
+                    onToggleFavourite={handleToggleDrugFavourite}
+                  />
+                </>
+              )}
+            </>
           )}
         </div>
 
@@ -908,3 +918,31 @@ function EmptyState({ query }) {
   )
 }
 
+// ─── TooShortState ────────────────────────────────────────────────────────────
+// Shown for a 1-character query instead of a results list (drug_search_plan
+// §5 point 1) — a single letter matches thousands of drug names, so search
+// simply asks for one more character rather than showing an unusably long
+// or misleading list.
+
+function TooShortState() {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
+        Type at least 2 characters to search
+      </div>
+    </div>
+  )
+}
+
+// ─── NarrowResultsHint ─────────────────────────────────────────────────────────
+// Shown above the list only once a result list passes 100 items (drug_search_plan
+// §5 point 4) — the vast majority of searches never get anywhere near this
+// size, so this stays out of the way for typical queries.
+
+function NarrowResultsHint() {
+  return (
+    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
+      Keep typing to narrow these results
+    </div>
+  )
+}
