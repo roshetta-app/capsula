@@ -39,6 +39,11 @@
  *     load, not just once the full fetch lands. Existing concentration/form/
  *     name fields are untouched and stay in use elsewhere (DrugCard.jsx,
  *     DrugsScreen.jsx's list rows, etc.).
+ *   - 2026-07-20 (drug_card_title_suffix, plan step A.1): added fill_volume
+ *     (brands) to BOTH the full and light selects/mappers, mapped to
+ *     fillVolume on FlatDrug. Needed alongside the existing pack_size so the
+ *     card title suffix can show bottle/vial fill size for liquid forms
+ *     (syrup, suspension, vial, ampoule, etc.) instead of a bare pack count.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -51,7 +56,7 @@ const SUPABASE_MAX_ROWS = 1000
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
 const FULL_BRAND_SELECT = `
-  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, is_published,
+  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, doses_structured, default_dose_override, is_published,
     generics (
@@ -77,8 +82,10 @@ const FULL_BRAND_SELECT = `
 // strength_value / strength_unit / strength_basis are included for the same
 // reason (plan §7 step 0a) — the drug card's title is built from these on
 // every screen that uses this light list, including the very first load.
+// fill_volume is included for the same reason again (drug_card_title_suffix
+// plan, step A.1) — the title suffix needs it on the very first load too.
 const LIGHT_BRAND_SELECT = `
-  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, is_published,
+  id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, is_published,
     generics (
@@ -163,6 +170,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         source:               b.source,
         price:                b.price,
         packSize:             b.pack_size,
+        fillVolume:           b.fill_volume,
         // Formulation this item belongs to
         formulationId:        f.id,
         formulationSlug:      f.slug,
@@ -240,6 +248,7 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         source:               b.source,
         price:                b.price,
         packSize:             b.pack_size,
+        fillVolume:           b.fill_volume,
         formulationId:        f.id,
         formulationSlug:      f.slug,
         concentration:        f.concentration,
