@@ -272,9 +272,16 @@ export default function DrugsScreen() {
           : searchResults)
       : drugs.filter(d => activeCategory === '__all' || d.category === activeCategory)
 
-    const displayed = applyFilters(base, activeFilters)
-      .slice()
-      .sort((a, b) => a.genericName.localeCompare(b.genericName))
+    // Search results now come back pre-ranked from searchDrugsTiered (closeness
+    // of match for Brand mode; name-match-before-ingredient-match, then
+    // closeness, for Generic mode) — applyFilters only ever narrows the list
+    // with .filter(), never reorders it, so the ranked order survives filtering
+    // untouched. Browsing (no query) has no such ranking to preserve, so it
+    // sorts alphabetically by brand name instead of the old genericName sort.
+    const filtered = applyFilters(base, activeFilters)
+    const displayed = hasQuery
+      ? filtered
+      : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
     // activeCategory holds the category's stable slug (see plan's decided
     // design — generics.category stores a drug_categories.slug, not the

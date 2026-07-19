@@ -400,6 +400,29 @@ function genericPrefixFields(drug) {
 }
 
 /**
+ * Ranking signal for Generic-mode results (drug-card-ordering task,
+ * 2026-07-19): tells searchDrugsTiered's sort whether this drug matched on
+ * its own combined genericName (tier 0, stronger signal) or only via one of
+ * its buried ingredients (tier 1), plus how much text remains after the
+ * matched prefix — shorter remainder ranks higher within a tier. genericName
+ * is checked first since it's always present and is the stronger of the two
+ * signals; only checks ingredients if genericName didn't match, matching
+ * genericPrefixFields' own field order.
+ */
+function genericMatchRank(drug, lower) {
+  const generic = (drug.genericName ?? '').toLowerCase()
+  if (generic.startsWith(lower)) {
+    return { tier: 0, remainder: generic.length - lower.length }
+  }
+
+  const hit = Array.isArray(drug.ingredients)
+    ? drug.ingredients.find(ing => ing.toLowerCase().startsWith(lower))
+    : undefined
+
+  return { tier: 1, remainder: (hit?.length ?? lower.length) - lower.length }
+}
+
+/**
  * Ingredient reorder-on-match (2026-07-19, DRUG_SEARCH_PLAN.md §6, decision
  * 4.31, checklist 1e.3). SharedDrugCard.jsx renders only the first 2 entries
  * of `drug.ingredients` plus a "+N" count for the rest — so a query that only
@@ -431,6 +454,19 @@ function reorderIngredientsForMatch(drug, lower) {
  * scoped per mode: Brand mode checks 'tradenameClean'; Generic mode checks
  * 'genericName' plus each individual ingredient.
  *
+ * Ranking (drug_library_ui_ux, drug-card-ordering task, 2026-07-19): a plain
+ * "starts with" filter has no inherent order, so both modes now rank their
+ * matches rather than returning filter order as-is:
+ *   - Brand mode: shortest remaining text after the matched query prefix
+ *     wins (e.g. query "brufen" ranks "Brufen" above "Brufen Retard") —
+ *     tradenameClean.length is the whole signal since the query is a fixed-
+ *     length prefix on every result. Ties broken alphabetically.
+ *   - Generic mode: a match on the drug's own combined genericName outranks
+ *     a match that only hit via one of its buried ingredients (a name match
+ *     is a stronger signal than an ingredient match) — then, within each of
+ *     those two tiers, shortest remaining text after the prefix wins, same
+ *     rule as Brand mode. Ties broken alphabetically by genericName.
+ *
  * @param {object[]} pool    — the raw drugs array to filter
  * @param {string}   query
  * @param {'brand'|'generic'} mode
@@ -446,9 +482,24 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
     return pool
       .filter(d => genericPrefixFields(d).some(field => field.toLowerCase().startsWith(lower)))
       .map(d => reorderIngredientsForMatch(d, lower))
+      .map(d => ({ drug: d, ...genericMatchRank(d, lower) }))
+      .sort((a, b) =>
+        a.tier !== b.tier
+          ? a.tier - b.tier
+          : a.remainder !== b.remainder
+            ? a.remainder - b.remainder
+            : (a.drug.genericName ?? '').localeCompare(b.drug.genericName ?? '')
+      )
+      .map(r => r.drug)
   }
 
-  return pool.filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+  return pool
+    .filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+    .sort((a, b) => {
+      const aLen = drugFieldForMode(a, mode).length
+      const bLen = drugFieldForMode(b, mode).length
+      return aLen !== bLen ? aLen - bLen : drugFieldForMode(a, mode).localeCompare(drugFieldForMode(b, mode))
+    })
 }
 
 /**
