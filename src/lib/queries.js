@@ -44,6 +44,11 @@
  *     fillVolume on FlatDrug. Needed alongside the existing pack_size so the
  *     card title suffix can show bottle/vial fill size for liquid forms
  *     (syrup, suspension, vial, ampoule, etc.) instead of a bare pack count.
+ *   - 2026-07-20 (drug_card_title_suffix, plan step A.2): added form_modifier
+ *     (formulations) to BOTH the full and light selects/mappers, mapped to
+ *     formModifier (array) on FlatDrug. Needed so the card title suffix can
+ *     show tags like "Film-coated" / "Chewable" abbreviated (e.g. "FC",
+ *     "Chew") next to the form.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -58,7 +63,7 @@ const SUPABASE_MAX_ROWS = 1000
 const FULL_BRAND_SELECT = `
   id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
   formulations (
-    id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, doses_structured, default_dose_override, is_published,
+    id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, doses_structured, default_dose_override, is_published,
     generics (
       id, slug, name_en, name_ar, category, class,
       uses_legacy, uses_structured, warnings_legacy,
@@ -87,7 +92,7 @@ const FULL_BRAND_SELECT = `
 const LIGHT_BRAND_SELECT = `
   id, slug, name, name_ar, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
   formulations (
-    id, slug, concentration, strength_value, strength_unit, strength_basis, form, route, is_published,
+    id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, is_published,
     generics (
       id, slug, name_en, name_ar, category, class,
       pregnancy_category, breastfeeding_safety,
@@ -179,6 +184,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         strengthUnit:         f.strength_unit,
         strengthBasis:        f.strength_basis,
         form:                 f.form,
+        formModifier:         f.form_modifier ?? [],
         route:                f.route,
         doses:                f.doses_structured ?? [],
         defaultDoseOverride:  f.default_dose_override,
@@ -256,6 +262,7 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         strengthUnit:         f.strength_unit,
         strengthBasis:        f.strength_basis,
         form:                 f.form,
+        formModifier:         f.form_modifier ?? [],
         route:                f.route,
         genericId:            g.id,
         genericSlug:          g.slug,
