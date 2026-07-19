@@ -29,6 +29,8 @@
  * "amoxicillin + clavulanic acid" even when the combined name alone
  * wouldn't score well. Plain single-ingredient generics have a null
  * ingredients array and just keep matching on genericName as before.
+ * SUPERSEDED 2026-07-19 later same day — see the DRUG_SEARCH_PLAN.md §3b
+ * fix note further down; the `ingredients` key described here was removed.
  *
  * drug_library_ui_ux step 1e.1 (2026-07-19, decision 4.17, plan §4B):
  * added `searchDrugsTiered` below — originally the same 1/2/3+-char tiered
@@ -62,6 +64,8 @@
  * contains every ingredient word, but that's an existing, dated (3.5.3)
  * config and removing it wasn't part of this step's confirmed scope; flag
  * for a future cleanup pass.
+ * NOTE, 2026-07-19 later same day: that flagged redundancy turned out not to
+ * be harmless — see the fix note below. The `ingredients` key has been removed.
  *
  * drug_search_plan rebuild (2026-07-19, DRUG_SEARCH_PLAN.md §5, supersedes
  * decision 4.17's original tiering): the 1-char tier is gone — a single
@@ -82,6 +86,26 @@
  * Conditions, `getDrugAutocompleteSuggestionsTiered` for Drugs) — the
  * autocomplete dropdown UI they fed was deleted app-wide earlier and
  * nothing reads their output anymore.
+ *
+ * drug_search_plan false-positive fix (2026-07-19, later same day,
+ * DRUG_SEARCH_PLAN.md §3b, decision 4.33): the `ingredients` key on
+ * DRUG_GENERIC_FUSE_OPTIONS (added in GFB 3.5.3, flagged as possibly
+ * redundant in 1e.2) is confirmed as the cause of false-positive Generic
+ * mode results — e.g. searching "iron" surfaced multi-ingredient combo
+ * generics containing no iron at all. Root cause: that key let a whole
+ * drug's ingredient list be scored as one glued-together blob as part of
+ * the combined per-record Fuse score. On drugs with long ingredient lists,
+ * that blob can score a loose, coincidental match against a short query
+ * even when no individual ingredient is actually close — and because that
+ * score comes back on the SAME combined record as the genericName check,
+ * it can pass the relevance floor before the correct, fair per-ingredient
+ * index (built separately for exactly this purpose, see 1e.2 above) ever
+ * gets a chance to weigh in. Fix: removed the `ingredients` key from
+ * DRUG_GENERIC_FUSE_OPTIONS below. Ingredient-level matching still works
+ * exactly as before — it now runs ONLY through the fair, per-ingredient
+ * flattened index (`buildDrugIngredientIndex` / `searchGenericDrugsFuzzy`),
+ * never through this blended whole-record blob. genericName/arabicName/
+ * category matching on the generic index is unaffected.
  */
 
 import Fuse from 'fuse.js'
@@ -168,10 +192,15 @@ const DRUG_BRAND_FUSE_OPTIONS = {
   ignoreLocation:     true,
 }
 
+// `ingredients` key removed 2026-07-19 (DRUG_SEARCH_PLAN.md §3b, decision
+// 4.33) — was causing false-positive matches on combo generics with long
+// ingredient lists (see file header note above for the full root cause).
+// Ingredient-level matching now runs exclusively through the separate,
+// fair, per-ingredient flattened index below (`buildDrugIngredientIndex` /
+// `searchGenericDrugsFuzzy`).
 const DRUG_GENERIC_FUSE_OPTIONS = {
   keys: [
     { name: 'genericName', weight: 0.5 },
-    { name: 'ingredients', weight: 0.2 },
     { name: 'arabicName',  weight: 0.2 },
     { name: 'category',    weight: 0.1 },
   ],
