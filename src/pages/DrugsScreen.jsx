@@ -65,16 +65,20 @@
  * when both are active. Search index itself is unchanged (still built once
  * against the full catalog for performance) — this only narrows its results.
  *
- * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.2, decision 4.10): category
- * is now also pickable from inside DrugFilterPanel, kept in sync with the
- * category tiles — picking either one drives the same `activeCategory`
- * state. `categoriesWithCounts` (the same list the tiles render from) is now
- * computed once near the top of the component instead of only inside the
- * category-list branch, since both DrugFilterPanel mounts need it too.
- * `handleApplyFilters` now also calls `setActiveCategory` from the sheet's
- * result — a no-op if the user never touched the Category section, since
- * the sheet re-syncs its own category chip from `activeCategory` every time
- * it opens.
+ * 2026-07-18 (decision 4.10): category was made pickable from inside
+ * DrugFilterPanel too, kept in sync with the tiles — reverted 2026-07-19
+ * (user decision). Category is tile-only again; the sheet no longer takes
+ * `categories`/`activeCategory` props or returns a category from Apply.
+ * `categoriesWithCounts` stays hoisted here regardless, since the category
+ * tile list below still needs it.
+ *
+ * 2026-07-19: added a "Search all drugs instead" link, shown above results
+ * whenever searching inside a specific category. 1c.1 scopes in-category
+ * search on purpose, but a true match inside the category can still hide a
+ * same-name drug filed under a different one — this gives an explicit way
+ * out without changing default scoped behavior. Tapping it keeps the typed
+ * query and sets `activeCategory` to `'__all'`, the existing unscoped
+ * sentinel, rather than introducing a new state combination.
  *
  * 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.3, decision 4.21): softened
  * `CategoryRow`'s tile style — dropped the "N drugs" count line (and the
@@ -238,13 +242,6 @@ export default function DrugsScreen() {
     // Check if anything is actually active
     const hasActive = !filters.forms.includes('all') || filters.pregnancySafe || filters.pregnancyUnsafe || filters.bfSafe || filters.bfUnsafe
     setActiveFilters(hasActive ? filters : null)
-
-    // 1c.2 (decision 4.10): picking a category from the filter sheet drives
-    // the same activeCategory state a tile tap would. Harmless no-op if the
-    // user never touched the Category section — the sheet always re-syncs
-    // its chip from activeCategory when it opens, so filters.category will
-    // already match the current value in that case.
-    setActiveCategory(filters.category ?? null)
   }
 
   function handleQueryChange(val) {
@@ -255,8 +252,7 @@ export default function DrugsScreen() {
   const hasFilters = !!activeFilters
 
   // Same list the category tiles render from (see the category-list view
-  // below) — hoisted here so both DrugFilterPanel mounts can also use it
-  // for the sheet's Category section (1c.2, decision 4.10).
+  // below).
   const categoriesWithCounts = categories
     .map(cat => ({
       ...cat,
@@ -342,6 +338,24 @@ export default function DrugsScreen() {
             <TooShortState />
           ) : (
             <>
+              {/* Only category-scoped searches get this — a true match
+                  inside the category can still be hiding the drug they
+                  actually want under a different one (see file header). */}
+              {hasQuery && activeCategory && activeCategory !== '__all' && (
+                <button
+                  onClick={() => setActiveCategory('__all')}
+                  style={{
+                    display: 'block', background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--color-accent)', fontSize: 13, fontWeight: 500,
+                    fontFamily: 'var(--font-body)', padding: '4px 0',
+                    marginBottom: 'var(--space-2)',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  Search all drugs instead
+                </button>
+              )}
+
               <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
                 {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
                 {query && ` for "${query}"`}
@@ -377,8 +391,6 @@ export default function DrugsScreen() {
           isOpen={filterOpen}
           onClose={() => setFilterOpen(false)}
           onApply={handleApplyFilters}
-          categories={categoriesWithCounts}
-          activeCategory={activeCategory}
           mode={mode}
           onModeChange={setMode}
         />
@@ -558,8 +570,6 @@ export default function DrugsScreen() {
         isOpen={filterOpen}
         onClose={() => setFilterOpen(false)}
         onApply={handleApplyFilters}
-        categories={categoriesWithCounts}
-        activeCategory={activeCategory}
         mode={mode}
         onModeChange={setMode}
       />
