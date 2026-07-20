@@ -96,90 +96,9 @@ import { useState } from 'react'
 import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
-import { DRUG_FORM_SUFFIXES } from '../config/forms'
-import { FORM_MODIFIER_ABBREVIATIONS } from '../config/formModifiers'
-import { ROUTE_DETAIL_ABBREVIATIONS } from '../config/routeDetails'
+import { toTitleCase, getDrugTitleSuffix } from '../utils/drugTitleFormat'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
-
-// Forms that use fill_volume in the title suffix instead of pack_size
-// (drug_card_title_suffix plan, decision 4.38 + 4.42, confirmed 2026-07-20).
-// Locked by the plan: the "drops" family, spray, cream/gel/ointment/lotion,
-// syrup/suspension/solution, and vial/ampoule (4.42's override). Everything
-// else not explicitly named there — confirmed with the user 2026-07-20 —
-// falls in here too where it's genuinely liquid/topical (eye ointment,
-// washes, oils, injection, vaccine, inhaler, etc.); every remaining form
-// defaults to the pack_size/solid formula below.
-const LIQUID_FORMS = new Set([
-  'syrup', 'suspension', 'solution',
-  'drops', 'eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops',
-  'spray', 'cream', 'gel', 'ointment', 'lotion',
-  'vial', 'ampoule', // 4.42 — always fill_volume, never pack_size
-  'eye ointment', 'shampoo', 'mouth wash', 'vaginal douche',
-  'serum', 'hair oil', 'oil',
-  'antiseptic solution', 'inhalation solution', 'paint', 'enema',
-  'facial wash', 'conditioner', 'foam',
-  'injection', 'vaccine', 'inhaler',
-])
-
-// Collapses redundant whitespace and strips spacing around "/" so
-// concentration values render consistently regardless of how they were
-// entered — matches the plan's own locked example format ("200mg/5ml",
-// no spaces). Raw data is genuinely mixed: combo-ingredient ratios like
-// "10mg/10mg" already have no spaces, but per-volume values like
-// "200mg / 5ml" do — this brings both to the same no-space convention.
-function normalizeSpacing(value) {
-  if (!value) return value
-  return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
-}
-
-// pack_size and fill_volume additionally need a space inserted between a
-// bare number and its unit letters where one is missing (e.g. "100ml" ->
-// "100 ml"). Confirmed against the live data (2026-07-20): concentration is
-// 100% consistent with NO space ("100mg") and pack_size is 100% consistent
-// WITH a space ("15 g") — neither needs this. fill_volume is the one field
-// that's actually mixed: 89% have the space, 11% don't. This brings that
-// 11% in line with the rest, without touching concentration's opposite,
-// already-consistent convention.
-function normalizeUnitSpacing(value) {
-  if (!value) return value
-  return normalizeSpacing(value).replace(/(\d)([a-zA-Z])/g, '$1 $2')
-}
-
-// Comma-joins the known form_modifier abbreviations for a drug, in the
-// array's original order (4.43). Tags with no entry in
-// FORM_MODIFIER_ABBREVIATIONS (currently just "scored") are dropped
-// silently (4.41), same as any other missing field (4.39).
-function abbreviateFormModifiers(formModifier) {
-  if (!formModifier || formModifier.length === 0) return ''
-  return formModifier
-    .map(tag => FORM_MODIFIER_ABBREVIATIONS[tag])
-    .filter(Boolean)
-    .join(', ')
-}
-
-// Comma-joins the known route_details abbreviations for an injection
-// formulation, in the array's original order — same convention as
-// abbreviateFormModifiers above. Tags with no entry are dropped silently.
-function abbreviateRouteDetails(routeDetails) {
-  if (!routeDetails || routeDetails.length === 0) return ''
-  return routeDetails
-    .map(tag => ROUTE_DETAIL_ABBREVIATIONS[tag])
-    .filter(Boolean)
-    .join(', ')
-}
-
-// Title-case for display only (follow-up decision, 2026-07-20) — capitalizes
-// the first letter of each word/hyphen-separated segment, e.g. "dolo-d" ->
-// "Dolo-D". Purely cosmetic: the underlying tradenameClean value used for
-// search matching, ranking, and sort order (DrugsScreen.jsx) is completely
-// untouched — this function's output is only ever used inside the render
-// below, right before it goes into highlightMatch (which is case-insensitive,
-// so match positions/count are unaffected by this).
-function toTitleCase(str) {
-  if (!str) return str
-  return str.replace(/[^\s-]+/g, word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-}
 
 export default function SharedDrugCard({
   drug,
@@ -208,47 +127,11 @@ export default function SharedDrugCard({
     : (matchedCategory?.icon_name || 'Pill')
   const categoryColors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
-  // Title suffix (4.38, locked; extended by follow-up decisions 2026-07-20)
-  // — built per form category. Solid/countable forms show pack_size +
-  // form_modifier abbreviations; liquid/topical forms show fill_volume
-  // instead. Any field missing on this particular drug drops out silently
-  // (4.39) via the .filter(Boolean) calls below — never a blank gap or
-  // stray separator.
-  const normalizedConcentration = normalizeSpacing(drug.concentration)
-  const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
-  const modifierAbbrev = abbreviateFormModifiers(drug.formModifier)
-
-  // Vial/ampoule (4.42, reopened 2026-07-20): fill_volume is only actually
-  // populated on 6% of published vial/ampoule brands — the original
-  // "fill_volume or nothing" rule left 94% of these cards with no size
-  // detail at all. Now falls back to pack_size when fill_volume is missing
-  // (recovers another 26%), still preferring fill_volume when both exist.
-  const isVialOrAmpoule = drug.form === 'vial' || drug.form === 'ampoule'
-
-  let afterConcentration
-  if (isVialOrAmpoule) {
-    const size = normalizeUnitSpacing(drug.fillVolume) || normalizeUnitSpacing(drug.packSize)
-    afterConcentration = [formAbbrev, size].filter(Boolean)
-  } else if (LIQUID_FORMS.has(drug.form)) {
-    afterConcentration = [formAbbrev, normalizeUnitSpacing(drug.fillVolume)].filter(Boolean)
-  } else {
-    afterConcentration = [normalizeUnitSpacing(drug.packSize), modifierAbbrev, formAbbrev].filter(Boolean)
-  }
-
-  // Dash after concentration (follow-up decision, 2026-07-20) — only
-  // inserted when there's both a concentration AND something following it,
-  // so a drug with only one of the two never ends up with a stray dash.
-  const mainSuffix = normalizedConcentration && afterConcentration.length > 0
-    ? [normalizedConcentration, '-', ...afterConcentration].join(' ')
-    : [normalizedConcentration, ...afterConcentration].filter(Boolean).join(' ')
-
-  // Route details (follow-up decision, 2026-07-20) — injection formulations
-  // only, appended at the very end with a dash before it. Same
-  // dash-only-when-needed guard as above.
-  const routeAbbrev = drug.route === 'injection' ? abbreviateRouteDetails(drug.routeDetails) : ''
-  const titleSuffix = routeAbbrev
-    ? (mainSuffix ? `${mainSuffix} - ${routeAbbrev}` : routeAbbrev)
-    : mainSuffix
+  // Title suffix (4.38, locked; extended by follow-up decisions
+  // 2026-07-20) — shared with DrugHeader.jsx via utils/drugTitleFormat.js
+  // (extracted 2026-07-20, plan §7 step 2b) so both call sites stay in
+  // sync on the next correction instead of drifting apart.
+  const titleSuffix = getDrugTitleSuffix(drug)
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
   // + a "+N" count; plain generics just show the one genericName.

@@ -29,6 +29,31 @@
  * entirely, per user instruction. Share ships as a visual stub only — no
  * real share-image concept exists yet for a single drug (4.24).
  *
+ * CORRECTED 2026-07-20 (still same session, before this step was marked
+ * done): staying inside Layout's normal flow was assumed to still read as
+ * a full-width header — it doesn't. Layout.jsx wraps all page content in
+ * a <main> that's centered and capped at 680px, so the sticky header
+ * above was only ever stretching to that same 680px column, not the true
+ * screen edge (confirmed via screenshot — read as a floating rounded
+ * card, not a header). Fixed with a standard "break out of container"
+ * treatment: the outer <header> now cancels Layout's <main> width/margin
+ * via the `100vw` + `calc(50% - 50vw)` margin trick, so it spans the full
+ * viewport regardless of where it sits in the page; the original
+ * maxWidth: 680, centered inner <div> is kept unchanged so the header's
+ * actual content still lines up with the rest of the page's column.
+ * Layout.jsx itself is untouched — lower churn than removing Layout from
+ * DrugDetailScreen.jsx, and doesn't change how any other page works.
+ *
+ * CORRECTED 2026-07-20: row 2's brand name + strength + form suffix was
+ * built from guessed logic (raw strengthValue/strengthUnit/strengthBasis
+ * concatenation) instead of SharedDrugCard.jsx's real, several-times-
+ * corrected formatting (pack size, fill volume, form-modifier
+ * abbreviations, injection route detail, dash-only-when-needed spacing).
+ * That logic is now shared via utils/drugTitleFormat.js (extracted from
+ * SharedDrugCard.jsx this same step) so both call sites stay identical
+ * instead of drifting apart on the next correction. Brand name is now
+ * title-cased the same way SharedDrugCard displays it, for consistency.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -40,6 +65,7 @@ import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useCategories }            from '../../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
 
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
   const isDark = useIsDark()
@@ -50,22 +76,21 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
   const iconValue = iconType === 'custom' ? (category?.icon_url || '') : (category?.icon_name || 'Pill')
   const colors    = resolveToken(category?.color_token || FALLBACK_TOKEN, isDark)
 
-  // Brand name + strength + form, one line — same composition rule as
-  // SharedDrugCard's title line (step 1d.2): strengthValue + strengthUnit
-  // (+ strengthBasis after a "/" when present) + form. Strength-less
-  // drugs fall back to form alone, no gap left behind.
-  const strengthSuffix = drug.strengthValue
-    ? [
-        `${drug.strengthValue}${drug.strengthUnit ?? ''}${drug.strengthBasis ? `/${drug.strengthBasis}` : ''}`,
-        drug.form,
-      ].filter(Boolean).join(' ')
-    : drug.form
+  // Brand name + strength + form suffix — same shared logic SharedDrugCard
+  // uses for its title line (see utils/drugTitleFormat.js).
+  const titleSuffix = getDrugTitleSuffix(drug)
 
   return (
     <header style={{
       position:        'sticky',
       top:             0,
       zIndex:          50,
+      // Breaks out of Layout's centered, 680px-capped <main> so the header
+      // spans the true viewport width — see CORRECTED note above. The
+      // maxWidth: 680 inner wrapper below re-centers the actual content.
+      width:           '100vw',
+      marginLeft:      'calc(50% - 50vw)',
+      marginRight:     'calc(50% - 50vw)',
       backgroundColor: 'var(--color-surface)',
       borderRadius:    '0 0 18px 18px',
       boxShadow:       '0 2px 6px rgba(0,0,0,0.05)',
@@ -177,13 +202,13 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
             fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
             lineHeight: 1.2,
           }}>
-            {drug.tradenameClean}
+            {toTitleCase(drug.tradenameClean)}
           </span>
-          {strengthSuffix && (
+          {titleSuffix && (
             <span style={{
               fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)',
             }}>
-              {strengthSuffix}
+              {titleSuffix}
             </span>
           )}
         </div>
