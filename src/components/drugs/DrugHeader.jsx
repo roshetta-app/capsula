@@ -61,15 +61,70 @@
  *   onToggleFav   — () => void
  */
 
+import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useCategories }            from '../../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
 
+const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
+
+// CORRECTED 2026-07-20 (still step 2b, same session): row 3 (generic name)
+// had no overflow handling at all, so long combo-ingredient generics wrapped
+// onto extra lines instead of staying on one row — growing the header
+// instead of keeping it fixed-height like row 2. Fixed by giving row 3 the
+// same horizontal-scroll treatment as row 2. That alone isn't enough on its
+// own, though: a horizontally-scrolling row with no visual cue looks like
+// static text, so nothing tells the user there's hidden content to scroll
+// to. Fixed with a standard edge-fade mask (CSS mask-image gradient) on
+// both rows — fades whichever edge still has scrollable content, no fade at
+// all when text already fits, so it never falsely implies more content
+// exists. Chosen over truncating to "+N" (permanently hides ingredients,
+// unacceptable on a detail page) and over tap-to-expand (adds a new
+// interaction pattern and still needs its own affordance).
+function useEdgeFade(dep) {
+  const ref = useRef(null)
+  const [fade, setFade] = useState('none') // 'none' | 'left' | 'right' | 'both'
+
+  function update() {
+    const el = ref.current
+    if (!el) return
+    const { scrollLeft, scrollWidth, clientWidth } = el
+    if (scrollWidth <= clientWidth + 1) { setFade('none'); return }
+    const atStart = scrollLeft <= 1
+    const atEnd   = scrollLeft + clientWidth >= scrollWidth - 1
+    setFade(atStart ? 'right' : atEnd ? 'left' : 'both')
+  }
+
+  useEffect(() => {
+    update()
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dep])
+
+  return { ref, fade, onScroll: update }
+}
+
+// Builds the mask-image gradient for a given fade state. No entry (fade ===
+// 'none') returns an empty object so unaffected rows render with no mask at
+// all, rather than a permanently-transparent one.
+function edgeFadeStyle(fade) {
+  const solid = 'black', clear = 'transparent'
+  let gradient
+  if (fade === 'right') gradient = `linear-gradient(to right, ${solid} calc(100% - ${FADE_WIDTH}px), ${clear})`
+  else if (fade === 'left') gradient = `linear-gradient(to right, ${clear}, ${solid} ${FADE_WIDTH}px)`
+  else if (fade === 'both') gradient = `linear-gradient(to right, ${clear}, ${solid} ${FADE_WIDTH}px, ${solid} calc(100% - ${FADE_WIDTH}px), ${clear})`
+  else return {}
+  return { WebkitMaskImage: gradient, maskImage: gradient }
+}
+
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
   const isDark = useIsDark()
   const { categories } = useCategories()
+  const brandFade   = useEdgeFade(drug.id)
+  const genericFade = useEdgeFade(drug.id)
 
   const category  = categories.find(c => c.slug === drug.category)
   const iconType  = category?.icon_type || 'lucide'
@@ -186,18 +241,23 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
             long names/combo generics, never wraps/truncates/shrinks
             (4.22). touchAction reset to pan-x so sideways swiping here
             still works despite the header's own touchAction: 'none'. */}
-        <div style={{
-          display:                 'flex',
-          alignItems:              'baseline',
-          gap:                     6,
-          overflowX:               'auto',
-          whiteSpace:              'nowrap',
-          scrollbarWidth:          'none',
-          msOverflowStyle:         'none',
-          WebkitOverflowScrolling: 'touch',
-          touchAction:             'pan-x',
-          marginBottom:            2,
-        }}>
+        <div
+          ref={brandFade.ref}
+          onScroll={brandFade.onScroll}
+          style={{
+            display:                 'flex',
+            alignItems:              'baseline',
+            gap:                     6,
+            overflowX:               'auto',
+            whiteSpace:              'nowrap',
+            scrollbarWidth:          'none',
+            msOverflowStyle:         'none',
+            WebkitOverflowScrolling: 'touch',
+            touchAction:             'pan-x',
+            marginBottom:            2,
+            ...edgeFadeStyle(brandFade.fade),
+          }}
+        >
           <span style={{
             fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
             lineHeight: 1.2,
@@ -213,10 +273,25 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
           )}
         </div>
 
-        {/* Row 3: generic name */}
-        <div style={{
-          fontSize: 14, fontWeight: 500, color: 'var(--color-accent)',
-        }}>
+        {/* Row 3: generic name — same fixed-height horizontal-scroll +
+            edge-fade treatment as row 2 (see useEdgeFade above), instead of
+            wrapping onto extra lines for long combo-ingredient generics. */}
+        <div
+          ref={genericFade.ref}
+          onScroll={genericFade.onScroll}
+          style={{
+            fontSize:                14,
+            fontWeight:              500,
+            color:                   'var(--color-accent)',
+            overflowX:               'auto',
+            whiteSpace:              'nowrap',
+            scrollbarWidth:          'none',
+            msOverflowStyle:         'none',
+            WebkitOverflowScrolling: 'touch',
+            touchAction:             'pan-x',
+            ...edgeFadeStyle(genericFade.fade),
+          }}
+        >
           {drug.genericName}
         </div>
 
