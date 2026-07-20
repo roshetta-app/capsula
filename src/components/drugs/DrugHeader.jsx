@@ -2,6 +2,33 @@
  * src/components/drugs/DrugHeader.jsx
  * Phase 2G — Drug Detail Screen
  *
+ * 2026-07-20 (drug_library_ui_ux, plan §7 step 2b, decisions 4.22–4.24):
+ * full shell rebuild. Was a non-sticky bordered/shadowed card sitting in
+ * the normal page flow; now `position: sticky`, rounded-bottom, soft
+ * shadow, no hard border. Row 1's layout (Back + category group on the
+ * left, Share + Favourite on the right) is copied directly from
+ * ConditionDetailScreen.jsx's own DetailHeader so the two peer detail
+ * pages' headers stay visually consistent — minus the tab strip, since
+ * this page has none (per 4.23, this header also skips
+ * ConditionDetailScreen's measured-height/internal-scroll-box machinery
+ * entirely, since there are no tabs here for it to protect). Category
+ * display switched from the old static config/categories.js lookup +
+ * hardcoded hex map over to the live useCategories()/color-token system
+ * DrugsScreen.jsx's CategoryRow already uses, matching decision 4.30's
+ * precedent. Favourite icon switched from the old star to the heart
+ * icon/color token DetailHeader uses, for the same consistency reason.
+ * Row 2 (brand name + strength + form) scrolls horizontally instead of
+ * wrapping/truncating for long names or combo generics (4.22) — depends
+ * on step 0a's tradenameClean/strengthValue/strengthUnit/strengthBasis
+ * fields, and needs its own `touchAction: 'pan-x'` since the sticky
+ * header around it is `touchAction: 'none'` (to stop an accidental
+ * page-drag/pull-to-refresh starting on empty header space, same as
+ * DetailHeader) — without resetting it locally, that would also block
+ * sideways swiping on this one scrollable row. Row 3 is the generic-name
+ * line, content unchanged. Manufacturer/price/pack-size meta line removed
+ * entirely, per user instruction. Share ships as a visual stub only — no
+ * real share-image concept exists yet for a single drug (4.24).
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -9,160 +36,166 @@
  *   onToggleFav   — () => void
  */
 
-import { ArrowLeft, Star } from 'lucide-react'
-import { DRUG_CATEGORIES }  from '../../config/categories'
-
-const CATEGORY_COLORS = {
-  'antibiotic':               { bg: '#FEF3C7', color: '#92400E' },
-  'antiviral':                { bg: '#DBEAFE', color: '#1E40AF' },
-  'antifungal':                { bg: '#EDE9FE', color: '#5B21B6' },
-  'antiparasitic':            { bg: '#D1FAE5', color: '#065F46' },
-  'analgesic-nsaid':          { bg: '#F0FDF4', color: '#166534' },
-  'cardiovascular':           { bg: '#FFF1F2', color: '#9F1239' },
-  'respiratory':              { bg: '#F0F9FF', color: '#0C4A6E' },
-  'gastrointestinal':         { bg: '#FDF4FF', color: '#6B21A8' },
-  'endocrine-metabolic':      { bg: '#ECFDF5', color: '#064E3B' },
-  'neurological-psychiatric': { bg: '#F5F3FF', color: '#4C1D95' },
-  'musculoskeletal':          { bg: '#FFF7ED', color: '#9A3412' },
-  'vitamins-minerals':        { bg: '#F7FEE7', color: '#3F6212' },
-  'dermatological':           { bg: '#F5F3FF', color: '#4C1D95' },
-  'ophthalmic-otic':          { bg: '#ECFEFF', color: '#164E63' },
-  'urological':               { bg: '#EFF6FF', color: '#1E40AF' },
-  'obstetric-gynecological':  { bg: '#FDF2F8', color: '#831843' },
-  'other':                    { bg: '#FEE2E2', color: '#7F1D1D' },
-}
-
-const CATEGORY_LABELS = Object.fromEntries(
-  DRUG_CATEGORIES.map(c => [c.value, c.label])
-)
+import { ArrowLeft, Share2, Heart } from 'lucide-react'
+import { useCategories }            from '../../hooks/useCategories'
+import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
-  const chipStyle = CATEGORY_COLORS[drug.category] ?? { bg: '#F3F4F6', color: '#374151' }
-  const label     = CATEGORY_LABELS[drug.category]  ?? drug.category ?? ''
+  const isDark = useIsDark()
+  const { categories } = useCategories()
 
-  // Manufacturer / price / pack size — price and pack size are display-only,
-  // relative-ranking info (may be outdated), not a live price feed. Any
-  // piece can be blank, so build the line defensively.
-  const metaLine = [drug.manufacturer, drug.price, drug.packSize].filter(Boolean).join(' · ')
+  const category  = categories.find(c => c.slug === drug.category)
+  const iconType  = category?.icon_type || 'lucide'
+  const iconValue = iconType === 'custom' ? (category?.icon_url || '') : (category?.icon_name || 'Pill')
+  const colors    = resolveToken(category?.color_token || FALLBACK_TOKEN, isDark)
+
+  // Brand name + strength + form, one line — same composition rule as
+  // SharedDrugCard's title line (step 1d.2): strengthValue + strengthUnit
+  // (+ strengthBasis after a "/" when present) + form. Strength-less
+  // drugs fall back to form alone, no gap left behind.
+  const strengthSuffix = drug.strengthValue
+    ? [
+        `${drug.strengthValue}${drug.strengthUnit ?? ''}${drug.strengthBasis ? `/${drug.strengthBasis}` : ''}`,
+        drug.form,
+      ].filter(Boolean).join(' ')
+    : drug.form
 
   return (
-    <div style={{
+    <header style={{
+      position:        'sticky',
+      top:             0,
+      zIndex:          50,
       backgroundColor: 'var(--color-surface)',
-      border:          '1px solid var(--color-border)',
-      borderRadius:    'var(--radius-lg)',
-      padding:         'var(--space-5)',
-      marginBottom:    'var(--space-4)',
-      boxShadow:       'var(--shadow-card)',
+      borderRadius:    '0 0 18px 18px',
+      boxShadow:       '0 2px 6px rgba(0,0,0,0.05)',
+      // Header has no scroll content of its own outside row 2 — without
+      // this, a touch starting on empty header space has nothing local to
+      // consume it and the browser treats it as a page drag (including
+      // triggering pull-to-reload). Same fix as DetailHeader's own.
+      touchAction:     'none',
     }}>
-      {/* Top row: back ← ····· ★ */}
-      <div style={{
-        display:        'flex',
-        justifyContent: 'space-between',
-        alignItems:     'center',
-        marginBottom:   'var(--space-4)',
-      }}>
-        <button
-          onClick={onBack}
-          aria-label="Go back"
-          style={{
-            display:    'flex',
-            alignItems: 'center',
-            gap:        'var(--space-1)',
-            background: 'none',
-            border:     'none',
-            cursor:     'pointer',
-            color:      'var(--color-accent)',
-            fontSize:   14,
-            fontFamily: 'var(--font-body)',
-            fontWeight: 500,
-            padding:    0,
-          }}
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) var(--space-4)' }}>
 
-        <button
-          onClick={onToggleFav}
-          aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
-          style={{
-            background: 'none',
-            border:     'none',
-            cursor:     'pointer',
-            padding:    4,
-            color:      isFavourited ? '#F59E0B' : 'var(--color-text-tertiary)',
-            display:    'flex',
-            alignItems: 'center',
-          }}
-        >
-          <Star
-            size={20}
-            fill={isFavourited ? '#F59E0B' : 'none'}
-            strokeWidth={isFavourited ? 0 : 1.5}
-          />
-        </button>
-      </div>
-
-      {/* Item's own name — primary, per ADR-029 */}
-      <h1 style={{
-        fontSize:   22,
-        fontWeight: 700,
-        color:      'var(--color-text-primary)',
-        margin:     '0 0 var(--space-1)',
-        lineHeight: 1.2,
-      }}>
-        {drug.name}
-      </h1>
-
-      {/* Concentration · Form */}
-      {(drug.concentration || drug.form) && (
+        {/* Row 1: Back + category group (left), Share + Favourite (right) */}
         <div style={{
-          fontSize:     14,
-          fontWeight:   500,
-          color:        'var(--color-text-secondary)',
-          marginBottom: 'var(--space-1)',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          marginBottom:   8,
         }}>
-          {[drug.concentration, drug.form].filter(Boolean).join(' · ')}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', minWidth: 0 }}>
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                fontFamily: 'var(--font-body)', padding: '4px 0',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+                flexShrink: 0,
+              }}
+            >
+              <ArrowLeft size={16} strokeWidth={2} />
+              Back
+            </button>
+
+            {category && (
+              <>
+                {/* Dot divider — same muted treatment as DetailHeader's
+                    Back/specialty separator. */}
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 3, height: 3, borderRadius: '50%',
+                    backgroundColor: 'var(--color-text-tertiary)',
+                    opacity: 0.6, flexShrink: 0,
+                  }}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0, opacity: 0.75 }}>
+                  <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={11} color={colors.fg} />
+                  <span style={{
+                    fontSize: 12, fontWeight: 400, letterSpacing: '0.03em',
+                    color: 'var(--color-text-secondary)', lineHeight: 1,
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}>
+                    {category.name_en}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            {/* Share — visual stub only, per 4.24. No real share-image
+                concept exists yet for a single drug; wiring real behavior
+                is deferred to a separate future task. */}
+            <button
+              aria-label="Share"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                color: 'var(--color-text-tertiary)',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Share2 size={20} strokeWidth={2} />
+            </button>
+
+            <button
+              onClick={onToggleFav}
+              aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                color: isFavourited ? 'var(--color-favourite)' : 'var(--color-text-tertiary)',
+                transition: 'color 0.15s ease',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Heart size={20} strokeWidth={2} fill={isFavourited ? 'currentColor' : 'none'} />
+            </button>
+          </div>
         </div>
-      )}
 
-      {/* Generic name — secondary */}
-      <div style={{
-        fontSize:     14,
-        color:        'var(--color-accent)',
-        fontWeight:   500,
-        marginBottom: 'var(--space-2)',
-      }}>
-        {drug.genericName}
-      </div>
-
-      {/* Manufacturer · Price · Pack size */}
-      {metaLine && (
+        {/* Row 2: brand name + strength + form — horizontal scroll for
+            long names/combo generics, never wraps/truncates/shrinks
+            (4.22). touchAction reset to pan-x so sideways swiping here
+            still works despite the header's own touchAction: 'none'. */}
         <div style={{
-          fontSize:     13,
-          color:        'var(--color-text-tertiary)',
-          marginBottom: 'var(--space-3)',
+          display:                 'flex',
+          alignItems:              'baseline',
+          gap:                     6,
+          overflowX:               'auto',
+          whiteSpace:              'nowrap',
+          scrollbarWidth:          'none',
+          msOverflowStyle:         'none',
+          WebkitOverflowScrolling: 'touch',
+          touchAction:             'pan-x',
+          marginBottom:            2,
         }}>
-          {metaLine}
+          <span style={{
+            fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
+            lineHeight: 1.2,
+          }}>
+            {drug.tradenameClean}
+          </span>
+          {strengthSuffix && (
+            <span style={{
+              fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)',
+            }}>
+              {strengthSuffix}
+            </span>
+          )}
         </div>
-      )}
 
-      {/* Category breadcrumb badge */}
-      {label && (
-        <span style={{
-          display:         'inline-block',
-          fontSize:        11,
-          fontWeight:      600,
-          letterSpacing:   '0.04em',
-          textTransform:   'uppercase',
-          backgroundColor: chipStyle.bg,
-          color:           chipStyle.color,
-          padding:         '3px 10px',
-          borderRadius:    'var(--radius-full)',
+        {/* Row 3: generic name */}
+        <div style={{
+          fontSize: 14, fontWeight: 500, color: 'var(--color-accent)',
         }}>
-          {label}
-        </span>
-      )}
-    </div>
+          {drug.genericName}
+        </div>
+
+      </div>
+    </header>
   )
 }
