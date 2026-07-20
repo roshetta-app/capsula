@@ -384,7 +384,7 @@ export default function DrugsScreen() {
                 )
               ) : (
                 <>
-                  {displayed.length > 100 && <NarrowResultsHint />}
+                  {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
                   <VirtualDrugList
                     drugs={displayed}
                     onTap={handleDrugTap}
