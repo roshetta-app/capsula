@@ -12,6 +12,14 @@
  * by the four grouped section components (ClinicalOverview/DosingSection/
  * SafetySection/PrescribingSection), mounted in decision 4.25's order.
  *
+ * 2026-07-20 (drug_detail_moa_spacing_fix): the section group below
+ * DrugHeader had no top spacing at all — content touched the header
+ * directly. Wrapped the section group in its own div with
+ * paddingTop: 'var(--space-5)', matching the exact top-padding value
+ * ConditionDetailScreen.jsx uses on its own content wrapper directly below
+ * its sticky header, instead of introducing a new one-off value. DrugHeader
+ * itself is untouched.
+ *
  * Route: /drugs/:slug
  */
 
@@ -133,18 +141,23 @@ export default function DrugDetailScreen() {
 
         {/* 2c.1 — card wrapper removed (decisions 4.25–4.27): sections now
             sit flat on the page background, no border/shadow/box. 2c.7 —
-            the four grouped sections, mounted in decision 4.25's order. */}
-        <ClinicalOverview drug={drug} />
+            the four grouped sections, mounted in decision 4.25's order.
+            drug_detail_moa_spacing_fix — paddingTop added here so content
+            no longer touches DrugHeader directly; matches
+            ConditionDetailScreen.jsx's own header-to-content gap. */}
+        <div style={{ paddingTop: 'var(--space-5)' }}>
+          <ClinicalOverview drug={drug} />
 
-        <DosingSection
-          drug={drug}
-          siblings={siblings}
-          onSelectBrand={handleSiblingTap}
-        />
+          <DosingSection
+            drug={drug}
+            siblings={siblings}
+            onSelectBrand={handleSiblingTap}
+          />
 
-        <SafetySection drug={drug} />
+          <SafetySection drug={drug} />
 
-        <PrescribingSection drug={drug} />
+          <PrescribingSection drug={drug} />
+        </div>
 
       </div>
     </Layout>

@@ -8,10 +8,16 @@
  * the old single classification fallback for zero content anywhere has been
  * dropped (see plan decisions).
  *
+ * 2026-07-20 (drug_detail_moa_spacing_fix): Mechanism of Action no longer
+ * wraps its content in Collapsible — it now renders as a plain static
+ * section (header + text), matching how Uses (and every other section on
+ * this page) already renders. There was no reason for MOA alone to hide
+ * its content by default.
+ *
  * Props: drug — flat drug object from DrugContext
  */
 
-import { Collapsible, SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
+import { SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
 
 export default function ClinicalOverview({ drug }) {
   const {
@@ -24,7 +30,8 @@ export default function ClinicalOverview({ drug }) {
 
       {/* -- Mechanism of Action -- */}
       {mechanismOfAction ? (
-        <Collapsible title="Mechanism of Action">
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <SectionHeader title="Mechanism of Action" />
           <p style={{
             fontSize:   14,
             color:      'var(--color-text-primary)',
@@ -33,7 +40,8 @@ export default function ClinicalOverview({ drug }) {
           }}>
             {mechanismOfAction}
           </p>
-        </Collapsible>
+          <Divider />
+        </div>
       ) : (
         <EmptySection title="Mechanism of Action" />
       )}
