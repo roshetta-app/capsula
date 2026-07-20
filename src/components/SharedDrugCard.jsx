@@ -122,14 +122,15 @@ const LIQUID_FORMS = new Set([
   'injection', 'vaccine', 'inhaler',
 ])
 
-// Collapses redundant whitespace and normalizes spacing around "/" so
-// "200mg / 5ml"-style values render consistently regardless of how they
-// were entered (plan §2 — raw concentration/pack_size/fill_volume spacing
-// is inconsistent in the source data). Does not touch unit spelling
-// ("g" vs "gm") — that's a data question, not a formatting one.
+// Collapses redundant whitespace and strips spacing around "/" so
+// concentration values render consistently regardless of how they were
+// entered — matches the plan's own locked example format ("200mg/5ml",
+// no spaces). Raw data is genuinely mixed: combo-ingredient ratios like
+// "10mg/10mg" already have no spaces, but per-volume values like
+// "200mg / 5ml" do — this brings both to the same no-space convention.
 function normalizeSpacing(value) {
   if (!value) return value
-  return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, ' / ')
+  return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/')
 }
 
 // pack_size and fill_volume additionally need a space inserted between a
