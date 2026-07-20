@@ -260,6 +260,11 @@ export default function DrugsScreen() {
     }))
     .filter(c => c.count > 0)
 
+  // content holds whichever view's markup applies (search results/category
+  // browsing vs. the category list) so DrugFilterPanel can be mounted once,
+  // below, shared by both — instead of once per branch (step 1f.2).
+  let content
+
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
     // 1c.1 (decision 4.9): a query and an active category can both be true
@@ -291,8 +296,8 @@ export default function DrugsScreen() {
       ? 'All Drugs'
       : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
 
-    return (
-      <Layout>
+    content = (
+      <>
         <StickyDrugsHeader
           visible={showStickyHeader}
           isDark={isDark}
@@ -395,33 +400,24 @@ export default function DrugsScreen() {
             </>
           )}
         </div>
-
-        <DrugFilterPanel
-          isOpen={filterOpen}
-          onClose={() => setFilterOpen(false)}
-          onApply={handleApplyFilters}
-          mode={mode}
-          onModeChange={setMode}
-        />
-      </Layout>
+      </>
     )
-  }
+  } else {
+    // ── Category list view ────────────────────────────────────────────────
+    // Matched by slug, the category's stable internal code — not name_en,
+    // which is just the editable display label. This is the plan's decided
+    // design (a generic's category is stored as a drug_categories.slug, kept
+    // as plain text rather than a foreign key, but still the stable code,
+    // not the human-facing name that can be renamed later).
+    // categoriesWithCounts is computed once above (1c.2) so both this tile
+    // list and the search-results branch above share the exact same list.
+    const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
 
-  // ── Category list view ────────────────────────────────────────────────────
-  // Matched by slug, the category's stable internal code — not name_en,
-  // which is just the editable display label. This is the plan's decided
-  // design (a generic's category is stored as a drug_categories.slug, kept
-  // as plain text rather than a foreign key, but still the stable code, not
-  // the human-facing name that can be renamed later).
-  // categoriesWithCounts is now computed once above (1c.2) so both
-  // DrugFilterPanel mounts and this tile list share the exact same list.
-  const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
-
-  return (
-    <Layout>
-      <StickyDrugsHeader
-        visible={showStickyHeader}
-        isDark={isDark}
+    content = (
+      <>
+        <StickyDrugsHeader
+          visible={showStickyHeader}
+          isDark={isDark}
         query={query}
         onQueryChange={handleQueryChange}
         placeholder="Search drugs…"
@@ -574,6 +570,13 @@ export default function DrugsScreen() {
           </>
         )}
       </div>
+      </>
+    )
+  }
+
+  return (
+    <Layout>
+      {content}
 
       <DrugFilterPanel
         isOpen={filterOpen}

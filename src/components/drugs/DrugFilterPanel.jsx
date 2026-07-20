@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -24,6 +24,17 @@ import { useState } from 'react'
  * the whole Drugs screen, not just active searches. Section is omitted
  * entirely if 'onModeChange' isn't passed, so this stays backward-compatible
  * with any future caller that doesn't use Drugs' Brand/Generic concept.
+ *
+ * 2026-07-20 (drug_library_ui_ux, plan §7 step 1f.1, decision 4.20): shell
+ * rebuilt on SpecialtiesBottomSheet.jsx's pattern. Old shell sat at
+ * backdrop zIndex 80 / sheet zIndex 90 — below BottomNav's zIndex 100, so
+ * the nav visually covered the sheet's bottom edge including its Apply/
+ * Clear buttons. Now matches SpecialtiesBottomSheet exactly: zIndex 200/201
+ * (well above the nav), shouldRender/animateIn mount-timing pair so the
+ * sheet stays present through its 280ms exit transition instead of
+ * vanishing instantly, Escape-key close, and body-scroll lock while open.
+ * Filter content below (Search By / Form-Route / Pregnancy / Breastfeeding
+ * sections, Clear All / Apply buttons) is unchanged — only this shell.
  *
  * Props:
  *   isOpen           boolean
@@ -61,7 +72,39 @@ const EMPTY = {
 export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onModeChange }) {
   const [filters, setFilters] = useState(EMPTY)
 
-  if (!isOpen) return null
+  // shouldRender keeps the DOM present during the exit transition.
+  // animateIn drives the CSS open/closed visual position. Same pattern as
+  // SpecialtiesBottomSheet.jsx (decision 4.20, step 1f.1).
+  const [shouldRender, setShouldRender] = useState(isOpen)
+  const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useEffect(() => {
+    if (isOpen) {
+      // Mount first, then flip animateIn on the next frame so the
+      // browser has painted the start-position before transitioning.
+      setShouldRender(true)
+      requestAnimationFrame(() => setAnimateIn(true))
+    } else {
+      // Start exit transition immediately; unmount after it finishes.
+      setAnimateIn(false)
+      const t = setTimeout(() => setShouldRender(false), 280)
+      return () => clearTimeout(t)
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isOpen, onClose])
+
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
+
+  if (!shouldRender) return null
 
   function toggleForm(val) {
     setFilters(prev => {
@@ -90,23 +133,35 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onMode
       {/* Backdrop */}
       <div
         onClick={onClose}
+        aria-hidden="true"
         style={{
-          position: 'fixed', inset: 0, zIndex: 80,
+          position:        'fixed',
+          inset:           0,
+          zIndex:          200,
           backgroundColor: 'rgba(0,0,0,0.4)',
+          opacity:         animateIn ? 1 : 0,
+          transition:      'opacity var(--motion-base) var(--ease-reveal)',
         }}
       />
 
       {/* Sheet */}
-      <div style={{
-        position: 'fixed', bottom: 0, left: 0, right: 0,
-        zIndex: 90,
-        backgroundColor: 'var(--color-surface)',
-        borderRadius: '16px 16px 0 0',
-        padding: 'var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom))',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
-      }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filter drugs"
+        style={{
+          position:      'fixed', bottom: 0, left: 0, right: 0,
+          zIndex:        201,
+          backgroundColor: 'var(--color-surface)',
+          borderRadius:  '16px 16px 0 0',
+          padding:       'var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom))',
+          maxHeight:     '80vh',
+          overflowY:     'auto',
+          boxShadow:     '0 -4px 24px rgba(0,0,0,0.12)',
+          transform:     animateIn ? 'translateY(0)' : 'translateY(100%)',
+          transition:    'transform var(--motion-screen) var(--ease-settle)',
+        }}
+      >
         {/* Handle */}
         <div style={{
           width: 36, height: 4, borderRadius: 2,
@@ -265,4 +320,3 @@ function ToggleChip({ label, active, onToggle }) {
     </button>
   )
 }
-
