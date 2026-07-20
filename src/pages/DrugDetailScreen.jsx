@@ -3,6 +3,15 @@
  * Phase 2G — Drug Detail Screen (full rebuild)
  * Phase 3J — added logUsageEvent on mount for analytics
  *
+ * 2026-07-20 (drug_library_ui_ux, plan §7 step 2c.1, decisions 4.25–4.27):
+ * removed the bordered/shadowed box that used to wrap everything below the
+ * header — no card anywhere on the page now, flat content directly on the
+ * page background, same flat-content direction as the rest of this
+ * redesign (SharedDrugCard's flat row, the flat drugs list). Section
+ * components themselves are unchanged for now — DoseTable/BrandsList/
+ * DrugInfoSections are retired and replaced by the four grouped sections
+ * in steps 2c.2–2c.7, not this step.
+ *
  * Route: /drugs/:slug
  */
 
@@ -121,29 +130,25 @@ export default function DrugDetailScreen() {
           onToggleFav={() => toggleDrug(drug.id)}
         />
 
-        <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border:          '1px solid var(--color-border)',
-          borderRadius:    'var(--radius-lg)',
-          padding:         'var(--space-5)',
-          boxShadow:       'var(--shadow-card)',
-        }}>
+        {/* 2c.1 — card wrapper removed (decisions 4.25–4.27): sections now
+            sit flat on the page background, no border/shadow/box. Still
+            mounting the old DoseTable/BrandsList/DrugInfoSections trio
+            here unchanged — 2c.2–2c.7 replace these with the four grouped
+            section components and retire this block. */}
+        <DoseTable
+          doses={drug.doses}
+          defaultDoseOverride={drug.defaultDoseOverride}
+          textbookDoses={drug.textbookDoses}
+          textbookDoseNotes={drug.textbookDoseNotes}
+        />
 
-          <DoseTable
-            doses={drug.doses}
-            defaultDoseOverride={drug.defaultDoseOverride}
-            textbookDoses={drug.textbookDoses}
-            textbookDoseNotes={drug.textbookDoseNotes}
-          />
+        <BrandsList
+          siblings={siblings}
+          onTap={handleSiblingTap}
+        />
 
-          <BrandsList
-            siblings={siblings}
-            onTap={handleSiblingTap}
-          />
+        <DrugInfoSections drug={drug} />
 
-          <DrugInfoSections drug={drug} />
-
-        </div>
       </div>
     </Layout>
   )
