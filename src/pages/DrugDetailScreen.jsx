@@ -3,14 +3,14 @@
  * Phase 2G — Drug Detail Screen (full rebuild)
  * Phase 3J — added logUsageEvent on mount for analytics
  *
- * 2026-07-20 (drug_library_ui_ux, plan §7 step 2c.1, decisions 4.25–4.27):
- * removed the bordered/shadowed box that used to wrap everything below the
- * header — no card anywhere on the page now, flat content directly on the
- * page background, same flat-content direction as the rest of this
- * redesign (SharedDrugCard's flat row, the flat drugs list). Section
- * components themselves are unchanged for now — DoseTable/BrandsList/
- * DrugInfoSections are retired and replaced by the four grouped sections
- * in steps 2c.2–2c.7, not this step.
+ * 2026-07-20 (drug_library_ui_ux, plan §7 steps 2c.1–2c.7, decisions
+ * 4.25–4.27): removed the bordered/shadowed box that used to wrap
+ * everything below the header — no card anywhere on the page now, flat
+ * content directly on the page background, same flat-content direction as
+ * the rest of this redesign (SharedDrugCard's flat row, the flat drugs
+ * list). DoseTable/BrandsList/DrugInfoSections are retired; replaced below
+ * by the four grouped section components (ClinicalOverview/DosingSection/
+ * SafetySection/PrescribingSection), mounted in decision 4.25's order.
  *
  * Route: /drugs/:slug
  */
@@ -19,9 +19,10 @@ import { useEffect }                    from 'react'
 import { useParams, useNavigate }        from 'react-router-dom'
 import Layout                            from '../components/layout'
 import DrugHeader                        from '../components/drugs/DrugHeader'
-import DoseTable                         from '../components/drugs/DoseTable'
-import BrandsList                        from '../components/drugs/BrandsList'
-import DrugInfoSections                  from '../components/drugs/DrugInfoSections'
+import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
+import DosingSection                     from '../components/drugs/sections/DosingSection'
+import SafetySection                     from '../components/drugs/sections/SafetySection'
+import PrescribingSection                from '../components/drugs/sections/PrescribingSection'
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { logUsageEvent }                 from '../analytics/usageEvents'
@@ -131,23 +132,19 @@ export default function DrugDetailScreen() {
         />
 
         {/* 2c.1 — card wrapper removed (decisions 4.25–4.27): sections now
-            sit flat on the page background, no border/shadow/box. Still
-            mounting the old DoseTable/BrandsList/DrugInfoSections trio
-            here unchanged — 2c.2–2c.7 replace these with the four grouped
-            section components and retire this block. */}
-        <DoseTable
-          doses={drug.doses}
-          defaultDoseOverride={drug.defaultDoseOverride}
-          textbookDoses={drug.textbookDoses}
-          textbookDoseNotes={drug.textbookDoseNotes}
-        />
+            sit flat on the page background, no border/shadow/box. 2c.7 —
+            the four grouped sections, mounted in decision 4.25's order. */}
+        <ClinicalOverview drug={drug} />
 
-        <BrandsList
+        <DosingSection
+          drug={drug}
           siblings={siblings}
-          onTap={handleSiblingTap}
+          onSelectBrand={handleSiblingTap}
         />
 
-        <DrugInfoSections drug={drug} />
+        <SafetySection drug={drug} />
+
+        <PrescribingSection drug={drug} />
 
       </div>
     </Layout>
