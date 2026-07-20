@@ -35,5 +35,10 @@ export const METADATA_TABLE = 'app_metadata'
  * the gap visible: title suffixes showed pack size correctly but never
  * showed fill volume or modifier abbreviations). This bump forces every
  * device to re-fetch once, picking up both new fields.
+ *
+ * 2026-07-20 (drug_card_title_suffix, route-details follow-up): bumped
+ * 2 -> 3. Added routeDetails to the mapped FlatDrug shape — same reasoning
+ * as the bump above, applied proactively this time instead of found via a
+ * live bug report.
  */
-export const DRUGS_CACHE_SCHEMA_VERSION = 2
+export const DRUGS_CACHE_SCHEMA_VERSION = 3

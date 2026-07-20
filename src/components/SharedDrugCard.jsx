@@ -98,6 +98,7 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
 import { DRUG_FORM_SUFFIXES } from '../config/forms'
 import { FORM_MODIFIER_ABBREVIATIONS } from '../config/formModifiers'
+import { ROUTE_DETAIL_ABBREVIATIONS } from '../config/routeDetails'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
@@ -143,6 +144,29 @@ function abbreviateFormModifiers(formModifier) {
     .join(', ')
 }
 
+// Comma-joins the known route_details abbreviations for an injection
+// formulation, in the array's original order — same convention as
+// abbreviateFormModifiers above. Tags with no entry are dropped silently.
+function abbreviateRouteDetails(routeDetails) {
+  if (!routeDetails || routeDetails.length === 0) return ''
+  return routeDetails
+    .map(tag => ROUTE_DETAIL_ABBREVIATIONS[tag])
+    .filter(Boolean)
+    .join(', ')
+}
+
+// Title-case for display only (follow-up decision, 2026-07-20) — capitalizes
+// the first letter of each word/hyphen-separated segment, e.g. "dolo-d" ->
+// "Dolo-D". Purely cosmetic: the underlying tradenameClean value used for
+// search matching, ranking, and sort order (DrugsScreen.jsx) is completely
+// untouched — this function's output is only ever used inside the render
+// below, right before it goes into highlightMatch (which is case-insensitive,
+// so match positions/count are unaffected by this).
+function toTitleCase(str) {
+  if (!str) return str
+  return str.replace(/[^\s-]+/g, word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+}
+
 export default function SharedDrugCard({
   drug,
   categories,
@@ -170,22 +194,47 @@ export default function SharedDrugCard({
     : (matchedCategory?.icon_name || 'Pill')
   const categoryColors = resolveToken(matchedCategory?.color_token || FALLBACK_TOKEN, isDark)
 
-  // Title suffix (4.38, locked) — built per form category. Solid/countable
-  // forms show pack_size + form_modifier abbreviations; liquid/topical
-  // forms (plus vial/ampoule, 4.42) show fill_volume instead. Any field
-  // missing on this particular drug drops out silently (4.39) via the
-  // .filter(Boolean) below — never a blank gap or stray separator.
+  // Title suffix (4.38, locked; extended by follow-up decisions 2026-07-20)
+  // — built per form category. Solid/countable forms show pack_size +
+  // form_modifier abbreviations; liquid/topical forms show fill_volume
+  // instead. Any field missing on this particular drug drops out silently
+  // (4.39) via the .filter(Boolean) calls below — never a blank gap or
+  // stray separator.
   const normalizedConcentration = normalizeSpacing(drug.concentration)
   const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
   const modifierAbbrev = abbreviateFormModifiers(drug.formModifier)
 
-  const titleSuffix = LIQUID_FORMS.has(drug.form)
-    ? [normalizedConcentration, formAbbrev, normalizeSpacing(drug.fillVolume)]
-        .filter(Boolean)
-        .join(' ')
-    : [normalizedConcentration, normalizeSpacing(drug.packSize), modifierAbbrev, formAbbrev]
-        .filter(Boolean)
-        .join(' ')
+  // Vial/ampoule (4.42, reopened 2026-07-20): fill_volume is only actually
+  // populated on 6% of published vial/ampoule brands — the original
+  // "fill_volume or nothing" rule left 94% of these cards with no size
+  // detail at all. Now falls back to pack_size when fill_volume is missing
+  // (recovers another 26%), still preferring fill_volume when both exist.
+  const isVialOrAmpoule = drug.form === 'vial' || drug.form === 'ampoule'
+
+  let afterConcentration
+  if (isVialOrAmpoule) {
+    const size = normalizeSpacing(drug.fillVolume) || normalizeSpacing(drug.packSize)
+    afterConcentration = [formAbbrev, size].filter(Boolean)
+  } else if (LIQUID_FORMS.has(drug.form)) {
+    afterConcentration = [formAbbrev, normalizeSpacing(drug.fillVolume)].filter(Boolean)
+  } else {
+    afterConcentration = [normalizeSpacing(drug.packSize), modifierAbbrev, formAbbrev].filter(Boolean)
+  }
+
+  // Dash after concentration (follow-up decision, 2026-07-20) — only
+  // inserted when there's both a concentration AND something following it,
+  // so a drug with only one of the two never ends up with a stray dash.
+  const mainSuffix = normalizedConcentration && afterConcentration.length > 0
+    ? [normalizedConcentration, '-', ...afterConcentration].join(' ')
+    : [normalizedConcentration, ...afterConcentration].filter(Boolean).join(' ')
+
+  // Route details (follow-up decision, 2026-07-20) — injection formulations
+  // only, appended at the very end with a dash before it. Same
+  // dash-only-when-needed guard as above.
+  const routeAbbrev = drug.route === 'injection' ? abbreviateRouteDetails(drug.routeDetails) : ''
+  const titleSuffix = routeAbbrev
+    ? (mainSuffix ? `${mainSuffix} - ${routeAbbrev}` : routeAbbrev)
+    : mainSuffix
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
   // + a "+N" count; plain generics just show the one genericName.
@@ -202,7 +251,7 @@ export default function SharedDrugCard({
   // itself already returns a single, unbolded segment when passed an empty
   // query, so passing '' for the non-active mode is enough — no extra
   // branching needed here.
-  const titleSegments   = highlightMatch(drug.tradenameClean, searchMode === 'brand'   ? highlight : '')
+  const titleSegments   = highlightMatch(toTitleCase(drug.tradenameClean), searchMode === 'brand'   ? highlight : '')
   const genericSegments = highlightMatch(genericLine || '',   searchMode === 'generic' ? highlight : '')
 
   return (
@@ -246,7 +295,7 @@ export default function SharedDrugCard({
       {/* Middle: text content — title line (1d.2) + generic line (1d.3) */}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize:     16,
+          fontSize:     15,
           fontWeight:   500,
           color:        'var(--color-text-primary)',
           lineHeight:   1.3,
@@ -262,7 +311,7 @@ export default function SharedDrugCard({
           {titleSuffix && (
             <span style={{
               fontWeight: 400,
-              fontSize:   13,
+              fontSize:   12,
               color:      'var(--color-text-primary)',
             }}>
               {' '}{titleSuffix}
