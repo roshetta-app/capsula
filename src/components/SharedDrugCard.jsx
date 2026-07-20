@@ -132,6 +132,19 @@ function normalizeSpacing(value) {
   return value.trim().replace(/\s+/g, ' ').replace(/\s*\/\s*/g, ' / ')
 }
 
+// pack_size and fill_volume additionally need a space inserted between a
+// bare number and its unit letters where one is missing (e.g. "100ml" ->
+// "100 ml"). Confirmed against the live data (2026-07-20): concentration is
+// 100% consistent with NO space ("100mg") and pack_size is 100% consistent
+// WITH a space ("15 g") — neither needs this. fill_volume is the one field
+// that's actually mixed: 89% have the space, 11% don't. This brings that
+// 11% in line with the rest, without touching concentration's opposite,
+// already-consistent convention.
+function normalizeUnitSpacing(value) {
+  if (!value) return value
+  return normalizeSpacing(value).replace(/(\d)([a-zA-Z])/g, '$1 $2')
+}
+
 // Comma-joins the known form_modifier abbreviations for a drug, in the
 // array's original order (4.43). Tags with no entry in
 // FORM_MODIFIER_ABBREVIATIONS (currently just "scored") are dropped
@@ -213,12 +226,12 @@ export default function SharedDrugCard({
 
   let afterConcentration
   if (isVialOrAmpoule) {
-    const size = normalizeSpacing(drug.fillVolume) || normalizeSpacing(drug.packSize)
+    const size = normalizeUnitSpacing(drug.fillVolume) || normalizeUnitSpacing(drug.packSize)
     afterConcentration = [formAbbrev, size].filter(Boolean)
   } else if (LIQUID_FORMS.has(drug.form)) {
-    afterConcentration = [formAbbrev, normalizeSpacing(drug.fillVolume)].filter(Boolean)
+    afterConcentration = [formAbbrev, normalizeUnitSpacing(drug.fillVolume)].filter(Boolean)
   } else {
-    afterConcentration = [normalizeSpacing(drug.packSize), modifierAbbrev, formAbbrev].filter(Boolean)
+    afterConcentration = [normalizeUnitSpacing(drug.packSize), modifierAbbrev, formAbbrev].filter(Boolean)
   }
 
   // Dash after concentration (follow-up decision, 2026-07-20) — only
