@@ -16,8 +16,17 @@ const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites']
  * header. Condition detail screens (/conditions/:slug) render their own
  * DetailHeader (back/share/favourite + tab strip) — without this, Layout's
  * shared header rendered on top of it as a second header bar.
+ *
+ * 2026-07-20 (drug_library_ui_ux, plan §7 step 2a, decision 4.23): added
+ * '/drugs/' — the drug detail page renders its own sticky header too, so
+ * it needs the same suppression. Unlike '/conditions/', this is NOT also
+ * added to SELF_CONTAINED_SCROLL_PREFIXES below — the drug detail header
+ * is a plain sticky header inside the page's normal scroll, not the
+ * measured-height/internal-scroll-box setup ConditionDetailScreen uses to
+ * protect its tab strip, so there's nothing here for that machinery to
+ * protect.
  */
-const HEADER_SUPPRESSED_PREFIXES = ['/conditions/']
+const HEADER_SUPPRESSED_PREFIXES = ['/conditions/', '/drugs/']
 
 /**
  * Route prefixes whose screens size and scroll themselves internally.
