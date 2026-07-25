@@ -29,6 +29,15 @@
  * renders nothing; see its own file header), same treatment ClinicalOverview
  * got in step 1.2, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
  *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.6, decision 4.14):
+ * ContraindicationsSection.jsx mounted here, right before SafetySection.jsx
+ * per the locked §11.3 order (... Pregnancy & Breastfeeding →
+ * Contraindications → Drug Interactions ...). SafetySection.jsx — whose
+ * last remaining content (Contraindications) has now fully moved into
+ * ContraindicationsSection.jsx — stays mounted (now renders nothing; see
+ * its own file header), same treatment ClinicalOverview and DosingSection
+ * got, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
+ *
  * Route: /drugs/:slug
  */
 
@@ -42,6 +51,7 @@ import UsesSection                       from '../components/drugs/sections/Uses
 import DoseSection                       from '../components/drugs/sections/DoseSection'
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
+import ContraindicationsSection          from '../components/drugs/sections/ContraindicationsSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
 import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
 import PregnancySection                  from '../components/drugs/sections/PregnancySection'
@@ -243,6 +253,8 @@ export default function DrugDetailScreen() {
             <DosingSection drug={drug} />
 
             <PregnancySection drug={drug} />
+
+            <ContraindicationsSection drug={drug} />
 
             <SafetySection drug={drug} />
 
