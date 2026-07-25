@@ -2,39 +2,21 @@
  * src/components/drugs/sections/SafetySection.jsx
  * Phase 2c — Drug Detail Screen, grouped sections
  *
- * Renders the Safety group for a drug: Contraindications + Pregnancy &
- * Breastfeeding. Side Effects moved out to its own standalone
- * SideEffectsSection.jsx (drug_detail_rebuild, step 1.4, decision 4.12).
- *
- * Ride-along fix (§11 item 8): crossesPlacenta/crossesBbb were previously
- * compared against the booleans true/false, but the database column is
- * text constrained to 'yes' / 'no' / 'unknown', so the comparison never
- * matched and the raw lowercase string was printed. Fixed here by
- * comparing against the actual string values and capitalizing for display.
+ * Renders the remaining Safety group content for a drug: Contraindications
+ * only. Side Effects moved out to SideEffectsSection.jsx (step 1.4, decision
+ * 4.12); Pregnancy & Breastfeeding moved out to PregnancySection.jsx (step
+ * 1.5, decision 4.13). This file fully retires once Contraindications also
+ * migrates to its own section (step 1.6, decision 4.14).
  *
  * Props: drug — flat drug object from DrugContext
  */
 
-import { SectionHeader, Divider, EmptySection, PregnancyBadge, IconRow } from './sectionPrimitives.jsx'
-
-function displayYesNo(value) {
-  if (value === 'yes')     return 'Yes'
-  if (value === 'no')      return 'No'
-  if (value === 'unknown') return 'Unknown'
-  return value
-}
+import { SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
 
 export default function SafetySection({ drug }) {
   const {
-    pregnancyCategory,
-    breastfeedingSafety,
-    crossesPlacenta,
-    crossesBbb,
     contraindications = [],
   } = drug
-
-  const hasPregnancySection =
-    !!pregnancyCategory || !!breastfeedingSafety || crossesPlacenta != null || crossesBbb != null
 
   return (
     <div>
@@ -60,20 +42,6 @@ export default function SafetySection({ drug }) {
         </div>
       ) : (
         <EmptySection title="Contraindications" />
-      )}
-
-      {/* -- Pregnancy & Breastfeeding -- */}
-      {hasPregnancySection ? (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <SectionHeader title="Pregnancy & Breastfeeding" />
-          {pregnancyCategory && <PregnancyBadge category={pregnancyCategory} />}
-          <IconRow icon="🤱" label="Breastfeeding" value={breastfeedingSafety} />
-          <IconRow icon="🧬" label="Crosses placenta" value={displayYesNo(crossesPlacenta)} />
-          <IconRow icon="🧠" label="Crosses BBB" value={displayYesNo(crossesBbb)} />
-          <Divider />
-        </div>
-      ) : (
-        <EmptySection title="Pregnancy & Breastfeeding" />
       )}
 
     </div>
