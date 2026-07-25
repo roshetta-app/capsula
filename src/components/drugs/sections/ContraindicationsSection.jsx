@@ -28,15 +28,10 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { tintedBg } from '../../../utils/specialtyTokens.js'
+import { SPECIALTY_TOKENS, tintedBg } from '../../../utils/specialtyTokens.js'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
 const TRUNCATE_AT = 3
-
-// Fixed danger tint — deliberately not the drug's category color (see
-// decision 4.14). Base color only; tintedBg() derives the actual light/dark
-// pastel wash from it, same helper Uses already uses for its own box.
-const DANGER_COLOR = '#EF4444'
 
 export default function ContraindicationsSection({ drug }) {
   const [open, setOpen] = useState(false)
@@ -49,12 +44,19 @@ export default function ContraindicationsSection({ drug }) {
   const hasMore = contraindications.length > TRUNCATE_AT
   const shown = open ? contraindications : contraindications.slice(0, TRUNCATE_AT)
 
+  // Fixed danger tint — deliberately not the drug's category color (see
+  // decision 4.14). Reuses the existing 'red' specialty token's own
+  // pre-lightened bg (not a raw saturated hex) as the base color, same as
+  // every category-tinted box on this page feeds tintedBg() — a flat
+  // saturated red here produced a much harsher wash than intended.
+  const dangerBg = isDark ? SPECIALTY_TOKENS.red.dark.bg : SPECIALTY_TOKENS.red.light.bg
+
   return (
     <div style={{
       marginBottom:    'var(--space-5)',
       padding:         'var(--space-4)',
       borderRadius:    'var(--radius-sm)',
-      backgroundColor: tintedBg(DANGER_COLOR, isDark),
+      backgroundColor: tintedBg(dangerBg, isDark),
     }}>
       <div style={{
         fontSize:     15,
