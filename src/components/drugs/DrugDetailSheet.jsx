@@ -48,6 +48,12 @@ import { forwardRef } from 'react'
  * held solid too long and then cut off too fast. The sheet itself
  * (background/border-radius/shadow) is untouched and fully solid again.
  *
+ * 2026-07-25 (session 18): the fade previously started from the strip's
+ * very first pixel, so text could still peek through faintly right at the
+ * sheet's own top edge. Mask now holds fully opaque for the strip's first
+ * half (a real cap — nothing shows through there at all), then fades
+ * smoothly to transparent across the second half.
+ *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
@@ -80,8 +86,13 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
           height: `${STRIP_HEIGHT}px`,
           marginBottom: `-${STRIP_HEIGHT}px`,
           backgroundColor: 'var(--color-surface)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)',
-          maskImage:       'linear-gradient(to bottom, black, transparent)',
+          // Fully opaque for the first half (a real cap — nothing shows
+          // through at all right at the sheet's own top edge), then a
+          // smooth, continuous fade to transparent for the second half.
+          // The earlier version faded from the very first pixel, so text
+          // could still peek through faintly right at the top.
+          WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
+          maskImage:       'linear-gradient(to bottom, black 50%, transparent 100%)',
           pointerEvents: 'none',
         }}
       />
