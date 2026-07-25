@@ -28,8 +28,28 @@
  * only the Dose Adjustments trigger itself has an explicit hide-when-empty
  * rule (4.11).
  *
+ * Correction, 2026-07-25 (against the real mockup image — plan decision 4.6
+ * never covered this, a genuine gap, not a missed read):
+ *   - "Dosage" renders as a large bold title, matching Side Effects' header
+ *     weight/size — not the small uppercase SectionHeader style the 4 old
+ *     retiring grouped sections use.
+ *   - `generic.textbook_dose_notes` (already selected in queries.js as
+ *     `textbookDoseNotes`, previously not read anywhere in this rebuild) is
+ *     shown as an italic line. It's a single field per generic, not part of
+ *     the textbook_doses array, so it can't vary by population/bracket —
+ *     rendered once for the whole section (under the tabs, above the
+ *     bracket cards), not repeated inside every card.
+ *   - `max_dose` renders inside a tinted callout (reusing the existing
+ *     "major" severity red — #FEE2E2 / #991B1B — already established in
+ *     sectionPrimitives.jsx's SEVERITY_STYLE, rather than inventing a new
+ *     color pair), not plain gray text.
+ *   - Citation line reads "Source: {source}", not an em-dash prefix.
+ *   - Unselected tab pill is outlined (transparent bg, bordered), not
+ *     filled gray — only the active tab gets a filled background.
+ *
  * Props:
- *   drug — flat drug object from DrugContext (textbookDoses, doseAdjustments)
+ *   drug — flat drug object from DrugContext (textbookDoses, doseAdjustments,
+ *          textbookDoseNotes)
  */
 
 import { useState } from 'react'
@@ -40,6 +60,7 @@ import { EmptySection } from './sectionPrimitives.jsx'
 export default function DoseSection({ drug }) {
   const {
     textbookDoses = [],
+    textbookDoseNotes,
     doseAdjustments = [],
   } = drug
 
@@ -79,11 +100,9 @@ export default function DoseSection({ drug }) {
         marginBottom:   'var(--space-3)',
       }}>
         <div style={{
-          fontSize:      10,
-          fontWeight:    700,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color:         'var(--color-text-tertiary)',
+          fontSize:   17,
+          fontWeight: 700,
+          color:      'var(--color-text-primary)',
         }}>
           Dosage
         </div>
@@ -126,12 +145,12 @@ export default function DoseSection({ drug }) {
               style={{
                 padding:         '6px 14px',
                 borderRadius:    'var(--radius-full)',
-                border:          'none',
                 cursor:          'pointer',
                 fontFamily:      'var(--font-body)',
                 fontSize:        13,
                 fontWeight:      600,
-                backgroundColor: pop === currentPopulation ? 'var(--color-text-primary)' : '#F3F4F6',
+                border:          pop === currentPopulation ? 'none' : '1px solid var(--color-border)',
+                backgroundColor: pop === currentPopulation ? 'var(--color-text-primary)' : 'transparent',
                 color:           pop === currentPopulation ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               }}
             >
@@ -139,6 +158,22 @@ export default function DoseSection({ drug }) {
             </button>
           ))}
         </div>
+      )}
+
+      {/* -- Dose note: single field per generic (textbook_dose_notes),
+            can't vary by population/bracket, so shown once here rather
+            than repeated inside every card below. -- */}
+      {textbookDoseNotes && (
+        <p style={{
+          fontSize:     13,
+          fontStyle:    'italic',
+          color:        'var(--color-text-secondary)',
+          lineHeight:   1.5,
+          margin:       0,
+          marginBottom: 'var(--space-3)',
+        }}>
+          {textbookDoseNotes}
+        </p>
       )}
 
       {/* -- Bracket cards for the active tab -- */}
@@ -176,11 +211,15 @@ export default function DoseSection({ drug }) {
 
             {entry.max_dose && (
               <div style={{
-                fontSize:  13,
-                color:     'var(--color-text-secondary)',
-                marginTop: 4,
+                display:         'inline-block',
+                fontSize:        13,
+                color:           '#991B1B',
+                backgroundColor: '#FEE2E2',
+                padding:         '4px 10px',
+                borderRadius:    'var(--radius-sm)',
+                marginTop:       'var(--space-2)',
               }}>
-                Max dose: {entry.max_dose}
+                <strong>Max:</strong> {entry.max_dose}
               </div>
             )}
 
@@ -191,7 +230,7 @@ export default function DoseSection({ drug }) {
                 fontStyle: 'italic',
                 marginTop: 6,
               }}>
-                — {entry.source}
+                Source: {entry.source}
               </div>
             )}
           </div>
