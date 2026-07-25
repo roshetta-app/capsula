@@ -12,8 +12,8 @@
  *     CMS via DoseRowList.jsx)
  *   - each tab's entries sharing that population render as one card per
  *     distinct `bracket` (age/weight/etc., optional), in `position` order
- *   - each card shows `instruction`, `max_dose`, and `source` as a citation
- *     line
+ *   - each card shows `instruction`, `max_dose`, `note`, and `source` as a
+ *     citation line
  *   - header row carries a "Dose adjustments ›" text-link trigger, styled to
  *     match GenericOverviewSection.jsx's "See Available Brands" link exactly
  *     (plain text + ChevronRight, no border — decision 4.11 distinguishes
@@ -46,6 +46,16 @@
  *   - Citation line reads "Source: {source}", not an em-dash prefix.
  *   - Unselected tab pill is outlined (transparent bg, bordered), not
  *     filled gray — only the active tab gets a filled background.
+ *
+ * Follow-up, 2026-07-25 (dose notes — "both" direction, brainstormed and
+ * approved same session): `textbook_doses` entries can now also carry an
+ * optional `note` field, entered per row in DoseRowList.jsx. Unlike
+ * `textbookDoseNotes` above (generic-wide, shown once regardless of tab),
+ * this is scoped to a single population/bracket entry and renders inside
+ * that entry's own card — so it can differ per tab, or be left blank on
+ * tabs it doesn't apply to. No DB migration needed; jsonb entries without a
+ * `note` key just render nothing extra, same as `bracket`/`max_dose`/
+ * `source` already do when absent.
  *
  * Props:
  *   drug — flat drug object from DrugContext (textbookDoses, doseAdjustments,
@@ -160,9 +170,10 @@ export default function DoseSection({ drug }) {
         </div>
       )}
 
-      {/* -- Dose note: single field per generic (textbook_dose_notes),
+      {/* -- General note: single field per generic (textbook_dose_notes),
             can't vary by population/bracket, so shown once here rather
-            than repeated inside every card below. -- */}
+            than repeated inside every card below. For a note scoped to
+            one specific tab/bracket, see entry.note inside each card. -- */}
       {textbookDoseNotes && (
         <p style={{
           fontSize:     13,
@@ -221,6 +232,21 @@ export default function DoseSection({ drug }) {
               }}>
                 <strong>Max:</strong> {entry.max_dose}
               </div>
+            )}
+
+            {/* Per-entry note — scoped to this bracket/tab only, distinct
+                from the generic-wide textbookDoseNotes shown above. */}
+            {entry.note && (
+              <p style={{
+                fontSize:     13,
+                fontStyle:    'italic',
+                color:        'var(--color-text-secondary)',
+                lineHeight:   1.5,
+                margin:       0,
+                marginTop:    'var(--space-2)',
+              }}>
+                {entry.note}
+              </p>
             )}
 
             {entry.source && (
