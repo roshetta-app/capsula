@@ -77,6 +77,59 @@ export function Collapsible({ title, children }) {
   )
 }
 
+// --- Inline truncated list ---------------------------------------------------
+//
+// A comma-joined line of items that truncates after `max` entries once there
+// are more, revealing a small chevron at the end of the line that
+// expands/collapses the rest in place.
+//
+// Deliberately separate from Collapsible above: Collapsible toggles a whole
+// content block under its own section header (title + chevron, content
+// appears below). This instead stays inline within a single line of text —
+// e.g. a combo drug's comma-joined ingredient names — with no title and no
+// block appearing underneath. (drug_detail_rebuild, step 1.1, decision 4.7 /
+// §11.6 — confirmed Collapsible doesn't fit this shape, built as its own
+// small shared primitive instead of forcing Collapsible to do both jobs.)
+//
+// Items are expected pre-formatted (already capitalized etc.) by the caller —
+// this primitive only handles truncation/expand display, no text
+// transformation of its own.
+export function InlineTruncatedList({ items = [], max = 3 }) {
+  const [open, setOpen] = useState(false)
+
+  if (!items || items.length === 0) return null
+
+  const hasMore = items.length > max
+  const shown = open ? items : items.slice(0, max)
+
+  return (
+    <span>
+      {shown.join(', ')}
+      {hasMore && (
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-label={open ? 'Show fewer' : 'Show more'}
+          style={{
+            display:        'inline-flex',
+            alignItems:     'center',
+            verticalAlign:  'middle',
+            background:     'none',
+            border:         'none',
+            cursor:         'pointer',
+            padding:        0,
+            marginLeft:     4,
+          }}
+        >
+          {open
+            ? <ChevronUp size={14} color="var(--color-text-tertiary)" />
+            : <ChevronDown size={14} color="var(--color-text-tertiary)" />
+          }
+        </button>
+      )}
+    </span>
+  )
+}
+
 // --- Empty-section state ("Not yet added") ---------------------------------
 
 export function NotYetAdded() {
