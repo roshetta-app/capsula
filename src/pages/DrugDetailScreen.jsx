@@ -45,6 +45,14 @@
  * PrescribingSection.jsx had its Drug Interactions content removed (now
  * Pharmacokinetics only, see 1.8) and stays mounted where it already was.
  *
+ * 2026-07-25 (drug_detail_rebuild, plan §7 Phase 1 step 1.8a, decision 4.16):
+ * PharmacologySection.jsx mounted here, right after DrugInteractionsSection
+ * per the locked §11.3 order (... Contraindications → Drug Interactions →
+ * Pharmacology → Sources). PrescribingSection.jsx had its remaining
+ * Pharmacokinetics content removed (step 1.8b) and now renders nothing —
+ * stays mounted where it already was until STEPS_DRUG_DETAIL.md 1.10's
+ * final retirement pass.
+ *
  * Route: /drugs/:slug
  */
 
@@ -60,6 +68,7 @@ import ClinicalOverview                  from '../components/drugs/sections/Clin
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import ContraindicationsSection          from '../components/drugs/sections/ContraindicationsSection'
 import DrugInteractionsSection           from '../components/drugs/sections/DrugInteractionsSection'
+import PharmacologySection               from '../components/drugs/sections/PharmacologySection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
 import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
 import PregnancySection                  from '../components/drugs/sections/PregnancySection'
@@ -265,6 +274,8 @@ export default function DrugDetailScreen() {
             <ContraindicationsSection drug={drug} />
 
             <DrugInteractionsSection drug={drug} />
+
+            <PharmacologySection drug={drug} />
 
             <SafetySection drug={drug} />
 

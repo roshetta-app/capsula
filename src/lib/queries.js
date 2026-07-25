@@ -54,6 +54,14 @@
  *     selected anywhere before) to BOTH the full and light selects/mappers,
  *     mapped to routeDetails (array) on FlatDrug. Needed so injection-route
  *     formulations can show IV/IM/SC etc. at the end of the card title.
+ *   - 2026-07-25 (drug_detail_rebuild, step 1.8c, decision 4.16): added
+ *     clinical_relevance (generics) to FULL_BRAND_SELECT only — detail-only
+ *     field, same treatment as drug_interactions/pharmacokinetics, correctly
+ *     left out of LIGHT_BRAND_SELECT. Mapped to clinicalRelevance on
+ *     FlatDrug, matching mechanismOfAction's plain pass-through style.
+ *     pharmacokinetics is now mapped with a `?? []` fallback to match every
+ *     other jsonb-list field on this table, reflecting its reshape from a
+ *     fixed 5-field object to a plain bullet list (also decision 4.16).
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -76,7 +84,7 @@ const FULL_BRAND_SELECT = `
       pregnancy_category, breastfeeding_safety,
       crosses_placenta, crosses_bbb,
       contraindications, drug_interactions, dose_adjustments,
-      pharmacokinetics, textbook_doses, textbook_dose_notes,
+      pharmacokinetics, clinical_relevance, textbook_doses, textbook_dose_notes,
       mechanism_of_action, card_tagline, is_published, ingredients
     )
   )
@@ -219,7 +227,8 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         contraindications:    g.contraindications     ?? [],
         drugInteractions:     g.drug_interactions     ?? [],
         doseAdjustments:      g.dose_adjustments      ?? [],
-        pharmacokinetics:     g.pharmacokinetics,
+        pharmacokinetics:     g.pharmacokinetics      ?? [],
+        clinicalRelevance:    g.clinical_relevance,
         textbookDoses:        g.textbook_doses        ?? [],
         textbookDoseNotes:    g.textbook_dose_notes,
       }
