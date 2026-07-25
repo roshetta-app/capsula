@@ -31,22 +31,27 @@ import { forwardRef } from 'react'
  * `pointerEvents: 'none'` so it never blocks scroll/tap. New pattern for
  * this app — not copied from ConditionDetailScreen or elsewhere.
  *
- * 2026-07-25 (session 16): replaced the overlay-strip fade with a true CSS
- * `mask-image` on this element itself — same technique DrugHeader.jsx
- * already uses for its horizontal edge-fades (see useEdgeFade there),
- * applied vertically here instead of horizontally. The previous version
- * was a separate strip painting a solid-to-transparent color patch on top
- * of the content — a reasonable approximation, but not a real fade, and it
- * looked too abrupt. A `mask-image` instead fades this element's own
- * actual rendered pixels — background, content, everything — to
- * transparent near the top, which is the standard way this effect is done
- * and blends smoothly into whatever's behind it (the header) with no
- * separate strip element needed.
+ * 2026-07-25 (session 16): tried a `mask-image` on this whole element to
+ * fade the top — same technique DrugHeader.jsx uses for its horizontal
+ * edge-fades. Wrong scope: masking the whole element faded the sheet's own
+ * border-radius/shadow/corner along with the content, which wasn't the
+ * intent. Reverted same session — see next note.
+ *
+ * 2026-07-25 (session 16, corrected): back to a separate small strip
+ * element (as in session 13), but now *that strip itself* uses a true
+ * `mask-image` fade instead of a solid-to-transparent background-color
+ * gradient. The strip is still a plain `--color-surface` rectangle, pinned
+ * to the top of the scroll box and pulled up over the content by a
+ * negative margin so it adds no extra space — same mechanic as session 13
+ * — but its own opacity now fades smoothly via mask-image (single linear
+ * ramp, no early solid plateau) rather than a 3-stop color gradient that
+ * held solid too long and then cut off too fast. The sheet itself
+ * (background/border-radius/shadow) is untouched and fully solid again.
  *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
-const FADE_HEIGHT = 40 // px — how far down the top fade extends before content is fully opaque
+const STRIP_HEIGHT = 40 // px — height of the fading buffer strip
 
 const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
   return (
@@ -61,10 +66,25 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         backgroundColor: 'var(--color-surface)',
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
-        WebkitMaskImage: `linear-gradient(to bottom, transparent, black ${FADE_HEIGHT}px, black 100%)`,
-        maskImage:       `linear-gradient(to bottom, transparent, black ${FADE_HEIGHT}px, black 100%)`,
       }}
     >
+      {/* Sticky fade strip — see the dated note above. Purely decorative,
+          so it's aria-hidden and never intercepts scroll/tap. Its own
+          opacity fades via mask-image (a true fade), not its color. */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 1,
+          height: `${STRIP_HEIGHT}px`,
+          marginBottom: `-${STRIP_HEIGHT}px`,
+          backgroundColor: 'var(--color-surface)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black, transparent)',
+          maskImage:       'linear-gradient(to bottom, black, transparent)',
+          pointerEvents: 'none',
+        }}
+      />
       <div
         style={{
           maxWidth: 680,
