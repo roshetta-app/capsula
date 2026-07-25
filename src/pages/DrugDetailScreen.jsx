@@ -211,7 +211,12 @@ export default function DrugDetailScreen() {
           // tone — a real color difference now does the separating.
           // `colors` is still resolved above and passed to DrugHeader for
           // its category label/icon/suffix text, unchanged.
-          backgroundColor: 'var(--color-bg)',
+          // 2026-07-25 (session 17, scoped to this page only): switched
+          // from --color-bg to --color-hero-bg (FAFAFA light / 29323F
+          // dark) — same existing token DrugHeader.jsx now uses, and root
+          // must keep matching header exactly (see session 14 note above)
+          // to avoid reintroducing the rounded-corner mismatch.
+          backgroundColor: 'var(--color-hero-bg)',
         }}
       >
         <DrugHeader

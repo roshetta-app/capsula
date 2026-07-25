@@ -236,7 +236,13 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
       // kept too, as a secondary depth cue). No mismatch reappears in the
       // rounded corner: header and root still match each other exactly:
       // only the sheet differs, by design.
-      backgroundColor: 'var(--color-bg)',
+      // 2026-07-25 (session 17, scoped to this page only): switched from
+      // --color-bg to the existing --color-hero-bg token (FAFAFA light /
+      // 29323F dark) — already defined in globals.css for exactly this
+      // "base layer needs to read as distinct from the panel/surface"
+      // case, so reusing it here instead of hardcoding a new value or
+      // touching the shared --color-bg token used app-wide.
+      backgroundColor: 'var(--color-hero-bg)',
       // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including
