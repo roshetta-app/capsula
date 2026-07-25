@@ -43,6 +43,7 @@ import DoseSection                       from '../components/drugs/sections/Dose
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
+import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
 import PrescribingSection                from '../components/drugs/sections/PrescribingSection'
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
@@ -239,6 +240,8 @@ export default function DrugDetailScreen() {
             <DosingSection drug={drug} />
 
             <SafetySection drug={drug} />
+
+            <SideEffectsSection drug={drug} />
 
             <PrescribingSection drug={drug} />
           </div>
