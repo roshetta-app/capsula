@@ -62,6 +62,12 @@
  *     pharmacokinetics is now mapped with a `?? []` fallback to match every
  *     other jsonb-list field on this table, reflecting its reshape from a
  *     fixed 5-field object to a plain bullet list (also decision 4.16).
+ *   - 2026-07-26 (drug_detail_rebuild, step 1.9b, decision 4.17): added
+ *     sources (generics) to FULL_BRAND_SELECT only — detail-only field,
+ *     same treatment as drug_interactions/pharmacokinetics/clinical_relevance,
+ *     correctly left out of LIGHT_BRAND_SELECT. Mapped to sources on
+ *     FlatDrug with a `?? []` fallback, matching every other jsonb-list
+ *     field on this table.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -84,7 +90,7 @@ const FULL_BRAND_SELECT = `
       pregnancy_category, breastfeeding_safety,
       crosses_placenta, crosses_bbb,
       contraindications, drug_interactions, dose_adjustments,
-      pharmacokinetics, clinical_relevance, textbook_doses, textbook_dose_notes,
+      pharmacokinetics, clinical_relevance, sources, textbook_doses, textbook_dose_notes,
       mechanism_of_action, card_tagline, is_published, ingredients
     )
   )
@@ -229,6 +235,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         doseAdjustments:      g.dose_adjustments      ?? [],
         pharmacokinetics:     g.pharmacokinetics      ?? [],
         clinicalRelevance:    g.clinical_relevance,
+        sources:              g.sources               ?? [],
         textbookDoses:        g.textbook_doses        ?? [],
         textbookDoseNotes:    g.textbook_dose_notes,
       }
