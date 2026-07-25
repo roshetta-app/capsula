@@ -28,6 +28,12 @@
  * styled in an accent color yet — the codebase's accent token name hasn't
  * been confirmed (globals.css not yet read); swap in once known.
  *
+ * Corrected 2026-07-25, session 20: dropped the trailing Divider() —
+ * page-wide correction (surfaced while building UsesSection.jsx, 1.2):
+ * no divider lines between any section on this page going forward, per
+ * the real mockup, which has no visible rules between blocks anywhere.
+ * Supersedes the divider carried over from the old 4-bundle design.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   siblings      — array of sibling flat drug objects sharing the same
@@ -39,7 +45,7 @@
 import { useState } from 'react'
 import { Atom, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { Divider, NotYetAdded, InlineTruncatedList } from './sectionPrimitives.jsx'
+import { NotYetAdded, InlineTruncatedList } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 const pillStyle = {
@@ -65,7 +71,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   const isCombo = Array.isArray(ingredients) && ingredients.length > 0
 
   return (
-    <div>
+    <div style={{ marginBottom: 'var(--space-5)' }}>
 
       {/* -- Top row: "Active ingredient(s)" label + Available Brands link
             (moved from DosingSection.jsx, 4.5; restyled to match mockup) -- */}
@@ -142,8 +148,6 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         <span style={pillStyle}>Class</span>
         <span style={pillStyle}>Subclass</span>
       </div>
-
-      <Divider />
 
       <BrandsBottomSheet
         isOpen={brandsOpen}

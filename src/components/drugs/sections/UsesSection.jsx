@@ -7,12 +7,18 @@
  * uses inside a category-color-tinted box, each entry a bold name with an
  * italic sub-line underneath only when that entry's `context` is present.
  * Past 3 entries the list truncates — a centered "See more"/"See less"
- * text button below the box reveals or re-hides the rest in place, its
- * chevron flipping between the two states. The button is omitted entirely
- * (not just inert) when the count is at or under 3 (4.10, clarified 4.14).
- * If `uses` is empty, the whole section is omitted — no header, no
- * "Not yet added" placeholder — a deliberate exception to the
- * EmptySection convention every other section on this page still uses.
+ * text button reveals or re-hides the rest in place, its chevron flipping
+ * between the two states. The button is omitted entirely (not just inert)
+ * when the count is at or under 3 (4.10, clarified 4.14). If `uses` is
+ * empty, the whole section is omitted — no header, no "Not yet added"
+ * placeholder — a deliberate exception to the EmptySection convention
+ * every other section on this page still uses.
+ *
+ * Corrected 2026-07-25, session 20, against the real mockup image: the
+ * "Uses and indications" label and the See more/See less toggle both live
+ * *inside* the tinted box now, not above/below it as first built — matches
+ * the mockup, which has no content outside the box at all. The trailing
+ * Divider() is also dropped — see the page-wide correction note below.
  *
  * Built as its own one-off component per 4.10 — no shared primitive was
  * extracted, since no second consumer needs this shape yet. The tint
@@ -28,7 +34,6 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { SectionHeader, Divider } from './sectionPrimitives.jsx'
 import { tintedBg } from '../../../utils/specialtyTokens.js'
 
 const TRUNCATE_AT = 3
@@ -44,38 +49,43 @@ export default function UsesSection({ drug, colors, isDark }) {
   const shown = open ? uses : uses.slice(0, TRUNCATE_AT)
 
   return (
-    <div style={{ marginBottom: 'var(--space-5)' }}>
-      <SectionHeader title="Uses" />
-
-      <ul style={{
-        margin:          0,
-        padding:         'var(--space-3)',
-        listStyle:       'none',
-        borderRadius:    'var(--radius-sm)',
-        backgroundColor: tintedBg(colors.bg, isDark),
+    <div style={{
+      marginBottom:    'var(--space-5)',
+      padding:         'var(--space-4)',
+      borderRadius:    'var(--radius-sm)',
+      backgroundColor: tintedBg(colors.bg, isDark),
+    }}>
+      <div style={{
+        fontSize:     15,
+        fontWeight:   700,
+        color:        'var(--color-text-primary)',
+        marginBottom: 'var(--space-3)',
       }}>
+        Uses and indications:
+      </div>
+
+      <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
         {shown.map((use, i) => {
           const name    = typeof use === 'string' ? use : use.use_name
           const context = typeof use === 'object' ? use.context : ''
           return (
             <li
               key={i}
-              style={{
-                display:      'flex',
-                alignItems:   'flex-start',
-                gap:          'var(--space-2)',
-                marginBottom: i === shown.length - 1 ? 0 : 'var(--space-2)',
-              }}
+              style={{ marginBottom: i === shown.length - 1 ? 0 : 'var(--space-2)' }}
             >
-              <span style={{
-                width:           5,
-                height:          5,
-                borderRadius:    '50%',
-                backgroundColor: colors.fg,
-                marginTop:       7,
-                flexShrink:      0,
-              }} />
-              <div>
+              {/* Dot sits in its own flex row with just the name, so it
+                  centers against that one line regardless of whether a
+                  context sub-line follows below (2026-07-25 alignment fix —
+                  previously top-aligned against the whole li block, which
+                  put the dot visibly above center once a sub-line existed). */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{
+                  width:           5,
+                  height:          5,
+                  borderRadius:    '50%',
+                  backgroundColor: colors.fg,
+                  flexShrink:      0,
+                }} />
                 <span style={{
                   fontSize:   14,
                   fontWeight: 600,
@@ -83,17 +93,18 @@ export default function UsesSection({ drug, colors, isDark }) {
                 }}>
                   {name}
                 </span>
-                {context && (
-                  <div style={{
-                    fontSize:  13,
-                    fontStyle: 'italic',
-                    color:     'var(--color-text-tertiary)',
-                    marginTop: 1,
-                  }}>
-                    {context}
-                  </div>
-                )}
               </div>
+              {context && (
+                <div style={{
+                  fontSize:   13,
+                  fontStyle:  'italic',
+                  color:      'var(--color-text-tertiary)',
+                  marginTop:  1,
+                  paddingLeft: 'calc(5px + var(--space-2))',
+                }}>
+                  {context}
+                </div>
+              )}
             </li>
           )
         })}
@@ -127,8 +138,6 @@ export default function UsesSection({ drug, colors, isDark }) {
           }
         </button>
       )}
-
-      <Divider />
     </div>
   )
 }
