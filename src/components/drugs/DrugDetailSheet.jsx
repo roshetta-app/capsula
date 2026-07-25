@@ -54,6 +54,13 @@ import { forwardRef } from 'react'
  * half (a real cap — nothing shows through there at all), then fades
  * smoothly to transparent across the second half.
  *
+ * 2026-07-25 (session 19): sheet background (and the fade strip's own
+ * background, so its cap still blends seamlessly) switched from
+ * --color-surface to --color-bg (F7F8FA light / 111827 dark), per this
+ * session's request. Header/root still use --color-hero-bg (FAFAFA/29323F
+ * — session 17), so the two-tone separation between header and sheet still
+ * holds, just with different token values now.
+ *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
@@ -69,7 +76,7 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: 'var(--color-bg)',
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
       }}
@@ -85,7 +92,7 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
           zIndex: 1,
           height: `${STRIP_HEIGHT}px`,
           marginBottom: `-${STRIP_HEIGHT}px`,
-          backgroundColor: 'var(--color-surface)',
+          backgroundColor: 'var(--color-bg)',
           // Fully opaque for the first half (a real cap — nothing shows
           // through at all right at the sheet's own top edge), then a
           // smooth, continuous fade to transparent for the second half.
