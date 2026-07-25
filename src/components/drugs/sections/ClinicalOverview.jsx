@@ -2,17 +2,21 @@
  * src/components/drugs/sections/ClinicalOverview.jsx
  * Phase 2c — Drug Detail Screen, grouped sections
  *
- * Renders the Clinical Overview group for a drug: Mechanism of Action + Uses.
- * Content logic carried over unchanged from the retiring DrugInfoSections.jsx.
- * Each of the two sections shows its own independent "Not yet added" state —
- * the old single classification fallback for zero content anywhere has been
- * dropped (see plan decisions).
+ * Renders the Clinical Overview group for a drug. Content logic carried
+ * over unchanged from the retiring DrugInfoSections.jsx.
  *
  * 2026-07-20 (drug_detail_moa_spacing_fix): Mechanism of Action no longer
  * wraps its content in Collapsible — it now renders as a plain static
  * section (header + text), matching how Uses (and every other section on
  * this page) already renders. There was no reason for MOA alone to hide
  * its content by default.
+ *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.1, decision 4.19):
+ * Mechanism of Action removed from this file — it now renders inside
+ * GenericOverviewSection.jsx instead (mounted first on the page), so it
+ * isn't shown twice now that both files are mounted together. This file
+ * temporarily renders Uses only, until UsesSection.jsx (checklist step 1.2)
+ * replaces it entirely and it's retired for good.
  *
  * Props: drug — flat drug object from DrugContext
  */
@@ -21,30 +25,11 @@ import { SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
 
 export default function ClinicalOverview({ drug }) {
   const {
-    mechanismOfAction,
     uses = [],
   } = drug
 
   return (
     <div>
-
-      {/* -- Mechanism of Action -- */}
-      {mechanismOfAction ? (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <SectionHeader title="Mechanism of Action" />
-          <p style={{
-            fontSize:   14,
-            color:      'var(--color-text-primary)',
-            lineHeight: 1.6,
-            margin:     0,
-          }}>
-            {mechanismOfAction}
-          </p>
-          <Divider />
-        </div>
-      ) : (
-        <EmptySection title="Mechanism of Action" />
-      )}
 
       {/* -- Uses -- */}
       {uses.length > 0 ? (
