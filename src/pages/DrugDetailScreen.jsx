@@ -196,17 +196,22 @@ export default function DrugDetailScreen() {
           display:         'flex',
           flexDirection:   'column',
           // 2026-07-25 (drug header/root color fix, session 11): reverted
-          // from the category color to the app's standard neutral page
-          // 2026-07-25 (header/root color fix, session 12): matches
-          // DrugHeader's and DrugDetailSheet's own surface tone exactly now,
-          // instead of the page's slightly different standard background —
-          // that mismatch was exactly what showed through in
-          // DrugDetailSheet's rounded top corners. `colors` is still
-          // resolved above and passed to DrugHeader for its category
-          // label/icon/suffix text, unchanged. Header/sheet separation is
-          // now handled by DrugDetailSheet's own top shadow instead of a
-          // color difference — see DrugDetailSheet.jsx.
-          backgroundColor: 'var(--color-surface)',
+          // from the category color to a neutral tone, matching the app's
+          // plain, minimal visual branding.
+          // 2026-07-25 (session 12): matched to DrugHeader's and
+          // DrugDetailSheet's own surface tone exactly, to remove a
+          // rounded-corner color mismatch — superseded next note.
+          // 2026-07-25 (session 14): switched back to the plain page tone,
+          // matching DrugHeader (not DrugDetailSheet). Session 12's fix
+          // removed the corner mismatch but also made the header and sheet
+          // identical colors with nothing but a faint shadow between them —
+          // barely visible in dark mode. Header and root now share this
+          // plain page tone (no mismatch: they still match each other
+          // exactly), while DrugDetailSheet keeps its own separate surface
+          // tone — a real color difference now does the separating.
+          // `colors` is still resolved above and passed to DrugHeader for
+          // its category label/icon/suffix text, unchanged.
+          backgroundColor: 'var(--color-bg)',
         }}
       >
         <DrugHeader

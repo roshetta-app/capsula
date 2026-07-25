@@ -219,16 +219,24 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
       // already renders full-width without any extra CSS. See the
       // dated correction note above.
       // 2026-07-25 (drug header/root color fix, session 11): background
-      // reverted from the drug's category color to the app's standard
-      // neutral surface tone — same value ConditionDetailScreen's own
-      // DetailHeader uses, so this matches the app's plain, minimal visual
-      // branding instead of a colored panel. `colors.fg` below is unchanged
-      // — the category label, icons, and suffix text still use it, which is
-      // the exact same category-color-on-surface pairing already proven
-      // readable on ConditionDetailScreen's header, in both light and dark
-      // mode (that pairing has its own light/dark values built in — no new
-      // contrast work needed here).
-      backgroundColor: 'var(--color-surface)',
+      // reverted from the drug's category color to a neutral tone, so this
+      // matches the app's plain, minimal visual branding instead of a
+      // colored panel. `colors.fg` below is unchanged — the category
+      // label, icons, and suffix text still use it.
+      // 2026-07-25 (session 14): switched from the surface (card) tone to
+      // the plain page tone. Session 12 had matched this to
+      // DrugDetailSheet's own surface tone to remove a rounded-corner
+      // mismatch, but that also made the header and the sheet identical
+      // colors with only a faint shadow between them — nearly invisible in
+      // dark mode, where a dark shadow barely shows against an
+      // already-dark background. Now header and the shared root
+      // (DrugDetailScreen.jsx) both use this same plain page tone, and
+      // DrugDetailSheet keeps its own separate surface tone — a real color
+      // difference does the separating now, not just a shadow (shadow is
+      // kept too, as a secondary depth cue). No mismatch reappears in the
+      // rounded corner: header and root still match each other exactly:
+      // only the sheet differs, by design.
+      backgroundColor: 'var(--color-bg)',
       // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including

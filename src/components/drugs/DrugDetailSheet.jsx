@@ -12,15 +12,14 @@ import { forwardRef } from 'react'
  * from it.
  *
  * 2026-07-25 (header/root color fix, session 12): header, this sheet, and
- * the shared page root all use the exact same surface tone now, which
- * removes the rounded-corner color mismatch this file's header used to
- * have — but also means nothing separated the header from the sheet
- * anymore. Added a soft shadow along this sheet's top edge so it still
- * reads as a distinct panel sitting above the header, reusing the same
- * shadow value ConditionDetailScreen's own header already uses
- * (`0 2px 6px rgba(0,0,0,0.05)`), just flipped to a negative vertical
- * offset so it projects upward from this element's top edge instead of
- * downward from a header's bottom edge.
+ * the shared page root briefly all used the exact same surface tone, which
+ * removed a rounded-corner color mismatch — but also meant nothing
+ * separated the header from the sheet, relying only on a shadow that
+ * barely showed in dark mode. Superseded in session 14: header and root
+ * went back to the app's plain page tone, while this sheet keeps its own
+ * separate surface tone — see DrugHeader.jsx's and DrugDetailScreen.jsx's
+ * own session 14 notes. This sheet's own styling didn't need to change;
+ * it already used the surface tone and already had this top shadow.
  *
  * 2026-07-25 (session 13): top corner roundedness increased 18px → 24px.
  * Also added a sticky buffer strip — a plain rectangle, same background as
