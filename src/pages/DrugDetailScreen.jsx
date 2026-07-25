@@ -197,10 +197,16 @@ export default function DrugDetailScreen() {
           flexDirection:   'column',
           // 2026-07-25 (drug header/root color fix, session 11): reverted
           // from the category color to the app's standard neutral page
-          // background — same value ConditionDetailScreen's own rootStyle
-          // uses. `colors` is still resolved above and passed to DrugHeader
-          // for its category label/icon/suffix text, unchanged.
-          backgroundColor: 'var(--color-bg)',
+          // 2026-07-25 (header/root color fix, session 12): matches
+          // DrugHeader's and DrugDetailSheet's own surface tone exactly now,
+          // instead of the page's slightly different standard background —
+          // that mismatch was exactly what showed through in
+          // DrugDetailSheet's rounded top corners. `colors` is still
+          // resolved above and passed to DrugHeader for its category
+          // label/icon/suffix text, unchanged. Header/sheet separation is
+          // now handled by DrugDetailSheet's own top shadow instead of a
+          // color difference — see DrugDetailSheet.jsx.
+          backgroundColor: 'var(--color-surface)',
         }}
       >
         <DrugHeader
