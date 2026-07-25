@@ -28,10 +28,19 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { SPECIALTY_TOKENS, tintedBg } from '../../../utils/specialtyTokens.js'
+import { SPECIALTY_TOKENS, hexToRgb } from '../../../utils/specialtyTokens.js'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
 const TRUNCATE_AT = 3
+
+// Fixed danger tint — deliberately not the drug's category color (decision
+// 4.14). tintedBg()'s alpha (0.35 light / 0.16 dark) is tuned for token
+// 'bg' colors that are already near-pastel — feeding it the 'red' token's
+// bg washed out almost to white. Built locally instead: the richer 'pill'
+// red (same red the "Major" interaction badge uses) as the base, at a
+// lower, hand-tuned alpha — enough color to still read as "danger"
+// without being a solid block.
+const DANGER_ALPHA = { light: 0.14, dark: 0.22 }
 
 export default function ContraindicationsSection({ drug }) {
   const [open, setOpen] = useState(false)
@@ -44,19 +53,15 @@ export default function ContraindicationsSection({ drug }) {
   const hasMore = contraindications.length > TRUNCATE_AT
   const shown = open ? contraindications : contraindications.slice(0, TRUNCATE_AT)
 
-  // Fixed danger tint — deliberately not the drug's category color (see
-  // decision 4.14). Reuses the existing 'red' specialty token's own
-  // pre-lightened bg (not a raw saturated hex) as the base color, same as
-  // every category-tinted box on this page feeds tintedBg() — a flat
-  // saturated red here produced a much harsher wash than intended.
-  const dangerBg = isDark ? SPECIALTY_TOKENS.red.dark.bg : SPECIALTY_TOKENS.red.light.bg
+  const [r, g, b] = hexToRgb(SPECIALTY_TOKENS.red.light.pill)
+  const dangerBg = `rgba(${r}, ${g}, ${b}, ${isDark ? DANGER_ALPHA.dark : DANGER_ALPHA.light})`
 
   return (
     <div style={{
       marginBottom:    'var(--space-5)',
       padding:         'var(--space-4)',
       borderRadius:    'var(--radius-sm)',
-      backgroundColor: tintedBg(dangerBg, isDark),
+      backgroundColor: dangerBg,
     }}>
       <div style={{
         fontSize:     15,
