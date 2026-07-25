@@ -32,7 +32,12 @@ import { ChevronDown, ChevronUp, FlaskConical } from 'lucide-react'
 export default function PharmacologySection({ drug }) {
   const [open, setOpen] = useState(false)
 
-  const { pharmacokinetics = [], clinicalRelevance } = drug
+  // Destructuring defaults only cover `undefined`, not `null` — and this
+  // column comes back `null` (not just absent) for any drug that hasn't
+  // had pharmacokinetics filled in yet, so an explicit `??` is needed here
+  // even with queries.js's own `?? []` fallback already in place upstream.
+  const pharmacokinetics  = drug.pharmacokinetics ?? []
+  const clinicalRelevance = drug.clinicalRelevance
 
   const hasContent = pharmacokinetics.length > 0 || !!clinicalRelevance
 
