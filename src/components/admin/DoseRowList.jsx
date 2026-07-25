@@ -18,9 +18,18 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
  * every add/remove/reorder, so it can never drift out of sync with what's
  * displayed here.
  *
+ * 2026-07-25 (drug notes follow-up): added an optional per-row `note` field,
+ * rendered as a full-width textarea below each row's main grid rather than a
+ * 7th grid column (would've made the row too cramped). This is separate from
+ * generic.textbook_dose_notes (still edited in GenericEditor.jsx) — that one
+ * is a single field for the whole generic, shown once on the app regardless
+ * of tab; this one is scoped to a single population/bracket row and shows
+ * only under that row's card on the app.
+ *
  * Props:
  *   doses     { population: string, bracket?: string, instruction: string,
- *               max_dose?: string, source?: string, position: number }[]
+ *               max_dose?: string, source?: string, note?: string,
+ *               position: number }[]
  *   onChange  (doses) => void
  *   disabled  boolean
  */
@@ -38,7 +47,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
   function addRow() {
     onChange(withRecomputedPositions([
       ...doses,
-      { population: '', bracket: '', instruction: '', max_dose: '', source: '', position: doses.length },
+      { population: '', bracket: '', instruction: '', max_dose: '', source: '', note: '', position: doses.length },
     ]))
   }
 
@@ -55,7 +64,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
       {/* Header row */}
       {doses.length > 0 && (
@@ -70,100 +79,114 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
       )}
 
       {doses.map((dose, idx) => (
-        <div
-          key={idx}
-          style={{ display: 'grid', gridTemplateColumns: '110px 110px 1fr 100px 140px 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}
-        >
-          {/* Population */}
-          <input
-            type="text"
-            value={dose.population ?? ''}
-            onChange={e => updateRow(idx, 'population', e.target.value)}
-            placeholder="e.g. Adult"
-            disabled={disabled}
-            style={inputBase}
-          />
+        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div
+            style={{ display: 'grid', gridTemplateColumns: '110px 110px 1fr 100px 140px 56px', gap: 'var(--space-2)', alignItems: 'flex-start' }}
+          >
+            {/* Population */}
+            <input
+              type="text"
+              value={dose.population ?? ''}
+              onChange={e => updateRow(idx, 'population', e.target.value)}
+              placeholder="e.g. Adult"
+              disabled={disabled}
+              style={inputBase}
+            />
 
-          {/* Bracket */}
-          <input
-            type="text"
-            value={dose.bracket ?? ''}
-            onChange={e => updateRow(idx, 'bracket', e.target.value)}
-            placeholder="e.g. 2–6y"
-            disabled={disabled}
-            style={inputBase}
-          />
+            {/* Bracket */}
+            <input
+              type="text"
+              value={dose.bracket ?? ''}
+              onChange={e => updateRow(idx, 'bracket', e.target.value)}
+              placeholder="e.g. 2–6y"
+              disabled={disabled}
+              style={inputBase}
+            />
 
-          {/* Instruction */}
+            {/* Instruction */}
+            <textarea
+              value={dose.instruction ?? ''}
+              onChange={e => updateRow(idx, 'instruction', e.target.value)}
+              placeholder="Dose instruction…"
+              disabled={disabled}
+              dir="auto"
+              rows={2}
+              style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+            />
+
+            {/* Max dose */}
+            <input
+              type="text"
+              value={dose.max_dose ?? ''}
+              onChange={e => updateRow(idx, 'max_dose', e.target.value || '')}
+              placeholder="e.g. 3g/day"
+              disabled={disabled}
+              style={inputBase}
+            />
+
+            {/* Source */}
+            <input
+              type="text"
+              value={dose.source ?? ''}
+              onChange={e => updateRow(idx, 'source', e.target.value)}
+              placeholder="e.g. BNF 2024"
+              disabled={disabled}
+              style={inputBase}
+            />
+
+            {/* Reorder + remove */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {!disabled && (
+                <>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    <button
+                      type="button"
+                      onClick={() => moveRow(idx, -1)}
+                      disabled={idx === 0}
+                      aria-label="Move dose row up"
+                      style={reorderBtnStyle(idx === 0)}
+                    >
+                      <ChevronUp size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveRow(idx, 1)}
+                      disabled={idx === doses.length - 1}
+                      aria-label="Move dose row down"
+                      style={reorderBtnStyle(idx === doses.length - 1)}
+                    >
+                      <ChevronDown size={13} />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeRow(idx)}
+                    aria-label="Remove dose row"
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: 'var(--color-text-tertiary)', padding: 4,
+                      display: 'flex', alignItems: 'center',
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Note — optional, scoped to this row only. Shown under this
+              row's card on the app (DoseSection.jsx), not shared across
+              tabs like generic.textbook_dose_notes is. */}
           <textarea
-            value={dose.instruction ?? ''}
-            onChange={e => updateRow(idx, 'instruction', e.target.value)}
-            placeholder="Dose instruction…"
+            value={dose.note ?? ''}
+            onChange={e => updateRow(idx, 'note', e.target.value)}
+            placeholder="Note for this dose only (optional) — shown under this card on the app"
             disabled={disabled}
             dir="auto"
-            rows={2}
-            style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+            rows={1}
+            style={{ ...inputBase, resize: 'vertical', fontFamily: 'var(--font-body)', fontStyle: 'italic' }}
           />
-
-          {/* Max dose */}
-          <input
-            type="text"
-            value={dose.max_dose ?? ''}
-            onChange={e => updateRow(idx, 'max_dose', e.target.value || '')}
-            placeholder="e.g. 3g/day"
-            disabled={disabled}
-            style={inputBase}
-          />
-
-          {/* Source */}
-          <input
-            type="text"
-            value={dose.source ?? ''}
-            onChange={e => updateRow(idx, 'source', e.target.value)}
-            placeholder="e.g. BNF 2024"
-            disabled={disabled}
-            style={inputBase}
-          />
-
-          {/* Reorder + remove */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {!disabled && (
-              <>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  <button
-                    type="button"
-                    onClick={() => moveRow(idx, -1)}
-                    disabled={idx === 0}
-                    aria-label="Move dose row up"
-                    style={reorderBtnStyle(idx === 0)}
-                  >
-                    <ChevronUp size={13} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => moveRow(idx, 1)}
-                    disabled={idx === doses.length - 1}
-                    aria-label="Move dose row down"
-                    style={reorderBtnStyle(idx === doses.length - 1)}
-                  >
-                    <ChevronDown size={13} />
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeRow(idx)}
-                  aria-label="Remove dose row"
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--color-text-tertiary)', padding: 4,
-                    display: 'flex', alignItems: 'center',
-                  }}
-                >
-                  <Trash2 size={15} />
-                </button>
-              </>
-            )}
-          </div>
         </div>
       ))}
 
