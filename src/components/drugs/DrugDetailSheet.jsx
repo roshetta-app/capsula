@@ -31,6 +31,16 @@ import { forwardRef } from 'react'
  * `pointerEvents: 'none'` so it never blocks scroll/tap. New pattern for
  * this app — not copied from ConditionDetailScreen or elsewhere.
  *
+ * 2026-07-25 (session 15): buffer strip changed from a solid opaque
+ * rectangle to a top-to-bottom fade — content now dissolves smoothly as it
+ * scrolls up instead of disappearing behind a hard edge. Same linear-
+ * gradient fade idea DrugHeader.jsx already uses for its horizontal
+ * edge-fades (see useEdgeFade there), just oriented vertically here
+ * instead of horizontally. Made the strip taller so the fade has room to
+ * look smooth rather than abrupt. Dropped the strip's own border-radius —
+ * this sheet's own overflow: auto + border-radius already clips every
+ * child to the rounded shape, so it was redundant.
+ *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
@@ -49,7 +59,7 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
       }}
     >
-      {/* Sticky buffer strip — see the dated note above. Purely decorative,
+      {/* Sticky fade strip — see the dated note above. Purely decorative,
           so it's aria-hidden and never intercepts scroll/tap. */}
       <div
         aria-hidden="true"
@@ -57,10 +67,9 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
           position: 'sticky',
           top: 0,
           zIndex: 1,
-          height: 'var(--space-5)',
-          marginBottom: 'calc(var(--space-5) * -1)',
-          backgroundColor: 'var(--color-surface)',
-          borderRadius: '24px 24px 0 0',
+          height: 'calc(var(--space-5) * 2)',
+          marginBottom: 'calc(var(--space-5) * -2)',
+          background: 'linear-gradient(to bottom, var(--color-surface) 0%, var(--color-surface) 35%, transparent 100%)',
           pointerEvents: 'none',
         }}
       />
