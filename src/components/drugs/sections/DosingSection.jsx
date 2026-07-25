@@ -1,69 +1,25 @@
 /**
  * src/components/drugs/sections/DosingSection.jsx
- * Phase 2c — Drug Detail Screen, grouped sections
- *
- * Renders the Dosing group for a drug: Doses (via the existing DoseTable)
- * and Dose Adjustments. Dose Adjustments content logic carried over
- * unchanged from the retiring DrugInfoSections.jsx.
+ * Phase 2c — Drug Detail Screen, grouped sections (retiring)
  *
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.1 / decision 4.5):
- * the "Available Brands" trigger row and BrandsBottomSheet mount that used
- * to live here have moved to GenericOverviewSection.jsx — same behavior,
- * just relocated. This file now only renders Doses + Dose Adjustments.
+ * the "Available Brands" trigger row and BrandsBottomSheet mount moved to
+ * GenericOverviewSection.jsx.
+ *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.3 / decisions 4.6,
+ * 4.11): Doses and Dose Adjustments — this file's only remaining content —
+ * have both moved to the new DoseSection.jsx + DoseAdjustmentsBottomSheet.jsx.
+ * This file now renders nothing. Same treatment ClinicalOverview.jsx got once
+ * Uses moved out (step 1.2) — stays mounted (empty) in DrugDetailScreen.jsx
+ * until STEPS_DRUG_DETAIL.md 1.10's final retirement pass removes it, along
+ * with the other 3 old grouped section files, once every one of them has had
+ * all of its content individually absorbed.
  *
  * Props:
- *   drug — flat drug object from DrugContext (dose + doseAdjustments data)
+ *   drug — unused now; kept so the call site in DrugDetailScreen.jsx doesn't
+ *          need touching again before 1.10
  */
 
-import DoseTable from '../DoseTable.jsx'
-import { SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
-
-export default function DosingSection({ drug }) {
-  const {
-    defaultDoseOverride,
-    textbookDoses = [],
-    textbookDoseNotes,
-    doseAdjustments = [],
-  } = drug
-
-  return (
-    <div>
-
-      {/* -- Doses -- */}
-      <DoseTable
-        defaultDoseOverride={defaultDoseOverride}
-        textbookDoses={textbookDoses}
-        textbookDoseNotes={textbookDoseNotes}
-      />
-
-      {/* -- Dose Adjustments -- */}
-      {doseAdjustments.length > 0 ? (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <SectionHeader title="Dose Adjustments" />
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {doseAdjustments.map((da, i) => (
-              <li key={i} style={{
-                padding:      'var(--space-2) 0',
-                borderBottom: i < doseAdjustments.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-                lineHeight:   1.5,
-              }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {da.condition}
-                </span>
-                {da.adjustment && (
-                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                    {da.adjustment}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-          <Divider />
-        </div>
-      ) : (
-        <EmptySection title="Dose Adjustments" />
-      )}
-
-    </div>
-  )
+export default function DosingSection() {
+  return null
 }

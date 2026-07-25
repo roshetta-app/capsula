@@ -1,66 +1,15 @@
 /**
  * src/pages/DrugDetailScreen.jsx
- * Phase 2G — Drug Detail Screen (full rebuild)
- * Phase 3J — added logUsageEvent on mount for analytics
  *
- * 2026-07-20 (drug_library_ui_ux, plan §7 steps 2c.1–2c.7, decisions
- * 4.25–4.27): removed the bordered/shadowed box that used to wrap
- * everything below the header — no card anywhere on the page now, flat
- * content directly on the page background, same flat-content direction as
- * the rest of this redesign (SharedDrugCard's flat row, the flat drugs
- * list). DoseTable/BrandsList/DrugInfoSections are retired; replaced below
- * by the four grouped section components (ClinicalOverview/DosingSection/
- * SafetySection/PrescribingSection), mounted in decision 4.25's order.
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 0, decisions 4.1, 4.2):
+ * Rebuilt root — <Layout> dropped entirely (same as ConditionDetailScreen.jsx),
+ * measured-height/overflow-hidden pattern adopted, DrugHeader + DrugDetailSheet
+ * mounted directly, BottomNav self-rendered at the end of the page.
  *
- * 2026-07-20 (drug_detail_moa_spacing_fix): the section group below
- * DrugHeader had no top spacing at all — content touched the header
- * directly. Wrapped the section group in its own div with
- * paddingTop: 'var(--space-5)', matching the exact top-padding value
- * ConditionDetailScreen.jsx uses on its own content wrapper directly below
- * its sticky header, instead of introducing a new one-off value. DrugHeader
- * itself is untouched.
- *
- * 2026-07-25 (drug_library_ui_ux, STEPS_DRUG_DETAIL.md step 0.2, decision
- * 4.2 + its 2026-07-25 correction): dropped the shared Layout wrapper
- * entirely, same as ConditionDetailScreen.jsx — direct consequence: the
- * offline/notification banners no longer show on this page. The root now
- * self-manages a measured-height, overflow-hidden container (written fresh
- * for this screen, not copied from ConditionDetailScreen.jsx, per 4.2's
- * no-copy-paste rule — same end mechanic only), with DrugHeader as the
- * fixed top piece and the new DrugDetailSheet (step 0.1) as the single
- * independently-scrolling child. BottomNav is now rendered directly here
- * instead of being supplied by Layout. Section children inside the sheet
- * are unchanged for now — still the same 4 grouped blocks; swapping them
- * for the 9 new standalone sections is Phase 1's job, not this step.
- *
- * 2026-07-25 (header/root color fix): the header's colored panel used to
- * stop in a straight line at its own bottom edge, while the root behind it
- * had no background of its own — so DrugDetailSheet's rounded top corners
- * revealed the plain page background in that gap instead of more of the
- * header's color. Category color was briefly resolved once here and
- * painted on this root to match the header — **superseded same session,
- * see the next note.**
- *
- * 2026-07-25 (header/root reverted to neutral, session 11): the category-
- * colored header didn't match the app's plain, minimal visual branding.
- * Root and header both now use the app's standard neutral tokens instead
- * (`--color-bg` / `--color-surface`, same values ConditionDetailScreen
- * already uses) — the earlier mismatch this fixed is a non-issue between
- * two close neutral tones, same as it already is on that screen. Category
- * `colors` is still resolved here and passed to DrugHeader, but only for
- * its category label/icon/suffix text now, not for any background.
- *
- * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.1, decision 4.19):
- * GenericOverviewSection.jsx mounted here, first in the section order per
- * the locked mount order (§11.3) — carries the generic/combo name, Class/
- * Subclass placeholder tags, the Available Brands trigger (relocated from
- * DosingSection.jsx, decision 4.5), and Mechanism of Action. `siblings`/
- * `handleSiblingTap` (used only by the Brands trigger) moved here from
- * DosingSection accordingly. Per decision 4.19, each new Phase 1 section
- * now gets wired in here as soon as it's built, instead of all 9 landing
- * together at the old single integration step — the remaining 4 old
- * grouped sections (ClinicalOverview trimmed to Uses-only for now,
- * DosingSection, SafetySection, PrescribingSection) stay mounted
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.1, decision 4.5):
+ * GenericOverviewSection.jsx mounted first per the locked §11.3 order. The 4
+ * old grouped sections (ClinicalOverview, DosingSection, SafetySection,
+ * PrescribingSection) stay mounted, unchanged behaviorally, and will render
  * side-by-side with the new ones until each is individually replaced.
  *
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.2, decision 4.10):
@@ -72,6 +21,14 @@
  * STEPS_DRUG_DETAIL.md 1.10 retires it alongside the other old grouped
  * sections.
  *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.3, decisions 4.6,
+ * 4.11): DoseSection.jsx mounted third per the locked §11.3 order
+ * (Generic Overview → Uses → Dose → ...). DosingSection.jsx — whose only
+ * remaining content (Doses + Dose Adjustments) has now fully moved into
+ * DoseSection.jsx / DoseAdjustmentsBottomSheet.jsx — stays mounted (now
+ * renders nothing; see its own file header), same treatment ClinicalOverview
+ * got in step 1.2, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
+ *
  * Route: /drugs/:slug
  */
 
@@ -82,6 +39,7 @@ import DrugDetailSheet                   from '../components/drugs/DrugDetailShe
 import BottomNav                         from '../components/BottomNav'
 import GenericOverviewSection            from '../components/drugs/sections/GenericOverviewSection'
 import UsesSection                       from '../components/drugs/sections/UsesSection'
+import DoseSection                       from '../components/drugs/sections/DoseSection'
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
@@ -253,12 +211,13 @@ export default function DrugDetailScreen() {
         />
 
         {/* 0.2 — DrugDetailSheet (step 0.1) is now the single scrolling
-            child. GenericOverviewSection (1.1) and UsesSection (1.2, decision
-            4.10) mount first and second per the locked §11.3 order; the
-            remaining 3 old grouped sections stay mounted as-is until each is
-            individually replaced by its own Phase 1 rebuild. paddingTop kept
-            per drug_detail_moa_spacing_fix; paddingBottom kept so content
-            still clears the fixed BottomNav below, same as today. */}
+            child. GenericOverviewSection (1.1), UsesSection (1.2, decision
+            4.10), and DoseSection (1.3, decisions 4.6/4.11) mount first,
+            second, and third per the locked §11.3 order; the remaining old
+            grouped sections stay mounted as-is until each is individually
+            replaced by its own Phase 1 rebuild. paddingTop kept per
+            drug_detail_moa_spacing_fix; paddingBottom kept so content still
+            clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
             <GenericOverviewSection
@@ -272,6 +231,8 @@ export default function DrugDetailScreen() {
               colors={colors}
               isDark={isDark}
             />
+
+            <DoseSection drug={drug} />
 
             <ClinicalOverview drug={drug} />
 
