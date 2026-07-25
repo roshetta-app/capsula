@@ -31,19 +31,23 @@ import { forwardRef } from 'react'
  * `pointerEvents: 'none'` so it never blocks scroll/tap. New pattern for
  * this app — not copied from ConditionDetailScreen or elsewhere.
  *
- * 2026-07-25 (session 15): buffer strip changed from a solid opaque
- * rectangle to a top-to-bottom fade — content now dissolves smoothly as it
- * scrolls up instead of disappearing behind a hard edge. Same linear-
- * gradient fade idea DrugHeader.jsx already uses for its horizontal
- * edge-fades (see useEdgeFade there), just oriented vertically here
- * instead of horizontally. Made the strip taller so the fade has room to
- * look smooth rather than abrupt. Dropped the strip's own border-radius —
- * this sheet's own overflow: auto + border-radius already clips every
- * child to the rounded shape, so it was redundant.
+ * 2026-07-25 (session 16): replaced the overlay-strip fade with a true CSS
+ * `mask-image` on this element itself — same technique DrugHeader.jsx
+ * already uses for its horizontal edge-fades (see useEdgeFade there),
+ * applied vertically here instead of horizontally. The previous version
+ * was a separate strip painting a solid-to-transparent color patch on top
+ * of the content — a reasonable approximation, but not a real fade, and it
+ * looked too abrupt. A `mask-image` instead fades this element's own
+ * actual rendered pixels — background, content, everything — to
+ * transparent near the top, which is the standard way this effect is done
+ * and blends smoothly into whatever's behind it (the header) with no
+ * separate strip element needed.
  *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
+const FADE_HEIGHT = 40 // px — how far down the top fade extends before content is fully opaque
+
 const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
   return (
     <div
@@ -57,22 +61,10 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         backgroundColor: 'var(--color-surface)',
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
+        WebkitMaskImage: `linear-gradient(to bottom, transparent, black ${FADE_HEIGHT}px, black 100%)`,
+        maskImage:       `linear-gradient(to bottom, transparent, black ${FADE_HEIGHT}px, black 100%)`,
       }}
     >
-      {/* Sticky fade strip — see the dated note above. Purely decorative,
-          so it's aria-hidden and never intercepts scroll/tap. */}
-      <div
-        aria-hidden="true"
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          height: 'calc(var(--space-5) * 2)',
-          marginBottom: 'calc(var(--space-5) * -2)',
-          background: 'linear-gradient(to bottom, var(--color-surface) 0%, var(--color-surface) 35%, transparent 100%)',
-          pointerEvents: 'none',
-        }}
-      />
       <div
         style={{
           maxWidth: 680,
