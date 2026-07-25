@@ -37,9 +37,18 @@
  * stop in a straight line at its own bottom edge, while the root behind it
  * had no background of its own — so DrugDetailSheet's rounded top corners
  * revealed the plain page background in that gap instead of more of the
- * header's color. Category color is now resolved once here (moved from
- * DrugHeader.jsx) and painted on this root, with `category`/`colors` passed
- * down to DrugHeader as props instead of it re-resolving them itself.
+ * header's color. Category color was briefly resolved once here and
+ * painted on this root to match the header — **superseded same session,
+ * see the next note.**
+ *
+ * 2026-07-25 (header/root reverted to neutral, session 11): the category-
+ * colored header didn't match the app's plain, minimal visual branding.
+ * Root and header both now use the app's standard neutral tokens instead
+ * (`--color-bg` / `--color-surface`, same values ConditionDetailScreen
+ * already uses) — the earlier mismatch this fixed is a non-issue between
+ * two close neutral tones, same as it already is on that screen. Category
+ * `colors` is still resolved here and passed to DrugHeader, but only for
+ * its category label/icon/suffix text now, not for any background.
  *
  * Route: /drugs/:slug
  */
@@ -186,12 +195,12 @@ export default function DrugDetailScreen() {
           overflow:        'hidden',
           display:         'flex',
           flexDirection:   'column',
-          // Header/root color fix: this is now the single source of the
-          // category color for the whole page, not just the header's own
-          // box. DrugHeader no longer paints its own background, so the
-          // gap revealed by DrugDetailSheet's rounded top corners shows
-          // more of this same color instead of a mismatched neutral one.
-          backgroundColor: colors.bg,
+          // 2026-07-25 (drug header/root color fix, session 11): reverted
+          // from the category color to the app's standard neutral page
+          // background — same value ConditionDetailScreen's own rootStyle
+          // uses. `colors` is still resolved above and passed to DrugHeader
+          // for its category label/icon/suffix text, unchanged.
+          backgroundColor: 'var(--color-bg)',
         }}
       >
         <DrugHeader

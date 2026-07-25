@@ -218,16 +218,17 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
       // full-width root (Layout no longer wraps this screen), so it
       // already renders full-width without any extra CSS. See the
       // dated correction note above.
-      // 2026-07-25 (drug header/root color fix): no longer paints its own
-      // background. The rounded top corners of DrugDetailSheet below sit
-      // right underneath this header, and the header's box always stops
-      // in a straight line at its own bottom edge — so a rectangle here
-      // was always going to leave a mismatched sliver of the plain page
-      // background showing through that curve. DrugDetailScreen.jsx now
-      // resolves this same category color once and paints it on the
-      // shared page root instead, so that sliver reveals more of the same
-      // color rather than a different one. `colors` is still used below
-      // for text/icon foreground only.
+      // 2026-07-25 (drug header/root color fix, session 11): background
+      // reverted from the drug's category color to the app's standard
+      // neutral surface tone — same value ConditionDetailScreen's own
+      // DetailHeader uses, so this matches the app's plain, minimal visual
+      // branding instead of a colored panel. `colors.fg` below is unchanged
+      // — the category label, icons, and suffix text still use it, which is
+      // the exact same category-color-on-surface pairing already proven
+      // readable on ConditionDetailScreen's header, in both light and dark
+      // mode (that pairing has its own light/dark values built in — no new
+      // contrast work needed here).
+      backgroundColor: 'var(--color-surface)',
       // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including
