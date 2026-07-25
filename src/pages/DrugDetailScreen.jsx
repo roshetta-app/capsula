@@ -20,13 +20,27 @@
  * its sticky header, instead of introducing a new one-off value. DrugHeader
  * itself is untouched.
  *
+ * 2026-07-25 (drug_library_ui_ux, STEPS_DRUG_DETAIL.md step 0.2, decision
+ * 4.2 + its 2026-07-25 correction): dropped the shared Layout wrapper
+ * entirely, same as ConditionDetailScreen.jsx — direct consequence: the
+ * offline/notification banners no longer show on this page. The root now
+ * self-manages a measured-height, overflow-hidden container (written fresh
+ * for this screen, not copied from ConditionDetailScreen.jsx, per 4.2's
+ * no-copy-paste rule — same end mechanic only), with DrugHeader as the
+ * fixed top piece and the new DrugDetailSheet (step 0.1) as the single
+ * independently-scrolling child. BottomNav is now rendered directly here
+ * instead of being supplied by Layout. Section children inside the sheet
+ * are unchanged for now — still the same 4 grouped blocks; swapping them
+ * for the 9 new standalone sections is Phase 1's job, not this step.
+ *
  * Route: /drugs/:slug
  */
 
-import { useEffect }                    from 'react'
+import { useEffect, useRef, useState }   from 'react'
 import { useParams, useNavigate }        from 'react-router-dom'
-import Layout                            from '../components/layout'
 import DrugHeader                        from '../components/drugs/DrugHeader'
+import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
+import BottomNav                         from '../components/BottomNav'
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
@@ -65,73 +79,95 @@ export default function DrugDetailScreen() {
     }
   }, [drug?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Step 0.2 — measured-height/overflow-hidden root, written fresh for this
+  // screen per decision 4.2's no-copy-paste rule. Measures the space left
+  // below this root's own top edge and pins the whole page to exactly that
+  // height, so DrugDetailSheet below can own a single independent scroll
+  // box instead of the whole page scrolling.
+  const rootRef = useRef(null)
+  const [availableHeight, setAvailableHeight] = useState(null)
+
+  useEffect(() => {
+    function measure() {
+      if (rootRef.current) {
+        setAvailableHeight(window.innerHeight - rootRef.current.getBoundingClientRect().top)
+      }
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading && !drug) {
     return (
-      <Layout>
-        <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          minHeight:      '60dvh',
-          color:          'var(--color-text-tertiary)',
-          fontSize:       14,
-        }}>
-          Loading…
-        </div>
-      </Layout>
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        minHeight:      '60dvh',
+        color:          'var(--color-text-tertiary)',
+        fontSize:       14,
+      }}>
+        Loading…
+      </div>
     )
   }
 
   // ── Not found ──────────────────────────────────────────────────────────────
   if (!drug) {
     return (
-      <Layout>
-        <div style={{
-          display:        'flex',
-          flexDirection:  'column',
-          alignItems:     'center',
-          justifyContent: 'center',
-          minHeight:      '60dvh',
-          gap:            'var(--space-3)',
-          color:          'var(--color-text-tertiary)',
-          padding:        'var(--space-6)',
-          textAlign:      'center',
-        }}>
-          <div style={{ fontSize: 32, opacity: 0.3 }}>💊</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-            Drug not found
-          </div>
-          <div style={{ fontSize: 13 }}>
-            This drug may have been removed or the link is incorrect.
-          </div>
-          <button
-            onClick={() => navigate('/drugs')}
-            style={{
-              marginTop:    'var(--space-2)',
-              padding:      '8px 20px',
-              borderRadius: 'var(--radius-sm)',
-              border:       '1px solid var(--color-border)',
-              background:   'none',
-              fontSize:     13,
-              fontWeight:   500,
-              color:        'var(--color-text-secondary)',
-              cursor:       'pointer',
-              fontFamily:   'var(--font-body)',
-            }}
-          >
-            ← Back to Drugs
-          </button>
+      <div style={{
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        justifyContent: 'center',
+        minHeight:      '60dvh',
+        gap:            'var(--space-3)',
+        color:          'var(--color-text-tertiary)',
+        padding:        'var(--space-6)',
+        textAlign:      'center',
+      }}>
+        <div style={{ fontSize: 32, opacity: 0.3 }}>💊</div>
+        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+          Drug not found
         </div>
-      </Layout>
+        <div style={{ fontSize: 13 }}>
+          This drug may have been removed or the link is incorrect.
+        </div>
+        <button
+          onClick={() => navigate('/drugs')}
+          style={{
+            marginTop:    'var(--space-2)',
+            padding:      '8px 20px',
+            borderRadius: 'var(--radius-sm)',
+            border:       '1px solid var(--color-border)',
+            background:   'none',
+            fontSize:     13,
+            fontWeight:   500,
+            color:        'var(--color-text-secondary)',
+            cursor:       'pointer',
+            fontFamily:   'var(--font-body)',
+          }}
+        >
+          ← Back to Drugs
+        </button>
+      </div>
     )
   }
 
   // ── Detail ─────────────────────────────────────────────────────────────────
   return (
-    <Layout>
-      <div style={{ paddingBottom: 'var(--space-12)' }}>
-
+    <>
+      <div
+        ref={rootRef}
+        style={{
+          height:        availableHeight ?? '100dvh',
+          overflow:      'hidden',
+          display:       'flex',
+          flexDirection: 'column',
+        }}
+      >
         <DrugHeader
           drug={drug}
           isFavourited={isDrugFavourited(drug.id)}
@@ -139,27 +175,29 @@ export default function DrugDetailScreen() {
           onToggleFav={() => toggleDrug(drug.id)}
         />
 
-        {/* 2c.1 — card wrapper removed (decisions 4.25–4.27): sections now
-            sit flat on the page background, no border/shadow/box. 2c.7 —
-            the four grouped sections, mounted in decision 4.25's order.
-            drug_detail_moa_spacing_fix — paddingTop added here so content
-            no longer touches DrugHeader directly; matches
-            ConditionDetailScreen.jsx's own header-to-content gap. */}
-        <div style={{ paddingTop: 'var(--space-5)' }}>
-          <ClinicalOverview drug={drug} />
+        {/* 0.2 — DrugDetailSheet (step 0.1) is now the single scrolling
+            child; the four grouped sections mount inside it unchanged for
+            now (2c.1 card-removal, 4.25–4.27; drug_detail_moa_spacing_fix's
+            paddingTop preserved). paddingBottom kept so content still
+            clears the fixed BottomNav below, same as today. */}
+        <DrugDetailSheet>
+          <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
+            <ClinicalOverview drug={drug} />
 
-          <DosingSection
-            drug={drug}
-            siblings={siblings}
-            onSelectBrand={handleSiblingTap}
-          />
+            <DosingSection
+              drug={drug}
+              siblings={siblings}
+              onSelectBrand={handleSiblingTap}
+            />
 
-          <SafetySection drug={drug} />
+            <SafetySection drug={drug} />
 
-          <PrescribingSection drug={drug} />
-        </div>
-
+            <PrescribingSection drug={drug} />
+          </div>
+        </DrugDetailSheet>
       </div>
-    </Layout>
+
+      <BottomNav />
+    </>
   )
 }
