@@ -18,27 +18,24 @@ export const CACHE_KEYS = {
 export const METADATA_TABLE = 'app_metadata'
 
 /**
- * Bump this whenever the SHAPE of what gets cached for the drugs slice
- * changes on the app side (new fields added to the mapped drug object,
- * fields renamed, etc.) — independent of the server-side data version
- * (app_metadata timestamp). A device that already has a cached copy has
- * no other way to know its saved objects are missing fields the current
- * code expects, since the underlying database rows themselves may not
- * have changed at all.
+ * Stamped automatically at build time (see vite.config.js's BUILD_STAMP /
+ * VITE_BUILD_STAMP define) — the same unique value baked into every build
+ * that also cache-busts the service worker. A device's saved drugs cache
+ * is stamped with whatever this value was at the moment it was written
+ * (see utils/cache.js's writeDrugsCache/readDrugsCache); any new build
+ * automatically carries a new stamp, so any device with an older saved
+ * copy is forced to re-fetch on its next open.
  *
- * 2026-07-20 (drug_card_title_suffix, steps A.1/A.2 follow-up): bumped
- * 1 -> 2. A.1 added fillVolume and A.2 added formModifier to the mapped
- * FlatDrug shape, but this version wasn't bumped alongside those two
- * steps — so devices with a pre-existing cache kept passing the schema
- * check and served the old-shaped data, silently missing both new fields
- * (pack_size, an existing field, still worked fine, which is what made
- * the gap visible: title suffixes showed pack size correctly but never
- * showed fill volume or modifier abbreviations). This bump forces every
- * device to re-fetch once, picking up both new fields.
- *
- * 2026-07-20 (drug_card_title_suffix, route-details follow-up): bumped
- * 2 -> 3. Added routeDetails to the mapped FlatDrug shape — same reasoning
- * as the bump above, applied proactively this time instead of found via a
- * live bug report.
+ * This replaces a manually-typed version number that had to be bumped by
+ * hand every time a new field was added to the cached drug shape —
+ * independent of the server-side data version (app_metadata timestamp),
+ * since the underlying database rows themselves may not change at all
+ * when the app-side shape does. That manual step was missed twice before
+ * bumping to a real fix here: first for fillVolume/formModifier
+ * (2026-07-20), then again for `sources` (2026-07-26, decision 4.17) —
+ * both times a device with a pre-existing cache kept passing the check
+ * and silently served the old-shaped data. There's no number to remember
+ * to bump now, because there's no number a person has to type — every
+ * build stamps itself.
  */
-export const DRUGS_CACHE_SCHEMA_VERSION = 3
+export const DRUGS_CACHE_SCHEMA_VERSION = import.meta.env.VITE_BUILD_STAMP ?? 'dev'
