@@ -16,11 +16,20 @@
  * — same approach already used for Uses' own See more/See less control.
  *
  * Props: drug — flat drug object from DrugContext
+ *
+ * Correction, 2026-07-25 (against the real app screenshots, not the original
+ * mockup): title and the "See all"/"See less" trigger were first built using
+ * the small uppercase SectionHeader style shared with Contraindications/
+ * Pregnancy — corrected to match Dosage's bold title (17px/700/text-primary)
+ * and its "Dose adjustments" trigger's exact button style (13px/600/
+ * text-primary), and the bullet text now matches Dosage's instruction text
+ * color/line-height. Trailing Divider() also removed, per the page-wide
+ * no-divider-between-sections rule already established for Uses/Dosage.
  */
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Divider, EmptySection } from './sectionPrimitives.jsx'
+import { EmptySection } from './sectionPrimitives.jsx'
 
 const TRUNCATE_AT = 3
 
@@ -50,11 +59,9 @@ export default function SideEffectsSection({ drug }) {
         marginBottom:   'var(--space-3)',
       }}>
         <div style={{
-          fontSize:      10,
-          fontWeight:    700,
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color:         'var(--color-text-tertiary)',
+          fontSize:   17,
+          fontWeight: 700,
+          color:      'var(--color-text-primary)',
         }}>
           Side Effects
         </div>
@@ -65,15 +72,16 @@ export default function SideEffectsSection({ drug }) {
             style={{
               display:    'flex',
               alignItems: 'center',
-              gap:        'var(--space-1)',
+              gap:        2,
               background: 'none',
               border:     'none',
               cursor:     'pointer',
               padding:    0,
-              fontSize:   13,
-              fontWeight: 500,
-              color:      'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
+              fontSize:   13,
+              fontWeight: 600,
+              color:      'var(--color-text-primary)',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             {expanded ? 'See less' : 'See all'}
@@ -89,16 +97,14 @@ export default function SideEffectsSection({ drug }) {
         {shown.map((se, i) => (
           <li key={i} style={{
             fontSize:     14,
-            color:        'var(--color-text-secondary)',
-            lineHeight:   1.4,
+            color:        'var(--color-text-primary)',
+            lineHeight:   1.6,
             marginBottom: 'var(--space-2)',
           }}>
             {se}
           </li>
         ))}
       </ul>
-
-      <Divider />
     </div>
   )
 }
