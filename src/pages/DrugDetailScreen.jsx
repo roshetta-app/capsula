@@ -33,6 +33,14 @@
  * are unchanged for now — still the same 4 grouped blocks; swapping them
  * for the 9 new standalone sections is Phase 1's job, not this step.
  *
+ * 2026-07-25 (header/root color fix): the header's colored panel used to
+ * stop in a straight line at its own bottom edge, while the root behind it
+ * had no background of its own — so DrugDetailSheet's rounded top corners
+ * revealed the plain page background in that gap instead of more of the
+ * header's color. Category color is now resolved once here (moved from
+ * DrugHeader.jsx) and painted on this root, with `category`/`colors` passed
+ * down to DrugHeader as props instead of it re-resolving them itself.
+ *
  * Route: /drugs/:slug
  */
 
@@ -47,6 +55,9 @@ import SafetySection                     from '../components/drugs/sections/Safe
 import PrescribingSection                from '../components/drugs/sections/PrescribingSection'
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
+import { useCategories }                 from '../hooks/useCategories'
+import { useIsDark }                     from '../utils/specialtyIcon'
+import { resolveToken, FALLBACK_TOKEN }  from '../utils/specialtyTokens'
 import { logUsageEvent }                 from '../analytics/usageEvents'
 import { ROUTES }                        from '../router'
 
@@ -97,6 +108,15 @@ export default function DrugDetailScreen() {
     window.addEventListener('resize', measure)
     return () => window.removeEventListener('resize', measure)
   }, [])
+
+  // Category + color resolution — moved here from DrugHeader.jsx (header/root
+  // color fix) so the same resolved color can be painted on the shared page
+  // root below, not just on the header's own box. DrugHeader now receives
+  // both `category` and `colors` as props instead of resolving them itself.
+  const isDark = useIsDark()
+  const { categories } = useCategories()
+  const category = categories.find(c => c.slug === drug?.category)
+  const colors    = resolveToken(category?.color_token || FALLBACK_TOKEN, isDark)
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading && !drug) {
@@ -162,14 +182,22 @@ export default function DrugDetailScreen() {
       <div
         ref={rootRef}
         style={{
-          height:        availableHeight ?? '100dvh',
-          overflow:      'hidden',
-          display:       'flex',
-          flexDirection: 'column',
+          height:          availableHeight ?? '100dvh',
+          overflow:        'hidden',
+          display:         'flex',
+          flexDirection:   'column',
+          // Header/root color fix: this is now the single source of the
+          // category color for the whole page, not just the header's own
+          // box. DrugHeader no longer paints its own background, so the
+          // gap revealed by DrugDetailSheet's rounded top corners shows
+          // more of this same color instead of a mismatched neutral one.
+          backgroundColor: colors.bg,
         }}
       >
         <DrugHeader
           drug={drug}
+          category={category}
+          colors={colors}
           isFavourited={isDrugFavourited(drug.id)}
           onBack={() => navigate(-1)}
           onToggleFav={() => toggleDrug(drug.id)}

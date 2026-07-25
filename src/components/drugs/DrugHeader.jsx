@@ -120,9 +120,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
-import { useCategories }            from '../../hooks/useCategories'
-import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -181,16 +179,12 @@ function edgeFadeStyle(fade) {
   return { WebkitMaskImage: gradient, maskImage: gradient }
 }
 
-export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
-  const isDark = useIsDark()
-  const { categories } = useCategories()
+export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, category, colors }) {
   const brandFade  = useEdgeFade(drug.id)
   const suffixFade = useEdgeFade(drug.id)
 
-  const category  = categories.find(c => c.slug === drug.category)
   const iconType  = category?.icon_type || 'lucide'
   const iconValue = iconType === 'custom' ? (category?.icon_url || '') : (category?.icon_name || 'Pill')
-  const colors    = resolveToken(category?.color_token || FALLBACK_TOKEN, isDark)
 
   // Brand name + strength + form suffix — same shared logic SharedDrugCard
   // uses for its title line (see utils/drugTitleFormat.js).
@@ -224,11 +218,16 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
       // full-width root (Layout no longer wraps this screen), so it
       // already renders full-width without any extra CSS. See the
       // dated correction note above.
-      // Colored panel — drug's own category color, using resolveToken's
-      // soft 'bg' tint (not the richer 'pill' value, which read as a
-      // single loud block and doesn't carry a real light/dark distinction
-      // the way 'bg' does).
-      backgroundColor: colors.bg,
+      // 2026-07-25 (drug header/root color fix): no longer paints its own
+      // background. The rounded top corners of DrugDetailSheet below sit
+      // right underneath this header, and the header's box always stops
+      // in a straight line at its own bottom edge — so a rectangle here
+      // was always going to leave a mismatched sliver of the plain page
+      // background showing through that curve. DrugDetailScreen.jsx now
+      // resolves this same category color once and paints it on the
+      // shared page root instead, so that sliver reveals more of the same
+      // color rather than a different one. `colors` is still used below
+      // for text/icon foreground only.
       // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including
