@@ -38,6 +38,13 @@
  * its own file header), same treatment ClinicalOverview and DosingSection
  * got, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
  *
+ * 2026-07-25 (drug_detail_rebuild, plan §7 Phase 1 step 1.7, decision 4.15):
+ * DrugInteractionsSection.jsx mounted here, right after
+ * ContraindicationsSection.jsx per the locked §11.3 order (... Pregnancy &
+ * Breastfeeding → Contraindications → Drug Interactions → ...).
+ * PrescribingSection.jsx had its Drug Interactions content removed (now
+ * Pharmacokinetics only, see 1.8) and stays mounted where it already was.
+ *
  * Route: /drugs/:slug
  */
 
@@ -52,6 +59,7 @@ import DoseSection                       from '../components/drugs/sections/Dose
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import ContraindicationsSection          from '../components/drugs/sections/ContraindicationsSection'
+import DrugInteractionsSection           from '../components/drugs/sections/DrugInteractionsSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
 import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
 import PregnancySection                  from '../components/drugs/sections/PregnancySection'
@@ -255,6 +263,8 @@ export default function DrugDetailScreen() {
             <PregnancySection drug={drug} />
 
             <ContraindicationsSection drug={drug} />
+
+            <DrugInteractionsSection drug={drug} />
 
             <SafetySection drug={drug} />
 

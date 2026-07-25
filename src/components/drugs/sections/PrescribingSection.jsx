@@ -2,14 +2,16 @@
  * src/components/drugs/sections/PrescribingSection.jsx
  * Phase 2c — Drug Detail Screen, grouped sections
  *
- * Renders the Prescribing group for a drug: Drug Interactions +
- * Pharmacokinetics. Content logic carried over unchanged from the retiring
- * DrugInfoSections.jsx.
+ * 2026-07-25 (drug_detail_rebuild, step 1.7, decision 4.15): Drug
+ * Interactions content moved out to its own standalone
+ * DrugInteractionsSection.jsx (mounted right after ContraindicationsSection
+ * in DrugDetailScreen.jsx, per the locked §11.3 order). This file now
+ * renders Pharmacokinetics only.
  *
  * Props: drug — flat drug object from DrugContext
  */
 
-import { SectionHeader, Divider, EmptySection, SeverityBadge } from './sectionPrimitives.jsx'
+import { SectionHeader, EmptySection } from './sectionPrimitives.jsx'
 
 const PK_FIELDS = [
   { key: 'onset',           label: 'Onset' },
@@ -20,45 +22,12 @@ const PK_FIELDS = [
 ]
 
 export default function PrescribingSection({ drug }) {
-  const {
-    drugInteractions = [],
-    pharmacokinetics,
-  } = drug
+  const { pharmacokinetics } = drug
 
   const hasPharmacokinetics = !!pharmacokinetics && PK_FIELDS.some(({ key }) => pharmacokinetics[key])
 
   return (
     <div>
-
-      {/* -- Drug Interactions -- */}
-      {drugInteractions.length > 0 ? (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <SectionHeader title="Drug Interactions" />
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {drugInteractions.map((ix, i) => (
-              <li key={i} style={{
-                padding:      'var(--space-2) 0',
-                borderBottom: i < drugInteractions.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                    {ix.drug ?? ix.drug_name ?? ix.name}
-                  </span>
-                  {ix.severity && <SeverityBadge severity={ix.severity} />}
-                </div>
-                {(ix.description ?? ix.risk) && (
-                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2, lineHeight: 1.4 }}>
-                    {ix.description ?? ix.risk}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-          <Divider />
-        </div>
-      ) : (
-        <EmptySection title="Drug Interactions" />
-      )}
 
       {/* -- Pharmacokinetics -- */}
       {hasPharmacokinetics ? (
