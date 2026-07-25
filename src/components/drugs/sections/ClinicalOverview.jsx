@@ -18,56 +18,19 @@
  * temporarily renders Uses only, until UsesSection.jsx (checklist step 1.2)
  * replaces it entirely and it's retired for good.
  *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.2, decision 4.10):
+ * Uses migrated out to UsesSection.jsx (now mounted second on the page,
+ * per the locked §11.3 order). This file has no content left to render.
+ * Kept in place — not deleted, still mounted in DrugDetailScreen.jsx —
+ * per STEPS_DRUG_DETAIL.md 1.10, which retires all 4 old grouped section
+ * files together in one final cleanup pass, once each of them has had its
+ * content fully absorbed (DosingSection/SafetySection/PrescribingSection
+ * still hold unmigrated content — steps 1.3–1.9). Renders nothing until
+ * then.
+ *
  * Props: drug — flat drug object from DrugContext
  */
 
-import { SectionHeader, Divider, EmptySection } from './sectionPrimitives.jsx'
-
-export default function ClinicalOverview({ drug }) {
-  const {
-    uses = [],
-  } = drug
-
-  return (
-    <div>
-
-      {/* -- Uses -- */}
-      {uses.length > 0 ? (
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <SectionHeader title="Uses" />
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {uses.map((use, i) => {
-              const name    = typeof use === 'string' ? use : use.use_name
-              const context = typeof use === 'object' ? use.context : ''
-              return (
-                <li key={i} style={{ marginBottom: 'var(--space-2)' }}>
-                  <span style={{
-                    fontSize:   14,
-                    fontWeight: 600,
-                    color:      'var(--color-text-primary)',
-                  }}>
-                    {name}
-                  </span>
-                  {context && (
-                    <span style={{
-                      fontSize:   13,
-                      fontStyle:  'italic',
-                      color:      'var(--color-text-tertiary)',
-                      marginLeft: 'var(--space-2)',
-                    }}>
-                      {context}
-                    </span>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-          <Divider />
-        </div>
-      ) : (
-        <EmptySection title="Uses" />
-      )}
-
-    </div>
-  )
+export default function ClinicalOverview() {
+  return null
 }

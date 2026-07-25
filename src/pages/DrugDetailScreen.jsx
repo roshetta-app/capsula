@@ -63,6 +63,15 @@
  * DosingSection, SafetySection, PrescribingSection) stay mounted
  * side-by-side with the new ones until each is individually replaced.
  *
+ * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.2, decision 4.10):
+ * UsesSection.jsx mounted here, second in the section order per the locked
+ * §11.3 order (Generic Overview → Uses → ...). Receives `colors`/`isDark`
+ * — same category-color token already resolved below for DrugHeader — so
+ * its tinted box matches the drug's category. ClinicalOverview stays
+ * mounted (now renders nothing; see its own file header) until
+ * STEPS_DRUG_DETAIL.md 1.10 retires it alongside the other old grouped
+ * sections.
+ *
  * Route: /drugs/:slug
  */
 
@@ -72,6 +81,7 @@ import DrugHeader                        from '../components/drugs/DrugHeader'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
 import BottomNav                         from '../components/BottomNav'
 import GenericOverviewSection            from '../components/drugs/sections/GenericOverviewSection'
+import UsesSection                       from '../components/drugs/sections/UsesSection'
 import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
 import DosingSection                     from '../components/drugs/sections/DosingSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
@@ -243,18 +253,24 @@ export default function DrugDetailScreen() {
         />
 
         {/* 0.2 — DrugDetailSheet (step 0.1) is now the single scrolling
-            child. GenericOverviewSection (1.1, decision 4.19) mounts first,
-            per the locked §11.3 order; the remaining 3 old grouped sections
-            stay mounted as-is until each is individually replaced by its
-            own Phase 1 rebuild. paddingTop kept per drug_detail_moa_spacing_fix;
-            paddingBottom kept so content still clears the fixed BottomNav
-            below, same as today. */}
+            child. GenericOverviewSection (1.1) and UsesSection (1.2, decision
+            4.10) mount first and second per the locked §11.3 order; the
+            remaining 3 old grouped sections stay mounted as-is until each is
+            individually replaced by its own Phase 1 rebuild. paddingTop kept
+            per drug_detail_moa_spacing_fix; paddingBottom kept so content
+            still clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}
               onSelectBrand={handleSiblingTap}
+            />
+
+            <UsesSection
+              drug={drug}
+              colors={colors}
+              isDark={isDark}
             />
 
             <ClinicalOverview drug={drug} />
