@@ -54,6 +54,42 @@
  * instead of drifting apart on the next correction. Brand name is now
  * title-cased the same way SharedDrugCard displays it, for consistency.
  *
+ * 2026-07-25 (drug_library_ui_ux, STEPS_DRUG_DETAIL.md step 0.4, decision
+ * 4.1, plus its 2026-07-25 third correction note): redesign pass.
+ *   - Background switched from flat `var(--color-surface)` white to the
+ *     drug's own category color, using `resolveToken()`'s `pill` value
+ *     (the same richer, solid tint already used elsewhere for an active
+ *     filter pill) instead of the softer `bg` tint. Row 1 (Back/category/
+ *     Share/Heart) is otherwise untouched, per 4.1's explicit "unchanged
+ *     from today's behavior."
+ *   - Row 2 (brand name) and the old inline suffix are split onto two
+ *     separate lines instead of one shared horizontally-scrolling row —
+ *     brand name on its own line, strength/form suffix on its own line
+ *     beneath it. Each keeps its own independent horizontal-scroll +
+ *     edge-fade treatment (reusing the same useEdgeFade hook twice, one
+ *     per line) so a very long combo brand name or a long suffix string
+ *     still has somewhere to go instead of wrapping or getting cut off.
+ *   - New image-search icon added on the brand-name line, reusing the
+ *     exact ScanSearch pattern already built in PrescriptionSheetBlock.jsx
+ *     (DrugMainLine's handleSearchClick) — same icon, same click handler
+ *     shape, same query (`[name, concentration, form, 'Egypt']` joined
+ *     with spaces, opened via `tbm=isch` Google Images search in a new
+ *     tab). `drug.concentration`/`drug.form` confirmed as real, already-
+ *     selected fields on this flat drug object via `src/lib/queries.js`
+ *     — not guessed.
+ *   - Row 3 (generic name) removed entirely — it now leads the new
+ *     Active Ingredients section instead (`GenericOverviewSection.jsx`,
+ *     step `1.1`), not shown here anymore. `genericFade`/its div are gone
+ *     along with it.
+ *   - The `100vw` / `calc(50% - 50vw)` width break-out trick from the
+ *     2026-07-20 correction above is removed. That trick only existed to
+ *     escape `Layout`'s centered, 680px-capped `<main>` — step `0.2`
+ *     already dropped `Layout` from this screen entirely, so this header
+ *     now sits directly inside `0.2`'s own unconstrained, full-width
+ *     root. There's nothing left to break out of; the header renders at
+ *     its container's natural full width instead. Pure cleanup, no
+ *     visual change expected.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -62,7 +98,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Share2, Heart } from 'lucide-react'
+import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { useCategories }            from '../../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
@@ -83,6 +119,10 @@ const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
 // exists. Chosen over truncating to "+N" (permanently hides ingredients,
 // unacceptable on a detail page) and over tap-to-expand (adds a new
 // interaction pattern and still needs its own affordance).
+//
+// 2026-07-25 (step 0.4): row 3 (generic name) is gone, but the same hook
+// is now reused for both the brand-name line and the suffix line below it
+// instead of just one combined row.
 function useEdgeFade(dep) {
   const ref = useRef(null)
   const [fade, setFade] = useState('none') // 'none' | 'left' | 'right' | 'both'
@@ -123,8 +163,8 @@ function edgeFadeStyle(fade) {
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) {
   const isDark = useIsDark()
   const { categories } = useCategories()
-  const brandFade   = useEdgeFade(drug.id)
-  const genericFade = useEdgeFade(drug.id)
+  const brandFade  = useEdgeFade(drug.id)
+  const suffixFade = useEdgeFade(drug.id)
 
   const category  = categories.find(c => c.slug === drug.category)
   const iconType  = category?.icon_type || 'lucide'
@@ -135,21 +175,35 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
   // uses for its title line (see utils/drugTitleFormat.js).
   const titleSuffix = getDrugTitleSuffix(drug)
 
+  // Image-search icon — opens Google Images for this drug in Egypt.
+  // Exact same pattern as PrescriptionSheetBlock.jsx's DrugMainLine
+  // (handleSearchClick): same query shape, same tbm=isch search, same
+  // new-tab behavior. drug.concentration/drug.form confirmed real fields
+  // on this flat drug object via src/lib/queries.js.
+  const handleSearchClick = (e) => {
+    e.stopPropagation()
+    const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
+      .filter(Boolean)
+      .join(' ')
+    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer')
+  }
+
   return (
     <header style={{
       position:        'sticky',
       top:             0,
       zIndex:          50,
-      // Breaks out of Layout's centered, 680px-capped <main> so the header
-      // spans the true viewport width — see CORRECTED note above. The
-      // maxWidth: 680 inner wrapper below re-centers the actual content.
-      width:           '100vw',
-      marginLeft:      'calc(50% - 50vw)',
-      marginRight:     'calc(50% - 50vw)',
-      backgroundColor: 'var(--color-surface)',
+      // 2026-07-25 (step 0.4): width break-out trick removed — this
+      // header now sits directly inside step 0.2's own unconstrained,
+      // full-width root (Layout no longer wraps this screen), so it
+      // already renders full-width without any extra CSS. See the
+      // dated correction note above.
+      // Colored panel — drug's own category color (resolveToken's
+      // richer 'pill' value), replacing the old flat white surface.
+      backgroundColor: colors.pill,
       borderRadius:    '0 0 18px 18px',
       boxShadow:       '0 2px 6px rgba(0,0,0,0.05)',
-      // Header has no scroll content of its own outside row 2 — without
+      // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including
       // triggering pull-to-reload). Same fix as DetailHeader's own.
@@ -157,7 +211,8 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
     }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) var(--space-4)' }}>
 
-        {/* Row 1: Back + category group (left), Share + Favourite (right) */}
+        {/* Row 1: Back + category group (left), Share + Favourite (right) —
+            unchanged from today's behavior, per decision 4.1. */}
         <div style={{
           display:        'flex',
           alignItems:     'center',
@@ -237,63 +292,78 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
           </div>
         </div>
 
-        {/* Row 2: brand name + strength + form — horizontal scroll for
-            long names/combo generics, never wraps/truncates/shrinks
-            (4.22). touchAction reset to pan-x so sideways swiping here
-            still works despite the header's own touchAction: 'none'. */}
-        <div
-          ref={brandFade.ref}
-          onScroll={brandFade.onScroll}
-          style={{
-            display:                 'flex',
-            alignItems:              'baseline',
-            gap:                     6,
-            overflowX:               'auto',
-            whiteSpace:              'nowrap',
-            scrollbarWidth:          'none',
-            msOverflowStyle:         'none',
-            WebkitOverflowScrolling: 'touch',
-            touchAction:             'pan-x',
-            marginBottom:            2,
-            ...edgeFadeStyle(brandFade.fade),
-          }}
-        >
-          <span style={{
-            fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
-            lineHeight: 1.2,
-          }}>
-            {toTitleCase(drug.tradenameClean)}
-          </span>
-          {titleSuffix && (
+        {/* Row 2: brand name, on its own line — horizontal scroll for long
+            names/combo generics, never wraps/truncates/shrinks (4.22).
+            touchAction reset to pan-x so sideways swiping here still works
+            despite the header's own touchAction: 'none'. Image-search icon
+            sits at the end of this same line (space-between), matching
+            where PrescriptionSheetBlock.jsx's DrugMainLine places its own
+            copy of this icon. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+          <div
+            ref={brandFade.ref}
+            onScroll={brandFade.onScroll}
+            style={{
+              display:                 'flex',
+              overflowX:               'auto',
+              whiteSpace:              'nowrap',
+              scrollbarWidth:          'none',
+              msOverflowStyle:         'none',
+              WebkitOverflowScrolling: 'touch',
+              touchAction:             'pan-x',
+              flex:                    1,
+              minWidth:                0,
+              ...edgeFadeStyle(brandFade.fade),
+            }}
+          >
             <span style={{
-              fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)',
+              fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
+              lineHeight: 1.2,
             }}>
-              {titleSuffix}
+              {toTitleCase(drug.tradenameClean)}
             </span>
-          )}
+          </div>
+
+          <button
+            onClick={handleSearchClick}
+            aria-label={`Search images for ${drug.tradenameClean}`}
+            style={{
+              background: 'none', border: 'none', padding: 2,
+              cursor: 'pointer', flexShrink: 0,
+              color: 'var(--color-text-secondary)',
+              display: 'flex', alignItems: 'center',
+              lineHeight: 1,
+            }}
+          >
+            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
+          </button>
         </div>
 
-        {/* Row 3: generic name — same fixed-height horizontal-scroll +
-            edge-fade treatment as row 2 (see useEdgeFade above), instead of
-            wrapping onto extra lines for long combo-ingredient generics. */}
-        <div
-          ref={genericFade.ref}
-          onScroll={genericFade.onScroll}
-          style={{
-            fontSize:                14,
-            fontWeight:              500,
-            color:                   'var(--color-accent)',
-            overflowX:               'auto',
-            whiteSpace:              'nowrap',
-            scrollbarWidth:          'none',
-            msOverflowStyle:         'none',
-            WebkitOverflowScrolling: 'touch',
-            touchAction:             'pan-x',
-            ...edgeFadeStyle(genericFade.fade),
-          }}
-        >
-          {drug.genericName}
-        </div>
+        {/* Row 3: strength/form suffix — own line beneath the brand name
+            now, instead of sharing row 2's single scrolling line. Same
+            edge-fade + horizontal-scroll treatment as the brand-name line
+            above, reusing the same hook. Whole row hidden if there's no
+            suffix to show. */}
+        {titleSuffix && (
+          <div
+            ref={suffixFade.ref}
+            onScroll={suffixFade.onScroll}
+            style={{
+              fontSize:                14,
+              fontWeight:              500,
+              color:                   'var(--color-text-secondary)',
+              overflowX:               'auto',
+              whiteSpace:              'nowrap',
+              scrollbarWidth:          'none',
+              msOverflowStyle:         'none',
+              WebkitOverflowScrolling: 'touch',
+              touchAction:             'pan-x',
+              ...edgeFadeStyle(suffixFade.fade),
+            }}
+          >
+            {titleSuffix}
+          </div>
+        )}
 
       </div>
     </header>
