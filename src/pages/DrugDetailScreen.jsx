@@ -53,6 +53,12 @@
  * stays mounted where it already was until STEPS_DRUG_DETAIL.md 1.10's
  * final retirement pass.
  *
+ * 2026-07-26 (drug_detail_rebuild, plan §7 Phase 1 step 1.9c, decision 4.17):
+ * SourcesSection.jsx mounted here, right after PharmacologySection — the
+ * last of the 9 standalone sections per the locked §11.3 order (Generic
+ * Overview → Uses → Dose → Side Effects → Pregnancy & Breastfeeding →
+ * Contraindications → Drug Interactions → Pharmacology → Sources).
+ *
  * Route: /drugs/:slug
  */
 
@@ -69,6 +75,7 @@ import DosingSection                     from '../components/drugs/sections/Dosi
 import ContraindicationsSection          from '../components/drugs/sections/ContraindicationsSection'
 import DrugInteractionsSection           from '../components/drugs/sections/DrugInteractionsSection'
 import PharmacologySection               from '../components/drugs/sections/PharmacologySection'
+import SourcesSection                    from '../components/drugs/sections/SourcesSection'
 import SafetySection                     from '../components/drugs/sections/SafetySection'
 import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
 import PregnancySection                  from '../components/drugs/sections/PregnancySection'
@@ -276,6 +283,8 @@ export default function DrugDetailScreen() {
             <DrugInteractionsSection drug={drug} />
 
             <PharmacologySection drug={drug} />
+
+            <SourcesSection drug={drug} />
 
             <SafetySection drug={drug} />
 
