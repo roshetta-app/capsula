@@ -90,6 +90,27 @@
  *     its container's natural full width instead. Pure cleanup, no
  *     visual change expected.
  *
+ * CORRECTED 2026-07-25 (same session, right after 0.4 was first built — real
+ * screenshot reviewed before deciding, not guessed): three problems found once
+ * actually rendered.
+ *   - `pill` was the wrong token value for a full-panel background — it's meant
+ *     for small elements like an active filter chip, not a large area, and read
+ *     as one loud flat block. Switched to `bg`, the token's softer, purpose-built
+ *     background tint (already has its own light/dark pair).
+ *   - The panel still looked like a separate floating rounded card sitting on
+ *     top of DrugDetailSheet, because it kept its own rounded-bottom corners,
+ *     drop shadow, and sticky positioning from the pre-redesign version. All
+ *     three removed — this is now a flat rectangle behind DrugDetailSheet, whose
+ *     own rounded top corners are the only rounding visible. Sticky positioning
+ *     was never actually needed post-0.2 either, since only DrugDetailSheet
+ *     scrolls internally now.
+ *   - Category label, Share icon, non-favourited Heart icon, the search icon,
+ *     and the strength/form suffix line were all still using the app's normal
+ *     muted text tokens (designed for a plain white background) — on a colored
+ *     panel they read as washed-out/near-invisible. Switched all five to the
+ *     resolved token's own `fg` color, which is designed to stay readable
+ *     against that same token's `bg`.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -190,19 +211,24 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
 
   return (
     <header style={{
-      position:        'sticky',
-      top:             0,
-      zIndex:          50,
+      // 2026-07-25 (step 0.4 fix, same session): no longer sticky/rounded/
+      // shadowed — those made this read as a separate floating card on top
+      // of DrugDetailSheet instead of a flat colored layer sitting behind
+      // it. Now a plain flat rectangle; DrugDetailSheet's own rounded top
+      // corners (step 0.1) are the only rounding visible, laid on top of
+      // this panel. Sticky positioning is also unnecessary now — step 0.2's
+      // root already keeps this header in place without it, since only
+      // DrugDetailSheet scrolls internally.
       // 2026-07-25 (step 0.4): width break-out trick removed — this
       // header now sits directly inside step 0.2's own unconstrained,
       // full-width root (Layout no longer wraps this screen), so it
       // already renders full-width without any extra CSS. See the
       // dated correction note above.
-      // Colored panel — drug's own category color (resolveToken's
-      // richer 'pill' value), replacing the old flat white surface.
-      backgroundColor: colors.pill,
-      borderRadius:    '0 0 18px 18px',
-      boxShadow:       '0 2px 6px rgba(0,0,0,0.05)',
+      // Colored panel — drug's own category color, using resolveToken's
+      // soft 'bg' tint (not the richer 'pill' value, which read as a
+      // single loud block and doesn't carry a real light/dark distinction
+      // the way 'bg' does).
+      backgroundColor: colors.bg,
       // Header has no scroll content of its own outside rows 2/3 — without
       // this, a touch starting on empty header space has nothing local to
       // consume it and the browser treats it as a page drag (including
@@ -252,7 +278,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
                   <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={11} color={colors.fg} />
                   <span style={{
                     fontSize: 12, fontWeight: 400, letterSpacing: '0.03em',
-                    color: 'var(--color-text-secondary)', lineHeight: 1,
+                    color: colors.fg, lineHeight: 1,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {category.name_en}
@@ -270,7 +296,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
               aria-label="Share"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: 'var(--color-text-tertiary)',
+                color: colors.fg,
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
@@ -282,7 +308,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
               aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: isFavourited ? 'var(--color-favourite)' : 'var(--color-text-tertiary)',
+                color: isFavourited ? 'var(--color-favourite)' : colors.fg,
                 transition: 'color 0.15s ease',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
@@ -330,7 +356,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
             style={{
               background: 'none', border: 'none', padding: 2,
               cursor: 'pointer', flexShrink: 0,
-              color: 'var(--color-text-secondary)',
+              color: colors.fg,
               display: 'flex', alignItems: 'center',
               lineHeight: 1,
             }}
@@ -351,7 +377,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav }) 
             style={{
               fontSize:                14,
               fontWeight:              500,
-              color:                   'var(--color-text-secondary)',
+              color:                   colors.fg,
               overflowX:               'auto',
               whiteSpace:              'nowrap',
               scrollbarWidth:          'none',
