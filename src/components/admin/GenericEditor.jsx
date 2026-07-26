@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { fetchCategoriesForCMS } from '../../lib/adminQueries'
 import TagInput   from './TagInput'
 import DoseRowList from './DoseRowList'
@@ -28,7 +28,7 @@ const DOSE_ADJ_CONDITIONS = ['renal', 'hepatic', 'elderly', 'pediatric']
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function GenericEditor({ generic = {}, onChange, disabled = false }) {
-  const [pkOpen, setPkOpen] = useState(false)
+
   const [categories, setCategories] = useState([])
 
   useEffect(() => {
@@ -84,13 +84,6 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
   function removeAdjustment(idx) {
     set('dose_adjustments', (generic.dose_adjustments ?? []).filter((_, i) => i !== idx))
   }
-
-  // ── pharmacokinetics helper ──
-  function setPk(field, value) {
-    set('pharmacokinetics', { ...(generic.pharmacokinetics ?? {}), [field]: value })
-  }
-
-  const pk = generic.pharmacokinetics ?? {}
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -419,37 +412,26 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         </div>
       </Section>
 
-      {/* ── PHARMACOKINETICS ── */}
-      <Section label="Pharmacokinetics">
-        <button
-          type="button"
-          onClick={() => setPkOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            background: 'none', border: 'none', cursor: 'pointer',
-            color: 'var(--color-text-secondary)', fontSize: 13,
-            fontFamily: 'var(--font-body)', padding: 0, marginBottom: pkOpen ? 'var(--space-3)' : 0,
-          }}
-        >
-          {pkOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          {pkOpen ? 'Hide PK fields' : 'Show PK fields'}
-        </button>
-        {pkOpen && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>
-            {['onset', 'peak', 'duration', 'half_life', 'bioavailability'].map(field => (
-              <Field key={field} label={field.replace('_', ' ')} style={{ flex: '1 1 160px' }}>
-                <input
-                  type="text"
-                  value={pk[field] ?? ''}
-                  onChange={e => setPk(field, e.target.value)}
-                  placeholder={`e.g. ${field === 'half_life' ? '6-8 hours' : field === 'onset' ? '30 min' : '—'}`}
-                  disabled={disabled}
-                  style={inputStyle}
-                />
-              </Field>
-            ))}
-          </div>
-        )}
+      {/* ── PHARMACOLOGY ── */}
+      <Section label="Pharmacology">
+        <Field label="Pharmacokinetics" hint="Add each point as its own entry — e.g. 'Onset: 30 min', 'Half-life: 6-8 hours'">
+          <TagInput
+            tags={generic.pharmacokinetics ?? []}
+            onChange={tags => set('pharmacokinetics', tags)}
+            placeholder="Type a PK point and press Enter…"
+            disabled={disabled}
+          />
+        </Field>
+        <Field label="Clinical relevance">
+          <textarea
+            value={generic.clinical_relevance ?? ''}
+            onChange={e => set('clinical_relevance', e.target.value)}
+            placeholder="Short paragraph on why this pharmacology matters clinically"
+            rows={3}
+            disabled={disabled}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+          />
+        </Field>
       </Section>
 
       {/* ── TEXTBOOK DOSES ── */}
