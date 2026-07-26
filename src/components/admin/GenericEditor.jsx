@@ -9,6 +9,22 @@
  *   generic   object  — the current generic state
  *   onChange  (patch: Partial<generic>) => void
  *   disabled  boolean
+ *
+ * Style pass (decision 4.18, step 3.3): switched from local Section/Field
+ * primitives to the shared SectionCard/SectionCardHeader/FieldLabel from
+ * adminSectionPrimitives.jsx. Section order reflows to match the app's
+ * locked order (§11.3): Generic Overview -> Uses -> Dose -> Side Effects ->
+ * Pregnancy & Breastfeeding -> Contraindications -> Drug Interactions ->
+ * Pharmacology -> Sources.
+ *
+ * Resolved 2026-07-26 (§11.13, Option A): today's groupings don't map
+ * 1-for-1 onto the app's 9 sections ("Mechanism & Uses" bundles Generic
+ * Overview + Uses; "Side Effects" bundles Side Effects + Contraindications;
+ * Dose is split across "Dose Adjustments" and "Textbook (Reference) Doses").
+ * Restyle only, no field or content changes: groupings stay as they are,
+ * reordered as closely as they map to the app order. Bundled sections are
+ * placed at their earliest-covered app position; the two Dose sections move
+ * up together, adjacent, keeping their existing relative order.
  */
 
 import { useEffect, useState } from 'react'
@@ -16,6 +32,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { fetchCategoriesForCMS, fetchDistinctSources } from '../../lib/adminQueries'
 import TagInput   from './TagInput'
 import DoseRowList from './DoseRowList'
+import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -119,8 +136,10 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-      {/* ── IDENTITY ── */}
-      <Section label="Identity">
+      {/* ── IDENTITY (Generic Overview) ── */}
+      <SectionCard>
+        <SectionCardHeader>Identity</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
         <Field label="Generic name (English)" required>
           <input
@@ -146,11 +165,11 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           />
         </Field>
 
-        <Field label="Ingredients" hint="Combo generics only — press Enter to add each active ingredient (e.g. Amoxicillin, Clavulanic acid). Leave empty for single-ingredient generics.">
+        <Field label="Ingredients" hint="Combo generics only. Leave empty for single-ingredient generics.">
           <TagInput
             tags={generic.ingredients ?? []}
             onChange={tags => set('ingredients', tags)}
-            placeholder="Add active ingredient…"
+            placeholder="Add active ingredient and press Enter…"
             disabled={disabled}
           />
         </Field>
@@ -186,7 +205,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           </Field>
         </div>
 
-        <Field label="Card tagline" hint="One line shown on condition cards. Leave blank to hide.">
+        <Field label="Card tagline" hint="Leave blank to hide.">
           <input
             type="text"
             value={generic.card_tagline ?? ''}
@@ -207,23 +226,26 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           />
         </Field>
 
-      </Section>
+        </div>
+      </SectionCard>
 
-      {/* ── MECHANISM & USES ── */}
-      <Section label="Mechanism & Uses">
+      {/* ── MECHANISM & USES (Generic Overview + Uses) ── */}
+      <SectionCard>
+        <SectionCardHeader>Mechanism & Uses</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-        <Field label="Mechanism of action" hint="Short paragraph, plain clinical English, ~200 words max">
+        <Field label="Mechanism of action">
           <textarea
             value={generic.mechanism_of_action ?? ''}
             onChange={e => set('mechanism_of_action', e.target.value)}
-            placeholder="Describe how this drug works…"
+            placeholder="Describe how this drug works — plain clinical English, ~200 words max…"
             rows={4}
             disabled={disabled}
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)', lineHeight: 1.6 }}
           />
         </Field>
 
-        <Field label="Uses (structured)" hint="Add use_name + context per indication">
+        <Field label="Uses (structured)">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {(generic.uses_structured ?? []).map((u, idx) => (
               <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
@@ -258,16 +280,82 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           </div>
         </Field>
 
-      </Section>
+        </div>
+      </SectionCard>
 
-      {/* ── SIDE EFFECTS ── */}
-      <Section label="Side Effects">
+      {/* ── DOSE ADJUSTMENTS (Dose) ── */}
+      <SectionCard>
+        <SectionCardHeader>Dose Adjustments</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {(generic.dose_adjustments ?? []).map((x, idx) => (
+            <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+              <select
+                value={x.condition ?? 'renal'}
+                onChange={e => setAdjustment(idx, 'condition', e.target.value)}
+                disabled={disabled}
+                style={{ ...inputStyle, width: 130, flexShrink: 0 }}
+              >
+                {DOSE_ADJ_CONDITIONS.map(c => (
+                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
+                ))}
+              </select>
+              <textarea
+                value={x.adjustment ?? ''}
+                onChange={e => setAdjustment(idx, 'adjustment', e.target.value)}
+                placeholder="Adjustment instruction…"
+                rows={2}
+                disabled={disabled}
+                style={{ ...inputStyle, flex: 1, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+              />
+              {!disabled && (
+                <button type="button" onClick={() => removeAdjustment(idx)} style={iconTrashStyle}>
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          ))}
+          {!disabled && (
+            <button type="button" onClick={addAdjustment} style={addRowBtnStyle}>
+              <Plus size={13} /> Add adjustment
+            </button>
+          )}
+        </div>
+      </SectionCard>
 
-        <Field label="Common side effects" hint="Press Enter to add each item">
+      {/* ── TEXTBOOK (REFERENCE) DOSES (Dose) ── */}
+      <SectionCard>
+        <SectionCardHeader>Textbook (Reference) Doses</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <Field hint="Shown collapsed as 'Reference Dose' in Drug Detail screen">
+          <DoseRowList
+            doses={generic.textbook_doses ?? []}
+            onChange={doses => set('textbook_doses', doses)}
+            disabled={disabled}
+          />
+        </Field>
+        <Field label="Textbook dose notes">
+          <textarea
+            value={generic.textbook_dose_notes ?? ''}
+            onChange={e => set('textbook_dose_notes', e.target.value)}
+            placeholder="e.g. Higher doses used for severe infections"
+            rows={2}
+            disabled={disabled}
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)' }}
+          />
+        </Field>
+        </div>
+      </SectionCard>
+
+      {/* ── SIDE EFFECTS (Side Effects + Contraindications) ── */}
+      <SectionCard>
+        <SectionCardHeader>Side Effects</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+        <Field label="Common side effects">
           <TagInput
             tags={generic.side_effects_common ?? []}
             onChange={tags => set('side_effects_common', tags)}
-            placeholder="Add common side effect…"
+            placeholder="Add common side effect and press Enter…"
             disabled={disabled}
           />
         </Field>
@@ -284,20 +372,21 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           />
         </Field>
 
-        <Field label="Contraindications" hint="Press Enter to add each item">
+        <Field label="Contraindications">
           <TagInput
             tags={generic.contraindications ?? []}
             onChange={tags => set('contraindications', tags)}
-            placeholder="Add contraindication…"
+            placeholder="Add contraindication and press Enter…"
             disabled={disabled}
           />
         </Field>
 
-      </Section>
+        </div>
+      </SectionCard>
 
-      {/* ── SAFETY ── */}
-      <Section label="Safety & Pregnancy">
-
+      {/* ── SAFETY & PREGNANCY (Pregnancy & Breastfeeding) ── */}
+      <SectionCard>
+        <SectionCardHeader>Safety & Pregnancy</SectionCardHeader>
         <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
 
           <Field label="Pregnancy category" style={{ flex: 1, minWidth: 140 }}>
@@ -357,10 +446,11 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           </Field>
 
         </div>
-      </Section>
+      </SectionCard>
 
       {/* ── DRUG INTERACTIONS ── */}
-      <Section label="Drug Interactions">
+      <SectionCard>
+        <SectionCardHeader>Drug Interactions</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {(generic.drug_interactions ?? []).map((x, idx) => (
             <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
@@ -403,49 +493,13 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             </button>
           )}
         </div>
-      </Section>
-
-      {/* ── DOSE ADJUSTMENTS ── */}
-      <Section label="Dose Adjustments">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {(generic.dose_adjustments ?? []).map((x, idx) => (
-            <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-              <select
-                value={x.condition ?? 'renal'}
-                onChange={e => setAdjustment(idx, 'condition', e.target.value)}
-                disabled={disabled}
-                style={{ ...inputStyle, width: 130, flexShrink: 0 }}
-              >
-                {DOSE_ADJ_CONDITIONS.map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                ))}
-              </select>
-              <textarea
-                value={x.adjustment ?? ''}
-                onChange={e => setAdjustment(idx, 'adjustment', e.target.value)}
-                placeholder="Adjustment instruction…"
-                rows={2}
-                disabled={disabled}
-                style={{ ...inputStyle, flex: 1, resize: 'vertical', fontFamily: 'var(--font-body)' }}
-              />
-              {!disabled && (
-                <button type="button" onClick={() => removeAdjustment(idx)} style={iconTrashStyle}>
-                  <Trash2 size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-          {!disabled && (
-            <button type="button" onClick={addAdjustment} style={addRowBtnStyle}>
-              <Plus size={13} /> Add adjustment
-            </button>
-          )}
-        </div>
-      </Section>
+      </SectionCard>
 
       {/* ── PHARMACOLOGY ── */}
-      <Section label="Pharmacology">
-        <Field label="Pharmacokinetics" hint="Add each point as its own entry — e.g. 'Onset: 30 min', 'Half-life: 6-8 hours'">
+      <SectionCard>
+        <SectionCardHeader>Pharmacology</SectionCardHeader>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+        <Field label="Pharmacokinetics" hint="e.g. 'Onset: 30 min', 'Half-life: 6-8 hours'">
           <TagInput
             tags={generic.pharmacokinetics ?? []}
             onChange={tags => set('pharmacokinetics', tags)}
@@ -463,10 +517,12 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)' }}
           />
         </Field>
-      </Section>
+        </div>
+      </SectionCard>
 
       {/* ── SOURCES ── */}
-      <Section label="Sources">
+      <SectionCard>
+        <SectionCardHeader>Sources</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {(generic.sources ?? []).map((s, idx) => {
             const uniqueAbbrevs = [...new Set(knownSources.map(k => k.source).filter(Boolean))].sort()
@@ -531,78 +587,24 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             </button>
           )}
         </div>
-      </Section>
+      </SectionCard>
 
-      {/* ── TEXTBOOK DOSES ── */}
-      <Section label="Textbook (Reference) Doses">
-        <Field hint="Shown collapsed as 'Reference Dose' in Drug Detail screen">
-          <DoseRowList
-            doses={generic.textbook_doses ?? []}
-            onChange={doses => set('textbook_doses', doses)}
-            disabled={disabled}
-          />
-        </Field>
-        <Field label="Textbook dose notes">
-          <textarea
-            value={generic.textbook_dose_notes ?? ''}
-            onChange={e => set('textbook_dose_notes', e.target.value)}
-            placeholder="e.g. Higher doses used for severe infections"
-            rows={2}
-            disabled={disabled}
-            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)' }}
-          />
-        </Field>
-      </Section>
-
-    </div>
-  )
-}
-
-// ─── Section wrapper ──────────────────────────────────────────────────────────
-
-function Section({ label, children }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-bg)',
-      border:          '1px solid var(--color-border)',
-      borderRadius:    'var(--radius-md)',
-      overflow:        'hidden',
-    }}>
-      {label && (
-        <div style={{
-          padding:         'var(--space-2) var(--space-4)',
-          backgroundColor: 'var(--color-surface)',
-          borderBottom:    '1px solid var(--color-border)',
-          fontSize:        11,
-          fontWeight:      700,
-          letterSpacing:   '0.08em',
-          textTransform:   'uppercase',
-          color:           'var(--color-text-tertiary)',
-          fontFamily:      'var(--font-body)',
-        }}>
-          {label}
-        </div>
-      )}
-      <div style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-        {children}
-      </div>
     </div>
   )
 }
 
 // ─── Field wrapper ────────────────────────────────────────────────────────────
+// Local layout-only wrapper: uses the shared FieldLabel for the label itself,
+// keeps hint-line rendering local since adminSectionPrimitives doesn't cover
+// hints. Per decision 4.18, each field's hint was individually judged during
+// this pass: folded into its placeholder, dropped, or kept standalone.
 
 function Field({ label, hint, required, children, style: extraStyle }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', ...extraStyle }}>
-      {label && (
-        <label style={labelStyle}>
-          {label}
-          {required && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
-        </label>
-      )}
+      {label && <FieldLabel required={required}>{label}</FieldLabel>}
       {hint && (
-        <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 2 }}>
           {hint}
         </span>
       )}
@@ -664,15 +666,6 @@ function ToggleSwitch({ value, onChange, disabled, labelOn = 'On', labelOff = 'O
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const labelStyle = {
-  fontSize:      12,
-  fontWeight:    600,
-  color:         'var(--color-text-secondary)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.05em',
-  fontFamily:    'var(--font-body)',
-}
-
 const inputStyle = {
   width:              '100%',
   boxSizing:          'border-box',
@@ -715,4 +708,3 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
-
