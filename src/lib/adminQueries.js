@@ -1,3 +1,4 @@
+
 /**
  * adminQueries.js — Supabase write operations for the admin CMS.
  *
@@ -1006,6 +1007,21 @@ export async function fetchTagsForCondition(conditionId) {
   if (error) return { data: [], error }
   const names = (data ?? []).map(row => row.tags?.name).filter(Boolean)
   return { data: names, error: null }
+}
+
+// ─── Sources autosuggest (2.4) ───────────────────────────────────────────────
+
+/**
+ * Fetch every distinct {source, title, note, url} combination already used
+ * across all generics' sources, for CMS autosuggest. Backed by the
+ * distinct_sources view (unnests generics.sources jsonb server-side).
+ * Returns { source, title, note, url }[].
+ */
+export async function fetchDistinctSources() {
+  const { data, error } = await supabase
+    .from('distinct_sources')
+    .select('source, title, note, url')
+  return { data: data ?? [], error }
 }
 
 /**

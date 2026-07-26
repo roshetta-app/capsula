@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
-import { fetchCategoriesForCMS } from '../../lib/adminQueries'
+import { fetchCategoriesForCMS, fetchDistinctSources } from '../../lib/adminQueries'
 import TagInput   from './TagInput'
 import DoseRowList from './DoseRowList'
 
@@ -30,11 +30,20 @@ const DOSE_ADJ_CONDITIONS = ['renal', 'hepatic', 'elderly', 'pediatric']
 export default function GenericEditor({ generic = {}, onChange, disabled = false }) {
 
   const [categories, setCategories] = useState([])
+  const [knownSources, setKnownSources] = useState([])
 
   useEffect(() => {
     let cancelled = false
     fetchCategoriesForCMS().then(({ data }) => {
       if (!cancelled) setCategories(data ?? [])
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    fetchDistinctSources().then(({ data }) => {
+      if (!cancelled) setKnownSources(data ?? [])
     })
     return () => { cancelled = true }
   }, [])
@@ -69,6 +78,28 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
   }
   function removeInteraction(idx) {
     set('drug_interactions', (generic.drug_interactions ?? []).filter((_, i) => i !== idx))
+  }
+
+  // ── sources helpers (2.4) ──
+  function setSource(idx, field, value) {
+    const next = (generic.sources ?? []).map((s, i) =>
+      i === idx ? { ...s, [field]: value } : s
+    )
+    set('sources', next)
+  }
+  function addSource() {
+    set('sources', [...(generic.sources ?? []), { source: '', title: '', note: '', url: '' }])
+  }
+  function removeSource(idx) {
+    set('sources', (generic.sources ?? []).filter((_, i) => i !== idx))
+  }
+  // Autofills title/note/url from a previously-used source when the admin
+  // picks a suggestion, so they only ever type "BNF" once, not four times.
+  function applySourceSuggestion(idx, picked) {
+    const next = (generic.sources ?? []).map((s, i) =>
+      i === idx ? { source: picked.source ?? '', title: picked.title ?? '', note: picked.note ?? '', url: picked.url ?? '' } : s
+    )
+    set('sources', next)
   }
 
   // ── dose_adjustments helpers ──
@@ -432,6 +463,74 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)' }}
           />
         </Field>
+      </Section>
+
+      {/* ── SOURCES ── */}
+      <Section label="Sources">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {(generic.sources ?? []).map((s, idx) => {
+            const uniqueAbbrevs = [...new Set(knownSources.map(k => k.source).filter(Boolean))].sort()
+            return (
+              <div key={idx} style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <input
+                  type="text"
+                  list={`source-abbrevs-${idx}`}
+                  value={s.source ?? ''}
+                  onChange={e => {
+                    const val = e.target.value
+                    setSource(idx, 'source', val)
+                    // Only autofill the rest when this row is otherwise empty —
+                    // never clobber something the admin already typed.
+                    const match = knownSources.find(k => k.source === val)
+                    if (match && !s.title && !s.note && !s.url) {
+                      applySourceSuggestion(idx, match)
+                    }
+                  }}
+                  placeholder="BNF"
+                  disabled={disabled}
+                  style={{ ...inputStyle, width: 100, flexShrink: 0 }}
+                />
+                <datalist id={`source-abbrevs-${idx}`}>
+                  {uniqueAbbrevs.map(a => <option key={a} value={a} />)}
+                </datalist>
+                <input
+                  type="text"
+                  value={s.title ?? ''}
+                  onChange={e => setSource(idx, 'title', e.target.value)}
+                  placeholder="British National Formulary, 2024"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: '1 1 220px' }}
+                />
+                <input
+                  type="text"
+                  value={s.note ?? ''}
+                  onChange={e => setSource(idx, 'note', e.target.value)}
+                  placeholder="Dosage, indications, contraindications"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: '1 1 220px' }}
+                />
+                <input
+                  type="url"
+                  value={s.url ?? ''}
+                  onChange={e => setSource(idx, 'url', e.target.value)}
+                  placeholder="https://…"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: '1 1 200px' }}
+                />
+                {!disabled && (
+                  <button type="button" onClick={() => removeSource(idx)} style={iconTrashStyle}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {!disabled && (
+            <button type="button" onClick={addSource} style={addRowBtnStyle}>
+              <Plus size={13} /> Add source
+            </button>
+          )}
+        </div>
       </Section>
 
       {/* ── TEXTBOOK DOSES ── */}
