@@ -9,55 +9,47 @@
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.1, decision 4.5):
  * GenericOverviewSection.jsx mounted first per the locked §11.3 order. The 4
  * old grouped sections (ClinicalOverview, DosingSection, SafetySection,
- * PrescribingSection) stay mounted, unchanged behaviorally, and will render
- * side-by-side with the new ones until each is individually replaced.
+ * PrescribingSection) stayed mounted, unchanged behaviorally, alongside the
+ * new ones until each was individually replaced — see 1.10 note below.
  *
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.2, decision 4.10):
  * UsesSection.jsx mounted here, second in the section order per the locked
  * §11.3 order (Generic Overview → Uses → ...). Receives `colors`/`isDark`
  * — same category-color token already resolved below for DrugHeader — so
- * its tinted box matches the drug's category. ClinicalOverview stays
- * mounted (now renders nothing; see its own file header) until
- * STEPS_DRUG_DETAIL.md 1.10 retires it alongside the other old grouped
- * sections.
+ * its tinted box matches the drug's category.
  *
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.3, decisions 4.6,
  * 4.11): DoseSection.jsx mounted third per the locked §11.3 order
- * (Generic Overview → Uses → Dose → ...). DosingSection.jsx — whose only
- * remaining content (Doses + Dose Adjustments) has now fully moved into
- * DoseSection.jsx / DoseAdjustmentsBottomSheet.jsx — stays mounted (now
- * renders nothing; see its own file header), same treatment ClinicalOverview
- * got in step 1.2, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
+ * (Generic Overview → Uses → Dose → ...).
  *
  * 2026-07-25 (drug_library_ui_ux, plan §7 Phase 1 step 1.6, decision 4.14):
  * ContraindicationsSection.jsx mounted here, right before SafetySection.jsx
  * per the locked §11.3 order (... Pregnancy & Breastfeeding →
- * Contraindications → Drug Interactions ...). SafetySection.jsx — whose
- * last remaining content (Contraindications) has now fully moved into
- * ContraindicationsSection.jsx — stays mounted (now renders nothing; see
- * its own file header), same treatment ClinicalOverview and DosingSection
- * got, until STEPS_DRUG_DETAIL.md 1.10's final retirement pass.
+ * Contraindications → Drug Interactions ...).
  *
  * 2026-07-25 (drug_detail_rebuild, plan §7 Phase 1 step 1.7, decision 4.15):
  * DrugInteractionsSection.jsx mounted here, right after
  * ContraindicationsSection.jsx per the locked §11.3 order (... Pregnancy &
  * Breastfeeding → Contraindications → Drug Interactions → ...).
- * PrescribingSection.jsx had its Drug Interactions content removed (now
- * Pharmacokinetics only, see 1.8) and stays mounted where it already was.
  *
  * 2026-07-25 (drug_detail_rebuild, plan §7 Phase 1 step 1.8a, decision 4.16):
  * PharmacologySection.jsx mounted here, right after DrugInteractionsSection
  * per the locked §11.3 order (... Contraindications → Drug Interactions →
- * Pharmacology → Sources). PrescribingSection.jsx had its remaining
- * Pharmacokinetics content removed (step 1.8b) and now renders nothing —
- * stays mounted where it already was until STEPS_DRUG_DETAIL.md 1.10's
- * final retirement pass.
+ * Pharmacology → Sources).
  *
  * 2026-07-26 (drug_detail_rebuild, plan §7 Phase 1 step 1.9c, decision 4.17):
  * SourcesSection.jsx mounted here, right after PharmacologySection — the
  * last of the 9 standalone sections per the locked §11.3 order (Generic
  * Overview → Uses → Dose → Side Effects → Pregnancy & Breastfeeding →
  * Contraindications → Drug Interactions → Pharmacology → Sources).
+ *
+ * 2026-07-26 (drug_detail_rebuild, step 1.10, decision 4.19 — final
+ * retirement pass): ClinicalOverview, DosingSection, SafetySection, and
+ * PrescribingSection removed for good. All 4 had been rendering `null` for
+ * a while (every section's real content had already been individually
+ * absorbed into its own new standalone component per 1.1–1.9) — this just
+ * deletes the now-pointless empty mounts and their imports. No behavior
+ * change; the page renders identically to before this pass.
  *
  * Route: /drugs/:slug
  */
@@ -70,16 +62,12 @@ import BottomNav                         from '../components/BottomNav'
 import GenericOverviewSection            from '../components/drugs/sections/GenericOverviewSection'
 import UsesSection                       from '../components/drugs/sections/UsesSection'
 import DoseSection                       from '../components/drugs/sections/DoseSection'
-import ClinicalOverview                  from '../components/drugs/sections/ClinicalOverview'
-import DosingSection                     from '../components/drugs/sections/DosingSection'
+import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
+import PregnancySection                  from '../components/drugs/sections/PregnancySection'
 import ContraindicationsSection          from '../components/drugs/sections/ContraindicationsSection'
 import DrugInteractionsSection           from '../components/drugs/sections/DrugInteractionsSection'
 import PharmacologySection               from '../components/drugs/sections/PharmacologySection'
 import SourcesSection                    from '../components/drugs/sections/SourcesSection'
-import SafetySection                     from '../components/drugs/sections/SafetySection'
-import SideEffectsSection                from '../components/drugs/sections/SideEffectsSection'
-import PregnancySection                  from '../components/drugs/sections/PregnancySection'
-import PrescribingSection                from '../components/drugs/sections/PrescribingSection'
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { useCategories }                 from '../hooks/useCategories'
@@ -246,12 +234,11 @@ export default function DrugDetailScreen() {
           onToggleFav={() => toggleDrug(drug.id)}
         />
 
-        {/* 0.2 — DrugDetailSheet (step 0.1) is now the single scrolling
-            child. GenericOverviewSection (1.1), UsesSection (1.2, decision
-            4.10), and DoseSection (1.3, decisions 4.6/4.11) mount first,
-            second, and third per the locked §11.3 order; the remaining old
-            grouped sections stay mounted as-is until each is individually
-            replaced by its own Phase 1 rebuild. paddingTop kept per
+        {/* 0.2 — DrugDetailSheet (step 0.1) is the single scrolling child.
+            Every section below is mounted per the locked §11.3 order:
+            Generic Overview → Uses → Dose → Side Effects → Pregnancy &
+            Breastfeeding → Contraindications → Drug Interactions →
+            Pharmacology → Sources. paddingTop kept per
             drug_detail_moa_spacing_fix; paddingBottom kept so content still
             clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet>
@@ -272,10 +259,6 @@ export default function DrugDetailScreen() {
 
             <SideEffectsSection drug={drug} />
 
-            <ClinicalOverview drug={drug} />
-
-            <DosingSection drug={drug} />
-
             <PregnancySection drug={drug} />
 
             <ContraindicationsSection drug={drug} />
@@ -285,10 +268,6 @@ export default function DrugDetailScreen() {
             <PharmacologySection drug={drug} />
 
             <SourcesSection drug={drug} />
-
-            <SafetySection drug={drug} />
-
-            <PrescribingSection drug={drug} />
           </div>
         </DrugDetailSheet>
       </div>
