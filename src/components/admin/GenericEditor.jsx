@@ -65,7 +65,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     set('drug_interactions', next)
   }
   function addInteraction() {
-    set('drug_interactions', [...(generic.drug_interactions ?? []), { drug_name: '', risk: '', severity: 'moderate' }])
+    set('drug_interactions', [...(generic.drug_interactions ?? []), { drug: '', description: '', severity: 'moderate' }])
   }
   function removeInteraction(idx) {
     set('drug_interactions', (generic.drug_interactions ?? []).filter((_, i) => i !== idx))
@@ -342,16 +342,16 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
               <input
                 type="text"
-                value={x.drug_name}
-                onChange={e => setInteraction(idx, 'drug_name', e.target.value)}
+                value={x.drug}
+                onChange={e => setInteraction(idx, 'drug', e.target.value)}
                 placeholder="Drug name"
                 disabled={disabled}
                 style={{ ...inputStyle, width: 160, flexShrink: 0 }}
               />
               <input
                 type="text"
-                value={x.risk ?? ''}
-                onChange={e => setInteraction(idx, 'risk', e.target.value)}
+                value={x.description ?? ''}
+                onChange={e => setInteraction(idx, 'description', e.target.value)}
                 placeholder="Risk / interaction note"
                 disabled={disabled}
                 style={{ ...inputStyle, flex: 1 }}
@@ -634,3 +634,4 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
+
