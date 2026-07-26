@@ -1,3 +1,4 @@
+
 /**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
@@ -37,54 +38,7 @@ import {
   syncConditionTags,
 } from '../../lib/adminQueries'
 
-// ─── Section card header ──────────────────────────────────────────────────────
-// Renders the bold uppercase label that sits directly above each section card.
-// Replaces SectionTitle inside <main> — label is now outside the card, not
-// inside it, so the card's padding stays clean with no top-margin offset.
-
-function SectionCardHeader({ children }) {
-  return (
-    <div style={{
-      fontSize: 11, fontWeight: 700, letterSpacing: '0.07em',
-      textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
-      marginBottom: 'var(--space-2)',
-    }}>
-      {children}
-    </div>
-  )
-}
-
-// ─── Section card wrapper ─────────────────────────────────────────────────────
-// One white card per major section, sits on the tinted --color-bg backdrop.
-// No nested borders inside — content is rendered flat within this single shell.
-
-function SectionCard({ children, style }) {
-  return (
-    <div style={{
-      backgroundColor: 'var(--color-surface)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-5)',
-      boxShadow: 'var(--shadow-card)',
-      ...style,
-    }}>
-      {children}
-    </div>
-  )
-}
-
-// ─── Field label ─────────────────────────────────────────────────────────────
-
-function FieldLabel({ children, required }) {
-  return (
-    <label style={{
-      display: 'block', fontSize: 13, fontWeight: 600,
-      color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)',
-    }}>
-      {children}{required && <span style={{ color: '#DC2626', marginLeft: 3 }}>*</span>}
-    </label>
-  )
-}
+import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
 
 // ─── Text input ───────────────────────────────────────────────────────────────
 
