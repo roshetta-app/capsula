@@ -96,7 +96,7 @@ export default function DrugEditor() {
       .select(`
         id, slug, name_en, ingredients, category, class, is_published,
         mechanism_of_action,
-        uses_legacy, uses_structured,
+        uses_structured,
         warnings_legacy,
         side_effects_common, side_effects_serious,
         pregnancy_category, breastfeeding_safety,
@@ -147,7 +147,6 @@ export default function DrugEditor() {
       is_published:         generic.is_published ?? true,
       mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
       uses_structured:      generic.uses_structured ?? null,
-      uses_legacy:          generic.uses_legacy ?? [],
       warnings_legacy:      generic.warnings_legacy ?? [],
       side_effects_common:  generic.side_effects_common ?? [],
       side_effects_serious: generic.side_effects_serious ?? [],
