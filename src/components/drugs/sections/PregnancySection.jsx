@@ -27,7 +27,7 @@
  *
  * Props: drug — flat drug object from DrugContext
  *
- * decision 9 / plan §7 Pregnancy step 4 (2026-08-03): pregnancy category,
+ * decision 9 / plan §7 Pregnancy steps 3-4 (2026-08-03): pregnancy category,
  * breastfeeding safety, and crosses placenta/BBB now use new value sets
  * (see sectionPrimitives.jsx). `categoryMeta` falls back to
  * PREGNANCY_META.insufficient_data (not the old, now-nonexistent `.N` key)
@@ -37,6 +37,9 @@
  * an L1-L5 -> safe/caution/unsafe derive step so the raw L-value is never
  * printed directly; old safe/caution/unsafe rows still display exactly as
  * before. displayYesNo() adds a `minimal` branch for crosses placenta/BBB.
+ * "What does this mean?" now opens for any of the 4 fields (was
+ * pregnancyCategory-only), now that PregnancyCategoryBottomSheet.jsx (6.3)
+ * covers all four.
  */
 
 import { useState } from 'react'
@@ -220,7 +223,7 @@ export default function PregnancySection({ drug }) {
         })}
       </div>
 
-      {pregnancyCategory && (
+      {hasAny && (
         <button
           onClick={() => setSheetOpen(true)}
           style={{

@@ -2,8 +2,8 @@
  * src/components/drugs/sections/PregnancyCategoryBottomSheet.jsx
  * Drug Detail Screen rebuild — Phase 1, step 1.5b (decision 4.13, §10 Section 12)
  *
- * Static reference sheet listing every pregnancy category's badge + full
- * description — fixed content, the same every time, not drug-specific.
+ * Static reference sheet listing every value for all four Safety &
+ * Pregnancy fields — fixed content, the same every time, not drug-specific.
  * Opened from PregnancySection.jsx's "What does this mean?" link, once the
  * category badge alone (shown inline in the table) isn't enough context.
  *
@@ -15,10 +15,20 @@
  * built-in title, so a plain title is added directly under the drag handle
  * here.
  *
- * Body reuses PregnancyBadge + PREGNANCY_META from sectionPrimitives.jsx
- * as-is (confirmed in the plan's own audit — "PREGNANCY_META already has
- * every category's color/label, so the legend sheet needs no new content,
- * just a new place to show it") rather than duplicating that content here.
+ * decision 9 / plan §7 Pregnancy step 3 (2026-08-03): generalized from a
+ * single "Pregnancy Categories" list into three grouped sections, in the
+ * same order as PregnancySection.jsx's table rows:
+ *   1. Pregnancy Category   — unchanged: PregnancyBadge + PREGNANCY_META.
+ *   2. Breastfeeding Safety — new: same colored-box treatment as pregnancy,
+ *      looping BREASTFEEDING_META's L1-L5 entries via a local
+ *      BreastfeedingBadge (no exported breastfeeding-badge component exists
+ *      yet in sectionPrimitives.jsx; kept local to keep this change
+ *      contained to this file).
+ *   3. Crosses Placenta / BBB — new: label-only text (no colored box, per
+ *      the 6.2 design call), looping CROSSES_META's yes/no/minimal/unknown
+ *      entries once — both fields share the same value meanings, so shown
+ *      a single time rather than duplicated.
+ * Each group uses the existing SectionHeader primitive for its subheading.
  *
  * Props:
  *   isOpen   boolean
@@ -26,7 +36,52 @@
  */
 
 import { useEffect, useState } from 'react'
-import { PREGNANCY_META, PregnancyBadge } from './sectionPrimitives.jsx'
+import {
+  PREGNANCY_META,
+  PregnancyBadge,
+  BREASTFEEDING_META,
+  CROSSES_META,
+  SectionHeader,
+} from './sectionPrimitives.jsx'
+
+function BreastfeedingBadge({ level }) {
+  const meta = BREASTFEEDING_META[level]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+      <span style={{
+        display:         'inline-flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        width:           32,
+        height:          32,
+        borderRadius:    'var(--radius-sm)',
+        backgroundColor: meta.bg,
+        color:           meta.color,
+        fontSize:        16,
+        fontWeight:      700,
+        flexShrink:      0,
+      }}>
+        {level}
+      </span>
+      <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
+        {meta.label}
+      </span>
+    </div>
+  )
+}
+
+function CrossesItem({ item }) {
+  return (
+    <div style={{
+      fontSize:     13,
+      color:        'var(--color-text-secondary)',
+      lineHeight:   1.4,
+      marginBottom: 'var(--space-2)',
+    }}>
+      {item.label}
+    </div>
+  )
+}
 
 export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
   const [shouldRender, setShouldRender] = useState(isOpen)
@@ -74,7 +129,7 @@ export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Pregnancy categories"
+        aria-label="Pregnancy & breastfeeding"
         style={{
           position:        'fixed',
           bottom:          0,
@@ -108,20 +163,36 @@ export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
             color:        'var(--color-text-primary)',
             marginBottom: 'var(--space-4)',
           }}>
-            Pregnancy Categories
+            Pregnancy & Breastfeeding
           </div>
         </div>
 
-        {/* Scrollable body — every PREGNANCY_META entry, reusing the
-            existing PregnancyBadge component unchanged. */}
+        {/* Scrollable body — three grouped sections, one per meta object. */}
         <div style={{
           flex:      1,
           overflowY: 'auto',
           padding:   '0 var(--space-4) var(--space-6)',
         }}>
-          {Object.keys(PREGNANCY_META).map(category => (
-            <PregnancyBadge key={category} category={category} />
-          ))}
+          <div style={{ marginBottom: 'var(--space-5)' }}>
+            <SectionHeader title="Pregnancy Category" />
+            {Object.keys(PREGNANCY_META).map(category => (
+              <PregnancyBadge key={category} category={category} />
+            ))}
+          </div>
+
+          <div style={{ marginBottom: 'var(--space-5)' }}>
+            <SectionHeader title="Breastfeeding Safety" />
+            {Object.keys(BREASTFEEDING_META).map(level => (
+              <BreastfeedingBadge key={level} level={level} />
+            ))}
+          </div>
+
+          <div>
+            <SectionHeader title="Crosses Placenta / Blood-Brain Barrier" />
+            {Object.values(CROSSES_META).map(item => (
+              <CrossesItem key={item.label} item={item} />
+            ))}
+          </div>
         </div>
       </div>
     </>
