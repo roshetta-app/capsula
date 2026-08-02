@@ -69,6 +69,13 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     onChange({ [field]: value })
   }
 
+  // Splits on whitespace and drops empty entries, so leading/trailing/
+  // repeated spaces don't inflate the count. Used by Mechanism of
+  // Action's live word counter (150-word warn, decision 5).
+  function countWords(text) {
+    return (text ?? '').trim().split(/\s+/).filter(Boolean).length
+  }
+
   // ── uses_structured helpers ──
   function setUse(idx, field, value) {
     const next = (generic.uses_structured ?? []).map((u, i) =>
@@ -213,11 +220,20 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           <textarea
             value={generic.mechanism_of_action ?? ''}
             onChange={e => set('mechanism_of_action', e.target.value)}
-            placeholder="Describe how this drug works — plain clinical English, ~200 words max…"
+            placeholder="Describe how this drug works — plain clinical English, ~150 words max…"
             rows={4}
             disabled={disabled}
             style={{ ...inputStyle, resize: 'vertical', fontFamily: 'var(--font-body)', lineHeight: 1.6 }}
           />
+          <span style={{
+            fontSize: 12,
+            alignSelf: 'flex-end',
+            color: countWords(generic.mechanism_of_action) > 150
+              ? '#dc2626'
+              : 'var(--color-text-tertiary)',
+          }}>
+            {countWords(generic.mechanism_of_action)} / 150 words
+          </span>
         </Field>
 
         <Field label="Uses (structured)">
