@@ -141,31 +141,17 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Identity</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-        <Field label="Generic name (English)" required>
+        <Field label="Generic name (English)" hint="Computed from Ingredients below — always the ingredient list joined together.">
           <input
             type="text"
-            value={generic.name_en ?? ''}
-            onChange={e => set('name_en', e.target.value)}
-            placeholder="Molecule name only — e.g. Amoxicillin"
-            disabled={disabled}
-            required
-            style={inputStyle}
+            value={(generic.ingredients ?? []).join(' + ')}
+            disabled
+            readOnly
+            style={{ ...inputStyle, color: 'var(--color-text-tertiary)', backgroundColor: 'var(--color-bg)' }}
           />
         </Field>
 
-        <Field label="Generic name (Arabic)">
-          <input
-            type="text"
-            value={generic.name_ar ?? ''}
-            onChange={e => set('name_ar', e.target.value)}
-            placeholder="الاسم العلمي"
-            disabled={disabled}
-            dir="rtl"
-            style={{ ...inputStyle, textAlign: 'right' }}
-          />
-        </Field>
-
-        <Field label="Ingredients" hint="Combo generics only. Leave empty for single-ingredient generics.">
+        <Field label="Ingredients" required hint="Every generic needs at least one ingredient — add more for combo products. This drives the generic's name above.">
           <TagInput
             tags={generic.ingredients ?? []}
             onChange={tags => set('ingredients', tags)}
@@ -204,17 +190,6 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             />
           </Field>
         </div>
-
-        <Field label="Card tagline" hint="Leave blank to hide.">
-          <input
-            type="text"
-            value={generic.card_tagline ?? ''}
-            onChange={e => set('card_tagline', e.target.value)}
-            placeholder="Short descriptor shown on cards"
-            disabled={disabled}
-            style={inputStyle}
-          />
-        </Field>
 
         <Field label="Published">
           <ToggleSwitch
@@ -708,3 +683,4 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
+

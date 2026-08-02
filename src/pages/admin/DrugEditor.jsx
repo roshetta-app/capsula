@@ -94,8 +94,8 @@ export default function DrugEditor() {
     const { data: gData, error: gErr } = await supabase
       .from('generics')
       .select(`
-        id, slug, name_en, name_ar, category, class, is_published,
-        card_tagline, mechanism_of_action,
+        id, slug, name_en, ingredients, category, class, is_published,
+        mechanism_of_action,
         uses_legacy, uses_structured,
         warnings_legacy,
         side_effects_common, side_effects_serious,
@@ -140,12 +140,11 @@ export default function DrugEditor() {
     setSavingGeneric(true)
     setGlobalError(null)
     const { error } = await updateGeneric(genericId, {
-      name_en:              generic.name_en?.trim(),
-      name_ar:              generic.name_ar?.trim() || null,
+      ingredients:          generic.ingredients ?? [],
+      name_en:              (generic.ingredients ?? []).join(' + '),
       category:             generic.category,
       class:                generic.class?.trim() || null,
       is_published:         generic.is_published ?? true,
-      card_tagline:         generic.card_tagline?.trim() || null,
       mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
       uses_structured:      generic.uses_structured ?? null,
       uses_legacy:          generic.uses_legacy ?? [],
@@ -321,7 +320,7 @@ export default function DrugEditor() {
     </Shell>
   )
 
-  const genericValid = generic?.name_en?.trim() && generic?.category
+  const genericValid = generic?.ingredients?.length > 0 && generic?.category
 
   return (
     <Shell name={generic?.name_en ?? 'Drug'} onBack={() => navigate(-1)}>
