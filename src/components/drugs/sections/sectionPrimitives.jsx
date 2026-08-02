@@ -158,16 +158,14 @@ export function EmptySection({ title }) {
 // --- Pregnancy badge --------------------------------------------------------
 
 export const PREGNANCY_META = {
-  A: { bg: '#D1FAE5', color: '#065F46', label: 'Category A — Adequate studies show no risk' },
-  B: { bg: '#DBEAFE', color: '#1E40AF', label: 'Category B — Animal studies show no risk; no adequate human studies' },
-  C: { bg: '#FEF3C7', color: '#92400E', label: 'Category C — Animal studies show adverse effects; benefits may outweigh risks' },
-  D: { bg: '#FEE2E2', color: '#991B1B', label: 'Category D — Evidence of human fetal risk; benefits may outweigh risks' },
-  X: { bg: '#FCA5A5', color: '#7F1D1D', label: 'Category X — Fetal abnormalities demonstrated; risks outweigh benefits' },
-  N: { bg: '#F3F4F6', color: '#6B7280', label: 'Not classified' },
+  no_known_risk:     { bg: '#D1FAE5', color: '#065F46', label: 'No known risk — Studies have not shown risk to the fetus' },
+  some_risk_monitor: { bg: '#FEF3C7', color: '#92400E', label: 'Some risk / monitor — Risk cannot be ruled out; use only if benefits outweigh potential risk, with monitoring' },
+  contraindicated:   { bg: '#FEE2E2', color: '#991B1B', label: 'Contraindicated — Should not be used during pregnancy' },
+  insufficient_data: { bg: '#F3F4F6', color: '#6B7280', label: 'Insufficient data — Not enough evidence to determine risk' },
 }
 
 export function PregnancyBadge({ category }) {
-  const meta = PREGNANCY_META[category] ?? PREGNANCY_META.N
+  const meta = PREGNANCY_META[category] ?? PREGNANCY_META.insufficient_data
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
       <span style={{
@@ -190,6 +188,28 @@ export function PregnancyBadge({ category }) {
       </span>
     </div>
   )
+}
+
+// --- Breastfeeding badge (Hale's Lactation Risk Categories, L1-L5) ------------
+
+export const BREASTFEEDING_META = {
+  L1: { bg: '#D1FAE5', color: '#065F46', label: 'L1 — Safest: compatible with breastfeeding; no evidence of risk to the infant' },
+  L2: { bg: '#D1FAE5', color: '#065F46', label: 'L2 — Safer: limited data in nursing mothers; no evidence of increased risk' },
+  L3: { bg: '#FEF3C7', color: '#92400E', label: 'L3 — Moderately safe: no controlled data in nursing mothers, but risk appears low' },
+  L4: { bg: '#FEE2E2', color: '#991B1B', label: 'L4 — Possibly hazardous: positive evidence of risk, but benefit may outweigh risk in some situations' },
+  L5: { bg: '#FEE2E2', color: '#991B1B', label: 'L5 — Contraindicated: significant documented risk to the infant based on human experience' },
+}
+
+// --- Crosses placenta / crosses BBB explanatory copy --------------------------
+// Label-only — these two fields render as plain text on the card (real
+// answer in standard color, "Unknown" in muted gray), not colored badges,
+// so no bg/color is needed here, only the info-sheet copy.
+
+export const CROSSES_META = {
+  yes:     { label: 'Yes — Crosses readily' },
+  no:      { label: 'No — Does not cross' },
+  minimal: { label: 'Minimal — Crosses only in small/limited amounts' },
+  unknown: { label: 'Unknown — Not established' },
 }
 
 // --- Icon row -----------------------------------------------------------------
