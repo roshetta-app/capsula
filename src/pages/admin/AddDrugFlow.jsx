@@ -280,7 +280,7 @@ export default function AddDrugFlow() {
           {step === 1 && (
             <FormulationEditor
               formulation={formulation}
-              genericName={(generic.ingredients ?? []).join(' + ')}
+              ingredients={generic.ingredients ?? []}
               onChange={patchFormulation}
               disabled={saving}
             />

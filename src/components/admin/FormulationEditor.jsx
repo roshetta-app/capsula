@@ -1,3 +1,4 @@
+import { AlertTriangle } from 'lucide-react'
 import { DRUG_FORMS, DRUG_ROUTES, INJECTION_ROUTE_DETAILS } from '../../config/forms'
 import DoseRowList from './DoseRowList'
 import TagInput from './TagInput'
@@ -25,32 +26,35 @@ import TagInput from './TagInput'
  *     strength_value, strength_unit, strength_basis, strength_structured,
  *     form_modifier, device_type, route_details, formulation_note
  *   }
- *   genericName  string  — the parent generic's name_en. Only used to derive
- *     ingredient names (splitting on " + ") for a brand-new formulation that
- *     doesn't have strength_structured yet.
+ *   ingredients  string[]  — the parent generic's real ingredient names
+ *     (generics.ingredients). Used to build blank ingredient rows for a
+ *     brand-new formulation that doesn't have strength_structured yet, and
+ *     to flag (not block) any existing strength_structured.ingredients row
+ *     whose name no longer matches this list — e.g. after a later edit to
+ *     the parent generic.
  *   onChange     (patch) => void
  *   disabled     boolean
  */
-export default function FormulationEditor({ formulation, genericName = '', onChange, disabled = false }) {
+export default function FormulationEditor({ formulation, ingredients = [], onChange, disabled = false }) {
 
-  const ingredients = getIngredients(formulation, genericName)
+  const rows = getIngredientRows(formulation, ingredients)
 
   function set(field, value) {
     onChange({ [field]: value })
   }
 
   function setIngredient(idx, field, value) {
-    const nextIngredients = ingredients.map((ing, i) =>
-      i === idx ? { ...ing, [field]: value } : ing
+    const nextRows = rows.map((row, i) =>
+      i === idx ? { ...row, [field]: value } : row
     )
     const patch = {
-      strength_structured: { ingredients: nextIngredients },
-      concentration: buildConcentration(nextIngredients),
+      strength_structured: { ingredients: nextRows },
+      concentration: buildConcentration(nextRows),
     }
-    if (nextIngredients.length === 1) {
-      patch.strength_value = nextIngredients[0].value || null
-      patch.strength_unit  = nextIngredients[0].unit  || null
-      patch.strength_basis = nextIngredients[0].basis || null
+    if (nextRows.length === 1) {
+      patch.strength_value = nextRows[0].value || null
+      patch.strength_unit  = nextRows[0].unit  || null
+      patch.strength_basis = nextRows[0].basis || null
     } else {
       patch.strength_value = null
       patch.strength_unit  = null
@@ -64,50 +68,62 @@ export default function FormulationEditor({ formulation, genericName = '', onCha
 
       {/* Strength — one Value/Unit/Basis row per ingredient */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {ingredients.map((ing, idx) => (
-          <div key={idx}>
-            {ingredients.length > 1 && (
-              <div style={{
-                fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)',
-                marginBottom: 4, textTransform: 'capitalize',
-              }}>
-                {ing.ingredient || `Ingredient ${idx + 1}`}
+        {rows.map((row, idx) => {
+          const matched = isMatchedIngredient(row.ingredient, ingredients)
+          return (
+            <div key={idx}>
+              {(rows.length > 1 || !matched) && (
+                <div style={{
+                  fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)',
+                  marginBottom: 4, textTransform: 'capitalize',
+                }}>
+                  {row.ingredient || `Ingredient ${idx + 1}`}
+                </div>
+              )}
+              {!matched && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, color: '#DC2626', marginBottom: 4,
+                }}>
+                  <AlertTriangle size={12} style={{ flexShrink: 0 }} />
+                  Doesn't match this generic's ingredient list
+                </div>
+              )}
+              <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                <Field label="Strength Value" style={{ flex: 1 }}>
+                  <input
+                    type="text"
+                    value={row.value ?? ''}
+                    onChange={e => setIngredient(idx, 'value', e.target.value || null)}
+                    placeholder="e.g. 250"
+                    disabled={disabled}
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="Strength Unit" style={{ flex: 1 }}>
+                  <input
+                    type="text"
+                    value={row.unit ?? ''}
+                    onChange={e => setIngredient(idx, 'unit', e.target.value || null)}
+                    placeholder="e.g. mg"
+                    disabled={disabled}
+                    style={inputStyle}
+                  />
+                </Field>
+                <Field label="Strength Basis" style={{ flex: 1 }}>
+                  <input
+                    type="text"
+                    value={row.basis ?? ''}
+                    onChange={e => setIngredient(idx, 'basis', e.target.value || null)}
+                    placeholder="e.g. per_5ml"
+                    disabled={disabled}
+                    style={inputStyle}
+                  />
+                </Field>
               </div>
-            )}
-            <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-              <Field label="Strength Value" style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={ing.value ?? ''}
-                  onChange={e => setIngredient(idx, 'value', e.target.value || null)}
-                  placeholder="e.g. 250"
-                  disabled={disabled}
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label="Strength Unit" style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={ing.unit ?? ''}
-                  onChange={e => setIngredient(idx, 'unit', e.target.value || null)}
-                  placeholder="e.g. mg"
-                  disabled={disabled}
-                  style={inputStyle}
-                />
-              </Field>
-              <Field label="Strength Basis" style={{ flex: 1 }}>
-                <input
-                  type="text"
-                  value={ing.basis ?? ''}
-                  onChange={e => setIngredient(idx, 'basis', e.target.value || null)}
-                  placeholder="e.g. per_5ml"
-                  disabled={disabled}
-                  style={inputStyle}
-                />
-              </Field>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Concentration — built automatically from the ingredient rows above */}
@@ -288,19 +304,33 @@ export default function FormulationEditor({ formulation, genericName = '', onCha
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 // Real ingredient rows to render: the existing strength_structured.ingredients
-// if present, otherwise one blank row per ingredient parsed from the generic's
-// name (splitting on " + ") — for a brand-new formulation that hasn't had its
+// if present, otherwise one blank row per name in the generic's real
+// ingredients array — for a brand-new formulation that hasn't had its
 // strength filled in yet.
-function getIngredients(formulation, genericName) {
+function getIngredientRows(formulation, genericIngredients) {
   const existing = formulation.strength_structured?.ingredients
   if (Array.isArray(existing) && existing.length > 0) return existing
-  return deriveIngredientsFromName(genericName)
+  return blankRowsFromIngredients(genericIngredients)
 }
 
-function deriveIngredientsFromName(genericName) {
-  const parts = (genericName || '').split(' + ').map(s => s.trim()).filter(Boolean)
-  if (parts.length === 0) return [{ ingredient: genericName || '', value: null, unit: null, basis: null }]
-  return parts.map(name => ({ ingredient: name, value: null, unit: null, basis: null }))
+function blankRowsFromIngredients(genericIngredients) {
+  if (!genericIngredients || genericIngredients.length === 0) {
+    return [{ ingredient: '', value: null, unit: null, basis: null }]
+  }
+  return genericIngredients.map(name => ({ ingredient: name, value: null, unit: null, basis: null }))
+}
+
+// A formulation ingredient row is "matched" when its name lines up exactly
+// (case/whitespace-insensitive) with one of the parent generic's real
+// ingredient names. An empty/not-yet-typed row is treated as matched so a
+// brand-new blank row doesn't show a warning before anything is entered.
+// Unmatched rows are surfaced for manual review, not silently dropped or
+// silently kept as-is — see plan §4 decision 3's 2026-08-02 addendum.
+function isMatchedIngredient(name, genericIngredients) {
+  const norm = s => (s || '').trim().toLowerCase()
+  const target = norm(name)
+  if (!target) return true
+  return (genericIngredients ?? []).some(gi => norm(gi) === target)
 }
 
 // Builds the display-string Concentration value from the ingredient rows,
@@ -363,4 +393,3 @@ const inputStyle = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
-

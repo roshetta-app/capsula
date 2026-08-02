@@ -426,7 +426,7 @@ export default function DrugEditor() {
                   route_details:        f.route_details,
                   formulation_note:     f.formulation_note,
                 }}
-                genericName={generic?.name_en}
+                ingredients={generic?.ingredients ?? []}
                 onChange={patch => patchFormulation(f.id, patch)}
                 disabled={isSaving}
               />
