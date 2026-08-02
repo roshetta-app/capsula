@@ -26,6 +26,17 @@
  * 1.4). No trailing Divider(), per the page-wide no-divider rule.
  *
  * Props: drug — flat drug object from DrugContext
+ *
+ * decision 9 / plan §7 Pregnancy step 4 (2026-08-03): pregnancy category,
+ * breastfeeding safety, and crosses placenta/BBB now use new value sets
+ * (see sectionPrimitives.jsx). `categoryMeta` falls back to
+ * PREGNANCY_META.insufficient_data (not the old, now-nonexistent `.N` key)
+ * for any pregnancyCategory value not found in the new value set — this
+ * covers old letter-coded rows (A/B/C/D/X/N) that haven't been
+ * re-classified yet (step 6.5) without crashing. Breastfeeding safety adds
+ * an L1-L5 -> safe/caution/unsafe derive step so the raw L-value is never
+ * printed directly; old safe/caution/unsafe rows still display exactly as
+ * before. displayYesNo() adds a `minimal` branch for crosses placenta/BBB.
  */
 
 import { useState } from 'react'
@@ -48,9 +59,23 @@ const BREASTFEEDING_COLOR = {
   unsafe:  '#DC2626',
 }
 
+// Hale's L1-L5 breastfeeding-safety values collapse to the same
+// safe/caution/unsafe tiers already used for color and (pre-decision-9)
+// direct text display. Old safe/caution/unsafe rows pass straight through
+// unchanged so they keep displaying exactly as before until step 6.5
+// re-classifies them.
+function deriveBreastfeedingTier(value) {
+  if (value === 'L1' || value === 'L2') return 'safe'
+  if (value === 'L3') return 'caution'
+  if (value === 'L4' || value === 'L5') return 'unsafe'
+  if (value === 'safe' || value === 'caution' || value === 'unsafe') return value
+  return null
+}
+
 function displayYesNo(value) {
-  if (value === 'yes') return 'Yes'
-  if (value === 'no')  return 'No'
+  if (value === 'yes')     return 'Yes'
+  if (value === 'no')      return 'No'
+  if (value === 'minimal') return 'Minimal'
   return 'Unknown'
 }
 
@@ -108,7 +133,11 @@ export default function PregnancySection({ drug }) {
   if (!hasAny) return null
 
   const categoryMeta = pregnancyCategory
-    ? (PREGNANCY_META[pregnancyCategory] ?? PREGNANCY_META.N)
+    ? (PREGNANCY_META[pregnancyCategory] ?? PREGNANCY_META.insufficient_data)
+    : null
+
+  const breastfeedingTier = breastfeedingSafety
+    ? deriveBreastfeedingTier(breastfeedingSafety)
     : null
 
   // Build the visible row list first so only the true last one drops its
@@ -158,9 +187,9 @@ export default function PregnancySection({ drug }) {
                 <span style={{
                   fontWeight:     600,
                   textTransform:  'capitalize',
-                  color:          BREASTFEEDING_COLOR[breastfeedingSafety] ?? 'var(--color-text-primary)',
+                  color:          BREASTFEEDING_COLOR[breastfeedingTier] ?? 'var(--color-text-primary)',
                 }}>
-                  {breastfeedingSafety}
+                  {breastfeedingTier ?? breastfeedingSafety}
                 </span>
               </Row>
             )
