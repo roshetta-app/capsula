@@ -40,7 +40,6 @@ const PREGNANCY_CATEGORIES = ['A', 'B', 'C', 'D', 'X', 'N']
 const YES_NO_UNKNOWN = ['yes', 'no', 'unknown']
 const BREASTFEEDING_OPTIONS = ['safe', 'caution', 'unsafe', 'unknown']
 const INTERACTION_SEVERITIES = ['major', 'moderate', 'minor']
-const DOSE_ADJ_CONDITIONS = ['renal', 'hepatic', 'elderly', 'pediatric']
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -134,7 +133,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     set('dose_adjustments', next)
   }
   function addAdjustment() {
-    set('dose_adjustments', [...(generic.dose_adjustments ?? []), { condition: 'renal', adjustment: '' }])
+    set('dose_adjustments', [...(generic.dose_adjustments ?? []), { condition: '', adjustment: '' }])
   }
   function removeAdjustment(idx) {
     set('dose_adjustments', (generic.dose_adjustments ?? []).filter((_, i) => i !== idx))
@@ -280,16 +279,14 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {(generic.dose_adjustments ?? []).map((x, idx) => (
             <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
-              <select
-                value={x.condition ?? 'renal'}
+              <input
+                type="text"
+                value={x.condition ?? ''}
                 onChange={e => setAdjustment(idx, 'condition', e.target.value)}
+                placeholder="Condition (e.g. Renal impairment)"
                 disabled={disabled}
-                style={{ ...inputStyle, width: 130, flexShrink: 0 }}
-              >
-                {DOSE_ADJ_CONDITIONS.map(c => (
-                  <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
-                ))}
-              </select>
+                style={{ ...inputStyle, width: 180, flexShrink: 0 }}
+              />
               <textarea
                 value={x.adjustment ?? ''}
                 onChange={e => setAdjustment(idx, 'adjustment', e.target.value)}
