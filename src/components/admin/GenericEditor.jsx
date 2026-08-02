@@ -139,6 +139,30 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     set('dose_adjustments', (generic.dose_adjustments ?? []).filter((_, i) => i !== idx))
   }
 
+  // ── side_effects helpers ──
+  function setSideEffect(idx, value) {
+    const next = (generic.side_effects ?? []).map((x, i) => (i === idx ? value : x))
+    set('side_effects', next)
+  }
+  function addSideEffect() {
+    set('side_effects', [...(generic.side_effects ?? []), ''])
+  }
+  function removeSideEffect(idx) {
+    set('side_effects', (generic.side_effects ?? []).filter((_, i) => i !== idx))
+  }
+
+  // ── contraindications helpers ──
+  function setContraindication(idx, value) {
+    const next = (generic.contraindications ?? []).map((x, i) => (i === idx ? value : x))
+    set('contraindications', next)
+  }
+  function addContraindication() {
+    set('contraindications', [...(generic.contraindications ?? []), ''])
+  }
+  function removeContraindication(idx) {
+    set('contraindications', (generic.contraindications ?? []).filter((_, i) => i !== idx))
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
@@ -339,34 +363,58 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Side Effects</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-        <Field label="Common side effects">
-          <TagInput
-            tags={generic.side_effects_common ?? []}
-            onChange={tags => set('side_effects_common', tags)}
-            placeholder="Add common side effect and press Enter…"
-            disabled={disabled}
-          />
-        </Field>
-
-        <Field label="Serious / black-box side effects" hint="Shown in red in the app">
-          <TagInput
-            tags={generic.side_effects_serious ?? []}
-            onChange={tags => set('side_effects_serious', tags)}
-            placeholder="Add serious side effect…"
-            disabled={disabled}
-            tagColor="#DC2626"
-            tagBg="#FEF2F2"
-            tagBorder="#FECACA"
-          />
+        <Field label="Side Effects">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {(generic.side_effects ?? []).map((val, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <input
+                  type="text"
+                  value={val}
+                  onChange={e => setSideEffect(idx, e.target.value)}
+                  placeholder="Side effect…"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {!disabled && (
+                  <button type="button" onClick={() => removeSideEffect(idx)} style={iconTrashStyle}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {!disabled && (
+              <button type="button" onClick={addSideEffect} style={addRowBtnStyle}>
+                <Plus size={13} /> Add side effect
+              </button>
+            )}
+          </div>
         </Field>
 
         <Field label="Contraindications">
-          <TagInput
-            tags={generic.contraindications ?? []}
-            onChange={tags => set('contraindications', tags)}
-            placeholder="Add contraindication and press Enter…"
-            disabled={disabled}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {(generic.contraindications ?? []).map((val, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <input
+                  type="text"
+                  value={val}
+                  onChange={e => setContraindication(idx, e.target.value)}
+                  placeholder="Contraindication…"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {!disabled && (
+                  <button type="button" onClick={() => removeContraindication(idx)} style={iconTrashStyle}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {!disabled && (
+              <button type="button" onClick={addContraindication} style={addRowBtnStyle}>
+                <Plus size={13} /> Add contraindication
+              </button>
+            )}
+          </div>
         </Field>
 
         </div>
@@ -696,3 +744,4 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
+
