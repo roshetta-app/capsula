@@ -66,8 +66,7 @@ export default function UsesSection({ drug, colors, isDark }) {
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
         {shown.map((use, i) => {
-          const name    = typeof use === 'string' ? use : use.use_name
-          const context = typeof use === 'object' ? use.context : ''
+          const { use_name: name, context } = use
           return (
             <li
               key={i}

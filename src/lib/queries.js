@@ -85,7 +85,7 @@ const FULL_BRAND_SELECT = `
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
     generics (
       id, slug, name_en, category, class,
-      uses_legacy, uses_structured, warnings_legacy,
+      uses_structured, warnings_legacy,
       side_effects_common, side_effects_serious,
       pregnancy_category, breastfeeding_safety,
       crosses_placenta, crosses_bbb,
@@ -218,8 +218,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         category:             g.category,
         class:                g.class,
         mechanismOfAction:    g.mechanism_of_action,
-        // Uses: prefer structured, fall back to legacy
-        uses:                 g.uses_structured ?? (g.uses_legacy ?? []).map(u => ({ use_name: u, context: '' })),
+        uses:                 g.uses_structured ?? [],
         warnings:             g.warnings_legacy ?? [],
         sideEffectsCommon:    g.side_effects_common   ?? [],
         sideEffectsSerious:   g.side_effects_serious  ?? [],
@@ -434,5 +433,3 @@ export async function fetchCmsConfig(supabase, key) {
   if (error) throw error
   return data?.value ?? null
 }
-
-
