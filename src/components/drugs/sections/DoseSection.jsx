@@ -5,15 +5,11 @@
  * plan §10 Sections 6, 10)
  *
  * Replaces DosingSection.jsx's Doses + Dose Adjustments content with:
- *   - one tab per distinct `population` value present in textbookDoses,
- *     tab order = first-appearance order once every entry is sorted by its
- *     explicit `position` (4.6 — no clean auto-sort rule for free-text
- *     population/bracket labels, so ordering is fully manual, entered in the
- *     CMS via DoseRowList.jsx)
- *   - each tab's entries sharing that population render as one card per
- *     distinct `bracket` (age/weight/etc., optional), in `position` order
- *   - each card shows `instruction`, `max_dose`, `note`, and `source` as a
- *     citation line
+ *   - one tab per population entry in textbookDoses, in array order (see
+ *     2026-08-03 note below — ordering is no longer position-derived)
+ *   - each tab's own `brackets` array renders as one card per bracket, in
+ *     array order
+ *   - each card shows `bracket` (title, optional) and `instruction`
  *   - header row carries a "Dose adjustments ›" text-link trigger, styled to
  *     match GenericOverviewSection.jsx's "See Available Brands" link exactly
  *     (plain text + ChevronRight, no border — decision 4.11 distinguishes
@@ -33,29 +29,33 @@
  *   - "Dosage" renders as a large bold title, matching Side Effects' header
  *     weight/size — not the small uppercase SectionHeader style the 4 old
  *     retiring grouped sections use.
- *   - `generic.textbook_dose_notes` (already selected in queries.js as
- *     `textbookDoseNotes`, previously not read anywhere in this rebuild) is
- *     shown as an italic line. It's a single field per generic, not part of
- *     the textbook_doses array, so it can't vary by population/bracket —
- *     rendered once for the whole section (under the tabs, above the
- *     bracket cards), not repeated inside every card.
- *   - `max_dose` renders inside a tinted callout (reusing the existing
- *     "major" severity red — #FEE2E2 / #991B1B — already established in
- *     sectionPrimitives.jsx's SEVERITY_STYLE, rather than inventing a new
- *     color pair), not plain gray text.
- *   - Citation line reads "Source: {source}", not an em-dash prefix.
  *   - Unselected tab pill is outlined (transparent bg, bordered), not
  *     filled gray — only the active tab gets a filled background.
  *
  * Follow-up, 2026-07-25 (dose notes — "both" direction, brainstormed and
- * approved same session): `textbook_doses` entries can now also carry an
- * optional `note` field, entered per row in DoseRowList.jsx. Unlike
- * `textbookDoseNotes` above (generic-wide, shown once regardless of tab),
- * this is scoped to a single population/bracket entry and renders inside
- * that entry's own card — so it can differ per tab, or be left blank on
- * tabs it doesn't apply to. No DB migration needed; jsonb entries without a
- * `note` key just render nothing extra, same as `bracket`/`max_dose`/
- * `source` already do when absent.
+ * approved same session): each bracket can carry an optional `note` field,
+ * entered per bracket in DoseRowList.jsx. Unlike `textbookDoseNotes` above
+ * (generic-wide, shown once regardless of tab), this is scoped to a single
+ * bracket and renders inside that bracket's own card — so it can differ per
+ * tab, or be left blank on tabs it doesn't apply to.
+ *
+ * 2026-08-03 (CMS Library rebuild, plan §7 Doses step 3, decision 7) —
+ * textbook_doses reshaped from flat population+bracket rows to population-
+ * owns-brackets objects. This component updated to match:
+ *   - tabs now come directly from `textbookDoses` array order — no more
+ *     deriving tabs by sorting a flat array by `position` and taking
+ *     first-appearance order, since population is now the top-level grouping
+ *     itself, not something to reconstruct
+ *   - `max_dose` moved from per-bracket to once per tab: rendered once,
+ *     under all of the active tab's bracket cards, reusing the same tinted
+ *     callout style (the existing "major" severity red — #FEE2E2 / #991B1B,
+ *     already established in sectionPrimitives.jsx's SEVERITY_STYLE) rather
+ *     than the old per-card placement
+ *   - `Source: {entry.source}` citation line removed — `source` is dropped
+ *     from the data model entirely (confirmed 0 of 8 real entries used it)
+ *   - `textbookDoseNotes` repositioned from above the tabs/bracket cards to
+ *     after the tab's max-dose callout, at the very end of the section —
+ *     reverses the 2026-07-25 placement, per decision 7
  *
  * Props:
  *   drug — flat drug object from DrugContext (textbookDoses, doseAdjustments,
@@ -74,30 +74,18 @@ export default function DoseSection({ drug }) {
     doseAdjustments = [],
   } = drug
 
-  const [activePopulation, setActivePopulation] = useState(null)
+  const [activeIndex, setActiveIndex] = useState(0)
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false)
 
   if (textbookDoses.length === 0) {
     return <EmptySection title="Dosage" />
   }
 
-  // Sort once by the explicit, manually-entered `position` (4.6 — no
-  // reliable auto-sort rule for free-text population/bracket labels).
-  const sorted = [...textbookDoses].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
-
-  // Tab order = first-appearance order within the position-sorted list.
-  const populations = []
-  for (const entry of sorted) {
-    if (entry.population && !populations.includes(entry.population)) {
-      populations.push(entry.population)
-    }
-  }
-
-  const currentPopulation = populations.includes(activePopulation)
-    ? activePopulation
-    : populations[0]
-
-  const bracketsForCurrentTab = sorted.filter(e => e.population === currentPopulation)
+  // Tab order = array order — population is now the top-level grouping
+  // itself, nothing to derive by sorting/filtering a flat array anymore.
+  const currentIndex = Math.min(activeIndex, textbookDoses.length - 1)
+  const currentTab = textbookDoses[currentIndex]
+  const brackets = currentTab.brackets ?? []
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -142,16 +130,16 @@ export default function DoseSection({ drug }) {
       </div>
 
       {/* -- Population tabs -- */}
-      {populations.length > 1 && (
+      {textbookDoses.length > 1 && (
         <div style={{
           display: 'flex',
           gap:     'var(--space-2)',
           marginBottom: 'var(--space-3)',
         }}>
-          {populations.map(pop => (
+          {textbookDoses.map((tab, idx) => (
             <button
-              key={pop}
-              onClick={() => setActivePopulation(pop)}
+              key={idx}
+              onClick={() => setActiveIndex(idx)}
               style={{
                 padding:         '6px 14px',
                 borderRadius:    'var(--radius-full)',
@@ -159,37 +147,20 @@ export default function DoseSection({ drug }) {
                 fontFamily:      'var(--font-body)',
                 fontSize:        13,
                 fontWeight:      600,
-                border:          pop === currentPopulation ? 'none' : '1px solid var(--color-border)',
-                backgroundColor: pop === currentPopulation ? 'var(--color-text-primary)' : 'transparent',
-                color:           pop === currentPopulation ? 'var(--color-surface)' : 'var(--color-text-secondary)',
+                border:          idx === currentIndex ? 'none' : '1px solid var(--color-border)',
+                backgroundColor: idx === currentIndex ? 'var(--color-text-primary)' : 'transparent',
+                color:           idx === currentIndex ? 'var(--color-surface)' : 'var(--color-text-secondary)',
               }}
             >
-              {pop}
+              {tab.population}
             </button>
           ))}
         </div>
       )}
 
-      {/* -- General note: single field per generic (textbook_dose_notes),
-            can't vary by population/bracket, so shown once here rather
-            than repeated inside every card below. For a note scoped to
-            one specific tab/bracket, see entry.note inside each card. -- */}
-      {textbookDoseNotes && (
-        <p style={{
-          fontSize:     13,
-          fontStyle:    'italic',
-          color:        'var(--color-text-secondary)',
-          lineHeight:   1.5,
-          margin:       0,
-          marginBottom: 'var(--space-3)',
-        }}>
-          {textbookDoseNotes}
-        </p>
-      )}
-
       {/* -- Bracket cards for the active tab -- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-        {bracketsForCurrentTab.map((entry, idx) => (
+        {brackets.map((entry, idx) => (
           <div
             key={idx}
             style={{
@@ -220,22 +191,9 @@ export default function DoseSection({ drug }) {
               </p>
             )}
 
-            {entry.max_dose && (
-              <div style={{
-                display:         'inline-block',
-                fontSize:        13,
-                color:           '#991B1B',
-                backgroundColor: '#FEE2E2',
-                padding:         '4px 10px',
-                borderRadius:    'var(--radius-sm)',
-                marginTop:       'var(--space-2)',
-              }}>
-                <strong>Max:</strong> {entry.max_dose}
-              </div>
-            )}
-
-            {/* Per-entry note — scoped to this bracket/tab only, distinct
-                from the generic-wide textbookDoseNotes shown above. */}
+            {/* Per-bracket note — scoped to this bracket only, distinct
+                from the generic-wide textbookDoseNotes shown at the end
+                of the section. */}
             {entry.note && (
               <p style={{
                 fontSize:     13,
@@ -248,20 +206,41 @@ export default function DoseSection({ drug }) {
                 {entry.note}
               </p>
             )}
-
-            {entry.source && (
-              <div style={{
-                fontSize:  12,
-                color:     'var(--color-text-tertiary)',
-                fontStyle: 'italic',
-                marginTop: 6,
-              }}>
-                Source: {entry.source}
-              </div>
-            )}
           </div>
         ))}
       </div>
+
+      {/* -- Max dose: once per tab, under all of this tab's bracket cards -- */}
+      {currentTab.max_dose && (
+        <div style={{
+          display:         'inline-block',
+          fontSize:        13,
+          color:           '#991B1B',
+          backgroundColor: '#FEE2E2',
+          padding:         '4px 10px',
+          borderRadius:    'var(--radius-sm)',
+          marginTop:       'var(--space-3)',
+        }}>
+          <strong>Max:</strong> {currentTab.max_dose}
+        </div>
+      )}
+
+      {/* -- General note: single field per generic (textbook_dose_notes),
+            can't vary by population/bracket. Positioned at the very end of
+            the section, after the active tab's max-dose callout. For a
+            note scoped to one specific bracket, see entry.note above. -- */}
+      {textbookDoseNotes && (
+        <p style={{
+          fontSize:     13,
+          fontStyle:    'italic',
+          color:        'var(--color-text-secondary)',
+          lineHeight:   1.5,
+          margin:       0,
+          marginTop:    'var(--space-3)',
+        }}>
+          {textbookDoseNotes}
+        </p>
+      )}
 
       <DoseAdjustmentsBottomSheet
         isOpen={adjustmentsOpen}
