@@ -11,7 +11,7 @@ import BrandEditor from '../../components/admin/BrandEditor'
  * AddDrugFlow — /admin/drugs/new
  *
  * 3-step wizard:
- *   Step 1 — Generic info (name EN/AR, category, class, uses, warnings, textbook doses)
+ *   Step 1 — Generic info (ingredients, category, class, uses, warnings, textbook doses)
  *   Step 2 — Formulation (concentration, form, route, practical doses)
  *   Step 3 — Brands (at least 1 required)
  *
@@ -21,10 +21,9 @@ import BrandEditor from '../../components/admin/BrandEditor'
 const STEPS = ['Generic', 'Formulation', 'Brands']
 
 const EMPTY_GENERIC = {
-  name_en:  '',
-  name_ar:  '',
-  category: '',
-  class:    '',
+  ingredients: [],
+  category:    '',
+  class:       '',
 }
 
 const EMPTY_FORMULATION = {
@@ -70,7 +69,7 @@ export default function AddDrugFlow() {
   // ─── Validation per step ───────────────────────────────────────────────────
 
   function stepValid() {
-    if (step === 0) return generic.name_en.trim() && generic.category
+    if (step === 0) return (generic.ingredients?.length > 0) && generic.category
     if (step === 1) return formulation.concentration.trim() && formulation.form && formulation.route
     if (step === 2) return brands.length > 0 && brands.every(b => b.name.trim())
     return false
@@ -83,8 +82,11 @@ export default function AddDrugFlow() {
     setSaving(true)
 
     try {
-      // 1. Insert generic — generate slug from name_en
-      const slugBase = generic.name_en.trim()
+      // 1. Insert generic — name_en is never typed directly, it's always
+      //    derived from ingredients (same rule as DrugEditor.jsx's saveGeneric);
+      //    slug is generated from that same computed name.
+      const computedName = (generic.ingredients ?? []).join(' + ')
+      const slugBase = computedName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '')
@@ -92,12 +94,11 @@ export default function AddDrugFlow() {
 
       const { data: newGeneric, error: gErr } = await insertGeneric({
         slug,
-        name_en:              generic.name_en.trim(),
-        name_ar:              generic.name_ar?.trim() || '',
+        ingredients:          generic.ingredients ?? [],
+        name_en:              computedName,
         category:             generic.category,
         class:                generic.class?.trim()   || null,
         is_published:         generic.is_published ?? true,
-        card_tagline:         generic.card_tagline?.trim() || null,
         mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
         uses_structured:      generic.uses_structured ?? null,
         uses_legacy:          [],
@@ -279,7 +280,7 @@ export default function AddDrugFlow() {
           {step === 1 && (
             <FormulationEditor
               formulation={formulation}
-              genericName={generic.name_en}
+              genericName={(generic.ingredients ?? []).join(' + ')}
               onChange={patchFormulation}
               disabled={saving}
             />
