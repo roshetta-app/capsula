@@ -84,7 +84,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
         id, slug, name_en, category, class,
         warnings_legacy, textbook_doses, textbook_dose_notes,
         uses_structured, mechanism_of_action,
-        side_effects_common, side_effects_serious,
+        side_effects,
         pregnancy_category, breastfeeding_safety,
         crosses_placenta, crosses_bbb,
         contraindications, drug_interactions, dose_adjustments,
@@ -1074,3 +1074,4 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+

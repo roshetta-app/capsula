@@ -86,7 +86,7 @@ const FULL_BRAND_SELECT = `
     generics (
       id, slug, name_en, category, class,
       uses_structured, warnings_legacy,
-      side_effects_common, side_effects_serious,
+      side_effects,
       pregnancy_category, breastfeeding_safety,
       crosses_placenta, crosses_bbb,
       contraindications, drug_interactions, dose_adjustments,
@@ -220,8 +220,7 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         mechanismOfAction:    g.mechanism_of_action,
         uses:                 g.uses_structured ?? [],
         warnings:             g.warnings_legacy ?? [],
-        sideEffectsCommon:    g.side_effects_common   ?? [],
-        sideEffectsSerious:   g.side_effects_serious  ?? [],
+        sideEffects:          g.side_effects          ?? [],
         pregnancyCategory:    g.pregnancy_category,
         breastfeedingSafety:  g.breastfeeding_safety,
         crossesPlacenta:      g.crosses_placenta,
@@ -433,3 +432,4 @@ export async function fetchCmsConfig(supabase, key) {
   if (error) throw error
   return data?.value ?? null
 }
+
