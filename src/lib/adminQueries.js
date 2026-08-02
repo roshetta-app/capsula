@@ -1,4 +1,3 @@
-
 /**
  * adminQueries.js — Supabase write operations for the admin CMS.
  *
@@ -22,6 +21,9 @@
  *   1A.3 — uploadCategoryIcon (new, reuses specialty-icons bucket)
  *   DrugCMS fix — fetchGenericsPage (new, added alongside fetchAllGenerics):
  *           real server-side search/category-filter/50-cap query for the CMS list
+ *   1.8 — fetchGenericsPage: combo matching now checks the real 'ingredients'
+ *           array (per-ingredient, "starts with") instead of guessing from
+ *           name_en text
  */
 
 import { supabase }  from './supabase'
@@ -820,6 +822,30 @@ export async function fetchAllGenerics() {
  * @returns {Promise<{ data: object[]|null, count: number, error: object|null }>}
  */
 export async function fetchGenericsPage({ query = '', category = null, limit = 50, page = 0, sortBy = 'name' } = {}) {
+  const term = query.trim()
+
+  // Combo matching (1.8): a search term is checked against each entry in the
+  // real 'ingredients' array, not guessed from name_en text (the old
+  // '%+ term%' pattern). Mirrors the app's own generic-mode search
+  // (searchUtils.js 'genericPrefixFields' — same 'starts with' rule per
+  // ingredient), but run as a slim, targeted lookup here instead of against
+  // an already-downloaded full drug list, since this CMS list stays
+  // server-paged by design. Only id + ingredients are pulled for this
+  // check — never the full row — and only when there's something to search.
+  let ingredientMatchIds = []
+  if (term) {
+    const lowerTerm = term.toLowerCase()
+    const { data: ingredientRows, error: ingredientError } = await supabase
+      .from('generics')
+      .select('id, ingredients')
+      .not('ingredients', 'is', null)
+    if (ingredientError) return { data: null, count: 0, error: ingredientError }
+
+    ingredientMatchIds = (ingredientRows ?? [])
+      .filter(g => (g.ingredients ?? []).some(i => i.toLowerCase().startsWith(lowerTerm)))
+      .map(g => g.id)
+  }
+
   let q = supabase
     .from('generics')
     .select(`
@@ -835,9 +861,9 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
 
   if (category) q = q.eq('category', category)
 
-  const term = query.trim()
   if (term) {
-    q = q.or(`name_en.ilike.${term}%,name_en.ilike.%+ ${term}%,name_ar.ilike.%${term}%`)
+    const idFilter = ingredientMatchIds.length > 0 ? `,id.in.(${ingredientMatchIds.join(',')})` : ''
+    q = q.or(`name_en.ilike.${term}%,name_ar.ilike.%${term}%${idFilter}`)
   }
 
   const { data, error, count } = await q
@@ -1081,4 +1107,3 @@ export async function updateCmsConfig(key, value) {
 
   if (error) throw error
   return { error: null }
-}
