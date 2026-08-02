@@ -1107,3 +1107,4 @@ export async function updateCmsConfig(key, value) {
 
   if (error) throw error
   return { error: null }
+}
