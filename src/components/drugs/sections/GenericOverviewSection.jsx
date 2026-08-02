@@ -43,7 +43,7 @@
  */
 
 import { useState } from 'react'
-import { Atom, ChevronRight } from 'lucide-react'
+import { Atom, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
 import { NotYetAdded, InlineTruncatedList } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
@@ -57,14 +57,25 @@ const pillStyle = {
   borderRadius:    'var(--radius-full)',
 }
 
+// Mechanism of Action app-side truncation (decision 5) — 30 words, same
+// "See more"/"See less" toggle pattern UsesSection.jsx already uses.
+const MOA_TRUNCATE_AT = 30
+
 export default function GenericOverviewSection({ drug, siblings = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
+  const [moaOpen,    setMoaOpen]    = useState(false)
 
   const {
     genericName,
     ingredients,
     mechanismOfAction,
   } = drug
+
+  const moaWords   = mechanismOfAction ? mechanismOfAction.trim().split(/\s+/).filter(Boolean) : []
+  const moaHasMore = moaWords.length > MOA_TRUNCATE_AT
+  const moaText     = moaOpen || !moaHasMore
+    ? mechanismOfAction
+    : moaWords.slice(0, MOA_TRUNCATE_AT).join(' ') + '…'
 
   // Combo generics (2+ active ingredients) — ingredients is now populated
   // for single-ingredient generics too (a 1-element array), so the combo
@@ -127,18 +138,51 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         </div>
       </div>
 
-      {/* -- Mechanism of Action — directly under the name, no label -- */}
+      {/* -- Mechanism of Action — directly under the name, no label.
+            App-side truncation at 30 words (decision 5) — button omitted
+            entirely (not just inert) when already under the limit, same
+            convention UsesSection.jsx uses. -- */}
       <div style={{ marginBottom: 'var(--space-3)' }}>
         {mechanismOfAction
           ? (
-            <p style={{
-              fontSize:   14,
-              color:      'var(--color-text-primary)',
-              lineHeight: 1.6,
-              margin:     0,
-            }}>
-              {mechanismOfAction}
-            </p>
+            <>
+              <p style={{
+                fontSize:   14,
+                color:      'var(--color-text-primary)',
+                lineHeight: 1.6,
+                margin:     0,
+              }}>
+                {moaText}
+              </p>
+              {moaHasMore && (
+                <button
+                  onClick={() => setMoaOpen(o => !o)}
+                  style={{
+                    display:        'flex',
+                    alignItems:     'center',
+                    justifyContent: 'center',
+                    gap:            4,
+                    width:          '100%',
+                    marginTop:      'var(--space-2)',
+                    background:     'none',
+                    border:         'none',
+                    cursor:         'pointer',
+                    padding:        0,
+                    fontFamily:     'var(--font-body)',
+                    fontSize:       13,
+                    fontWeight:     600,
+                    color:          'var(--color-text-secondary)',
+                    WebkitTapHighlightColor: 'transparent',
+                  }}
+                >
+                  {moaOpen ? 'See less' : 'See more'}
+                  {moaOpen
+                    ? <ChevronUp size={14} />
+                    : <ChevronDown size={14} />
+                  }
+                </button>
+              )}
+            </>
           )
           : <NotYetAdded />
         }
