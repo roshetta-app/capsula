@@ -141,7 +141,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Identity</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
 
-        <Field label="Generic name (English)" hint="Computed from Ingredients below — always the ingredient list joined together.">
+        <Field label="Generic name (English)">
           <input
             type="text"
             value={(generic.ingredients ?? []).join(' + ')}
@@ -151,7 +151,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
           />
         </Field>
 
-        <Field label="Ingredients" required hint="Every generic needs at least one ingredient — add more for combo products. This drives the generic's name above.">
+        <Field label="Ingredients" required>
           <TagInput
             tags={generic.ingredients ?? []}
             onChange={tags => set('ingredients', tags)}
@@ -683,4 +683,3 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
-
