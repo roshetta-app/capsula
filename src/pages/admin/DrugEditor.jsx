@@ -117,7 +117,7 @@ export default function DrugEditor() {
         strength_value, strength_unit, strength_basis, strength_structured,
         form_modifier, device_type, route_details, formulation_note,
         doses_structured, default_dose_override, is_published,
-        brands ( id, name, name_ar, manufacturer, source, is_published )
+        brands ( id, name, manufacturer, source, is_published )
       `)
       .eq('generic_id', genericId)
       .order('concentration')
@@ -207,7 +207,6 @@ export default function DrugEditor() {
         }
         const payload = {
           name:         brand.name.trim(),
-          name_ar:      brand.name_ar?.trim() || null,
           manufacturer: brand.manufacturer?.trim() || null,
           source:       brand.source ?? 'manual',
           is_published: brand.is_published ?? true,

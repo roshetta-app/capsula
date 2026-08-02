@@ -600,7 +600,7 @@ export async function fetchPrescriptionsForCondition(conditionId) {
           id, dose_instruction, sort_order,
           brand_id,
           brands (
-            id, name, name_ar,
+            id, name,
             formulation_id,
             formulations (
               id, concentration, form,
@@ -733,7 +733,7 @@ export async function searchBrandsForTypeahead(query) {
   const { data, error } = await supabase
     .from('brands')
     .select(`
-      id, name, name_ar,
+      id, name,
       formulations (
         id, concentration, form,
         generics ( id, name_en, slug, category, doses )
@@ -1074,4 +1074,5 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
 
