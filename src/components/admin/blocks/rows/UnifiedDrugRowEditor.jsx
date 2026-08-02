@@ -625,7 +625,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       brand_id:       brand.id,
       generic_name:   generic?.name_en   ?? option.generic_name,
       generic_id:     generic?.id        ?? option.generic_id,
-      name_ar:        brand.name_ar ?? null,
       formulation_id: f?.id              ?? null,
       concentration:  f?.concentration   ?? null,
       form:           f?.form            ?? null,
@@ -743,7 +742,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           const { data: newBrand, error: bErr } = await insertBrand({
             formulation_id: formulationId,
             name: brandName,
-            name_ar: option.name_ar?.trim() || '',
             manufacturer: null,
             source: SOURCE_FLAG_VALUE,
             is_published: true,
@@ -832,7 +830,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         isLinked={isLinked}
         concentration={option.concentration}
         form={option.form}
-        nameAr={option.name_ar}
         genericName={option.generic_name}
         mode="brand"
         onChangeText={handleChangeText}
@@ -907,17 +904,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
                 ))}
               </select>
             </div>
-          </div>
-          <div>
-            <FieldLabel hint="optional">Arabic name</FieldLabel>
-            <input
-              type="text"
-              value={option.name_ar ?? ''}
-              onChange={e => patch({ name_ar: e.target.value || null })}
-              placeholder="الاسم بالعربي"
-              dir="rtl"
-              style={textInput({ textAlign: 'right' })}
-            />
           </div>
         </>
       )}
@@ -1320,7 +1306,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       brand_id:       brand.id,
       generic_name:   generic?.name_en  ?? null,
       generic_id:     generic?.id       ?? null,
-      name_ar:        brand.name_ar ?? null,
       formulation_id: f?.id             ?? null,
       concentration:  f?.concentration  ?? null,
       form:           f?.form           ?? null,

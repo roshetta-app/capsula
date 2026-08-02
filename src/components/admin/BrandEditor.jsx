@@ -9,7 +9,7 @@ import { useToast } from '../../context/ToastContext'
  *             Added formulationLabel prop to show inherited concentration + form.
  *
  * Props:
- *   brands          { id?, name, name_ar, manufacturer, source, is_published }[]
+ *   brands          { id?, name, manufacturer, source, is_published }[]
  *   onChange        (brands) => void
  *   onDelete        (brandId) => void   — called for existing brands being removed
  *   disabled        boolean
@@ -33,7 +33,6 @@ export default function BrandEditor({
   const { toast } = useToast()
 
   const [newName,   setNewName]   = useState('')
-  const [newNameAr, setNewNameAr] = useState('')
   const [newMfr,    setNewMfr]    = useState('')
   const [newSource, setNewSource] = useState('manual')
   const [toggling,  setToggling]  = useState(null) // brandId being toggled
@@ -83,14 +82,12 @@ export default function BrandEditor({
       ...brands,
       {
         name:         newName.trim(),
-        name_ar:      newNameAr.trim() || null,
         manufacturer: newMfr.trim()    || null,
         source:       newSource,
         is_published: true,
       },
     ])
     setNewName('')
-    setNewNameAr('')
     setNewMfr('')
     setNewSource('manual')
   }
@@ -161,18 +158,6 @@ export default function BrandEditor({
                 placeholder="Brand name"
                 required
                 style={inputStyle}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <SmallLabel>Brand name (AR)</SmallLabel>
-              <input
-                type="text"
-                value={brand.name_ar ?? ''}
-                onChange={e => updateLocal(idx, 'name_ar', e.target.value || null)}
-                disabled={disabled}
-                placeholder="اسم العلامة التجارية"
-                dir="rtl"
-                style={{ ...inputStyle, textAlign: 'right' }}
               />
             </div>
           </div>
@@ -286,14 +271,6 @@ export default function BrandEditor({
               style={inputStyle}
               onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addBrand())}
             />
-            <input
-              type="text"
-              value={newNameAr}
-              onChange={e => setNewNameAr(e.target.value)}
-              placeholder="اسم (AR)"
-              dir="rtl"
-              style={{ ...inputStyle, textAlign: 'right' }}
-            />
           </div>
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
@@ -369,4 +346,5 @@ const inputStyle = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
+
 

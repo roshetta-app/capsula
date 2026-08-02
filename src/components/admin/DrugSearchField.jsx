@@ -79,7 +79,7 @@
  *                                          responsible for extracting
  *                                          brand_id/generic_id/
  *                                          formulation_id/concentration/
- *                                          form/name_ar/category from it,
+ *                                          form/category from it,
  *                                          same as today's auto-fill.
  *   onUnlink      () => void             — fired when the admin clicks
  *                                          "change" and then types free
@@ -149,7 +149,7 @@ async function searchFormulations(query) {
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
       generics ( id, name_en, slug, category ),
-      brands ( id, name, name_ar, is_published )
+      brands ( id, name, is_published )
     `)
     .eq('is_published', true)
     .order('concentration')
@@ -178,7 +178,7 @@ async function searchBrands(query) {
   const { data, error } = await supabase
     .from('brands')
     .select(`
-      id, name, name_ar, is_published,
+      id, name, is_published,
       formulations (
         id, concentration, form, route,
         doses_structured, default_dose_override,
@@ -231,13 +231,12 @@ function toSuggestion(result, mode) {
 
 // ─── Linked read-only summary label ────────────────────────────────────────
 // BUG FIX (2026-06-23): the linked display previously showed only the drug
-// name. Concentration/form/Arabic name are library data once a row is
-// linked — read-only, not separately editable fields — so they're folded
-// into this one summary line instead of a standalone Arabic name input
-// sitting elsewhere on the row. Format: "Name — concentration, form — name_ar".
-function buildLinkedSummary(name, concentration, form, nameAr) {
+// name. Concentration/form are library data once a row is linked —
+// read-only, not separately editable fields — so they're folded into this
+// one summary line. Format: "Name — concentration, form".
+function buildLinkedSummary(name, concentration, form) {
   const concForm = [concentration, form].filter(Boolean).join(', ')
-  return [name, concForm, nameAr].filter(Boolean).join(' — ')
+  return [name, concForm].filter(Boolean).join(' — ')
 }
 
 export default function DrugSearchField({
@@ -245,7 +244,6 @@ export default function DrugSearchField({
   isLinked = false,
   concentration = null,
   form = null,
-  nameAr = null,
   genericName = null,
   onChangeText,
   onLink,
@@ -440,7 +438,7 @@ export default function DrugSearchField({
   // aren't scattered across two places on the row.
   //
   // BUG FIX (2026-06-23): added a second, grey line under the brand summary
-  // showing the generic name — brand_name/concentration/form/name_ar were
+  // showing the generic name — brand_name/concentration/form were
   // already combined into one line; generic_name is distinct enough
   // (different drug identity, not a display detail of the brand) to get
   // its own quieter line rather than being folded into the same string.
@@ -464,7 +462,7 @@ export default function DrugSearchField({
             fontWeight: 600,
             color:      'var(--color-text-primary)',
           }}>
-            {buildLinkedSummary(value, concentration, form, nameAr)}
+            {buildLinkedSummary(value, concentration, form)}
           </span>
           {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
           <button
@@ -769,4 +767,5 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
 

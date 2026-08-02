@@ -21,7 +21,7 @@
  *   same pattern as the existing promote-to-library flow) for when the
  *   needed brand doesn't exist under this formulation yet.
  *   onSelect(brand) — brand object shaped like mode="brand"'s result
- *   (`{ id, name, name_ar, formulations: { id, concentration, form, route,
+ *   (`{ id, name, formulations: { id, concentration, form, route,
  *   doses_structured, default_dose_override, generics: {...} } }`), so
  *   existing onSelect handlers written for mode="brand" work unchanged.
  *
@@ -55,7 +55,7 @@ async function searchFormulationsForPicker(query) {
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
       generics ( id, name_en, slug, category ),
-      brands ( id, name, name_ar )
+      brands ( id, name )
     `)
     .eq('is_published', true)
     .order('concentration')
@@ -90,7 +90,7 @@ async function searchBrandsForPicker(query) {
   const { data, error } = await supabase
     .from('brands')
     .select(`
-      id, name, name_ar,
+      id, name,
       formulations (
         id, concentration, form, route,
         doses_structured, default_dose_override,
@@ -220,17 +220,6 @@ function BrandResultRow({ brand, onSelect }) {
         marginBottom: 2,
       }}>
         {brand.name}
-        {brand.name_ar && (
-          <span style={{
-            fontSize:   13,
-            fontWeight: 400,
-            color:      'var(--color-text-secondary)',
-            marginLeft: 8,
-            direction:  'rtl',
-          }}>
-            {brand.name_ar}
-          </span>
-        )}
       </div>
 
       {/* Generic + concentration + form — secondary */}
@@ -276,14 +265,6 @@ function ScopedBrandResultRow({ brand, onSelect }) {
       <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
         {brand.name}
       </span>
-      {brand.name_ar && (
-        <span style={{
-          fontSize: 13, fontWeight: 400, color: 'var(--color-text-secondary)',
-          marginLeft: 8, direction: 'rtl',
-        }}>
-          {brand.name_ar}
-        </span>
-      )}
     </button>
   )
 }
@@ -368,18 +349,17 @@ export default function DrugPickerModal({
 
       let brandRow
       if (existing) {
-        brandRow = { id: existing.id, name: existing.name, name_ar: null }
+        brandRow = { id: existing.id, name: existing.name }
       } else {
         const { data: created, error: insertErr } = await insertBrand({
           formulation_id: scopeFormulationId,
           name,
-          name_ar: '',
           manufacturer: null,
           source: SOURCE_FLAG_VALUE,
           is_published: true,
         })
         if (insertErr) throw new Error(insertErr.message)
-        brandRow = { id: created.id, name, name_ar: null }
+        brandRow = { id: created.id, name }
       }
 
       // Shape to match mode="brand"'s onSelect contract — formulations
@@ -388,7 +368,6 @@ export default function DrugPickerModal({
       handleSelect({
         id: brandRow.id,
         name: brandRow.name,
-        name_ar: brandRow.name_ar,
         formulations: {
           id:               scopeFormulationId,
           concentration:    scopeContext?.concentration ?? null,
@@ -650,4 +629,5 @@ export default function DrugPickerModal({
     </Modal>
   )
 }
+
 

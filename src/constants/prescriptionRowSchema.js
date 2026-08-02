@@ -19,6 +19,14 @@
  * field-mapping reference material. No persisted data of these shapes
  * remained in the database at the time of removal (confirmed via audit).
  *
+ * Decision 26 amendment (2026-08-02): the 'name_ar' field (previously
+ * LOCKED 2026-06-20) is removed entirely from DrugRow, AlternativeDrug,
+ * and DrugOption — not just its brands.name_ar auto-fill source. It was
+ * confirmed dead in the live app (PrescriptionSheetBlock.jsx never read
+ * it) and CMS-only. A DB migration strips any 'name_ar' key already saved
+ * inside existing condition_blocks.data rows/alternatives at the same time
+ * this ships.
+ *
  * Masterplan reference: capsula_prescription_redesign_masterplan.md
  * sections 2.1, 2.3, 2.4, 2.4a, 2.4b, 2.5, 2.6
  */
@@ -51,13 +59,6 @@ export const ROW_TYPES = {
  * @property {string|null} generic_id        - uuid, set only if generic_name matched/was picked
  *                                              from an existing generics row. Null = unlinked free text
  *                                              or left blank entirely (masterplan §2.6).
- *
- * @property {string|null} name_ar           - LOCKED (2026-06-20). Arabic display name shown
- *                                              directly under the English name. Mirrors
- *                                              brand.name_ar when this row is brand-led, or
- *                                              generic.name_ar when unbranded. Auto-filled on
- *                                              library pick (brand/formulation/generic select),
- *                                              but always freely editable for free-text rows.
  *
  * @property {string|null} formulation_id    - uuid, set only if this row is fully linked to a
  *                                              specific formulations row (concentration + form
@@ -165,7 +166,6 @@ export const DRUG_ROW_TEMPLATE = {
   brand_id: null,
   generic_name: null,
   generic_id: null,
-  name_ar: null,
   formulation_id: null,
   concentration: null,
   form: null,
@@ -190,11 +190,6 @@ export const DRUG_ROW_TEMPLATE = {
  * @property {string|null} brand_id
  * @property {string|null} generic_name
  * @property {string|null} generic_id
- * @property {string|null} name_ar
- *   - Same rule as DrugRow.name_ar: brand.name_ar if this alternative is
- *     brand-led, else generic.name_ar. Always shown under this
- *     alternative's own name, even when it shares the parent's dose/note
- *     cluster — only dose/note/breadcrumb are shared, not the name.
  * @property {string|null} formulation_id
  * @property {string|null} concentration
  * @property {string|null} form
@@ -251,7 +246,6 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_id: null,
   generic_name: null,
   generic_id: null,
-  name_ar: null,
   formulation_id: null,
   concentration: null,
   form: null,
@@ -436,7 +430,6 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     brand_id: chosen.brand_id,
     generic_name: chosen.generic_name,
     generic_id: chosen.generic_id,
-    name_ar: chosen.name_ar,
     formulation_id: chosen.formulation_id,
     concentration: chosen.concentration,
     form: chosen.form,
@@ -511,7 +504,6 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
  * @property {string|null} brand_id
  * @property {string|null} generic_name
  * @property {string|null} generic_id
- * @property {string|null} name_ar
  * @property {string|null} formulation_id
  * @property {string|null} concentration
  * @property {string|null} form
@@ -536,7 +528,6 @@ export const DRUG_OPTION_TEMPLATE = {
   brand_id: null,
   generic_name: null,
   generic_id: null,
-  name_ar: null,
   formulation_id: null,
   concentration: null,
   form: null,
@@ -607,7 +598,6 @@ export function toDrugOptions(row) {
     brand_id: row.brand_id,
     generic_name: row.generic_name,
     generic_id: row.generic_id,
-    name_ar: row.name_ar,
     formulation_id: row.formulation_id,
     concentration: row.concentration,
     form: row.form,
@@ -666,7 +656,6 @@ export function toDrugOptions(row) {
       brand_id: alt.brand_id,
       generic_name: alt.generic_name,
       generic_id: alt.generic_id,
-      name_ar: alt.name_ar,
       formulation_id: alt.formulation_id,
       concentration: alt.concentration,
       form: alt.form,
@@ -775,7 +764,6 @@ export function fromDrugOptions(row, groups) {
       brand_id: opt.brand_id,
       generic_name: opt.generic_name,
       generic_id: opt.generic_id,
-      name_ar: opt.name_ar,
       formulation_id: opt.formulation_id,
       concentration: opt.concentration,
       form: opt.form,
@@ -803,7 +791,6 @@ export function fromDrugOptions(row, groups) {
     brand_id: mainOpt.brand_id,
     generic_name: mainOpt.generic_name,
     generic_id: mainOpt.generic_id,
-    name_ar: mainOpt.name_ar,
     formulation_id: mainOpt.formulation_id,
     concentration: mainOpt.concentration,
     form: mainOpt.form,
@@ -825,4 +812,5 @@ export function fromDrugOptions(row, groups) {
     alternatives,
   };
 }
+
 

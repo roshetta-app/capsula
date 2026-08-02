@@ -90,7 +90,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
         contraindications, drug_interactions, dose_adjustments,
         pharmacokinetics, is_published
       ),
-      brands ( id, name, name_ar, manufacturer, source, is_published )
+      brands ( id, name, manufacturer, source, is_published )
     `)
     .eq('id', formulationId)
     .single()
@@ -169,7 +169,7 @@ export async function deleteBrand(id) {
 export async function fetchBrandsForFormulation(formulationId) {
   const { data, error } = await supabase
     .from('brands')
-    .select('id, name, name_ar')
+    .select('id, name')
     .eq('formulation_id', formulationId)
     .order('name')
   return { data: data ?? [], error }
@@ -1074,3 +1074,4 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
