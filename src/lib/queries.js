@@ -84,14 +84,14 @@ const FULL_BRAND_SELECT = `
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
     generics (
-      id, slug, name_en, name_ar, category, class,
+      id, slug, name_en, category, class,
       uses_legacy, uses_structured, warnings_legacy,
       side_effects_common, side_effects_serious,
       pregnancy_category, breastfeeding_safety,
       crosses_placenta, crosses_bbb,
       contraindications, drug_interactions, dose_adjustments,
       pharmacokinetics, clinical_relevance, sources, textbook_doses, textbook_dose_notes,
-      mechanism_of_action, card_tagline, is_published, ingredients
+      mechanism_of_action, is_published, ingredients
     )
   )
 `
@@ -113,9 +113,9 @@ const LIGHT_BRAND_SELECT = `
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, is_published,
     generics (
-      id, slug, name_en, name_ar, category, class,
+      id, slug, name_en, category, class,
       pregnancy_category, breastfeeding_safety,
-      card_tagline, is_published, ingredients
+      is_published, ingredients
     )
   )
 `
@@ -212,14 +212,12 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         genericId:            g.id,
         genericSlug:          g.slug,
         genericName:          g.name_en,
-        arabicName:           g.name_ar,
         // Combo generics only (2+ active ingredients) — null for plain generics.
         // Populated 2026-07-16 (step 3.5.1) from raw_drug_import, lets generic-mode
         // search match a combo by any one of its ingredients, not just the whole name.
         ingredients:          g.ingredients ?? null,
         category:             g.category,
         class:                g.class,
-        cardTagline:          g.card_tagline,
         mechanismOfAction:    g.mechanism_of_action,
         // Uses: prefer structured, fall back to legacy
         uses:                 g.uses_structured ?? (g.uses_legacy ?? []).map(u => ({ use_name: u, context: '' })),
@@ -290,11 +288,9 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         genericId:            g.id,
         genericSlug:          g.slug,
         genericName:          g.name_en,
-        arabicName:           g.name_ar,
         ingredients:          g.ingredients ?? null,
         category:             g.category,
         class:                g.class,
-        cardTagline:          g.card_tagline,
         pregnancyCategory:    g.pregnancy_category,
         breastfeedingSafety:  g.breastfeeding_safety,
       }
@@ -440,3 +436,4 @@ export async function fetchCmsConfig(supabase, key) {
   if (error) throw error
   return data?.value ?? null
 }
+

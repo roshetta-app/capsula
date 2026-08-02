@@ -277,10 +277,13 @@ const DRUG_BRAND_FUSE_OPTIONS = {
 // Ingredient-level matching now runs exclusively through the separate,
 // fair, per-ingredient flattened index below (`buildDrugIngredientIndex` /
 // `searchGenericDrugsFuzzy`).
+// `arabicName` key removed 2026-08-02 (CMS Library Identity section, decision
+// 1) — it scored `generics.name_ar`, confirmed dead (2 of 7,266 rows
+// populated, not read anywhere outside the CMS editor's own input) and now
+// removed from the query/DB entirely. genericName/category remain.
 const DRUG_GENERIC_FUSE_OPTIONS = {
   keys: [
     { name: 'genericName', weight: 0.5 },
-    { name: 'arabicName',  weight: 0.2 },
     { name: 'category',    weight: 0.1 },
   ],
   threshold:          0.35,
