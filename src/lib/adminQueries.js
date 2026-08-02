@@ -83,7 +83,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
       generics (
         id, slug, name_en, name_ar, category, class,
         uses_legacy, warnings_legacy, textbook_doses, textbook_dose_notes,
-        uses_structured, mechanism_of_action, card_tagline,
+        uses_structured, mechanism_of_action,
         side_effects_common, side_effects_serious,
         pregnancy_category, breastfeeding_safety,
         crosses_placenta, crosses_bbb,
@@ -763,39 +763,6 @@ export async function toggleConditionPublished(id, isPublished, name = null) {
 // ─── Generics — publish toggle + list (3E) ───────────────────────────────────
 
 /**
- * Fetch all generics (published + draft) for the admin CMS list.
- * Returns one row per generic with formulation count.
- */
-export async function fetchAllGenerics() {
-  const { data, error } = await supabase
-    .from('generics')
-    .select(`
-      id, name_en, name_ar, category, class,
-      is_published, updated_at,
-      mechanism_of_action,
-      uses_legacy, uses_structured,
-      warnings_legacy,
-      side_effects_common, side_effects_serious,
-      pregnancy_category, breastfeeding_safety,
-      crosses_placenta, crosses_bbb,
-      contraindications, drug_interactions, dose_adjustments,
-      pharmacokinetics, textbook_doses, textbook_dose_notes,
-      card_tagline,
-      formulations ( id )
-    `)
-    .order('name_en')
-
-  if (error) return { data: null, error }
-
-  const mapped = data.map(g => ({
-    ...g,
-    formulationCount: (g.formulations ?? []).length,
-  }))
-
-  return { data: mapped, error: null }
-}
-
-/**
  * Fetch one page of generics for the admin CMS list, always querying the
  * live database directly (never a client-side re-filter of a preloaded
  * list) — so search and category filtering reach every row, not just
@@ -804,8 +771,7 @@ export async function fetchAllGenerics() {
  * Search matches at the START of each ingredient, not anywhere inside a
  * word — combo generic names are plain text like "achillea + anise + basil",
  * so a match is either the very start of the name, or right after a
- * " + " separator. name_ar still matches anywhere (kept as a plain
- * substring match, unchanged). Category matches generics.category as
+ * " + " separator. Category matches generics.category as
  * free text against the drug_categories.slug value the caller passes in
  * (generics.category stores the slug, not the display label — confirmed
  * against live data).
@@ -849,7 +815,7 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
   let q = supabase
     .from('generics')
     .select(`
-      id, name_en, name_ar, category, class,
+      id, name_en, category, class,
       is_published, updated_at, brand_count,
       formulations ( id )
     `, { count: 'exact' })
@@ -863,7 +829,7 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
 
   if (term) {
     const idFilter = ingredientMatchIds.length > 0 ? `,id.in.(${ingredientMatchIds.join(',')})` : ''
-    q = q.or(`name_en.ilike.${term}%,name_ar.ilike.%${term}%${idFilter}`)
+    q = q.or(`name_en.ilike.${term}%${idFilter}`)
   }
 
   const { data, error, count } = await q

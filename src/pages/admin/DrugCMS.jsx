@@ -9,7 +9,7 @@
  *   - Delete → ConfirmModal
  *   - "Forms" count → navigates to DrugEditor
  *   - "+ Add New" → navigates to AddDrugFlow (/admin/drugs/new)
- *   - Search (name_en, name_ar) + category filter, both querying the live
+ *   - Search (name_en) + category filter, both querying the live
  *     database directly (debounced, capped at 50 rows) — never a client-side
  *     re-filter of a preloaded list. Category options come from the real
  *     drug_categories table via useCategories, shown as a full-width dropdown.
@@ -286,11 +286,6 @@ export default function DrugCMS() {
                       <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 3, flexWrap: 'wrap', alignItems: 'center' }}>
                         {g.category && (
                           <span style={catChipStyle}>{g.category}</span>
-                        )}
-                        {g.name_ar && (
-                          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', direction: 'rtl' }}>
-                            {g.name_ar}
-                          </span>
                         )}
                         <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
                           {formatDate(g.updated_at)}
