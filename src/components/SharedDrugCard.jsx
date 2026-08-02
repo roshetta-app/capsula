@@ -52,12 +52,14 @@
  * array's original order (4.43). `titleSegments` (the tradenameClean +
  * highlightMatch logic, below) is untouched.
  *
- * Generic/ingredient line (1d.3, decision 4.13): `drug.ingredients` is only
- * populated for combo generics (2+ active ingredients) — confirmed live, a
- * plain array of lowercase ingredient-name strings, e.g. ["calcium", "vitamin
- * a", "zinc"]. Shows the first 2, then "+N" for the rest (real data has combo
- * rows with up to 26 ingredients). For plain (non-combo) generics, `ingredients`
- * is null and the line just shows `drug.genericName` instead.
+ * Generic/ingredient line (1d.3, decision 4.13): `drug.ingredients` is now
+ * always populated — a plain array of lowercase ingredient-name strings,
+ * e.g. ["calcium", "vitamin a", "zinc"] for a combo, or a single-element
+ * array for a plain generic (CMS Library Identity section, decision 1).
+ * Shows the first 2, then "+N" for the rest (real data has combo rows with
+ * up to 26 ingredients). `drug.genericName` is kept only as a defensive
+ * fallback for a row with a missing/empty `ingredients` array, not the
+ * normal path anymore.
  *
  * Category icon badge (1d.4, decisions 4.14/4.30): sources category data
  * entirely from the live `categories` prop (from `useCategories()`, passed
@@ -134,8 +136,10 @@ export default function SharedDrugCard({
   const titleSuffix = getDrugTitleSuffix(drug)
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
-  // + a "+N" count; plain generics just show the one genericName.
-  const genericLine = drug.ingredients
+  // + a "+N" count; single-ingredient generics show that one ingredient.
+  // ingredients is now always populated (decision 1) — genericName is a
+  // defensive fallback only, for a row with a missing/empty array.
+  const genericLine = drug.ingredients?.length > 0
     ? drug.ingredients.length > 2
       ? `${drug.ingredients.slice(0, 2).join(', ')} +${drug.ingredients.length - 2}`
       : drug.ingredients.join(', ')
