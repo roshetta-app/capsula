@@ -25,6 +25,11 @@
  * text-primary), and the bullet text now matches Dosage's instruction text
  * color/line-height. Trailing Divider() also removed, per the page-wide
  * no-divider-between-sections rule already established for Uses/Dosage.
+ *
+ * Correction, 2026-08-03 (decision 8, plan §7 step 4): side_effects_common
+ * and side_effects_serious merged into one DB column, side_effects, mapped
+ * app-side as sideEffects — this component now reads it directly and no
+ * longer performs its own merge.
  */
 
 import { useState } from 'react'
@@ -36,19 +41,14 @@ const TRUNCATE_AT = 3
 export default function SideEffectsSection({ drug }) {
   const [expanded, setExpanded] = useState(false)
 
-  const {
-    sideEffectsCommon = [],
-    sideEffectsSerious = [],
-  } = drug
+  const { sideEffects = [] } = drug
 
-  const merged = [...sideEffectsCommon, ...sideEffectsSerious]
-
-  if (merged.length === 0) {
+  if (sideEffects.length === 0) {
     return <EmptySection title="Side Effects" />
   }
 
-  const hasMore = merged.length > TRUNCATE_AT
-  const shown = expanded ? merged : merged.slice(0, TRUNCATE_AT)
+  const hasMore = sideEffects.length > TRUNCATE_AT
+  const shown = expanded ? sideEffects : sideEffects.slice(0, TRUNCATE_AT)
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
