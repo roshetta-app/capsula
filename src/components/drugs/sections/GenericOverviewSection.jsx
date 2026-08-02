@@ -66,9 +66,11 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     mechanismOfAction,
   } = drug
 
-  // Combo generics (2+ active ingredients) — ingredients is populated only
-  // for combos, null otherwise (4.7).
-  const isCombo = Array.isArray(ingredients) && ingredients.length > 0
+  // Combo generics (2+ active ingredients) — ingredients is now populated
+  // for single-ingredient generics too (a 1-element array), so the combo
+  // check needs more than one element, not just a non-empty array (CMS
+  // Library Identity section, step 5).
+  const isCombo = Array.isArray(ingredients) && ingredients.length > 1
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
