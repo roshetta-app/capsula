@@ -625,7 +625,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       brand_id:       brand.id,
       generic_name:   generic?.name_en   ?? option.generic_name,
       generic_id:     generic?.id        ?? option.generic_id,
-      name_ar:        brand.name_ar ?? generic?.name_ar ?? null,
+      name_ar:        brand.name_ar ?? null,
       formulation_id: f?.id              ?? null,
       concentration:  f?.concentration   ?? null,
       form:           f?.form            ?? null,
@@ -696,7 +696,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           const { data: newGeneric, error: gErr } = await insertGeneric({
             slug: slugBase || `generic-${Date.now()}`,
             name_en: genericName,
-            name_ar: option.brand_name?.trim() ? '' : (option.name_ar?.trim() || ''),
             category: promoteCategory,
             class: null,
           })
@@ -1321,7 +1320,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       brand_id:       brand.id,
       generic_name:   generic?.name_en  ?? null,
       generic_id:     generic?.id       ?? null,
-      name_ar:        brand.name_ar ?? generic?.name_ar ?? null,
+      name_ar:        brand.name_ar ?? null,
       formulation_id: f?.id             ?? null,
       concentration:  f?.concentration  ?? null,
       form:           f?.form           ?? null,
@@ -1339,7 +1338,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       id:             `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       generic_name:   generic?.name_en   ?? null,
       generic_id:     generic?.id        ?? null,
-      name_ar:        generic?.name_ar   ?? null,
       formulation_id: formulation.id,
       concentration:  formulation.concentration ?? null,
       form:           formulation.form ?? null,

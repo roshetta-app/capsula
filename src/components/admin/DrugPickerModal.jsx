@@ -54,7 +54,7 @@ async function searchFormulationsForPicker(query) {
     .select(`
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
-      generics ( id, name_en, name_ar, slug, category ),
+      generics ( id, name_en, slug, category ),
       brands ( id, name, name_ar )
     `)
     .eq('is_published', true)
@@ -94,7 +94,7 @@ async function searchBrandsForPicker(query) {
       formulations (
         id, concentration, form, route,
         doses_structured, default_dose_override,
-        generics ( id, name_en, name_ar, slug, category )
+        generics ( id, name_en, slug, category )
       )
     `)
     .eq('formulations.is_published', true)
@@ -650,3 +650,4 @@ export default function DrugPickerModal({
     </Modal>
   )
 }
+

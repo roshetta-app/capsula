@@ -148,7 +148,7 @@ async function searchFormulations(query) {
     .select(`
       id, slug, concentration, form, route,
       doses_structured, default_dose_override,
-      generics ( id, name_en, name_ar, slug, category ),
+      generics ( id, name_en, slug, category ),
       brands ( id, name, name_ar, is_published )
     `)
     .eq('is_published', true)
@@ -182,7 +182,7 @@ async function searchBrands(query) {
       formulations (
         id, concentration, form, route,
         doses_structured, default_dose_override,
-        generics ( id, name_en, name_ar, slug, category )
+        generics ( id, name_en, slug, category )
       )
     `)
     .eq('is_published', true)
@@ -769,3 +769,4 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+

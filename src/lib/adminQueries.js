@@ -81,7 +81,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
       id, concentration, form, route,
       doses_structured, default_dose_override, is_published,
       generics (
-        id, slug, name_en, name_ar, category, class,
+        id, slug, name_en, category, class,
         uses_legacy, warnings_legacy, textbook_doses, textbook_dose_notes,
         uses_structured, mechanism_of_action,
         side_effects_common, side_effects_serious,
