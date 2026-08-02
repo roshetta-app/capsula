@@ -36,9 +36,9 @@ import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimit
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PREGNANCY_CATEGORIES = ['A', 'B', 'C', 'D', 'X', 'N']
-const YES_NO_UNKNOWN = ['yes', 'no', 'unknown']
-const BREASTFEEDING_OPTIONS = ['safe', 'caution', 'unsafe', 'unknown']
+const PREGNANCY_CATEGORIES = ['no_known_risk', 'some_risk_monitor', 'contraindicated', 'insufficient_data']
+const YES_NO_UNKNOWN = ['yes', 'no', 'minimal', 'unknown']
+const BREASTFEEDING_OPTIONS = ['L1', 'L2', 'L3', 'L4', 'L5']
 const INTERACTION_SEVERITIES = ['major', 'moderate', 'minor']
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -434,7 +434,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
             >
               <option value="">— not set —</option>
               {PREGNANCY_CATEGORIES.map(v => (
-                <option key={v} value={v}>{v}</option>
+                <option key={v} value={v}>{v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
               ))}
             </select>
           </Field>
