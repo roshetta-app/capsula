@@ -39,7 +39,6 @@ import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimit
 const PREGNANCY_CATEGORIES = ['no_known_risk', 'some_risk_monitor', 'contraindicated', 'insufficient_data']
 const YES_NO_UNKNOWN = ['yes', 'no', 'minimal', 'unknown']
 const BREASTFEEDING_OPTIONS = ['L1', 'L2', 'L3', 'L4', 'L5']
-const INTERACTION_SEVERITIES = ['major', 'moderate', 'minor']
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -97,7 +96,7 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
     set('drug_interactions', next)
   }
   function addInteraction() {
-    set('drug_interactions', [...(generic.drug_interactions ?? []), { drug: '', description: '', severity: 'moderate' }])
+    set('drug_interactions', [...(generic.drug_interactions ?? []), { drug: '', description: '' }])
   }
   function removeInteraction(idx) {
     set('drug_interactions', (generic.drug_interactions ?? []).filter((_, i) => i !== idx))
@@ -161,6 +160,18 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
   }
   function removeContraindication(idx) {
     set('contraindications', (generic.contraindications ?? []).filter((_, i) => i !== idx))
+  }
+
+  // ── pharmacokinetics helpers ──
+  function setPharmacokinetic(idx, value) {
+    const next = (generic.pharmacokinetics ?? []).map((x, i) => (i === idx ? value : x))
+    set('pharmacokinetics', next)
+  }
+  function addPharmacokinetic() {
+    set('pharmacokinetics', [...(generic.pharmacokinetics ?? []), ''])
+  }
+  function removePharmacokinetic(idx) {
+    set('pharmacokinetics', (generic.pharmacokinetics ?? []).filter((_, i) => i !== idx))
   }
 
   return (
@@ -506,16 +517,6 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
                 disabled={disabled}
                 style={{ ...inputStyle, flex: 1 }}
               />
-              <select
-                value={x.severity ?? 'moderate'}
-                onChange={e => setInteraction(idx, 'severity', e.target.value)}
-                disabled={disabled}
-                style={{ ...inputStyle, width: 110, flexShrink: 0 }}
-              >
-                {INTERACTION_SEVERITIES.map(s => (
-                  <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                ))}
-              </select>
               {!disabled && (
                 <button type="button" onClick={() => removeInteraction(idx)} style={iconTrashStyle}>
                   <Trash2 size={14} />
@@ -536,12 +537,30 @@ export default function GenericEditor({ generic = {}, onChange, disabled = false
         <SectionCardHeader>Pharmacology</SectionCardHeader>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
         <Field label="Pharmacokinetics" hint="e.g. 'Onset: 30 min', 'Half-life: 6-8 hours'">
-          <TagInput
-            tags={generic.pharmacokinetics ?? []}
-            onChange={tags => set('pharmacokinetics', tags)}
-            placeholder="Type a PK point and press Enter…"
-            disabled={disabled}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {(generic.pharmacokinetics ?? []).map((val, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
+                <input
+                  type="text"
+                  value={val}
+                  onChange={e => setPharmacokinetic(idx, e.target.value)}
+                  placeholder="PK point…"
+                  disabled={disabled}
+                  style={{ ...inputStyle, flex: 1 }}
+                />
+                {!disabled && (
+                  <button type="button" onClick={() => removePharmacokinetic(idx)} style={iconTrashStyle}>
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {!disabled && (
+              <button type="button" onClick={addPharmacokinetic} style={addRowBtnStyle}>
+                <Plus size={13} /> Add PK point
+              </button>
+            )}
+          </div>
         </Field>
         <Field label="Clinical relevance">
           <textarea
@@ -744,4 +763,3 @@ const addRowBtnStyle = {
   cursor:          'pointer',
   alignSelf:       'flex-start',
 }
-
