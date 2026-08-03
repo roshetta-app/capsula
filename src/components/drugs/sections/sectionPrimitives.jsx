@@ -164,24 +164,31 @@ export const PREGNANCY_META = {
   insufficient_data: { bg: '#F3F4F6', color: '#6B7280', label: 'Insufficient data — Not enough evidence to determine risk' },
 }
 
+// 2026-08-03 fix: the badge box below used to be a fixed 32x32 square sized
+// for a single old letter category (B/X/etc). Decision 9's values are long
+// plain-language strings, which overflowed that box. Now an auto-width pill
+// (same shape as the Category pill on PregnancySection.jsx) showing a short
+// label (the text before " — " in PREGNANCY_META's label) instead of the
+// raw stored value.
 export function PregnancyBadge({ category }) {
   const meta = PREGNANCY_META[category] ?? PREGNANCY_META.insufficient_data
+  const shortLabel = meta.label.split(' — ')[0]
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
       <span style={{
         display:         'inline-flex',
         alignItems:      'center',
         justifyContent:  'center',
-        width:           32,
-        height:          32,
-        borderRadius:    'var(--radius-sm)',
+        padding:         '4px 10px',
+        borderRadius:    'var(--radius-full)',
         backgroundColor: meta.bg,
         color:           meta.color,
-        fontSize:        16,
+        fontSize:        13,
         fontWeight:      700,
+        whiteSpace:      'nowrap',
         flexShrink:      0,
       }}>
-        {category}
+        {shortLabel}
       </span>
       <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>
         {meta.label}

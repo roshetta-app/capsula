@@ -40,6 +40,10 @@
  * "What does this mean?" now opens for any of the 4 fields (was
  * pregnancyCategory-only), now that PregnancyCategoryBottomSheet.jsx (6.3)
  * covers all four.
+ * 2026-08-03 fix: Category pill now shows PREGNANCY_META's short label
+ * (e.g. "No known risk") instead of the raw stored value (e.g.
+ * `no_known_risk`), matching the matching fix on PregnancyBadge in
+ * sectionPrimitives.jsx.
  */
 
 import { useState } from 'react'
@@ -178,7 +182,7 @@ export default function PregnancySection({ drug }) {
                   backgroundColor: categoryMeta.bg,
                   color:           categoryMeta.color,
                 }}>
-                  {pregnancyCategory}
+                  {categoryMeta.label.split(' — ')[0]}
                 </span>
               </Row>
             )
