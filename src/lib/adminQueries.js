@@ -86,7 +86,7 @@ export async function fetchFormulationWithGeneric(formulationId) {
         contraindications, drug_interactions, dose_adjustments,
         pharmacokinetics, is_published
       ),
-      brands ( id, name, manufacturer, source, is_published )
+      brands ( id, tradename_clean, manufacturer, is_published )
     `)
     .eq('id', formulationId)
     .single()
@@ -169,6 +169,83 @@ export async function fetchBrandsForFormulation(formulationId) {
     .eq('formulation_id', formulationId)
     .order('name')
   return { data: data ?? [], error }
+}
+
+// ─── Search & Add — live drug search (Phase 3, Brands + Search & Add) ────────
+//
+// A fresh, always-live query for the admin "Search & Add" picker
+// (DrugPickerModal.jsx). Deliberately NOT a reuse of DrugContext/useDrugs —
+// that hook's cache is device-persisted and TTL-based, built for the
+// end-user app, so an admin adding a just-created brand wouldn't see it
+// until the cache refreshed. This queries Supabase directly every time.
+//
+// Mirrors fetchFlatDrugs's (src/lib/queries.js) select shape and its three
+// publish-flag filters (brand + formulation + generic), so results can be
+// rendered with the same display components (SharedDrugCard.jsx,
+// drugTitleFormat.js) the rest of the app already uses. Matches on
+// tradename_clean, not the legacy brands.name field.
+
+/**
+ * Live search for brands by tradename, for the admin Search & Add picker.
+ * Returns only published brands whose formulation and generic are also
+ * published, shaped to match the app's FlatDrug fields.
+ *
+ * @param {string} query — partial tradename text
+ * @param {{ limit?: number }} [options]
+ * @returns {Promise<{ data: object[]|null, error: object|null }>}
+ */
+export async function searchDrugsForPicker(query, { limit = 30 } = {}) {
+  const term = query.trim()
+  if (!term) return { data: [], error: null }
+
+  const { data, error } = await supabase
+    .from('brands')
+    .select(`
+      id, slug, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
+      formulations (
+        id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, is_published,
+        generics ( id, slug, name_en, category, class, ingredients, is_published )
+      )
+    `)
+    .eq('is_published', true)
+    .ilike('tradename_clean', `%${term}%`)
+    .limit(limit)
+
+  if (error) return { data: null, error }
+
+  const mapped = (data ?? [])
+    .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
+    .map(b => {
+      const f = b.formulations
+      const g = f.generics
+      return {
+        id:              b.id,
+        slug:            b.slug,
+        tradenameClean:  b.tradename_clean,
+        manufacturer:    b.manufacturer,
+        price:           b.price,
+        packSize:        b.pack_size,
+        fillVolume:      b.fill_volume,
+        formulationId:       f.id,
+        formulationSlug:     f.slug,
+        concentration:       f.concentration,
+        strengthValue:       f.strength_value,
+        strengthUnit:        f.strength_unit,
+        strengthBasis:       f.strength_basis,
+        form:                f.form,
+        formModifier:        f.form_modifier ?? [],
+        route:               f.route,
+        routeDetails:        f.route_details ?? [],
+        genericId:       g.id,
+        genericSlug:     g.slug,
+        genericName:     g.name_en,
+        ingredients:     g.ingredients ?? null,
+        category:        g.category,
+        class:           g.class,
+      }
+    })
+
+  return { data: mapped, error: null }
 }
 
 // ─── Specialties (5.4 + 3H) ──────────────────────────────────────────────────
@@ -718,16 +795,17 @@ export async function findFormulationMatch(genericId, concentration, form) {
 }
 
 /**
- * Find an existing brand under a formulation by exact, case-insensitive name.
+ * Find an existing brand under a formulation by exact, case-insensitive
+ * tradename match.
  * @param {string} formulationId
- * @param {string} name
+ * @param {string} tradenameClean
  */
-export async function findBrandMatch(formulationId, name) {
+export async function findBrandMatch(formulationId, tradenameClean) {
   const { data, error } = await supabase
     .from('brands')
-    .select('id, name, source')
+    .select('id, tradename_clean')
     .eq('formulation_id', formulationId)
-    .ilike('name', name.trim())
+    .ilike('tradename_clean', tradenameClean.trim())
     .limit(1)
     .maybeSingle()
   return { data: data ?? null, error }
