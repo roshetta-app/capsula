@@ -102,7 +102,8 @@ export default function DrugEditor() {
         pregnancy_category, breastfeeding_safety,
         crosses_placenta, crosses_bbb,
         contraindications, drug_interactions, dose_adjustments,
-        pharmacokinetics, textbook_doses, textbook_dose_notes
+        pharmacokinetics, clinical_relevance, sources,
+        textbook_doses, textbook_dose_notes
       `)
       .eq('id', genericId)
       .single()
@@ -157,6 +158,8 @@ export default function DrugEditor() {
       drug_interactions:    generic.drug_interactions ?? [],
       dose_adjustments:     generic.dose_adjustments ?? [],
       pharmacokinetics:     generic.pharmacokinetics ?? null,
+      clinical_relevance:   generic.clinical_relevance?.trim() || null,
+      sources:              generic.sources ?? [],
       textbook_doses:       generic.textbook_doses ?? [],
       textbook_dose_notes:  generic.textbook_dose_notes?.trim() || null,
     })
