@@ -17,6 +17,20 @@
  *   │                                                                          │
  *   │  [+ Add Formulation]                                                     │
  *   └──────────────────────────────────────────────────────────────────────────┘
+ *
+ * CMS Library rebuild (plan §7, Brands + Search & Add, step 10.2, decisions
+ * 21/26): brands now read/write `tradename_clean` instead of the legacy
+ * `name` field, and `source` is dropped entirely — both here (this file's
+ * own live query and save payload, a 5th blast-radius spot not in the
+ * original 4-spot list since it queries Supabase directly rather than going
+ * through adminQueries.js's fetchFormulationWithGeneric) and in
+ * BrandEditor.jsx itself. `pack_size`/`fill_volume` are now selected too,
+ * needed by BrandEditor's collapsed-row title (built the same way
+ * SharedDrugCard.jsx builds one). The formulation's own concentration/form/
+ * form_modifier/route/route_details are passed down to BrandEditor as a new
+ * `formulation` prop, replacing the old `formulationLabel` string prop —
+ * which this file never actually passed (confirmed dead, removed rather
+ * than kept alongside).
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -120,7 +134,7 @@ export default function DrugEditor() {
         strength_value, strength_unit, strength_basis, strength_structured,
         form_modifier, device_type, route_details, formulation_note,
         doses_structured, default_dose_override, is_published,
-        brands ( id, name, manufacturer, source, is_published )
+        brands ( id, tradename_clean, manufacturer, pack_size, fill_volume, is_published )
       `)
       .eq('generic_id', genericId)
       .order('concentration')
@@ -210,17 +224,16 @@ export default function DrugEditor() {
           continue
         }
         const payload = {
-          name:         brand.name.trim(),
-          manufacturer: brand.manufacturer?.trim() || null,
-          source:       brand.source ?? 'manual',
-          is_published: brand.is_published ?? true,
+          tradename_clean: brand.tradename_clean.trim(),
+          manufacturer:    brand.manufacturer?.trim() || null,
+          is_published:    brand.is_published ?? true,
         }
         if (brand.id) {
           const { error } = await updateBrand(brand.id, payload)
-          if (error) throw new Error(`Update brand "${brand.name}": ${error.message}`)
+          if (error) throw new Error(`Update brand "${brand.tradename_clean}": ${error.message}`)
         } else {
           const { error } = await insertBrand({ ...payload, formulation_id: f.id })
-          if (error) throw new Error(`Insert brand "${brand.name}": ${error.message}`)
+          if (error) throw new Error(`Insert brand "${brand.tradename_clean}": ${error.message}`)
         }
       }
     } catch (err) {
@@ -490,6 +503,13 @@ export default function DrugEditor() {
                 </div>
                 <BrandEditor
                   brands={visibleBrands}
+                  formulation={{
+                    concentration: f.concentration,
+                    form:          f.form,
+                    form_modifier: f.form_modifier,
+                    route:         f.route,
+                    route_details: f.route_details,
+                  }}
                   onChange={updated => patchBrands(f.id, [
                     ...updated,
                     ...f.brands.filter(b => b._deleted),
