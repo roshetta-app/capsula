@@ -68,6 +68,11 @@
  *     correctly left out of LIGHT_BRAND_SELECT. Mapped to sources on
  *     FlatDrug with a `?? []` fallback, matching every other jsonb-list
  *     field on this table.
+ *   - 2026-08-03 (client-side caching bugfix): added FLAT_DRUG_SCHEMA_VERSION
+ *     below — see its own comment. Replaces the previous per-build timestamp
+ *     approach (src/constants/cache.js / vite.config.js's VITE_BUILD_STAMP),
+ *     which invalidated every device's local drugs cache on every single
+ *     deploy, regardless of whether FULL_BRAND_SELECT actually changed.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -119,6 +124,38 @@ const LIGHT_BRAND_SELECT = `
     )
   )
 `
+
+// ─── Schema version (local cache invalidation) ─────────────────────────────────
+//
+// 2026-08-03 fix: the drugs library's local IndexedDB cache (see
+// src/utils/cache.js) needs to know when the *shape* of a FlatDrug object
+// has genuinely changed (a field added/removed/renamed) so it can throw out
+// a stale-shaped saved copy — vs. a normal server data update, which is
+// already handled separately via app_metadata's drugs_updated_at timestamp.
+//
+// The previous approach stamped this with a fresh value on every single
+// `vite build`, regardless of whether FULL_BRAND_SELECT below had changed
+// at all — so every deploy forced a full re-download of the entire drug
+// catalog on every device, even for changes that had nothing to do with the
+// drug data's shape. (Before that, it was a number a developer had to
+// remember to bump by hand, which got missed twice.)
+//
+// Fixed here by deriving the version directly from FULL_BRAND_SELECT — the
+// exact set of columns fetchFlatDrugs pulls to build a FlatDrug. This only
+// changes when a column is actually added, removed, or renamed in that
+// string, so a normal code/deploy with no shape change leaves it untouched
+// and devices keep their cached library. There's also no separate field
+// list to remember to keep in sync — if FULL_BRAND_SELECT changes, this
+// changes with it automatically, computed once, at module load.
+function hashString(str) {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0
+  }
+  return (hash >>> 0).toString(36)
+}
+
+export const FLAT_DRUG_SCHEMA_VERSION = hashString(FULL_BRAND_SELECT.replace(/\s+/g, ''))
 
 /**
  * Page through the full `brands` table for a given select shape. Looks up
@@ -432,4 +469,3 @@ export async function fetchCmsConfig(supabase, key) {
   if (error) throw error
   return data?.value ?? null
 }
-

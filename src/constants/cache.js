@@ -4,6 +4,8 @@
  * To change TTL: edit CACHE_TTL_MS here only.
  */
 
+import { FLAT_DRUG_SCHEMA_VERSION } from '../lib/queries'
+
 /** 7 days in milliseconds */
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -18,24 +20,23 @@ export const CACHE_KEYS = {
 export const METADATA_TABLE = 'app_metadata'
 
 /**
- * Stamped automatically at build time (see vite.config.js's BUILD_STAMP /
- * VITE_BUILD_STAMP define) — the same unique value baked into every build
- * that also cache-busts the service worker. A device's saved drugs cache
- * is stamped with whatever this value was at the moment it was written
- * (see utils/cache.js's writeDrugsCache/readDrugsCache); any new build
- * automatically carries a new stamp, so any device with an older saved
- * copy is forced to re-fetch on its next open.
+ * The local drugs cache's schema version — a stable fingerprint of the
+ * FlatDrug shape, sourced from FLAT_DRUG_SCHEMA_VERSION in src/lib/queries.js
+ * (derived from FULL_BRAND_SELECT, the query that defines that shape). A
+ * device's saved drugs cache is stamped with whatever this value was at the
+ * moment it was written (see utils/cache.js's writeDrugsCache/readDrugsCache);
+ * it only changes when a column fetchFlatDrugs actually selects is added,
+ * removed, or renamed — not on every deploy.
  *
- * This replaces a manually-typed version number that had to be bumped by
- * hand every time a new field was added to the cached drug shape —
- * independent of the server-side data version (app_metadata timestamp),
- * since the underlying database rows themselves may not change at all
- * when the app-side shape does. That manual step was missed twice before
- * bumping to a real fix here: first for fillVolume/formModifier
- * (2026-07-20), then again for `sources` (2026-07-26, decision 4.17) —
- * both times a device with a pre-existing cache kept passing the check
- * and silently served the old-shaped data. There's no number to remember
- * to bump now, because there's no number a person has to type — every
- * build stamps itself.
+ * 2026-08-03: this used to be pulled from a per-build timestamp
+ * (VITE_BUILD_STAMP, see vite.config.js), which changed on every single
+ * `vite build` — so every deploy invalidated every device's drugs cache,
+ * regardless of whether the drug shape had actually changed. Before that, it
+ * was a number a developer had to bump by hand, which got missed twice
+ * (first for fillVolume/formModifier, 2026-07-20, then again for `sources`,
+ * 2026-07-26) — a stale-shaped cache silently kept passing the check both
+ * times. Sourcing it from the select string itself avoids both failure
+ * modes: nothing to remember to bump, and no false invalidation on unrelated
+ * code changes.
  */
-export const DRUGS_CACHE_SCHEMA_VERSION = import.meta.env.VITE_BUILD_STAMP ?? 'dev'
+export const DRUGS_CACHE_SCHEMA_VERSION = FLAT_DRUG_SCHEMA_VERSION

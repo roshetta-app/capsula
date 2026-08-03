@@ -3,11 +3,23 @@ import react from '@vitejs/plugin-react'
 import fs from 'fs'
 import path from 'path'
 
-// Single build stamp shared by both the service worker's own cache-busting
-// logic and the app's drugs cache schema check (src/constants/cache.js) —
-// one value, computed once per build (or once per dev-server start), so the
-// two can never drift out of sync the way a manually-typed version number
-// could (and did, twice, before this).
+// Build stamp used ONLY by the service worker's own cache-busting logic
+// below — unique per build (or per dev-server start), so the SW's
+// CACHE_VERSION changes on every deploy and forces the browser to evict old
+// JS/CSS/asset caches and fetch fresh ones. That's the correct behavior for
+// build assets: they must always bust on every deploy.
+//
+// 2026-08-03: this used to ALSO be piped into the app's drugs cache schema
+// check (src/constants/cache.js's DRUGS_CACHE_SCHEMA_VERSION, via the
+// VITE_BUILD_STAMP define below) — the idea being one shared value so the
+// two could never drift out of sync. In practice this meant the local drugs
+// cache (tens of MB, the full catalog) was invalidated on every single
+// deploy too, not just ones that actually changed the drug data's shape.
+// The drugs cache schema version is now instead derived from the actual
+// query that defines that shape (FLAT_DRUG_SCHEMA_VERSION in
+// src/lib/queries.js) — decoupled from this build stamp entirely, so the
+// VITE_BUILD_STAMP define that used to expose this value to the app bundle
+// has been removed; it's no longer used anywhere.
 const BUILD_STAMP = Date.now().toString(36) // e.g. "lq3k8f2" — short, unique per build
 
 // ─── Service Worker build-stamp plugin ───────────────────────────────────────
@@ -50,13 +62,4 @@ function swBuildStampPlugin() {
 export default defineConfig({
   plugins: [react(), swBuildStampPlugin()],
   base: '/capsula/',
-  define: {
-    // Exposes the same build stamp used for the service worker to the app
-    // bundle itself, so src/constants/cache.js's drugs-cache schema check
-    // is stamped automatically on every build/deploy — no manually-typed
-    // number to remember to bump whenever a new field is added to the
-    // cached drug shape (see cache.js for the history of that going wrong
-    // twice: fillVolume/formModifier, then again with sources).
-    'import.meta.env.VITE_BUILD_STAMP': JSON.stringify(BUILD_STAMP),
-  },
 })
