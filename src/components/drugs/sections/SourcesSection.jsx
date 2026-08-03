@@ -95,8 +95,8 @@ export default function SourcesSection({ drug }) {
 
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
-                  fontSize:   14,
-                  fontWeight: 600,
+                  fontSize:   13,
+                  fontWeight: 500,
                   color:      'var(--color-text-primary)',
                 }}>
                   {src.title}
