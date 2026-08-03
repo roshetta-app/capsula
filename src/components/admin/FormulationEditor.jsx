@@ -333,6 +333,24 @@ function isMatchedIngredient(name, genericIngredients) {
   return (genericIngredients ?? []).some(gi => norm(gi) === target)
 }
 
+// Normalizes a basis string like "per_5ml" or "per 5 ml" into one clean
+// form ("per_5ml") — one shared rule instead of a lookup table, confirmed
+// against every distinct live basis value in use (decision 15).
+function normalizeBasis(raw) {
+  const trimmed = (raw ?? '').trim()
+  const stripped = trimmed.replace(/^per[_\s]+/i, '')
+  const collapsed = stripped.replace(/\s+/g, '')
+  return `per_${collapsed}`
+}
+
+// Bases with no useful suffix to show: `per_unit` is too generic to mean
+// anything on its own, and `percentage` rows already show their `%` in the
+// unit itself, so appending it again would be redundant. Checked against
+// the raw value first since `percentage` isn't a per_-prefixed value at
+// all — normalizing it would incorrectly turn it into "per_percentage"
+// (decision 15).
+const SUPPRESSED_BASES = ['percentage', 'per_unit']
+
 // Builds the display-string Concentration value from the ingredient rows,
 // e.g. single ingredient ('250', 'mg', 'per_5ml') -> '250mg / 5ml';
 // combo [{10,mg},{20,mg}] -> '10mg/20mg' (matches the existing data format).
@@ -345,9 +363,12 @@ function buildConcentration(ingredients) {
     return `${v}${u}`.trim()
   })
   const joined = parts.join('/')
-  const basis = ingredients.map(i => i.basis).find(b => b && b.trim())
-  if (!basis) return joined
-  const readable = basis.replace(/^per_/, '').replace(/_/g, ' ')
+  const rawBasis = ingredients.map(i => i.basis).find(b => b && b.trim())
+  if (!rawBasis) return joined
+  if (SUPPRESSED_BASES.includes(rawBasis.trim())) return joined
+  const normalized = normalizeBasis(rawBasis)
+  if (SUPPRESSED_BASES.includes(normalized)) return joined
+  const readable = normalized.replace(/^per_/, '')
   return joined ? `${joined} / ${readable}` : `/ ${readable}`
 }
 
