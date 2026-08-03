@@ -385,7 +385,7 @@ export default function DrugEditor() {
           return (
             <SectionCard
               key={f.id}
-              title={[f.concentration, f.form, f.route].filter(Boolean).join(' · ')}
+              title={[f.concentration, f.form].filter(Boolean).join(' · ')}
               badge={f.is_published ? 'Live' : 'Draft'}
               badgeLive={f.is_published}
               open={isOpen}
