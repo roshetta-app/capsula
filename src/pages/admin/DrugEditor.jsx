@@ -28,6 +28,7 @@ import GenericEditor from '../../components/admin/GenericEditor'
 import FormulationEditor from '../../components/admin/FormulationEditor'
 import BrandEditor from '../../components/admin/BrandEditor'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import { DRUG_FORMS } from '../../config/forms'
 import {
   updateGeneric,
   insertFormulation,
@@ -85,6 +86,7 @@ export default function DrugEditor() {
   const [deleting,      setDeleting]      = useState(false)
   const [globalError,   setGlobalError]   = useState(null)
   const [addingForm,    setAddingForm]    = useState(false)
+  const [formFilter,    setFormFilter]    = useState(null)  // active form-chip filter, or null for all
 
   // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -130,6 +132,7 @@ export default function DrugEditor() {
       doses: f.doses_structured ?? [],
       brands: (f.brands ?? []).map(b => ({ ...b })),
     })))
+    setFormFilter(null)
 
     setLoading(false)
   }, [genericId])
@@ -362,6 +365,47 @@ export default function DrugEditor() {
           Formulations ({formulations.length})
         </div>
 
+        {/* Form chips — filter to the forms actually used by this generic's
+            formulations, not the app's full form list */}
+        {formulations.length > 0 && (() => {
+          const counts = formulations.reduce((acc, f) => {
+            if (f.form) acc[f.form] = (acc[f.form] ?? 0) + 1
+            return acc
+          }, {})
+          const presentForms = DRUG_FORMS.filter(df => counts[df.value] > 0)
+          if (presentForms.length < 2) return null  // nothing to filter with only one form
+
+          return (
+            <div style={{
+              display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)',
+              marginBottom: 'var(--space-3)',
+            }}>
+              {presentForms.map(df => {
+                const active = formFilter === df.value
+                return (
+                  <button
+                    key={df.value}
+                    onClick={() => setFormFilter(active ? null : df.value)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '5px 12px',
+                      borderRadius: 'var(--radius-full)',
+                      border: `1px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                      backgroundColor: active ? 'var(--color-accent)' : 'var(--color-surface)',
+                      color: active ? '#fff' : 'var(--color-text-secondary)',
+                      fontSize: 12.5, fontWeight: 600,
+                      fontFamily: 'var(--font-body)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {df.label} ({counts[df.value]})
+                  </button>
+                )
+              })}
+            </div>
+          )
+        })()}
+
         {formulations.length === 0 && (
           <div style={{
             textAlign: 'center', padding: 'var(--space-8)',
@@ -375,7 +419,7 @@ export default function DrugEditor() {
           </div>
         )}
 
-        {formulations.map(f => {
+        {(formFilter ? formulations.filter(f => f.form === formFilter) : formulations).map(f => {
           const isOpen    = openFormId === f.id
           const isSaving  = savingFormId === f.id
           const isSaved   = savedFormId === f.id
