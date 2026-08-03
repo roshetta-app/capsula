@@ -140,7 +140,7 @@ export const DRUG_ROUTES = [
 export const INJECTION_ROUTE_DETAILS = [
   { value: 'iv',            label: 'IV' },
   { value: 'im',            label: 'IM' },
-  { value: 'subcutaneous',  label: 'Subcutaneous' },
+  { value: 'sc',            label: 'Subcutaneous' },
   { value: 'intrathecal',   label: 'Intrathecal' },
   { value: 'intravascular', label: 'Intravascular' },
 ]
