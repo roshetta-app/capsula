@@ -8,29 +8,29 @@
  * sources are short, there's no dense MOA-style content to hide by default,
  * so the whole list just always shows.
  *
- * Each row: a colored badge (background/foreground picked deterministically
- * per source, via SPECIALTY_TOKENS — same token system SpecialtySelector/
+ * Each row: a fixed document-icon badge, colored by the row's position in
+ * the list (via SPECIALTY_TOKENS — same token system SpecialtySelector/
  * ConditionCard use for their icon bubbles, see specialtyTokens.js), the
  * source's title + optional note, and an external-link icon when a url is
  * present. Rows render in whatever order they arrive in (insertion order) —
- * no re-sorting. Whole row is a real link out (target="_blank") when a url
+ * no re-sorting, which is what keeps each row's color stable across
+ * reloads. Whole row is a real link out (target="_blank") when a url
  * exists, plain text otherwise.
  *
- * Note on the badge itself: STEPS_DRUG_DETAIL.md's 1.9c line describes a
- * generic "FileText" icon badge. The reference screenshot supplied this
- * session instead shows a short text abbreviation per source (BNF / NICE /
- * FDA) — a real per-source label, not one fixed icon repeated on every row.
- * Built to match the screenshot, since it's the more specific and more
- * recent reference; flagging the divergence here rather than silently
- * picking one.
+ * Decision 13 (2026-07-29): the badge used to show a per-source text
+ * abbreviation (BNF / NICE / FDA) colored by hashing that text — this
+ * replaced the original spec's plain "FileText" icon to match an early
+ * reference screenshot. Reverted back to the fixed-icon spec, now with
+ * position-based color instead of the original's unspecified-color intent,
+ * since the CMS's abbreviation field (the badge text's source) is being
+ * dropped as a maintenance burden with no display value of its own.
  *
  * Whole card is hidden entirely if `sources` is empty — same hide-when-empty
  * treatment as Pharmacology/Uses.
  *
  * Data shape (jsonb list on generics.sources), one object per entry:
  *   { source, title, note, url }
- *   - source — short badge text, e.g. "BNF" / "NICE" / "FDA" — also the
- *     string the badge color is derived from
+ *   - source — legacy abbreviation field, no longer read for display
  *   - title  — the specific document/guideline name, e.g.
  *     "British National Formulary, 2024" — bold row text
  *   - note   — optional one-line detail under the title, e.g.
@@ -41,20 +41,9 @@
  * Props: drug — flat drug object from DrugContext
  */
 
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, FileText } from 'lucide-react'
 import { TOKEN_KEYS, resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
-
-// Deterministic string -> token key, so the same source always gets the
-// same badge color across every drug it appears on (not random per render,
-// not re-picked on re-render).
-function tokenForSource(key) {
-  let hash = 0
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash * 31 + key.charCodeAt(i)) >>> 0
-  }
-  return TOKEN_KEYS[hash % TOKEN_KEYS.length]
-}
 
 export default function SourcesSection({ drug }) {
   const isDark = useIsDark()
@@ -86,8 +75,7 @@ export default function SourcesSection({ drug }) {
 
       <div>
         {sources.map((src, i) => {
-          const badgeText = src.source ?? src.title?.slice(0, 3).toUpperCase() ?? '?'
-          const colors    = resolveToken(tokenForSource(badgeText), isDark)
+          const colors = resolveToken(TOKEN_KEYS[i % TOKEN_KEYS.length], isDark)
 
           const content = (
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%' }}>
@@ -95,17 +83,14 @@ export default function SourcesSection({ drug }) {
                 display:         'inline-flex',
                 alignItems:      'center',
                 justifyContent:  'center',
-                minWidth:        40,
+                width:           40,
                 height:          40,
-                padding:         '0 var(--space-2)',
                 borderRadius:    'var(--radius-sm)',
                 backgroundColor: colors.bg,
                 color:           colors.fg,
-                fontSize:        11,
-                fontWeight:      700,
                 flexShrink:      0,
               }}>
-                {badgeText}
+                <FileText size={18} />
               </span>
 
               <div style={{ flex: 1, minWidth: 0 }}>
