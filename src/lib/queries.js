@@ -1,3 +1,4 @@
+
 /**
  * queries.js — Supabase data fetching
  *
@@ -85,7 +86,7 @@ const SUPABASE_MAX_ROWS = 1000
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
 const FULL_BRAND_SELECT = `
-  id, slug, name, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
+  id, slug, name, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
     generics (
@@ -114,7 +115,7 @@ const FULL_BRAND_SELECT = `
 // fill_volume is included for the same reason again (drug_card_title_suffix
 // plan, step A.1) — the title suffix needs it on the very first load too.
 const LIGHT_BRAND_SELECT = `
-  id, slug, name, tradename_clean, manufacturer, source, price, pack_size, fill_volume, is_published,
+  id, slug, name, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, is_published,
     generics (
@@ -227,7 +228,6 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         name:                 b.name,
         tradenameClean:       b.tradename_clean,
         manufacturer:         b.manufacturer,
-        source:               b.source,
         price:                b.price,
         packSize:             b.pack_size,
         fillVolume:           b.fill_volume,
@@ -304,7 +304,6 @@ export async function fetchFlatDrugsLight(supabase, onProgress) {
         name:                 b.name,
         tradenameClean:       b.tradename_clean,
         manufacturer:         b.manufacturer,
-        source:               b.source,
         price:                b.price,
         packSize:             b.pack_size,
         fillVolume:           b.fill_volume,
