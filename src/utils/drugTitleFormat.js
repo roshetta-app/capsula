@@ -36,6 +36,34 @@ const LIQUID_FORMS = new Set([
   'injection', 'vaccine', 'inhaler',
 ])
 
+// Release-mechanism tags (decision 25, 2026-08-04) — the only form_modifier
+// tags treated as "same underlying fact, different word" duplicates of one
+// another. Live data audit (2026-08-04) confirmed CR/ER/MR/SR/PR/DR
+// co-occur on ~34 formulations almost entirely from inconsistent synonym
+// tagging, not genuinely distinct facts. Real, separate physical
+// properties (film_coated, chewable, effervescent, etc.) are NOT in this
+// set and are never collapsed — they keep showing in full everywhere they
+// already did.
+const RELEASE_MECHANISM_TAGS = [
+  'extended_release', 'sustained_release', 'modified_release',
+  'controlled_release', 'prolonged_release', 'delayed_release',
+]
+
+// Trade-name hint tokens (decision 25) — confirmed live 2026-08-04 against
+// every published brand/formulation row: whenever a trade name contains
+// one of these as a standalone word, it matches the paired tag with
+// essentially zero mismatches (0-1 out of hundreds checked). Reliable
+// enough to trust as "the package itself already says this."
+// "retard"/"dr"/"pr"/"la" were inconsistent or had no supporting live
+// data and are deliberately left out rather than guessed at.
+const RELEASE_NAME_HINT_TOKENS = {
+  xr: 'extended_release',
+  xl: 'extended_release',
+  sr: 'sustained_release',
+  mr: 'modified_release',
+  cr: 'controlled_release',
+}
+
 // Collapses redundant whitespace and strips spacing around "/" so
 // concentration values render consistently regardless of how they were
 // entered — matches the plan's own locked example format ("200mg/5ml").
@@ -57,9 +85,15 @@ function normalizeUnitSpacing(value) {
 // array's original order (4.43). Tags with no entry in
 // FORM_MODIFIER_ABBREVIATIONS are dropped silently (4.41), same as any
 // other missing field (4.39).
-function abbreviateFormModifiers(formModifier) {
+// General duplication guard (decision 23-follow-up, 2026-08-04): a tag is
+// also dropped if it's identical to the drug's own form (e.g. an
+// "effervescent" tablet form tagged with the "effervescent" modifier used
+// to render "Eff Eff." back to back) — not a one-off patch for that word,
+// applies to any tag/form collision.
+function abbreviateFormModifiers(formModifier, form) {
   if (!formModifier || formModifier.length === 0) return ''
   return formModifier
+    .filter(tag => tag !== form)
     .map(tag => FORM_MODIFIER_ABBREVIATIONS[tag])
     .filter(Boolean)
     .join(', ')
@@ -74,6 +108,41 @@ function abbreviateRouteDetails(routeDetails) {
     .map(tag => ROUTE_DETAIL_ABBREVIATIONS[tag])
     .filter(Boolean)
     .join(', ')
+}
+
+// True if this specific brand's own trade name already spells out one of
+// the release-mechanism tags present on it (e.g. "Aig Alfuzosin XR"
+// already says "extended release" via "XR") — used so the abbreviation
+// isn't shown a second time right next to a name that already announces it.
+// Checked per brand, not per formulation: two brands sharing the same
+// formulation/tags can have completely different trade names, so this
+// can't be decided once for the whole formulation.
+function nameAlreadyAnnouncesRelease(tradenameClean, releaseTags) {
+  if (!tradenameClean || releaseTags.length === 0) return false
+  return Object.entries(RELEASE_NAME_HINT_TOKENS).some(([token, tag]) => {
+    if (!releaseTags.includes(tag)) return false
+    const re = new RegExp(`\\b${token}\\b`, 'i')
+    return re.test(tradenameClean)
+  })
+}
+
+// Collapses a drug's release-mechanism tags (decision 25) down to at most
+// one shown abbreviation, instead of comma-joining every synonym tagged on
+// the row:
+//   - If this brand's own trade name already announces one of them (e.g.
+//     "XR"), nothing is shown here — it would just repeat what the name
+//     already says.
+//   - Otherwise, shows the abbreviation for whichever release tag appears
+//     first in this row's own formModifier array (no global priority
+//     order — decision 25: the data doesn't support one well enough to be
+//     worth maintaining, and the row's own tagging order is as good a
+//     signal as any arbitrary fixed list).
+function getReleaseModifierAbbrev(formModifier, tradenameClean) {
+  if (!formModifier || formModifier.length === 0) return ''
+  const releaseTags = formModifier.filter(tag => RELEASE_MECHANISM_TAGS.includes(tag))
+  if (releaseTags.length === 0) return ''
+  if (nameAlreadyAnnouncesRelease(tradenameClean, releaseTags)) return ''
+  return FORM_MODIFIER_ABBREVIATIONS[releaseTags[0]] || ''
 }
 
 // Title-case for display only — capitalizes the first letter of each
@@ -93,7 +162,18 @@ export function toTitleCase(str) {
 export function getDrugTitleSuffix(drug) {
   const normalizedConcentration = normalizeSpacing(drug.concentration)
   const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
-  const modifierAbbrev = abbreviateFormModifiers(drug.formModifier)
+
+  // Decision 25: release-mechanism tags (ER/SR/MR/CR/PR/DR) collapse to at
+  // most one shown abbreviation via getReleaseModifierAbbrev; every other
+  // modifier tag (chewable, effervescent, film_coated, etc.) still shows
+  // in full, same as before — only the release-mechanism synonym pile-up
+  // was the actual problem.
+  const nonReleaseModifiers = (drug.formModifier || []).filter(
+    tag => !RELEASE_MECHANISM_TAGS.includes(tag)
+  )
+  const releaseAbbrev = getReleaseModifierAbbrev(drug.formModifier, drug.tradenameClean)
+  const nonReleaseAbbrev = abbreviateFormModifiers(nonReleaseModifiers, drug.form)
+  const modifierAbbrev = [releaseAbbrev, nonReleaseAbbrev].filter(Boolean).join(', ')
 
   // Vial/ampoule (4.42, reopened 2026-07-20): falls back to pack_size when
   // fill_volume is missing, still preferring fill_volume when both exist.
@@ -131,11 +211,14 @@ export function getDrugTitleSuffix(drug) {
 // getDrugTitleSuffix — just the modifier/route pieces on their own, since
 // the sheet already renders concentration and form as their own separate
 // pieces and only needs these two added in.
+// UPDATED (decision 25, 2026-08-04): the sheet only ever shows a
+// release-mechanism tag (never chewable/effervescent/film_coated/etc.),
+// and now via the same collapse-to-one-tag + name-redundancy-guard logic
+// as the card, instead of comma-joining every modifier tag on the row.
 export function getDrugModifierAndRouteSuffix(drug) {
   if (!drug) return { modifierAbbrev: '', routeAbbrev: '' }
   return {
-    modifierAbbrev: abbreviateFormModifiers(drug.formModifier),
+    modifierAbbrev: getReleaseModifierAbbrev(drug.formModifier, drug.tradenameClean),
     routeAbbrev: drug.route === 'injection' ? abbreviateRouteDetails(drug.routeDetails) : '',
   }
 }
-

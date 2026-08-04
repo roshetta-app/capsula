@@ -535,6 +535,11 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
  * VISUAL-WEIGHT PASS: inner row gap dropped 8 -> 5, tightening the spacing
  * between the drug name, concentration, and form so they read as one
  * cohesive line rather than three loosely-spaced chips.
+ *
+ * UPDATED (decision 25, 2026-08-04): modifierAbbrev now renders immediately
+ * after the name (not after form) — it's now at most a single
+ * release-mechanism tag (e.g. "ER"), meant to read as part of identifying
+ * the drug itself, same rhythm as "Adwiflam ER 50mg [Capsule]" on the box.
  */
 function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, linkEnabled }) {
   if (!name) return null
@@ -547,7 +552,7 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
 
   return (
     <>
-      {/* Name line: name + conc + form + link icon + search icon — equal spacing */}
+      {/* Name line: name + modifier + conc + form + link icon + search icon — equal spacing */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 0, justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
           <span style={{
@@ -557,6 +562,23 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
           }}>
             {name}
           </span>
+
+          {/* Modifier (decision 24, moved decision 25) — the drug's single
+              release-mechanism abbreviation, e.g. "ER" for extended-release.
+              Placed right after the name (not after form) so it reads as
+              part of identifying the drug, matching how it'd appear on the
+              actual package (e.g. "Adwiflam ER"). Same contrast tier as
+              concentration; plain text, not its own pill, since it's a
+              qualifier on the drug rather than a distinct fact. */}
+          {modifierAbbrev && (
+            <span style={{
+              fontSize: 12, fontWeight: 500,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+              lineHeight: 1.3,
+            }}>
+              {modifierAbbrev}
+            </span>
+          )}
 
           {/* Concentration — raised from secondary to near-primary contrast;
               this was reading as near-invisible at the old --color-text-secondary
@@ -585,21 +607,8 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
             </span>
           )}
 
-          {/* Modifiers (decision 24) — e.g. "FC" for film-coated. Same
-              contrast tier as concentration; plain text, not its own pill,
-              since it's a qualifier on the form rather than a distinct fact. */}
-          {modifierAbbrev && (
-            <span style={{
-              fontSize: 12, fontWeight: 500,
-              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
-              lineHeight: 1.3,
-            }}>
-              {modifierAbbrev}
-            </span>
-          )}
-
           {/* Route details (decision 24) — injection formulations only,
-              e.g. "IM". Same tier as modifiers above. */}
+              e.g. "IM". Same tier as modifier above. */}
           {routeAbbrev && (
             <span style={{
               fontSize: 12, fontWeight: 500,
@@ -801,4 +810,3 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
-
