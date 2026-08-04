@@ -5,6 +5,22 @@ import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
+import { getDrugModifierAndRouteSuffix } from '../../utils/drugTitleFormat'
+
+// ─── Resolved-drug lookup (decision 23 fix, 2026-08-04) ───────────────────────
+// A formulation can have several brands, so matching on formulation_id alone
+// can return the wrong one — the app's flat drug list has one entry per
+// brand, and .find() just returns whichever brand entry happens to come
+// first. brand_id is the specific, correct match; only fall back to
+// formulation_id for older rows that predate brand_id being stored.
+function findDrugForOption(drugs, brandId, formulationId) {
+  if (brandId) {
+    const byBrand = (drugs ?? []).find(d => d.id === brandId)
+    if (byBrand) return byBrand
+  }
+  if (!formulationId) return null
+  return (drugs ?? []).find(d => d.formulationId === formulationId) ?? null
+}
 
 // Fixed width of the left metadata rail (Rx labels + 'or' connectors).
 // Sized for 13px Semibold labels at flush-left alignment — wide enough for
@@ -117,8 +133,12 @@ export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }
         // `id` is now the item's own id, and the old formulation id lives at
         // `formulationId` instead. Matching on `d.id` here silently found nothing
         // for every row post-reshape.
-        const formulation = row.formulation_id
-          ? drugs.find(d => d.formulationId === row.formulation_id)
+        // FIX (decision 23, 2026-08-04): matching on formulation_id alone could
+        // return any brand under that formulation, not necessarily the one this
+        // row actually links to — now brand_id-first, formulation_id as fallback
+        // for older rows that predate brand_id being stored.
+        const formulation = (row.formulation_id || row.brand_id)
+          ? findDrugForOption(drugs, row.brand_id, row.formulation_id)
           : null
         return (
           <UnifiedDrugRow
@@ -335,11 +355,17 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   // Every option now looks up its own formulation_id independently, so
   // alternatives get exactly the same link/fallback-name treatment as the
   // main drug whenever they're linked to a formulation themselves.
-  const findFormulation = (formulationId) => {
-    if (!formulationId) return null
-    if (formulationId === row.formulation_id) return mainFormulation ?? null
-    // FIX (step 3.14): same id/formulationId correction as the main lookup above.
-    return (drugs ?? []).find(d => d.formulationId === formulationId) ?? null
+  //
+  // FIX (decision 23, 2026-08-04): same brand_id-first correction as the
+  // main-path lookup above — a formulation can have several brands, so
+  // formulation_id alone can resolve to the wrong one. Takes the whole
+  // option now (not just formulation_id) so it can check opt.brand_id.
+  const findFormulation = (opt) => {
+    if (!opt?.formulation_id && !opt?.brand_id) return null
+    const isSameAsMain = opt.formulation_id === row.formulation_id &&
+      (opt.brand_id ?? null) === (row.brand_id ?? null)
+    if (isSameAsMain) return mainFormulation ?? null
+    return findDrugForOption(drugs, opt.brand_id, opt.formulation_id)
   }
 
   return groups.map(group => ({
@@ -348,7 +374,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
     note: group.note,
     members: group.options.map(opt => ({
       data: opt,
-      formulation: findFormulation(opt.formulation_id),
+      formulation: findFormulation(opt),
     })),
   }))
 }
@@ -409,6 +435,12 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
           // note below already covers it; rendering both would duplicate
           // the same text.
           const showOwnNote = data.note && data.note !== cluster.note
+          // Decision 24: modifiers + route details, sourced from the resolved
+          // formulation (not the row itself — these fields aren't saved on
+          // the row, only concentration/form are). Deliberately excludes
+          // pack size/fill volume, unlike getDrugTitleSuffix's search-card
+          // use of the same abbreviation logic.
+          const { modifierAbbrev, routeAbbrev } = getDrugModifierAndRouteSuffix(member.formulation)
 
           return (
             <React.Fragment key={uIdx}>
@@ -456,6 +488,8 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                     name={memberName}
                     concentration={data.concentration}
                     form={data.form}
+                    modifierAbbrev={modifierAbbrev}
+                    routeAbbrev={routeAbbrev}
                     linkEnabled={memberLinkEnabled}
                   />
                   {showOwnNote && <RowNote note={data.note} />}
@@ -502,7 +536,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
  * between the drug name, concentration, and form so they read as one
  * cohesive line rather than three loosely-spaced chips.
  */
-function DrugMainLine({ name, concentration, form, linkEnabled }) {
+function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, linkEnabled }) {
   if (!name) return null
 
   const handleSearchClick = (e) => {
@@ -548,6 +582,31 @@ function DrugMainLine({ name, concentration, form, linkEnabled }) {
               flexShrink: 0,
             }}>
               {form}
+            </span>
+          )}
+
+          {/* Modifiers (decision 24) — e.g. "FC" for film-coated. Same
+              contrast tier as concentration; plain text, not its own pill,
+              since it's a qualifier on the form rather than a distinct fact. */}
+          {modifierAbbrev && (
+            <span style={{
+              fontSize: 12, fontWeight: 500,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+              lineHeight: 1.3,
+            }}>
+              {modifierAbbrev}
+            </span>
+          )}
+
+          {/* Route details (decision 24) — injection formulations only,
+              e.g. "IM". Same tier as modifiers above. */}
+          {routeAbbrev && (
+            <span style={{
+              fontSize: 12, fontWeight: 500,
+              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+              lineHeight: 1.3,
+            }}>
+              {routeAbbrev}
             </span>
           )}
 
@@ -742,3 +801,4 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
+

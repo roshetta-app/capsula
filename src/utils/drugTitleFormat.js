@@ -123,3 +123,19 @@ export function getDrugTitleSuffix(drug) {
     ? (mainSuffix ? `${mainSuffix} - ${routeAbbrev}` : routeAbbrev)
     : mainSuffix
 }
+
+// New (decision 24, 2026-08-04) — prescription sheet drug display: modifier
+// and route-details abbreviations only, deliberately excluding pack
+// size/fill volume (the sheet never shows those, unlike getDrugTitleSuffix's
+// search-card use above). Reuses the exact same abbreviation logic as
+// getDrugTitleSuffix — just the modifier/route pieces on their own, since
+// the sheet already renders concentration and form as their own separate
+// pieces and only needs these two added in.
+export function getDrugModifierAndRouteSuffix(drug) {
+  if (!drug) return { modifierAbbrev: '', routeAbbrev: '' }
+  return {
+    modifierAbbrev: abbreviateFormModifiers(drug.formModifier),
+    routeAbbrev: drug.route === 'injection' ? abbreviateRouteDetails(drug.routeDetails) : '',
+  }
+}
+
