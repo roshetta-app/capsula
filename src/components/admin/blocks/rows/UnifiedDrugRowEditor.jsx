@@ -741,9 +741,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         } else {
           const { data: newBrand, error: bErr } = await insertBrand({
             formulation_id: formulationId,
-            name: brandName,
+            tradename_clean: brandName,
             manufacturer: null,
-            source: SOURCE_FLAG_VALUE,
             is_published: true,
           })
           if (bErr) throw new Error(`Creating brand "${brandName}": ${bErr.message}`)
