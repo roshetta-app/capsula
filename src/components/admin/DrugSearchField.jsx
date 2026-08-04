@@ -132,6 +132,7 @@ import { Search, X } from 'lucide-react'
 import { faPills } from '@fortawesome/free-solid-svg-icons'
 import Icon from '../ui/Icon'
 import { supabase } from '../../lib/supabase'
+import { searchDrugsForPicker } from '../../lib/adminQueries'
 
 // ─── Search queries (reused from DrugPickerModal) ─────────────────────────
 // Same client-side-filter pattern as DrugPickerModal's
@@ -174,41 +175,44 @@ async function searchFormulations(query) {
   return { data: filtered, error: null }
 }
 
+// ─── Brand query (Phase 3, Brands + Search & Add rebuild, decision 18) ────────
+// Replaces the old client-filtered brands.name search above: now calls the
+// live, always-fresh searchDrugsForPicker (adminQueries.js, step 10.1), which
+// matches on tradename_clean and filters on all three publish flags (brand +
+// formulation + generic) — fixing both bugs the old query had.
+//
+// Reshapes each flat result back into the exact old nested { id, name,
+// formulations: { ..., generics: {...} } } shape, so toSuggestion (below) and
+// onLink's existing contract need no changes — displaying tradename_clean
+// falls out for free, since it's now what "name" holds.
+
+function reshapeToLegacyBrandShape(flat) {
+  return {
+    id:   flat.id,
+    name: flat.tradenameClean,
+    formulations: {
+      id:                   flat.formulationId,
+      concentration:        flat.concentration,
+      form:                 flat.form,
+      route:                flat.route,
+      doses_structured:     flat.dosesStructured,
+      default_dose_override: flat.defaultDoseOverride,
+      generics: {
+        id:       flat.genericId,
+        name_en:  flat.genericName,
+        category: flat.category,
+      },
+    },
+  }
+}
+
 async function searchBrands(query) {
-  const { data, error } = await supabase
-    .from('brands')
-    .select(`
-      id, name, is_published,
-      formulations (
-        id, concentration, form, route,
-        doses_structured, default_dose_override,
-        generics ( id, name_en, slug, category )
-      )
-    `)
-    .eq('is_published', true)
-    .eq('formulations.is_published', true)
-    .order('name')
-
-  if (error) return { data: null, error }
-
-  const published = (data ?? []).filter(b => b.formulations)
   if (!query || query.trim().length < 2) return { data: [], error: null }
 
-  const q = query.trim().toLowerCase()
-  const filtered = published.filter(b => {
-    const brandName     = (b.name ?? '').toLowerCase()
-    const genericName   = (b.formulations?.generics?.name_en ?? '').toLowerCase()
-    const concentration = (b.formulations?.concentration ?? '').toLowerCase()
-    const form          = (b.formulations?.form ?? '').toLowerCase()
-    return (
-      brandName.includes(q) ||
-      genericName.includes(q) ||
-      concentration.includes(q) ||
-      form.includes(q)
-    )
-  })
+  const { data, error } = await searchDrugsForPicker(query, { limit: 5 })
+  if (error) return { data: null, error }
 
-  return { data: filtered, error: null }
+  return { data: (data ?? []).map(reshapeToLegacyBrandShape), error: null }
 }
 
 // ─── Result -> dropdown suggestion shape ───────────────────────────────────
@@ -767,5 +771,3 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
-
-

@@ -38,11 +38,15 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { Search, X, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import Modal from './Modal'
+import SearchBar from '../ui/SearchBar'
+import SharedDrugCard from '../SharedDrugCard'
 import { supabase } from '../../lib/supabase'
-import { findBrandMatch, insertBrand, fetchBrandsForFormulation } from '../../lib/adminQueries'
+import { findBrandMatch, insertBrand, fetchBrandsForFormulation, searchDrugsForPicker } from '../../lib/adminQueries'
 import { SOURCE_FLAG_VALUE } from '../../constants/prescriptionRowSchema'
+import { useCategories } from '../../hooks/useCategories'
+import { useDarkMode } from '../../hooks/useDarkMode'
 
 // ─── Formulation query (existing) ─────────────────────────────────────────────
 
@@ -82,47 +86,47 @@ async function searchFormulationsForPicker(query) {
   return { data: filtered, error: null }
 }
 
-// ─── Brand query (new, Phase 1) ───────────────────────────────────────────────
+// ─── Brand query (Phase 3, Brands + Search & Add rebuild, decision 18) ────────
+// Replaces the old client-filtered brands.name search above: this now calls
+// the live, always-fresh searchDrugsForPicker (adminQueries.js, step 10.1),
+// which matches on tradename_clean and filters on all three publish flags
+// (brand + formulation + generic) — fixing both bugs the old query had.
+//
+// searchDrugsForPicker returns a flat FlatDrug-shaped object (for reuse with
+// SharedDrugCard's display). reshapeToLegacyBrandShape below converts each
+// result back into the exact old nested { id, name, formulations: { ...,
+// generics: {...} } } shape, so onSelect's existing contract — and
+// UnifiedDrugRowEditor.jsx's handleBrandPick, which reads that nested shape —
+// need no changes in this step.
+
+function reshapeToLegacyBrandShape(flat) {
+  return {
+    id:   flat.id,
+    name: flat.tradenameClean,
+    formulations: {
+      id:                   flat.formulationId,
+      concentration:        flat.concentration,
+      form:                 flat.form,
+      route:                flat.route,
+      doses_structured:     flat.dosesStructured,
+      default_dose_override: flat.defaultDoseOverride,
+      generics: {
+        id:       flat.genericId,
+        name_en:  flat.genericName,
+        category: flat.category,
+      },
+    },
+    _flat: flat, // kept for SharedDrugCard, which expects the flat shape directly
+  }
+}
 
 async function searchBrandsForPicker(query) {
-  // Fetch all brands under published formulations with generic context.
-  // Filter client-side to keep the pattern consistent with formulation mode.
-  const { data, error } = await supabase
-    .from('brands')
-    .select(`
-      id, name,
-      formulations (
-        id, concentration, form, route,
-        doses_structured, default_dose_override,
-        generics ( id, name_en, slug, category )
-      )
-    `)
-    .eq('formulations.is_published', true)
-    .order('name')
+  if (!query || query.trim().length < 1) return { data: [], error: null }
 
+  const { data, error } = await searchDrugsForPicker(query)
   if (error) return { data: null, error }
 
-  // Drop brands whose formulation didn't pass the is_published filter
-  const published = (data ?? []).filter(b => b.formulations)
-
-  if (!query || query.trim().length < 1) return { data: published, error: null }
-
-  const q = query.trim().toLowerCase()
-
-  const filtered = published.filter(b => {
-    const brandName     = (b.name ?? '').toLowerCase()
-    const genericName   = (b.formulations?.generics?.name_en ?? '').toLowerCase()
-    const concentration = (b.formulations?.concentration ?? '').toLowerCase()
-    const form          = (b.formulations?.form ?? '').toLowerCase()
-    return (
-      brandName.includes(q) ||
-      genericName.includes(q) ||
-      concentration.includes(q) ||
-      form.includes(q)
-    )
-  })
-
-  return { data: filtered, error: null }
+  return { data: (data ?? []).map(reshapeToLegacyBrandShape), error: null }
 }
 
 // ─── Brand query, scoped to one formulation (new, Phase 3) ───────────────────
@@ -187,57 +191,6 @@ function FormulationResultRow({ formulation, onSelect }) {
   )
 }
 
-// ─── Brand result row (new, Phase 1) ──────────────────────────────────────────
-
-function BrandResultRow({ brand, onSelect }) {
-  const [hovered, setHovered] = useState(false)
-  const f = brand.formulations
-  const g = f?.generics
-
-  return (
-    <button
-      onClick={() => onSelect(brand)}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        display:         'block',
-        width:           '100%',
-        textAlign:       'left',
-        padding:         '10px 14px',
-        background:      hovered ? 'var(--color-bg)' : 'transparent',
-        border:          'none',
-        borderBottom:    '1px solid var(--color-border)',
-        cursor:          'pointer',
-        fontFamily:      'var(--font-body)',
-        transition:      'background-color 0.1s',
-      }}
-    >
-      {/* Brand name — primary */}
-      <div style={{
-        fontSize:     14,
-        fontWeight:   600,
-        color:        'var(--color-text-primary)',
-        marginBottom: 2,
-      }}>
-        {brand.name}
-      </div>
-
-      {/* Generic + concentration + form — secondary */}
-      {(g || f) && (
-        <div style={{
-          fontSize: 13,
-          color:    'var(--color-text-secondary)',
-        }}>
-          {g?.name_en ?? ''}
-          {f?.concentration && ` · ${f.concentration}`}
-          {f?.form && ` ${f.form}`}
-          {f?.route && ` · ${f.route}`}
-        </div>
-      )}
-    </button>
-  )
-}
-
 // ─── Brand-scoped result row (new, Phase 3) ───────────────────────────────────
 // Simpler than BrandResultRow: formulation/generic context is already fixed
 // and shown once above the list (scopeContext), not repeated per row.
@@ -277,6 +230,11 @@ export default function DrugPickerModal({
 }) {
   const isBrandMode  = mode === 'brand'
   const isScopedMode = mode === 'brand-scoped'
+
+  // SharedDrugCard's required props (brand-mode results only) — same hooks
+  // the Drugs screen already uses for these cards.
+  const { categories } = useCategories()
+  const { isDark }     = useDarkMode()
 
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
@@ -424,60 +382,14 @@ export default function DrugPickerModal({
         </div>
       )}
 
-      {/* Search input */}
-      <div style={{
-        position:     'relative',
-        marginBottom: 'var(--space-3)',
-      }}>
-        <Search
-          size={15}
-          style={{
-            position:      'absolute',
-            left:          12,
-            top:           '50%',
-            transform:     'translateY(-50%)',
-            color:         'var(--color-text-tertiary)',
-            pointerEvents: 'none',
-          }}
-        />
-        <input
+      {/* Search input — shared SearchBar component (decision 18) */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <SearchBar
           ref={inputRef}
-          type="text"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={setQuery}
           placeholder={placeholder}
-          style={{
-            width:           '100%',
-            boxSizing:       'border-box',
-            padding:         '9px 36px',
-            border:          '1.5px solid var(--color-border)',
-            borderRadius:    'var(--radius-md)',
-            fontSize:        14,
-            fontFamily:      'var(--font-body)',
-            backgroundColor: 'var(--color-surface)',
-            color:           'var(--color-text-primary)',
-            outline:         'none',
-          }}
         />
-        {query && (
-          <button
-            onClick={() => setQuery('')}
-            style={{
-              position:  'absolute',
-              right:     10,
-              top:       '50%',
-              transform: 'translateY(-50%)',
-              background: 'none',
-              border:    'none',
-              cursor:    'pointer',
-              color:     'var(--color-text-tertiary)',
-              display:   'flex',
-              padding:   2,
-            }}
-          >
-            <X size={14} />
-          </button>
-        )}
       </div>
 
       {/* Results list */}
@@ -521,11 +433,22 @@ export default function DrugPickerModal({
           </div>
         )}
 
-        {!loading && !error && results.map(item => (
+        {!loading && !error && results.map((item, i) => (
           isScopedMode
             ? <ScopedBrandResultRow key={item.id} brand={item} onSelect={handleSelect} />
             : isBrandMode
-              ? <BrandResultRow key={item.id} brand={item} onSelect={handleSelect} />
+              ? (
+                <SharedDrugCard
+                  key={item.id}
+                  drug={item._flat}
+                  categories={categories}
+                  isDark={isDark}
+                  onTap={() => handleSelect(item)}
+                  isLast={i === results.length - 1}
+                  searchMode="brand"
+                  highlight={query}
+                />
+              )
               : <FormulationResultRow key={item.id} formulation={item} onSelect={handleSelect} />
         ))}
       </div>

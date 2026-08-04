@@ -204,6 +204,7 @@ export async function searchDrugsForPicker(query, { limit = 30 } = {}) {
       id, slug, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
       formulations (
         id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, is_published,
+        doses_structured, default_dose_override,
         generics ( id, slug, name_en, category, class, ingredients, is_published )
       )
     `)
@@ -236,6 +237,8 @@ export async function searchDrugsForPicker(query, { limit = 30 } = {}) {
         formModifier:        f.form_modifier ?? [],
         route:               f.route,
         routeDetails:        f.route_details ?? [],
+        dosesStructured:     f.doses_structured ?? null,
+        defaultDoseOverride: f.default_dose_override ?? null,
         genericId:       g.id,
         genericSlug:     g.slug,
         genericName:     g.name_en,
