@@ -5,7 +5,7 @@ import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
 import { toDrugOptions } from '../../constants/prescriptionRowSchema'
-import { getDrugModifierAndRouteSuffix } from '../../utils/drugTitleFormat'
+import { getDrugModifierAndRouteSuffix, toTitleCase } from '../../utils/drugTitleFormat'
 
 // ─── Resolved-drug lookup (decision 23 fix, 2026-08-04) ───────────────────────
 // A formulation can have several brands, so matching on formulation_id alone
@@ -426,7 +426,11 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
           // its own formulation never got a fallback name or a working
           // link at all.
           const fallbackName = !memberHasOwnName ? (member.formulation?.genericName ?? null) : null
-          const memberName = data.brand_name?.trim() || data.generic_name || fallbackName
+          // Title-cased for display (decision 26, 2026-08-04) — same
+          // convention SharedDrugCard.jsx already uses for tradenameClean,
+          // so a sheet drug name reads the same way a card one does
+          // ("Adwiflam" not "adwiflam").
+          const memberName = toTitleCase(data.brand_name?.trim() || data.generic_name || fallbackName)
           const memberLinkEnabled = Boolean(data.drug_link_enabled) && Boolean(member.formulation?.slug)
           // A member's own per-drug note (Decision 5 two-slot model) is
           // only shown as its own line when it differs from the cluster's
@@ -563,17 +567,17 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
             {name}
           </span>
 
-          {/* Modifier (decision 24, moved decision 25) — the drug's single
-              release-mechanism abbreviation, e.g. "ER" for extended-release.
-              Placed right after the name (not after form) so it reads as
-              part of identifying the drug, matching how it'd appear on the
-              actual package (e.g. "Adwiflam ER"). Same contrast tier as
-              concentration; plain text, not its own pill, since it's a
-              qualifier on the drug rather than a distinct fact. */}
+          {/* Modifier (decision 24, moved decision 25, styled decision 26) —
+              the drug's single release-mechanism abbreviation, e.g. "ER"
+              for extended-release. Placed right after the name and styled
+              identically to it (same size/weight/color) so it reads as
+              one unit with the name, matching how it'd appear on the
+              actual package (e.g. "Adwiflam ER"), rather than as a
+              separate, smaller qualifier. */}
           {modifierAbbrev && (
             <span style={{
-              fontSize: 12, fontWeight: 500,
-              color: 'color-mix(in srgb, var(--color-text-primary) 70%, var(--color-text-secondary) 30%)',
+              fontSize: 17, fontWeight: 600,
+              color: 'var(--color-text-primary)',
               lineHeight: 1.3,
             }}>
               {modifierAbbrev}
