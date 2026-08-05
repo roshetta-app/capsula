@@ -26,9 +26,15 @@
  * filter and the Alphabetical/Most Common sort are hidden in Brand mode —
  * neither maps onto a list of brands. Brand mode's edit action navigates to
  * the right generic's editor now; auto-expanding the right formulation and
- * highlighting the specific brand is 12.4. Brand mode's publish/delete
- * actions are 12.3 — not built here, so the trailing slot only carries a
- * working Edit action rather than icons with nothing behind them yet.
+ * highlighting the specific brand is 12.4.
+ *
+ * 12.3 (decision 28): brand rows now get full parity with a generic row —
+ * publish/draft toggle and delete added alongside Edit in the trailing
+ * slot. Publish is immediate; unpublish opens ConfirmModal first, same as
+ * the generic table. "Delete" is a soft retire (toggleBrandPublished(id,
+ * false)) behind that same ConfirmModal pattern, never the hard
+ * deleteBrand — every brand row here comes from searchBrandsForCMS, so its
+ * identity is always the brand itself.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -44,6 +50,7 @@ import {
   toggleGenericPublished,
   deleteGeneric,
   searchBrandsForCMS,
+  toggleBrandPublished,
 } from '../../lib/adminQueries'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -96,6 +103,12 @@ export default function DrugCMS() {
   const [confirmUnpub, setConfirmUnpub] = useState(null)
   const [confirmDel,   setConfirmDel]   = useState(null)
   const [actionId,     setActionId]     = useState(null)
+
+  // 12.3 (decision 28) — brand row actions, kept separate from the generic
+  // row's own confirm/action state above so the two lists never collide.
+  const [confirmUnpubBrand, setConfirmUnpubBrand] = useState(null)
+  const [confirmDelBrand,   setConfirmDelBrand]   = useState(null)
+  const [actionIdBrand,     setActionIdBrand]     = useState(null)
 
   // Real, admin-curated category list (drug_categories table), not scanned
   // from whatever text happens to be sitting on generics right now.
@@ -188,6 +201,48 @@ export default function DrugCMS() {
     if (error) { toast.error(`Delete failed: ${error.message}`); return }
     setGenerics(prev => prev.filter(x => x.id !== g.id))
     toast.success('Generic deleted')
+  }
+
+  // ── Brand row actions (12.3, decision 28) ────────────────────────────────────
+  // Full parity with the generic row above: publish is immediate, unpublish
+  // confirms first, "delete" is a soft retire (toggleBrandPublished(id, false)),
+  // never the hard deleteBrand — every row here comes from searchBrandsForCMS,
+  // so its identity is always the brand itself; toggleGenericPublished never
+  // applies on this screen.
+  async function handleBrandPublishToggle(brand) {
+    const toPublish = !brand.isPublished
+    if (!toPublish) {
+      setConfirmUnpubBrand(brand)
+      return
+    }
+    setActionIdBrand(brand.id)
+    const { error } = await toggleBrandPublished(brand.id, true)
+    setActionIdBrand(null)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    setBrands(prev => prev.map(b => b.id === brand.id ? { ...b, isPublished: true } : b))
+    toast.success('Brand published')
+  }
+
+  async function confirmUnpublishBrand() {
+    const b = confirmUnpubBrand
+    setConfirmUnpubBrand(null)
+    setActionIdBrand(b.id)
+    const { error } = await toggleBrandPublished(b.id, false)
+    setActionIdBrand(null)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    setBrands(prev => prev.map(x => x.id === b.id ? { ...x, isPublished: false } : x))
+    toast.success('Brand unpublished')
+  }
+
+  async function handleDeleteBrand() {
+    const b = confirmDelBrand
+    setConfirmDelBrand(null)
+    setActionIdBrand(b.id)
+    const { error } = await toggleBrandPublished(b.id, false)
+    setActionIdBrand(null)
+    if (error) { toast.error(`Failed: ${error.message}`); return }
+    setBrands(prev => prev.map(x => x.id === b.id ? { ...x, isPublished: false } : x))
+    toast.success('Brand retired')
   }
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -323,14 +378,41 @@ export default function DrugCMS() {
                 searchMode="brand"
                 onTap={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
                 trailing={
-                  <button
-                    onClick={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
-                    aria-label="Edit"
-                    title="Edit generic, formulations & brands"
-                    style={iconBtnStyle}
-                  >
-                    <Edit2 size={14} />
-                  </button>
+                  <div style={{
+                    display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
+                    opacity: actionIdBrand === b.id ? 0.5 : 1,
+                  }}>
+                    <button
+                      onClick={() => actionIdBrand !== b.id && handleBrandPublishToggle(b)}
+                      disabled={actionIdBrand === b.id}
+                      aria-label={b.isPublished ? 'Unpublish' : 'Publish'}
+                      title={b.isPublished ? 'Click to unpublish' : 'Click to publish'}
+                      style={{
+                        ...toggleBtnStyle,
+                        backgroundColor: b.isPublished ? '#D1FAE5' : 'var(--color-bg)',
+                        color: b.isPublished ? '#065F46' : 'var(--color-text-tertiary)',
+                        border: `1px solid ${b.isPublished ? '#6EE7B7' : 'var(--color-border)'}`,
+                      }}
+                    >
+                      {b.isPublished ? '● Live' : '○ Draft'}
+                    </button>
+                    <button
+                      onClick={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
+                      aria-label="Edit"
+                      title="Edit generic, formulations & brands"
+                      style={iconBtnStyle}
+                    >
+                      <Edit2 size={14} />
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelBrand(b)}
+                      aria-label="Delete"
+                      title="Retire brand"
+                      style={{ ...iconBtnStyle, color: '#DC2626' }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 }
               />
             ))
@@ -496,6 +578,33 @@ export default function DrugCMS() {
           danger
           onConfirm={handleDelete}
           onCancel={() => setConfirmDel(null)}
+        />
+      )}
+
+      {/* Confirm unpublish (brand, 12.3) */}
+      {confirmUnpubBrand && (
+        <ConfirmModal
+          isOpen
+          title="Unpublish brand?"
+          message="This brand will be hidden from the app. You can republish it at any time."
+          confirmLabel="Unpublish"
+          danger
+          onConfirm={confirmUnpublishBrand}
+          onCancel={() => setConfirmUnpubBrand(null)}
+        />
+      )}
+
+      {/* Confirm delete (brand, 12.3) — a soft retire (toggleBrandPublished),
+          not the hard deleteBrand, per decision 28 / §10 Section 21 */}
+      {confirmDelBrand && (
+        <ConfirmModal
+          isOpen
+          title="Retire this brand?"
+          message="This brand will be hidden from the app, the same as unpublishing it. You can bring it back at any time from the generic's editor."
+          confirmLabel="Retire"
+          danger
+          onConfirm={handleDeleteBrand}
+          onCancel={() => setConfirmDelBrand(null)}
         />
       )}
 
