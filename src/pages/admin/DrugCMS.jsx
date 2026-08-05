@@ -383,7 +383,7 @@ export default function DrugCMS() {
                     opacity: actionIdBrand === b.id ? 0.5 : 1,
                   }}>
                     <button
-                      onClick={() => actionIdBrand !== b.id && handleBrandPublishToggle(b)}
+                      onClick={(e) => { e.stopPropagation(); actionIdBrand !== b.id && handleBrandPublishToggle(b) }}
                       disabled={actionIdBrand === b.id}
                       aria-label={b.isPublished ? 'Unpublish' : 'Publish'}
                       title={b.isPublished ? 'Click to unpublish' : 'Click to publish'}
@@ -397,7 +397,7 @@ export default function DrugCMS() {
                       {b.isPublished ? '● Live' : '○ Draft'}
                     </button>
                     <button
-                      onClick={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}`) }}
                       aria-label="Edit"
                       title="Edit generic, formulations & brands"
                       style={iconBtnStyle}
@@ -405,7 +405,7 @@ export default function DrugCMS() {
                       <Edit2 size={14} />
                     </button>
                     <button
-                      onClick={() => setConfirmDelBrand(b)}
+                      onClick={(e) => { e.stopPropagation(); setConfirmDelBrand(b) }}
                       aria-label="Delete"
                       title="Retire brand"
                       style={{ ...iconBtnStyle, color: '#DC2626' }}
