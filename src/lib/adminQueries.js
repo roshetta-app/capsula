@@ -20,6 +20,8 @@
  *   1.8 — fetchGenericsPage: combo matching now checks the real 'ingredients'
  *           array (per-ingredient, "starts with") instead of guessing from
  *           name_en text
+ *   12.1 — searchBrandsForCMS (new): live tradename_clean search for the
+ *           CMS drug library screen's brand-name search (decision 27)
  */
 
 import { supabase }  from './supabase'
@@ -754,6 +756,73 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
   }))
 
   return { data: mapped, count: count ?? 0, error: null }
+}
+
+// ─── CMS drug library — brand search (12.1, decision 27) ─────────────────────
+//
+// Live, uncached search matching brands.tradename_clean (decision 21/27's
+// locked field — never brands.name), used alongside fetchGenericsPage above
+// so DrugCMS.jsx can find a drug by its brand name, not just its generic
+// name. Mirrors searchDrugsForPicker's live-query shape (Search & Add's
+// modal) rather than fetchGenericsPage's shape, since this is a live lookup
+// against a search term, not a cached/paged listing.
+//
+// No is_published filter, deliberately — unlike searchDrugsForPicker (which
+// is app-facing and only shows published drugs), this is an admin tool that
+// needs to find and manage drafts too, matching fetchGenericsPage's own
+// lack of a published filter above.
+//
+// Prefix match ('term%'), not substring — matches fetchGenericsPage's own
+// name_en search in the same combined search box, so typing "Panad" behaves
+// the same way whether it lands on a generic or a brand match.
+//
+// Returns enough of each match's real composition (generic name +
+// ingredients) for the "Brand — ingredient readout" row decision 27 #4
+// calls for, plus the formulation/generic ids the later deep-link (step 4)
+// and row actions (step 3) need — but does not format the readout text
+// itself; that's DrugCMS.jsx's job (step 2).
+export async function searchBrandsForCMS(query, { limit = 50 } = {}) {
+  const term = query.trim()
+  if (!term) return { data: [], error: null }
+
+  const { data, error } = await supabase
+    .from('brands')
+    .select(`
+      id, tradename_clean, manufacturer, is_published,
+      formulations (
+        id, concentration, form, is_published,
+        generics ( id, name_en, category, class, ingredients, is_published )
+      )
+    `)
+    .ilike('tradename_clean', `${term}%`)
+    .limit(limit)
+
+  if (error) return { data: null, error }
+
+  const mapped = (data ?? [])
+    .filter(b => b.formulations?.generics) // defensive — a brand should always have both, but never render a broken row if data is mid-edit
+    .map(b => {
+      const f = b.formulations
+      const g = f.generics
+      return {
+        id:               b.id,
+        tradenameClean:   b.tradename_clean,
+        manufacturer:     b.manufacturer,
+        isPublished:      b.is_published,
+        formulationId:        f.id,
+        concentration:        f.concentration,
+        form:                 f.form,
+        formulationPublished: f.is_published,
+        genericId:        g.id,
+        genericName:      g.name_en,
+        ingredients:      g.ingredients ?? null,
+        category:         g.category,
+        class:            g.class,
+        genericPublished: g.is_published,
+      }
+    })
+
+  return { data: mapped, error: null }
 }
 
 // ─── Promote-to-library matching (Phase 2, masterplan §2.5) ──────────────────
