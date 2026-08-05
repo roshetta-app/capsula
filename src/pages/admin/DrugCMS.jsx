@@ -13,6 +13,22 @@
  *     database directly (debounced, capped at 50 rows) — never a client-side
  *     re-filter of a preloaded list. Category options come from the real
  *     drug_categories table via useCategories, shown as a full-width dropdown.
+ *
+ * 12.2 (decisions 27-28): added a Generic/Brand mode toggle, styled like the
+ * existing Alphabetical/Most Common sort toggle. Generic mode is the table
+ * above, completely unchanged. Brand mode searches brands.tradename_clean
+ * (searchBrandsForCMS, 12.1/12.2) instead of generics.name_en, and renders
+ * its own flat-row result list built on the shared SharedDrugCard (the same
+ * row component the consumer app's Drugs screen already uses) rather than
+ * the generic table — a brand row shows the brand name plus its real
+ * composition underneath, so one brand name that spans several different
+ * medicines (e.g. Panadol) still shows each as its own clear row. Category
+ * filter and the Alphabetical/Most Common sort are hidden in Brand mode —
+ * neither maps onto a list of brands. Brand mode's edit action navigates to
+ * the right generic's editor now; auto-expanding the right formulation and
+ * highlighting the specific brand is 12.4. Brand mode's publish/delete
+ * actions are 12.3 — not built here, so the trailing slot only carries a
+ * working Edit action rather than icons with nothing behind them yet.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -20,11 +36,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Edit2, Trash2, Search, X, AlertTriangle, Layers } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useCategories } from '../../hooks/useCategories'
+import { useIsDark } from '../../utils/specialtyIcon'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import SharedDrugCard from '../../components/SharedDrugCard'
 import {
   fetchGenericsPage,
   toggleGenericPublished,
   deleteGeneric,
+  searchBrandsForCMS,
 } from '../../lib/adminQueries'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,6 +63,7 @@ export default function DrugCMS() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [generics,     setGenerics]     = useState([])
+  const [brands,       setBrands]       = useState([])
   const [totalCount,   setTotalCount]   = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [loadError,    setLoadError]    = useState(null)
@@ -51,13 +71,16 @@ export default function DrugCMS() {
   const [query,           setQuery]           = useState('')
   const [debouncedQuery,  setDebouncedQuery]  = useState('')
 
-  // Category, sort, and page live in the URL — not component state — so they
-  // survive a refresh and restore correctly on browser back/forward after
-  // opening a generic. A brand-new session (no params in the URL yet) falls
-  // through to sort='common' by default, per request.
+  // Category, sort, mode, and page live in the URL — not component state —
+  // so they survive a refresh and restore correctly on browser back/forward
+  // after opening a generic. A brand-new session (no params in the URL yet)
+  // falls through to sort='common' / mode='generic' by default, per request.
   const activeCategory = searchParams.get('category') || null
   const sortBy         = searchParams.get('sort') || 'common' // 'name' | 'common'
+  const mode            = searchParams.get('mode') || 'generic' // 'generic' | 'brand'
   const page            = Number(searchParams.get('page') || '0')
+
+  const isDark = useIsDark()
 
   function updateSearchParams(patch) {
     setSearchParams(prev => {
@@ -84,19 +107,36 @@ export default function DrugCMS() {
     return () => clearTimeout(t)
   }, [query])
 
-  // A new search always starts back at page 1 — the old page number wouldn't
-  // mean anything against a different result set. Skips the very first
-  // render so a deep-linked/persisted page number isn't immediately wiped.
+  // A new search, or switching Generic/Brand mode, always starts back at
+  // page 1 — the old page number wouldn't mean anything against a different
+  // result set. Skips the very first render so a deep-linked/persisted page
+  // number isn't immediately wiped.
   const isFirstRender = useRef(true)
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     updateSearchParams({ page: 0 })
-  }, [debouncedQuery])
+  }, [debouncedQuery, mode])
 
   // ── Load — always a real, filtered, sorted, paginated query against the live DB ──
+  // Generic mode (unchanged): fetchGenericsPage, category + sort apply.
+  // Brand mode (12.2): searchBrandsForCMS instead — category and sort don't
+  // apply to a brand list (decision 27), so they're simply not passed.
   async function load() {
     setLoading(true)
     setLoadError(null)
+
+    if (mode === 'brand') {
+      const { data, count, error } = await searchBrandsForCMS(debouncedQuery, {
+        limit: PAGE_SIZE,
+        page,
+      })
+      setLoading(false)
+      if (error) { setLoadError(error.message); return }
+      setBrands(data)
+      setTotalCount(count)
+      return
+    }
+
     const { data, count, error } = await fetchGenericsPage({
       query: debouncedQuery,
       category: activeCategory,
@@ -110,7 +150,7 @@ export default function DrugCMS() {
     setTotalCount(count)
   }
 
-  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, page])
+  useEffect(() => { load() }, [debouncedQuery, activeCategory, sortBy, mode, page])
 
   // ── Publish toggle ──────────────────────────────────────────────────────────
   async function handlePublishToggle(generic) {
@@ -166,7 +206,7 @@ export default function DrugCMS() {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
-          placeholder="Search generic name…"
+          placeholder={mode === 'brand' ? 'Search brand name…' : 'Search generic name…'}
           style={searchInputStyle}
         />
         {query && (
@@ -176,8 +216,26 @@ export default function DrugCMS() {
         )}
       </div>
 
-      {/* Category filter */}
-      {categories.length > 0 && (
+      {/* Generic/Brand toggle (12.2, decision 27) — Brand mode is its own
+          full results list on SharedDrugCard, not a few extra matches
+          folded into the generic table below. */}
+      <div style={sortToggleWrapStyle}>
+        <button
+          onClick={() => updateSearchParams({ mode: 'generic', page: 0 })}
+          style={{ ...sortToggleBtnStyle, ...(mode === 'generic' ? sortToggleBtnActiveStyle : {}) }}
+        >
+          Generic
+        </button>
+        <button
+          onClick={() => updateSearchParams({ mode: 'brand', page: 0 })}
+          style={{ ...sortToggleBtnStyle, ...(mode === 'brand' ? sortToggleBtnActiveStyle : {}) }}
+        >
+          Brand
+        </button>
+      </div>
+
+      {/* Category filter — generics only; a brand list has no category of its own */}
+      {mode === 'generic' && categories.length > 0 && (
         <select
           value={activeCategory ?? ''}
           onChange={e => updateSearchParams({ category: e.target.value || null, page: 0 })}
@@ -190,21 +248,24 @@ export default function DrugCMS() {
         </select>
       )}
 
-      {/* Sort toggle */}
-      <div style={sortToggleWrapStyle}>
-        <button
-          onClick={() => updateSearchParams({ sort: 'name', page: 0 })}
-          style={{ ...sortToggleBtnStyle, ...(sortBy === 'name' ? sortToggleBtnActiveStyle : {}) }}
-        >
-          Alphabetical
-        </button>
-        <button
-          onClick={() => updateSearchParams({ sort: 'common', page: 0 })}
-          style={{ ...sortToggleBtnStyle, ...(sortBy === 'common' ? sortToggleBtnActiveStyle : {}) }}
-        >
-          Most Common
-        </button>
-      </div>
+      {/* Sort toggle — generics only; "Most Common" counts a generic's
+          brands, which doesn't map onto a list of brands */}
+      {mode === 'generic' && (
+        <div style={sortToggleWrapStyle}>
+          <button
+            onClick={() => updateSearchParams({ sort: 'name', page: 0 })}
+            style={{ ...sortToggleBtnStyle, ...(sortBy === 'name' ? sortToggleBtnActiveStyle : {}) }}
+          >
+            Alphabetical
+          </button>
+          <button
+            onClick={() => updateSearchParams({ sort: 'common', page: 0 })}
+            style={{ ...sortToggleBtnStyle, ...(sortBy === 'common' ? sortToggleBtnActiveStyle : {}) }}
+          >
+            Most Common
+          </button>
+        </div>
+      )}
 
       {/* Count */}
       <div style={{
@@ -214,8 +275,8 @@ export default function DrugCMS() {
         {loading
           ? 'Loading…'
           : totalCount === 0
-            ? '0 generics'
-            : `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + generics.length} of ${totalCount}`}
+            ? `0 ${mode === 'brand' ? 'brands' : 'generics'}`
+            : `Showing ${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + (mode === 'brand' ? brands.length : generics.length)} of ${totalCount}`}
         {query && ` for "${query}"`}
       </div>
 
@@ -224,9 +285,11 @@ export default function DrugCMS() {
         <ErrorBanner message={loadError} onDismiss={() => setLoadError(null)} />
       )}
 
-      {/* Table */}
-      {!loading && generics.length === 0 ? (
-        <EmptyState query={query} />
+      {/* Results — Generic mode: the table below, unchanged. Brand mode
+          (12.2): a flat SharedDrugCard list, no table header, since a brand
+          row isn't a table row. */}
+      {!loading && (mode === 'brand' ? brands.length === 0 : generics.length === 0) ? (
+        <EmptyState query={query} noun={mode === 'brand' ? 'brands' : 'generics'} />
       ) : (
         <div style={{
           backgroundColor: 'var(--color-surface)',
@@ -236,17 +299,43 @@ export default function DrugCMS() {
           boxShadow: 'var(--shadow-card)',
         }}>
 
-          {/* Header row */}
-          <div style={theadStyle}>
-            <span style={thStyle}>Generic</span>
-            <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
-            <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
-            <span style={thStyle}>Actions</span>
-          </div>
+          {/* Header row — generic table only */}
+          {mode === 'generic' && (
+            <div style={theadStyle}>
+              <span style={thStyle}>Generic</span>
+              <span style={{ ...thStyle, textAlign: 'center' }}>Forms</span>
+              <span style={{ ...thStyle, textAlign: 'center' }}>Published</span>
+              <span style={thStyle}>Actions</span>
+            </div>
+          )}
 
-          {loading
-            ? [1,2,3,4].map(i => <SkeletonRow key={i} />)
-            : generics.map((g, idx) => {
+          {loading ? (
+            [1,2,3,4].map(i => <SkeletonRow key={i} height={mode === 'brand' ? 64 : 56} />)
+          ) : mode === 'brand' ? (
+            brands.map((b, idx) => (
+              <SharedDrugCard
+                key={b.id}
+                drug={b}
+                categories={categories}
+                isDark={isDark}
+                isLast={idx === brands.length - 1}
+                highlight={query}
+                searchMode="brand"
+                onTap={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
+                trailing={
+                  <button
+                    onClick={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
+                    aria-label="Edit"
+                    title="Edit generic, formulations & brands"
+                    style={iconBtnStyle}
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                }
+              />
+            ))
+          ) : (
+            generics.map((g, idx) => {
                 const isLast   = idx === generics.length - 1
                 const isActing = actionId === g.id
 
@@ -353,7 +442,7 @@ export default function DrugCMS() {
                   </div>
                 )
               })
-          }
+          )}
         </div>
       )}
 
@@ -478,24 +567,24 @@ function ErrorBanner({ message, onDismiss }) {
   )
 }
 
-function EmptyState({ query }) {
+function EmptyState({ query, noun = 'generics' }) {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
         <Search size={32} />
       </div>
       <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-1)' }}>
-        No generics found{query ? ` for "${query}"` : ''}
+        No {noun} found{query ? ` for "${query}"` : ''}
       </div>
-      <div style={{ fontSize: 13 }}>Try a different search or category filter</div>
+      <div style={{ fontSize: 13 }}>Try a different search{noun === 'generics' ? ' or category filter' : ''}</div>
     </div>
   )
 }
 
-function SkeletonRow() {
+function SkeletonRow({ height = 56 }) {
   return (
     <div style={{
-      height: 56,
+      height,
       borderBottom: '1px solid var(--color-border-subtle)',
       backgroundColor: 'var(--color-surface)',
       animation: 'shimmer 1.4s ease-in-out infinite',

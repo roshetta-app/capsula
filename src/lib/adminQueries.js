@@ -22,6 +22,12 @@
  *           name_en text
  *   12.1 — searchBrandsForCMS (new): live tradename_clean search for the
  *           CMS drug library screen's brand-name search (decision 27)
+ *   12.2 — searchBrandsForCMS revised: added real server-side paging
+ *           (page/count, matching fetchGenericsPage's shape) now that Brand
+ *           mode is its own full results list, not a few extra matches
+ *           tacked onto generic results; also added pack_size, fill_volume,
+ *           and form_modifier so DrugCMS.jsx can build the full title
+ *           suffix via SharedDrugCard/getDrugTitleSuffix
  */
 
 import { supabase }  from './supabase'
@@ -758,14 +764,18 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
   return { data: mapped, count: count ?? 0, error: null }
 }
 
-// ─── CMS drug library — brand search (12.1, decision 27) ─────────────────────
+// ─── CMS drug library — brand search (12.1, decision 27; revised 12.2) ───────
 //
 // Live, uncached search matching brands.tradename_clean (decision 21/27's
 // locked field — never brands.name), used alongside fetchGenericsPage above
 // so DrugCMS.jsx can find a drug by its brand name, not just its generic
-// name. Mirrors searchDrugsForPicker's live-query shape (Search & Add's
-// modal) rather than fetchGenericsPage's shape, since this is a live lookup
-// against a search term, not a cached/paged listing.
+// name.
+//
+// 12.2 revision: DrugCMS.jsx's Brand mode is now a full standalone results
+// list (a Generic/Brand toggle, not a few extra matches folded into the
+// generic list), so this needs the same real server-side paging
+// fetchGenericsPage already has — {data, count, error}, page * limit via
+// .range() — instead of the one-shot .limit() this shipped with in 12.1.
 //
 // No is_published filter, deliberately — unlike searchDrugsForPicker (which
 // is app-facing and only shows published drugs), this is an admin tool that
@@ -778,26 +788,30 @@ export async function fetchGenericsPage({ query = '', category = null, limit = 5
 //
 // Returns enough of each match's real composition (generic name +
 // ingredients) for the "Brand — ingredient readout" row decision 27 #4
-// calls for, plus the formulation/generic ids the later deep-link (step 4)
-// and row actions (step 3) need — but does not format the readout text
-// itself; that's DrugCMS.jsx's job (step 2).
-export async function searchBrandsForCMS(query, { limit = 50 } = {}) {
+// calls for, plus the formulation/generic ids the deep-link (step 4) and row
+// actions (step 3) need. 12.2 revision also adds pack_size, fill_volume, and
+// form_modifier — DrugCMS.jsx reuses SharedDrugCard for brand rows, and its
+// title suffix (getDrugTitleSuffix) needs those fields to build the full
+// title (e.g. "Panadol Extra 500mg 2 FC Tab.", not just "Panadol Extra
+// 500mg"). Still doesn't format the readout text itself; that's
+// DrugCMS.jsx's job.
+export async function searchBrandsForCMS(query, { limit = 50, page = 0 } = {}) {
   const term = query.trim()
-  if (!term) return { data: [], error: null }
+  if (!term) return { data: [], count: 0, error: null }
 
-  const { data, error } = await supabase
+  const { data, error, count } = await supabase
     .from('brands')
     .select(`
-      id, tradename_clean, manufacturer, is_published,
+      id, tradename_clean, manufacturer, pack_size, fill_volume, is_published,
       formulations (
-        id, concentration, form, is_published,
+        id, concentration, form, form_modifier, is_published,
         generics ( id, name_en, category, class, ingredients, is_published )
       )
-    `)
+    `, { count: 'exact' })
     .ilike('tradename_clean', `${term}%`)
-    .limit(limit)
+    .range(page * limit, page * limit + limit - 1)
 
-  if (error) return { data: null, error }
+  if (error) return { data: null, count: 0, error }
 
   const mapped = (data ?? [])
     .filter(b => b.formulations?.generics) // defensive — a brand should always have both, but never render a broken row if data is mid-edit
@@ -808,10 +822,13 @@ export async function searchBrandsForCMS(query, { limit = 50 } = {}) {
         id:               b.id,
         tradenameClean:   b.tradename_clean,
         manufacturer:     b.manufacturer,
+        packSize:         b.pack_size,
+        fillVolume:       b.fill_volume,
         isPublished:      b.is_published,
         formulationId:        f.id,
         concentration:        f.concentration,
         form:                 f.form,
+        formModifier:         f.form_modifier ?? [],
         formulationPublished: f.is_published,
         genericId:        g.id,
         genericName:      g.name_en,
@@ -822,7 +839,7 @@ export async function searchBrandsForCMS(query, { limit = 50 } = {}) {
       }
     })
 
-  return { data: mapped, error: null }
+  return { data: mapped, count: count ?? 0, error: null }
 }
 
 // ─── Promote-to-library matching (Phase 2, masterplan §2.5) ──────────────────
