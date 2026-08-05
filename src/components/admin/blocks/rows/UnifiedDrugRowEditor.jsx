@@ -177,6 +177,7 @@ import {
   insertFormulation,
   insertBrand,
   fetchFormulationWithGeneric,
+  updateFormulation,
 } from '../../../../lib/adminQueries'
 import {
   DRUG_OPTION_TEMPLATE,
@@ -1102,6 +1103,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [restoringGroupIdx, setRestoringGroupIdx] = useState(null)
   const [restorePendingChoice, setRestorePendingChoice] = useState(null) // { groupIdx, populations } | null
 
+  // WRITE-BACK FEATURE (2026-08-05, step 11.3): opt-in "save this edit back
+  // to the library" action on one dose line, keyed off the bracket's
+  // permanent id (decision 7's addendum / decision 25). Default behavior
+  // (no opt-in) is unchanged — an edited/removed line only affects this one
+  // sheet unless this action is explicitly used. Confirmed with the user
+  // (2026-08-05): requires an "are you sure?" step before writing, since it
+  // changes something shared by every sheet using that dose, not just this
+  // one — unlike "Restore from library" above, which only reads.
+  // confirmSaveLine: { groupIdx, line } | null — which line's confirm prompt
+  // is currently open (only one at a time).
+  const [confirmSaveLine, setConfirmSaveLine] = useState(null)
+  const [savingLineId, setSavingLineId] = useState(null) // id of the line currently being written
+  const [savedLineId, setSavedLineId] = useState(null)   // id of the line that just finished saving, for a brief "Saved" confirmation
+  const [lineSaveError, setLineSaveError] = useState(null) // { lineId, message } | null
+
   // ── Mutation helpers ───────────────────────────────────────────────────
 
   function emitGroups(nextGroups) {
@@ -1232,6 +1248,73 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       // group.dose/dose_lines are left exactly as-is.
     } finally {
       setRestoringGroupIdx(null)
+    }
+  }
+
+  // ── Save one dose line back to the library (step 11.3) ─────────────────
+  // Always re-fetches the formulation's CURRENT doses_structured live,
+  // same reasoning as restoreDoseFromLibrary above — the library may have
+  // changed since this line was first picked, and this action must find
+  // and update the real current bracket, not a stale local copy.
+  //
+  // A line's displayed text is built by formatBracketLineText() as
+  // "{bracket label}: {instruction} (max {max_dose})" when a label or max
+  // dose is set — only the {instruction} portion belongs in the bracket's
+  // own instruction field. If we wrote the whole displayed line back
+  // verbatim on a bracket that has a label or max dose, that label/max
+  // text would get baked into 'instruction' and then show up doubled the
+  // next time the line is built. Since today's real data has no bracket
+  // ever using a label or max dose (confirmed live, decision 7), this
+  // can't happen yet in practice — but rather than silently mis-saving the
+  // day it does, this stops and shows a clear message instead of guessing
+  // how to split the text back apart.
+  async function saveLineToLibrary(groupIdx, line) {
+    const group = groups[groupIdx]
+    const formulationId = group.options[0]?.formulation_id
+    if (!formulationId || !line.bracket_id) return // defensive — button shouldn't render without these
+
+    setSavingLineId(line.id)
+    setLineSaveError(null)
+    try {
+      const { data, error } = await fetchFormulationWithGeneric(formulationId)
+      if (error || !data) {
+        setLineSaveError({ lineId: line.id, message: 'Could not load the library entry to save to. Please try again.' })
+        return
+      }
+
+      const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
+      let matchedBracket = null
+      const nextStructured = populations.map(population => ({
+        ...population,
+        brackets: (Array.isArray(population.brackets) ? population.brackets : []).map(bracket => {
+          if (bracket.id !== line.bracket_id) return bracket
+          matchedBracket = bracket
+          return { ...bracket, instruction: line.text ?? '' }
+        }),
+      }))
+
+      if (!matchedBracket) {
+        setLineSaveError({ lineId: line.id, message: 'This line no longer matches an entry in the library — it may have been changed or removed there.' })
+        return
+      }
+      const population = populations.find(p => (p.brackets ?? []).some(b => b.id === line.bracket_id))
+      if (matchedBracket.bracket?.trim() || population?.max_dose) {
+        setLineSaveError({ lineId: line.id, message: 'This dose has a label or a maximum-dose note in the library, so it can\u2019t be saved back from here without risking duplicating that text. Edit it directly in the drug\u2019s library entry instead.' })
+        return
+      }
+
+      const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
+      if (updateErr) {
+        setLineSaveError({ lineId: line.id, message: 'Saving to the library failed. Please try again.' })
+        return
+      }
+
+      setSavedLineId(line.id)
+      setTimeout(() => {
+        setSavedLineId(current => current === line.id ? null : current)
+      }, 2000)
+    } finally {
+      setSavingLineId(null)
     }
   }
 
@@ -1536,45 +1619,135 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   // Population pick (decision 25): one independently editable/
                   // removable row per bracket, instead of a single input.
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
-                    {group.dose_lines.map(line => (
-                      <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        <input
-                          type="text"
-                          value={line.text ?? ''}
-                          onChange={e => updateDoseLine(groupIdx, line.id, e.target.value)}
-                          dir="auto"
-                          style={{
-                            flex: 1,
-                            width: '100%', boxSizing: 'border-box',
-                            padding: '3px 8px',
-                            border: '1px solid var(--color-border)',
-                            borderRadius: 'var(--radius-md)',
-                            fontSize: 12, fontWeight: 400,
-                            fontFamily: 'var(--font-body)',
-                            backgroundColor: 'var(--color-surface)',
-                            color: 'var(--color-text-secondary)',
-                            outline: 'none',
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeDoseLine(groupIdx, line.id)}
-                          title="Remove this line"
-                          aria-label="Remove this dose line"
-                          style={{
-                            flexShrink: 0,
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: 22, height: 22,
-                            border: 'none', background: 'none', padding: 0,
-                            borderRadius: 'var(--radius-md)',
-                            color: 'var(--color-text-tertiary)',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          <X size={13} />
-                        </button>
-                      </div>
-                    ))}
+                    {group.dose_lines.map(line => {
+                      // WRITE-BACK FEATURE (step 11.3): only lines that trace
+                      // back to a real library bracket (and whose group is
+                      // still linked to a formulation) can be saved back —
+                      // a hand-typed line has nothing to write into.
+                      const canSaveToLibrary = !!(line.bracket_id && firstOpt.formulation_id)
+                      const isConfirmingThisLine = confirmSaveLine?.line.id === line.id
+                      const isSavingThisLine = savingLineId === line.id
+                      return (
+                        <div key={line.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <input
+                              type="text"
+                              value={line.text ?? ''}
+                              onChange={e => updateDoseLine(groupIdx, line.id, e.target.value)}
+                              dir="auto"
+                              style={{
+                                flex: 1,
+                                width: '100%', boxSizing: 'border-box',
+                                padding: '3px 8px',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                fontSize: 12, fontWeight: 400,
+                                fontFamily: 'var(--font-body)',
+                                backgroundColor: 'var(--color-surface)',
+                                color: 'var(--color-text-secondary)',
+                                outline: 'none',
+                              }}
+                            />
+                            {canSaveToLibrary && (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmSaveLine({ groupIdx, line })}
+                                disabled={isSavingThisLine}
+                                title="Save this wording back to the drug library"
+                                aria-label="Save this dose line back to the drug library"
+                                style={{
+                                  flexShrink: 0,
+                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                  width: 22, height: 22,
+                                  border: 'none', background: 'none', padding: 0,
+                                  borderRadius: 'var(--radius-md)',
+                                  color: savedLineId === line.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                                  cursor: isSavingThisLine ? 'default' : 'pointer',
+                                  opacity: isSavingThisLine ? 0.5 : 1,
+                                }}
+                              >
+                                <Library size={13} />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeDoseLine(groupIdx, line.id)}
+                              title="Remove this line"
+                              aria-label="Remove this dose line"
+                              style={{
+                                flexShrink: 0,
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 22, height: 22,
+                                border: 'none', background: 'none', padding: 0,
+                                borderRadius: 'var(--radius-md)',
+                                color: 'var(--color-text-tertiary)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <X size={13} />
+                            </button>
+                          </div>
+
+                          {/* Confirm prompt — shown for exactly one line at a
+                              time. Confirmed with the user (2026-08-05): this
+                              write touches the shared library, so it always
+                              asks first, unlike "Restore from library". */}
+                          {isConfirmingThisLine && (
+                            <div style={{
+                              display: 'flex', flexDirection: 'column', gap: 4,
+                              padding: '6px 8px',
+                              border: '1px solid var(--color-accent)',
+                              borderRadius: 'var(--radius-md)',
+                              backgroundColor: '#EFF6FF',
+                            }}>
+                              <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
+                                Save this wording to the drug library for everyone?
+                              </span>
+                              <div style={{ display: 'flex', gap: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const target = confirmSaveLine
+                                    setConfirmSaveLine(null)
+                                    saveLineToLibrary(target.groupIdx, target.line)
+                                  }}
+                                  style={{
+                                    background: 'var(--color-accent)', color: '#fff',
+                                    border: 'none', borderRadius: 'var(--radius-md)',
+                                    padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                                    cursor: 'pointer', fontFamily: 'var(--font-body)',
+                                  }}
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmSaveLine(null)}
+                                  style={{
+                                    background: 'none', color: 'var(--color-text-secondary)',
+                                    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                                    padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                                    cursor: 'pointer', fontFamily: 'var(--font-body)',
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+
+                          {isSavingThisLine && (
+                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+                          )}
+                          {savedLineId === line.id && (
+                            <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+                          )}
+                          {lineSaveError?.lineId === line.id && (
+                            <span style={{ fontSize: 10, color: '#ef4444' }}>{lineSaveError.message}</span>
+                          )}
+                        </div>
+                      )
+                    })}
                     {firstOpt.formulation_id && (
                       <button
                         type="button"
