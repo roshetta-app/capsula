@@ -164,7 +164,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw } from 'lucide-react'
+import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS } from '../../../../config/forms'
@@ -183,6 +183,7 @@ import {
   DRUG_OPTION_TEMPLATE,
   SOURCE_FLAG_VALUE,
   doseWhoLabel,
+  doseLineInstructionText,
   toDrugOptions,
   fromDrugOptions,
 } from '../../../../constants/prescriptionRowSchema'
@@ -307,48 +308,247 @@ function PopulationChooser({ populations, onChoose, onSkip }) {
 }
 
 // Turns one chosen population's brackets into independent dose lines, each
-// carrying the permanent bracket id (decision 7's addendum) so a future
-// "save this edit back to the library" action and bulk-refresh tool can
+// carrying the permanent bracket id (decision 7's addendum) so the "save
+// this edit back to the library" action and the bulk-refresh tool can
 // trace a line back to the exact library note it came from. A bracket with
-// no usable instruction is silently dropped, same as the old formatter did.
-// Combines a bracket's own label (e.g. "5-7.9kg (3-6 months)") with its
-// instruction and the population's max_dose into one line of text.
-// FIX (2026-08-05, caught in review): the first version of this function
-// used formatDoseRowText directly on the bracket, which only knows about
-// 'instruction'/'max_dose' — it silently dropped 'bracket' entirely, so a
-// multi-bracket population's lines had no way to tell which weight/age
-// range each one was for once the population chooser closed.
-function formatBracketLineText(bracket, maxDose) {
-  const instruction = bracket?.instruction?.trim()
-  if (!instruction) return null
-  const label = bracket?.bracket?.trim()
-  const body = label ? `${label}: ${instruction}` : instruction
-  return maxDose ? `${body} (max ${maxDose})` : body
-}
-
+// no usable instruction is silently dropped, same as before.
+//
+// FIELD-SEPARATION ADDENDUM (2026-08-06): a bracket's title and instruction
+// are now kept as two separate pieces ('bracket_title' / 'instruction')
+// instead of being flattened into one 'text' sentence — this is what lets
+// the CMS editor show/edit them as two real fields, and lets "save back to
+// the library" write each piece into the right spot without guessing how
+// to split combined text apart. The population's max_dose is pulled out to
+// the group-level 'dose_max' (applied once by applyDoseToGroup, not per
+// line) instead of being repeated inside every bracket's text. 'text' is
+// left null on every newly-built line — it is only ever populated on
+// legacy lines saved before this addendum, and doseLineInstructionText()
+// is what every reader (this editor, the app renderer, the bulk-refresh
+// tool) uses to fall back to it correctly.
 function buildDoseLinesFromPopulation(population) {
   const brackets = Array.isArray(population?.brackets) ? population.brackets : []
   const dose_lines = brackets
+    .filter(bracket => bracket?.instruction?.trim())
     .map(bracket => ({
       id: `line-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       bracket_id: bracket.id ?? null,
-      text: formatBracketLineText(bracket, population.max_dose),
+      bracket_title: bracket.bracket?.trim() || null,
+      instruction: bracket.instruction.trim(),
+      text: null,
     }))
-    .filter(line => line.text)
   return {
     dose: null,
     dose_who: population?.population ?? null,
     dose_lines,
+    dose_max: population?.max_dose?.trim() || null,
   }
 }
 
 function resolveDosePick(dosesStructured) {
   const populations = Array.isArray(dosesStructured) ? dosesStructured : []
-  if (populations.length === 0) return { needsChoice: false, dose: null, dose_who: null, dose_lines: [] }
+  if (populations.length === 0) return { needsChoice: false, dose: null, dose_who: null, dose_lines: [], dose_max: null }
   if (populations.length === 1) {
     return { needsChoice: false, ...buildDoseLinesFromPopulation(populations[0]) }
   }
   return { needsChoice: true, populations }
+}
+
+// ─── EditableDoseLine ────────────────────────────────────────────────────────
+// FIELD-SEPARATION ADDENDUM (2026-08-06): one dose_lines row, shown as
+// clean read-only text by default (title bold-ish, instruction plain,
+// mirroring how it will look on the actual patient sheet), with an edit
+// button that opens the title + instruction into two real inputs. This
+// replaces the old always-editable single text box — reduces visual noise
+// when nothing needs changing, while keeping editing exactly as available
+// as before.
+//
+// A legacy line (saved before this addendum) has 'instruction' as null and
+// its whole wording in 'text'. Opening such a line for the first time seeds
+// the instruction box with that existing text (so nothing is lost) and
+// leaves the title box blank — there is no safe way to guess where a title
+// ends and the instruction begins inside old flattened text, so this asks
+// the admin to fill the title back in if one applies, rather than guessing
+// wrong. Once edited, the line is in the new shape going forward and
+// 'text' is no longer read for it.
+function EditableDoseLine({
+  line, onUpdateField, onRemove,
+  canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
+  isSaving, isSaved, saveError,
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  function startEditing() {
+    if (line.instruction == null) {
+      // Legacy line — one-time split: move the existing flattened text into
+      // the instruction box so it isn't lost, title starts blank.
+      onUpdateField('instruction', line.text ?? '')
+    }
+    setIsEditing(true)
+  }
+
+  const displayInstruction = doseLineInstructionText(line)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {isEditing ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <input
+            type="text"
+            value={line.bracket_title ?? ''}
+            onChange={e => onUpdateField('bracket_title', e.target.value || null)}
+            placeholder="Title, e.g. 5-7.9kg (3-6 months)"
+            dir="auto"
+            style={editLineInputStyle}
+          />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <input
+              type="text"
+              value={line.instruction ?? ''}
+              onChange={e => onUpdateField('instruction', e.target.value)}
+              placeholder="Instruction"
+              dir="auto"
+              style={{ ...editLineInputStyle, flex: 1 }}
+            />
+            <button
+              type="button"
+              onClick={() => setIsEditing(false)}
+              title="Done editing"
+              aria-label="Done editing this dose line"
+              style={lineIconButtonStyle}
+            >
+              <Check size={13} />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div
+            dir="auto"
+            style={{
+              flex: 1,
+              padding: '3px 8px',
+              fontSize: 12, fontFamily: 'var(--font-body)',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {line.bracket_title && (
+              <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                {line.bracket_title}{': '}
+              </span>
+            )}
+            {displayInstruction}
+          </div>
+          <button
+            type="button"
+            onClick={startEditing}
+            title="Edit this dose line"
+            aria-label="Edit this dose line"
+            style={lineIconButtonStyle}
+          >
+            <Edit2 size={12} />
+          </button>
+          {canSaveToLibrary && (
+            <button
+              type="button"
+              onClick={onRequestSave}
+              disabled={isSaving}
+              title="Save this wording back to the drug library"
+              aria-label="Save this dose line back to the drug library"
+              style={{
+                ...lineIconButtonStyle,
+                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                cursor: isSaving ? 'default' : 'pointer',
+                opacity: isSaving ? 0.5 : 1,
+              }}
+            >
+              <Library size={13} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove this line"
+            aria-label="Remove this dose line"
+            style={lineIconButtonStyle}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {isConfirming && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 4,
+          padding: '6px 8px',
+          border: '1px solid var(--color-accent)',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#EFF6FF',
+        }}>
+          <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
+            Save this wording to the drug library for everyone?
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={onConfirmSave}
+              style={{
+                background: 'var(--color-accent)', color: '#fff',
+                border: 'none', borderRadius: 'var(--radius-md)',
+                padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={onCancelConfirm}
+              style={{
+                background: 'none', color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isSaving && (
+        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+      )}
+      {isSaved && (
+        <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+      )}
+      {saveError && (
+        <span style={{ fontSize: 10, color: '#ef4444' }}>{saveError}</span>
+      )}
+    </div>
+  )
+}
+
+const editLineInputStyle = {
+  width: '100%', boxSizing: 'border-box',
+  padding: '3px 8px',
+  border: '1px solid var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  fontSize: 12, fontWeight: 400,
+  fontFamily: 'var(--font-body)',
+  backgroundColor: 'var(--color-surface)',
+  color: 'var(--color-text-secondary)',
+  outline: 'none',
+}
+
+const lineIconButtonStyle = {
+  flexShrink: 0,
+  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: 22, height: 22,
+  border: 'none', background: 'none', padding: 0,
+  borderRadius: 'var(--radius-md)',
+  color: 'var(--color-text-tertiary)',
+  cursor: 'pointer',
 }
 
 // ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
@@ -1158,7 +1358,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   function applyDoseToGroup(groupIdx, doseFields) {
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx
-        ? { ...g, dose: doseFields.dose ?? null, dose_who: doseFields.dose_who ?? null, dose_lines: doseFields.dose_lines ?? [] }
+        ? {
+            ...g,
+            dose: doseFields.dose ?? null,
+            dose_who: doseFields.dose_who ?? null,
+            dose_lines: doseFields.dose_lines ?? [],
+            dose_max: doseFields.dose_max ?? null,
+          }
         : g
     )
     emitGroups(nextGroups)
@@ -1176,10 +1382,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
   // Edit or remove one independently-editable dose line (decision 25) —
   // never touches any other line in the group, and never touches 'dose'.
-  function updateDoseLine(groupIdx, lineId, text) {
+  //
+  // FIELD-SEPARATION ADDENDUM (2026-08-06): 'field' is 'bracket_title' or
+  // 'instruction' — the two real editable pieces — rather than one flat
+  // 'text' string. Editing either field never touches the other, and never
+  // rewrites a legacy line's 'text' — a legacy line's 'text' stays exactly
+  // as saved unless the admin explicitly edits it (see EditableDoseLine
+  // below, which starts a legacy line's edit by moving its 'text' into
+  // 'instruction' the first time it's opened, so editing it doesn't lose
+  // the existing wording).
+  function updateDoseLineField(groupIdx, lineId, field, value) {
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx
-        ? { ...g, dose_lines: (g.dose_lines ?? []).map(l => l.id === lineId ? { ...l, text } : l) }
+        ? { ...g, dose_lines: (g.dose_lines ?? []).map(l => l.id === lineId ? { ...l, [field]: value } : l) }
         : g
     )
     emitGroups(nextGroups)
@@ -1190,6 +1405,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       gi === groupIdx
         ? { ...g, dose_lines: (g.dose_lines ?? []).filter(l => l.id !== lineId) }
         : g
+    )
+    emitGroups(nextGroups)
+  }
+
+  // Update the shared "max dose" note for a group's dose_lines (field-
+  // separation addendum, 2026-08-06). Mirrors updateGroupDose/updateGroupNote
+  // exactly — one value, shown once under the whole group of lines.
+  function updateGroupDoseMax(groupIdx, value) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx ? { ...g, dose_max: value || null } : g
     )
     emitGroups(nextGroups)
   }
@@ -1257,21 +1482,26 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // changed since this line was first picked, and this action must find
   // and update the real current bracket, not a stale local copy.
   //
-  // A line's displayed text is built by formatBracketLineText() as
-  // "{bracket label}: {instruction} (max {max_dose})" when a label or max
-  // dose is set — only the {instruction} portion belongs in the bracket's
-  // own instruction field. If we wrote the whole displayed line back
-  // verbatim on a bracket that has a label or max dose, that label/max
-  // text would get baked into 'instruction' and then show up doubled the
-  // next time the line is built. Since today's real data has no bracket
-  // ever using a label or max dose (confirmed live, decision 7), this
-  // can't happen yet in practice — but rather than silently mis-saving the
-  // day it does, this stops and shows a clear message instead of guessing
-  // how to split the text back apart.
+  // FIELD-SEPARATION ADDENDUM (2026-08-06): now that a line carries
+  // 'bracket_title'/'instruction' as two real, independently-known fields
+  // (instead of one flattened sentence a label/max-dose could be baked
+  // into), each is written straight into the matching bracket field —
+  // nothing needs to be split apart, so the old guard that refused to save
+  // any line whose bracket had a title or max dose is gone; it's not
+  // possible to mis-save anymore, since there's nothing left to guess.
+  // Still gated (see canSaveToLibrary at the call site) to lines that have
+  // actually gone through the split — a legacy line that has never been
+  // opened for editing still has 'instruction' as null and cannot be saved
+  // from here, since its whole wording lives in the old flattened 'text'
+  // field and writing that into 'instruction' verbatim would duplicate any
+  // title/max-dose text the library bracket already carries. Opening a
+  // legacy line for editing (see EditableDoseLine) is what performs the
+  // one-time, explicit split into the new shape — after that, saving here
+  // is safe.
   async function saveLineToLibrary(groupIdx, line) {
     const group = groups[groupIdx]
     const formulationId = group.options[0]?.formulation_id
-    if (!formulationId || !line.bracket_id) return // defensive — button shouldn't render without these
+    if (!formulationId || !line.bracket_id || line.instruction == null) return // defensive — button shouldn't render without these
 
     setSavingLineId(line.id)
     setLineSaveError(null)
@@ -1289,17 +1519,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         brackets: (Array.isArray(population.brackets) ? population.brackets : []).map(bracket => {
           if (bracket.id !== line.bracket_id) return bracket
           matchedBracket = bracket
-          return { ...bracket, instruction: line.text ?? '' }
+          return {
+            ...bracket,
+            bracket: line.bracket_title ?? '',
+            instruction: line.instruction ?? '',
+          }
         }),
       }))
 
       if (!matchedBracket) {
         setLineSaveError({ lineId: line.id, message: 'This line no longer matches an entry in the library — it may have been changed or removed there.' })
-        return
-      }
-      const population = populations.find(p => (p.brackets ?? []).some(b => b.id === line.bracket_id))
-      if (matchedBracket.bracket?.trim() || population?.max_dose) {
-        setLineSaveError({ lineId: line.id, message: 'This dose has a label or a maximum-dose note in the library, so it can\u2019t be saved back from here without risking duplicating that text. Edit it directly in the drug\u2019s library entry instead.' })
         return
       }
 
@@ -1618,136 +1847,63 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                 {group.dose_lines?.length > 0 ? (
                   // Population pick (decision 25): one independently editable/
                   // removable row per bracket, instead of a single input.
+                  // FIELD-SEPARATION ADDENDUM (2026-08-06): each line renders
+                  // read-only by default via EditableDoseLine, with its own
+                  // edit toggle — see that component for the legacy-line
+                  // split-on-first-edit behavior.
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
                     {group.dose_lines.map(line => {
                       // WRITE-BACK FEATURE (step 11.3): only lines that trace
-                      // back to a real library bracket (and whose group is
-                      // still linked to a formulation) can be saved back —
-                      // a hand-typed line has nothing to write into.
-                      const canSaveToLibrary = !!(line.bracket_id && firstOpt.formulation_id)
-                      const isConfirmingThisLine = confirmSaveLine?.line.id === line.id
-                      const isSavingThisLine = savingLineId === line.id
+                      // back to a real library bracket, whose group is still
+                      // linked to a formulation, and that have actually been
+                      // split into title/instruction can be saved back — a
+                      // hand-typed line, or a legacy line never opened for
+                      // editing, has nothing safe to write.
+                      const canSaveToLibrary = !!(line.bracket_id && firstOpt.formulation_id && line.instruction != null)
                       return (
-                        <div key={line.id} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <input
-                              type="text"
-                              value={line.text ?? ''}
-                              onChange={e => updateDoseLine(groupIdx, line.id, e.target.value)}
-                              dir="auto"
-                              style={{
-                                flex: 1,
-                                width: '100%', boxSizing: 'border-box',
-                                padding: '3px 8px',
-                                border: '1px solid var(--color-border)',
-                                borderRadius: 'var(--radius-md)',
-                                fontSize: 12, fontWeight: 400,
-                                fontFamily: 'var(--font-body)',
-                                backgroundColor: 'var(--color-surface)',
-                                color: 'var(--color-text-secondary)',
-                                outline: 'none',
-                              }}
-                            />
-                            {canSaveToLibrary && (
-                              <button
-                                type="button"
-                                onClick={() => setConfirmSaveLine({ groupIdx, line })}
-                                disabled={isSavingThisLine}
-                                title="Save this wording back to the drug library"
-                                aria-label="Save this dose line back to the drug library"
-                                style={{
-                                  flexShrink: 0,
-                                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                  width: 22, height: 22,
-                                  border: 'none', background: 'none', padding: 0,
-                                  borderRadius: 'var(--radius-md)',
-                                  color: savedLineId === line.id ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                                  cursor: isSavingThisLine ? 'default' : 'pointer',
-                                  opacity: isSavingThisLine ? 0.5 : 1,
-                                }}
-                              >
-                                <Library size={13} />
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeDoseLine(groupIdx, line.id)}
-                              title="Remove this line"
-                              aria-label="Remove this dose line"
-                              style={{
-                                flexShrink: 0,
-                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                                width: 22, height: 22,
-                                border: 'none', background: 'none', padding: 0,
-                                borderRadius: 'var(--radius-md)',
-                                color: 'var(--color-text-tertiary)',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <X size={13} />
-                            </button>
-                          </div>
-
-                          {/* Confirm prompt — shown for exactly one line at a
-                              time. Confirmed with the user (2026-08-05): this
-                              write touches the shared library, so it always
-                              asks first, unlike "Restore from library". */}
-                          {isConfirmingThisLine && (
-                            <div style={{
-                              display: 'flex', flexDirection: 'column', gap: 4,
-                              padding: '6px 8px',
-                              border: '1px solid var(--color-accent)',
-                              borderRadius: 'var(--radius-md)',
-                              backgroundColor: '#EFF6FF',
-                            }}>
-                              <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
-                                Save this wording to the drug library for everyone?
-                              </span>
-                              <div style={{ display: 'flex', gap: 8 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const target = confirmSaveLine
-                                    setConfirmSaveLine(null)
-                                    saveLineToLibrary(target.groupIdx, target.line)
-                                  }}
-                                  style={{
-                                    background: 'var(--color-accent)', color: '#fff',
-                                    border: 'none', borderRadius: 'var(--radius-md)',
-                                    padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                                    cursor: 'pointer', fontFamily: 'var(--font-body)',
-                                  }}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setConfirmSaveLine(null)}
-                                  style={{
-                                    background: 'none', color: 'var(--color-text-secondary)',
-                                    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-                                    padding: '3px 10px', fontSize: 11, fontWeight: 600,
-                                    cursor: 'pointer', fontFamily: 'var(--font-body)',
-                                  }}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {isSavingThisLine && (
-                            <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
-                          )}
-                          {savedLineId === line.id && (
-                            <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
-                          )}
-                          {lineSaveError?.lineId === line.id && (
-                            <span style={{ fontSize: 10, color: '#ef4444' }}>{lineSaveError.message}</span>
-                          )}
-                        </div>
+                        <EditableDoseLine
+                          key={line.id}
+                          line={line}
+                          onUpdateField={(field, value) => updateDoseLineField(groupIdx, line.id, field, value)}
+                          onRemove={() => removeDoseLine(groupIdx, line.id)}
+                          canSaveToLibrary={canSaveToLibrary}
+                          isConfirming={confirmSaveLine?.line.id === line.id}
+                          onRequestSave={() => setConfirmSaveLine({ groupIdx, line })}
+                          onConfirmSave={() => {
+                            const target = confirmSaveLine
+                            setConfirmSaveLine(null)
+                            saveLineToLibrary(target.groupIdx, target.line)
+                          }}
+                          onCancelConfirm={() => setConfirmSaveLine(null)}
+                          isSaving={savingLineId === line.id}
+                          isSaved={savedLineId === line.id}
+                          saveError={lineSaveError?.lineId === line.id ? lineSaveError.message : null}
+                        />
                       )
                     })}
+
+                    {/* Shared "max dose" note — one box for the whole group of
+                        lines (field-separation addendum, 2026-08-06), instead
+                        of being repeated inside every line's text. */}
+                    <input
+                      type="text"
+                      value={group.dose_max ?? ''}
+                      onChange={e => updateGroupDoseMax(groupIdx, e.target.value)}
+                      placeholder="Max dose (optional, shown once under all lines)"
+                      dir="auto"
+                      style={{
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '3px 8px',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: 'var(--radius-md)',
+                        fontSize: 12, fontWeight: 400, fontStyle: 'italic',
+                        fontFamily: 'var(--font-body)',
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text-tertiary)',
+                        outline: 'none',
+                      }}
+                    />
+
                     {firstOpt.formulation_id && (
                       <button
                         type="button"

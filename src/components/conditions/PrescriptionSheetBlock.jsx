@@ -4,7 +4,7 @@ import { useDrugs } from '../../hooks/useDrugs'
 import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
-import { toDrugOptions } from '../../constants/prescriptionRowSchema'
+import { toDrugOptions, doseLineInstructionText } from '../../constants/prescriptionRowSchema'
 import { getDrugModifierAndRouteSuffix, toTitleCase } from '../../utils/drugTitleFormat'
 
 // ─── Resolved-drug lookup (decision 23 fix, 2026-08-04) ───────────────────────
@@ -372,6 +372,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
     dose: group.dose,
     doseWho: group.dose_who ?? null,
     doseLines: group.dose_lines ?? [],
+    doseMax: group.dose_max ?? null,
     note: group.note,
     members: group.options.map(opt => ({
       data: opt,
@@ -508,7 +509,12 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
               {isLastMemberOfCluster && (
                 <div style={{ paddingInlineStart: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
                   {cluster.doseLines?.length > 0
-                    ? cluster.doseLines.map(line => <DoseLine key={line.id} text={line.text} />)
+                    ? <>
+                        {cluster.doseLines.map(line => (
+                          <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} />
+                        ))}
+                        {cluster.doseMax && <MaxDoseLine text={cluster.doseMax} />}
+                      </>
                     : cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </div>
@@ -672,15 +678,49 @@ function DrugMainLine({ name, concentration, form, modifierAbbrev, routeAbbrev, 
  */
 const ARABIC_RE_DOSE = /[\u0600-\u06FF\u0750-\u077F]/
 
-function DoseLine({ text }) {
+// FIELD-SEPARATION ADDENDUM (2026-08-06): optional 'title' prop — a
+// bracket's title (e.g. "5-7.9kg (3-6 months)"), rendered bolder than the
+// instruction text next to it, per the requested visual hierarchy (title
+// bold, instruction lighter). Omitted entirely for a hand-typed 'dose'
+// (no bracket, no title) — that case renders exactly as before.
+function DoseLine({ title, text }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   return (
     <div dir="auto" style={{ marginTop: 8, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+      {title && (
+        <span style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: 'var(--color-dose)',
+          lineHeight: 1.55,
+        }}>
+          {title}{': '}
+        </span>
+      )}
       <span style={{
         fontSize: 13,
-        fontWeight: 600,
+        fontWeight: title ? 500 : 600,
         color: 'var(--color-dose)',
         lineHeight: 1.55,
+      }}>
+        {text}
+      </span>
+    </div>
+  )
+}
+
+// FIELD-SEPARATION ADDENDUM (2026-08-06): the shared "max dose" note for a
+// cluster's dose_lines group, rendered once after every bracket line (never
+// repeated per line) and in red, per the requested styling.
+function MaxDoseLine({ text }) {
+  const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
+  return (
+    <div dir="auto" style={{ marginTop: 4, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+      <span style={{
+        fontSize: 12,
+        fontWeight: 600,
+        color: '#DC2626',
+        lineHeight: 1.5,
       }}>
         {text}
       </span>
@@ -817,4 +857,5 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
+
 
