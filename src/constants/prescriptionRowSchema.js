@@ -135,7 +135,7 @@ export const ROW_TYPES = {
  *                                              gap. Defaults to null; additive — existing rows have no
  *                                              main-drug per-drug note, so this is null on migration,
  *                                              same as AlternativeDrug.note was when it was introduced.
- * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
  *   - Added for the Practical Doses redesign (CMS_LIBRARY_PLAN.md decision
  *     25). Populated only when the admin picks a patient group with more
  *     than one dosing note from formulations.doses_structured — every
@@ -150,6 +150,17 @@ export const ROW_TYPES = {
  *     renders and 'dose' stays null — 'dose' keeps its existing role
  *     unchanged for hand-typed doses and any row saved before this field
  *     existed.
+ *   - FIELD-SEPARATION ADDENDUM (2026-08-06): a line's title and wording
+ *     are kept as two separate pieces, 'bracket_title' and 'instruction',
+ *     instead of one flattened sentence — this is what lets the CMS show/
+ *     edit them as two real fields and lets "save back to the library"
+ *     write each piece into the right spot without guessing how to split
+ *     combined text apart. 'text' is left null on every newly-built line;
+ *     it is populated only on legacy lines saved before this addendum,
+ *     which have 'instruction' as null. doseLineInstructionText() below
+ *     is the single place every reader (CMS, app, future refresh tool)
+ *     falls back from 'instruction' to legacy 'text', so this logic is
+ *     never duplicated.
  * @property {boolean} drug_link_enabled     - whether the brand/formulation name links through to
  *                                              its drug detail page in the app
  *
@@ -189,6 +200,13 @@ export const DRUG_ROW_TEMPLATE = {
   dose: null,
   dose_who: null,
   dose_lines: [],
+  // FIELD-SEPARATION ADDENDUM (2026-08-06): group-level "max dose" note,
+  // shown once under a group's dose_lines rather than repeated per line.
+  // Mirrors 'note' above (group-level, not per-line) — see dose_lines'
+  // own docstring for the matching bracket_title/instruction split, and
+  // doseLineInstructionText() below for how a line's display text is
+  // resolved.
+  dose_max: null,
   note: null,
   drug_note: null,
   source_flag: null,
@@ -229,13 +247,14 @@ export const DRUG_ROW_TEMPLATE = {
  *   - PHASE 3 (2026-06-20), new. Same rule as DrugRow.dose_who: the raw
  *     doses_structured 'who' key picked at add-time, display-only, not
  *     cleared by hand-editing 'dose' afterward.
- * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
  *   - Same rule as DrugRow.dose_lines: populated only via a multi-note
  *     population pick, empty array otherwise. Only ever set on an
  *     alternative that does NOT share the parent's formulation_id (see
  *     DrugRow.dose's docstring) — an alternative sharing its parent's
  *     formulation shares the parent's dose_lines too, same as it already
- *     shares 'dose'.
+ *     shares 'dose'. See DrugRow.dose_lines for the bracket_title/
+ *     instruction/text field-separation addendum (2026-08-06).
  * @property {string|null} note
  *   - PHASE A DOCSTRING FIX (2026-06-26): this comment previously said
  *     this field was "hidden/inherited from the parent's note" when
@@ -263,6 +282,13 @@ export const DRUG_ROW_TEMPLATE = {
  *     note. Null when this alternative shares the main group (the group
  *     note in that case is the row's own top-level 'note' field) or when
  *     the group simply has no note set.
+ * @property {string|null} group_dose_max
+ *   - FIELD-SEPARATION ADDENDUM (2026-08-06), new. The group-level "max
+ *     dose" note (mirrors 'group_note' exactly, same reasoning) for any
+ *     group other than the main drug's group. Null when this alternative
+ *     shares the main group (the group's max-dose in that case is the
+ *     row's own top-level 'dose_max' field) or when the group simply has
+ *     no max-dose note set.
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_name: null,
@@ -281,6 +307,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   source_flag: null,
   group_id: null,
   group_note: null,
+  group_dose_max: null,
 };
 
 /**
@@ -401,6 +428,28 @@ export function formatDoseRowText(doseRow) {
 }
 
 /**
+ * FIELD-SEPARATION ADDENDUM (2026-08-06): resolves the display text for
+ * one dose_lines entry, so every reader (CMS editor, app renderer, future
+ * bulk-refresh tool) falls back from the new split shape to legacy text
+ * the same way, in one place.
+ *
+ * A line built after this addendum has 'instruction' set (possibly to an
+ * empty string, if an admin deliberately cleared it) and 'text' left null.
+ * A legacy line saved before this addendum has 'instruction' as null and
+ * its whole wording sitting in 'text'. This checks 'instruction' with
+ * `!= null` (not truthiness) specifically so a deliberately-cleared
+ * instruction on a newly-split line doesn't fall through to a stale
+ * legacy 'text' value that should no longer be read.
+ *
+ * @param {{instruction?:string|null, text?:string|null}} line
+ * @returns {string}
+ */
+export function doseLineInstructionText(line) {
+  if (!line) return '';
+  return line.instruction != null ? line.instruction : (line.text ?? '');
+}
+
+/**
  * Determines whether an alternative should display/edit its own 'dose',
  * or defer to the parent drug row's single shared 'dose'.
  *
@@ -454,6 +503,11 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // If it was in its own group, use that group's note.
   const promotedNote = chosen.group_note ?? row.note ?? null;
 
+  // FIELD-SEPARATION ADDENDUM (2026-08-06): dose_max mirrors dose_lines/note
+  // above exactly — same "shared with parent" fallback, since it is a
+  // group-level field mirroring group_note's own promotion rule.
+  const promotedDoseMax = chosen.group_dose_max ?? row.dose_max ?? null;
+
   return {
     ...DRUG_ROW_TEMPLATE,
     id: row.id,
@@ -469,6 +523,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     dose: promotedDose,
     dose_who: promotedDoseWho,
     dose_lines: promotedDoseLines,
+    dose_max: promotedDoseMax,
     note: promotedNote,
     // Per-drug note (Decision 5 two-slot model) — travels with the option.
     drug_note: chosen.note ?? null,
@@ -584,8 +639,11 @@ export const DRUG_OPTION_TEMPLATE = {
  * @property {DrugOption[]} options   - display order within the group
  * @property {string|null} dose
  * @property {string|null} dose_who
- * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
  *   - Mirrors DrugRow.dose_lines — see that field's docstring.
+ * @property {string|null} dose_max
+ *   - FIELD-SEPARATION ADDENDUM (2026-08-06). Mirrors DrugRow.dose_max —
+ *     the group's shared "max dose" note, shown once under dose_lines.
  * @property {string|null} note
  */
 
@@ -652,6 +710,8 @@ export function toDrugOptions(row) {
     dose: row.dose,
     dose_who: row.dose_who,
     dose_lines: row.dose_lines ?? [],
+    // FIELD-SEPARATION ADDENDUM (2026-08-06): mirrors 'note' below exactly.
+    dose_max: row.dose_max ?? null,
     note: row.note,
   };
 
@@ -725,6 +785,10 @@ export function toDrugOptions(row) {
       dose: alt.dose,
       dose_who: alt.dose_who,
       dose_lines: alt.dose_lines ?? [],
+      // FIELD-SEPARATION ADDENDUM (2026-08-06): mirrors the 'note' fallback
+      // immediately below — same reasoning, group_dose_max is a group-level
+      // field exactly like group_note.
+      dose_max: alt.group_dose_max ?? null,
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
       // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
@@ -818,6 +882,10 @@ export function fromDrugOptions(row, groups) {
       // PHASE 2.8: persist the group-level note for non-main groups —
       // previously dropped entirely, since this field didn't exist.
       group_note: sharesMainGroup ? null : (grp.note ?? null),
+      // FIELD-SEPARATION ADDENDUM (2026-08-06): persist the group-level
+      // max-dose note for non-main groups — mirrors group_note immediately
+      // above exactly, same reasoning.
+      group_dose_max: sharesMainGroup ? null : (grp.dose_max ?? null),
     };
   });
 
@@ -836,6 +904,8 @@ export function fromDrugOptions(row, groups) {
     dose: mainGrp.dose,
     dose_who: mainGrp.dose_who,
     dose_lines: mainGrp.dose_lines ?? [],
+    // FIELD-SEPARATION ADDENDUM (2026-08-06): mirrors 'note' below exactly.
+    dose_max: mainGrp.dose_max ?? null,
     note: mainGrp.note,
     // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
     // note back onto drug_note (the group note above is a separate,
