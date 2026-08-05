@@ -182,7 +182,6 @@ import {
   DRUG_OPTION_TEMPLATE,
   SOURCE_FLAG_VALUE,
   doseWhoLabel,
-  formatDoseRowText,
   toDrugOptions,
   fromDrugOptions,
 } from '../../../../constants/prescriptionRowSchema'
@@ -311,13 +310,28 @@ function PopulationChooser({ populations, onChoose, onSkip }) {
 // "save this edit back to the library" action and bulk-refresh tool can
 // trace a line back to the exact library note it came from. A bracket with
 // no usable instruction is silently dropped, same as the old formatter did.
+// Combines a bracket's own label (e.g. "5-7.9kg (3-6 months)") with its
+// instruction and the population's max_dose into one line of text.
+// FIX (2026-08-05, caught in review): the first version of this function
+// used formatDoseRowText directly on the bracket, which only knows about
+// 'instruction'/'max_dose' — it silently dropped 'bracket' entirely, so a
+// multi-bracket population's lines had no way to tell which weight/age
+// range each one was for once the population chooser closed.
+function formatBracketLineText(bracket, maxDose) {
+  const instruction = bracket?.instruction?.trim()
+  if (!instruction) return null
+  const label = bracket?.bracket?.trim()
+  const body = label ? `${label}: ${instruction}` : instruction
+  return maxDose ? `${body} (max ${maxDose})` : body
+}
+
 function buildDoseLinesFromPopulation(population) {
   const brackets = Array.isArray(population?.brackets) ? population.brackets : []
   const dose_lines = brackets
     .map(bracket => ({
       id: `line-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       bracket_id: bracket.id ?? null,
-      text: formatDoseRowText({ instruction: bracket.instruction, max_dose: population.max_dose }),
+      text: formatBracketLineText(bracket, population.max_dose),
     }))
     .filter(line => line.text)
   return {
