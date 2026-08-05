@@ -371,6 +371,7 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
   return groups.map(group => ({
     dose: group.dose,
     doseWho: group.dose_who ?? null,
+    doseLines: group.dose_lines ?? [],
     note: group.note,
     members: group.options.map(opt => ({
       data: opt,
@@ -506,7 +507,9 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                   the drug name column rather than flush with the Rx/or rail. */}
               {isLastMemberOfCluster && (
                 <div style={{ paddingInlineStart: RX_RAIL_WIDTH + RX_RAIL_GAP }}>
-                  {cluster.dose && <DoseLine text={cluster.dose} />}
+                  {cluster.doseLines?.length > 0
+                    ? cluster.doseLines.map(line => <DoseLine key={line.id} text={line.text} />)
+                    : cluster.dose && <DoseLine text={cluster.dose} />}
                   {cluster.note && <RowNote note={cluster.note} />}
                 </div>
               )}
@@ -814,3 +817,4 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
+

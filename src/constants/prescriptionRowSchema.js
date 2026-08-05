@@ -135,6 +135,21 @@ export const ROW_TYPES = {
  *                                              gap. Defaults to null; additive — existing rows have no
  *                                              main-drug per-drug note, so this is null on migration,
  *                                              same as AlternativeDrug.note was when it was introduced.
+ * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ *   - Added for the Practical Doses redesign (CMS_LIBRARY_PLAN.md decision
+ *     25). Populated only when the admin picks a patient group with more
+ *     than one dosing note from formulations.doses_structured — every
+ *     note under that group lands here as its own independently
+ *     editable/removable line, instead of being flattened into 'dose'.
+ *     'bracket_id' traces a line back to the exact library note it came
+ *     from (null for a line with no such origin), reusing the permanent
+ *     id decision 7's addendum put on every doses_structured bracket —
+ *     this is what a future "save this edit back to the library" action
+ *     (step 3) and bulk-refresh tool will key off of. Defaults to an
+ *     empty array. When this array is non-empty, it is what actually
+ *     renders and 'dose' stays null — 'dose' keeps its existing role
+ *     unchanged for hand-typed doses and any row saved before this field
+ *     existed.
  * @property {boolean} drug_link_enabled     - whether the brand/formulation name links through to
  *                                              its drug detail page in the app
  *
@@ -173,6 +188,7 @@ export const DRUG_ROW_TEMPLATE = {
   category: null,
   dose: null,
   dose_who: null,
+  dose_lines: [],
   note: null,
   drug_note: null,
   source_flag: null,
@@ -213,6 +229,13 @@ export const DRUG_ROW_TEMPLATE = {
  *   - PHASE 3 (2026-06-20), new. Same rule as DrugRow.dose_who: the raw
  *     doses_structured 'who' key picked at add-time, display-only, not
  *     cleared by hand-editing 'dose' afterward.
+ * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ *   - Same rule as DrugRow.dose_lines: populated only via a multi-note
+ *     population pick, empty array otherwise. Only ever set on an
+ *     alternative that does NOT share the parent's formulation_id (see
+ *     DrugRow.dose's docstring) — an alternative sharing its parent's
+ *     formulation shares the parent's dose_lines too, same as it already
+ *     shares 'dose'.
  * @property {string|null} note
  *   - PHASE A DOCSTRING FIX (2026-06-26): this comment previously said
  *     this field was "hidden/inherited from the parent's note" when
@@ -253,6 +276,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   category: null,
   dose: null,
   dose_who: null,
+  dose_lines: [],
   note: null,
   source_flag: null,
   group_id: null,
@@ -344,6 +368,12 @@ export const DOSE_WHO_LABELS = {
  * Display label for a doses_structured 'who' key, falling back to the raw
  * value (capitalized as typed) if it isn't in the known map — same
  * fallback behavior as DoseTable.jsx's formatWho().
+ *
+ * Since the Practical Doses redesign (decision 25), dose_who set alongside
+ * dose_lines holds the free-text population label an admin typed in the
+ * Doses editor (e.g. "Toddler"), not one of the fixed keys below — those
+ * fall straight through the map to the raw-value fallback, which is
+ * already the correct display text.
  * @param {string|null} who
  * @returns {string}
  */
@@ -417,6 +447,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // dose so the promoted row does not silently lose it.
   const promotedDose    = chosen.dose    ?? row.dose    ?? null;
   const promotedDoseWho = chosen.dose_who ?? row.dose_who ?? null;
+  const promotedDoseLines = (chosen.dose_lines?.length ? chosen.dose_lines : row.dose_lines) ?? [];
 
   // group_note: if the chosen alternative was in the main group (group_note
   // null / same group_id as row.id), preserve the main group's note.
@@ -437,6 +468,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     category: chosen.category,
     dose: promotedDose,
     dose_who: promotedDoseWho,
+    dose_lines: promotedDoseLines,
     note: promotedNote,
     // Per-drug note (Decision 5 two-slot model) — travels with the option.
     drug_note: chosen.note ?? null,
@@ -552,6 +584,8 @@ export const DRUG_OPTION_TEMPLATE = {
  * @property {DrugOption[]} options   - display order within the group
  * @property {string|null} dose
  * @property {string|null} dose_who
+ * @property {Array<{id:string, bracket_id:string|null, text:string}>} dose_lines
+ *   - Mirrors DrugRow.dose_lines — see that field's docstring.
  * @property {string|null} note
  */
 
@@ -617,6 +651,7 @@ export function toDrugOptions(row) {
     options: [mainOption],
     dose: row.dose,
     dose_who: row.dose_who,
+    dose_lines: row.dose_lines ?? [],
     note: row.note,
   };
 
@@ -689,6 +724,7 @@ export function toDrugOptions(row) {
       options: [option],
       dose: alt.dose,
       dose_who: alt.dose_who,
+      dose_lines: alt.dose_lines ?? [],
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
       // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
@@ -772,6 +808,7 @@ export function fromDrugOptions(row, groups) {
       source_flag: opt.source_flag,
       dose: sharesMainGroup ? null : grp.dose,
       dose_who: sharesMainGroup ? null : grp.dose_who,
+      dose_lines: sharesMainGroup ? [] : (grp.dose_lines ?? []),
       // Per-drug note (Decision 5 two-slot model) — always opt.note, the
       // per-drug note travels with the option, not with the group.
       note: opt.note ?? null,
@@ -798,6 +835,7 @@ export function fromDrugOptions(row, groups) {
     category: mainOpt.category,
     dose: mainGrp.dose,
     dose_who: mainGrp.dose_who,
+    dose_lines: mainGrp.dose_lines ?? [],
     note: mainGrp.note,
     // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
     // note back onto drug_note (the group note above is a separate,
@@ -812,5 +850,6 @@ export function fromDrugOptions(row, groups) {
     alternatives,
   };
 }
+
 
 

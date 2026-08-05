@@ -241,9 +241,16 @@ function NotInLibraryTag() {
   )
 }
 
-// ─── Dose age-group chooser ────────────────────────────────────────────────────
+// ─── Dose population chooser ────────────────────────────────────────────────────
+// Rebuilt for the Practical Doses redesign (CMS_LIBRARY_PLAN.md decision 25,
+// plan §7 Practical Doses step 2): a formulation's doses_structured is now
+// { population, max_dose?, brackets: [{ id, bracket?, instruction, note? }] }[]
+// (decision 7's addendum) rather than a flat list of one-dose-per-row. Picking
+// a dose is a single-population pick, not a pick-one-sentence chooser — every
+// bracket under the chosen population becomes its own line on the row (see
+// buildDoseLinesFromPopulation below), not one flattened sentence.
 
-function DoseWhoChooser({ doseRows, onChoose, onSkip }) {
+function PopulationChooser({ populations, onChoose, onSkip }) {
   return (
     <div style={{
       border: '1.5px solid var(--color-accent)',
@@ -253,31 +260,34 @@ function DoseWhoChooser({ doseRows, onChoose, onSkip }) {
       display: 'flex', flexDirection: 'column', gap: 8,
     }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-        Which dose should pre-fill this row?
+        Which patient group is this dose for?
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {doseRows.map((doseRow, i) => (
-          <button
-            key={i}
-            type="button"
-            onClick={() => onChoose(doseRow)}
-            style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
-              padding: '7px 10px', textAlign: 'left',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-surface)', cursor: 'pointer',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }}>
-              {doseWhoLabel(doseRow.who ?? doseRow.group) || 'Dose'}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              {formatDoseRowText(doseRow)}
-            </span>
-          </button>
-        ))}
+        {populations.map((population, i) => {
+          const bracketCount = Array.isArray(population.brackets) ? population.brackets.length : 0
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onChoose(population)}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start',
+                padding: '7px 10px', textAlign: 'left',
+                border: '1px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-surface)', cursor: 'pointer',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)' }}>
+                {population.population?.trim() || 'Untitled'}
+              </span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                {bracketCount === 1 ? '1 dose line' : `${bracketCount} dose lines`}
+              </span>
+            </button>
+          )
+        })}
       </div>
       <button
         type="button"
@@ -296,14 +306,34 @@ function DoseWhoChooser({ doseRows, onChoose, onSkip }) {
   )
 }
 
-function resolveDosePick(dosesStructured) {
-  const rows = Array.isArray(dosesStructured) ? dosesStructured : []
-  if (rows.length === 0) return { needsChoice: false, dose: null, dose_who: null }
-  if (rows.length === 1) {
-    const only = rows[0]
-    return { needsChoice: false, dose: formatDoseRowText(only), dose_who: only.who ?? only.group ?? null }
+// Turns one chosen population's brackets into independent dose lines, each
+// carrying the permanent bracket id (decision 7's addendum) so a future
+// "save this edit back to the library" action and bulk-refresh tool can
+// trace a line back to the exact library note it came from. A bracket with
+// no usable instruction is silently dropped, same as the old formatter did.
+function buildDoseLinesFromPopulation(population) {
+  const brackets = Array.isArray(population?.brackets) ? population.brackets : []
+  const dose_lines = brackets
+    .map(bracket => ({
+      id: `line-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      bracket_id: bracket.id ?? null,
+      text: formatDoseRowText({ instruction: bracket.instruction, max_dose: population.max_dose }),
+    }))
+    .filter(line => line.text)
+  return {
+    dose: null,
+    dose_who: population?.population ?? null,
+    dose_lines,
   }
-  return { needsChoice: true, doseRows: rows }
+}
+
+function resolveDosePick(dosesStructured) {
+  const populations = Array.isArray(dosesStructured) ? dosesStructured : []
+  if (populations.length === 0) return { needsChoice: false, dose: null, dose_who: null, dose_lines: [] }
+  if (populations.length === 1) {
+    return { needsChoice: false, ...buildDoseLinesFromPopulation(populations[0]) }
+  }
+  return { needsChoice: true, populations }
 }
 
 // ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
@@ -554,8 +584,9 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
 //   onRemove      — () => void
 //   isOnly        — true when this is the only option across all groups (prevents
 //                   removing the last option, which would leave an empty row)
-//   onDoseReady   — (dose, dose_who) => void — called when a brand pick resolves
-//                   to a pre-filled dose, so the parent can write it to the group
+//   onDoseReady   — (doseFields: {dose, dose_who, dose_lines}) => void — called
+//                   when a brand pick resolves to a pre-filled dose, so the
+//                   parent can write it to the group in one go
 //   onMove        — (action: 'new-group'|'above'|'below') => void — PHASE 2.4
 //   canMoveToNew  — bool: show "Move to new group" option            — PHASE 2.4
 //   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
@@ -642,9 +673,9 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
     // Resolve dose — bubbled to parent so it can write to the group's dose field.
     const resolved = resolveDosePick(f?.doses_structured)
     if (resolved.needsChoice) {
-      setPendingDoseChoice({ doseRows: resolved.doseRows })
-    } else if (resolved.dose) {
-      onDoseReady?.(resolved.dose, resolved.dose_who)
+      setPendingDoseChoice({ populations: resolved.populations })
+    } else if (resolved.dose_lines.length || resolved.dose) {
+      onDoseReady?.(resolved)
     }
   }
 
@@ -719,13 +750,24 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           doses_structured: (() => {
             const dose = groupDose?.trim()
             if (!dose) return []
+            // Population-owns-brackets shape (decision 7's addendum, decision 25's
+            // target shape) — same shape every other doses_structured value in the
+            // library uses. A newly-promoted formulation with a bug-era flat
+            // {who, instruction} shape would silently fail to show up in the
+            // Practical Doses picker at all, since resolveDosePick only reads
+            // 'population'/'brackets' now.
+            const makeBracket = () => ({
+              id: `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              instruction: dose,
+            })
             if (promoteDoseWho === 'both') {
               return [
-                { who: 'adult', instruction: dose },
-                { who: 'child', instruction: dose },
+                { population: 'Adult', brackets: [makeBracket()] },
+                { population: 'Child', brackets: [makeBracket()] },
               ]
             }
-            return [{ who: promoteDoseWho, instruction: dose }]
+            const label = promoteDoseWho === 'adult' ? 'Adult' : promoteDoseWho === 'child' ? 'Child' : promoteDoseWho
+            return [{ population: label, brackets: [makeBracket()] }]
           })(),
         })
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
@@ -1001,12 +1043,14 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         </div>
       )}
 
-      {/* Inline dose age-group chooser — shown after a multi-dose brand pick */}
+      {/* Inline population chooser — shown after a brand pick whose formulation
+          has more than one patient group defined. Picking one inserts every
+          bracket under it as its own line (decision 25) — not one sentence. */}
       {pendingDoseChoice && (
-        <DoseWhoChooser
-          doseRows={pendingDoseChoice.doseRows}
-          onChoose={doseRow => {
-            onDoseReady?.(formatDoseRowText(doseRow), doseRow.who ?? doseRow.group ?? null)
+        <PopulationChooser
+          populations={pendingDoseChoice.populations}
+          onChoose={population => {
+            onDoseReady?.(buildDoseLinesFromPopulation(population))
             setPendingDoseChoice(null)
           }}
           onSkip={() => setPendingDoseChoice(null)}
@@ -1035,13 +1079,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // Group-scoped pending-choice state, separate from DrugOptionRow's own
   // pendingDoseChoice (which is per-option, used during a fresh brand
   // pick). This one lives here because it operates directly on
-  // group.dose/group.dose_who, not on any specific option's library link
-  // action. restoringGroupIdx tracks which group's restore is in flight
-  // (for a loading state); restorePendingChoice holds the dose rows when
-  // the formulation has 2+ and the admin needs to pick one, keyed by
-  // groupIdx so only the relevant group's chooser renders.
+  // group.dose/group.dose_who/group.dose_lines, not on any specific
+  // option's library link action. restoringGroupIdx tracks which group's
+  // restore is in flight (for a loading state); restorePendingChoice
+  // holds the populations when the formulation has 2+ and the admin
+  // needs to pick one, keyed by groupIdx so only the relevant group's
+  // chooser renders.
   const [restoringGroupIdx, setRestoringGroupIdx] = useState(null)
-  const [restorePendingChoice, setRestorePendingChoice] = useState(null) // { groupIdx, doseRows } | null
+  const [restorePendingChoice, setRestorePendingChoice] = useState(null) // { groupIdx, populations } | null
 
   // ── Mutation helpers ───────────────────────────────────────────────────
 
@@ -1076,18 +1121,45 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     emitGroups(nextGroups)
   }
 
-  // Write a pre-filled dose (bubbled up from DrugOptionRow's brand pick) to a group.
-  function applyDoseToGroup(groupIdx, dose, dose_who) {
+  // Write a pre-filled dose (bubbled up from DrugOptionRow's brand pick, or
+  // from a population pick) to a group. Takes the whole { dose, dose_who,
+  // dose_lines } object so a multi-line pick and a single-sentence pick go
+  // through the same path without the caller juggling separate args.
+  function applyDoseToGroup(groupIdx, doseFields) {
     const nextGroups = groups.map((g, gi) =>
-      gi === groupIdx ? { ...g, dose: dose ?? null, dose_who: dose_who ?? null } : g
+      gi === groupIdx
+        ? { ...g, dose: doseFields.dose ?? null, dose_who: doseFields.dose_who ?? null, dose_lines: doseFields.dose_lines ?? [] }
+        : g
     )
     emitGroups(nextGroups)
   }
 
-  // Update the shared dose field for a group (direct text edit).
+  // Update the shared dose field for a group (direct text edit). Only used
+  // for the single freeform dose box — a group already showing dose_lines
+  // doesn't render this input at all (see the group render below).
   function updateGroupDose(groupIdx, value) {
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx ? { ...g, dose: value || null } : g
+    )
+    emitGroups(nextGroups)
+  }
+
+  // Edit or remove one independently-editable dose line (decision 25) —
+  // never touches any other line in the group, and never touches 'dose'.
+  function updateDoseLine(groupIdx, lineId, text) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx
+        ? { ...g, dose_lines: (g.dose_lines ?? []).map(l => l.id === lineId ? { ...l, text } : l) }
+        : g
+    )
+    emitGroups(nextGroups)
+  }
+
+  function removeDoseLine(groupIdx, lineId) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx
+        ? { ...g, dose_lines: (g.dose_lines ?? []).filter(l => l.id !== lineId) }
+        : g
     )
     emitGroups(nextGroups)
   }
@@ -1118,14 +1190,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   //
   // Behavior mirrors the existing fresh-pick flow exactly
   // (handleBrandPick / resolveDosePick in DrugOptionRow):
-  //   0 dose rows  -> nothing to restore; defensive no-op (button
-  //                   shouldn't be visible in this state to begin with).
-  //   1 dose row   -> applied immediately, no extra confirmation.
-  //   2+ dose rows -> surfaces the same DoseWhoChooser UI used for a
-  //                   fresh multi-dose pick, so the admin re-picks which
-  //                   age-group dose to restore.
-  // Only ever touches group.dose / group.dose_who — never the group
-  // note, never any option's identity fields.
+  //   0 populations  -> nothing to restore; defensive no-op (button
+  //                     shouldn't be visible in this state to begin with).
+  //   1 population   -> applied immediately, no extra confirmation.
+  //   2+ populations -> surfaces the same PopulationChooser UI used for a
+  //                     fresh multi-population pick, so the admin re-picks
+  //                     which patient group to restore.
+  // Only ever touches group.dose / group.dose_who / group.dose_lines —
+  // never the group note, never any option's identity fields.
   async function restoreDoseFromLibrary(groupIdx) {
     const group = groups[groupIdx]
     const formulationId = group.options[0]?.formulation_id
@@ -1138,12 +1210,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
       const resolved = resolveDosePick(data.doses_structured)
       if (resolved.needsChoice) {
-        setRestorePendingChoice({ groupIdx, doseRows: resolved.doseRows })
-      } else if (resolved.dose) {
-        applyDoseToGroup(groupIdx, resolved.dose, resolved.dose_who)
+        setRestorePendingChoice({ groupIdx, populations: resolved.populations })
+      } else if (resolved.dose_lines.length || resolved.dose) {
+        applyDoseToGroup(groupIdx, resolved)
       }
-      // resolved.dose === null (formulation has zero dose rows) -> no-op,
-      // nothing to restore to; existing group.dose is left exactly as-is.
+      // no populations at all -> no-op, nothing to restore to; existing
+      // group.dose/dose_lines are left exactly as-is.
     } finally {
       setRestoringGroupIdx(null)
     }
@@ -1246,10 +1318,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // formulation_id matches that group's first option — same logic as
   // toDrugOptions() default-join. If no match, a new group is created.
 
-  // pendingDose — optional { dose, dose_who, needsChoice, doseRows } from resolveDosePick.
-  // When provided, the dose is written into the target group in the same emit so the
-  // "Add option: pick a brand/formulation" buttons pre-fill dose identically to picking
-  // a drug inside an existing DrugOptionRow via DrugSearchField (bug fix 2026-06-26).
+  // pendingDose — optional { dose, dose_who, dose_lines, needsChoice, populations } from
+  // resolveDosePick. When provided, the dose is written into the target group in the
+  // same emit so the "Add option: pick a brand/formulation" buttons pre-fill dose
+  // identically to picking a drug inside an existing DrugOptionRow via DrugSearchField
+  // (bug fix 2026-06-26).
   function addOptionToGroups(newOption, pendingDose) {
     const matchGroupIdx = groups.findIndex(g => {
       const firstOpt = g.options[0]
@@ -1260,6 +1333,9 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       )
     })
 
+    const hasResolvedDose = pendingDose && !pendingDose.needsChoice &&
+      (pendingDose.dose_lines?.length || pendingDose.dose)
+
     let nextGroups
     let targetGroupIdx
     if (matchGroupIdx >= 0) {
@@ -1267,8 +1343,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       const joined = { ...newOption, group_id: groups[matchGroupIdx].group_id }
       nextGroups = groups.map((g, gi) => {
         if (gi !== matchGroupIdx) return g
-        const doseFields = pendingDose && !pendingDose.needsChoice && pendingDose.dose
-          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null }
+        const doseFields = hasResolvedDose
+          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [] }
           : {}
         return { ...g, ...doseFields, options: [...g.options, joined] }
       })
@@ -1276,18 +1352,18 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       targetGroupIdx = groups.length
       const newGroupId = `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const standalone = { ...newOption, group_id: newGroupId }
-      const doseFields = pendingDose && !pendingDose.needsChoice && pendingDose.dose
-        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null }
-        : { dose: null, dose_who: null }
+      const doseFields = hasResolvedDose
+        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [] }
+        : { dose: null, dose_who: null, dose_lines: [] }
       nextGroups = [...groups, { group_id: newGroupId, options: [standalone], ...doseFields, note: null }]
     }
     emitGroups(nextGroups)
 
-    // Multi-dose chooser case: option is already added (dose null); surface the
-    // DoseWhoChooser on the target group using the same restorePendingChoice
+    // Multi-population case: option is already added (dose null); surface the
+    // PopulationChooser on the target group using the same restorePendingChoice
     // mechanism the restore-from-library button uses (reuses existing UI).
     if (pendingDose?.needsChoice) {
-      setRestorePendingChoice({ groupIdx: targetGroupIdx, doseRows: pendingDose.doseRows })
+      setRestorePendingChoice({ groupIdx: targetGroupIdx, populations: pendingDose.populations })
     }
   }
 
@@ -1371,7 +1447,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               onUpdate={nextOpt => updateOption(groupIdx, option.id, nextOpt)}
               onRemove={() => removeOption(groupIdx, option.id)}
               isOnly={totalOptions === 1}
-              onDoseReady={(dose, dose_who) => applyDoseToGroup(groupIdx, dose, dose_who)}
+              onDoseReady={doseFields => applyDoseToGroup(groupIdx, doseFields)}
               onMove={action => {
                 if (action === 'new-group') moveToNewGroup(groupIdx, option.id)
                 else if (action === 'above') moveToGroupAbove(groupIdx, option.id)
@@ -1442,61 +1518,125 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     above, which also covers brand/generic-only links that have
                     no formulation_id and therefore no doses_structured to
                     restore from at all). */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="text"
-                    value={group.dose ?? ''}
-                    onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                    placeholder="Dose / instructions"
-                    dir="auto"
-                    style={{
-                      flex: 1,
-                      width: '100%', boxSizing: 'border-box',
-                      padding: '3px 8px',
-                      paddingLeft: 19,
-                      border: '1px solid var(--color-border)',
-                      borderRadius: 'var(--radius-md)',
-                      fontSize: 12, fontWeight: 400,
-                      fontFamily: 'var(--font-body)',
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text-secondary)',
-                      outline: 'none',
-                    }}
-                  />
-                  {firstOpt.formulation_id && (
-                    <button
-                      type="button"
-                      onClick={() => restoreDoseFromLibrary(groupIdx)}
-                      disabled={restoringGroupIdx === groupIdx}
-                      title="Restore dose from library"
-                      aria-label="Restore dose from library"
+                {group.dose_lines?.length > 0 ? (
+                  // Population pick (decision 25): one independently editable/
+                  // removable row per bracket, instead of a single input.
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
+                    {group.dose_lines.map(line => (
+                      <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <input
+                          type="text"
+                          value={line.text ?? ''}
+                          onChange={e => updateDoseLine(groupIdx, line.id, e.target.value)}
+                          dir="auto"
+                          style={{
+                            flex: 1,
+                            width: '100%', boxSizing: 'border-box',
+                            padding: '3px 8px',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: 'var(--radius-md)',
+                            fontSize: 12, fontWeight: 400,
+                            fontFamily: 'var(--font-body)',
+                            backgroundColor: 'var(--color-surface)',
+                            color: 'var(--color-text-secondary)',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeDoseLine(groupIdx, line.id)}
+                          title="Remove this line"
+                          aria-label="Remove this dose line"
+                          style={{
+                            flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22,
+                            border: 'none', background: 'none', padding: 0,
+                            borderRadius: 'var(--radius-md)',
+                            color: 'var(--color-text-tertiary)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                    {firstOpt.formulation_id && (
+                      <button
+                        type="button"
+                        onClick={() => restoreDoseFromLibrary(groupIdx)}
+                        disabled={restoringGroupIdx === groupIdx}
+                        style={{
+                          alignSelf: 'flex-start',
+                          background: 'none', border: 'none', padding: 0,
+                          fontSize: 11, color: 'var(--color-text-tertiary)',
+                          textDecoration: 'underline',
+                          cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
+                          opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                          fontFamily: 'var(--font-body)',
+                        }}
+                      >
+                        Restore from library
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <input
+                      type="text"
+                      value={group.dose ?? ''}
+                      onChange={e => updateGroupDose(groupIdx, e.target.value)}
+                      placeholder="Dose / instructions"
+                      dir="auto"
                       style={{
-                        flexShrink: 0,
-                        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                        width: 22, height: 22,
-                        border: 'none', background: 'none', padding: 0,
+                        flex: 1,
+                        width: '100%', boxSizing: 'border-box',
+                        padding: '3px 8px',
+                        paddingLeft: 19,
+                        border: '1px solid var(--color-border)',
                         borderRadius: 'var(--radius-md)',
-                        color: 'var(--color-text-tertiary)',
-                        cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
-                        opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                        fontSize: 12, fontWeight: 400,
+                        fontFamily: 'var(--font-body)',
+                        backgroundColor: 'var(--color-surface)',
+                        color: 'var(--color-text-secondary)',
+                        outline: 'none',
                       }}
-                    >
-                      <RotateCcw size={13} />
-                    </button>
-                  )}
-                </div>
+                    />
+                    {firstOpt.formulation_id && (
+                      <button
+                        type="button"
+                        onClick={() => restoreDoseFromLibrary(groupIdx)}
+                        disabled={restoringGroupIdx === groupIdx}
+                        title="Restore dose from library"
+                        aria-label="Restore dose from library"
+                        style={{
+                          flexShrink: 0,
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 22, height: 22,
+                          border: 'none', background: 'none', padding: 0,
+                          borderRadius: 'var(--radius-md)',
+                          color: 'var(--color-text-tertiary)',
+                          cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
+                          opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                        }}
+                      >
+                        <RotateCcw size={13} />
+                      </button>
+                    )}
+                  </div>
+                )}
 
-                {/* RESTORE-DOSE FEATURE (2026-06-26): multi-dose chooser,
-                    only rendered for the group currently being restored. */}
+                {/* RESTORE-DOSE FEATURE (2026-06-26): population chooser,
+                    only rendered for the group currently being restored.
+                    Picking a population replaces this group's dose_lines
+                    wholesale (or 'dose' if that population has one bracket
+                    and collapses to a single line) with its current library
+                    content — same immediate-apply behavior as before. */}
                 {restorePendingChoice?.groupIdx === groupIdx && (
-                  <DoseWhoChooser
-                    doseRows={restorePendingChoice.doseRows}
-                    onChoose={(doseRow) => {
-                      applyDoseToGroup(
-                        groupIdx,
-                        formatDoseRowText(doseRow),
-                        doseRow.who ?? doseRow.group ?? null
-                      )
+                  <PopulationChooser
+                    populations={restorePendingChoice.populations}
+                    onChoose={(population) => {
+                      applyDoseToGroup(groupIdx, buildDoseLinesFromPopulation(population))
                       setRestorePendingChoice(null)
                     }}
                     onSkip={() => setRestorePendingChoice(null)}
