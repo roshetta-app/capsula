@@ -376,7 +376,7 @@ export default function DrugCMS() {
                 isLast={idx === brands.length - 1}
                 highlight={query}
                 searchMode="brand"
-                onTap={() => navigate(`/admin/drugs/generic/${b.genericId}`)}
+                onTap={() => navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`)}
                 trailing={
                   <div style={{
                     display: 'flex', gap: 'var(--space-1)', alignItems: 'center',
@@ -397,7 +397,7 @@ export default function DrugCMS() {
                       {b.isPublished ? '● Live' : '○ Draft'}
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}`) }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/admin/drugs/generic/${b.genericId}?formulation=${b.formulationId}&brand=${b.id}`) }}
                       aria-label="Edit"
                       title="Edit generic, formulations & brands"
                       style={iconBtnStyle}

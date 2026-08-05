@@ -33,8 +33,8 @@
  * than kept alongside).
  */
 
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useDrugContext } from '../../context/DrugContext'
@@ -102,6 +102,18 @@ export default function DrugEditor() {
   const [addingForm,    setAddingForm]    = useState(false)
   const [formFilter,    setFormFilter]    = useState(null)  // active form-chip filter, or null for all
 
+  // ── Deep link (12.4/12.5) — a brand row on the CMS drug library screen
+  // links here with ?formulation=<id>&brand=<id> so this page can land
+  // already opened to the right strength/form and scrolled to the right
+  // brand, instead of everything collapsed. Read once; not kept in sync
+  // with later navigation on this same page.
+  const [searchParams]       = useSearchParams()
+  const targetFormulationId  = searchParams.get('formulation')
+  const targetBrandId        = searchParams.get('brand')
+  const formSectionRefs      = useRef({})       // formulationId -> DOM node, for scrollIntoView
+  const deepLinkOpenedRef    = useRef(false)    // has the target formulation been auto-opened yet
+  const deepLinkScrolledRef  = useRef(false)    // has the page already scrolled to it
+
   // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
@@ -152,6 +164,34 @@ export default function DrugEditor() {
   }, [genericId])
 
   useEffect(() => { load() }, [load])
+
+  // ── Deep link — auto-open the target formulation (12.4) ──────────────────────
+  // Runs once: fires as soon as the target formulation id shows up in the
+  // loaded list, then never again, so a user manually collapsing it later
+  // isn't fought by this effect.
+  useEffect(() => {
+    if (deepLinkOpenedRef.current) return
+    if (!targetFormulationId || loading) return
+    if (formulations.some(f => f.id === targetFormulationId)) {
+      setOpenFormId(targetFormulationId)
+      deepLinkOpenedRef.current = true
+    }
+  }, [targetFormulationId, loading, formulations])
+
+  // ── Deep link — scroll to the opened formulation (12.4) ───────────────────────
+  // Waits a beat after the section opens so its body (formulation fields +
+  // brand list) has actually expanded before scrolling, then scrolls once.
+  useEffect(() => {
+    if (deepLinkScrolledRef.current) return
+    if (!targetFormulationId || openFormId !== targetFormulationId) return
+    const el = formSectionRefs.current[targetFormulationId]
+    if (!el) return
+    const t = setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      deepLinkScrolledRef.current = true
+    }, 60)
+    return () => clearTimeout(t)
+  }, [openFormId, targetFormulationId])
 
   // ── Save generic ────────────────────────────────────────────────────────────
   async function saveGeneric() {
@@ -440,85 +480,87 @@ export default function DrugEditor() {
           const formValid = f.form && f.route
 
           return (
-            <SectionCard
-              key={f.id}
-              title={[f.concentration, f.form].filter(Boolean).join(' · ')}
-              badge={f.is_published ? 'Live' : 'Draft'}
-              badgeLive={f.is_published}
-              open={isOpen}
-              onToggle={() => setOpenFormId(isOpen ? null : f.id)}
-              deleteSlot={
-                <button
-                  onClick={e => { e.stopPropagation(); setConfirmDel(f) }}
-                  title="Delete formulation"
-                  style={iconDangerBtnStyle}
-                >
-                  <Trash2 size={13} />
-                </button>
-              }
-              saveSlot={
-                <SaveRow
-                  onSave={() => saveFormulation(f)}
-                  saving={isSaving}
-                  saved={isSaved}
-                  valid={formValid}
-                />
-              }
-            >
-              {/* Formulation fields */}
-              <FormulationEditor
-                formulation={{
-                  concentration:        f.concentration,
-                  form:                 f.form,
-                  route:                f.route,
-                  doses:                f.doses,
-                  default_dose_override: f.default_dose_override,
-                  is_published:         f.is_published,
-                  strength_value:       f.strength_value,
-                  strength_unit:        f.strength_unit,
-                  strength_basis:       f.strength_basis,
-                  strength_structured:  f.strength_structured,
-                  form_modifier:        f.form_modifier,
-                  device_type:          f.device_type,
-                  route_details:        f.route_details,
-                  formulation_note:     f.formulation_note,
-                }}
-                ingredients={generic?.ingredients ?? []}
-                onChange={patch => patchFormulation(f.id, patch)}
-                disabled={isSaving}
-              />
-
-              {/* Brand divider */}
-              <div style={{
-                margin: 'var(--space-5) 0 var(--space-4)',
-                borderTop: '1px solid var(--color-border)',
-                paddingTop: 'var(--space-4)',
-              }}>
-                <div style={{
-                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
-                  letterSpacing: '0.08em', color: 'var(--color-text-tertiary)',
-                  marginBottom: 'var(--space-3)',
-                }}>
-                  Brands ({visibleBrands.length})
-                </div>
-                <BrandEditor
-                  brands={visibleBrands}
+            <div key={f.id} ref={el => { formSectionRefs.current[f.id] = el }}>
+              <SectionCard
+                title={[f.concentration, f.form].filter(Boolean).join(' · ')}
+                badge={f.is_published ? 'Live' : 'Draft'}
+                badgeLive={f.is_published}
+                open={isOpen}
+                onToggle={() => setOpenFormId(isOpen ? null : f.id)}
+                deleteSlot={
+                  <button
+                    onClick={e => { e.stopPropagation(); setConfirmDel(f) }}
+                    title="Delete formulation"
+                    style={iconDangerBtnStyle}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                }
+                saveSlot={
+                  <SaveRow
+                    onSave={() => saveFormulation(f)}
+                    saving={isSaving}
+                    saved={isSaved}
+                    valid={formValid}
+                  />
+                }
+              >
+                {/* Formulation fields */}
+                <FormulationEditor
                   formulation={{
-                    concentration: f.concentration,
-                    form:          f.form,
-                    form_modifier: f.form_modifier,
-                    route:         f.route,
-                    route_details: f.route_details,
+                    concentration:        f.concentration,
+                    form:                 f.form,
+                    route:                f.route,
+                    doses:                f.doses,
+                    default_dose_override: f.default_dose_override,
+                    is_published:         f.is_published,
+                    strength_value:       f.strength_value,
+                    strength_unit:        f.strength_unit,
+                    strength_basis:       f.strength_basis,
+                    strength_structured:  f.strength_structured,
+                    form_modifier:        f.form_modifier,
+                    device_type:          f.device_type,
+                    route_details:        f.route_details,
+                    formulation_note:     f.formulation_note,
                   }}
-                  onChange={updated => patchBrands(f.id, [
-                    ...updated,
-                    ...f.brands.filter(b => b._deleted),
-                  ])}
-                  onDelete={brandId => markBrandDeleted(f.id, brandId)}
+                  ingredients={generic?.ingredients ?? []}
+                  onChange={patch => patchFormulation(f.id, patch)}
                   disabled={isSaving}
                 />
-              </div>
-            </SectionCard>
+
+                {/* Brand divider */}
+                <div style={{
+                  margin: 'var(--space-5) 0 var(--space-4)',
+                  borderTop: '1px solid var(--color-border)',
+                  paddingTop: 'var(--space-4)',
+                }}>
+                  <div style={{
+                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                    letterSpacing: '0.08em', color: 'var(--color-text-tertiary)',
+                    marginBottom: 'var(--space-3)',
+                  }}>
+                    Brands ({visibleBrands.length})
+                  </div>
+                  <BrandEditor
+                    brands={visibleBrands}
+                    formulation={{
+                      concentration: f.concentration,
+                      form:          f.form,
+                      form_modifier: f.form_modifier,
+                      route:         f.route,
+                      route_details: f.route_details,
+                    }}
+                    onChange={updated => patchBrands(f.id, [
+                      ...updated,
+                      ...f.brands.filter(b => b._deleted),
+                    ])}
+                    onDelete={brandId => markBrandDeleted(f.id, brandId)}
+                    disabled={isSaving}
+                    highlightBrandId={f.id === targetFormulationId ? targetBrandId : null}
+                  />
+                </div>
+              </SectionCard>
+            </div>
           )
         })}
 

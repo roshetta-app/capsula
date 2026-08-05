@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Trash2, ChevronRight, ChevronDown } from 'lucide-react'
 import { updateBrand } from '../../lib/adminQueries'
 import { useToast } from '../../context/ToastContext'
@@ -24,6 +24,12 @@ import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
  * app read, no DB column. Name field is `brands.tradename_clean`, not the
  * legacy `brands.name` (decision 21's fix for this file specifically).
  *
+ * 12.4/12.5 — accepts an optional `highlightBrandId`, the deep-link target
+ * from a brand row on the CMS drug library screen. The matching row starts
+ * expanded and scrolls into view once on mount; every row also carries a
+ * `data-brand-id` anchor so a future highlight/scroll target survives
+ * whichever redesign of this file lands next (decision 27 #6).
+ *
  * Props:
  *   brands       { id?, tradename_clean, manufacturer, pack_size?, fill_volume?, is_published }[]
  *   formulation  { concentration, form, form_modifier, route, route_details }
@@ -33,6 +39,7 @@ import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
  *   onChange     (brands) => void
  *   onDelete     (brandId) => void   — called for existing brands being removed
  *   disabled     boolean
+ *   highlightBrandId  string|null — deep-link target brand id (12.4/12.5)
  */
 
 export default function BrandEditor({
@@ -41,13 +48,30 @@ export default function BrandEditor({
   onChange,
   onDelete,
   disabled = false,
+  highlightBrandId = null,
 }) {
   const { toast } = useToast()
 
   const [newName,     setNewName]     = useState('')
   const [newMfr,       setNewMfr]     = useState('')
   const [toggling,    setToggling]    = useState(null) // brandId being toggled
-  const [expandedIdx, setExpandedIdx] = useState(null) // which row is expanded
+  // Starts expanded on the deep-linked brand, if any, so a click from the
+  // CMS drug library screen lands already open on the right row.
+  const [expandedIdx, setExpandedIdx] = useState(() =>
+    highlightBrandId != null ? brands.findIndex(b => b.id === highlightBrandId) : null
+  )
+
+  const highlightRef = useRef(null)
+
+  // Scroll the deep-linked row into view once, after it renders expanded.
+  useEffect(() => {
+    if (!highlightBrandId || !highlightRef.current) return
+    const t = setTimeout(() => {
+      highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 80)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function updateLocal(idx, field, value) {
     onChange(brands.map((b, i) => i === idx ? { ...b, [field]: value } : b))
@@ -128,9 +152,12 @@ export default function BrandEditor({
       {/* Existing brand rows */}
       {brands.map((brand, idx) => {
         const isOpen = expandedIdx === idx
+        const isHighlighted = brand.id != null && brand.id === highlightBrandId
         return (
           <div
             key={brand.id ?? `new-${idx}`}
+            data-brand-id={brand.id ?? undefined}
+            ref={isHighlighted ? highlightRef : null}
             onClick={() => !disabled && setExpandedIdx(isOpen ? null : idx)}
             style={{
               backgroundColor: (brand.is_published ?? true) ? 'var(--color-surface)' : 'var(--color-bg)',
@@ -142,6 +169,8 @@ export default function BrandEditor({
               gap: 'var(--space-2)',
               opacity: (brand.is_published ?? true) ? 1 : 0.65,
               cursor: disabled ? 'default' : 'pointer',
+              outline: isHighlighted ? '2px solid var(--color-accent)' : 'none',
+              outlineOffset: 2,
             }}
           >
             {/* Collapsed summary line — always shown */}
