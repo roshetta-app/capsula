@@ -716,6 +716,18 @@ function MaxDoseLine({ text }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
   return (
     <div dir="auto" style={{ marginTop: 4, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
+      {/* BUG FIX (2026-08-06): previously printed the raw max-dose text with
+          no label at all — reads ambiguously next to the dose lines above
+          it. Adds a bold "Max dose:" prefix, same weight/color treatment
+          DoseLine already uses for a bracket's title. */}
+      <span style={{
+        fontSize: 12,
+        fontWeight: 700,
+        color: '#DC2626',
+        lineHeight: 1.5,
+      }}>
+        Max dose{': '}
+      </span>
       <span style={{
         fontSize: 12,
         fontWeight: 600,

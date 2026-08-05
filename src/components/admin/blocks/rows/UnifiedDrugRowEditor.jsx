@@ -1669,8 +1669,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       const joined = { ...newOption, group_id: groups[matchGroupIdx].group_id }
       nextGroups = groups.map((g, gi) => {
         if (gi !== matchGroupIdx) return g
+        // BUG FIX (2026-08-06): dose_max was missing from this hand-built
+        // dose object, so a fresh "Add option: pick a brand/formulation"
+        // pick dropped the library's max-dose note entirely, even though
+        // restoreDoseFromLibrary (which goes through applyDoseToGroup)
+        // carried it correctly. Mirrors dose/dose_who/dose_lines exactly.
         const doseFields = hasResolvedDose
-          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [] }
+          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null }
           : {}
         return { ...g, ...doseFields, options: [...g.options, joined] }
       })
@@ -1678,9 +1683,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       targetGroupIdx = groups.length
       const newGroupId = `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const standalone = { ...newOption, group_id: newGroupId }
+      // BUG FIX (2026-08-06): same dose_max omission as the matched-group
+      // branch above — see that comment.
       const doseFields = hasResolvedDose
-        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [] }
-        : { dose: null, dose_who: null, dose_lines: [] }
+        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null }
+        : { dose: null, dose_who: null, dose_lines: [], dose_max: null }
       nextGroups = [...groups, { group_id: newGroupId, options: [standalone], ...doseFields, note: null }]
     }
     emitGroups(nextGroups)
