@@ -59,6 +59,38 @@ createRoot(document.getElementById('root')).render(
 // Guard: a single reloading flag prevents controllerchange and the RELOAD
 // message from both firing a navigation in the same update cycle.
 //
+// DOUBLE-RELOAD FIX (2026-08-06): that in-memory `reloading` flag only
+// guards against both triggers firing on the SAME page load. In practice,
+// controllerchange fires almost immediately when the new SW takes control
+// and reloads the page right away — but sw.js's activate handler also
+// sends its own RELOAD message 4 s later, on purpose, as a backup for the
+// idle-tab race described below. Once hardReload() navigates, this whole
+// JS module is torn down and a brand new instance of it runs on the
+// freshly-reloaded page, with its own fresh `reloading = false`. When that
+// 4 s-delayed backup message then arrives, it lands on this brand-new
+// instance, which has no memory of the reload that already just
+// happened — so it dutifully reloads again, producing the visible
+// double-refresh.
+// A plain variable can't survive the navigation to catch this, but
+// sessionStorage does (same tab, same origin) — same reasoning already
+// used above for capsula_boot_retry_count. recentlyReloaded() below
+// remembers, across the reload, "we already handled an update very
+// recently" for a short window comfortably covering that 4 s backup
+// delay, so the backup message becomes a safe no-op instead of a second
+// navigation — without removing the backup itself, which still exists to
+// catch the idle-tab case it was added for (see the fix below).
+const RELOAD_GUARD_KEY = 'capsula_sw_reload_at'
+const RELOAD_GUARD_WINDOW_MS = 8000 // comfortably covers sw.js's 4 s backup delay
+
+function recentlyReloaded() {
+  try {
+    const at = Number(sessionStorage.getItem(RELOAD_GUARD_KEY))
+    return Boolean(at) && (Date.now() - at) < RELOAD_GUARD_WINDOW_MS
+  } catch (e) {
+    return false // sessionStorage unavailable — fail open, same as elsewhere in this file
+  }
+}
+//
 // Fix (blank-screen-until-tab-reopened bug):
 //   The controllerchange/message listeners used to be attached inside
 //   register().then(...), i.e. only after the registration promise resolved.
@@ -88,8 +120,9 @@ if ('serviceWorker' in navigator) {
   let reloading = false
 
   function hardReload(reason) {
-    if (reloading) return
+    if (reloading || recentlyReloaded()) return
     reloading = true
+    try { sessionStorage.setItem(RELOAD_GUARD_KEY, String(Date.now())) } catch (e) { /* sessionStorage unavailable — the in-memory `reloading` flag above still covers same-load double-fires */ }
     console.log('[SW] ' + reason + ' — navigating for fresh build')
     // Cache-busting: unique URL forces browser past HTTP cache for index.html.
     // Built from the CURRENT location (not a hardcoded root path) so a
