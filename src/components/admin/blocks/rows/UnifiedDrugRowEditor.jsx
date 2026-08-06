@@ -551,6 +551,105 @@ const lineIconButtonStyle = {
   cursor: 'pointer',
 }
 
+// ─── EditableMaxDose ────────────────────────────────────────────────────────
+// FIELD-SEPARATION ADDENDUM (2026-08-06): the group's shared "max dose" note
+// gets the same read-only-by-default + edit-toggle treatment as each
+// EditableDoseLine above — clean text by default, pencil opens it into a
+// real input, checkmark closes it back to read-only. Mirrors
+// EditableDoseLine's edit/remove buttons exactly (same icons, same
+// lineIconButtonStyle/editLineInputStyle).
+//
+// No "save back to library" button here — open question, not yet answered.
+// Each dose bracket line can trace back to its exact library bracket
+// because every bracket carries a permanent 'id' (decision 25's addendum).
+// A population's max_dose has no equivalent id — only brackets got one —
+// so there is no safe, stable key to match a group's dose_max back to the
+// right library population. Matching by population name (dose_who) would
+// work only until the population is renamed in the library, and this
+// project has already been burned once by guessing a matching-key choice
+// instead of confirming it. Needs a decision before building the save
+// action for this field.
+//
+// Empty state: no value and not currently editing shows a "+ Max dose"
+// trigger instead of an empty box, matching the existing "+ note" /
+// "+ group note" convention used elsewhere in this same editor
+// (see GroupNoteSlot below).
+function EditableMaxDose({ value, onChange, onRemove }) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  if (!value && !isEditing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        style={{
+          alignSelf: 'flex-start',
+          background: 'none', border: 'none', padding: 0,
+          fontSize: 11, color: 'var(--color-text-tertiary)',
+          textDecoration: 'underline', cursor: 'pointer',
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        + Max dose
+      </button>
+    )
+  }
+
+  return isEditing ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <input
+        type="text"
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Max dose, shown once under all lines"
+        dir="auto"
+        style={{ ...editLineInputStyle, flex: 1 }}
+      />
+      <button
+        type="button"
+        onClick={() => setIsEditing(false)}
+        title="Done editing"
+        aria-label="Done editing max dose"
+        style={lineIconButtonStyle}
+      >
+        <Check size={13} />
+      </button>
+    </div>
+  ) : (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div
+        dir="auto"
+        style={{
+          flex: 1,
+          padding: '3px 8px',
+          fontSize: 12, fontFamily: 'var(--font-body)', fontStyle: 'italic',
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        {value}
+      </div>
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        title="Edit max dose"
+        aria-label="Edit max dose"
+        style={lineIconButtonStyle}
+      >
+        <Edit2 size={12} />
+      </button>
+      <button
+        type="button"
+        onClick={onRemove}
+        title="Remove max dose"
+        aria-label="Remove max dose"
+        style={lineIconButtonStyle}
+      >
+        <X size={13} />
+      </button>
+    </div>
+  )
+}
+
 // ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
 // PHASE 2.2-C: per-group note slot, rendered below the dose field for each
 // group. Holds its own 'noteOpen' state so groups open/close independently.
@@ -1891,24 +1990,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
                     {/* Shared "max dose" note — one box for the whole group of
                         lines (field-separation addendum, 2026-08-06), instead
-                        of being repeated inside every line's text. */}
-                    <input
-                      type="text"
-                      value={group.dose_max ?? ''}
-                      onChange={e => updateGroupDoseMax(groupIdx, e.target.value)}
-                      placeholder="Max dose (optional, shown once under all lines)"
-                      dir="auto"
-                      style={{
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '3px 8px',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 12, fontWeight: 400, fontStyle: 'italic',
-                        fontFamily: 'var(--font-body)',
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text-tertiary)',
-                        outline: 'none',
-                      }}
+                        of being repeated inside every line's text. Given the
+                        same read-only/edit/remove treatment as each dose line
+                        above — see EditableMaxDose. */}
+                    <EditableMaxDose
+                      value={group.dose_max}
+                      onChange={val => updateGroupDoseMax(groupIdx, val)}
+                      onRemove={() => updateGroupDoseMax(groupIdx, null)}
                     />
 
                     {firstOpt.formulation_id && (
