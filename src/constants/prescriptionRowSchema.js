@@ -207,6 +207,12 @@ export const DRUG_ROW_TEMPLATE = {
   // doseLineInstructionText() below for how a line's display text is
   // resolved.
   dose_max: null,
+  // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors dose_lines'
+  // own 'bracket_id' — traces this group's dose_max back to the exact
+  // library population it was picked from (null if hand-typed), so it can
+  // be safely saved back. Requires DoseRowList.jsx's population id
+  // backfill fix to be in place for any given formulation.
+  dose_max_population_id: null,
   note: null,
   drug_note: null,
   source_flag: null,
@@ -289,6 +295,11 @@ export const DRUG_ROW_TEMPLATE = {
  *     shares the main group (the group's max-dose in that case is the
  *     row's own top-level 'dose_max' field) or when the group simply has
  *     no max-dose note set.
+ * @property {string|null} group_dose_max_population_id
+ *   - MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06), new. Mirrors
+ *     'group_dose_max' immediately above exactly, but carries the
+ *     library-population id instead of the text — see DrugRow's
+ *     'dose_max_population_id' for the full explanation.
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_name: null,
@@ -308,6 +319,7 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   group_id: null,
   group_note: null,
   group_dose_max: null,
+  group_dose_max_population_id: null,
 };
 
 /**
@@ -507,6 +519,9 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
   // above exactly — same "shared with parent" fallback, since it is a
   // group-level field mirroring group_note's own promotion rule.
   const promotedDoseMax = chosen.group_dose_max ?? row.dose_max ?? null;
+  // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors promotedDoseMax
+  // immediately above exactly.
+  const promotedDoseMaxPopulationId = chosen.group_dose_max_population_id ?? row.dose_max_population_id ?? null;
 
   return {
     ...DRUG_ROW_TEMPLATE,
@@ -524,6 +539,7 @@ export function promoteAlternativeToMain(row, alternativeIndex) {
     dose_who: promotedDoseWho,
     dose_lines: promotedDoseLines,
     dose_max: promotedDoseMax,
+    dose_max_population_id: promotedDoseMaxPopulationId,
     note: promotedNote,
     // Per-drug note (Decision 5 two-slot model) — travels with the option.
     drug_note: chosen.note ?? null,
@@ -644,6 +660,9 @@ export const DRUG_OPTION_TEMPLATE = {
  * @property {string|null} dose_max
  *   - FIELD-SEPARATION ADDENDUM (2026-08-06). Mirrors DrugRow.dose_max —
  *     the group's shared "max dose" note, shown once under dose_lines.
+ * @property {string|null} dose_max_population_id
+ *   - MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06). Mirrors
+ *     DrugRow.dose_max_population_id.
  * @property {string|null} note
  */
 
@@ -712,6 +731,9 @@ export function toDrugOptions(row) {
     dose_lines: row.dose_lines ?? [],
     // FIELD-SEPARATION ADDENDUM (2026-08-06): mirrors 'note' below exactly.
     dose_max: row.dose_max ?? null,
+    // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
+    // immediately above.
+    dose_max_population_id: row.dose_max_population_id ?? null,
     note: row.note,
   };
 
@@ -789,6 +811,9 @@ export function toDrugOptions(row) {
       // immediately below — same reasoning, group_dose_max is a group-level
       // field exactly like group_note.
       dose_max: alt.group_dose_max ?? null,
+      // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
+      // immediately above.
+      dose_max_population_id: alt.group_dose_max_population_id ?? null,
       // PHASE A BUG FIX (2026-06-26): no longer falls back to alt.note.
       // The previous 'alt.group_note ?? alt.note ?? null' fallback was
       // written for true legacy data (alternatives saved before
@@ -886,6 +911,9 @@ export function fromDrugOptions(row, groups) {
       // max-dose note for non-main groups — mirrors group_note immediately
       // above exactly, same reasoning.
       group_dose_max: sharesMainGroup ? null : (grp.dose_max ?? null),
+      // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors
+      // group_dose_max immediately above.
+      group_dose_max_population_id: sharesMainGroup ? null : (grp.dose_max_population_id ?? null),
     };
   });
 
@@ -906,6 +934,9 @@ export function fromDrugOptions(row, groups) {
     dose_lines: mainGrp.dose_lines ?? [],
     // FIELD-SEPARATION ADDENDUM (2026-08-06): mirrors 'note' below exactly.
     dose_max: mainGrp.dose_max ?? null,
+    // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors 'dose_max'
+    // immediately above.
+    dose_max_population_id: mainGrp.dose_max_population_id ?? null,
     note: mainGrp.note,
     // PHASE A BUG FIX (2026-06-26): write the main option's own per-drug
     // note back onto drug_note (the group note above is a separate,

@@ -33,13 +33,43 @@ import ConfirmModal from './ConfirmModal'
  * tab) is a separate field, still edited directly in GenericEditor.jsx —
  * unaffected by this rebuild.
  *
+ * ID BACKFILL FIX (2026-08-06): populations and brackets are each meant to
+ * carry a permanent 'id', generated the moment they're created — this is
+ * what lets a dose or max-dose picked into a prescription trace back to
+ * the exact library entry it came from, safely, for a "save this edit back
+ * to the library" action. That id was never actually being stamped on
+ * here — addPopulation/addBracket built plain objects with no id at all.
+ * Nothing about what you see or type was ever affected by this (every
+ * field displays and saves the same either way), so this fixes it as a
+ * quiet backfill rather than a visible change: ensureIds() below adds an
+ * id only to a population or bracket that doesn't already have one,
+ * leaving everything else about it untouched, and runs automatically
+ * every time anything in this component saves — so any older population
+ * or bracket gets tagged the next time an admin opens and saves this
+ * formulation, no bulk migration required.
+ *
  * Props:
- *   doses     { population: string, max_dose?: string,
- *               brackets: { bracket?: string, instruction: string,
+ *   doses     { id: string, population: string, max_dose?: string,
+ *               brackets: { id: string, bracket?: string, instruction: string,
  *                           note?: string }[] }[]
  *   onChange  (doses) => void
  *   disabled  boolean
  */
+
+function generateId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function ensureIds(doses) {
+  return doses.map(pop => ({
+    ...pop,
+    id: pop.id ?? generateId('pop'),
+    brackets: (pop.brackets ?? []).map(b => ({
+      ...b,
+      id: b.id ?? generateId('bracket'),
+    })),
+  }))
+}
 
 export default function DoseRowList({ doses = [], onChange, disabled = false }) {
 
@@ -52,14 +82,14 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
   // ── Population (tab) helpers ──
 
   function updatePopulation(idx, field, value) {
-    onChange(doses.map((d, i) => i === idx ? { ...d, [field]: value } : d))
+    onChange(ensureIds(doses.map((d, i) => i === idx ? { ...d, [field]: value } : d)))
   }
 
   function addPopulation() {
-    onChange([
+    onChange(ensureIds([
       ...doses,
       { population: '', max_dose: '', brackets: [{ bracket: '', instruction: '', note: '' }] },
-    ])
+    ]))
     setActiveIndex(doses.length)
   }
 
@@ -67,7 +97,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
     const idx = pendingRemoveIndex
     setPendingRemoveIndex(null)
     const next = doses.filter((_, i) => i !== idx)
-    onChange(next)
+    onChange(ensureIds(next))
     if (activeIndex >= next.length) {
       setActiveIndex(Math.max(0, next.length - 1))
     }
@@ -76,27 +106,27 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
   // ── Bracket helpers (scoped to one population) ──
 
   function updateBracket(popIdx, bracketIdx, field, value) {
-    onChange(doses.map((d, i) => {
+    onChange(ensureIds(doses.map((d, i) => {
       if (i !== popIdx) return d
       return {
         ...d,
         brackets: d.brackets.map((b, bi) => bi === bracketIdx ? { ...b, [field]: value } : b),
       }
-    }))
+    })))
   }
 
   function addBracket(popIdx) {
-    onChange(doses.map((d, i) => i === popIdx
+    onChange(ensureIds(doses.map((d, i) => i === popIdx
       ? { ...d, brackets: [...d.brackets, { bracket: '', instruction: '', note: '' }] }
       : d
-    ))
+    )))
   }
 
   function removeBracket(popIdx, bracketIdx) {
-    onChange(doses.map((d, i) => i === popIdx
+    onChange(ensureIds(doses.map((d, i) => i === popIdx
       ? { ...d, brackets: d.brackets.filter((_, bi) => bi !== bracketIdx) }
       : d
-    ))
+    )))
   }
 
   function moveBracket(popIdx, bracketIdx, direction) {
@@ -105,7 +135,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
     if (target < 0 || target >= pop.brackets.length) return
     const nextBrackets = [...pop.brackets]
     ;[nextBrackets[bracketIdx], nextBrackets[target]] = [nextBrackets[target], nextBrackets[bracketIdx]]
-    onChange(doses.map((d, i) => i === popIdx ? { ...d, brackets: nextBrackets } : d))
+    onChange(ensureIds(doses.map((d, i) => i === popIdx ? { ...d, brackets: nextBrackets } : d)))
   }
 
   return (
@@ -349,3 +379,4 @@ const inputBase = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
+

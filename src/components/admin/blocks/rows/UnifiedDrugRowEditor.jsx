@@ -325,6 +325,14 @@ function PopulationChooser({ populations, onChoose, onSkip }) {
 // legacy lines saved before this addendum, and doseLineInstructionText()
 // is what every reader (this editor, the app renderer, the bulk-refresh
 // tool) uses to fall back to it correctly.
+//
+// MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): 'dose_max_population_id'
+// mirrors 'bracket_id' above exactly, but for the group's max dose instead
+// of one line — it's what lets saveMaxDoseToLibrary() below trace a
+// group's dose_max back to the exact population it came from, now that
+// DoseRowList.jsx actually stamps a permanent id onto every population
+// (see that file's ID BACKFILL FIX comment). null for any group whose
+// dose_max was hand-typed rather than picked from a population.
 function buildDoseLinesFromPopulation(population) {
   const brackets = Array.isArray(population?.brackets) ? population.brackets : []
   const dose_lines = brackets
@@ -341,12 +349,13 @@ function buildDoseLinesFromPopulation(population) {
     dose_who: population?.population ?? null,
     dose_lines,
     dose_max: population?.max_dose?.trim() || null,
+    dose_max_population_id: population?.id ?? null,
   }
 }
 
 function resolveDosePick(dosesStructured) {
   const populations = Array.isArray(dosesStructured) ? dosesStructured : []
-  if (populations.length === 0) return { needsChoice: false, dose: null, dose_who: null, dose_lines: [], dose_max: null }
+  if (populations.length === 0) return { needsChoice: false, dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null }
   if (populations.length === 1) {
     return { needsChoice: false, ...buildDoseLinesFromPopulation(populations[0]) }
   }
@@ -559,22 +568,21 @@ const lineIconButtonStyle = {
 // EditableDoseLine's edit/remove buttons exactly (same icons, same
 // lineIconButtonStyle/editLineInputStyle).
 //
-// No "save back to library" button here — open question, not yet answered.
-// Each dose bracket line can trace back to its exact library bracket
-// because every bracket carries a permanent 'id' (decision 25's addendum).
-// A population's max_dose has no equivalent id — only brackets got one —
-// so there is no safe, stable key to match a group's dose_max back to the
-// right library population. Matching by population name (dose_who) would
-// work only until the population is renamed in the library, and this
-// project has already been burned once by guessing a matching-key choice
-// instead of confirming it. Needs a decision before building the save
-// action for this field.
+// MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): also mirrors
+// EditableDoseLine's "save this wording back to the drug library" button
+// and confirm-first flow, now that DoseRowList.jsx stamps a permanent id
+// on every population — see saveMaxDoseToLibrary at the call site for the
+// matching logic (by population id rather than bracket id).
 //
 // Empty state: no value and not currently editing shows a "+ Max dose"
 // trigger instead of an empty box, matching the existing "+ note" /
 // "+ group note" convention used elsewhere in this same editor
 // (see GroupNoteSlot below).
-function EditableMaxDose({ value, onChange, onRemove }) {
+function EditableMaxDose({
+  value, onChange, onRemove,
+  canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
+  isSaving, isSaved, saveError,
+}) {
   const [isEditing, setIsEditing] = useState(false)
 
   if (!value && !isEditing) {
@@ -595,57 +603,128 @@ function EditableMaxDose({ value, onChange, onRemove }) {
     )
   }
 
-  return isEditing ? (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Max dose, shown once under all lines"
-        dir="auto"
-        style={{ ...editLineInputStyle, flex: 1 }}
-      />
-      <button
-        type="button"
-        onClick={() => setIsEditing(false)}
-        title="Done editing"
-        aria-label="Done editing max dose"
-        style={lineIconButtonStyle}
-      >
-        <Check size={13} />
-      </button>
-    </div>
-  ) : (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <div
-        dir="auto"
-        style={{
-          flex: 1,
-          padding: '3px 8px',
-          fontSize: 12, fontFamily: 'var(--font-body)', fontStyle: 'italic',
-          color: 'var(--color-text-secondary)',
-        }}
-      >
-        {value}
-      </div>
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        title="Edit max dose"
-        aria-label="Edit max dose"
-        style={lineIconButtonStyle}
-      >
-        <Edit2 size={12} />
-      </button>
-      <button
-        type="button"
-        onClick={onRemove}
-        title="Remove max dose"
-        aria-label="Remove max dose"
-        style={lineIconButtonStyle}
-      >
-        <X size={13} />
-      </button>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      {isEditing ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input
+            type="text"
+            value={value ?? ''}
+            onChange={e => onChange(e.target.value)}
+            placeholder="Max dose, shown once under all lines"
+            dir="auto"
+            style={{ ...editLineInputStyle, flex: 1 }}
+          />
+          <button
+            type="button"
+            onClick={() => setIsEditing(false)}
+            title="Done editing"
+            aria-label="Done editing max dose"
+            style={lineIconButtonStyle}
+          >
+            <Check size={13} />
+          </button>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div
+            dir="auto"
+            style={{
+              flex: 1,
+              padding: '3px 8px',
+              fontSize: 12, fontFamily: 'var(--font-body)', fontStyle: 'italic',
+              color: 'var(--color-text-secondary)',
+            }}
+          >
+            {value}
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            title="Edit max dose"
+            aria-label="Edit max dose"
+            style={lineIconButtonStyle}
+          >
+            <Edit2 size={12} />
+          </button>
+          {canSaveToLibrary && (
+            <button
+              type="button"
+              onClick={onRequestSave}
+              disabled={isSaving}
+              title="Save this wording back to the drug library"
+              aria-label="Save this max dose back to the drug library"
+              style={{
+                ...lineIconButtonStyle,
+                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                cursor: isSaving ? 'default' : 'pointer',
+                opacity: isSaving ? 0.5 : 1,
+              }}
+            >
+              <Library size={13} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove max dose"
+            aria-label="Remove max dose"
+            style={lineIconButtonStyle}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {isConfirming && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 4,
+          padding: '6px 8px',
+          border: '1px solid var(--color-accent)',
+          borderRadius: 'var(--radius-md)',
+          backgroundColor: '#EFF6FF',
+        }}>
+          <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
+            Save this max dose to the drug library for everyone?
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              onClick={onConfirmSave}
+              style={{
+                background: 'var(--color-accent)', color: '#fff',
+                border: 'none', borderRadius: 'var(--radius-md)',
+                padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={onCancelConfirm}
+              style={{
+                background: 'none', color: 'var(--color-text-secondary)',
+                border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'var(--font-body)',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isSaving && (
+        <span style={{ fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+      )}
+      {isSaved && (
+        <span style={{ fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+      )}
+      {saveError && (
+        <span style={{ fontSize: 10, color: '#ef4444' }}>{saveError}</span>
+      )}
     </div>
   )
 }
@@ -1417,6 +1496,18 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [savedLineId, setSavedLineId] = useState(null)   // id of the line that just finished saving, for a brief "Saved" confirmation
   const [lineSaveError, setLineSaveError] = useState(null) // { lineId, message } | null
 
+  // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): same "save this edit
+  // back to the library" action as dose lines above, but for a group's
+  // shared max dose — keyed off the population's permanent id
+  // (dose_max_population_id) instead of a bracket id. Same confirm-first
+  // requirement, same reasoning: it changes something shared by every
+  // sheet using that dose. Keyed by groupIdx (only one group's max dose
+  // can be mid-save/confirm at a time, mirroring confirmSaveLine).
+  const [confirmSaveMaxDose, setConfirmSaveMaxDose] = useState(null) // groupIdx | null
+  const [savingMaxDoseGroupIdx, setSavingMaxDoseGroupIdx] = useState(null)
+  const [savedMaxDoseGroupIdx, setSavedMaxDoseGroupIdx] = useState(null)
+  const [maxDoseSaveError, setMaxDoseSaveError] = useState(null) // { groupIdx, message } | null
+
   // ── Mutation helpers ───────────────────────────────────────────────────
 
   function emitGroups(nextGroups) {
@@ -1463,6 +1554,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             dose_who: doseFields.dose_who ?? null,
             dose_lines: doseFields.dose_lines ?? [],
             dose_max: doseFields.dose_max ?? null,
+            dose_max_population_id: doseFields.dose_max_population_id ?? null,
           }
         : g
     )
@@ -1646,6 +1738,56 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     }
   }
 
+  // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): mirrors saveLineToLibrary
+  // above exactly, but matches by the population's permanent id
+  // (dose_max_population_id) instead of a bracket's id, and writes
+  // population.max_dose instead of a bracket's bracket/instruction.
+  // Gated (see canSaveToLibrary at the call site) to groups whose dose_max
+  // actually traces back to a population — a hand-typed max dose, or one
+  // picked before DoseRowList.jsx's id-backfill fix reached that
+  // formulation, has nothing safe to match and cannot be saved from here.
+  async function saveMaxDoseToLibrary(groupIdx) {
+    const group = groups[groupIdx]
+    const formulationId = group.options[0]?.formulation_id
+    if (!formulationId || !group.dose_max_population_id) return // defensive — button shouldn't render without these
+
+    setSavingMaxDoseGroupIdx(groupIdx)
+    setMaxDoseSaveError(null)
+    try {
+      const { data, error } = await fetchFormulationWithGeneric(formulationId)
+      if (error || !data) {
+        setMaxDoseSaveError({ groupIdx, message: 'Could not load the library entry to save to. Please try again.' })
+        return
+      }
+
+      const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
+      let matchedPopulation = null
+      const nextStructured = populations.map(population => {
+        if (population.id !== group.dose_max_population_id) return population
+        matchedPopulation = population
+        return { ...population, max_dose: group.dose_max ?? '' }
+      })
+
+      if (!matchedPopulation) {
+        setMaxDoseSaveError({ groupIdx, message: 'This max dose no longer matches an entry in the library — it may have been changed or removed there.' })
+        return
+      }
+
+      const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
+      if (updateErr) {
+        setMaxDoseSaveError({ groupIdx, message: 'Saving to the library failed. Please try again.' })
+        return
+      }
+
+      setSavedMaxDoseGroupIdx(groupIdx)
+      setTimeout(() => {
+        setSavedMaxDoseGroupIdx(current => current === groupIdx ? null : current)
+      }, 2000)
+    } finally {
+      setSavingMaxDoseGroupIdx(null)
+    }
+  }
+
   // ── Move mutations (PHASE 2.4) ─────────────────────────────────────────
   // All three helpers follow the same pattern:
   //   1. Remove the option from its current group; drop the group if now empty.
@@ -1773,8 +1915,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         // pick dropped the library's max-dose note entirely, even though
         // restoreDoseFromLibrary (which goes through applyDoseToGroup)
         // carried it correctly. Mirrors dose/dose_who/dose_lines exactly.
+        // dose_max_population_id mirrors dose_max in turn — needed so a
+        // freshly-added drug's max dose can be saved back to the library
+        // too (see saveMaxDoseToLibrary below).
         const doseFields = hasResolvedDose
-          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null }
+          ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null, dose_max_population_id: pendingDose.dose_max_population_id ?? null }
           : {}
         return { ...g, ...doseFields, options: [...g.options, joined] }
       })
@@ -1782,11 +1927,11 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       targetGroupIdx = groups.length
       const newGroupId = `grp-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const standalone = { ...newOption, group_id: newGroupId }
-      // BUG FIX (2026-08-06): same dose_max omission as the matched-group
-      // branch above — see that comment.
+      // BUG FIX (2026-08-06): same dose_max / dose_max_population_id
+      // omission as the matched-group branch above — see that comment.
       const doseFields = hasResolvedDose
-        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null }
-        : { dose: null, dose_who: null, dose_lines: [], dose_max: null }
+        ? { dose: pendingDose.dose, dose_who: pendingDose.dose_who ?? null, dose_lines: pendingDose.dose_lines ?? [], dose_max: pendingDose.dose_max ?? null, dose_max_population_id: pendingDose.dose_max_population_id ?? null }
+        : { dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null }
       nextGroups = [...groups, { group_id: newGroupId, options: [standalone], ...doseFields, note: null }]
     }
     emitGroups(nextGroups)
@@ -1991,12 +2136,27 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     {/* Shared "max dose" note — one box for the whole group of
                         lines (field-separation addendum, 2026-08-06), instead
                         of being repeated inside every line's text. Given the
-                        same read-only/edit/remove treatment as each dose line
-                        above — see EditableMaxDose. */}
+                        same read-only/edit/remove/save-to-library treatment
+                        as each dose line above — see EditableMaxDose.
+                        canSaveToLibrary mirrors the dose-line gate exactly:
+                        only a max dose that traces back to a real library
+                        population, whose group is still linked to a
+                        formulation, can be saved back. */}
                     <EditableMaxDose
                       value={group.dose_max}
                       onChange={val => updateGroupDoseMax(groupIdx, val)}
                       onRemove={() => updateGroupDoseMax(groupIdx, null)}
+                      canSaveToLibrary={!!(group.dose_max_population_id && firstOpt.formulation_id)}
+                      isConfirming={confirmSaveMaxDose === groupIdx}
+                      onRequestSave={() => setConfirmSaveMaxDose(groupIdx)}
+                      onConfirmSave={() => {
+                        setConfirmSaveMaxDose(null)
+                        saveMaxDoseToLibrary(groupIdx)
+                      }}
+                      onCancelConfirm={() => setConfirmSaveMaxDose(null)}
+                      isSaving={savingMaxDoseGroupIdx === groupIdx}
+                      isSaved={savedMaxDoseGroupIdx === groupIdx}
+                      saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
                     />
 
                     {firstOpt.formulation_id && (
