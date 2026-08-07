@@ -609,7 +609,6 @@ function RowCard({
       border: '1px solid var(--color-border)',
       borderRadius: 'var(--radius-md)',
       background: 'var(--color-surface)',
-      overflow: 'hidden',
     }}>
       {/* ── Row header ── */}
       <div
@@ -621,6 +620,19 @@ function RowCard({
           background: cfg.color + '12',
           borderBottom: expanded ? '1px solid var(--color-border)' : 'none',
           userSelect: 'none',
+          // BUG FIX (2026-08-08): the card used to rely on overflow: hidden
+          // on its outer wrapper to keep this header's square corners from
+          // poking past the card's rounded corners — but that same
+          // overflow: hidden also clipped popups (like the "More options"
+          // dropdown) whenever they opened near the bottom of an expanded
+          // card. Rounding the header's own corners does the same visual
+          // job without clipping anything. Bottom corners only need
+          // rounding when collapsed, since that's the only state where the
+          // header's bottom edge is also the card's bottom edge.
+          borderTopLeftRadius: 'var(--radius-md)',
+          borderTopRightRadius: 'var(--radius-md)',
+          borderBottomLeftRadius: expanded ? 0 : 'var(--radius-md)',
+          borderBottomRightRadius: expanded ? 0 : 'var(--radius-md)',
         }}
       >
         {/* Index */}
