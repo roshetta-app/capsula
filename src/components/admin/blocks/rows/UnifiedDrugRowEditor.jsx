@@ -2175,6 +2175,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   // ── Derived ────────────────────────────────────────────────────────────
   const totalOptions = groups.reduce((sum, g) => sum + g.options.length, 0)
 
+  // BUG FIX (2026-08-08): when the row's one and only option is still
+  // completely untouched, DrugOptionRow already renders its own "Add a
+  // drug / More options" prompt for that option. Without this check, the
+  // row-level "add a second option" control below rendered the identical
+  // prompt a second time — visually a duplicate, since there's nothing to
+  // add a *second* drug to yet. Suppressed only in that exact case; as
+  // soon as the sole option has a name/link, or a second option exists,
+  // the bottom control reappears as normal.
+  const soleOptionEmpty = totalOptions === 1 && (() => {
+    const o = groups[0]?.options[0]
+    if (!o) return false
+    const isLinked = !!(o.brand_id || o.generic_id || o.formulation_id)
+    return !isLinked && !o.brand_name?.trim() && !o.generic_name?.trim()
+  })()
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -2446,15 +2461,17 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
           "Add new drug" here creates a fresh option and flags it via
           manualEntryOptionId so its DrugOptionRow starts directly in manual
           fields — no intermediate AddDrugControls step for that new option. */}
-      <AddDrugControls
-        onPickBrand={() => setAddBrandPickerOpen(true)}
-        onPickFormulation={() => setAddFormulationPickerOpen(true)}
-        onAddManual={() => {
-          const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`
-          setManualEntryOptionId(id)
-          addOptionToGroups({ ...DRUG_OPTION_TEMPLATE, id })
-        }}
-      />
+      {!soleOptionEmpty && (
+        <AddDrugControls
+          onPickBrand={() => setAddBrandPickerOpen(true)}
+          onPickFormulation={() => setAddFormulationPickerOpen(true)}
+          onAddManual={() => {
+            const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`
+            setManualEntryOptionId(id)
+            addOptionToGroups({ ...DRUG_OPTION_TEMPLATE, id })
+          }}
+        />
+      )}
 
       {/* Picker modals */}
       <DrugPickerModal
