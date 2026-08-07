@@ -1,4 +1,3 @@
-
 /**
  * src/components/admin/blocks/rows/UnifiedDrugRowEditor.jsx
  *
@@ -1086,7 +1085,7 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
 //   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
 //   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
-function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho }) {
+function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteDoseWho, setPromoteDoseWho]   = useState('adult')
@@ -1106,8 +1105,17 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
   // A fresh option shows only the search bar until a name is committed or the
   // admin opts into genericOnlyMode for the rarer generic-only entry path.
   const [genericOnlyMode, setGenericOnlyMode] = useState(
-    !!option.generic_name?.trim() && !option.brand_name?.trim()
+    startInManualMode || (!!option.generic_name?.trim() && !option.brand_name?.trim())
   )
+
+  // Unified Drug Row Editor Redesign, Phase 3 (2026-08-08): startInManualMode
+  // only matters at the instant this row is first created for a brand-new
+  // option added via "Add new drug" — read once on mount, never re-applied
+  // on later re-renders (mirrors the file's other mount-only effects).
+  useEffect(() => {
+    if (startInManualMode) onManualModeConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): picker modal
   // open/closed state for this specific option's own "Add a drug" /
@@ -1641,6 +1649,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [addBrandPickerOpen, setAddBrandPickerOpen]             = useState(false)
   const [addFormulationPickerOpen, setAddFormulationPickerOpen] = useState(false)
 
+  // Unified Drug Row Editor Redesign, Phase 3 (2026-08-08): id of a
+  // freshly-added option that should start in manual-entry mode (skips
+  // DrugOptionRow's own "empty untouched" AddDrugControls step, since
+  // "Add new drug" already made that choice explicitly). Cleared once
+  // consumed by the matching DrugOptionRow on mount.
+  const [manualEntryOptionId, setManualEntryOptionId] = useState(null)
+
   // RESTORE-DOSE FEATURE (2026-06-26): "restore dose from library" button.
   // Group-scoped pending-choice state, separate from DrugOptionRow's own
   // pendingDoseChoice (which is per-option, used during a fresh brand
@@ -2156,13 +2171,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     }, pendingDose)
   }
 
-  function addFreeTextOption() {
-    addOptionToGroups({
-      ...DRUG_OPTION_TEMPLATE,
-      id: `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    })
-  }
-
   // ── Derived ────────────────────────────────────────────────────────────
   const totalOptions = groups.reduce((sum, g) => sum + g.options.length, 0)
 
@@ -2208,6 +2216,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               canMoveBelow={groupIdx < groups.length - 1}
               groupDose={group.dose ?? ''}
               groupDoseWho={group.dose_who ?? null}
+              startInManualMode={option.id === manualEntryOptionId}
+              onManualModeConsumed={() => setManualEntryOptionId(null)}
             />
           ))}
 
@@ -2426,63 +2436,24 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         </div>
       ))}
 
-      {/* ── Add drug option buttons ──
-          Replace the old "add alternative" buttons (Decision 5: no main/alt
-          concept). Same three entry paths — brand pick, formulation pick,
-          free text. The "same formulation, new brand" scoped picker from Phase
-          3 is removed: the default-join logic already auto-groups same-
-          formulation picks without needing a separate button for it. */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          onClick={() => setAddBrandPickerOpen(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px',
-            border: '1.5px dashed var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'transparent',
-            color: 'var(--color-text-tertiary)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <Plus size={11} /> Add option: pick a brand…
-        </button>
-        <button
-          type="button"
-          onClick={() => setAddFormulationPickerOpen(true)}
-          title="Use this for a genuinely different drug serving the same purpose"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px',
-            border: '1.5px dashed var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'transparent',
-            color: 'var(--color-text-tertiary)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <Plus size={11} /> Add option: pick a formulation…
-        </button>
-        <button
-          type="button"
-          onClick={addFreeTextOption}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 5,
-            padding: '5px 10px',
-            border: '1.5px dashed var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'transparent',
-            color: 'var(--color-text-tertiary)',
-            fontSize: 11, fontWeight: 600, cursor: 'pointer',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          <Plus size={11} /> Add option: free text
-        </button>
-      </div>
+      {/* ── Add drug option control ──
+          Unified Drug Row Editor Redesign, Phase 3 (2026-08-08): replaces the
+          old three separate "add alternative"-style buttons (brand pick,
+          formulation pick, free text) with the same shared AddDrugControls
+          used inside each DrugOptionRow's own empty state, so "add a second
+          option" looks and behaves identically to the first-option path.
+          "Add new drug" here creates a fresh option and flags it via
+          manualEntryOptionId so its DrugOptionRow starts directly in manual
+          fields — no intermediate AddDrugControls step for that new option. */}
+      <AddDrugControls
+        onPickBrand={() => setAddBrandPickerOpen(true)}
+        onPickFormulation={() => setAddFormulationPickerOpen(true)}
+        onAddManual={() => {
+          const id = `opt-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          setManualEntryOptionId(id)
+          addOptionToGroups({ ...DRUG_OPTION_TEMPLATE, id })
+        }}
+      />
 
       {/* Picker modals */}
       <DrugPickerModal
