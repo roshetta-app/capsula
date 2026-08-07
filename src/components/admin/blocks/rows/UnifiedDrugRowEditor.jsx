@@ -1,3 +1,4 @@
+
 /**
  * src/components/admin/blocks/rows/UnifiedDrugRowEditor.jsx
  *
@@ -164,7 +165,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check } from 'lucide-react'
+import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check, ChevronDown } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS } from '../../../../config/forms'
@@ -869,6 +870,106 @@ function DrugOptionNoteSlot({ note, onChange }) {
     >
       + note
     </button>
+  )
+}
+
+// ─── AddDrugControls ─────────────────────────────────────────────────────────
+// Unified Drug Row Editor Redesign, Phase 1 (2026-08-08). Two-action control
+// used everywhere a drug identity can be attached: "Add a drug" (opens the
+// brand-picker modal directly) and "More options" (a small dropdown with
+// "Pick formulation" and "Add new drug"). Replaces the old row of 2-3
+// separate dashed-border buttons with one consistent control.
+//
+// Props:
+//   onPickBrand       — () => void — open the brand-picker modal
+//   onPickFormulation — () => void — open the formulation-picker modal
+//   onAddManual       — () => void — switch this option into manual/
+//                        generic-only entry mode
+//   disabled          — bool, optional
+
+const addOptionButtonStyle = {
+  display: 'flex', alignItems: 'center', gap: 5,
+  padding: '5px 10px',
+  border: '1.5px dashed var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  background: 'transparent',
+  color: 'var(--color-text-tertiary)',
+  fontSize: 11, fontWeight: 600, cursor: 'pointer',
+  fontFamily: 'var(--font-body)',
+}
+
+const addDrugDropdownStyle = {
+  position: 'absolute', top: '100%', left: 0, marginTop: 4, zIndex: 200,
+  background: 'var(--color-surface)',
+  border: '1.5px solid var(--color-border)',
+  borderRadius: 'var(--radius-md)',
+  boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+  padding: 4, minWidth: 170,
+  display: 'flex', flexDirection: 'column', gap: 2,
+}
+
+const addDrugDropdownItemStyle = {
+  display: 'block', width: '100%', textAlign: 'left',
+  padding: '7px 12px', background: 'none', border: 'none',
+  fontSize: 12, fontFamily: 'var(--font-body)',
+  color: 'var(--color-text-primary)', cursor: 'pointer',
+  borderRadius: 'var(--radius-md)',
+}
+
+function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled = false }) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef(null)
+
+  // Dismiss on click-outside — same pattern as MoveMenu below.
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
+  return (
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button
+        type="button"
+        onClick={onPickBrand}
+        disabled={disabled}
+        style={{ ...addOptionButtonStyle, flex: 1, justifyContent: 'center' }}
+      >
+        <Plus size={12} /> Add a drug
+      </button>
+      <div style={{ position: 'relative' }}>
+        <button
+          type="button"
+          onClick={() => setMenuOpen(v => !v)}
+          disabled={disabled}
+          style={addOptionButtonStyle}
+        >
+          More options <ChevronDown size={12} />
+        </button>
+        {menuOpen && (
+          <div ref={menuRef} style={addDrugDropdownStyle}>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); onPickFormulation() }}
+              style={addDrugDropdownItemStyle}
+            >
+              Pick formulation
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); onAddManual() }}
+              style={addDrugDropdownItemStyle}
+            >
+              Add new drug
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 
