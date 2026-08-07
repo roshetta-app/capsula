@@ -1448,6 +1448,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
               onUnlink={handleUnlink}
               placeholder="Search or type a drug name…"
               extraAction={drugLinkToggle}
+              onRequestBrandPicker={() => setBrandPickerOpen(true)}
             />
           )}
 
