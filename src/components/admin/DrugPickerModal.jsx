@@ -44,7 +44,6 @@ import SearchBar from '../ui/SearchBar'
 import SharedDrugCard from '../SharedDrugCard'
 import { supabase } from '../../lib/supabase'
 import { findBrandMatch, insertBrand, fetchBrandsForFormulation, searchDrugsForPicker } from '../../lib/adminQueries'
-import { SOURCE_FLAG_VALUE } from '../../constants/prescriptionRowSchema'
 import { useCategories } from '../../hooks/useCategories'
 import { useDarkMode } from '../../hooks/useDarkMode'
 
@@ -313,7 +312,6 @@ export default function DrugPickerModal({
           formulation_id: scopeFormulationId,
           name,
           manufacturer: null,
-          source: SOURCE_FLAG_VALUE,
           is_published: true,
         })
         if (insertErr) throw new Error(insertErr.message)
@@ -552,5 +550,3 @@ export default function DrugPickerModal({
     </Modal>
   )
 }
-
-
