@@ -255,6 +255,7 @@ export default function DrugSearchField({
   mode = 'formulation',
   placeholder = 'Search or type a drug name…',
   extraAction = null,
+  onRequestBrandPicker = null,
 }) {
   // Three display states for this field:
   //   editing   = true,  committed = false → open search input (new/nameless rows, or
@@ -468,10 +469,16 @@ export default function DrugSearchField({
           }}>
             {buildLinkedSummary(value, concentration, form)}
           </span>
-          {/* Change button — re-opens search (Decision 1: icon-only, no label) */}
+          {/* Change button — re-opens search (Decision 1: icon-only, no label).
+              Unified Drug Row Editor Redesign, Decision 4 (2026-08-08): when
+              onRequestBrandPicker is supplied, this opens the same brand-picker
+              modal "Add a drug" uses instead of the inline search box, so
+              re-picking a drug looks the same everywhere. Falls back to the
+              original inline-reopen behavior for any caller that doesn't pass
+              the new prop. */}
           <button
             type="button"
-            onClick={handleStartChange}
+            onClick={onRequestBrandPicker ? onRequestBrandPicker : handleStartChange}
             aria-label="Change drug"
             style={{
               display:    'flex',
@@ -530,10 +537,13 @@ export default function DrugSearchField({
         }}>
           {value}
         </span>
-        {/* Edit button — re-opens search pre-filled with current name */}
+        {/* Edit button — re-opens search pre-filled with current name.
+            Decision 4 (2026-08-08): same onRequestBrandPicker fallback as the
+            linked-display pencil above, so a never-linked, committed
+            free-text name also opens the brand-picker modal when supplied. */}
         <button
           type="button"
-          onClick={handleEditCommitted}
+          onClick={onRequestBrandPicker ? onRequestBrandPicker : handleEditCommitted}
           aria-label="Edit drug name"
           style={{
             display:    'flex',
@@ -771,3 +781,4 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
+
