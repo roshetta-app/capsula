@@ -1109,6 +1109,15 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
     !!option.generic_name?.trim() && !option.brand_name?.trim()
   )
 
+  // Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): picker modal
+  // open/closed state for this specific option's own "Add a drug" /
+  // "Pick formulation" controls. Each DrugOptionRow owns its own pair —
+  // not shared with the row-level "add a second option" pickers at the
+  // bottom of the file (those have their own state, added/kept in
+  // Phase 3).
+  const [brandPickerOpen, setBrandPickerOpen] = useState(false)
+  const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
+
   function patch(updates) {
     onUpdate({ ...option, ...updates })
   }
@@ -1117,6 +1126,13 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
   const showManualFields = !isLinked && (!!option.brand_name?.trim() || genericOnlyMode)
   const displayName = option.brand_name || option.generic_name || ''
   const showLink = option.drug_link_enabled !== false
+
+  // Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): true only for a
+  // brand-new option that hasn't been touched yet — no library link, no
+  // typed brand name, and manual entry hasn't been chosen. Drives whether
+  // AddDrugControls (the "Add a drug" / "More options" control) or the
+  // regular search field + fields are shown.
+  const isEmptyUntouched = !isLinked && !option.brand_name?.trim() && !genericOnlyMode
 
   // ── Drug-link enabled toggle ────────────────────────────────────────────
   const drugLinkToggle = (
@@ -1179,6 +1195,39 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       concentration: null, form: null, route: null, category: null,
       _formulationMeta: undefined,
     })
+  }
+
+  // Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): "Pick
+  // formulation" path from AddDrugControls' "More options" menu. Mirrors
+  // handleBrandPick's dose-resolution branch exactly — same
+  // pendingDoseChoice / onDoseReady contract — so the existing
+  // PopulationChooser rendering further down needs no changes. No brand
+  // fields: this is the no-brand, formulation-only identity path.
+  function handleFormulationPick(formulation) {
+    const generic = formulation.generics
+    patch({
+      brand_name: null,
+      brand_id: null,
+      generic_name: generic?.name_en ?? option.generic_name,
+      generic_id: generic?.id ?? option.generic_id,
+      formulation_id: formulation.id ?? null,
+      concentration: formulation.concentration ?? null,
+      form: formulation.form ?? null,
+      route: formulation.route ?? null,
+      category: generic?.category ?? null,
+      _formulationMeta: {
+        name_en: generic?.name_en ?? '',
+        concentration: formulation.concentration ?? '',
+        form: formulation.form ?? '',
+        route: formulation.route ?? '',
+      },
+    })
+    const resolved = resolveDosePick(formulation.doses_structured)
+    if (resolved.needsChoice) {
+      setPendingDoseChoice({ populations: resolved.populations })
+    } else if (resolved.dose_lines.length || resolved.dose) {
+      onDoseReady?.(resolved)
+    }
   }
 
   function handleChangeText(text) {
@@ -1359,47 +1408,52 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         )}
       </div>
 
-      {/* Single drug search field — always present */}
-      <DrugSearchField
-        value={displayName}
-        isLinked={isLinked}
-        concentration={option.concentration}
-        form={option.form}
-        genericName={option.generic_name}
-        mode="brand"
-        onChangeText={handleChangeText}
-        onLink={handleBrandPick}
-        onUnlink={handleUnlink}
-        placeholder="Search or type a drug name…"
-        extraAction={drugLinkToggle}
-      />
-
-      {/* PHASE 2.2-D — per-drug note slot (Decision 5 two-slot note model).
-          Sits directly under this drug's name at all times once the option
-          has any content — no gate beyond the option existing. Travels with
-          the drug if it is moved to a different group. */}
-      {(isLinked || !!displayName) && (
-        <DrugOptionNoteSlot
-          note={option.note ?? null}
-          onChange={value => patch({ note: value })}
+      {/* Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): an
+          untouched option shows only the "Add a drug" / "More options"
+          control. Once a drug has been picked, typed, or manual entry
+          chosen, the regular search field + note slot take over. The old
+          "Or add generic only (no brand)" button is removed entirely —
+          its one job (setGenericOnlyMode(true)) is now "Add new drug" in
+          the More options menu, reached before any search box shows. */}
+      {isEmptyUntouched ? (
+        <AddDrugControls
+          onPickBrand={() => setBrandPickerOpen(true)}
+          onPickFormulation={() => setFormulationPickerOpen(true)}
+          onAddManual={() => setGenericOnlyMode(true)}
         />
-      )}
+      ) : (
+        <>
+          {/* Suppressed once "Add new drug" has been chosen (genericOnlyMode) —
+              per the locked decision, manual entry is a strictly no-brand path,
+              so the brand-name search box never shows alongside the manual
+              fields below. */}
+          {!genericOnlyMode && (
+            <DrugSearchField
+              value={displayName}
+              isLinked={isLinked}
+              concentration={option.concentration}
+              form={option.form}
+              genericName={option.generic_name}
+              mode="brand"
+              onChangeText={handleChangeText}
+              onLink={handleBrandPick}
+              onUnlink={handleUnlink}
+              placeholder="Search or type a drug name…"
+              extraAction={drugLinkToggle}
+            />
+          )}
 
-      {/* Generic-only fallback — appears before any fields are revealed */}
-      {!isLinked && !showManualFields && (
-        <button
-          type="button"
-          onClick={() => setGenericOnlyMode(true)}
-          style={{
-            alignSelf: 'flex-start',
-            background: 'none', border: 'none', padding: 0,
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            color: 'var(--color-text-tertiary)', textDecoration: 'underline',
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          Or add generic only (no brand)
-        </button>
+          {/* PHASE 2.2-D — per-drug note slot (Decision 5 two-slot note model).
+              Sits directly under this drug's name at all times once the option
+              has any content — no gate beyond the option existing. Travels with
+              the drug if it is moved to a different group. */}
+          {(isLinked || !!displayName) && (
+            <DrugOptionNoteSlot
+              note={option.note ?? null}
+              onChange={value => patch({ note: value })}
+            />
+          )}
+        </>
       )}
 
       {/* Manual identity fields — unlinked rows only */}
@@ -1550,6 +1604,24 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
           onSkip={() => setPendingDoseChoice(null)}
         />
       )}
+
+      {/* Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): this
+          option's own picker modals, opened from AddDrugControls above.
+          Not shared with the row-level "add a second option" pickers at
+          the bottom of the file — each DrugOptionRow instance owns its
+          own pair. */}
+      <DrugPickerModal
+        isOpen={brandPickerOpen}
+        onClose={() => setBrandPickerOpen(false)}
+        onSelect={brand => { setBrandPickerOpen(false); handleBrandPick(brand) }}
+        mode="brand"
+      />
+      <DrugPickerModal
+        isOpen={formulationPickerOpen}
+        onClose={() => setFormulationPickerOpen(false)}
+        onSelect={formulation => { setFormulationPickerOpen(false); handleFormulationPick(formulation) }}
+        mode="formulation"
+      />
     </div>
   )
 }
