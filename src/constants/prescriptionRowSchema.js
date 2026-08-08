@@ -300,6 +300,9 @@ export const DRUG_ROW_TEMPLATE = {
  *     'group_dose_max' immediately above exactly, but carries the
  *     library-population id instead of the text — see DrugRow's
  *     'dose_max_population_id' for the full explanation.
+ * @property {'or'|'and'} joiner
+ *   - OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08), new. The word rendered
+ *     on the divider directly before this option. Defaults to 'or'.
  */
 export const ALTERNATIVE_DRUG_TEMPLATE = {
   brand_name: null,
@@ -320,6 +323,13 @@ export const ALTERNATIVE_DRUG_TEMPLATE = {
   group_note: null,
   group_dose_max: null,
   group_dose_max_population_id: null,
+  // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word shown on the
+  // divider that sits directly before this option ('or' | 'and'). Lives
+  // per-option (not per-row) since a row can have several independent
+  // dividers, one per boundary. Defaults to 'or', same fallback pattern
+  // as 'note'/'group_id' above. The main/first option in a row has no
+  // divider before it, so this field is never read for it.
+  joiner: 'or',
 };
 
 /**
@@ -643,6 +653,11 @@ export const DRUG_OPTION_TEMPLATE = {
   // is moved to a different group. Defaults null; preserved on round-trip
   // through toDrugOptions / fromDrugOptions via alt.note.
   note: null,
+  // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word shown on the
+  // divider that sits directly before this option ('or' | 'and').
+  // Defaults 'or'; preserved on round-trip through toDrugOptions /
+  // fromDrugOptions via alt.joiner, same pattern as 'note' above.
+  joiner: 'or',
 };
 
 /**
@@ -783,6 +798,9 @@ export function toDrugOptions(row) {
       // Per-drug note (Decision 5 two-slot model) — independent of the
       // group note, travels with the option regardless of grouping.
       note: alt.note ?? null,
+      // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): the word on the
+      // divider directly before this option, defaulting to 'or'.
+      joiner: alt.joiner ?? 'or',
     };
 
     if (joinsMain) {
@@ -901,6 +919,10 @@ export function fromDrugOptions(row, groups) {
       // Per-drug note (Decision 5 two-slot model) — always opt.note, the
       // per-drug note travels with the option, not with the group.
       note: opt.note ?? null,
+      // OR/AND DIVIDER TOGGLE ADDENDUM (2026-08-08): persist the divider
+      // word directly before this option, same round-trip pattern as
+      // 'note' immediately above.
+      joiner: opt.joiner ?? 'or',
       // PHASE 2.8: persist the real grouping signal literally, so it can
       // be trusted directly on next load (see toDrugOptions above).
       group_id: opt.group_id,
@@ -951,6 +973,3 @@ export function fromDrugOptions(row, groups) {
     alternatives,
   };
 }
-
-
-

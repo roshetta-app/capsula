@@ -328,8 +328,9 @@ function SectionHeader({ label, children }) {
  *   Form renders as a pill badge (not plain text).
  *
  * Alternatives:
- *   Every boundary between alternatives renders a single OrMarker ('or',
- *   italic + muted, left-aligned with the drug name column, not the badge).
+ *   Every boundary between alternatives renders a single OrMarker — the
+ *   word itself is per-option ('or' | 'and', from data.joiner, defaulting
+ *   to 'or'), left-aligned with the drug name column, not the badge.
  *   Every alternative member shows its own concentration + form (not first-only).
  *
  *   buildFormulationClusters now delegates to toDrugOptions() (the same
@@ -478,7 +479,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                       fontSize: 12, fontWeight: 500,
                       color: 'color-mix(in srgb, var(--color-warning) 90%, black 10%)',
                       lineHeight: 1,
-                    }}>or</span>
+                    }}>{data.joiner ?? 'or'}</span>
                   )}
                 </div>
                 <div
@@ -869,5 +870,3 @@ const rowWrap = {
   alignItems: 'flex-start',
   padding: '13px 0',
 }
-
-

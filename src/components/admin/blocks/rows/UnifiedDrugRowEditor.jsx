@@ -1191,18 +1191,29 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 // text between two thin lines. The badge was carrying no meaning beyond
 // "these are alternatives," which the surrounding stacked layout already
 // communicates; the color/weight was pure chrome.
-function OrDivider() {
+//
+// OR/AND DIVIDER TOGGLE (2026-08-08): the word is now clickable — clicking
+// it toggles the underlying option's 'joiner' between 'or' and 'and'.
+// Keeps the exact same visual treatment; only a cursor/click handler is
+// added. 'value' defaults to 'or' so any call site that hasn't been wired
+// up yet still renders exactly as before.
+function OrDivider({ value = 'or', onChange }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
-      <span style={{
-        fontSize:   12,
-        fontWeight: 700,
-        fontFamily: 'var(--font-body)',
-        color:      'var(--color-accent)',
-        flexShrink: 0,
-      }}>
-        or
+      <span
+        onClick={onChange ? () => onChange(value === 'or' ? 'and' : 'or') : undefined}
+        style={{
+          fontSize:   12,
+          fontWeight: 700,
+          fontFamily: 'var(--font-body)',
+          color:      'var(--color-accent)',
+          flexShrink: 0,
+          cursor:     onChange ? 'pointer' : 'default',
+          userSelect: 'none',
+        }}
+      >
+        {value}
       </span>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
     </div>
@@ -3085,14 +3096,24 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               don't change the fact that every stacked option is an
               alternative to the one above it. No divider before the very
               first group (nothing to divide yet). */}
-          {groupIdx > 0 && <OrDivider />}
+          {groupIdx > 0 && (
+            <OrDivider
+              value={group.options[0].joiner ?? 'or'}
+              onChange={next => updateOption(groupIdx, group.options[0].id, { ...group.options[0], joiner: next })}
+            />
+          )}
 
           {/* ── Stacked drug-name lines ──
               OrDivider inserted before every option after the first within
               a group, so options stacked together read as "this OR this". */}
           {group.options.map((option, optIdx) => (
             <div key={option.id}>
-              {optIdx > 0 && <OrDivider />}
+              {optIdx > 0 && (
+                <OrDivider
+                  value={option.joiner ?? 'or'}
+                  onChange={next => updateOption(groupIdx, option.id, { ...option, joiner: next })}
+                />
+              )}
               <DrugOptionRow
                 option={option}
                 onUpdate={nextOpt => updateOption(groupIdx, option.id, nextOpt)}
