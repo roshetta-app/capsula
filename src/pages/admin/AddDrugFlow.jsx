@@ -15,7 +15,7 @@ import BrandEditor from '../../components/admin/BrandEditor'
  *   Step 2 — Formulation (concentration, form, route, practical doses)
  *   Step 3 — Brands (at least 1 required)
  *
- * On save: insert generic → insert formulation → insert brands → refresh context → navigate to /admin/drugs
+ * On save: insert generic -> insert formulation -> insert brands -> refresh context -> navigate to /admin/drugs
  */
 
 const STEPS = ['Generic', 'Formulation', 'Brands']
@@ -59,12 +59,12 @@ export default function AddDrugFlow() {
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState(null)
 
-  // ─── Patch helpers ──────────────────────────────────────────────────────────
+  // --- Patch helpers -----------------------------------------------------------
 
   function patchGeneric(patch)     { setGeneric(g     => ({ ...g,     ...patch })) }
   function patchFormulation(patch) { setFormulation(f => ({ ...f,     ...patch })) }
 
-  // ─── Validation per step ───────────────────────────────────────────────────
+  // --- Validation per step -------------------------------------------------------
 
   function stepValid() {
     if (step === 0) return (generic.ingredients?.length > 0) && generic.category
@@ -73,14 +73,14 @@ export default function AddDrugFlow() {
     return false
   }
 
-  // ─── Save ──────────────────────────────────────────────────────────────────
+  // --- Save -----------------------------------------------------------------------
 
   async function handleSave() {
     setError(null)
     setSaving(true)
 
     try {
-      // 1. Insert generic — name_en is never typed directly, it's always
+      // 1. Insert generic - name_en is never typed directly, it's always
       //    derived from ingredients (same rule as DrugEditor.jsx's saveGeneric);
       //    slug is generated from that same computed name.
       const computedName = (generic.ingredients ?? []).join(' + ')
@@ -99,10 +99,8 @@ export default function AddDrugFlow() {
         is_published:         generic.is_published ?? true,
         mechanism_of_action:  generic.mechanism_of_action?.trim() || null,
         uses_structured:      generic.uses_structured ?? null,
-        uses_legacy:          [],
         warnings_legacy:      [],
-        side_effects_common:  generic.side_effects_common  ?? [],
-        side_effects_serious: generic.side_effects_serious ?? [],
+        side_effects:         generic.side_effects ?? [],
         pregnancy_category:   generic.pregnancy_category   || null,
         breastfeeding_safety: generic.breastfeeding_safety || null,
         crosses_placenta:     generic.crosses_placenta     || null,
@@ -116,7 +114,7 @@ export default function AddDrugFlow() {
       })
       if (gErr) throw new Error(`Generic: ${gErr.message}`)
 
-      // 2. Insert formulation — slug generated the same way DrugEditor.jsx does
+      // 2. Insert formulation - slug generated the same way DrugEditor.jsx does
       //    when adding a formulation: generic slug + timestamp for uniqueness.
       const formulationSlug = `${slug}-${Date.now()}`
 
@@ -163,7 +161,7 @@ export default function AddDrugFlow() {
     }
   }
 
-  // ─── Render ────────────────────────────────────────────────────────────────
+  // --- Render -----------------------------------------------------------------------
 
   return (
     <div style={{
@@ -244,7 +242,7 @@ export default function AddDrugFlow() {
             {step === 2 && 'Brands'}
           </div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {step === 0 && "The drug's scientific identity — shared across all formulations"}
+            {step === 0 && "The drug's scientific identity - shared across all formulations"}
             {step === 1 && 'The specific strength, form, and route for this formulation'}
             {step === 2 && 'Commercial brands available for this formulation'}
           </div>
@@ -316,7 +314,7 @@ export default function AddDrugFlow() {
               disabled={!stepValid() || saving}
               style={primaryBtn(!stepValid() || saving)}
             >
-              {saving ? 'Saving…' : 'Save drug'}
+              {saving ? 'Saving...' : 'Save drug'}
               {!saving && <Check size={15} />}
             </button>
           )}
@@ -326,7 +324,7 @@ export default function AddDrugFlow() {
   )
 }
 
-// ─── Button styles ────────────────────────────────────────────────────────────
+// --- Button styles ----------------------------------------------------------------
 
 const secondaryBtn = {
   display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
