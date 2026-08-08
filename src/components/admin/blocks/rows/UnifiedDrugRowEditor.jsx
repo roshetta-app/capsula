@@ -731,11 +731,12 @@ function EditableMaxDose({
             style={{
               flex: 1,
               padding: '3px 8px',
-              fontSize: 12, fontFamily: 'var(--font-body)', fontStyle: 'italic',
+              fontSize: 12, fontFamily: 'var(--font-body)',
               color: 'var(--color-text-secondary)',
             }}
           >
-            {value}
+            <span style={{ fontWeight: 600 }}>Max dose: </span>
+            <span style={{ fontStyle: 'italic' }}>{value}</span>
           </div>
           {isHovered && (
             <>
@@ -911,161 +912,168 @@ function EditablePopulation({ value, onChange }) {
   )
 }
 
-// ─── GroupNoteSlot ─────────────────────────────────────────────────────────────
-// PHASE 2.2-C: per-group note slot, rendered below the dose field for each
-// group. Holds its own 'noteOpen' state so groups open/close independently.
-// PHASE 2.2-D: restyled to Decision 5 note-tier hierarchy — 11px, italic,
-// tertiary color. No FieldLabel (labels are removed per Decision 4). Button
-// label changed to "+ group note" to distinguish from the per-drug "+ note"
-// slot (DrugOptionNoteSlot) which sits directly under each drug name.
+// ─── NoteSlot ───────────────────────────────────────────────────────────────
+// UI PASS (2026-08-08): shared implementation for both GroupNoteSlot and
+// DrugOptionNoteSlot below. Replaces the old "+ note" bare-text trigger that,
+// once clicked, turned into a permanently-open full-width bordered input with
+// no way to close it back down. Now matches the read-only-by-default +
+// edit-toggle convention EditableDoseLine/EditableMaxDose already use
+// elsewhere in this file:
+//   - Empty, not editing: an icon+border+tint trigger button (Plus icon).
+//   - Has a value, not editing: a read-only note line; hovering reveals a
+//     pencil (edit) and an X (clear back to empty) — same icons/behavior
+//     as EditableMaxDose's hover actions.
+//   - Editing: a real input with an explicit checkmark ("done") button that
+//     closes it back to read-only, plus Enter-to-close.
+// This also removes the need for the old mount-only-state remount bug fix
+// (PHASE A BUG FIX, 2026-06-26): that patch existed only because a note with
+// content could render behind the empty-state trigger after a remount. Here,
+// a non-empty note always renders as the read-only line regardless of the
+// isEditing initializer, so that failure mode no longer exists.
+function NoteSlot({ note, onChange, label, triggerLabel, placeholder }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
 
-function GroupNoteSlot({ note, onChange }) {
-  const [noteOpen, setNoteOpen] = useState(!!note)
-
-  // PHASE A BUG FIX (2026-06-26, defensive): re-sync open state whenever
-  // note is non-empty, rather than relying solely on the mount-only
-  // useState(!!note) initializer above. Applied here as a precaution —
-  // see the identical, confirmed-triggering bug in DrugOptionNoteSlot
-  // below for the full explanation of the remount/timing risk this
-  // guards against.
-  useEffect(() => {
-    if (note) setNoteOpen(true)
-  }, [note])
-
-  // DECLUTTER PASS 4 (Direction 1, 2026-08-08): pulled tight to the dose
-  // card above it via a small negative marginTop, instead of taking the
-  // full block-level gap the rest of the group column uses — this is just
-  // two small buttons, not a section, so it shouldn't claim a whole
-  // section's worth of vertical space. Applied to both states so toggling
+  // Pulled tight to the content above via a small negative marginTop,
+  // instead of taking the full block-level gap the rest of the column
+  // uses (DECLUTTER PASS 4) — applied to all three states so switching
   // between them doesn't shift the layout.
-  if (noteOpen) {
+  const wrapStyle = { marginTop: -4 }
+
+  if (!note && !isEditing) {
     return (
-      <input
-        type="text"
-        value={note ?? ''}
-        onChange={e => onChange(e.target.value || null)}
-        placeholder="Group note (e.g. Take with food)"
-        dir="auto"
-        autoFocus={!note}
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
         style={{
-          width: '100%', boxSizing: 'border-box',
-          marginTop: -4,
-          padding: '4px 8px',
+          ...wrapStyle,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+          padding: '3px 8px',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
-          fontSize: 11, fontStyle: 'italic',
-          fontFamily: 'var(--font-body)',
-          backgroundColor: 'var(--color-surface)',
-          color: 'var(--color-text-tertiary)',
-          outline: 'none',
+          background: 'var(--color-bg)',
+          color: 'var(--color-text-secondary)',
+          fontSize: 11, fontWeight: 600,
+          cursor: 'pointer', fontFamily: 'var(--font-body)',
+          alignSelf: 'flex-start',
         }}
-      />
+      >
+        <Plus size={10} /> {triggerLabel}
+      </button>
+    )
+  }
+
+  if (isEditing) {
+    return (
+      <div style={{ ...wrapStyle, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <input
+          type="text"
+          value={note ?? ''}
+          onChange={e => onChange(e.target.value || null)}
+          placeholder={placeholder}
+          dir="auto"
+          autoFocus
+          onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
+          style={{ ...editLineInputStyle, flex: 1, fontSize: 11, fontStyle: 'italic' }}
+        />
+        <button
+          type="button"
+          onClick={() => setIsEditing(false)}
+          title="Done editing"
+          aria-label={`Done editing ${label}`}
+          style={lineIconButtonStyle}
+        >
+          <Check size={13} />
+        </button>
+      </div>
     )
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => setNoteOpen(true)}
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 3,
-        marginTop: -4,
-        background: 'none', border: 'none', padding: 0,
-        fontSize: 11, fontStyle: 'italic', fontWeight: 600,
-        color: 'var(--color-text-secondary)',
-        cursor: 'pointer', fontFamily: 'var(--font-body)',
-        alignSelf: 'flex-start',
+        ...wrapStyle,
+        display: 'flex', alignItems: 'center', gap: 4,
+        borderRadius: 'var(--radius-md)',
+        backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
       }}
     >
-      <Plus size={10} /> group note
-    </button>
+      <div
+        dir="auto"
+        style={{
+          flex: 1,
+          padding: '3px 8px',
+          fontSize: 11, fontStyle: 'italic', fontFamily: 'var(--font-body)',
+          color: 'var(--color-text-tertiary)',
+        }}
+      >
+        {note}
+      </div>
+      {isHovered && (
+        <>
+          <button
+            type="button"
+            onClick={() => setIsEditing(true)}
+            title={`Edit ${label}`}
+            aria-label={`Edit ${label}`}
+            style={lineIconButtonStyle}
+          >
+            <Edit2 size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange(null)}
+            title={`Remove ${label}`}
+            aria-label={`Remove ${label}`}
+            style={lineIconButtonStyle}
+          >
+            <X size={13} />
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── GroupNoteSlot ───────────────────────────────────────────────────────────
+// PHASE 2.2-C/D: per-group note slot, rendered below the dose card for each
+// group. Thin wrapper over NoteSlot above.
+
+function GroupNoteSlot({ note, onChange }) {
+  return (
+    <NoteSlot
+      note={note}
+      onChange={onChange}
+      label="group note"
+      triggerLabel="group note"
+      placeholder="Group note (e.g. Take with food)"
+    />
   )
 }
 
 // ─── DrugOptionNoteSlot ────────────────────────────────────────────────────────
 // PHASE 2.2-D: per-drug note slot (Decision 5 two-slot note model). Rendered
-// directly under each drug name in DrugOptionRow. Same collapsed-by-default /
-// stays-open behavior as GroupNoteSlot, but:
-//   - Labelled "+ note" (shorter — position under the name makes it clear this
-//     is the per-drug note, not the group note below the dose).
-//   - Travels with the drug option when it is moved to a different group
-//     (the note lives on 'option.note', not on the group record).
-//
-// Visual tier: 11px, italic, tertiary color — lowest visual priority, matching
-// the note tier in Decision 5's name > dose > note hierarchy.
+// directly under each drug name in DrugOptionRow. Thin wrapper over NoteSlot
+// above, labelled "note" (shorter — position under the name makes it clear
+// this is the per-drug note, not the group note below the dose). Travels
+// with the drug option when it is moved to a different group (the note lives
+// on 'option.note', not on the group record).
 //
 // Props:
 //   note      — current per-drug note value (string|null)
 //   onChange  — (value: string|null) => void
 
 function DrugOptionNoteSlot({ note, onChange }) {
-  const [open, setOpen] = useState(!!note)
-
-  // PHASE A BUG FIX (2026-06-26): re-sync open state whenever note is
-  // non-empty, instead of relying solely on the mount-only
-  // useState(!!note) initializer above. That initializer only
-  // evaluates once, on mount — if this component remounts (new
-  // option.id/key, or the surrounding groups[] array gets rebuilt in a
-  // way that changes this option's position/identity) before the
-  // patched note value has fully flowed back into the option prop this
-  // component receives, 'open' re-initializes to false on the remount,
-  // and a non-empty note appears to vanish behind a re-collapsed
-  // "+ note" button — even though the value is still present in state.
-  // This matches the reported bug exactly: a per-drug note in a group
-  // of 2+ "vanishes" after the row collapses, as if it never existed.
-  // This keeps the existing "stays open once clicked, no auto-collapse
-  // on blur" behavior (Decision 5) intact — it only ever forces OPEN
-  // when there is real content to show, never forces closed.
-  useEffect(() => {
-    if (note) setOpen(true)
-  }, [note])
-
-  // DECLUTTER PASS 4 (Direction 1, 2026-08-08): pulled tight to the drug
-  // name above it via a small negative marginTop, instead of taking the
-  // full block-level gap the rest of the row uses — same reasoning as
-  // GroupNoteSlot above. Applied to both states so toggling between them
-  // doesn't shift the layout.
-  if (open) {
-    return (
-      <input
-        type="text"
-        value={note ?? ''}
-        onChange={e => onChange(e.target.value || null)}
-        placeholder="Drug note (e.g. Preferred for children)"
-        dir="auto"
-        autoFocus={!note}
-        style={{
-          width: '100%', boxSizing: 'border-box',
-          marginTop: -4,
-          padding: '4px 8px',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-md)',
-          fontSize: 11, fontStyle: 'italic',
-          fontFamily: 'var(--font-body)',
-          backgroundColor: 'var(--color-surface)',
-          color: 'var(--color-text-tertiary)',
-          outline: 'none',
-        }}
-      />
-    )
-  }
-
   return (
-    <button
-      type="button"
-      onClick={() => setOpen(true)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 3,
-        marginTop: -4,
-        background: 'none', border: 'none', padding: 0,
-        fontSize: 11, fontStyle: 'italic', fontWeight: 600,
-        color: 'var(--color-text-secondary)',
-        cursor: 'pointer', fontFamily: 'var(--font-body)',
-        alignSelf: 'flex-start',
-      }}
-    >
-      <Plus size={10} /> note
-    </button>
+    <NoteSlot
+      note={note}
+      onChange={onChange}
+      label="note"
+      triggerLabel="note"
+      placeholder="Drug note (e.g. Preferred for children)"
+    />
   )
 }
 
@@ -1188,10 +1196,10 @@ function OrDivider() {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
       <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
       <span style={{
-        fontSize:   11,
-        fontWeight: 400,
+        fontSize:   12,
+        fontWeight: 700,
         fontFamily: 'var(--font-body)',
-        color:      'var(--color-text-secondary)',
+        color:      'var(--color-accent)',
         flexShrink: 0,
       }}>
         or
