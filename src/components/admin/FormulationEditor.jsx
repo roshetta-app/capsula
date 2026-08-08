@@ -1,4 +1,5 @@
-import { AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react'
 import { DRUG_FORMS, DRUG_ROUTES, INJECTION_ROUTE_DETAILS } from '../../config/forms'
 import DoseRowList from './DoseRowList'
 import TagInput from './TagInput'
@@ -9,6 +10,13 @@ import TagInput from './TagInput'
  * 2A.2 — added strength value/unit/basis, form modifier tags, device type,
  *   injection route-details tick-list, and the Formulation Note field
  *   (renamed from restricted_dispensing).
+ * Visual cleanup — Dose Override Note and Formulation Note fields removed
+ *   from this editor entirely (underlying formulation.default_dose_override
+ *   / formulation.formulation_note columns are untouched, just no longer
+ *   editable here). Strength/Concentration/Form/Route/Route Details/Form
+ *   Modifier/Device Type now live inside a "Formulation Details" section,
+ *   collapsed by default — Practical Doses and Published stay outside it,
+ *   always visible.
  * DrugCMS fix — strength is now always shown as one Value/Unit/Basis row
  *   PER INGREDIENT (strength_structured.ingredients), for single-ingredient
  *   and combo formulations alike — replacing the old split where singles got
@@ -63,8 +71,33 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
     onChange(patch)
   }
 
+  const [detailsOpen, setDetailsOpen] = useState(false)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+
+      {/* Formulation Details — collapsed by default. Wraps everything that
+          used to render flat above Practical Doses (strength, concentration,
+          form/route, route details, form modifier/device type) — visual
+          cleanup only, no field behavior changed. Mirrors the same
+          chevron-toggle pattern already used one level up, for the
+          formulation card itself. */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setDetailsOpen(open => !open)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+            ...labelStyle,
+          }}
+        >
+          {detailsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          Formulation Details
+        </button>
+
+        {detailsOpen && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', marginTop: 'var(--space-3)' }}>
 
       {/* Strength — one Value/Unit/Basis row per ingredient */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -227,6 +260,9 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
           />
         </Field>
       </div>
+      </div>
+        )}
+      </div>
 
       {/* Practical doses */}
       <Field label="Practical doses" hint="Patient-friendly doses shown for this formulation">
@@ -234,30 +270,6 @@ export default function FormulationEditor({ formulation, ingredients = [], onCha
           doses={formulation.doses ?? []}
           onChange={doses => set('doses', doses)}
           disabled={disabled}
-        />
-      </Field>
-
-      {/* Default dose override note */}
-      <Field label="Dose override note" hint="Optional note shown below the dose table (italic, muted)">
-        <input
-          type="text"
-          value={formulation.default_dose_override ?? ''}
-          onChange={e => set('default_dose_override', e.target.value || null)}
-          placeholder="e.g. Reduce dose in renal impairment"
-          disabled={disabled}
-          style={inputStyle}
-        />
-      </Field>
-
-      {/* Formulation Note */}
-      <Field label="Formulation Note" hint="Optional free-text note about this formulation">
-        <input
-          type="text"
-          value={formulation.formulation_note ?? ''}
-          onChange={e => set('formulation_note', e.target.value || null)}
-          placeholder="e.g. Hospital only"
-          disabled={disabled}
-          style={inputStyle}
         />
       </Field>
 
