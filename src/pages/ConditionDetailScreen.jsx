@@ -86,6 +86,8 @@ export default function ConditionDetailScreen() {
     0: scrollMemory.get(`${slug}:0`) ?? 0,
     1: scrollMemory.get(`${slug}:1`) ?? 0,
   })
+  // TEMP DIAGNOSTIC — remove after we find the break
+  console.log('[scroll-debug] mount seed for', slug, '→', scrollPositions.current, '| full map:', Array.from(scrollMemory.entries()))
 
   // The box that actually scrolls for this screen (see rootRef/rootStyle
   // below for why this replaced window-level scrolling).
@@ -116,6 +118,8 @@ export default function ConditionDetailScreen() {
       const pos = scrollBoxRef.current.scrollTop
       scrollPositions.current[activeTab] = pos
       scrollMemory.set(`${slug}:${activeTab}`, pos)
+      // TEMP DIAGNOSTIC — remove after we find the break
+      console.log('[scroll-debug] switchTab saved', `${slug}:${activeTab}`, '=', pos)
     }
     setActiveTab(index)
   }
@@ -128,7 +132,15 @@ export default function ConditionDetailScreen() {
   // Phase 18 for the full root-cause note).
   useLayoutEffect(() => {
     if (scrollBoxRef.current) {
-      scrollBoxRef.current.scrollTop = scrollPositions.current[activeTab] ?? 0
+      const target = scrollPositions.current[activeTab] ?? 0
+      scrollBoxRef.current.scrollTop = target
+      // TEMP DIAGNOSTIC — remove after we find the break
+      console.log(
+        '[scroll-debug] restore applying', target,
+        '| scrollHeight:', scrollBoxRef.current.scrollHeight,
+        '| clientHeight:', scrollBoxRef.current.clientHeight,
+        '| actual scrollTop after set:', scrollBoxRef.current.scrollTop
+      )
     }
   }, [activeTab])
 
@@ -146,7 +158,13 @@ export default function ConditionDetailScreen() {
     return () => {
       if (scrollBoxRef.current) {
         const { slug: s, activeTab: t } = latestRef.current
-        scrollMemory.set(`${s}:${t}`, scrollBoxRef.current.scrollTop)
+        const val = scrollBoxRef.current.scrollTop
+        scrollMemory.set(`${s}:${t}`, val)
+        // TEMP DIAGNOSTIC — remove after we find the break
+        console.log('[scroll-debug] unmount saved', `${s}:${t}`, '=', val)
+      } else {
+        // TEMP DIAGNOSTIC — remove after we find the break
+        console.log('[scroll-debug] unmount fired but scrollBoxRef.current was null')
       }
     }
   }, [])
