@@ -164,7 +164,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check, ChevronDown } from 'lucide-react'
+import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS } from '../../../../config/forms'
@@ -425,6 +425,17 @@ function EditableDoseLine({
 }) {
   const [isEditing, setIsEditing] = useState(startInEdit)
 
+  // NOISE-REDUCTION PASS (2026-08-08): the read-only row's action icons
+  // (edit / save-to-library / remove) used to be permanently visible,
+  // which is most of what made a dose section with several brackets read
+  // as cluttered. Now they only render once this row is hovered — same
+  // isHovered-driven inline-style approach already used elsewhere in this
+  // file (see the plain onMouseEnter/onMouseLeave handlers a few
+  // components down), just applied at the row level instead of a single
+  // button. Editing/saving/error states are unaffected — those still show
+  // regardless of hover, since they're active feedback, not idle chrome.
+  const [isHovered, setIsHovered] = useState(false)
+
   // Mount-time-only read (same "runs once" pattern already used elsewhere
   // in this file, e.g. DrugOptionRow's startInManualMode) — startInEdit
   // only matters at the instant this specific bracket is first rendered;
@@ -478,7 +489,15 @@ function EditableDoseLine({
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
+          }}
+        >
           <div
             dir="auto"
             style={{
@@ -495,41 +514,49 @@ function EditableDoseLine({
             )}
             {displayInstruction}
           </div>
-          <button
-            type="button"
-            onClick={startEditing}
-            title="Edit this dose line"
-            aria-label="Edit this dose line"
-            style={lineIconButtonStyle}
-          >
-            <Edit2 size={12} />
-          </button>
-          {canSaveToLibrary && (
-            <button
-              type="button"
-              onClick={onRequestSave}
-              disabled={isSaving}
-              title="Save this wording back to the drug library"
-              aria-label="Save this dose line back to the drug library"
-              style={{
-                ...lineIconButtonStyle,
-                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                cursor: isSaving ? 'default' : 'pointer',
-                opacity: isSaving ? 0.5 : 1,
-              }}
-            >
-              <Library size={13} />
-            </button>
+          {/* Action icons only render once hovered — isSaved still shows its
+              accent color the moment the row is next hovered after a save,
+              same feedback as before, just not competing for attention
+              while the row is at rest. */}
+          {isHovered && (
+            <>
+              <button
+                type="button"
+                onClick={startEditing}
+                title="Edit this dose line"
+                aria-label="Edit this dose line"
+                style={lineIconButtonStyle}
+              >
+                <Edit2 size={12} />
+              </button>
+              {canSaveToLibrary && (
+                <button
+                  type="button"
+                  onClick={onRequestSave}
+                  disabled={isSaving}
+                  title="Save this wording back to the drug library"
+                  aria-label="Save this dose line back to the drug library"
+                  style={{
+                    ...lineIconButtonStyle,
+                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    cursor: isSaving ? 'default' : 'pointer',
+                    opacity: isSaving ? 0.5 : 1,
+                  }}
+                >
+                  <Library size={13} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onRemove}
+                title="Remove this line"
+                aria-label="Remove this dose line"
+                style={lineIconButtonStyle}
+              >
+                <X size={13} />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onRemove}
-            title="Remove this line"
-            aria-label="Remove this dose line"
-            style={lineIconButtonStyle}
-          >
-            <X size={13} />
-          </button>
         </div>
       )}
 
@@ -632,6 +659,9 @@ function EditableMaxDose({
   isSaving, isSaved, saveError,
 }) {
   const [isEditing, setIsEditing] = useState(false)
+  // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icons as
+  // EditableDoseLine — see that component's comment for the reasoning.
+  const [isHovered, setIsHovered] = useState(false)
 
   if (!value && !isEditing) {
     return (
@@ -674,7 +704,15 @@ function EditableMaxDose({
           </button>
         </div>
       ) : (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4,
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: isHovered ? 'var(--color-bg)' : 'transparent',
+          }}
+        >
           <div
             dir="auto"
             style={{
@@ -686,41 +724,45 @@ function EditableMaxDose({
           >
             {value}
           </div>
-          <button
-            type="button"
-            onClick={() => setIsEditing(true)}
-            title="Edit max dose"
-            aria-label="Edit max dose"
-            style={lineIconButtonStyle}
-          >
-            <Edit2 size={12} />
-          </button>
-          {canSaveToLibrary && (
-            <button
-              type="button"
-              onClick={onRequestSave}
-              disabled={isSaving}
-              title="Save this wording back to the drug library"
-              aria-label="Save this max dose back to the drug library"
-              style={{
-                ...lineIconButtonStyle,
-                color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                cursor: isSaving ? 'default' : 'pointer',
-                opacity: isSaving ? 0.5 : 1,
-              }}
-            >
-              <Library size={13} />
-            </button>
+          {isHovered && (
+            <>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                title="Edit max dose"
+                aria-label="Edit max dose"
+                style={lineIconButtonStyle}
+              >
+                <Edit2 size={12} />
+              </button>
+              {canSaveToLibrary && (
+                <button
+                  type="button"
+                  onClick={onRequestSave}
+                  disabled={isSaving}
+                  title="Save this wording back to the drug library"
+                  aria-label="Save this max dose back to the drug library"
+                  style={{
+                    ...lineIconButtonStyle,
+                    color: isSaved ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    cursor: isSaving ? 'default' : 'pointer',
+                    opacity: isSaving ? 0.5 : 1,
+                  }}
+                >
+                  <Library size={13} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onRemove}
+                title="Remove max dose"
+                aria-label="Remove max dose"
+                style={lineIconButtonStyle}
+              >
+                <X size={13} />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onRemove}
-            title="Remove max dose"
-            aria-label="Remove max dose"
-            style={lineIconButtonStyle}
-          >
-            <X size={13} />
-          </button>
         </div>
       )}
 
@@ -787,6 +829,9 @@ function EditableMaxDose({
 // built from scratch (see addBracket below), it needs to be typeable too.
 function EditablePopulation({ value, onChange }) {
   const [isEditing, setIsEditing] = useState(false)
+  // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icon treatment as
+  // EditableDoseLine/EditableMaxDose — the pencil only shows on hover.
+  const [isHovered, setIsHovered] = useState(false)
 
   if (!value && !isEditing) {
     return (
@@ -822,7 +867,11 @@ function EditablePopulation({ value, onChange }) {
       />
     </div>
   ) : (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginLeft: 19 }}>
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginLeft: 19 }}
+    >
       <span style={{
         display: 'inline-flex', alignItems: 'center',
         padding: '1px 7px',
@@ -834,15 +883,17 @@ function EditablePopulation({ value, onChange }) {
       }}>
         {doseWhoLabel(value)}
       </span>
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        title="Edit population"
-        aria-label="Edit population"
-        style={{ ...lineIconButtonStyle, width: 18, height: 18 }}
-      >
-        <Edit2 size={11} />
-      </button>
+      {isHovered && (
+        <button
+          type="button"
+          onClick={() => setIsEditing(true)}
+          title="Edit population"
+          aria-label="Edit population"
+          style={{ ...lineIconButtonStyle, width: 18, height: 18 }}
+        >
+          <Edit2 size={11} />
+        </button>
+      )}
     </div>
   )
 }
@@ -2164,6 +2215,26 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [groupSaveError, setGroupSaveError] = useState(null) // { groupIdx, message } | null
   const [freshBracketId, setFreshBracketId] = useState(null) // id of a bracket just added from scratch — opens it already in edit mode
 
+  // NOISE-REDUCTION PASS (2026-08-08): "Restore from library" used to sit
+  // as its own permanently-visible underlined link at the bottom of the
+  // dose block, competing with "Save to library" above it. It now lives in
+  // a small "⋯" menu instead — same open-groupIdx-in-state + click-outside-
+  // dismiss pattern as confirmSaveGroup above, and the same dropdown style
+  // AddDrugControls already uses elsewhere in this file (addDrugDropdownStyle/
+  // addDrugDropdownItemStyle), so this doesn't introduce a new visual
+  // pattern. Only one group's menu can be open at a time.
+  const [doseMenuOpenGroupIdx, setDoseMenuOpenGroupIdx] = useState(null)
+  const doseMenuRef = useRef(null)
+  useEffect(() => {
+    function handlePointerDown(e) {
+      if (doseMenuRef.current && !doseMenuRef.current.contains(e.target)) {
+        setDoseMenuOpenGroupIdx(null)
+      }
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [])
+
   // ── Mutation helpers ───────────────────────────────────────────────────
 
   function emitGroups(nextGroups) {
@@ -2897,28 +2968,61 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     flat 'dose' text (if any) is shown as a one-time hint
                     and folded into the first bracket the moment "Add
                     bracket" is used — see addBracket. */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{
+                  display: 'flex', flexDirection: 'column', gap: 6,
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 12,
+                  padding: '10px 12px',
+                  backgroundColor: 'var(--color-surface)',
+                }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <EditablePopulation
                       value={group.dose_who}
                       onChange={val => updateGroupDoseWho(groupIdx, val)}
                     />
-                    {firstOpt.formulation_id && group.dose_who?.trim() && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
-                      <button
-                        type="button"
-                        onClick={() => setConfirmSaveGroup(groupIdx)}
-                        disabled={savingGroupIdx === groupIdx}
-                        title="Save this dose back to the drug library"
-                        style={{
-                          ...addOptionButtonStyle,
-                          color: savedGroupIdx === groupIdx ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                          cursor: savingGroupIdx === groupIdx ? 'default' : 'pointer',
-                          opacity: savingGroupIdx === groupIdx ? 0.5 : 1,
-                        }}
-                      >
-                        <Library size={12} /> Save to library
-                      </button>
-                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {firstOpt.formulation_id && group.dose_who?.trim() && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmSaveGroup(groupIdx)}
+                          disabled={savingGroupIdx === groupIdx}
+                          title="Save this dose back to the drug library"
+                          style={{
+                            ...addOptionButtonStyle,
+                            color: savedGroupIdx === groupIdx ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                            cursor: savingGroupIdx === groupIdx ? 'default' : 'pointer',
+                            opacity: savingGroupIdx === groupIdx ? 0.5 : 1,
+                          }}
+                        >
+                          <Library size={12} /> Save to library
+                        </button>
+                      )}
+                      {firstOpt.formulation_id && (
+                        <div style={{ position: 'relative' }}>
+                          <button
+                            type="button"
+                            onClick={() => setDoseMenuOpenGroupIdx(v => v === groupIdx ? null : groupIdx)}
+                            title="More dose actions"
+                            aria-label="More dose actions"
+                            style={{ ...lineIconButtonStyle, width: 22, height: 22, border: '1px solid var(--color-border)' }}
+                          >
+                            <MoreHorizontal size={13} />
+                          </button>
+                          {doseMenuOpenGroupIdx === groupIdx && (
+                            <div ref={doseMenuRef} style={{ ...addDrugDropdownStyle, minWidth: 150 }}>
+                              <button
+                                type="button"
+                                onClick={() => { setDoseMenuOpenGroupIdx(null); restoreDoseFromLibrary(groupIdx) }}
+                                disabled={restoringGroupIdx === groupIdx}
+                                style={addDrugDropdownItemStyle}
+                              >
+                                {restoringGroupIdx === groupIdx ? 'Restoring…' : 'Restore from library'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {confirmSaveGroup === groupIdx && (
@@ -3050,25 +3154,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       isSaved={savedMaxDoseGroupIdx === groupIdx}
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
                     />
-
-                    {firstOpt.formulation_id && (
-                      <button
-                        type="button"
-                        onClick={() => restoreDoseFromLibrary(groupIdx)}
-                        disabled={restoringGroupIdx === groupIdx}
-                        style={{
-                          alignSelf: 'flex-start',
-                          background: 'none', border: 'none', padding: 0,
-                          fontSize: 11, color: 'var(--color-text-tertiary)',
-                          textDecoration: 'underline',
-                          cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
-                          opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
-                          fontFamily: 'var(--font-body)',
-                        }}
-                      >
-                        Restore from library
-                      </button>
-                    )}
                   </div>
                 </div>
 
