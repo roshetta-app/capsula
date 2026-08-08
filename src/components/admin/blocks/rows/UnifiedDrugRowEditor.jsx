@@ -1085,7 +1085,7 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
 //   canMoveAbove  — bool: show "Move to group above" option          — PHASE 2.4
 //   canMoveBelow  — bool: show "Move to group below" option          — PHASE 2.4
 
-function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed }) {
+function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOptionPick, onMove, canMoveToNew, canMoveAbove, canMoveBelow, groupDose, groupDoseWho, startInManualMode, onManualModeConsumed }) {
   const [promoteOn, setPromoteOn]             = useState(false)
   const [promoteCategory, setPromoteCategory] = useState('')
   const [promoteDoseWho, setPromoteDoseWho]   = useState('adult')
@@ -1168,8 +1168,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
   // ── Library link/unlink ─────────────────────────────────────────────────
   function handleBrandPick(brand) {
     // Item B (Unified Drug Row Editor Redesign, Phase 6, 2026-08-08): captured
-    // BEFORE patch() runs below. isEmptyUntouched reflects the option as it
-    // was prior to this pick — true only for a brand-new, never-touched
+    // BEFORE the option update below. isEmptyUntouched reflects the option as
+    // it was prior to this pick — true only for a brand-new, never-touched
     // option. A false value here means this call is a re-pick (via the
     // pencil, which reuses this same handler per Decision 4) replacing an
     // existing linked or committed-free-text identity, not a first pick.
@@ -1193,21 +1193,39 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         route:         f.route ?? '',
       } : option._formulationMeta,
     }
-    patch(baseFields)
+    const nextOption = { ...option, ...baseFields }
 
-    // Resolve dose — bubbled to parent so it can write to the group's dose field.
+    // ROOT-CAUSE FIX (pencil re-pick reliability bug, 2026-08-08): the
+    // identity update and the dose update used to go through two separate
+    // parent calls (patch() -> onUpdate(), then onDoseReady()) fired
+    // synchronously in this same handler. Both were computed by the parent
+    // from the same pre-update groups[] snapshot, so the second call's
+    // setGroups() silently discarded the first call's option change — only
+    // the dose update survived. This never showed up on a brand-new,
+    // untouched option (no dose event fires there — see the final `else`
+    // below), which is why the FIRST pick on a row always looked correct;
+    // every re-pick after that sets wasReplacingExisting=true, which fires
+    // a dose event on almost every pick, silently reverting the identity
+    // change each time. Fixed by sending both pieces in one onOptionPick
+    // call so the parent can apply them in a single groups.map() pass —
+    // mirrors addOptionToGroups' already-working combined-update pattern
+    // (see that function below, and its 2026-08-06 comment for the same
+    // dose_max lesson).
     const resolved = resolveDosePick(f?.doses_structured)
     if (resolved.needsChoice) {
+      onOptionPick(nextOption, null)
       setPendingDoseChoice({ populations: resolved.populations })
     } else if (resolved.dose_lines.length || resolved.dose) {
-      onDoseReady?.(resolved)
+      onOptionPick(nextOption, resolved)
     } else if (wasReplacingExisting) {
       // Item B: the newly-picked drug has no library dose of its own, and
       // this was a re-pick — clear the group's dose fields so the previous
       // drug's dose brackets don't linger under the new drug's name. Applies
       // even in multi-drug groups, since the dose is shared at the group
       // level regardless of how many drug options sit in it.
-      onDoseReady?.({ dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null })
+      onOptionPick(nextOption, { dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null })
+    } else {
+      onOptionPick(nextOption, null)
     }
   }
 
@@ -1227,7 +1245,8 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
   // fields: this is the no-brand, formulation-only identity path.
   function handleFormulationPick(formulation) {
     const generic = formulation.generics
-    patch({
+    const nextOption = {
+      ...option,
       brand_name: null,
       brand_id: null,
       generic_name: generic?.name_en ?? option.generic_name,
@@ -1243,12 +1262,16 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
         form: formulation.form ?? '',
         route: formulation.route ?? '',
       },
-    })
+    }
+    // Same combined-update fix as handleBrandPick above, same root cause.
     const resolved = resolveDosePick(formulation.doses_structured)
     if (resolved.needsChoice) {
+      onOptionPick(nextOption, null)
       setPendingDoseChoice({ populations: resolved.populations })
     } else if (resolved.dose_lines.length || resolved.dose) {
-      onDoseReady?.(resolved)
+      onOptionPick(nextOption, resolved)
+    } else {
+      onOptionPick(nextOption, null)
     }
   }
 
@@ -1731,6 +1754,36 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     const nextGroups = groups.map((g, gi) => {
       if (gi !== groupIdx) return g
       return { ...g, options: g.options.map(o => o.id === optionId ? nextOption : o) }
+    })
+    emitGroups(nextGroups)
+  }
+
+  // Update a single option AND (optionally) the group's dose fields in ONE
+  // emit. Root-cause fix, pencil re-pick reliability bug (2026-08-08):
+  // DrugOptionRow's handleBrandPick/handleFormulationPick used to call
+  // onUpdate() and onDoseReady() separately in the same synchronous
+  // handler — both derived their nextGroups from the same pre-update
+  // groups[] snapshot, so the second emitGroups() call silently discarded
+  // the option-identity change made by the first. Combining both pieces
+  // into one groups.map() pass, one emitGroups() call, fixes it — mirrors
+  // addOptionToGroups' already-working combined pattern below (dose fields
+  // included, defaulting every field the same way applyDoseToGroup does).
+  // Pass doseFields=null to update only the option's identity (e.g. when
+  // resolveDosePick needs a population choice first).
+  function updateOptionAndDose(groupIdx, optionId, nextOption, doseFields) {
+    const nextGroups = groups.map((g, gi) => {
+      if (gi !== groupIdx) return g
+      const nextOptions = g.options.map(o => o.id === optionId ? nextOption : o)
+      if (!doseFields) return { ...g, options: nextOptions }
+      return {
+        ...g,
+        options: nextOptions,
+        dose: doseFields.dose ?? null,
+        dose_who: doseFields.dose_who ?? null,
+        dose_lines: doseFields.dose_lines ?? [],
+        dose_max: doseFields.dose_max ?? null,
+        dose_max_population_id: doseFields.dose_max_population_id ?? null,
+      }
     })
     emitGroups(nextGroups)
   }
@@ -2243,6 +2296,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
               onRemove={() => removeOption(groupIdx, option.id)}
               isOnly={totalOptions === 1}
               onDoseReady={doseFields => applyDoseToGroup(groupIdx, doseFields)}
+              onOptionPick={(nextOpt, doseFields) => updateOptionAndDose(groupIdx, option.id, nextOpt, doseFields)}
               onMove={action => {
                 if (action === 'new-group') moveToNewGroup(groupIdx, option.id)
                 else if (action === 'above') moveToGroupAbove(groupIdx, option.id)
