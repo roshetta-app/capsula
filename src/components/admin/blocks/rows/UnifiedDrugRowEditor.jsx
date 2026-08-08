@@ -1348,6 +1348,12 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       setPromoteOn(false)
       setPromoteCategory('')
       setPromoteDoseWho('adult')
+      // Item C (Unified Drug Row Editor Redesign, Phase 6, 2026-08-08): once
+      // promoted, the option is now library-linked (isLinked becomes true from
+      // the patch above), so genericOnlyMode's manual-fields reveal is no
+      // longer relevant. Leaving it true caused a blank manual-entry row to
+      // flash/persist under the newly-linked display after promote.
+      setGenericOnlyMode(false)
     } catch (err) {
       setPromoteError(err.message ?? 'Promotion failed. Please try again.')
     } finally {
