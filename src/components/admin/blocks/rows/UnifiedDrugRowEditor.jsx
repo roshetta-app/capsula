@@ -1167,6 +1167,13 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
 
   // ── Library link/unlink ─────────────────────────────────────────────────
   function handleBrandPick(brand) {
+    // Item B (Unified Drug Row Editor Redesign, Phase 6, 2026-08-08): captured
+    // BEFORE patch() runs below. isEmptyUntouched reflects the option as it
+    // was prior to this pick — true only for a brand-new, never-touched
+    // option. A false value here means this call is a re-pick (via the
+    // pencil, which reuses this same handler per Decision 4) replacing an
+    // existing linked or committed-free-text identity, not a first pick.
+    const wasReplacingExisting = !isEmptyUntouched
     const f       = brand.formulations
     const generic = f?.generics
     const baseFields = {
@@ -1194,6 +1201,13 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onMove
       setPendingDoseChoice({ populations: resolved.populations })
     } else if (resolved.dose_lines.length || resolved.dose) {
       onDoseReady?.(resolved)
+    } else if (wasReplacingExisting) {
+      // Item B: the newly-picked drug has no library dose of its own, and
+      // this was a re-pick — clear the group's dose fields so the previous
+      // drug's dose brackets don't linger under the new drug's name. Applies
+      // even in multi-drug groups, since the dose is shared at the group
+      // level regardless of how many drug options sit in it.
+      onDoseReady?.({ dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null })
     }
   }
 
