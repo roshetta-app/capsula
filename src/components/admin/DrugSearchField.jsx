@@ -125,6 +125,16 @@
  *   but never checked the brand row's own is_published flag. Both now
  *   filter out unpublished brands, matching the same published-only rule
  *   already enforced by fetchFlatDrugs in queries.js.
+ *
+ * UI PASS (2026-08-08):
+ *   Wrapped the name row (pill icon + name + pencil + extraAction icons)
+ *   in a faint blue background in both the linked and committed free-text
+ *   states, using the same var(--color-accent-light) token already used
+ *   for chip backgrounds elsewhere in the row editor — makes the whole
+ *   name line (which now also carries the move/remove buttons via
+ *   extraAction) read as one grouped control rather than plain text.
+ *   Generic-name sub-line indent adjusted to still align under the name
+ *   now that the row itself has padding.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -451,9 +461,12 @@ export default function DrugSearchField({
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        6,
+          display:         'flex',
+          alignItems:      'center',
+          gap:             6,
+          padding:         '6px 8px',
+          borderRadius:    'var(--radius-md)',
+          backgroundColor: 'var(--color-accent-light)',
         }}>
           {/* Pill icon — always-present name prefix (Decision 5 / Phase 1.5) */}
           <Icon
@@ -500,7 +513,7 @@ export default function DrugSearchField({
             fontSize:   12,
             fontWeight: 500,
             color:      'var(--color-text-tertiary)',
-            paddingLeft: 19, // aligns under the name, past the pill icon
+            paddingLeft: 27, // aligns under the name, past the row's own padding + pill icon
           }}>
             {genericName}
           </span>
@@ -519,9 +532,12 @@ export default function DrugSearchField({
   if (!isLinked && committed && value) {
     return (
       <div style={{
-        display:    'flex',
-        alignItems: 'center',
-        gap:        6,
+        display:         'flex',
+        alignItems:      'center',
+        gap:             6,
+        padding:         '6px 8px',
+        borderRadius:    'var(--radius-md)',
+        backgroundColor: 'var(--color-accent-light)',
       }}>
         {/* Pill icon — matches linked display layout */}
         <Icon
@@ -781,4 +797,3 @@ function AutocompleteDropdownInline({ suggestions, freeTextName, onSelect, onCom
     </div>
   )
 }
-

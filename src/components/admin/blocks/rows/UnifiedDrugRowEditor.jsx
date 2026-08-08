@@ -1141,6 +1141,35 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
   )
 }
 
+// ─── OrDivider ─────────────────────────────────────────────────────────────────
+// UI PASS (2026-08-08): small circled "OR" marker shown on the left between
+// stacked drug options within the same group, so multiple options sharing
+// one dose/note visually read as alternatives to each other rather than a
+// plain list. Purely decorative — no state, no interaction.
+function OrDivider() {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', marginLeft: 3 }}>
+      <span style={{
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        width:           18,
+        height:          18,
+        borderRadius:    '50%',
+        border:          '1px solid var(--color-border)',
+        color:           'var(--color-text-tertiary)',
+        fontSize:        9,
+        fontWeight:       700,
+        fontFamily:      'var(--font-body)',
+        backgroundColor: 'var(--color-surface)',
+        flexShrink:      0,
+      }}>
+        OR
+      </span>
+    </div>
+  )
+}
+
 // ─── MoveMenu ──────────────────────────────────────────────────────────────────
 // PHASE 2.4: inline context menu opened by the GripVertical move icon on each
 // DrugOptionRow header. Renders a small absolute-positioned card with whichever
@@ -1696,67 +1725,81 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
     }
   }
 
+  // ── Move / remove buttons ────────────────────────────────────────────────
+  // UI PASS (2026-08-08): these used to sit in their own header row above
+  // the drug name, leaving an near-empty line whenever the not-in-library
+  // tag wasn't showing. Now built here as reusable nodes and folded into
+  // whichever row actually shows the drug name (DrugSearchField's
+  // extraAction slot for the common linked/committed cases, or the
+  // AddDrugControls/manual-entry row for the two states where
+  // DrugSearchField itself isn't rendered — see the render section below).
+  //
+  // PHASE 2.4 — move icon. Hidden when this is the only option across all
+  // groups (nothing to move). The wrapper is position:relative so MoveMenu
+  // can position itself absolutely below the button.
+  const moveButton = !isOnly && (canMoveToNew || canMoveAbove || canMoveBelow) && (
+    <div style={{ position: 'relative' }}>
+      <button
+        ref={moveButtonRef}
+        type="button"
+        title="Move this drug to a different group"
+        aria-label="Move drug option"
+        onClick={() => setMoveMenuOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, flexShrink: 0,
+          border: '1px solid var(--color-border)',
+          borderRadius: 4,
+          background: moveMenuOpen ? 'var(--color-bg)' : 'transparent',
+          color: moveMenuOpen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+          cursor: 'pointer', padding: 0,
+        }}
+      >
+        <GripVertical size={11} />
+      </button>
+      {moveMenuOpen && (
+        <MoveMenu
+          canMoveToNew={canMoveToNew}
+          canMoveAbove={canMoveAbove}
+          canMoveBelow={canMoveBelow}
+          onMove={onMove}
+          onClose={() => setMoveMenuOpen(false)}
+        />
+      )}
+    </div>
+  )
+
+  const removeButton = !isOnly && (
+    <button
+      type="button"
+      onClick={onRemove}
+      title="Remove this drug option"
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 22, height: 22, flexShrink: 0,
+        border: '1px solid var(--color-border)',
+        borderRadius: 4, background: 'transparent',
+        color: '#ef4444', cursor: 'pointer', padding: 0,
+      }}
+    >
+      <X size={11} />
+    </button>
+  )
+
+  // Combined trailing actions for DrugSearchField's extraAction slot — tag,
+  // then the existing drug-link toggle, then move/remove at the very end.
+  const nameRowExtraActions = (
+    <>
+      {showManualFields && <NotInLibraryTag />}
+      {drugLinkToggle}
+      {moveButton}
+      {removeButton}
+    </>
+  )
+
   // ── Render ──────────────────────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-
-      {/* Header row: not-in-library tag + move button + remove button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        {showManualFields && <NotInLibraryTag />}
-
-        {/* PHASE 2.4 — move icon. Hidden when this is the only option across
-            all groups (nothing to move). The wrapper is position:relative so
-            MoveMenu can position itself absolutely below the button. */}
-        {!isOnly && (canMoveToNew || canMoveAbove || canMoveBelow) && (
-          <div style={{ position: 'relative' }}>
-            <button
-              ref={moveButtonRef}
-              type="button"
-              title="Move this drug to a different group"
-              aria-label="Move drug option"
-              onClick={() => setMoveMenuOpen(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 22, height: 22, flexShrink: 0,
-                border: '1px solid var(--color-border)',
-                borderRadius: 4,
-                background: moveMenuOpen ? 'var(--color-bg)' : 'transparent',
-                color: moveMenuOpen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                cursor: 'pointer', padding: 0,
-              }}
-            >
-              <GripVertical size={11} />
-            </button>
-            {moveMenuOpen && (
-              <MoveMenu
-                canMoveToNew={canMoveToNew}
-                canMoveAbove={canMoveAbove}
-                canMoveBelow={canMoveBelow}
-                onMove={onMove}
-                onClose={() => setMoveMenuOpen(false)}
-              />
-            )}
-          </div>
-        )}
-
-        {!isOnly && (
-          <button
-            type="button"
-            onClick={onRemove}
-            title="Remove this drug option"
-            style={{
-              marginLeft: 'auto',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 22, height: 22, flexShrink: 0,
-              border: '1px solid var(--color-border)',
-              borderRadius: 4, background: 'transparent',
-              color: '#ef4444', cursor: 'pointer', padding: 0,
-            }}
-          >
-            <X size={11} />
-          </button>
-        )}
-      </div>
 
       {/* Unified Drug Row Editor Redesign, Phase 2 (2026-08-08): an
           untouched option shows only the "Add a drug" / "More options"
@@ -1766,11 +1809,17 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
           its one job (setGenericOnlyMode(true)) is now "Add new drug" in
           the More options menu, reached before any search box shows. */}
       {isEmptyUntouched ? (
-        <AddDrugControls
-          onPickBrand={() => setBrandPickerOpen(true)}
-          onPickFormulation={() => setFormulationPickerOpen(true)}
-          onAddManual={() => setGenericOnlyMode(true)}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ flex: 1 }}>
+            <AddDrugControls
+              onPickBrand={() => setBrandPickerOpen(true)}
+              onPickFormulation={() => setFormulationPickerOpen(true)}
+              onAddManual={() => setGenericOnlyMode(true)}
+            />
+          </div>
+          {moveButton}
+          {removeButton}
+        </div>
       ) : (
         <>
           {/* Suppressed once "Add new drug" has been chosen (genericOnlyMode) —
@@ -1789,9 +1838,23 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               onLink={handleBrandPick}
               onUnlink={handleUnlink}
               placeholder="Search or type a drug name…"
-              extraAction={drugLinkToggle}
+              extraAction={nameRowExtraActions}
               onRequestBrandPicker={() => setBrandPickerOpen(true)}
             />
+          )}
+
+          {/* genericOnlyMode with no brand_name yet: DrugSearchField is
+              suppressed above (manual entry is a no-brand path) and nothing
+              else in this branch renders a name row, so the tag/move/remove
+              actions need this one fallback line instead of floating with
+              no anchor. Once a generic name is typed, showManualFields'
+              manual-fields block below takes over as the real content. */}
+          {genericOnlyMode && !option.brand_name?.trim() && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {showManualFields && <NotInLibraryTag />}
+              {moveButton}
+              {removeButton}
+            </div>
           )}
 
           {/* PHASE 2.2-D — per-drug note slot (Decision 5 two-slot note model).
@@ -2971,29 +3034,34 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             }} />
           )}
 
-          {/* ── Stacked drug-name lines ── */}
-          {group.options.map(option => (
-            <DrugOptionRow
-              key={option.id}
-              option={option}
-              onUpdate={nextOpt => updateOption(groupIdx, option.id, nextOpt)}
-              onRemove={() => removeOption(groupIdx, option.id)}
-              isOnly={totalOptions === 1}
-              onDoseReady={doseFields => applyDoseToGroup(groupIdx, doseFields)}
-              onOptionPick={(nextOpt, doseFields) => updateOptionAndDose(groupIdx, option.id, nextOpt, doseFields)}
-              onMove={action => {
-                if (action === 'new-group') moveToNewGroup(groupIdx, option.id)
-                else if (action === 'above') moveToGroupAbove(groupIdx, option.id)
-                else if (action === 'below') moveToGroupBelow(groupIdx, option.id)
-              }}
-              canMoveToNew={group.options.length > 1}
-              canMoveAbove={groupIdx > 0}
-              canMoveBelow={groupIdx < groups.length - 1}
-              groupDose={group.dose ?? ''}
-              groupDoseWho={group.dose_who ?? null}
-              startInManualMode={option.id === manualEntryOptionId}
-              onManualModeConsumed={() => setManualEntryOptionId(null)}
-            />
+          {/* ── Stacked drug-name lines ──
+              UI PASS (2026-08-08): OrDivider inserted before every option
+              after the first, so options stacked within one group read as
+              "this OR this" rather than a plain list. */}
+          {group.options.map((option, optIdx) => (
+            <div key={option.id}>
+              {optIdx > 0 && <OrDivider />}
+              <DrugOptionRow
+                option={option}
+                onUpdate={nextOpt => updateOption(groupIdx, option.id, nextOpt)}
+                onRemove={() => removeOption(groupIdx, option.id)}
+                isOnly={totalOptions === 1}
+                onDoseReady={doseFields => applyDoseToGroup(groupIdx, doseFields)}
+                onOptionPick={(nextOpt, doseFields) => updateOptionAndDose(groupIdx, option.id, nextOpt, doseFields)}
+                onMove={action => {
+                  if (action === 'new-group') moveToNewGroup(groupIdx, option.id)
+                  else if (action === 'above') moveToGroupAbove(groupIdx, option.id)
+                  else if (action === 'below') moveToGroupBelow(groupIdx, option.id)
+                }}
+                canMoveToNew={group.options.length > 1}
+                canMoveAbove={groupIdx > 0}
+                canMoveBelow={groupIdx < groups.length - 1}
+                groupDose={group.dose ?? ''}
+                groupDoseWho={group.dose_who ?? null}
+                startInManualMode={option.id === manualEntryOptionId}
+                onManualModeConsumed={() => setManualEntryOptionId(null)}
+              />
+            </div>
           ))}
 
           {/* ── Shared dose + note for this group ──
