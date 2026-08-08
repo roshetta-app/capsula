@@ -1468,17 +1468,31 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       } else {
         const formulationSlugBase = `${genericName}-${concentration}-${option.form}`
           .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+        // Item A follow-up (2026-08-08), corrected: strength_structured is
+        // the locked source of truth (FormulationEditor.jsx's own
+        // convention — flat strength_value/unit/basis are kept in sync
+        // FROM the structured ingredients, never the other way around).
+        // Writing only the flat columns left strength_structured null,
+        // so FormulationEditor's own getIngredientRows() — which reads
+        // strength_structured.ingredients first and only falls back to
+        // blank rows — showed this drug's strength as empty. Ingredient
+        // name is set to genericName so it lines up exactly with the
+        // quick-entry generic's own ingredients:[genericName] (set at
+        // creation above), matching FormulationEditor's "matched" check.
+        const strengthIngredient = {
+          ingredient: genericName,
+          value: strengthValue.trim() || null,
+          unit: strengthUnit.trim() || null,
+          basis: strengthBasis.trim() || null,
+        }
         const { data: newFormulation, error: fErr } = await insertFormulation({
           generic_id: genericId,
           slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
-          // Item A follow-up (2026-08-08): a quick-entry formulation used to
-          // write concentration only, leaving strength_value/unit/basis null
-          // — invisible to anything that reads the structured columns
-          // instead of the free-text one (e.g. numeric strength sort/filter).
-          strength_value: strengthValue.trim() || null,
-          strength_unit: strengthUnit.trim() || null,
-          strength_basis: strengthBasis.trim() || null,
+          strength_structured: { ingredients: [strengthIngredient] },
+          strength_value: strengthIngredient.value,
+          strength_unit: strengthIngredient.unit,
+          strength_basis: strengthIngredient.basis,
           form: option.form,
           route: null,
           doses_structured: (() => {
