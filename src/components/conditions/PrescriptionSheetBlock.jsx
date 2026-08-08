@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDrugContext } from '../../context/DrugContext'
 import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
@@ -396,6 +396,13 @@ function buildFormulationClusters(row, drugs, mainFormulation) {
 function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType }) {
   const clusters = buildFormulationClusters(row, drugs, formulation)
 
+  // TAP FEEDBACK (2026-08-09): tracks which unit (by uIdx) is currently
+  // pressed, so a linked drug name gives immediate visual feedback that
+  // it's tappable — same pointer-based press pattern SharedDrugCard.jsx
+  // already uses for its clickable rows. A row can have several linked
+  // members, so this tracks the index rather than a single boolean.
+  const [pressedIdx, setPressedIdx] = useState(null)
+
   // Flatten clusters into a sequence of renderable units so that every
   // boundary — within a cluster (same-formulation members) or between
   // clusters (different formulations) — gets exactly one OrMarker.
@@ -497,10 +504,26 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                   style={{
                     flex: 1, minWidth: 0,
                     cursor: memberLinkEnabled && member.formulation?.slug ? 'pointer' : 'default',
+                    // TAP FEEDBACK (2026-08-09): only linked members get the
+                    // press treatment — an unlinked name has no click handler,
+                    // so it shouldn't visually react to a tap either.
+                    borderRadius: 'var(--radius-sm)',
+                    WebkitTapHighlightColor: 'transparent',
+                    backgroundColor: memberLinkEnabled && pressedIdx === uIdx
+                      ? 'var(--color-surface-muted)'
+                      : 'transparent',
+                    transform: memberLinkEnabled && pressedIdx === uIdx
+                      ? 'scale(0.99)'
+                      : 'scale(1)',
+                    transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
                   }}
                   onClick={memberLinkEnabled && member.formulation?.slug
                     ? () => navigate(`/drugs/${member.formulation.slug}`)
                     : undefined}
+                  onPointerDown={memberLinkEnabled ? () => setPressedIdx(uIdx) : undefined}
+                  onPointerUp={memberLinkEnabled ? () => setPressedIdx(null) : undefined}
+                  onPointerLeave={memberLinkEnabled ? () => setPressedIdx(null) : undefined}
+                  onPointerCancel={memberLinkEnabled ? () => setPressedIdx(null) : undefined}
                 >
                   <DrugMainLine
                     name={memberName}
