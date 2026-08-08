@@ -254,6 +254,25 @@ function toSlug(name) {
   return `cond-${suffix}`
 }
 
+// BUG FIX (2026-08-09): the slug is regenerated from the name on every
+// save, but nothing checked whether another condition already used that
+// slug before hitting the database — so a rename that happened to collide
+// with an existing condition's slug failed with Postgres's raw
+// "duplicate key value violates unique constraint 'conditions_slug_key'"
+// message, shown to the admin verbatim (they don't code and have no way
+// to know what a "unique constraint" is). This translates that one known
+// error into a plain message; every other error still passes through
+// unchanged.
+function friendlySaveError(err) {
+  const isSlugCollision =
+    err?.code === '23505' &&
+    (err?.message?.includes('conditions_slug_key') || err?.details?.includes('slug'))
+  if (isSlugCollision) {
+    return 'Another condition already uses this name. Please choose a different name.'
+  }
+  return err?.message ?? 'Save failed'
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 const EMPTY_CONDITION = {
@@ -378,14 +397,14 @@ export default function ConditionEditor() {
     if (isEdit) {
       const { error } = await updateCondition(id, payload)
       if (error) {
-        setError(error.message ?? 'Save failed')
+        setError(friendlySaveError(error))
         setSaving(false)
         return
       }
     } else {
       const { data: newRow, error } = await insertCondition(payload)
       if (error || !newRow) {
-        setError(error?.message ?? 'Save failed')
+        setError(friendlySaveError(error))
         setSaving(false)
         return
       }
