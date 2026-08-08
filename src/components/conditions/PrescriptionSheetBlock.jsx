@@ -1,6 +1,6 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useDrugs } from '../../hooks/useDrugs'
+import { useDrugContext } from '../../context/DrugContext'
 import { FileText, ExternalLink, ScanSearch } from 'lucide-react'
 import NoteCallout from '../ui/NoteCallout'
 import FreeTextPostBlock from './FreeTextPostBlock'
@@ -101,7 +101,18 @@ const RX_RAIL_GAP = 8
  */
 export default function PrescriptionSheetBlock({ sheet, hasContentAfter = true }) {
   const navigate = useNavigate()
-  const { drugs } = useDrugs()
+  // BUG FIX (2026-08-09): this used to call useDrugs() directly, which
+  // spins up its own independent cache-read + fetch cycle every time this
+  // component mounts — completely separate from the app-wide DrugProvider
+  // that has (almost always) already finished loading by the time someone
+  // is deep enough in the app to view a condition's prescription sheet.
+  // That's what caused the drug-link icon to "flash"/appear late: this
+  // component started from drugs=[] every mount and had to wait through
+  // its own fresh loading cycle before any brand/formulation match could
+  // resolve, even though the real data was already sitting in context.
+  // useDrugContext() reads the one shared instance instead — same fix
+  // DrugDetailScreen.jsx already uses for the same reason.
+  const { drugs } = useDrugContext()
 
   const rows = sheet?.rows ?? []
   if (!rows.length) return null
