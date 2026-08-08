@@ -176,6 +176,8 @@ import {
   insertGeneric,
   insertFormulation,
   insertBrand,
+  fetchGenericsPage,
+  fetchFormulationsForGeneric,
   fetchFormulationWithGeneric,
   updateFormulation,
 } from '../../../../lib/adminQueries'
@@ -1126,6 +1128,71 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
   const [brandPickerOpen, setBrandPickerOpen] = useState(false)
   const [formulationPickerOpen, setFormulationPickerOpen] = useState(false)
 
+  // Unified Drug Row Editor Redesign, Item A (2026-08-08): "Add new drug"
+  // generic-name search box. A pick here is held LOCALLY, not written onto
+  // the option — writing option.generic_id immediately would flip isLinked
+  // to true and hide the manual fields/Promote button below (confirmed with
+  // user: wait until Promote). handlePromote reads pickedGeneric.id directly
+  // instead of calling findGenericByName when this is set.
+  const [genericSuggestions, setGenericSuggestions] = useState([])
+  const [genericSearching, setGenericSearching] = useState(false)
+  const [pickedGeneric, setPickedGeneric]       = useState(null) // { id, name_en }
+  const genericDropdownMouseDownRef = useRef(false)
+
+  // Formulations under the picked generic — shown so the admin can reuse an
+  // existing one instead of typing concentration/form from scratch.
+  // pickedFormulationId: null = nothing chosen yet, 'new' = explicit
+  // "none of these" choice (concentration/form stay open), or a real id.
+  const [formulationChoices, setFormulationChoices] = useState([])
+  const [loadingFormulations, setLoadingFormulations] = useState(false)
+  const [pickedFormulationId, setPickedFormulationId] = useState(null)
+
+  // Debounced generic search, driven off option.generic_name (the same value
+  // the text input patches directly) rather than a separate query state, so
+  // there's one source of truth for what's typed. Mirrors DrugSearchField's
+  // own 2-char/250ms pattern — same search UX, different data source
+  // (fetchGenericsPage instead of brand/formulation search).
+  const genericNameForSearch = option.generic_name ?? ''
+  useEffect(() => {
+    if (pickedGeneric || genericNameForSearch.trim().length < 2) {
+      setGenericSuggestions([])
+      return
+    }
+    setGenericSearching(true)
+    const timer = setTimeout(async () => {
+      const { data, error } = await fetchGenericsPage({ query: genericNameForSearch.trim(), limit: 5 })
+      if (!error) setGenericSuggestions(data ?? [])
+      setGenericSearching(false)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [genericNameForSearch, pickedGeneric])
+
+  function handlePickGeneric(generic) {
+    setGenericSuggestions([])
+    setPickedGeneric({ id: generic.id, name_en: generic.name_en })
+    patch({ generic_name: generic.name_en })
+    setPickedFormulationId(null)
+    setFormulationChoices([])
+    setLoadingFormulations(true)
+    fetchFormulationsForGeneric(generic.id).then(({ data }) => {
+      setFormulationChoices(data ?? [])
+      setLoadingFormulations(false)
+    })
+  }
+
+  function handleClearPickedGeneric() {
+    setPickedGeneric(null)
+    setPickedFormulationId(null)
+    setFormulationChoices([])
+  }
+
+  function handlePickFormulationChoice(formulationId) {
+    setPickedFormulationId(formulationId)
+    if (formulationId === 'new') return
+    const f = formulationChoices.find(fc => fc.id === formulationId)
+    if (f) patch({ concentration: f.concentration ?? null, form: f.form ?? null })
+  }
+
   function patch(updates) {
     onUpdate({ ...option, ...updates })
   }
@@ -1299,8 +1366,13 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
     }
 
     setPromoting(true)
-    let genericId     = option.generic_id ?? null
-    let formulationId = null
+    // Item A (Unified Drug Row Editor Redesign, 2026-08-08): a generic/
+    // formulation picked earlier in the search-aware manual entry flow was
+    // held locally (pickedGeneric / pickedFormulationId), not written to the
+    // option — use it directly here instead of re-running the
+    // reuse-or-create checks, per the approved design's step 5.
+    let genericId     = option.generic_id ?? pickedGeneric?.id ?? null
+    let formulationId = (pickedFormulationId && pickedFormulationId !== 'new') ? pickedFormulationId : null
     let brandId       = null
 
     try {
@@ -1316,12 +1388,18 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
             name_en: genericName,
             category: promoteCategory,
             class: null,
+            // Item A step 5: a quick-entry generic must still be findable by
+            // ingredient-aware search later — without this, fetchGenericsPage's
+            // ingredient match (and the app's own generic-mode search) would
+            // never surface it even though its name matches.
+            ingredients: [genericName],
           })
           if (gErr) throw new Error(`Creating generic "${genericName}": ${gErr.message}`)
           genericId = newGeneric.id
         }
       }
 
+      if (!formulationId) {
       const { data: existingFormulation, error: findFErr } = await findFormulationMatch(genericId, concentration, option.form)
       if (findFErr) throw new Error(`Checking for an existing formulation: ${findFErr.message}`)
       if (existingFormulation) {
@@ -1361,6 +1439,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
         if (fErr) throw new Error(`Creating formulation: ${fErr.message}`)
         formulationId = newFormulation.id
       }
+      }
 
       const brandName = option.brand_name?.trim()
       if (brandName) {
@@ -1391,6 +1470,9 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       // longer relevant. Leaving it true caused a blank manual-entry row to
       // flash/persist under the newly-linked display after promote.
       setGenericOnlyMode(false)
+      setPickedGeneric(null)
+      setPickedFormulationId(null)
+      setFormulationChoices([])
     } catch (err) {
       setPromoteError(err.message ?? 'Promotion failed. Please try again.')
     } finally {
@@ -1509,19 +1591,118 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
         </>
       )}
 
-      {/* Manual identity fields — unlinked rows only */}
+      {/* Manual identity fields — unlinked rows only.
+          Item A (Unified Drug Row Editor Redesign, 2026-08-08): generic name
+          is now a live search box instead of plain free text. Picking an
+          existing generic is held locally (pickedGeneric) — not written to
+          option.generic_id — so the row stays in manual mode with the
+          formulation picker, brand field, and Promote button all still
+          showing (confirmed with user: wait until Promote). */}
       {showManualFields && (
         <>
-          <div>
+          <div style={{ position: 'relative' }}>
             <FieldLabel>Generic name</FieldLabel>
-            <input
-              type="text"
-              value={option.generic_name ?? ''}
-              onChange={e => patch({ generic_name: e.target.value || null })}
-              placeholder="Generic name (e.g. Amoxicillin)"
-              style={textInput()}
-            />
+            {pickedGeneric ? (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 8px',
+                border: '1.5px solid var(--color-border)',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--color-bg)',
+              }}>
+                <span style={{ flex: 1, fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)' }}>
+                  {pickedGeneric.name_en}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleClearPickedGeneric}
+                  title="Search a different generic"
+                  aria-label="Clear picked generic"
+                  style={lineIconButtonStyle}
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  type="text"
+                  value={option.generic_name ?? ''}
+                  onChange={e => patch({ generic_name: e.target.value || null })}
+                  onBlur={() => {
+                    if (genericDropdownMouseDownRef.current) {
+                      genericDropdownMouseDownRef.current = false
+                      return
+                    }
+                    setGenericSuggestions([])
+                  }}
+                  placeholder="Generic name (e.g. Amoxicillin)"
+                  style={textInput()}
+                />
+                {genericSuggestions.length > 0 && (
+                  <div
+                    onMouseDown={() => { genericDropdownMouseDownRef.current = true }}
+                    style={addDrugDropdownStyle}
+                  >
+                    {genericSuggestions.map(g => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => handlePickGeneric(g)}
+                        style={addDrugDropdownItemStyle}
+                      >
+                        {g.name_en}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
+
+          {/* Formulation picker — only once an existing generic is picked
+              and it has formulations on file. "None of these" keeps
+              concentration/form open exactly as the free-text path today. */}
+          {pickedGeneric && loadingFormulations && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+              Loading formulations…
+            </div>
+          )}
+          {pickedGeneric && !loadingFormulations && formulationChoices.length > 0 && !pickedFormulationId && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <FieldLabel>Existing formulations</FieldLabel>
+              {formulationChoices.map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => handlePickFormulationChoice(f.id)}
+                  style={{ ...addOptionButtonStyle, justifyContent: 'flex-start' }}
+                >
+                  {[f.concentration, f.form].filter(Boolean).join(' ') || 'Unnamed formulation'}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handlePickFormulationChoice('new')}
+                style={{ ...addOptionButtonStyle, justifyContent: 'flex-start', fontStyle: 'italic' }}
+              >
+                None of these — create new
+              </button>
+            </div>
+          )}
+          {pickedFormulationId && pickedFormulationId !== 'new' && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+              Using existing formulation.{' '}
+              <button
+                type="button"
+                onClick={() => handlePickFormulationChoice(null)}
+                style={{ background: 'none', border: 'none', padding: 0, color: 'var(--color-accent)', cursor: 'pointer', fontSize: 11, fontFamily: 'var(--font-body)' }}
+              >
+                Change
+              </button>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <FieldLabel>Concentration</FieldLabel>
@@ -1530,6 +1711,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
                 value={option.concentration ?? ''}
                 onChange={e => patch({ concentration: e.target.value || null })}
                 placeholder="e.g. 500mg"
+                disabled={pickedFormulationId && pickedFormulationId !== 'new'}
                 style={textInput()}
               />
             </div>
@@ -1538,6 +1720,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               <select
                 value={option.form ?? ''}
                 onChange={e => patch({ form: e.target.value || null })}
+                disabled={pickedFormulationId && pickedFormulationId !== 'new'}
                 style={{ ...textInput(), appearance: 'none', cursor: 'pointer' }}
               >
                 <option value="">— select form —</option>
@@ -1546,6 +1729,22 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* Brand name (optional) — Item A, decided: reverses the earlier
+              locked "no-brand" rule. Sits at the bottom regardless of
+              whether a generic was matched or is brand-new. Writes to
+              option.brand_name; handlePromote's existing brand-creation
+              logic already reads this field unchanged. */}
+          <div>
+            <FieldLabel>Brand name (optional)</FieldLabel>
+            <input
+              type="text"
+              value={option.brand_name ?? ''}
+              onChange={e => patch({ brand_name: e.target.value || null })}
+              placeholder="e.g. Panadol"
+              style={textInput()}
+            />
           </div>
         </>
       )}
@@ -2667,3 +2866,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+

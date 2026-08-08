@@ -863,6 +863,24 @@ export async function findGenericByName(nameEn) {
 }
 
 /**
+ * List all formulations under a generic, for the "Add new drug" quick-entry
+ * flow (Unified Drug Row Editor Redesign, Item A, 2026-08-08): once an
+ * existing generic is matched by the search box, its formulations are shown
+ * so the admin can reuse one instead of typing concentration/form from
+ * scratch. Minimal fields — just enough to label each choice and to
+ * pre-fill an option the same way handleFormulationPick already does.
+ * @param {string} genericId
+ */
+export async function fetchFormulationsForGeneric(genericId) {
+  const { data, error } = await supabase
+    .from('formulations')
+    .select('id, concentration, form, route, doses_structured')
+    .eq('generic_id', genericId)
+    .order('concentration')
+  return { data: data ?? [], error }
+}
+
+/**
  * Find an existing formulation under a generic by concentration + form.
  * Matched case-insensitively on concentration since free text may differ
  * in spacing/case (e.g. "500mg" vs "500 mg"); form is matched exactly since
