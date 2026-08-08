@@ -544,8 +544,8 @@ export async function fetchConditionForEdit(id) {
   const { data, error } = await supabase
     .from('conditions')
     .select(`
-      id, name, slug, age_group, card_tagline,
-      icd10_code, is_published, specialty_id,
+      id, name, slug, card_tagline,
+      is_published, specialty_id,
       condition_blocks ( id, block_type, order_index, data )
     `)
     .eq('id', id)

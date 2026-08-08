@@ -19,29 +19,6 @@ import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 
-// ─── Age group badge ──────────────────────────────────────────────────────────
-
-const AGE_STYLES = {
-  adult:     { bg: '#DBEAFE', color: '#1E40AF' },
-  pediatric: { bg: '#D1FAE5', color: '#065F46' },
-  both:      { bg: '#EDE9FE', color: '#5B21B6' },
-}
-
-function AgeGroupBadge({ group }) {
-  const style = AGE_STYLES[group] ?? { bg: '#F3F4F6', color: '#374151' }
-  const label = group === 'pediatric' ? 'Pediatric' : group === 'both' ? 'All ages' : 'Adult'
-  return (
-    <span style={{
-      fontSize: 11, fontWeight: 500,
-      backgroundColor: style.bg, color: style.color,
-      padding: '2px 8px', borderRadius: 'var(--radius-full)',
-      flexShrink: 0,
-    }}>
-      {label}
-    </span>
-  )
-}
-
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ConditionsCMS() {
@@ -356,7 +333,6 @@ function ConditionRow({ condition, isPublished, onEdit, onDelete, onTogglePublis
               {condition.specialtyName}
             </span>
           )}
-          <AgeGroupBadge group={condition.ageGroup} />
           <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
             {rxCount} rx
           </span>

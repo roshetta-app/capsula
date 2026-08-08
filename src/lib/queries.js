@@ -357,8 +357,8 @@ export async function fetchMetadataTimestamps(supabase) {
  * Used by both fetchConditions (public) and fetchAllConditions (admin).
  */
 const CONDITIONS_SELECT = `
-  id, name, slug, age_group, card_tagline,
-  definition, icd10_code, epidemiology,
+  id, name, slug, card_tagline,
+  definition, epidemiology,
   when_to_refer, prognosis,
   differential_diagnosis, red_flags,
   clinical_picture, history_questions, examination, investigations,
@@ -383,10 +383,8 @@ function mapConditions(data) {
     specialtySortOrder:   c.specialties?.sort_order,
     name:                 c.name,
     slug:                 c.slug,
-    ageGroup:             c.age_group,
     cardTagline:          c.card_tagline,
     definition:           c.definition,
-    icd10Code:            c.icd10_code,
     epidemiology:         c.epidemiology,
     whenToRefer:          c.when_to_refer,
     prognosis:            c.prognosis,
@@ -468,3 +466,4 @@ export async function fetchCmsConfig(supabase, key) {
   if (error) throw error
   return data?.value ?? null
 }
+

@@ -278,17 +278,9 @@ function friendlySaveError(err) {
 const EMPTY_CONDITION = {
   name:         '',
   specialty_id: '',
-  age_group:    'adult',
   is_published: false,
   card_tagline: '',
-  icd10_code:   '',
 }
-
-const AGE_GROUP_OPTIONS = [
-  { value: 'adult',     label: 'Adult' },
-  { value: 'pediatric', label: 'Pediatric' },
-  { value: 'both',      label: 'Both (all ages)' },
-]
 
 export default function ConditionEditor() {
   const { id }    = useParams()
@@ -340,10 +332,8 @@ export default function ConditionEditor() {
       setForm({
         name:         data.name         ?? '',
         specialty_id: data.specialty_id ?? '',
-        age_group:    data.age_group    ?? 'adult',
         is_published: data.is_published ?? false,
         card_tagline: data.card_tagline ?? '',
-        icd10_code:   data.icd10_code   ?? '',
       })
 
       setBlocks(
@@ -371,7 +361,7 @@ export default function ConditionEditor() {
   // ─── Validation ───────────────────────────────────────────────────────────
 
   function isValid() {
-    return form.name.trim() && form.specialty_id && form.age_group
+    return form.name.trim() && form.specialty_id
   }
 
   // ─── Save ─────────────────────────────────────────────────────────────────
@@ -386,10 +376,8 @@ export default function ConditionEditor() {
       name:         form.name.trim(),
       slug,
       specialty_id: form.specialty_id,
-      age_group:    form.age_group,
       is_published: form.is_published,
       card_tagline: form.card_tagline.trim() || null,
-      icd10_code:   form.icd10_code.trim()   || null,
     }
 
     let conditionId = id   // undefined for new conditions
@@ -568,70 +556,66 @@ export default function ConditionEditor() {
             {/* Phase 3.4: helper text removed — placeholder carries the hint */}
           </div>
 
-          {/* Specialty row: dropdown + inline "New" button */}
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
-                <FieldLabel required>Specialty</FieldLabel>
-                <button
-                  onClick={() => setNewSpecialtyOpen(true)}
-                  disabled={saving}
-                  title="Create a new specialty"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 3,
-                    fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
-                    background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
-                    fontFamily: 'var(--font-body)', padding: '2px 0',
-                    opacity: saving ? 0.5 : 1,
-                  }}
-                >
-                  <Plus size={13} />
-                  New
-                </button>
-              </div>
-              <Select
-                value={form.specialty_id}
-                onChange={v => patch('specialty_id', v)}
-                options={specialtyOptions}
-                disabled={saving || specialtiesLoading}
-              />
-            </div>
-            <div style={{ flex: 1 }}>
-              <FieldLabel required>Age group</FieldLabel>
-              <Select
-                value={form.age_group}
-                onChange={v => patch('age_group', v)}
-                options={AGE_GROUP_OPTIONS}
+          {/* Specialty: dropdown + inline "New" button */}
+          <div style={{ marginBottom: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-1)' }}>
+              <FieldLabel required>Specialty</FieldLabel>
+              <button
+                onClick={() => setNewSpecialtyOpen(true)}
                 disabled={saving}
-              />
+                title="Create a new specialty"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 3,
+                  fontSize: 12, fontWeight: 500, color: 'var(--color-accent)',
+                  background: 'none', border: 'none', cursor: saving ? 'default' : 'pointer',
+                  fontFamily: 'var(--font-body)', padding: '2px 0',
+                  opacity: saving ? 0.5 : 1,
+                }}
+              >
+                <Plus size={13} />
+                New
+              </button>
             </div>
+            <Select
+              value={form.specialty_id}
+              onChange={v => patch('specialty_id', v)}
+              options={specialtyOptions}
+              disabled={saving || specialtiesLoading}
+            />
           </div>
 
-          <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <FieldLabel>ICD-10 code</FieldLabel>
-              <TextInput
-                value={form.icd10_code}
-                onChange={v => patch('icd10_code', v)}
-                placeholder="e.g. K25"
-                disabled={saving}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-              <FieldLabel>Published</FieldLabel>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: saving ? 'default' : 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={form.is_published}
-                  onChange={e => patch('is_published', e.target.checked)}
-                  disabled={saving}
-                  style={{ width: 16, height: 16, accentColor: 'var(--color-accent)' }}
-                />
-                <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
-                  {form.is_published ? 'Visible in app' : 'Draft'}
-                </span>
-              </label>
-            </div>
+          {/* Published toggle — matches the switch style used in Formulation Editor */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <FieldLabel>Published</FieldLabel>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_published}
+              onClick={() => !saving && patch('is_published', !form.is_published)}
+              disabled={saving}
+              style={{
+                width: 42, height: 24,
+                borderRadius: 12,
+                border: 'none',
+                backgroundColor: form.is_published ? 'var(--color-accent)' : 'var(--color-border)',
+                position: 'relative', cursor: saving ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute',
+                top: 3, left: form.is_published ? 21 : 3,
+                width: 18, height: 18,
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              {form.is_published ? 'Visible in app' : 'Draft'}
+            </span>
           </div>
 
         </SectionCard>
@@ -659,3 +643,4 @@ export default function ConditionEditor() {
     </div>
   )
 }
+
