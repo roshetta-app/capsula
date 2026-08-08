@@ -955,13 +955,10 @@ function GroupNoteSlot({ note, onChange }) {
       type="button"
       onClick={() => setNoteOpen(true)}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '4px 9px',
-        border: '1.5px dashed var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        background: 'transparent',
-        fontSize: 11, fontStyle: 'italic', fontWeight: 500,
-        color: 'var(--color-text-tertiary)',
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        background: 'none', border: 'none', padding: 0,
+        fontSize: 11, fontStyle: 'italic', fontWeight: 600,
+        color: 'var(--color-text-secondary)',
         cursor: 'pointer', fontFamily: 'var(--font-body)',
         alignSelf: 'flex-start',
       }}
@@ -1038,13 +1035,10 @@ function DrugOptionNoteSlot({ note, onChange }) {
       type="button"
       onClick={() => setOpen(true)}
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
-        padding: '4px 9px',
-        border: '1.5px dashed var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        background: 'transparent',
-        fontSize: 11, fontStyle: 'italic', fontWeight: 500,
-        color: 'var(--color-text-tertiary)',
+        display: 'inline-flex', alignItems: 'center', gap: 3,
+        background: 'none', border: 'none', padding: 0,
+        fontSize: 11, fontStyle: 'italic', fontWeight: 600,
+        color: 'var(--color-text-secondary)',
         cursor: 'pointer', fontFamily: 'var(--font-body)',
         alignSelf: 'flex-start',
       }}
@@ -1156,29 +1150,34 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 
 // ─── OrDivider ─────────────────────────────────────────────────────────────────
 // UI PASS (2026-08-08): small circled "OR" marker shown on the left between
-// stacked drug options within the same group, so multiple options sharing
-// one dose/note visually read as alternatives to each other rather than a
-// plain list. Purely decorative — no state, no interaction.
+// stacked drug options — within a group AND between groups. Clarified by the
+// project owner: "groups" only exist to share one dose line across drugs that
+// happen to use the same dose; every stacked drug option is an alternative to
+// every other one regardless of which group it's filed under. So this divider
+// now replaces the old plain <hr> between groups too — there is no longer a
+// separate "between groups" visual at all, OR is the only divider between
+// drug option lines. Restyled from a thin outline circle to a filled badge
+// (bigger, solid accent background) after feedback that the outline version
+// was too faint to notice next to the rest of the row's UI.
 function OrDivider() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', marginLeft: 3 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
       <span style={{
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'center',
-        width:           18,
-        height:          18,
+        width:           24,
+        height:          24,
         borderRadius:    '50%',
-        border:          '1px solid var(--color-border)',
-        color:           'var(--color-text-tertiary)',
-        fontSize:        9,
-        fontWeight:       700,
+        color:           '#fff',
+        fontSize:        10, fontWeight: 700,
         fontFamily:      'var(--font-body)',
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: 'var(--color-accent)',
         flexShrink:      0,
       }}>
         OR
       </span>
+      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
     </div>
   )
 }
@@ -1456,7 +1455,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 28, height: 28,
         borderRadius: 'var(--radius-md)',
-        border: `1.5px solid ${showLink ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        border: showLink ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
         backgroundColor: showLink ? '#EFF6FF' : 'transparent',
         color: showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
         cursor: 'pointer', padding: 0, flexShrink: 0,
@@ -1761,7 +1760,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 22, height: 22, flexShrink: 0,
-          border: '1px solid var(--color-border)',
+          border: 'none',
           borderRadius: 4,
           background: moveMenuOpen ? 'var(--color-bg)' : 'transparent',
           color: moveMenuOpen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
@@ -1790,7 +1789,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 22, height: 22, flexShrink: 0,
-        border: '1px solid var(--color-border)',
+        border: 'none',
         borderRadius: 4, background: 'transparent',
         color: '#ef4444', cursor: 'pointer', padding: 0,
       }}
@@ -3038,19 +3037,17 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       {groups.map((group, groupIdx) => (
         <div key={group.group_id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
 
-          {/* Divider between groups — Decision 5 (no divider before first group) */}
-          {groupIdx > 0 && (
-            <hr style={{
-              border: 'none',
-              borderTop: '1px solid var(--color-border)',
-              margin: '4px 0 0',
-            }} />
-          )}
+          {/* Divider between groups — UI PASS (2026-08-08): now the same OR
+              badge used within a group, not a plain line. Clarified by the
+              project owner: groups only exist to share a dose line, they
+              don't change the fact that every stacked option is an
+              alternative to the one above it. No divider before the very
+              first group (nothing to divide yet). */}
+          {groupIdx > 0 && <OrDivider />}
 
           {/* ── Stacked drug-name lines ──
-              UI PASS (2026-08-08): OrDivider inserted before every option
-              after the first, so options stacked within one group read as
-              "this OR this" rather than a plain list. */}
+              OrDivider inserted before every option after the first within
+              a group, so options stacked together read as "this OR this". */}
           {group.options.map((option, optIdx) => (
             <div key={option.id}>
               {optIdx > 0 && <OrDivider />}
