@@ -427,8 +427,8 @@ function EditableDoseLine({
 
   // Mount-time-only read (same "runs once" pattern already used elsewhere
   // in this file, e.g. DrugOptionRow's startInManualMode) — startInEdit
-  // only matters at the instant this specific line is first rendered; it
-  // should never re-trigger on a later re-render.
+  // only matters at the instant this specific bracket is first rendered;
+  // it should never re-trigger on a later re-render.
   useEffect(() => {
     if (startInEdit) onEditConsumed?.()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -773,6 +773,76 @@ function EditableMaxDose({
       {saveError && (
         <span style={{ fontSize: 10, color: '#ef4444' }}>{saveError}</span>
       )}
+    </div>
+  )
+}
+
+// ─── EditablePopulation ─────────────────────────────────────────────────────
+// A group's "who this dose is for" (dose_who) gets the same read-only-badge
+// + edit-toggle treatment as a dose line or max dose — a pill by default
+// (reusing doseWhoLabel's lookup so known keys like 'adult' still show their
+// friendly label), a pencil to rename it, and a "+ Population" trigger when
+// empty. Previously this was a plain, permanently read-only badge, since
+// dose_who was only ever set by a library pick — now that a dose can be
+// built from scratch (see addBracket below), it needs to be typeable too.
+function EditablePopulation({ value, onChange }) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  if (!value && !isEditing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        style={{
+          alignSelf: 'flex-start',
+          marginLeft: 19,
+          background: 'none', border: 'none', padding: 0,
+          fontSize: 11, color: 'var(--color-text-tertiary)',
+          textDecoration: 'underline', cursor: 'pointer',
+          fontFamily: 'var(--font-body)',
+        }}
+      >
+        + Population
+      </button>
+    )
+  }
+
+  return isEditing ? (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 19 }}>
+      <input
+        type="text"
+        value={value ?? ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Population, e.g. Adult"
+        dir="auto"
+        autoFocus
+        style={{ ...editLineInputStyle, width: 200 }}
+        onBlur={() => setIsEditing(false)}
+        onKeyDown={e => { if (e.key === 'Enter') setIsEditing(false) }}
+      />
+    </div>
+  ) : (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginLeft: 19 }}>
+      <span style={{
+        display: 'inline-flex', alignItems: 'center',
+        padding: '1px 7px',
+        borderRadius: 99,
+        fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+        color: 'var(--color-accent)',
+        background: 'var(--color-accent-light)',
+        fontFamily: 'var(--font-body)',
+      }}>
+        {doseWhoLabel(value)}
+      </span>
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        title="Edit population"
+        aria-label="Edit population"
+        style={{ ...lineIconButtonStyle, width: 18, height: 18 }}
+      >
+        <Edit2 size={11} />
+      </button>
     </div>
   )
 }
@@ -2067,12 +2137,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [savedLineId, setSavedLineId] = useState(null)   // id of the line that just finished saving, for a brief "Saved" confirmation
   const [lineSaveError, setLineSaveError] = useState(null) // { lineId, message } | null
 
-  // Id of a dose line just added from scratch (via addDoseLine below) —
-  // tells that one line's EditableDoseLine to open already in edit mode
-  // instead of the usual clean-read-only default, so there's no blank
-  // state to puzzle over right after adding it.
-  const [freshDoseLineId, setFreshDoseLineId] = useState(null)
-
   // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): same "save this edit
   // back to the library" action as dose lines above, but for a group's
   // shared max dose — keyed off the population's permanent id
@@ -2084,6 +2148,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [savingMaxDoseGroupIdx, setSavingMaxDoseGroupIdx] = useState(null)
   const [savedMaxDoseGroupIdx, setSavedMaxDoseGroupIdx] = useState(null)
   const [maxDoseSaveError, setMaxDoseSaveError] = useState(null) // { groupIdx, message } | null
+
+  // BUILD-FROM-SCRATCH ADDENDUM (2026-08-08): when a dose was built entirely
+  // by hand (no library pick to start from), it's saved back to the library
+  // as one combined action — population + every bracket + max dose together
+  // — rather than one icon per line/max-dose as above. Those per-line/
+  // per-max-dose actions still work unchanged for a line that already came
+  // FROM the library (matching by its own bracket_id); this is a second,
+  // group-level action alongside them, not a replacement, so it can also
+  // fold in any new hand-typed brackets added next to an existing library
+  // dose. Same confirm-first requirement as the other two, same reasoning.
+  const [confirmSaveGroup, setConfirmSaveGroup] = useState(null) // groupIdx | null
+  const [savingGroupIdx, setSavingGroupIdx] = useState(null)
+  const [savedGroupIdx, setSavedGroupIdx] = useState(null)
+  const [groupSaveError, setGroupSaveError] = useState(null) // { groupIdx, message } | null
+  const [freshBracketId, setFreshBracketId] = useState(null) // id of a bracket just added from scratch — opens it already in edit mode
 
   // ── Mutation helpers ───────────────────────────────────────────────────
 
@@ -2207,31 +2286,43 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     emitGroups(nextGroups)
   }
 
-  // Start a brand-new dose line from scratch (no library pick involved) —
+  // BUILD-FROM-SCRATCH ADDENDUM (2026-08-08): who this dose is for, typed
+  // directly rather than only ever arriving via a library pick. Mirrors
+  // updateGroupDose/updateGroupDoseMax exactly.
+  function updateGroupDoseWho(groupIdx, value) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx ? { ...g, dose_who: value || null } : g
+    )
+    emitGroups(nextGroups)
+  }
+
+  // Start a brand-new bracket from scratch (no library pick involved) —
   // mirrors DoseRowList's "Add bracket" affordance, so a dose can be built
-  // in the same title/instruction/max-dose format even when nothing was
-  // ever picked from the library. If the group already had old hand-typed
-  // text in 'dose' (the legacy single-sentence box), that text is carried
-  // into the new line's instruction rather than discarded, and 'dose' is
-  // cleared — same legacy-to-structured handoff EditableDoseLine already
-  // does for a pre-existing legacy line on its first edit.
-  function addDoseLine(groupIdx) {
+  // in the same population/title/instruction/max-dose shape even when
+  // nothing was ever picked from the library. If the group still has old
+  // hand-typed text in 'dose' (the legacy single-sentence box) and this is
+  // the first bracket, that text is carried into the new bracket's
+  // instruction rather than discarded, and 'dose' is cleared — same
+  // legacy-to-structured handoff EditableDoseLine already does for a
+  // pre-existing legacy line on its first edit.
+  function addBracket(groupIdx) {
     const group = groups[groupIdx]
     const newLineId = `line-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const carryLegacyText = (group.dose_lines ?? []).length === 0
     const newLine = {
       id: newLineId,
       bracket_id: null,
       bracket_title: null,
-      instruction: group.dose?.trim() || '',
+      instruction: carryLegacyText ? (group.dose?.trim() || '') : '',
       text: null,
     }
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx
-        ? { ...g, dose_lines: [...(g.dose_lines ?? []), newLine], dose: null }
+        ? { ...g, dose_lines: [...(g.dose_lines ?? []), newLine], dose: carryLegacyText ? null : g.dose }
         : g
     )
     emitGroups(nextGroups)
-    setFreshDoseLineId(newLineId)
+    setFreshBracketId(newLineId)
   }
 
   // Update the shared "max dose" note for a group's dose_lines (field-
@@ -2419,6 +2510,98 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       }, 2000)
     } finally {
       setSavingMaxDoseGroupIdx(null)
+    }
+  }
+
+  // ── Save a whole dose (population + brackets + max dose) built from
+  // scratch back to the library, in one combined action ──────────────────
+  // BUILD-FROM-SCRATCH ADDENDUM (2026-08-08): unlike saveLineToLibrary /
+  // saveMaxDoseToLibrary above, which only ever UPDATE a bracket/population
+  // that already exists in the library (matched by permanent id), this
+  // function also CREATES what's missing — since a hand-built dose has no
+  // permanent ids to match on yet. Population is matched by name (trimmed,
+  // case-insensitive) against the formulation's current populations: if one
+  // with that name already exists, the new brackets are appended into it
+  // (so typing "Adult" again reuses the real Adult population instead of
+  // making a second one); if not, a new population is created. Each local
+  // bracket is matched by its own bracket_id if it has one (a line that
+  // already came from the library, being edited alongside new ones in the
+  // same group), otherwise a new bracket is appended. After a successful
+  // save, every local id is stamped back (population id onto
+  // dose_max_population_id, each new bracket's id onto its line) so a
+  // second save on the same group is a clean update, not another create.
+  async function saveDoseToLibrary(groupIdx) {
+    const group = groups[groupIdx]
+    const formulationId = group.options[0]?.formulation_id
+    const typedWho = group.dose_who?.trim()
+    const linesToSave = (group.dose_lines ?? []).filter(l => l.instruction?.trim())
+    if (!formulationId || !typedWho || linesToSave.length === 0) return // defensive — button shouldn't render without these
+
+    setSavingGroupIdx(groupIdx)
+    setGroupSaveError(null)
+    try {
+      const { data, error } = await fetchFormulationWithGeneric(formulationId)
+      if (error || !data) {
+        setGroupSaveError({ groupIdx, message: 'Could not load the library entry to save to. Please try again.' })
+        return
+      }
+
+      const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
+      let targetPopulation = populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
+      let isNewPopulation = false
+      if (!targetPopulation) {
+        targetPopulation = {
+          id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          population: typedWho,
+          max_dose: '',
+          brackets: [],
+        }
+        isNewPopulation = true
+      }
+
+      const stampedBracketIds = {} // local line id -> library bracket id, applied after a successful save
+      const existingBrackets = Array.isArray(targetPopulation.brackets) ? targetPopulation.brackets : []
+      const nextBrackets = [...existingBrackets]
+      for (const line of linesToSave) {
+        const matchIdx = line.bracket_id ? nextBrackets.findIndex(b => b.id === line.bracket_id) : -1
+        if (matchIdx >= 0) {
+          nextBrackets[matchIdx] = { ...nextBrackets[matchIdx], bracket: line.bracket_title ?? '', instruction: line.instruction ?? '' }
+          stampedBracketIds[line.id] = nextBrackets[matchIdx].id
+        } else {
+          const newBracketId = `bracket-${Date.now()}-${Math.random().toString(36).slice(2)}`
+          nextBrackets.push({ id: newBracketId, bracket: line.bracket_title ?? '', instruction: line.instruction ?? '' })
+          stampedBracketIds[line.id] = newBracketId
+        }
+      }
+
+      const savedPopulation = { ...targetPopulation, max_dose: group.dose_max?.trim() || '', brackets: nextBrackets }
+      const nextStructured = isNewPopulation
+        ? [...populations, savedPopulation]
+        : populations.map(p => p.id === savedPopulation.id ? savedPopulation : p)
+
+      const { error: updateErr } = await updateFormulation(formulationId, { doses_structured: nextStructured })
+      if (updateErr) {
+        setGroupSaveError({ groupIdx, message: 'Saving to the library failed. Please try again.' })
+        return
+      }
+
+      const nextGroups = groups.map((g, gi) => gi === groupIdx
+        ? {
+            ...g,
+            dose_max_population_id: savedPopulation.id,
+            dose_lines: (g.dose_lines ?? []).map(l => stampedBracketIds[l.id] ? { ...l, bracket_id: stampedBracketIds[l.id] } : l),
+          }
+        : g
+      )
+      setGroups(nextGroups)
+      onChange(fromDrugOptions(row, nextGroups))
+
+      setSavedGroupIdx(groupIdx)
+      setTimeout(() => {
+        setSavedGroupIdx(current => current === groupIdx ? null : current)
+      }, 2000)
+    } finally {
+      setSavingGroupIdx(null)
     }
   }
 
@@ -2696,65 +2879,119 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             if (!firstIsLinked && !firstHasName) return null
             return (
               <>
-                {/* PHASE A BUG FIX (2026-06-26) — persistent dose_who
-                    provenance tag. Previously dose_who was ONLY shown as
-                    placeholder text on the dose input below, but
-                    placeholder text disappears the instant the field has
-                    a value — and dose_who is only ever set at the exact
-                    same moment dose gets a value (via a library pick).
-                    So the tag was invisible at the one moment it should
-                    have been visible (reported bug: "the adult/child
-                    dose tag doesn't appear"). dose_who itself was always
-                    being computed/persisted correctly (handleBrandPick →
-                    onDoseReady → applyDoseToGroup → fromDrugOptions) —
-                    this is a pure rendering addition, not a data fix.
-                    Per the schema's own docs, dose_who is provenance,
-                    not a lock: editing dose by hand afterward does NOT
-                    clear this tag, so it is shown unconditionally
-                    whenever set, regardless of whether dose has since
-                    been hand-edited. */}
-                {group.dose_who && (
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center',
-                    alignSelf: 'flex-start',
-                    marginLeft: 19, // aligns under the names, matching the dose input's paddingLeft
-                    padding: '1px 7px',
-                    borderRadius: 99,
-                    fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-                    color: 'var(--color-accent)',
-                    background: 'var(--color-accent-light)',
-                    fontFamily: 'var(--font-body)',
-                  }}>
-                    {doseWhoLabel(group.dose_who)}
-                  </span>
-                )}
+                {/* PHASE 2.2-D — dose area, 19px left indent to align under the
+                    drug names above it. FieldLabel removed (Decision 4 +
+                    Decision 5 hierarchy — dose position communicates its
+                    role; no label needed).
 
-                {/* PHASE 2.2-D — dose tier: 12px, regular weight, secondary color,
-                    19px left indent to align under the drug names above it.
-                    FieldLabel removed (Decision 4 + Decision 5 hierarchy — dose
-                    position communicates its role; no label needed).
+                    BUILD-FROM-SCRATCH REDESIGN (2026-08-08): previously this
+                    branched into two different layouts — a read-only
+                    dose_who badge plus either the structured bracket list
+                    (only reachable via a library pick) or a single flat
+                    "Dose / instructions" box (the only option when nothing
+                    had been picked yet). Now there's one dose area
+                    regardless of how it got here — population, brackets,
+                    max dose, same shape DoseRowList uses to edit the actual
+                    formulation — with one combined "Save to library" action
+                    that creates whatever's missing there. A group's old
+                    flat 'dose' text (if any) is shown as a one-time hint
+                    and folded into the first bracket the moment "Add
+                    bracket" is used — see addBracket. */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                    <EditablePopulation
+                      value={group.dose_who}
+                      onChange={val => updateGroupDoseWho(groupIdx, val)}
+                    />
+                    {firstOpt.formulation_id && group.dose_who?.trim() && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmSaveGroup(groupIdx)}
+                        disabled={savingGroupIdx === groupIdx}
+                        title="Save this dose back to the drug library"
+                        style={{
+                          ...addOptionButtonStyle,
+                          color: savedGroupIdx === groupIdx ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                          cursor: savingGroupIdx === groupIdx ? 'default' : 'pointer',
+                          opacity: savingGroupIdx === groupIdx ? 0.5 : 1,
+                        }}
+                      >
+                        <Library size={12} /> Save to library
+                      </button>
+                    )}
+                  </div>
 
-                    RESTORE-DOSE FEATURE (2026-06-26): wrapped in a row with a
-                    "restore from library" icon button, gated specifically on
-                    firstOpt.formulation_id (not the broader firstIsLinked check
-                    above, which also covers brand/generic-only links that have
-                    no formulation_id and therefore no doses_structured to
-                    restore from at all). */}
-                {group.dose_lines?.length > 0 ? (
-                  // Population pick (decision 25): one independently editable/
-                  // removable row per bracket, instead of a single input.
-                  // FIELD-SEPARATION ADDENDUM (2026-08-06): each line renders
-                  // read-only by default via EditableDoseLine, with its own
-                  // edit toggle — see that component for the legacy-line
-                  // split-on-first-edit behavior.
+                  {confirmSaveGroup === groupIdx && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      marginLeft: 19,
+                      padding: '6px 8px',
+                      border: '1px solid var(--color-accent)',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#EFF6FF',
+                    }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
+                        Save this dose to the drug library for everyone?
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setConfirmSaveGroup(null); saveDoseToLibrary(groupIdx) }}
+                          style={{
+                            background: 'var(--color-accent)', color: '#fff',
+                            border: 'none', borderRadius: 'var(--radius-md)',
+                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmSaveGroup(null)}
+                          style={{
+                            background: 'none', color: 'var(--color-text-secondary)',
+                            border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {savingGroupIdx === groupIdx && (
+                    <span style={{ marginLeft: 19, fontSize: 10, color: 'var(--color-text-tertiary)' }}>Saving…</span>
+                  )}
+                  {savedGroupIdx === groupIdx && (
+                    <span style={{ marginLeft: 19, fontSize: 10, color: 'var(--color-accent)' }}>Saved to library</span>
+                  )}
+                  {groupSaveError?.groupIdx === groupIdx && (
+                    <span style={{ marginLeft: 19, fontSize: 10, color: '#ef4444' }}>{groupSaveError.message}</span>
+                  )}
+
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
-                    {group.dose_lines.map(line => {
+                    {(group.dose_lines ?? []).length === 0 && group.dose?.trim() && (
+                      <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
+                        Previously entered: {group.dose}
+                      </div>
+                    )}
+
+                    {/* Population pick (decision 25): one independently editable/
+                        removable row per bracket, instead of a single input.
+                        FIELD-SEPARATION ADDENDUM (2026-08-06): each line renders
+                        read-only by default via EditableDoseLine, with its own
+                        edit toggle — see that component for the legacy-line
+                        split-on-first-edit behavior. */}
+                    {group.dose_lines?.map(line => {
                       // WRITE-BACK FEATURE (step 11.3): only lines that trace
                       // back to a real library bracket, whose group is still
                       // linked to a formulation, and that have actually been
-                      // split into title/instruction can be saved back — a
-                      // hand-typed line, or a legacy line never opened for
-                      // editing, has nothing safe to write.
+                      // split into title/instruction can be saved back
+                      // individually — this per-line action is separate from
+                      // (and still works alongside) the combined "Save to
+                      // library" button above, which covers new brackets too.
                       const canSaveToLibrary = !!(line.bracket_id && firstOpt.formulation_id && line.instruction != null)
                       return (
                         <EditableDoseLine
@@ -2774,11 +3011,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           isSaving={savingLineId === line.id}
                           isSaved={savedLineId === line.id}
                           saveError={lineSaveError?.lineId === line.id ? lineSaveError.message : null}
-                          startInEdit={line.id === freshDoseLineId}
-                          onEditConsumed={() => setFreshDoseLineId(null)}
+                          startInEdit={line.id === freshBracketId}
+                          onEditConsumed={() => setFreshBracketId(null)}
                         />
                       )
                     })}
+
+                    <button
+                      type="button"
+                      onClick={() => addBracket(groupIdx)}
+                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start' }}
+                    >
+                      <Plus size={12} /> Add bracket
+                    </button>
 
                     {/* Shared "max dose" note — one box for the whole group of
                         lines (field-separation addendum, 2026-08-06), instead
@@ -2806,14 +3051,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
                     />
 
-                    <button
-                      type="button"
-                      onClick={() => addDoseLine(groupIdx)}
-                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start' }}
-                    >
-                      <Plus size={12} /> Add dose line
-                    </button>
-
                     {firstOpt.formulation_id && (
                       <button
                         type="button"
@@ -2833,60 +3070,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       </button>
                     )}
                   </div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                      <input
-                        type="text"
-                        value={group.dose ?? ''}
-                        onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                        placeholder="Dose / instructions"
-                        dir="auto"
-                        style={{
-                          flex: 1,
-                          width: '100%', boxSizing: 'border-box',
-                          padding: '3px 8px',
-                          paddingLeft: 19,
-                          border: '1px solid var(--color-border)',
-                          borderRadius: 'var(--radius-md)',
-                          fontSize: 12, fontWeight: 400,
-                          fontFamily: 'var(--font-body)',
-                          backgroundColor: 'var(--color-surface)',
-                          color: 'var(--color-text-secondary)',
-                          outline: 'none',
-                        }}
-                      />
-                      {firstOpt.formulation_id && (
-                        <button
-                          type="button"
-                          onClick={() => restoreDoseFromLibrary(groupIdx)}
-                          disabled={restoringGroupIdx === groupIdx}
-                          title="Restore dose from library"
-                          aria-label="Restore dose from library"
-                          style={{
-                            flexShrink: 0,
-                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                            width: 22, height: 22,
-                            border: 'none', background: 'none', padding: 0,
-                            borderRadius: 'var(--radius-md)',
-                            color: 'var(--color-text-tertiary)',
-                            cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
-                            opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
-                          }}
-                        >
-                          <RotateCcw size={13} />
-                        </button>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => addDoseLine(groupIdx)}
-                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start', marginLeft: 19 }}
-                    >
-                      <Plus size={12} /> Add dose line
-                    </button>
-                  </div>
-                )}
+                </div>
 
                 {/* RESTORE-DOSE FEATURE (2026-06-26): population chooser,
                     only rendered for the group currently being restored.
