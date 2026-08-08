@@ -660,17 +660,15 @@ const lineIconButtonStyle = {
 // trigger instead of an empty box, matching the existing "+ note" /
 // "+ group note" convention used elsewhere in this same editor
 // (see GroupNoteSlot below).
-// DECLUTTER PASS 3 (Direction 1, 2026-08-08): accepts an optional
-// trailingAction node (the restyled "Add bracket" inline link) rendered on
-// the same line as the max-dose value/empty-state trigger, joined with a
-// middle dot — e.g. "max 1200mg/day · + add bracket" — instead of "Add
-// bracket" sitting in its own dashed-chrome block above this. Suppressed
-// while editing or confirming a save, so that flow isn't crowded.
+// DECLUTTER PASS 4 (Direction 1, 2026-08-08): the pass-3 merge of "Add
+// bracket" into this line (as a trailingAction joined by a middle dot) is
+// reverted here — "Add bracket" moved back to its own line at the top of
+// the dose card, and this component goes back to rendering just the max
+// dose, on its own line at the bottom, with no trailingAction concept.
 function EditableMaxDose({
   value, onChange, onRemove,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
-  trailingAction,
 }) {
   const [isEditing, setIsEditing] = useState(false)
   // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icons as
@@ -686,21 +684,13 @@ function EditableMaxDose({
 
   if (!value && !isEditing) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <button
-          type="button"
-          onClick={() => setIsEditing(true)}
-          style={{ ...trailingLinkStyle, alignSelf: 'flex-start' }}
-        >
-          + Max dose
-        </button>
-        {trailingAction && (
-          <>
-            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
-            {trailingAction}
-          </>
-        )}
-      </div>
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        style={{ ...trailingLinkStyle, alignSelf: 'flex-start' }}
+      >
+        + Max dose
+      </button>
     )
   }
 
@@ -747,12 +737,6 @@ function EditableMaxDose({
           >
             {value}
           </div>
-          {trailingAction && !isConfirming && (
-            <>
-              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
-              {trailingAction}
-            </>
-          )}
           {isHovered && (
             <>
               <button
@@ -948,6 +932,12 @@ function GroupNoteSlot({ note, onChange }) {
     if (note) setNoteOpen(true)
   }, [note])
 
+  // DECLUTTER PASS 4 (Direction 1, 2026-08-08): pulled tight to the dose
+  // card above it via a small negative marginTop, instead of taking the
+  // full block-level gap the rest of the group column uses — this is just
+  // two small buttons, not a section, so it shouldn't claim a whole
+  // section's worth of vertical space. Applied to both states so toggling
+  // between them doesn't shift the layout.
   if (noteOpen) {
     return (
       <input
@@ -959,6 +949,7 @@ function GroupNoteSlot({ note, onChange }) {
         autoFocus={!note}
         style={{
           width: '100%', boxSizing: 'border-box',
+          marginTop: -4,
           padding: '4px 8px',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
@@ -978,6 +969,7 @@ function GroupNoteSlot({ note, onChange }) {
       onClick={() => setNoteOpen(true)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
+        marginTop: -4,
         background: 'none', border: 'none', padding: 0,
         fontSize: 11, fontStyle: 'italic', fontWeight: 600,
         color: 'var(--color-text-secondary)',
@@ -1028,6 +1020,11 @@ function DrugOptionNoteSlot({ note, onChange }) {
     if (note) setOpen(true)
   }, [note])
 
+  // DECLUTTER PASS 4 (Direction 1, 2026-08-08): pulled tight to the drug
+  // name above it via a small negative marginTop, instead of taking the
+  // full block-level gap the rest of the row uses — same reasoning as
+  // GroupNoteSlot above. Applied to both states so toggling between them
+  // doesn't shift the layout.
   if (open) {
     return (
       <input
@@ -1039,6 +1036,7 @@ function DrugOptionNoteSlot({ note, onChange }) {
         autoFocus={!note}
         style={{
           width: '100%', boxSizing: 'border-box',
+          marginTop: -4,
           padding: '4px 8px',
           border: '1px solid var(--color-border)',
           borderRadius: 'var(--radius-md)',
@@ -1058,6 +1056,7 @@ function DrugOptionNoteSlot({ note, onChange }) {
       onClick={() => setOpen(true)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 3,
+        marginTop: -4,
         background: 'none', border: 'none', padding: 0,
         fontSize: 11, fontStyle: 'italic', fontWeight: 600,
         color: 'var(--color-text-secondary)',
@@ -3118,13 +3117,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     that creates whatever's missing there. A group's old
                     flat 'dose' text (if any) is shown as a one-time hint
                     and folded into the first bracket the moment "Add
-                    bracket" is used — see addBracket. */}
+                    bracket" is used — see addBracket.
+
+                    DECLUTTER PASS 4 (Direction 1, 2026-08-08): card
+                    background switched to the light grey tint
+                    (var(--color-bg), already used elsewhere in this file
+                    for hover/tint states) instead of var(--color-surface),
+                    so the dose card reads as a distinct sub-block against
+                    the row. Padding/gap tightened slightly in the same
+                    pass. */}
                 <div style={{
-                  display: 'flex', flexDirection: 'column', gap: 6,
+                  display: 'flex', flexDirection: 'column', gap: 5,
                   border: '1px solid var(--color-border)',
                   borderRadius: 12,
-                  padding: '10px 12px',
-                  backgroundColor: 'var(--color-surface)',
+                  padding: '8px 10px',
+                  backgroundColor: 'var(--color-bg)',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <EditablePopulation
@@ -3239,6 +3246,24 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
+                    {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): "Add
+                        bracket" un-merged from the max-dose line (pass 3)
+                        back to its own line, now at the top of the dose
+                        card's content column, above the dose lines. */}
+                    <button
+                      type="button"
+                      onClick={() => addBracket(groupIdx)}
+                      style={{
+                        alignSelf: 'flex-start',
+                        background: 'none', border: 'none', padding: 0,
+                        fontSize: 11, color: 'var(--color-text-tertiary)',
+                        textDecoration: 'underline', cursor: 'pointer',
+                        fontFamily: 'var(--font-body)',
+                      }}
+                    >
+                      + Add bracket
+                    </button>
+
                     {(group.dose_lines ?? []).length === 0 && group.dose?.trim() && (
                       <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
                         Previously entered: {group.dose}
@@ -3284,16 +3309,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       )
                     })}
 
-                    {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): "Add
-                        bracket" and the shared "max dose" note (field-
-                        separation addendum, 2026-08-06) merged into one
-                        quieter line instead of two separate blocks — "Add
-                        bracket" dropped its dashed-button chrome for a
-                        plain inline text link, passed to EditableMaxDose
-                        as trailingAction. canSaveToLibrary mirrors the
-                        dose-line gate exactly: only a max dose that traces
-                        back to a real library population, whose group is
-                        still linked to a formulation, can be saved back. */}
+                    {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): reverted
+                        to its own line at the bottom of the dose card, now
+                        that "Add bracket" has moved to the top (above).
+                        canSaveToLibrary mirrors the dose-line gate exactly:
+                        only a max dose that traces back to a real library
+                        population, whose group is still linked to a
+                        formulation, can be saved back. */}
                     <EditableMaxDose
                       value={group.dose_max}
                       onChange={val => updateGroupDoseMax(groupIdx, val)}
@@ -3309,20 +3331,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       isSaving={savingMaxDoseGroupIdx === groupIdx}
                       isSaved={savedMaxDoseGroupIdx === groupIdx}
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
-                      trailingAction={
-                        <button
-                          type="button"
-                          onClick={() => addBracket(groupIdx)}
-                          style={{
-                            background: 'none', border: 'none', padding: 0,
-                            fontSize: 11, color: 'var(--color-text-tertiary)',
-                            textDecoration: 'underline', cursor: 'pointer',
-                            fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
-                          }}
-                        >
-                          + Add bracket
-                        </button>
-                      }
                     />
                   </div>
                 </div>
