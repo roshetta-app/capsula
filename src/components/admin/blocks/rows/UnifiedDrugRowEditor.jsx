@@ -2619,40 +2619,74 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
 
       const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
 
-      // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at
-      // most one population with a blank name at any time. Checked against
-      // the REAL current library state just fetched above, not stale local
-      // data — if dose_who was left blank here but the library already has
-      // an unnamed population (created here or in the formulation editor,
-      // doesn't matter which), block and ask the admin to name the existing
-      // one first, rather than silently merging into it or creating a
-      // second unnamed population.
-      if (!typedWho) {
-        const blankPop = populations.find(p => !p.population?.trim())
-        if (blankPop) {
-          setGroupSaveError({
-            groupIdx,
-            message: 'This drug already has an unnamed population in the library. Name it before saving another one blank.',
-          })
-          return
-        }
-        // no existing populations, or none are blank — safe to save as the
-        // one allowed blank population, same as the named-match logic
-        // below, just with population: '' instead of typedWho.
-      }
-
-      let targetPopulation = typedWho
-        ? populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
-        : populations.find(p => !p.population?.trim())
+      // LINKED-RENAME FIX (2026-08-08): if this dose already traces back to
+      // a real library population — dose_max_population_id, stamped
+      // whenever a dose is picked from the library or previously saved
+      // here — that population is the real target, regardless of what the
+      // admin has since typed into the name field. Resolving by name
+      // instead (as below) would treat a rename as "no population found,"
+      // creating a DUPLICATE population with copied brackets rather than
+      // updating the one this dose actually came from.
+      let targetPopulation = group.dose_max_population_id
+        ? populations.find(p => p.id === group.dose_max_population_id)
+        : null
       let isNewPopulation = false
-      if (!targetPopulation) {
-        targetPopulation = {
-          id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          population: typedWho || '',
-          max_dose: '',
-          brackets: [],
+
+      if (targetPopulation) {
+        // OPTIONAL POPULATION NAME (2026-08-08): still enforce at-most-one-
+        // blank if the admin is blanking this population out, but exclude
+        // itself from the "already blank" check — it's the same population
+        // staying/becoming blank, not a second one.
+        if (!typedWho) {
+          const blankPop = populations.find(p => !p.population?.trim() && p.id !== targetPopulation.id)
+          if (blankPop) {
+            setGroupSaveError({
+              groupIdx,
+              message: 'This drug already has an unnamed population in the library. Name it before saving another one blank.',
+            })
+            return
+          }
         }
-        isNewPopulation = true
+        targetPopulation = { ...targetPopulation, population: typedWho || '' }
+      } else {
+        // Not linked to a real population (brand-new dose built from
+        // scratch, or the linked one was deleted upstream) — fall back to
+        // matching/creating by name or blank, same as before.
+        //
+        // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at
+        // most one population with a blank name at any time. Checked
+        // against the REAL current library state just fetched above, not
+        // stale local data — if dose_who was left blank here but the
+        // library already has an unnamed population (created here or in
+        // the formulation editor, doesn't matter which), block and ask the
+        // admin to name the existing one first, rather than silently
+        // merging into it or creating a second unnamed population.
+        if (!typedWho) {
+          const blankPop = populations.find(p => !p.population?.trim())
+          if (blankPop) {
+            setGroupSaveError({
+              groupIdx,
+              message: 'This drug already has an unnamed population in the library. Name it before saving another one blank.',
+            })
+            return
+          }
+          // no existing populations, or none are blank — safe to save as
+          // the one allowed blank population, same as the named-match
+          // logic below, just with population: '' instead of typedWho.
+        }
+
+        targetPopulation = typedWho
+          ? populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
+          : populations.find(p => !p.population?.trim())
+        if (!targetPopulation) {
+          targetPopulation = {
+            id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            population: typedWho || '',
+            max_dose: '',
+            brackets: [],
+          }
+          isNewPopulation = true
+        }
       }
 
       const stampedBracketIds = {} // local line id -> library bracket id, applied after a successful save
