@@ -43,11 +43,9 @@ const EMPTY_FORMULATION = {
 }
 
 const EMPTY_BRAND = {
-  name:         '',
-  name_ar:      null,
-  manufacturer: null,
-  source:       'manual',
-  is_published: true,
+  tradename_clean: '',
+  manufacturer:    null,
+  is_published:    true,
 }
 
 export default function AddDrugFlow() {
@@ -71,7 +69,7 @@ export default function AddDrugFlow() {
   function stepValid() {
     if (step === 0) return (generic.ingredients?.length > 0) && generic.category
     if (step === 1) return formulation.concentration.trim() && formulation.form && formulation.route
-    if (step === 2) return brands.length > 0 && brands.every(b => b.name.trim())
+    if (step === 2) return brands.length > 0 && brands.every(b => b.tradename_clean.trim())
     return false
   }
 
@@ -144,15 +142,15 @@ export default function AddDrugFlow() {
 
       // 3. Insert brands
       for (const brand of brands) {
+        const brandName = brand.tradename_clean.trim()
         const { error: bErr } = await insertBrand({
-          formulation_id: newFormulation.id,
-          name:           brand.name.trim(),
-          name_ar:        brand.name_ar?.trim() || null,
-          manufacturer:   brand.manufacturer?.trim() || null,
-          source:         brand.source ?? 'manual',
-          is_published:   brand.is_published ?? true,
+          formulation_id:  newFormulation.id,
+          name:            brandName,
+          tradename_clean: brandName,
+          manufacturer:    brand.manufacturer?.trim() || null,
+          is_published:    brand.is_published ?? true,
         })
-        if (bErr) throw new Error(`Brand "${brand.name}": ${bErr.message}`)
+        if (bErr) throw new Error(`Brand "${brandName}": ${bErr.message}`)
       }
 
       // 4. Refresh drug context + navigate back
