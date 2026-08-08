@@ -2311,6 +2311,13 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [groupSaveError, setGroupSaveError] = useState(null) // { groupIdx, message } | null
   const [freshBracketId, setFreshBracketId] = useState(null) // id of a bracket just added from scratch — opens it already in edit mode
 
+  // UI PASS (2026-08-08): "Clear doses" — a destructive dose-menu action that
+  // wipes the population, all dose lines/brackets, and the max dose for a
+  // group in one go (not the group note, which lives outside the dose card).
+  // Same confirm-first requirement as Save/Restore above, styled red like
+  // PromoteAlternativeDialog's "Delete all" since this can't be undone.
+  const [confirmClearGroup, setConfirmClearGroup] = useState(null) // groupIdx | null
+
   // NOISE-REDUCTION PASS (2026-08-08): "Restore from library" used to sit
   // as its own permanently-visible underlined link at the bottom of the
   // dose block, competing with "Save to library" above it. It now lives in
@@ -2508,6 +2515,20 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   function updateGroupNote(groupIdx, value) {
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx ? { ...g, note: value || null } : g
+    )
+    emitGroups(nextGroups)
+  }
+
+  // UI PASS (2026-08-08): "Clear doses" — wipes everything the dose card
+  // itself holds (population, legacy free-text dose, every dose line/
+  // bracket, and the max dose + its library link) back to empty, in one
+  // step. Deliberately leaves the group's note untouched — the note isn't
+  // part of the dose card, it renders below it.
+  function clearGroupDose(groupIdx) {
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx
+        ? { ...g, dose: null, dose_who: null, dose_lines: [], dose_max: null, dose_max_population_id: null }
+        : g
     )
     emitGroups(nextGroups)
   }
@@ -3147,12 +3168,29 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       onChange={val => updateGroupDoseWho(groupIdx, val)}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {/* UI PASS (2026-08-08): "Add bracket" moved here from
+                          its own line at the top of the content column,
+                          next to the "⋯" menu — same header row as the
+                          population badge. */}
+                      <button
+                        type="button"
+                        onClick={() => addBracket(groupIdx)}
+                        style={{
+                          background: 'none', border: 'none', padding: 0,
+                          fontSize: 11, color: 'var(--color-text-tertiary)',
+                          textDecoration: 'underline', cursor: 'pointer',
+                          fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        + Add bracket
+                      </button>
                       {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): the
                           always-visible "Save to library" button folded
                           into this menu as a conditionally-shown item,
                           using the same visibility gate it had as a
                           standalone button. Header row is now just the
-                          population badge (left) + this one kebab (right).
+                          population badge (left) + Add bracket + this one
+                          kebab (right).
                           OPTIONAL POPULATION NAME (2026-08-08): dose_who is
                           no longer required for the save item to show — a
                           blank population is valid as long as none of the
@@ -3196,12 +3234,65 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                               >
                                 {restoringGroupIdx === groupIdx ? 'Restoring…' : 'Restore from library'}
                               </button>
+                              {/* UI PASS (2026-08-08): "Clear doses" — wipes
+                                  population, dose lines/brackets, and max
+                                  dose for this group. Destructive, so it's
+                                  styled red (matches PromoteAlternativeDialog's
+                                  "Delete all") and requires the same
+                                  confirm-first step as Save/Restore above. */}
+                              <button
+                                type="button"
+                                onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmClearGroup(groupIdx) }}
+                                style={{ ...addDrugDropdownItemStyle, color: '#ef4444' }}
+                              >
+                                Clear doses
+                              </button>
                             </div>
                           )}
                         </div>
                       )}
                     </div>
                   </div>
+
+                  {confirmClearGroup === groupIdx && (
+                    <div style={{
+                      display: 'flex', flexDirection: 'column', gap: 4,
+                      padding: '6px 8px',
+                      border: '1px solid #ef4444',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: '#ef444410',
+                    }}>
+                      <span style={{ fontSize: 11, color: 'var(--color-text-primary)' }}>
+                        Clear the population, dose lines, and max dose for this drug?
+                      </span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => { setConfirmClearGroup(null); clearGroupDose(groupIdx) }}
+                          style={{
+                            background: '#ef4444', color: '#fff',
+                            border: 'none', borderRadius: 'var(--radius-md)',
+                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          Clear
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmClearGroup(null)}
+                          style={{
+                            background: 'none', color: 'var(--color-text-secondary)',
+                            border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+                            padding: '3px 10px', fontSize: 11, fontWeight: 600,
+                            cursor: 'pointer', fontFamily: 'var(--font-body)',
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {confirmSaveGroup === groupIdx && (
                     <div style={{
@@ -3254,24 +3345,6 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                   )}
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 19 }}>
-                    {/* DECLUTTER PASS 4 (Direction 1, 2026-08-08): "Add
-                        bracket" un-merged from the max-dose line (pass 3)
-                        back to its own line, now at the top of the dose
-                        card's content column, above the dose lines. */}
-                    <button
-                      type="button"
-                      onClick={() => addBracket(groupIdx)}
-                      style={{
-                        alignSelf: 'flex-start',
-                        background: 'none', border: 'none', padding: 0,
-                        fontSize: 11, color: 'var(--color-text-tertiary)',
-                        textDecoration: 'underline', cursor: 'pointer',
-                        fontFamily: 'var(--font-body)',
-                      }}
-                    >
-                      + Add bracket
-                    </button>
-
                     {(group.dose_lines ?? []).length === 0 && group.dose?.trim() && (
                       <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
                         Previously entered: {group.dose}
