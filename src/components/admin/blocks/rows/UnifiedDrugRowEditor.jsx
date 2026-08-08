@@ -171,7 +171,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { Link, Unlink, Plus, X, Library, GripVertical, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
+import { Link, Plus, X, Library, RotateCcw, Edit2, Check, ChevronDown, MoreHorizontal } from 'lucide-react'
 import DrugPickerModal from '../../DrugPickerModal'
 import DrugSearchField from '../../DrugSearchField'
 import { DRUG_FORMS } from '../../../../config/forms'
@@ -660,31 +660,47 @@ const lineIconButtonStyle = {
 // trigger instead of an empty box, matching the existing "+ note" /
 // "+ group note" convention used elsewhere in this same editor
 // (see GroupNoteSlot below).
+// DECLUTTER PASS 3 (Direction 1, 2026-08-08): accepts an optional
+// trailingAction node (the restyled "Add bracket" inline link) rendered on
+// the same line as the max-dose value/empty-state trigger, joined with a
+// middle dot — e.g. "max 1200mg/day · + add bracket" — instead of "Add
+// bracket" sitting in its own dashed-chrome block above this. Suppressed
+// while editing or confirming a save, so that flow isn't crowded.
 function EditableMaxDose({
   value, onChange, onRemove,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
+  trailingAction,
 }) {
   const [isEditing, setIsEditing] = useState(false)
   // NOISE-REDUCTION PASS (2026-08-08): same hover-gated icons as
   // EditableDoseLine — see that component's comment for the reasoning.
   const [isHovered, setIsHovered] = useState(false)
 
+  const trailingLinkStyle = {
+    background: 'none', border: 'none', padding: 0,
+    fontSize: 11, color: 'var(--color-text-tertiary)',
+    textDecoration: 'underline', cursor: 'pointer',
+    fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
+  }
+
   if (!value && !isEditing) {
     return (
-      <button
-        type="button"
-        onClick={() => setIsEditing(true)}
-        style={{
-          alignSelf: 'flex-start',
-          background: 'none', border: 'none', padding: 0,
-          fontSize: 11, color: 'var(--color-text-tertiary)',
-          textDecoration: 'underline', cursor: 'pointer',
-          fontFamily: 'var(--font-body)',
-        }}
-      >
-        + Max dose
-      </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <button
+          type="button"
+          onClick={() => setIsEditing(true)}
+          style={{ ...trailingLinkStyle, alignSelf: 'flex-start' }}
+        >
+          + Max dose
+        </button>
+        {trailingAction && (
+          <>
+            <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+            {trailingAction}
+          </>
+        )}
+      </div>
     )
   }
 
@@ -731,6 +747,12 @@ function EditableMaxDose({
           >
             {value}
           </div>
+          {trailingAction && !isConfirming && (
+            <>
+              <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>·</span>
+              {trailingAction}
+            </>
+          )}
           {isHovered && (
             <>
               <button
@@ -1149,65 +1171,75 @@ function AddDrugControls({ onPickBrand, onPickFormulation, onAddManual, disabled
 }
 
 // ─── OrDivider ─────────────────────────────────────────────────────────────────
-// UI PASS (2026-08-08): small circled "OR" marker shown on the left between
-// stacked drug options — within a group AND between groups. Clarified by the
-// project owner: "groups" only exist to share one dose line across drugs that
-// happen to use the same dose; every stacked drug option is an alternative to
-// every other one regardless of which group it's filed under. So this divider
-// now replaces the old plain <hr> between groups too — there is no longer a
-// separate "between groups" visual at all, OR is the only divider between
-// drug option lines. Restyled from a thin outline circle to a filled badge
-// (bigger, solid accent background) after feedback that the outline version
-// was too faint to notice next to the rest of the row's UI.
+// UI PASS (2026-08-08): shown between stacked drug options — within a group
+// AND between groups. Clarified by the project owner: "groups" only exist to
+// share one dose line across drugs that happen to use the same dose; every
+// stacked drug option is an alternative to every other one regardless of
+// which group it's filed under. So this divider replaces the old plain <hr>
+// between groups too — there is no separate "between groups" visual at all,
+// this is the only divider between drug option lines.
+//
+// DECLUTTER PASS 3 (Direction 1, 2026-08-08): downgraded from a filled
+// solid-accent circle badge to a quiet, colorless treatment — lowercase "or"
+// text between two thin lines. The badge was carrying no meaning beyond
+// "these are alternatives," which the surrounding stacked layout already
+// communicates; the color/weight was pure chrome.
 function OrDivider() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' }}>
+      <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
       <span style={{
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        width:           24,
-        height:          24,
-        borderRadius:    '50%',
-        color:           '#fff',
-        fontSize:        10, fontWeight: 700,
-        fontFamily:      'var(--font-body)',
-        backgroundColor: 'var(--color-accent)',
-        flexShrink:      0,
+        fontSize:   11,
+        fontWeight: 400,
+        fontFamily: 'var(--font-body)',
+        color:      'var(--color-text-secondary)',
+        flexShrink: 0,
       }}>
-        OR
+        or
       </span>
-      <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
+      <div style={{ flex: 1, height: '0.5px', backgroundColor: 'var(--color-border)' }} />
     </div>
   )
 }
 
-// ─── MoveMenu ──────────────────────────────────────────────────────────────────
-// PHASE 2.4: inline context menu opened by the GripVertical move icon on each
-// DrugOptionRow header. Renders a small absolute-positioned card with whichever
-// of the three move actions are valid for the option's current position.
+// ─── OptionActionsMenu ───────────────────────────────────────────────────────
+// DECLUTTER PASS 3 (Direction 1, 2026-08-08): replaces the old scattered
+// per-drug icon row (drugLinkToggle button, GripVertical move icon + its
+// MoveMenu popover, and the separate X remove button) with one kebab menu
+// per drug option row. Consolidation only — the underlying actions and their
+// visibility rules (canMoveToNew/canMoveAbove/canMoveBelow, isOnly hiding
+// remove) are unchanged from the previous moveButton/removeButton/
+// drugLinkToggle pieces.
 //
 // Props:
-//   canMoveToNew   — true when current group has >1 option (splitting a solo
-//                    option into its own new group is a no-op, so suppress it)
-//   canMoveAbove   — true when groupIdx > 0
-//   canMoveBelow   — true when groupIdx < groups.length - 1
+//   showLinkToggle — false suppresses the "Drug link" item entirely (used
+//                    for the two render states where no name/identity has
+//                    been set yet — matches the old nameRowExtraActions,
+//                    which never included drugLinkToggle in those states)
+//   showLink       — current drug_link_enabled value, for the toggle label
+//   onToggleLink   — () => void
+//   canMoveToNew / canMoveAbove / canMoveBelow — same meaning as before
 //   onMove         — (action: 'new-group'|'above'|'below') => void
-//   onClose        — () => void
+//   onRemove       — () => void
+//   isOnly         — hides "Remove this option" when true
 
-function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose }) {
+function OptionActionsMenu({
+  showLinkToggle, showLink, onToggleLink,
+  canMoveToNew, canMoveAbove, canMoveBelow, onMove,
+  onRemove, isOnly,
+}) {
+  const [open, setOpen] = useState(false)
   const menuRef = useRef(null)
 
-  // Dismiss on click-outside
   useEffect(() => {
     function handlePointerDown(e) {
       if (menuRef.current && !menuRef.current.contains(e.target)) {
-        onClose()
+        setOpen(false)
       }
     }
     document.addEventListener('pointerdown', handlePointerDown)
     return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [onClose])
+  }, [])
 
   const menuItemStyle = {
     display: 'block', width: '100%',
@@ -1218,59 +1250,87 @@ function MoveMenu({ canMoveToNew, canMoveAbove, canMoveBelow, onMove, onClose })
     cursor: 'pointer', whiteSpace: 'nowrap',
     borderRadius: 'var(--radius-md)',
   }
+  const destructiveItemStyle = { ...menuItemStyle, color: '#ef4444' }
 
-  const hasAnyOption = canMoveToNew || canMoveAbove || canMoveBelow
-  if (!hasAnyOption) return null
+  const showRemove = !isOnly
 
   return (
-    <div
-      ref={menuRef}
-      style={{
-        position: 'absolute',
-        top: '100%',
-        left: 0,
-        zIndex: 200,
-        marginTop: 4,
-        background: 'var(--color-surface)',
-        border: '1.5px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-        padding: '4px',
-        display: 'flex', flexDirection: 'column', gap: 2,
-      }}
-    >
-      {canMoveToNew && (
-        <button
-          type="button"
-          style={menuItemStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-          onClick={() => { onMove('new-group'); onClose() }}
-        >
-          Move to new group
-        </button>
-      )}
-      {canMoveAbove && (
-        <button
-          type="button"
-          style={menuItemStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-          onClick={() => { onMove('above'); onClose() }}
-        >
-          Move to group above
-        </button>
-      )}
-      {canMoveBelow && (
-        <button
-          type="button"
-          style={menuItemStyle}
-          onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
-          onClick={() => { onMove('below'); onClose() }}
-        >
-          Move to group below
-        </button>
+    <div ref={menuRef} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        title="Drug options"
+        aria-label="Drug options"
+        onClick={() => setOpen(v => !v)}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 22, height: 22, flexShrink: 0,
+          border: 'none',
+          borderRadius: 4,
+          background: open ? 'var(--color-bg)' : 'transparent',
+          color: open ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+          cursor: 'pointer', padding: 0,
+        }}
+      >
+        <MoreHorizontal size={13} />
+      </button>
+      {open && (
+        <div style={addDrugDropdownStyle}>
+          {showLinkToggle && (
+            <button
+              type="button"
+              style={menuItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onToggleLink(); setOpen(false) }}
+            >
+              Drug link: {showLink ? 'On' : 'Off'}
+            </button>
+          )}
+          {canMoveToNew && (
+            <button
+              type="button"
+              style={menuItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onMove('new-group'); setOpen(false) }}
+            >
+              Move to new group
+            </button>
+          )}
+          {canMoveAbove && (
+            <button
+              type="button"
+              style={menuItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onMove('above'); setOpen(false) }}
+            >
+              Move to group above
+            </button>
+          )}
+          {canMoveBelow && (
+            <button
+              type="button"
+              style={menuItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onMove('below'); setOpen(false) }}
+            >
+              Move to group below
+            </button>
+          )}
+          {showRemove && (
+            <button
+              type="button"
+              style={destructiveItemStyle}
+              onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-bg)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+              onClick={() => { onRemove(); setOpen(false) }}
+            >
+              Remove this option
+            </button>
+          )}
+        </div>
       )}
     </div>
   )
@@ -1304,12 +1364,6 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
 
   // Inline dose-age-group chooser — surfaces when a picked brand has 2+ dose rows
   const [pendingDoseChoice, setPendingDoseChoice] = useState(null)
-
-  // PHASE 2.4: move menu open/closed state. Localised here so each row's
-  // menu is independent — only one can be open at a time per user action
-  // (click-outside dismisses it), but the state still lives per-row.
-  const [moveMenuOpen, setMoveMenuOpen] = useState(false)
-  const moveButtonRef = useRef(null)
 
   // showManualFields / genericOnlyMode: same reveal pattern as the old main row.
   // A fresh option shows only the search bar until a name is committed or the
@@ -1442,27 +1496,18 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
   // regular search field + fields are shown.
   const isEmptyUntouched = !isLinked && !option.brand_name?.trim() && !genericOnlyMode
 
-  // ── Drug-link enabled toggle ────────────────────────────────────────────
-  const drugLinkToggle = (
-    <button
-      type="button"
-      onClick={() => patch({ drug_link_enabled: !showLink })}
-      aria-label={showLink ? 'Drug link on — tap to disable' : 'Drug link off — tap to enable'}
-      title={showLink
-        ? 'Drug link: ON — name taps navigate to Drug Detail'
-        : 'Drug link: OFF — name shown as plain text'}
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 28, height: 28,
-        borderRadius: 'var(--radius-md)',
-        border: showLink ? '1.5px solid var(--color-accent)' : '1.5px solid transparent',
-        backgroundColor: showLink ? '#EFF6FF' : 'transparent',
-        color: showLink ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-        cursor: 'pointer', padding: 0, flexShrink: 0,
-      }}
-    >
-      {showLink ? <Link size={13} /> : <Unlink size={13} />}
-    </button>
+  // ── Drug-link status indicator ──────────────────────────────────────────
+  // DECLUTTER PASS 3 (Direction 1): the toggle action itself now lives
+  // inside OptionActionsMenu's kebab. This stays as a small non-clickable
+  // status glyph next to the name so "drug link is on" is still visible at
+  // a glance without opening the menu.
+  const drugLinkIndicator = showLink && (
+    <Link
+      size={13}
+      color="var(--color-text-tertiary)"
+      aria-label="Drug link on"
+      style={{ flexShrink: 0 }}
+    />
   )
 
   // ── Library link/unlink ─────────────────────────────────────────────────
@@ -1737,75 +1782,46 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
     }
   }
 
-  // ── Move / remove buttons ────────────────────────────────────────────────
-  // UI PASS (2026-08-08): these used to sit in their own header row above
-  // the drug name, leaving an near-empty line whenever the not-in-library
-  // tag wasn't showing. Now built here as reusable nodes and folded into
-  // whichever row actually shows the drug name (DrugSearchField's
-  // extraAction slot for the common linked/committed cases, or the
-  // AddDrugControls/manual-entry row for the two states where
-  // DrugSearchField itself isn't rendered — see the render section below).
-  //
-  // PHASE 2.4 — move icon. Hidden when this is the only option across all
-  // groups (nothing to move). The wrapper is position:relative so MoveMenu
-  // can position itself absolutely below the button.
-  const moveButton = !isOnly && (canMoveToNew || canMoveAbove || canMoveBelow) && (
-    <div style={{ position: 'relative' }}>
-      <button
-        ref={moveButtonRef}
-        type="button"
-        title="Move this drug to a different group"
-        aria-label="Move drug option"
-        onClick={() => setMoveMenuOpen(v => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 22, height: 22, flexShrink: 0,
-          border: 'none',
-          borderRadius: 4,
-          background: moveMenuOpen ? 'var(--color-bg)' : 'transparent',
-          color: moveMenuOpen ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-          cursor: 'pointer', padding: 0,
-        }}
-      >
-        <GripVertical size={11} />
-      </button>
-      {moveMenuOpen && (
-        <MoveMenu
-          canMoveToNew={canMoveToNew}
-          canMoveAbove={canMoveAbove}
-          canMoveBelow={canMoveBelow}
-          onMove={onMove}
-          onClose={() => setMoveMenuOpen(false)}
-        />
-      )}
-    </div>
+  // ── Consolidated per-option actions menu ─────────────────────────────────
+  // DECLUTTER PASS 3 (Direction 1): one kebab replaces the old scattered
+  // move icon (+ MoveMenu popover) and remove button. Built once here and
+  // reused across the three render locations that used to carry their own
+  // moveButton/removeButton pair (DrugSearchField's extraAction slot, the
+  // isEmptyUntouched row, and the genericOnlyMode-no-name-yet fallback row)
+  // — see the render section below.
+  const optionActionsMenu = (
+    <OptionActionsMenu
+      showLinkToggle={false}
+      showLink={showLink}
+      onToggleLink={() => patch({ drug_link_enabled: !showLink })}
+      canMoveToNew={canMoveToNew}
+      canMoveAbove={canMoveAbove}
+      canMoveBelow={canMoveBelow}
+      onMove={onMove}
+      onRemove={onRemove}
+      isOnly={isOnly}
+    />
   )
 
-  const removeButton = !isOnly && (
-    <button
-      type="button"
-      onClick={onRemove}
-      title="Remove this drug option"
-      style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 22, height: 22, flexShrink: 0,
-        border: 'none',
-        borderRadius: 4, background: 'transparent',
-        color: '#ef4444', cursor: 'pointer', padding: 0,
-      }}
-    >
-      <X size={11} />
-    </button>
-  )
-
-  // Combined trailing actions for DrugSearchField's extraAction slot — tag,
-  // then the existing drug-link toggle, then move/remove at the very end.
+  // Same menu, but with the "Drug link" item included — used only in
+  // DrugSearchField's extraAction slot, where a name/identity already
+  // exists (matches the old nameRowExtraActions, which was the only place
+  // drugLinkToggle used to render).
   const nameRowExtraActions = (
     <>
       {showManualFields && <NotInLibraryTag />}
-      {drugLinkToggle}
-      {moveButton}
-      {removeButton}
+      {drugLinkIndicator}
+      <OptionActionsMenu
+        showLinkToggle={true}
+        showLink={showLink}
+        onToggleLink={() => patch({ drug_link_enabled: !showLink })}
+        canMoveToNew={canMoveToNew}
+        canMoveAbove={canMoveAbove}
+        canMoveBelow={canMoveBelow}
+        onMove={onMove}
+        onRemove={onRemove}
+        isOnly={isOnly}
+      />
     </>
   )
 
@@ -1829,8 +1845,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
               onAddManual={() => setGenericOnlyMode(true)}
             />
           </div>
-          {moveButton}
-          {removeButton}
+          {optionActionsMenu}
         </div>
       ) : (
         <>
@@ -1864,8 +1879,7 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
           {genericOnlyMode && !option.brand_name?.trim() && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {showManualFields && <NotInLibraryTag />}
-              {moveButton}
-              {removeButton}
+              {optionActionsMenu}
             </div>
           )}
 
@@ -3118,31 +3132,21 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       onChange={val => updateGroupDoseWho(groupIdx, val)}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {/* OPTIONAL POPULATION NAME (2026-08-08): dose_who is
-                          no longer required to render this button — a blank
-                          population is valid as long as none of the
+                      {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): the
+                          always-visible "Save to library" button folded
+                          into this menu as a conditionally-shown item,
+                          using the same visibility gate it had as a
+                          standalone button. Header row is now just the
+                          population badge (left) + this one kebab (right).
+                          OPTIONAL POPULATION NAME (2026-08-08): dose_who is
+                          no longer required for the save item to show — a
+                          blank population is valid as long as none of the
                           formulation's other populations are already
                           unnamed, which can't be known here without a
                           fetch. The real check happens in
                           saveDoseToLibrary() against the library's current
                           state, same deferred-validation pattern this file
                           already uses elsewhere (e.g. saveLineToLibrary). */}
-                      {firstOpt.formulation_id && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmSaveGroup(groupIdx)}
-                          disabled={savingGroupIdx === groupIdx}
-                          title="Save this dose back to the drug library"
-                          style={{
-                            ...addOptionButtonStyle,
-                            color: savedGroupIdx === groupIdx ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                            cursor: savingGroupIdx === groupIdx ? 'default' : 'pointer',
-                            opacity: savingGroupIdx === groupIdx ? 0.5 : 1,
-                          }}
-                        >
-                          <Library size={12} /> Save to library
-                        </button>
-                      )}
                       {firstOpt.formulation_id && (
                         <div style={{ position: 'relative' }}>
                           <button
@@ -3156,6 +3160,19 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           </button>
                           {doseMenuOpenGroupIdx === groupIdx && (
                             <div ref={doseMenuRef} style={{ ...addDrugDropdownStyle, minWidth: 150 }}>
+                              {(group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
+                                <button
+                                  type="button"
+                                  onClick={() => { setDoseMenuOpenGroupIdx(null); setConfirmSaveGroup(groupIdx) }}
+                                  disabled={savingGroupIdx === groupIdx}
+                                  style={{
+                                    ...addDrugDropdownItemStyle,
+                                    color: savedGroupIdx === groupIdx ? 'var(--color-accent)' : addDrugDropdownItemStyle.color,
+                                  }}
+                                >
+                                  Save to library
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => { setDoseMenuOpenGroupIdx(null); restoreDoseFromLibrary(groupIdx) }}
@@ -3267,23 +3284,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       )
                     })}
 
-                    <button
-                      type="button"
-                      onClick={() => addBracket(groupIdx)}
-                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start' }}
-                    >
-                      <Plus size={12} /> Add bracket
-                    </button>
-
-                    {/* Shared "max dose" note — one box for the whole group of
-                        lines (field-separation addendum, 2026-08-06), instead
-                        of being repeated inside every line's text. Given the
-                        same read-only/edit/remove/save-to-library treatment
-                        as each dose line above — see EditableMaxDose.
-                        canSaveToLibrary mirrors the dose-line gate exactly:
-                        only a max dose that traces back to a real library
-                        population, whose group is still linked to a
-                        formulation, can be saved back. */}
+                    {/* DECLUTTER PASS 3 (Direction 1, 2026-08-08): "Add
+                        bracket" and the shared "max dose" note (field-
+                        separation addendum, 2026-08-06) merged into one
+                        quieter line instead of two separate blocks — "Add
+                        bracket" dropped its dashed-button chrome for a
+                        plain inline text link, passed to EditableMaxDose
+                        as trailingAction. canSaveToLibrary mirrors the
+                        dose-line gate exactly: only a max dose that traces
+                        back to a real library population, whose group is
+                        still linked to a formulation, can be saved back. */}
                     <EditableMaxDose
                       value={group.dose_max}
                       onChange={val => updateGroupDoseMax(groupIdx, val)}
@@ -3299,6 +3309,20 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       isSaving={savingMaxDoseGroupIdx === groupIdx}
                       isSaved={savedMaxDoseGroupIdx === groupIdx}
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
+                      trailingAction={
+                        <button
+                          type="button"
+                          onClick={() => addBracket(groupIdx)}
+                          style={{
+                            background: 'none', border: 'none', padding: 0,
+                            fontSize: 11, color: 'var(--color-text-tertiary)',
+                            textDecoration: 'underline', cursor: 'pointer',
+                            fontFamily: 'var(--font-body)', whiteSpace: 'nowrap',
+                          }}
+                        >
+                          + Add bracket
+                        </button>
+                      }
                     />
                   </div>
                 </div>

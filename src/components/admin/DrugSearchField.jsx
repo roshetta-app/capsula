@@ -461,12 +461,9 @@ export default function DrugSearchField({
   if (isLinked && !editing) {
     return (
       <div style={{
-        display:         'flex',
-        flexDirection:   'column',
-        gap:             2,
-        padding:         '6px 8px',
-        borderRadius:    'var(--radius-md)',
-        backgroundColor: 'var(--color-accent-light)',
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           2,
       }}>
         <div style={{
           display:    'flex',
@@ -537,12 +534,9 @@ export default function DrugSearchField({
   if (!isLinked && committed && value) {
     return (
       <div style={{
-        display:         'flex',
-        alignItems:      'center',
-        gap:             6,
-        padding:         '6px 8px',
-        borderRadius:    'var(--radius-md)',
-        backgroundColor: 'var(--color-accent-light)',
+        display:    'flex',
+        alignItems: 'center',
+        gap:        6,
       }}>
         {/* Pill icon — matches linked display layout */}
         <Icon
