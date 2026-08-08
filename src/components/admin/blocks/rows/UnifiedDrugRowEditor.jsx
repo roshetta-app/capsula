@@ -2606,7 +2606,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
     const formulationId = group.options[0]?.formulation_id
     const typedWho = group.dose_who?.trim()
     const linesToSave = (group.dose_lines ?? []).filter(l => l.instruction?.trim())
-    if (!formulationId || !typedWho || linesToSave.length === 0) return // defensive — button shouldn't render without these
+    if (!formulationId || linesToSave.length === 0) return // defensive — button shouldn't render without these
 
     setSavingGroupIdx(groupIdx)
     setGroupSaveError(null)
@@ -2618,12 +2618,37 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       }
 
       const populations = Array.isArray(data.doses_structured) ? data.doses_structured : []
-      let targetPopulation = populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
+
+      // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at
+      // most one population with a blank name at any time. Checked against
+      // the REAL current library state just fetched above, not stale local
+      // data — if dose_who was left blank here but the library already has
+      // an unnamed population (created here or in the formulation editor,
+      // doesn't matter which), block and ask the admin to name the existing
+      // one first, rather than silently merging into it or creating a
+      // second unnamed population.
+      if (!typedWho) {
+        const blankPop = populations.find(p => !p.population?.trim())
+        if (blankPop) {
+          setGroupSaveError({
+            groupIdx,
+            message: 'This drug already has an unnamed population in the library. Name it before saving another one blank.',
+          })
+          return
+        }
+        // no existing populations, or none are blank — safe to save as the
+        // one allowed blank population, same as the named-match logic
+        // below, just with population: '' instead of typedWho.
+      }
+
+      let targetPopulation = typedWho
+        ? populations.find(p => p.population?.trim().toLowerCase() === typedWho.toLowerCase())
+        : populations.find(p => !p.population?.trim())
       let isNewPopulation = false
       if (!targetPopulation) {
         targetPopulation = {
           id: `pop-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          population: typedWho,
+          population: typedWho || '',
           max_dose: '',
           brackets: [],
         }
@@ -2981,7 +3006,16 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       onChange={val => updateGroupDoseWho(groupIdx, val)}
                     />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {firstOpt.formulation_id && group.dose_who?.trim() && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
+                      {/* OPTIONAL POPULATION NAME (2026-08-08): dose_who is
+                          no longer required to render this button — a blank
+                          population is valid as long as none of the
+                          formulation's other populations are already
+                          unnamed, which can't be known here without a
+                          fetch. The real check happens in
+                          saveDoseToLibrary() against the library's current
+                          state, same deferred-validation pattern this file
+                          already uses elsewhere (e.g. saveLineToLibrary). */}
+                      {firstOpt.formulation_id && (group.dose_lines ?? []).some(l => l.instruction?.trim()) && (
                         <button
                           type="button"
                           onClick={() => setConfirmSaveGroup(groupIdx)}

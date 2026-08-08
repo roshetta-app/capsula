@@ -75,6 +75,14 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
 
   const [activeIndex, setActiveIndex] = useState(0)
   const [pendingRemoveIndex, setPendingRemoveIndex] = useState(null)
+  // OPTIONAL POPULATION NAME (2026-08-08): true only right after
+  // addPopulation() was blocked because an existing population is still
+  // unnamed — drives the inline warning near the name input. Cleared
+  // whenever the admin switches tabs manually, and effectively cleared
+  // whenever the flagged population gets a real name (see the warning's
+  // render condition below, same reactive pattern as the bracket
+  // instruction-flag).
+  const [addBlockedWarning, setAddBlockedWarning] = useState(false)
 
   const currentIndex = doses.length === 0 ? 0 : Math.min(activeIndex, doses.length - 1)
   const current = doses[currentIndex]
@@ -86,6 +94,16 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
   }
 
   function addPopulation() {
+    // OPTIONAL POPULATION NAME (2026-08-08): a formulation may have at most
+    // one population with a blank name at any time. If one already exists,
+    // block adding a second and surface the existing unnamed one instead —
+    // it's what needs a name, not the new one that triggered the conflict.
+    const blankIdx = doses.findIndex(d => !d.population?.trim())
+    if (blankIdx !== -1) {
+      setActiveIndex(blankIdx)
+      setAddBlockedWarning(true)
+      return
+    }
     onChange(ensureIds([
       ...doses,
       { population: '', max_dose: '', brackets: [{ bracket: '', instruction: '', note: '' }] },
@@ -148,7 +166,7 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
             <button
               key={idx}
               type="button"
-              onClick={() => setActiveIndex(idx)}
+              onClick={() => { setActiveIndex(idx); setAddBlockedWarning(false) }}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 10px 6px 14px',
@@ -222,6 +240,13 @@ export default function DoseRowList({ doses = [], onChange, disabled = false }) 
               style={{ ...inputBase, flex: 1 }}
             />
           </div>
+
+          {addBlockedWarning && !current.population?.trim() && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#B45309' }}>
+              <AlertTriangle size={12} />
+              Name this population before adding another.
+            </div>
+          )}
 
           {(current.brackets ?? []).map((bracket, bIdx) => {
             const isFlagged = !bracket.instruction?.trim()
@@ -379,4 +404,3 @@ const inputBase = {
   appearance: 'none',
   WebkitAppearance: 'none',
 }
-
