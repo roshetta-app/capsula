@@ -47,6 +47,14 @@ const TABS = [
   { label: 'Clinical',  renderIcon: (color) => <IconStethoscope color={color} /> },
 ]
 
+// Module-level (outside the component) so it survives this screen unmounting
+// and remounting — e.g. tapping a linked drug then hitting Back. A plain
+// per-instance ref resets on every mount, which is why "Back" used to
+// always land at the top regardless of where the user actually was.
+// Keyed by `${slug}:${tabIndex}` so each condition's tabs are tracked
+// independently of one another.
+const scrollMemory = new Map()
+
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
@@ -71,7 +79,13 @@ export default function ConditionDetailScreen() {
   // manually on switch, or returning to a tab always lands at the top.
   // Phase 18: retargeted from window.scrollY to the tab box's own
   // scrollTop (see scrollBoxRef below) — see that section for why.
-  const scrollPositions = useRef({ 0: 0, 1: 0 })
+  // Seeded from scrollMemory (module-level) rather than always starting at
+  // 0, so a fresh mount for a condition visited earlier in this session
+  // picks up where it left off instead of resetting.
+  const scrollPositions = useRef({
+    0: scrollMemory.get(`${slug}:0`) ?? 0,
+    1: scrollMemory.get(`${slug}:1`) ?? 0,
+  })
 
   // The box that actually scrolls for this screen (see rootRef/rootStyle
   // below for why this replaced window-level scrolling).
@@ -99,7 +113,9 @@ export default function ConditionDetailScreen() {
     tabDirection.current = index > activeTab ? 1 : -1
     hasSwitchedRef.current = true
     if (scrollBoxRef.current) {
-      scrollPositions.current[activeTab] = scrollBoxRef.current.scrollTop
+      const pos = scrollBoxRef.current.scrollTop
+      scrollPositions.current[activeTab] = pos
+      scrollMemory.set(`${slug}:${activeTab}`, pos)
     }
     setActiveTab(index)
   }
@@ -115,6 +131,25 @@ export default function ConditionDetailScreen() {
       scrollBoxRef.current.scrollTop = scrollPositions.current[activeTab] ?? 0
     }
   }, [activeTab])
+
+  // Catches the position at the moment this screen is left entirely (e.g.
+  // tapping a linked drug) — switchTab only saves on a tab change, so
+  // without this the position at the time of navigating away was never
+  // captured, and Back would still land at the top even with scrollMemory
+  // in place above. Runs only on true unmount (empty deps) — reads
+  // latestRef rather than closing over slug/activeTab directly, since a
+  // stale closure would otherwise save under the wrong condition or tab
+  // if either changed since this effect was set up.
+  const latestRef = useRef({ slug, activeTab })
+  latestRef.current = { slug, activeTab }
+  useEffect(() => {
+    return () => {
+      if (scrollBoxRef.current) {
+        const { slug: s, activeTab: t } = latestRef.current
+        scrollMemory.set(`${s}:${t}`, scrollBoxRef.current.scrollTop)
+      }
+    }
+  }, [])
 
   // Sizes the root to exactly the space available below wherever this
   // screen actually starts in the viewport, then never lets the root
