@@ -123,6 +123,13 @@
  *        GroupNoteSlot component added; updateGroupNote() mutation added.
  *        Group note renders below dose, collapsed by default, stays open.
  *
+ *   UI PASS (2026-08-08): both GroupNoteSlot's "+ group note" and
+ *        DrugOptionNoteSlot's "+ note" collapsed triggers restyled from
+ *        bare unbordered text to the same dashed-pill button pattern
+ *        AddDrugControls already uses ("Add a drug" / "More options"),
+ *        with a small Plus icon — reads as an actual clickable control
+ *        instead of floating gray text.
+ *
  *   PHASE 2.2-D (2026-06-24) — visual hierarchy + divider + per-drug note slot.
  *        Decision 5 three-tier hierarchy (name > dose > note) applied:
  *        - Dose: 12px, regular weight, secondary color, 19px left indent.
@@ -949,14 +956,17 @@ function GroupNoteSlot({ note, onChange }) {
       onClick={() => setNoteOpen(true)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        background: 'none', border: 'none', padding: 0,
-        fontSize: 11, fontStyle: 'italic',
+        padding: '4px 9px',
+        border: '1.5px dashed var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        background: 'transparent',
+        fontSize: 11, fontStyle: 'italic', fontWeight: 500,
         color: 'var(--color-text-tertiary)',
         cursor: 'pointer', fontFamily: 'var(--font-body)',
         alignSelf: 'flex-start',
       }}
     >
-      + group note
+      <Plus size={10} /> group note
     </button>
   )
 }
@@ -1029,14 +1039,17 @@ function DrugOptionNoteSlot({ note, onChange }) {
       onClick={() => setOpen(true)}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 4,
-        background: 'none', border: 'none', padding: 0,
-        fontSize: 11, fontStyle: 'italic',
+        padding: '4px 9px',
+        border: '1.5px dashed var(--color-border)',
+        borderRadius: 'var(--radius-md)',
+        background: 'transparent',
+        fontSize: 11, fontStyle: 'italic', fontWeight: 500,
         color: 'var(--color-text-tertiary)',
         cursor: 'pointer', fontFamily: 'var(--font-body)',
         alignSelf: 'flex-start',
       }}
     >
-      + note
+      <Plus size={10} /> note
     </button>
   )
 }
