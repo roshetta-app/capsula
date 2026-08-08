@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useNavigationType } from 'react-router-dom'
 import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -58,6 +58,7 @@ const scrollMemory = new Map()
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
+  const navigationType = useNavigationType() // 'POP' | 'PUSH' | 'REPLACE'
   const { conditions, loading } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
   const { addRecentlyViewed } = useRecentlyViewed()
@@ -79,13 +80,18 @@ export default function ConditionDetailScreen() {
   // manually on switch, or returning to a tab always lands at the top.
   // Phase 18: retargeted from window.scrollY to the tab box's own
   // scrollTop (see scrollBoxRef below) — see that section for why.
-  // Seeded from scrollMemory (module-level) rather than always starting at
-  // 0, so a fresh mount for a condition visited earlier in this session
-  // picks up where it left off instead of resetting.
-  const scrollPositions = useRef({
-    0: scrollMemory.get(`${slug}:0`) ?? 0,
-    1: scrollMemory.get(`${slug}:1`) ?? 0,
-  })
+  // Seeded from scrollMemory (module-level) only when this mount is a POP
+  // (browser/history back — the condition → drug → Back round trip),
+  // never on a PUSH (a fresh tap from the home Conditions list or
+  // Favourites). This matches the standard native-app convention: popping
+  // back to a screen still on the stack resumes exactly where you left
+  // it, but a brand-new visit to the same content always starts fresh,
+  // even if you were there minutes ago.
+  const scrollPositions = useRef(
+    navigationType === 'POP'
+      ? { 0: scrollMemory.get(`${slug}:0`) ?? 0, 1: scrollMemory.get(`${slug}:1`) ?? 0 }
+      : { 0: 0, 1: 0 }
+  )
 
   // The box that actually scrolls for this screen (see rootRef/rootStyle
   // below for why this replaced window-level scrolling).
