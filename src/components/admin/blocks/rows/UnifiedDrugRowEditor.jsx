@@ -190,6 +190,42 @@ import {
   fromDrugOptions,
 } from '../../../../constants/prescriptionRowSchema'
 
+// ─── Strength helpers (2026-08-08) ──────────────────────────────────────────
+// Duplicated from FormulationEditor.jsx rather than imported — that file
+// doesn't export these, and this component's need is a single flat
+// value/unit/basis triple rather than FormulationEditor's per-ingredient
+// array, so a straight import wouldn't fit anyway. Same normalize/suppress
+// rules, kept in sync by hand if FormulationEditor's ever change.
+
+// Normalizes a basis string like "per_5ml" or "per 5 ml" into one clean
+// form ("per_5ml") — same rule as FormulationEditor.jsx.
+function normalizeBasis(raw) {
+  const trimmed = (raw ?? '').trim()
+  const stripped = trimmed.replace(/^per[_\s]+/i, '')
+  const collapsed = stripped.replace(/\s+/g, '')
+  return `per_${collapsed}`
+}
+
+// Bases with no useful suffix to show — same list as FormulationEditor.jsx.
+const SUPPRESSED_BASES = ['percentage', 'per_unit']
+
+// Builds the display-string Concentration value from one value/unit/basis
+// triple, e.g. ('500', 'mg', '') -> '500mg'; ('120', 'mg', 'per_5ml') ->
+// '120mg / 5ml'. Single-ingredient equivalent of FormulationEditor's
+// buildConcentration(ingredients[]).
+function buildStrengthConcentration(value, unit, basis) {
+  const v = (value ?? '').toString().trim()
+  const u = (unit ?? '').trim()
+  const joined = `${v}${u}`.trim()
+  const rawBasis = (basis ?? '').trim()
+  if (!rawBasis) return joined
+  if (SUPPRESSED_BASES.includes(rawBasis)) return joined
+  const normalized = normalizeBasis(rawBasis)
+  if (SUPPRESSED_BASES.includes(normalized)) return joined
+  const readable = normalized.replace(/^per_/, '')
+  return joined ? `${joined} / ${readable}` : `/ ${readable}`
+}
+
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
 function textInput(extraStyle = {}) {
@@ -1147,6 +1183,31 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
   const [loadingFormulations, setLoadingFormulations] = useState(false)
   const [pickedFormulationId, setPickedFormulationId] = useState(null)
 
+  // Strength Value/Unit/Basis (2026-08-08): mirrors FormulationEditor.jsx's
+  // single-ingredient strength row. Promote-flow-only local state, same
+  // category as promoteCategory/promoteDoseWho above — NOT a field on
+  // DRUG_OPTION_TEMPLATE, since the prescription row only ever needs the
+  // derived display string (option.concentration, already a real field);
+  // the structured value/unit/basis only need to exist long enough to (a)
+  // derive that display string and (b) go into the new formulation record
+  // on Promote. "Add new drug" is always a single generic, so — unlike
+  // FormulationEditor's per-ingredient rows — one flat triple is enough.
+  const [strengthValue, setStrengthValue] = useState('')
+  const [strengthUnit, setStrengthUnit] = useState('')
+  const [strengthBasis, setStrengthBasis] = useState('')
+
+  function handleStrengthChange(field, value) {
+    const next = {
+      value: field === 'value' ? value : strengthValue,
+      unit: field === 'unit' ? value : strengthUnit,
+      basis: field === 'basis' ? value : strengthBasis,
+    }
+    if (field === 'value') setStrengthValue(value)
+    if (field === 'unit') setStrengthUnit(value)
+    if (field === 'basis') setStrengthBasis(value)
+    patch({ concentration: buildStrengthConcentration(next.value, next.unit, next.basis) || null })
+  }
+
   // Debounced generic search, driven off option.generic_name (the same value
   // the text input patches directly) rather than a separate query state, so
   // there's one source of truth for what's typed. Mirrors DrugSearchField's
@@ -1411,6 +1472,13 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
           generic_id: genericId,
           slug: formulationSlugBase || `formulation-${Date.now()}`,
           concentration,
+          // Item A follow-up (2026-08-08): a quick-entry formulation used to
+          // write concentration only, leaving strength_value/unit/basis null
+          // — invisible to anything that reads the structured columns
+          // instead of the free-text one (e.g. numeric strength sort/filter).
+          strength_value: strengthValue.trim() || null,
+          strength_unit: strengthUnit.trim() || null,
+          strength_basis: strengthBasis.trim() || null,
           form: option.form,
           route: null,
           doses_structured: (() => {
@@ -1473,6 +1541,9 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
       setPickedGeneric(null)
       setPickedFormulationId(null)
       setFormulationChoices([])
+      setStrengthValue('')
+      setStrengthUnit('')
+      setStrengthBasis('')
     } catch (err) {
       setPromoteError(err.message ?? 'Promotion failed. Please try again.')
     } finally {
@@ -1703,16 +1774,60 @@ function DrugOptionRow({ option, onUpdate, onRemove, isOnly, onDoseReady, onOpti
             </div>
           )}
 
+          {/* Strength Value/Unit/Basis (2026-08-08) — only while creating a
+              new formulation. Mirrors FormulationEditor.jsx's per-ingredient
+              strength row; "Add new drug" is always a single generic, so one
+              flat triple stands in for that file's ingredient array. When an
+              existing formulation is picked instead, its own strength data
+              already lives in the library — these inputs don't apply. */}
+          {!(pickedFormulationId && pickedFormulationId !== 'new') && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+              <div>
+                <FieldLabel>Strength Value</FieldLabel>
+                <input
+                  type="text"
+                  value={strengthValue}
+                  onChange={e => handleStrengthChange('value', e.target.value)}
+                  placeholder="e.g. 500"
+                  style={textInput()}
+                />
+              </div>
+              <div>
+                <FieldLabel>Strength Unit</FieldLabel>
+                <input
+                  type="text"
+                  value={strengthUnit}
+                  onChange={e => handleStrengthChange('unit', e.target.value)}
+                  placeholder="e.g. mg"
+                  style={textInput()}
+                />
+              </div>
+              <div>
+                <FieldLabel>Strength Basis</FieldLabel>
+                <input
+                  type="text"
+                  value={strengthBasis}
+                  onChange={e => handleStrengthChange('basis', e.target.value)}
+                  placeholder="e.g. per_5ml"
+                  style={textInput()}
+                />
+              </div>
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
-              <FieldLabel>Concentration</FieldLabel>
+              <FieldLabel hint={pickedFormulationId && pickedFormulationId !== 'new'
+                ? 'Copied from the existing formulation'
+                : 'Built automatically from the strength fields above'}>
+                Concentration
+              </FieldLabel>
               <input
                 type="text"
                 value={option.concentration ?? ''}
-                onChange={e => patch({ concentration: e.target.value || null })}
                 placeholder="e.g. 500mg"
-                disabled={pickedFormulationId && pickedFormulationId !== 'new'}
-                style={textInput()}
+                disabled
+                style={{ ...textInput(), backgroundColor: 'var(--color-bg)', color: 'var(--color-text-tertiary)', cursor: 'not-allowed' }}
               />
             </div>
             <div>
@@ -2866,4 +2981,3 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
-
