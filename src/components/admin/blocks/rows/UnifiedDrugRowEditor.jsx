@@ -421,8 +421,18 @@ function EditableDoseLine({
   line, onUpdateField, onRemove,
   canSaveToLibrary, isConfirming, onRequestSave, onConfirmSave, onCancelConfirm,
   isSaving, isSaved, saveError,
+  startInEdit = false, onEditConsumed,
 }) {
-  const [isEditing, setIsEditing] = useState(false)
+  const [isEditing, setIsEditing] = useState(startInEdit)
+
+  // Mount-time-only read (same "runs once" pattern already used elsewhere
+  // in this file, e.g. DrugOptionRow's startInManualMode) — startInEdit
+  // only matters at the instant this specific line is first rendered; it
+  // should never re-trigger on a later re-render.
+  useEffect(() => {
+    if (startInEdit) onEditConsumed?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function startEditing() {
     if (line.instruction == null) {
@@ -2057,6 +2067,12 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
   const [savedLineId, setSavedLineId] = useState(null)   // id of the line that just finished saving, for a brief "Saved" confirmation
   const [lineSaveError, setLineSaveError] = useState(null) // { lineId, message } | null
 
+  // Id of a dose line just added from scratch (via addDoseLine below) —
+  // tells that one line's EditableDoseLine to open already in edit mode
+  // instead of the usual clean-read-only default, so there's no blank
+  // state to puzzle over right after adding it.
+  const [freshDoseLineId, setFreshDoseLineId] = useState(null)
+
   // MAX-DOSE SAVE-TO-LIBRARY ADDENDUM (2026-08-06): same "save this edit
   // back to the library" action as dose lines above, but for a group's
   // shared max dose — keyed off the population's permanent id
@@ -2189,6 +2205,33 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
         : g
     )
     emitGroups(nextGroups)
+  }
+
+  // Start a brand-new dose line from scratch (no library pick involved) —
+  // mirrors DoseRowList's "Add bracket" affordance, so a dose can be built
+  // in the same title/instruction/max-dose format even when nothing was
+  // ever picked from the library. If the group already had old hand-typed
+  // text in 'dose' (the legacy single-sentence box), that text is carried
+  // into the new line's instruction rather than discarded, and 'dose' is
+  // cleared — same legacy-to-structured handoff EditableDoseLine already
+  // does for a pre-existing legacy line on its first edit.
+  function addDoseLine(groupIdx) {
+    const group = groups[groupIdx]
+    const newLineId = `line-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const newLine = {
+      id: newLineId,
+      bracket_id: null,
+      bracket_title: null,
+      instruction: group.dose?.trim() || '',
+      text: null,
+    }
+    const nextGroups = groups.map((g, gi) =>
+      gi === groupIdx
+        ? { ...g, dose_lines: [...(g.dose_lines ?? []), newLine], dose: null }
+        : g
+    )
+    emitGroups(nextGroups)
+    setFreshDoseLineId(newLineId)
   }
 
   // Update the shared "max dose" note for a group's dose_lines (field-
@@ -2731,6 +2774,8 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                           isSaving={savingLineId === line.id}
                           isSaved={savedLineId === line.id}
                           saveError={lineSaveError?.lineId === line.id ? lineSaveError.message : null}
+                          startInEdit={line.id === freshDoseLineId}
+                          onEditConsumed={() => setFreshDoseLineId(null)}
                         />
                       )
                     })}
@@ -2761,6 +2806,14 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                       saveError={maxDoseSaveError?.groupIdx === groupIdx ? maxDoseSaveError.message : null}
                     />
 
+                    <button
+                      type="button"
+                      onClick={() => addDoseLine(groupIdx)}
+                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start' }}
+                    >
+                      <Plus size={12} /> Add dose line
+                    </button>
+
                     {firstOpt.formulation_id && (
                       <button
                         type="button"
@@ -2781,48 +2834,57 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
                     )}
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <input
-                      type="text"
-                      value={group.dose ?? ''}
-                      onChange={e => updateGroupDose(groupIdx, e.target.value)}
-                      placeholder="Dose / instructions"
-                      dir="auto"
-                      style={{
-                        flex: 1,
-                        width: '100%', boxSizing: 'border-box',
-                        padding: '3px 8px',
-                        paddingLeft: 19,
-                        border: '1px solid var(--color-border)',
-                        borderRadius: 'var(--radius-md)',
-                        fontSize: 12, fontWeight: 400,
-                        fontFamily: 'var(--font-body)',
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text-secondary)',
-                        outline: 'none',
-                      }}
-                    />
-                    {firstOpt.formulation_id && (
-                      <button
-                        type="button"
-                        onClick={() => restoreDoseFromLibrary(groupIdx)}
-                        disabled={restoringGroupIdx === groupIdx}
-                        title="Restore dose from library"
-                        aria-label="Restore dose from library"
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <input
+                        type="text"
+                        value={group.dose ?? ''}
+                        onChange={e => updateGroupDose(groupIdx, e.target.value)}
+                        placeholder="Dose / instructions"
+                        dir="auto"
                         style={{
-                          flexShrink: 0,
-                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                          width: 22, height: 22,
-                          border: 'none', background: 'none', padding: 0,
+                          flex: 1,
+                          width: '100%', boxSizing: 'border-box',
+                          padding: '3px 8px',
+                          paddingLeft: 19,
+                          border: '1px solid var(--color-border)',
                           borderRadius: 'var(--radius-md)',
-                          color: 'var(--color-text-tertiary)',
-                          cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
-                          opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                          fontSize: 12, fontWeight: 400,
+                          fontFamily: 'var(--font-body)',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text-secondary)',
+                          outline: 'none',
                         }}
-                      >
-                        <RotateCcw size={13} />
-                      </button>
-                    )}
+                      />
+                      {firstOpt.formulation_id && (
+                        <button
+                          type="button"
+                          onClick={() => restoreDoseFromLibrary(groupIdx)}
+                          disabled={restoringGroupIdx === groupIdx}
+                          title="Restore dose from library"
+                          aria-label="Restore dose from library"
+                          style={{
+                            flexShrink: 0,
+                            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22,
+                            border: 'none', background: 'none', padding: 0,
+                            borderRadius: 'var(--radius-md)',
+                            color: 'var(--color-text-tertiary)',
+                            cursor: restoringGroupIdx === groupIdx ? 'default' : 'pointer',
+                            opacity: restoringGroupIdx === groupIdx ? 0.5 : 1,
+                          }}
+                        >
+                          <RotateCcw size={13} />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => addDoseLine(groupIdx)}
+                      style={{ ...addOptionButtonStyle, alignSelf: 'flex-start', marginLeft: 19 }}
+                    >
+                      <Plus size={12} /> Add dose line
+                    </button>
                   </div>
                 )}
 
