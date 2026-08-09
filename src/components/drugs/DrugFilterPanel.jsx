@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useToast } from '../../context/ToastContext'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -82,7 +83,7 @@ import { useEffect, useState } from 'react'
 // id used for selection state - it is not necessarily a raw form value
 // itself anymore now that Tab/Capsule and Drops each cover several.
 export const FORM_OPTIONS = [
-  { value: 'all',         label: 'All',          matches: [] },
+  { value: 'all',         label: 'All Forms',    matches: [] },
   { value: 'tablet',      label: 'Tab / Capsule', matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
   { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops'] },
   { value: 'syrup',       label: 'Syrup',         matches: ['syrup', 'suspension', 'solution'] },
@@ -100,6 +101,7 @@ const EMPTY = {
 
 export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange }) {
   const [filters, setFilters] = useState(activeFilters || EMPTY)
+  const { toast } = useToast()
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual position. Same pattern as
@@ -170,6 +172,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   // the sheet immediately.
   function handleModeChange(m) {
     onModeChange(m)
+    toast.info(`Searching in ${m === 'brand' ? 'Brand' : 'Generic'} mode`)
     onClose()
   }
 
