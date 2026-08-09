@@ -50,10 +50,26 @@ import { useEffect, useState } from 'react'
  * persisted across that. Mode (Brand/Generic) is unaffected — it's
  * instant and was never part of 'filters' to begin with.
  *
+ * drug-filter-instant-apply — Apply Filters button removed. Form/Route
+ * chips now call onApply(...) directly on toggle, matching the instant-
+ * apply pattern the Search By mode switch already used — 'filters' local
+ * state and the applied state are always in sync, so there is nothing
+ * left to "discard" by closing without Apply. Sheet stays open on a chip
+ * tap (chips are multi-select, unlike mode which is a single instant
+ * choice) — it still closes on mode change, backdrop tap, or Escape.
+ * Clear All only renders when a real filter is active (filters.forms is
+ * not just ['all']) — mode alone doesn't count, since mode was never
+ * part of 'filters'. Also fixed ModeToggle's active-state fontWeight bug
+ * (400 -> 600 on active visibly resized the pill) the same way
+ * ToggleChip's was already fixed — weight is now constant, active state
+ * reads through color/border/background only.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
- *   onApply          (filters) => void   filters: { forms }
+ *   onApply          (filters) => void   filters: { forms } — called
+ *                    immediately on every Form/Route chip toggle and on
+ *                    Clear All, not buffered behind an Apply action
  *   activeFilters    { forms } | null    — the currently-applied filters; local
  *                    selections reset to this (or EMPTY if null) each time the
  *                    sheet opens
@@ -126,13 +142,21 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 
   if (!shouldRender) return null
 
+  // Instant-apply: compute the next forms list and immediately push it out
+  // via onApply, instead of buffering in local state until a separate
+  // Apply Filters action. Local 'filters' state stays in sync purely so
+  // the chips render their active state correctly.
   function toggleForm(val) {
-    setFilters(prev => {
-      if (val === 'all') return { ...prev, forms: ['all'] }
-      const without = prev.forms.filter(f => f !== 'all' && f !== val)
-      const next = prev.forms.includes(val) ? without : [...without, val]
-      return { ...prev, forms: next.length ? next : ['all'] }
-    })
+    const nextForms = val === 'all'
+      ? ['all']
+      : (() => {
+          const without = filters.forms.filter(f => f !== 'all' && f !== val)
+          const next = filters.forms.includes(val) ? without : [...without, val]
+          return next.length ? next : ['all']
+        })()
+    const nextFilters = { ...filters, forms: nextForms }
+    setFilters(nextFilters)
+    onApply(nextFilters)
   }
 
   function handleClear() {
@@ -141,18 +165,17 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
     onClose()
   }
 
-  function handleApply() {
-    onApply(filters)
-    onClose()
-  }
-
   // Mode (Brand/Generic) is instant and not part of 'filters' — see file
   // header note. Switching it has nothing left to "Apply", so it closes
-  // the sheet immediately instead of waiting for Apply Filters.
+  // the sheet immediately.
   function handleModeChange(m) {
     onModeChange(m)
     onClose()
   }
+
+  // Clear All only earns a place in the sheet when a real filter is set —
+  // mode alone was never part of 'filters' and shouldn't trigger it.
+  const hasActiveFilter = !(filters.forms.length === 1 && filters.forms[0] === 'all')
 
   return (
     <>
@@ -208,7 +231,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           </FilterSection>
         )}
 
-        {/* Form / Route */}
+        {/* Form / Route — instant-apply, see toggleForm above */}
         <FilterSection label="Form / Route">
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
             {FORM_OPTIONS.map(opt => {
@@ -220,39 +243,26 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           </div>
         </FilterSection>
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-          <button
-            onClick={handleClear}
-            style={{
-              flex: 1, padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 14, fontWeight: 600,
-              cursor: 'pointer',
-              border: '1.5px solid #DC2626',
-              backgroundColor: 'transparent',
-              color: '#DC2626',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Clear All
-          </button>
-          <button
-            onClick={handleApply}
-            style={{
-              flex: 1, padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 14, fontWeight: 600,
-              cursor: 'pointer',
-              border: 'none',
-              backgroundColor: 'var(--color-accent)',
-              color: '#fff',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            Apply Filters
-          </button>
-        </div>
+        {/* Clear All — only shown once a real filter is active */}
+        {hasActiveFilter && (
+          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
+            <button
+              onClick={handleClear}
+              style={{
+                flex: 1, padding: '12px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: 14, fontWeight: 600,
+                cursor: 'pointer',
+                border: '1.5px solid #DC2626',
+                backgroundColor: 'transparent',
+                color: '#DC2626',
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              Clear All
+            </button>
+          </div>
+        )}
       </div>
     </>
   )
@@ -278,6 +288,11 @@ function FilterSection({ label, children }) {
 // Segmented Brand/Generic control. Moved here from DrugsScreen.jsx
 // (2026-07-19) — same markup/logic as the old inline toggle, just full-width
 // to match this sheet's other rows instead of a compact pill-sized control.
+//
+// drug-filter-instant-apply — fontWeight used to jump 400 -> 600 on active,
+// which visibly resized the pill since bold text is wider (same bug already
+// fixed on ToggleChip below). Weight is now constant; active/inactive reads
+// purely through color/border/background.
 function ModeToggle({ mode, onChange }) {
   return (
     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
@@ -290,7 +305,7 @@ function ModeToggle({ mode, onChange }) {
             flex: 1,
             padding: '8px 14px',
             borderRadius: 'var(--radius-full)',
-            fontSize: 13, fontWeight: mode === m ? 600 : 400,
+            fontSize: 13, fontWeight: 500,
             cursor: 'pointer',
             border: mode === m ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
             backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
