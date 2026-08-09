@@ -194,8 +194,7 @@ function applyFilters(drugs, filters) {
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
-  const { drugs, loading, progress } = useDrugContext()
-  const [mode, setMode] = useState('brand')
+  const { drugs, loading, progress, mode, setMode, activeFilters, setActiveFilters } = useDrugContext()
   const {
     query,
     setQuery,
@@ -224,7 +223,6 @@ export default function DrugsScreen() {
   const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
 
   const [filterOpen,       setFilterOpen]       = useState(false)
-  const [activeFilters,    setActiveFilters]    = useState(null)
   const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
