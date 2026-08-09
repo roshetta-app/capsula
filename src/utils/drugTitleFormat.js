@@ -182,7 +182,7 @@ export function getDrugTitleSuffix(drug) {
   let afterConcentration
   if (isVialOrAmpoule) {
     const size = normalizeUnitSpacing(drug.fillVolume) || normalizeUnitSpacing(drug.packSize)
-    afterConcentration = [formAbbrev, size].filter(Boolean)
+    afterConcentration = [size, formAbbrev].filter(Boolean)
   } else if (LIQUID_FORMS.has(drug.form)) {
     afterConcentration = [formAbbrev, normalizeUnitSpacing(drug.fillVolume)].filter(Boolean)
   } else {
