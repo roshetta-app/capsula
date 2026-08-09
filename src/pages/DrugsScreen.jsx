@@ -120,6 +120,7 @@
  * of a category.
  */
 
+import { X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -551,6 +552,7 @@ export default function DrugsScreen() {
         isOpen={filterOpen}
         onClose={() => setFilterOpen(false)}
         onApply={handleApplyFilters}
+        activeFilters={activeFilters}
         mode={mode}
         onModeChange={setMode}
       />
@@ -1050,13 +1052,16 @@ function ClearFiltersButton({ onClick }) {
     <button
       onClick={onClick}
       style={{
+        display: 'flex', alignItems: 'center', gap: 4,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: 'var(--color-accent)', fontSize: 13, fontWeight: 500,
-        fontFamily: 'var(--font-body)', padding: '4px 0',
+        color: '#DC2626', fontSize: 13, fontWeight: 500,
+        fontFamily: 'var(--font-body)', padding: 0,
+        lineHeight: 1,
         flexShrink: 0,
         WebkitTapHighlightColor: 'transparent',
       }}
     >
+      <X size={13} />
       Clear filters
     </button>
   )

@@ -41,10 +41,22 @@ import { useEffect, useState } from 'react'
  * fields) per user decision. Search By + Form/Route are the only sections
  * left. filters shape is now just { forms }.
  *
+ * drugs-filter-sheet-discard-unsaved — local 'filters' selections now
+ * re-sync to the currently-applied 'activeFilters' every time the sheet
+ * opens, instead of only initializing once. Previously, taps made in the
+ * sheet but never committed via Apply Filters would still show as
+ * "selected" the next time the sheet reopened, since the sheet never
+ * unmounts (it just renders null while closed) and its local state
+ * persisted across that. Mode (Brand/Generic) is unaffected — it's
+ * instant and was never part of 'filters' to begin with.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
  *   onApply          (filters) => void   filters: { forms }
+ *   activeFilters    { forms } | null    — the currently-applied filters; local
+ *                    selections reset to this (or EMPTY if null) each time the
+ *                    sheet opens
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
  */
@@ -70,14 +82,21 @@ const EMPTY = {
   forms: ['all'],
 }
 
-export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onModeChange }) {
-  const [filters, setFilters] = useState(EMPTY)
+export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange }) {
+  const [filters, setFilters] = useState(activeFilters || EMPTY)
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual position. Same pattern as
   // SpecialtiesBottomSheet.jsx (decision 4.20, step 1f.1).
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  // Discard any unapplied taps: re-sync local selections to the real
+  // applied state every time the sheet opens, rather than only once on
+  // mount (see file header note above).
+  useEffect(() => {
+    if (isOpen) setFilters(activeFilters || EMPTY)
+  }, [isOpen, activeFilters])
 
   useEffect(() => {
     if (isOpen) {
@@ -289,20 +308,32 @@ function ModeToggle({ mode, onChange }) {
   )
 }
 
+// drugs-filter-chip-polish — fontWeight used to jump 400 -> 600 on active,
+// which visibly resized the chip since bold text is wider. Weight is now
+// constant; active/inactive reads purely through color/border/background.
+// Also added press feedback (scale down on press, release on up/leave/
+// cancel), matching CategoryRow's onPointer* + local 'pressed' state
+// pattern rather than inventing a new one.
 function ToggleChip({ label, active, onToggle }) {
+  const [pressed, setPressed] = useState(false)
   return (
     <button
       onClick={onToggle}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         padding: '6px 14px',
         borderRadius: 'var(--radius-full)',
-        fontSize: 13, fontWeight: active ? 600 : 400,
+        fontSize: 13, fontWeight: 500,
         cursor: 'pointer',
         border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
         backgroundColor: active ? 'var(--color-accent)' : 'transparent',
         color: active ? '#fff' : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
-        transition: 'all 0.15s ease',
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',
         outline: 'none',
       }}
