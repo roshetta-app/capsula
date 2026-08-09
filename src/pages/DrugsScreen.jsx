@@ -128,6 +128,7 @@ import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
+import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -228,6 +229,7 @@ export default function DrugsScreen() {
   const [activeFilters,    setActiveFilters]    = useState(null)
   const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
+  const [showInfoSheet,    setShowInfoSheet]    = useState(false)
 
   // Refresh recent list when navigating back
   useEffect(() => {
@@ -340,7 +342,7 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters}
         />
         <div>
-        <DrugsHero heroRef={heroRef} isDark={isDark} />
+        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
         {/* Search bar — same single-wrapper shape as the category-list view's
             copy below, on purpose (see 2026-07-19 note at the top of this
             file): keeping both trees identical at this position is what
@@ -457,7 +459,7 @@ export default function DrugsScreen() {
         hasActiveFilters={hasFilters}
       />
       <div>
-        <DrugsHero heroRef={heroRef} isDark={isDark} />
+        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
         {/* Same single-wrapper shape as the search-results view's copy
             above, on purpose — see 2026-07-19 note at the top of this file. */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
@@ -560,6 +562,11 @@ export default function DrugsScreen() {
         isDark={isDark}
         onSelectDrug={handleDrugTap}
       />
+
+      <DrugsInfoSheet
+        isOpen={showInfoSheet}
+        onClose={() => setShowInfoSheet(false)}
+      />
     </Layout>
   )
 }
@@ -585,7 +592,7 @@ export default function DrugsScreen() {
 // (the app's blue accent token) rather than var(--color-favourite), which
 // turned out to render red/pink, not blue.
 
-function DrugsHero({ heroRef, isDark }) {
+function DrugsHero({ heroRef, isDark, onInfoTap }) {
   return (
     <div ref={heroRef} style={{
       backgroundColor: 'var(--color-surface)',
@@ -632,8 +639,33 @@ function DrugsHero({ heroRef, isDark }) {
           </div>
         </div>
 
-        {/* Action-button slot — intentionally empty, see note above. */}
-        <div style={{ flexShrink: 0 }} />
+        {/* Action-button slot — 2026-08-09: now holds the info button that
+            opens DrugsInfoSheet (sources + disclaimer). Supersedes the
+            earlier "intentionally empty, deferred to area 2" note. */}
+        <button
+          onClick={onInfoTap}
+          aria-label="About this drug library"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            width:                   34,
+            height:                  34,
+            borderRadius:            '50%',
+            background:              'none',
+            border:                  'none',
+            cursor:                  'pointer',
+            color:                   'var(--color-text-tertiary)',
+            flexShrink:              0,
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="16" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+        </button>
       </div>
     </div>
   )
