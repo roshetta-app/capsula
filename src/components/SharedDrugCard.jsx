@@ -141,9 +141,9 @@ export default function SharedDrugCard({
   // defensive fallback only, for a row with a missing/empty array.
   const genericLine = drug.ingredients?.length > 0
     ? drug.ingredients.length > 2
-      ? `${drug.ingredients.slice(0, 2).join(', ')} +${drug.ingredients.length - 2}`
-      : drug.ingredients.join(', ')
-    : drug.genericName
+      ? `${drug.ingredients.slice(0, 2).map(toTitleCase).join(', ')} +${drug.ingredients.length - 2}`
+      : drug.ingredients.map(toTitleCase).join(', ')
+    : toTitleCase(drug.genericName)
 
   // Search-match highlighting — scoped by mode (see prop doc above): Brand
   // mode only ever matches tradenameClean, Generic mode only ever matches
