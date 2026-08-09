@@ -243,26 +243,29 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           </div>
         </FilterSection>
 
-        {/* Clear All — only shown once a real filter is active */}
-        {hasActiveFilter && (
-          <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-            <button
-              onClick={handleClear}
-              style={{
-                flex: 1, padding: '12px',
-                borderRadius: 'var(--radius-md)',
-                fontSize: 14, fontWeight: 600,
-                cursor: 'pointer',
-                border: '1.5px solid #DC2626',
-                backgroundColor: 'transparent',
-                color: '#DC2626',
-                fontFamily: 'var(--font-body)',
-              }}
-            >
-              Clear All
-            </button>
-          </div>
-        )}
+        {/* Clear All — always present now; greyed out and inert until a
+            real filter is active, then turns red/active. Was previously
+            hidden entirely when inactive; kept as a stable anchor in the
+            layout instead. */}
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
+          <button
+            onClick={handleClear}
+            disabled={!hasActiveFilter}
+            style={{
+              flex: 1, padding: '12px',
+              borderRadius: 'var(--radius-md)',
+              fontSize: 14, fontWeight: 600,
+              cursor: hasActiveFilter ? 'pointer' : 'not-allowed',
+              border: hasActiveFilter ? '1.5px solid #DC2626' : '1.5px solid var(--color-border)',
+              backgroundColor: 'transparent',
+              color: hasActiveFilter ? '#DC2626' : 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              transition: 'color 0.15s ease, border-color 0.15s ease',
+            }}
+          >
+            Clear All
+          </button>
+        </div>
       </div>
     </>
   )
@@ -329,6 +332,12 @@ function ModeToggle({ mode, onChange }) {
 // Also added press feedback (scale down on press, release on up/leave/
 // cancel), matching CategoryRow's onPointer* + local 'pressed' state
 // pattern rather than inventing a new one.
+//
+// drug-filter-checkbox-indicator — added a small checkbox square before
+// the label so the chip row reads as a multi-select control (several can
+// be active at once) rather than looking like a single-choice segmented
+// toggle. Checked state (filled box + checkmark) mirrors the chip's own
+// active state exactly, no separate logic.
 function ToggleChip({ label, active, onToggle }) {
   const [pressed, setPressed] = useState(false)
   return (
@@ -339,6 +348,7 @@ function ToggleChip({ label, active, onToggle }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
+        display: 'flex', alignItems: 'center', gap: 6,
         padding: '6px 14px',
         borderRadius: 'var(--radius-full)',
         fontSize: 13, fontWeight: 500,
@@ -353,6 +363,23 @@ function ToggleChip({ label, active, onToggle }) {
         outline: 'none',
       }}
     >
+      {/* Checkbox indicator — square outline when unselected, filled with
+          a checkmark when selected, signals "pick any number of these"
+          rather than "pick one". */}
+      <span style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 14, height: 14, flexShrink: 0,
+        borderRadius: 3,
+        border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
+        backgroundColor: active ? '#fff' : 'transparent',
+        transition: 'background-color 0.15s ease, border-color 0.15s ease',
+      }}>
+        {active && (
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        )}
+      </span>
       {label}
     </button>
   )
