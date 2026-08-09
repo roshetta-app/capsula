@@ -949,7 +949,7 @@ function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
         backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
         border:                  'none',
         borderRadius:            'var(--radius-lg)',
-        padding:                 'var(--space-2) var(--space-3)',
+        padding:                 'var(--space-2) 0',
         marginBottom:            'var(--space-3)',
         cursor:                  'pointer',
         fontFamily:              'var(--font-body)',
