@@ -82,13 +82,23 @@ import { useToast } from '../../context/ToastContext'
 // src/config/forms.js) it should catch. `value` stays the chip's own stable
 // id used for selection state - it is not necessarily a raw form value
 // itself anymore now that Tab/Capsule and Drops each cover several.
+//
+// drugs-filter-inhaled-route-fix — some real inhalers are recorded in the
+// data with form='piece'/'powder'/'solution' (device packaging or a
+// generic form label) rather than anything inhaler-specific, but always
+// with route='inhalation'. `matches` alone can't catch these without also
+// falsely pulling in every other 'piece'/'powder' product, so an optional
+// `routes` list was added: a drug counts as this chip's if its form is in
+// `matches` OR its route is in `routes` (see applyFilters in
+// DrugsScreen.jsx). Only Inhaled uses `routes` for now — every other chip
+// is unaffected and keeps matching on form alone.
 export const FORM_OPTIONS = [
   { value: 'all',         label: 'All Forms',     matches: [] },
   { value: 'tablet',      label: 'Tab / Cap.',    matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
   { value: 'syrup',       label: 'Syrup/Susp.',   matches: ['syrup', 'suspension', 'solution'] },
   { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops', 'drops'] },
   { value: 'sachet',      label: 'Sachet',        matches: ['sachet', 'powder', 'power'] },
-  { value: 'inhaler',     label: 'Inhaled',       matches: ['inhaler', 'inhalation solution'] },
+  { value: 'inhaler',     label: 'Inhaled',       matches: ['inhaler', 'inhalation solution'], routes: ['inhalation'] },
   { value: 'spray',       label: 'Spray',         matches: ['spray'] },
   { value: 'injection',   label: 'Inj.',          matches: ['injection', 'vial', 'ampoule', 'syringe', 'pen', 'vaccine'] },
   { value: 'suppository', label: 'Supp.',         matches: ['suppository', 'enema', 'vaginal douche'] },
