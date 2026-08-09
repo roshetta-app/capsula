@@ -8,8 +8,14 @@ import NotificationsBanner from './ui/NotificationsBanner'
  * '/favourites' added — FavouritesScreen now renders its own hero (logo +
  * heading) and sliding sticky header, same reason '/' and '/conditions'
  * are suppressed here.
+ *
+ * '/drugs' added (2026-08-09) — DrugsScreen renders its own DrugsHero and
+ * sliding sticky header (drug_library_ui_ux, plan §7 step 1a.1), same as
+ * Favourites and Conditions. Only the drug LIST route ('/drugs' exact) was
+ * missing here — the drug DETAIL prefix ('/drugs/') was already suppressed
+ * separately below, which is why this was easy to miss.
  */
-const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites']
+const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites', '/drugs']
 
 /**
  * Route prefixes that render their own top section and suppress the shared
