@@ -25,7 +25,6 @@
 
 import { useEffect, useState } from 'react'
 import BrandsList from '../BrandsList.jsx'
-import useBackGestureClose from '../../../hooks/useBackGestureClose'
 
 export default function BrandsBottomSheet({
   isOpen,
@@ -58,8 +57,6 @@ export default function BrandsBottomSheet({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
-
-  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

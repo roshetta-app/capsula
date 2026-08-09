@@ -36,7 +36,6 @@ import { useEffect, useState }          from 'react'
 import { ListFilter, ListChecks, ArrowUpDown, X } from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-import useBackGestureClose              from '../../hooks/useBackGestureClose'
 
 export default function FavouritesManagerSheet({
   isOpen,
@@ -76,8 +75,6 @@ export default function FavouritesManagerSheet({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
-
-  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

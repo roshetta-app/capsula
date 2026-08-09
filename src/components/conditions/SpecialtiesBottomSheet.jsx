@@ -46,7 +46,6 @@ import { useEffect, useState }          from 'react'
 import { LayoutGrid }                   from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-import useBackGestureClose              from '../../hooks/useBackGestureClose'
 
 
 export default function SpecialtiesBottomSheet({
@@ -88,8 +87,6 @@ export default function SpecialtiesBottomSheet({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
-
-  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

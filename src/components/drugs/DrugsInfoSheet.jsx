@@ -21,7 +21,6 @@
  */
 
 import { useEffect, useState } from 'react'
-import useBackGestureClose from '../../hooks/useBackGestureClose'
 
 const SOURCES = [
   '[Add the primary references the drug library is built from — e.g. a national or regional formulary, WHO essential medicines list, manufacturer product inserts, or a specific clinical reference text.]',
@@ -61,8 +60,6 @@ export default function DrugsInfoSheet({ isOpen, onClose }) {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
-
-  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

@@ -43,7 +43,6 @@ import {
   CROSSES_META,
   SectionHeader,
 } from './sectionPrimitives.jsx'
-import useBackGestureClose from '../../../hooks/useBackGestureClose'
 
 function BreastfeedingBadge({ level }) {
   const meta = BREASTFEEDING_META[level]
@@ -110,8 +109,6 @@ export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
-
-  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 
