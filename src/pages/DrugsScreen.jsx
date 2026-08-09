@@ -420,10 +420,11 @@ export default function DrugsScreen() {
                 </button>
               )}
 
-              {/* drug-filter-instant-apply — results count now sits in a
-                  flex row with a Clear filters link, same space-between
-                  pattern as the two other ClearFiltersButton spots in this
-                  file, rather than a bare div. */}
+              {/* drug-filter-instant-apply — only shown while a search
+                  query is active. When just browsing a category with no
+                  query, the back-to-categories row above already shows its
+                  own Clear filters link — showing this one too would be a
+                  duplicate right below it. */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 marginBottom: 'var(--space-3)',
@@ -432,7 +433,7 @@ export default function DrugsScreen() {
                   {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
                   {query && ` for "${query}"`}
                 </div>
-                {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
+                {hasFilters && hasQuery && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
 
               {displayed.length === 0 ? (
