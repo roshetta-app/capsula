@@ -103,10 +103,25 @@
  * the same input across the transition instead of remounting it. Also
  * moved the filter trigger inside the search pill itself (see
  * SearchBar.jsx) — the row no longer has anything squeezing the input.
+ *
+ * 2026-08-09 (drug category back-gesture navigation): `activeCategory` is no
+ * longer local component state — it's now derived from the URL's
+ * `categorySlug` route param (`/drugs`, `/drugs/category/all`,
+ * `/drugs/category/:slug`), read via `useParams()`. This makes the phone's
+ * back gesture return to the category grid the same standard way it already
+ * returns from a drug detail page, instead of leaving the Drugs tab
+ * entirely. The in-memory `'__all'` sentinel is preserved internally (every
+ * comparison below is unchanged) and mapped to/from the URL word `all` at
+ * the two edges: the derivation below, and the `ROUTES.DRUGS_CATEGORY('all')`
+ * navigate calls that replace the old `setActiveCategory('__all')` calls.
+ * Because DrugsScreen sits at the same position in the route tree for all
+ * three URLs, React Router re-renders rather than remounts it — query text,
+ * active filters, and recent-drugs state all survive tapping into and out
+ * of a category.
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Clock } from 'lucide-react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
@@ -180,6 +195,7 @@ function applyFilters(drugs, filters) {
 
 export default function DrugsScreen() {
   const navigate           = useNavigate()
+  const { categorySlug }   = useParams()
   const { drugs, loading, progress } = useDrugContext()
   const [mode, setMode] = useState('brand')
   const {
@@ -203,7 +219,12 @@ export default function DrugsScreen() {
     toggleDrug(id)
   }
 
-  const [activeCategory,   setActiveCategory]   = useState(null) // null = category list
+  // 2026-08-09: activeCategory is now derived from the URL's :categorySlug
+  // param instead of local state — see file header. null = category list
+  // (bare /drugs), '__all' = the existing unscoped sentinel (URL word
+  // "all"), anything else = that category's slug, taken as-is from the URL.
+  const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
+
   const [filterOpen,       setFilterOpen]       = useState(false)
   const [activeFilters,    setActiveFilters]    = useState(null)
   const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
@@ -339,7 +360,7 @@ export default function DrugsScreen() {
           {/* Back to categories button (only when in a category, not searching) */}
           {!hasQuery && activeCategory !== null && (
             <button
-              onClick={() => setActiveCategory(null)}
+              onClick={() => navigate(ROUTES.DRUGS)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 background: 'none', border: 'none', cursor: 'pointer',
@@ -367,7 +388,7 @@ export default function DrugsScreen() {
                   actually want under a different one (see file header). */}
               {hasQuery && activeCategory && activeCategory !== '__all' && (
                 <button
-                  onClick={() => setActiveCategory('__all')}
+                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
                   style={{
                     display: 'block', background: 'none', border: 'none', cursor: 'pointer',
                     color: 'var(--color-accent)', fontSize: 13, fontWeight: 500,
@@ -488,7 +509,7 @@ export default function DrugsScreen() {
                 iconValue="Pill"
                 color={allDrugsColors.bg}
                 textColor={allDrugsColors.fg}
-                onTap={() => setActiveCategory('__all')}
+                onTap={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
               />
 
               {categoriesWithCounts.map(cat => {
@@ -503,7 +524,7 @@ export default function DrugsScreen() {
                     iconValue={iconValue}
                     color={colors.bg}
                     textColor={colors.fg}
-                    onTap={() => setActiveCategory(cat.slug)}
+                    onTap={() => navigate(ROUTES.DRUGS_CATEGORY(cat.slug))}
                   />
                 )
               })}

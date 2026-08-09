@@ -44,6 +44,7 @@ export const ROUTES = {
   CONDITIONS:        '/conditions',
   CONDITION_DETAIL:  (slug) => `/conditions/${slug}`,
   DRUGS:             '/drugs',
+  DRUGS_CATEGORY:    (slug) => `/drugs/category/${slug}`,
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
 
@@ -76,8 +77,9 @@ export default function AppRoutes() {
       <Route path="/conditions"          element={<ConditionsScreen />} />
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
 
-      <Route path="/drugs"               element={<DrugsScreen />} />
-      <Route path="/drugs/:slug"         element={<DrugDetailScreen />} />
+      <Route path="/drugs"                        element={<DrugsScreen />} />
+      <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
+      <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
 
       <Route path="/favourites"          element={<FavouritesScreen />} />
 
