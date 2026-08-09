@@ -223,8 +223,8 @@ export default function SharedDrugCard({
         {genericLine && (
           <div style={{
             fontSize:     13,
-            fontWeight:   400,
-            color:        'var(--color-text-tertiary)',
+            fontWeight:   500,
+            color:        'var(--color-text-secondary)',
             lineHeight:   1.4,
             marginTop:    2,
             overflow:     'hidden',
