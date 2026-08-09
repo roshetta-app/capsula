@@ -122,7 +122,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Clock } from 'lucide-react'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import Layout from '../components/layout'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -479,7 +478,12 @@ export default function DrugsScreen() {
             full 15-item history instead of silently truncating what's
             visible. */}
         {recentDrugs.length > 0 && (
-          <RecentlyViewedButton onTap={() => setShowRecentSheet(true)} />
+          <RecentlyViewedButton
+            onTap={() => setShowRecentSheet(true)}
+            drugs={recentDrugObjects}
+            categories={categories}
+            isDark={isDark}
+          />
         )}
 
         {/* Loading progress ring */}
@@ -907,8 +911,28 @@ function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
 // reason (this button sits directly above the category grid, so it needs
 // to feel like part of the same tappable surface, not a plain form button).
 
-function RecentlyViewedButton({ onTap }) {
+// 2026-08-09 (redesign): swapped the clock-icon + label row for an avatar
+// stack of the 3 most recent drugs' initials, colored by each drug's own
+// category token (same resolveToken lookup CategoryRow uses). Gives a
+// visual preview of *what's* recent instead of just naming the feature.
+// Falls back gracefully if fewer than 3 recents exist — `preview` is just
+// however many are actually in `drugs` (already capped at MAX_RECENT
+// upstream, but this row itself only ever shows the first 3).
+
+function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
   const [pressed, setPressed] = useState(false)
+  const preview = drugs.slice(0, 3)
+
+  function getInitials(drug) {
+    const name = drug.tradenameClean || drug.genericName || ''
+    if (!name) return '?'
+    return name.slice(0, 1).toUpperCase() + name.slice(1, 2).toLowerCase()
+  }
+
+  function getColors(drug) {
+    const cat = categories.find(c => c.slug === drug.category)
+    return resolveToken(cat?.color_token || FALLBACK_TOKEN, isDark)
+  }
 
   return (
     <button
@@ -935,17 +959,47 @@ function RecentlyViewedButton({ onTap }) {
         transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      <Clock size={14} strokeWidth={1.8} color="var(--color-text-primary)" />
+      <div style={{ display: 'flex', flexShrink: 0 }}>
+        {preview.map((drug, i) => {
+          const colors = getColors(drug)
+          return (
+            <div
+              key={drug.id}
+              style={{
+                width:           28,
+                height:          28,
+                borderRadius:    '50%',
+                backgroundColor: colors.bg,
+                color:           colors.fg,
+                display:         'flex',
+                alignItems:      'center',
+                justifyContent:  'center',
+                fontSize:        11,
+                fontWeight:      600,
+                border:          '2px solid var(--color-surface)',
+                marginLeft:      i === 0 ? 0 : -10,
+              }}
+            >
+              {getInitials(drug)}
+            </div>
+          )
+        })}
+      </div>
+
       <span style={{
-        flex:       1,
-        textAlign:  'left',
         fontSize:   13,
         fontWeight: 500,
         color:      'var(--color-text-primary)',
       }}>
         Recently viewed
       </span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+      <svg
+        width="16" height="16" viewBox="0 0 24 24" fill="none"
+        stroke="var(--color-text-primary)" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round"
+        style={{ marginLeft: 'auto' }}
+      >
         <polyline points="9 18 15 12 9 6"/>
       </svg>
     </button>
