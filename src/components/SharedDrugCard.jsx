@@ -225,6 +225,7 @@ export default function SharedDrugCard({
             fontSize:     13,
             fontWeight:   500,
             color:        'var(--color-accent)',
+            opacity:      0.75,
             lineHeight:   1.4,
             marginTop:    2,
             overflow:     'hidden',
