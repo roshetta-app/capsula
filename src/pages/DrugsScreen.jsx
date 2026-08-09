@@ -1254,3 +1254,4 @@ function NarrowResultsHint() {
       Keep typing to narrow these results
     </div>
   )
+}
