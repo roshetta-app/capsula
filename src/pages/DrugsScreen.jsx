@@ -873,6 +873,14 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
 // call sites below), border lightened to --color-border-subtle, shadow moved
 // to --shadow-ambient-selector. Radius (--radius-lg) unchanged. Still a card,
 // unlike the flat drug row — kept deliberately distinct per 4.21.
+//
+// 2026-08-09: shadow removed. With DrugsHero (the title card) sitting right
+// above these using the same surface color + soft shadow, the two read as
+// the same visual tier and the title card lost its "this is the header"
+// weight. Each category keeps its own card (border + radius unchanged, so
+// they're still individually tappable, distinct rows) but is now flat —
+// only DrugsHero carries elevation, so it's the one thing on the page that
+// visually floats.
 
 function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
   return (
@@ -886,7 +894,6 @@ function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
         padding: 'var(--space-3) var(--space-4)',
         marginBottom: 'var(--space-2)',
         cursor: 'pointer',
-        boxShadow: 'var(--shadow-ambient-selector)',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
