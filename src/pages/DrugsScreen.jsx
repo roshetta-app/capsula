@@ -538,35 +538,48 @@ export default function DrugsScreen() {
           <LoadingProgress progress={progress} />
         )}
 
-        {/* "All Drugs" row */}
+        {/* Category grid — 2026-08-09: switched from a stacked full-width
+            list to a 2-column grid of compact tiles. The list version used
+            the same full-width white-card shape as DrugsHero and the search
+            bar above it, so the whole screen read as one undifferentiated
+            stack of identical blocks. The grid gives categories a visibly
+            different shape (icon-on-top tile vs. header's icon-left row),
+            so the eye reads it as "a set of options" rather than "more of
+            the same". "All Drugs" stays as the first tile in the grid
+            rather than pulled out as its own row, matching the agreed
+            mockup. */}
         {!loading && (
           <>
-            <CategoryRow
-              label="All Drugs"
-              iconType="lucide"
-              iconValue="Pill"
-              color={allDrugsColors.bg}
-              textColor={allDrugsColors.fg}
-              onTap={() => setActiveCategory('__all')}
-            />
+            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+              Browse by category
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+              <CategoryRow
+                label="All Drugs"
+                iconType="lucide"
+                iconValue="Pill"
+                color={allDrugsColors.bg}
+                textColor={allDrugsColors.fg}
+                onTap={() => setActiveCategory('__all')}
+              />
 
-            {/* Category rows */}
-            {categoriesWithCounts.map(cat => {
-              const iconType  = cat.icon_type || 'lucide'
-              const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
-              const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
-              return (
-                <CategoryRow
-                  key={cat.id}
-                  label={cat.name_en}
-                  iconType={iconType}
-                  iconValue={iconValue}
-                  color={colors.bg}
-                  textColor={colors.fg}
-                  onTap={() => setActiveCategory(cat.slug)}
-                />
-              )
-            })}
+              {categoriesWithCounts.map(cat => {
+                const iconType  = cat.icon_type || 'lucide'
+                const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
+                const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
+                return (
+                  <CategoryRow
+                    key={cat.id}
+                    label={cat.name_en}
+                    iconType={iconType}
+                    iconValue={iconValue}
+                    color={colors.bg}
+                    textColor={colors.fg}
+                    onTap={() => setActiveCategory(cat.slug)}
+                  />
+                )
+              })}
+            </div>
           </>
         )}
       </div>
@@ -874,50 +887,45 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
 // to --shadow-ambient-selector. Radius (--radius-lg) unchanged. Still a card,
 // unlike the flat drug row — kept deliberately distinct per 4.21.
 //
-// 2026-08-09: shadow removed. With DrugsHero (the title card) sitting right
-// above these using the same surface color + soft shadow, the two read as
-// the same visual tier and the title card lost its "this is the header"
-// weight. Each category keeps its own card (border + radius unchanged, so
-// they're still individually tappable, distinct rows) but is now flat —
-// only DrugsHero carries elevation, so it's the one thing on the page that
-// visually floats.
+// 2026-08-09: shadow removed, then restructured from a horizontal icon-left
+// row into an icon-top grid tile (rendered 2-up — see call site above).
+// With DrugsHero (the title card) and the search bar both using the same
+// full-width white-card shape, the category list below read as more of the
+// same stacked block rather than a distinct set of options. Giving it a
+// different shape entirely (compact tile, icon stacked above the label,
+// no chevron — the whole tile is the tap target) makes it read as a picker
+// grid, not a fourth copy of the header. Name kept as CategoryRow rather
+// than renamed to avoid touching every call site + prop-passing above for
+// what is still conceptually "one row's worth of category".
 
 function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
   return (
     <div
       onClick={onTap}
       style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
         backgroundColor: 'var(--color-surface)',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-3) var(--space-4)',
-        marginBottom: 'var(--space-2)',
+        padding: 'var(--space-3)',
         cursor: 'pointer',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
       {/* Icon in tinted circle */}
       <div style={{
-        width: 40, height: 40, borderRadius: '50%',
+        width: 32, height: 32, borderRadius: '50%',
         backgroundColor: color,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
-        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={16} color={textColor} />
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={15} color={textColor} />
       </div>
 
       {/* Name */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-          {label}
-        </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
+        {label}
       </div>
-
-      {/* Chevron */}
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
     </div>
   )
 }
