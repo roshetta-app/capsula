@@ -76,6 +76,11 @@ import { useToast } from '../../context/ToastContext'
  *                    sheet opens
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
+ *   hasSearchResults boolean | undefined — true only when a search query is active AND returned
+ *                    results on screen; gates the Sort By section (drug-search-sort-cheapest) — no
+ *                    query, or an empty/no-match result, means nothing to sort
+ *   sortMode         'relevance' | 'cheapest' | undefined — current sort mode, for the Sort By section
+ *   onSortChange     (mode) => void | undefined — instant, not gated by Apply; sheet stays open
  */
 
 // Each chip's `matches` list is the full set of real raw form values (from
@@ -110,7 +115,7 @@ const EMPTY = {
   forms: ['all'],
 }
 
-export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange }) {
+export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange, hasSearchResults, sortMode, onSortChange }) {
   const [filters, setFilters] = useState(activeFilters || EMPTY)
   const { toast } = useToast()
 
@@ -242,7 +247,14 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
         {onModeChange && (
           <>
             <FilterSection label="Search Mode">
-              <ModeToggle mode={mode} onChange={handleModeChange} />
+              <PillToggle
+                value={mode}
+                onChange={handleModeChange}
+                options={[
+                  { value: 'brand',   label: 'Brand' },
+                  { value: 'generic', label: 'Generic' },
+                ]}
+              />
             </FilterSection>
             <div style={{
               height: 1,
@@ -250,6 +262,30 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
               margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
             }} />
           </>
+        )}
+
+        {/* Sort By — Relevance/Cheapest First, instant-apply like Form/Route
+            below (not a single instant-choice-then-close action like Search
+            Mode above, since 'relevance' vs 'cheapest' has no analogous
+            "brand mode vs generic mode" full context switch to announce).
+            Only shown while a search query is active AND actually returned
+            results — sorting has nothing to act on otherwise (category
+            browsing, empty results, "did you mean" state). 'sortMode' lives
+            in DrugContext (see drug-search-sort-cheapest note there) so it
+            survives navigation the same way Search Mode and Form/Route
+            already do, and stays applied if the query is cleared and
+            retyped later. */}
+        {hasSearchResults && (
+          <FilterSection label="Sort By">
+            <PillToggle
+              value={sortMode}
+              onChange={onSortChange}
+              options={[
+                { value: 'relevance', label: 'Relevance' },
+                { value: 'cheapest',  label: 'Cheapest First' },
+              ]}
+            />
+          </FilterSection>
         )}
 
         {/* Form / Route — instant-apply, see toggleForm above. 'All Forms'
@@ -319,11 +355,17 @@ function FilterSection({ label, children }) {
 // which visibly resized the pill since bold text is wider (same bug already
 // fixed on ToggleChip below). Weight is now constant; active/inactive reads
 // purely through color/border/background.
-function ModeToggle({ mode, onChange }) {
+// Generic two-option pill control: one continuous bordered track, active
+// side filled solid, no gap/seam between the two. Originally ModeToggle
+// (Brand/Generic only) — generalized (drug-search-sort-cheapest) to also
+// drive the Sort By toggle (Relevance/Cheapest First), since both are
+// "pick exactly one of two" controls that should look identical rather
+// than duplicating this styling in a second component.
+function PillToggle({ value, onChange, options }) {
   // Tracks which of the two buttons (if any) is currently pressed, since
   // both share this one component instance — same onPointer* + scale
   // pattern as ToggleChip's own press feedback, just keyed per-button.
-  const [pressedMode, setPressedMode] = useState(null)
+  const [pressedValue, setPressedValue] = useState(null)
   return (
     <div style={{
       display: 'flex',
@@ -331,31 +373,31 @@ function ModeToggle({ mode, onChange }) {
       border: '1.5px solid var(--color-accent)',
       overflow: 'hidden',
     }}>
-      {['brand', 'generic'].map(m => (
+      {options.map(opt => (
         <button
-          key={m}
+          key={opt.value}
           type="button"
-          onClick={() => onChange(m)}
-          onPointerDown={() => setPressedMode(m)}
-          onPointerUp={() => setPressedMode(null)}
-          onPointerLeave={() => setPressedMode(null)}
-          onPointerCancel={() => setPressedMode(null)}
+          onClick={() => onChange(opt.value)}
+          onPointerDown={() => setPressedValue(opt.value)}
+          onPointerUp={() => setPressedValue(null)}
+          onPointerLeave={() => setPressedValue(null)}
+          onPointerCancel={() => setPressedValue(null)}
           style={{
             flex: 1,
             padding: '8px 14px',
             fontSize: 13, fontWeight: 500,
             cursor: 'pointer',
             border: 'none',
-            backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
-            color: mode === m ? '#fff' : 'var(--color-accent)',
+            backgroundColor: value === opt.value ? 'var(--color-accent)' : 'transparent',
+            color: value === opt.value ? '#fff' : 'var(--color-accent)',
             fontFamily: 'var(--font-body)',
-            transform: pressedMode === m ? 'scale(0.96)' : 'scale(1)',
+            transform: pressedValue === opt.value ? 'scale(0.96)' : 'scale(1)',
             transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
             WebkitTapHighlightColor: 'transparent',
             outline: 'none',
           }}
         >
-          {m === 'brand' ? 'Brand' : 'Generic'}
+          {opt.label}
         </button>
       ))}
     </div>

@@ -18,18 +18,26 @@ const DrugContext = createContext(null)
  * this only needs to survive in-app navigation, not a real session end
  * (see DrugFilterPanel.jsx's own header note on filters not persisting
  * between sessions — that decision is unchanged).
+ *
+ * drug-search-sort-cheapest — 'sortMode' ('relevance' | 'cheapest') joins
+ * 'mode' and 'activeFilters' here for the same reason: it needs to survive
+ * navigating into a drug's detail page and back, exactly like Search Mode
+ * and Form/Route already do, rather than silently resetting to Relevance
+ * on every return trip. Same non-persistence rule applies — in-memory only,
+ * not saved to localStorage/sessionStorage.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
   const [mode, setMode] = useState('brand')
   const [activeFilters, setActiveFilters] = useState(null)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters }
+  const [sortMode, setSortMode] = useState('relevance')
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
 /**
  * useDrugContext — consume drug data anywhere in the tree.
- * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters, setActiveFilters }
+ * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode }
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)

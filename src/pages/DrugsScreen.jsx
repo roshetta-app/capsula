@@ -194,12 +194,23 @@ function applyFilters(drugs, filters) {
   return result
 }
 
+// drug-search-sort-cheapest — ascending by price; drugs with no price (5 of
+// ~19,774 brands, per DB check) sort to the end rather than the front, since
+// a missing price isn't "free" and treating it as 0 would be misleading.
+function sortByPrice(drugs) {
+  return drugs.slice().sort((a, b) => {
+    const priceA = a.price ?? Infinity
+    const priceB = b.price ?? Infinity
+    return priceA - priceB
+  })
+}
+
 // ─── DrugsScreen ──────────────────────────────────────────────────────────────
 
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
-  const { drugs, loading, progress, mode, setMode, activeFilters, setActiveFilters } = useDrugContext()
+  const { drugs, loading, progress, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode } = useDrugContext()
   const {
     query,
     setQuery,
@@ -314,6 +325,11 @@ export default function DrugsScreen() {
   // browsing vs. the category list) so DrugFilterPanel can be mounted once,
   // below, shared by both — instead of once per branch (step 1f.2).
   let content
+  // drug-search-sort-cheapest — gates DrugFilterPanel's Sort By section.
+  // True only once a query is active AND actually produced results; set
+  // inside the search-results branch below, left false otherwise (category
+  // browsing, no query yet, or an empty/no-match result has nothing to sort).
+  let hasSearchResults = false
 
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
@@ -334,9 +350,14 @@ export default function DrugsScreen() {
     // untouched. Browsing (no query) has no such ranking to preserve, so it
     // sorts alphabetically by brand name instead of the old genericName sort.
     const filtered = applyFilters(base, activeFilters)
+    // drug-search-sort-cheapest — Cheapest First re-orders the already-
+    // filtered results by price; Relevance (default) leaves searchDrugsTiered's
+    // ranked order untouched, same as before this feature existed.
     const displayed = hasQuery
-      ? filtered
+      ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
+
+    hasSearchResults = hasQuery && displayed.length > 0
 
     // activeCategory holds the category's stable slug (see plan's decided
     // design — generics.category stores a drug_categories.slug, not the
@@ -591,6 +612,9 @@ export default function DrugsScreen() {
         activeFilters={activeFilters}
         mode={mode}
         onModeChange={setMode}
+        hasSearchResults={hasSearchResults}
+        sortMode={sortMode}
+        onSortChange={setSortMode}
       />
 
       <RecentlyViewedSheet
