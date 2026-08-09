@@ -586,10 +586,10 @@ export default function DrugsScreen() {
 // sticky-header scroll trigger without another edit to this file.
 
 // 2026-08-09: icon badge switched from a light-tinted circle (category
-// fallback token + colored icon) to a solid circle + white icon — the same
-// treatment FavouritesHero's own badge uses (backgroundColor: FAV_ACCENT,
-// white Heart). Uses the identical var(--color-favourite) token so the two
-// headers' badges render as the exact same color, not just a similar blue.
+// fallback token + colored icon) to a solid circle + white icon — same
+// structural treatment as FavouritesHero's badge. Uses var(--color-accent)
+// (the app's blue accent token) rather than var(--color-favourite), which
+// turned out to render red/pink, not blue.
 
 function DrugsHero({ heroRef, isDark }) {
   return (
@@ -607,7 +607,7 @@ function DrugsHero({ heroRef, isDark }) {
             width:           38,
             height:          38,
             borderRadius:    '50%',
-            backgroundColor: 'var(--color-favourite)',
+            backgroundColor: 'var(--color-accent)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
