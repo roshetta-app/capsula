@@ -190,7 +190,7 @@ export default function SharedDrugCard({
         alignItems:      'center',
         justifyContent:  'center',
       }}>
-        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={16} color={categoryColors.fg} />
+        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={19} color={categoryColors.fg} />
       </div>
 
       {/* Middle: text content — title line (1d.2) + generic line (1d.3) */}
@@ -213,7 +213,7 @@ export default function SharedDrugCard({
             <span style={{
               fontWeight: 400,
               fontSize:   12,
-              color:      'var(--color-text-primary)',
+              color:      'var(--color-text-secondary)',
             }}>
               {' '}{titleSuffix}
             </span>
@@ -223,7 +223,7 @@ export default function SharedDrugCard({
         {genericLine && (
           <div style={{
             fontSize:     13,
-            fontWeight:   500,
+            fontWeight:   400,
             color:        'var(--color-accent)',
             lineHeight:   1.4,
             marginTop:    2,
