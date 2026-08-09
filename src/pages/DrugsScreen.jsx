@@ -923,7 +923,7 @@ function RecentlyViewedButton({ onTap }) {
         gap:                     'var(--space-2)',
         width:                   '100%',
         backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
-        border:                  '1px solid var(--color-border-subtle)',
+        border:                  'none',
         borderRadius:            'var(--radius-lg)',
         padding:                 'var(--space-2) var(--space-3)',
         marginBottom:            'var(--space-3)',
@@ -935,17 +935,17 @@ function RecentlyViewedButton({ onTap }) {
         transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      <Clock size={14} strokeWidth={1.8} color="var(--color-text-tertiary)" />
+      <Clock size={14} strokeWidth={1.8} color="var(--color-text-primary)" />
       <span style={{
         flex:       1,
         textAlign:  'left',
         fontSize:   13,
         fontWeight: 500,
-        color:      'var(--color-text-secondary)',
+        color:      'var(--color-text-primary)',
       }}>
         Recently viewed
       </span>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <polyline points="9 18 15 12 9 6"/>
       </svg>
     </button>
