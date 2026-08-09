@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import { useDrugs } from '../hooks/useDrugs'
+import { useDrugSearch } from '../hooks/useDrugSearch'
 
 const DrugContext = createContext(null)
 
@@ -25,19 +26,31 @@ const DrugContext = createContext(null)
  * and Form/Route already do, rather than silently resetting to Relevance
  * on every return trip. Same non-persistence rule applies — in-memory only,
  * not saved to localStorage/sessionStorage.
+ *
+ * drug-search-persist-navigation — 'query'/'setQuery'/'results'/
+ * 'queryTooShort'/'suggestion' (from useDrugSearch) join the state above
+ * for the exact same reason: useDrugSearch used to be called locally
+ * inside DrugsScreen, so opening a drug's detail page (a separate route —
+ * DrugsScreen unmounts entirely) and coming back reset the typed query,
+ * and everything derived from it, to empty. useDrugSearch itself is
+ * unchanged — it's just called here instead, same relocation already done
+ * for mode/activeFilters/sortMode.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
   const [mode, setMode] = useState('brand')
   const [activeFilters, setActiveFilters] = useState(null)
   const [sortMode, setSortMode] = useState('relevance')
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode }
+  const searchValue = useDrugSearch(drugsValue.drugs, mode)
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
 /**
  * useDrugContext — consume drug data anywhere in the tree.
- * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode }
+ * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
+ * setActiveFilters, sortMode, setSortMode, query, setQuery, results,
+ * queryTooShort, suggestion }
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)

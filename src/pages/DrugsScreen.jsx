@@ -144,7 +144,6 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import { useDrugSearch } from '../hooks/useDrugSearch'
 import { useCategories } from '../hooks/useCategories'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
@@ -210,14 +209,16 @@ function sortByPrice(drugs) {
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
-  const { drugs, loading, progress, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode } = useDrugContext()
   const {
-    query,
-    setQuery,
+    drugs, loading, progress,
+    mode, setMode,
+    activeFilters, setActiveFilters,
+    sortMode, setSortMode,
+    query, setQuery,
     results:         searchResults,
     queryTooShort,
     suggestion,
-  } = useDrugSearch(drugs, mode)
+  } = useDrugContext()
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
   const isDark = useIsDark()
