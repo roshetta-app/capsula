@@ -237,34 +237,24 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             {FORM_OPTIONS.map(opt => {
               const active = filters.forms.includes(opt.value)
               return (
-                <ToggleChip key={opt.value} label={opt.label} active={active} onToggle={() => toggleForm(opt.value)} />
+                <ToggleChip
+                  key={opt.value}
+                  label={opt.label}
+                  active={active}
+                  onToggle={() => toggleForm(opt.value)}
+                  showCheckbox={opt.value !== 'all'}
+                />
               )
             })}
           </div>
         </FilterSection>
 
         {/* Clear All — always present now; greyed out and inert until a
-            real filter is active, then turns red/active. Was previously
+            real filter is active, then turns solid red/active. Was previously
             hidden entirely when inactive; kept as a stable anchor in the
             layout instead. */}
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
-          <button
-            onClick={handleClear}
-            disabled={!hasActiveFilter}
-            style={{
-              flex: 1, padding: '12px',
-              borderRadius: 'var(--radius-md)',
-              fontSize: 14, fontWeight: 600,
-              cursor: hasActiveFilter ? 'pointer' : 'not-allowed',
-              border: hasActiveFilter ? '1.5px solid #DC2626' : '1.5px solid var(--color-border)',
-              backgroundColor: 'transparent',
-              color: hasActiveFilter ? '#DC2626' : 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
-              transition: 'color 0.15s ease, border-color 0.15s ease',
-            }}
-          >
-            Clear All
-          </button>
+          <ClearAllButton onClick={handleClear} disabled={!hasActiveFilter} />
         </div>
       </div>
     </>
@@ -297,6 +287,10 @@ function FilterSection({ label, children }) {
 // fixed on ToggleChip below). Weight is now constant; active/inactive reads
 // purely through color/border/background.
 function ModeToggle({ mode, onChange }) {
+  // Tracks which of the two buttons (if any) is currently pressed, since
+  // both share this one component instance — same onPointer* + scale
+  // pattern as ToggleChip's own press feedback, just keyed per-button.
+  const [pressedMode, setPressedMode] = useState(null)
   return (
     <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
       {['brand', 'generic'].map(m => (
@@ -304,6 +298,10 @@ function ModeToggle({ mode, onChange }) {
           key={m}
           type="button"
           onClick={() => onChange(m)}
+          onPointerDown={() => setPressedMode(m)}
+          onPointerUp={() => setPressedMode(null)}
+          onPointerLeave={() => setPressedMode(null)}
+          onPointerCancel={() => setPressedMode(null)}
           style={{
             flex: 1,
             padding: '8px 14px',
@@ -314,7 +312,8 @@ function ModeToggle({ mode, onChange }) {
             backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
             color: mode === m ? '#fff' : 'var(--color-text-secondary)',
             fontFamily: 'var(--font-body)',
-            transition: 'all 0.15s ease',
+            transform: pressedMode === m ? 'scale(0.96)' : 'scale(1)',
+            transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
             WebkitTapHighlightColor: 'transparent',
             outline: 'none',
           }}
@@ -323,6 +322,40 @@ function ModeToggle({ mode, onChange }) {
         </button>
       ))}
     </div>
+  )
+}
+
+// Clear All — filled solid red when a real filter is active (was
+// border-only red before), grey/bordered/inert when disabled. Press
+// feedback (scale down on press, release on up/leave/cancel) matches
+// ToggleChip's own onPointer* + local 'pressed' state pattern.
+function ClearAllButton({ onClick, disabled }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onPointerDown={() => !disabled && setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        flex: 1, padding: '12px',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 14, fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        border: disabled ? '1.5px solid var(--color-border)' : '1.5px solid #DC2626',
+        backgroundColor: disabled ? 'transparent' : '#DC2626',
+        color: disabled ? 'var(--color-text-tertiary)' : '#fff',
+        fontFamily: 'var(--font-body)',
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+        outline: 'none',
+      }}
+    >
+      Clear All
+    </button>
   )
 }
 
@@ -338,7 +371,7 @@ function ModeToggle({ mode, onChange }) {
 // be active at once) rather than looking like a single-choice segmented
 // toggle. Checked state (filled box + checkmark) mirrors the chip's own
 // active state exactly, no separate logic.
-function ToggleChip({ label, active, onToggle }) {
+function ToggleChip({ label, active, onToggle, showCheckbox = true }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -348,7 +381,7 @@ function ToggleChip({ label, active, onToggle }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 5,
         width: '100%', minWidth: 0, boxSizing: 'border-box',
         padding: '6px 8px',
         borderRadius: 'var(--radius-full)',
@@ -366,21 +399,25 @@ function ToggleChip({ label, active, onToggle }) {
     >
       {/* Checkbox indicator — square outline when unselected, filled with
           a checkmark when selected, signals "pick any number of these"
-          rather than "pick one". */}
-      <span style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 14, height: 14, flexShrink: 0,
-        borderRadius: 3,
-        border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
-        backgroundColor: active ? '#fff' : 'transparent',
-        transition: 'background-color 0.15s ease, border-color 0.15s ease',
-      }}>
-        {active && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-        )}
-      </span>
+          rather than "pick one". Omitted for the 'All' chip: picking it
+          isn't a multi-select tick, it's a single exclusive reset, so it
+          reads as a plain selectable pill instead (see showCheckbox). */}
+      {showCheckbox && (
+        <span style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 14, height: 14, flexShrink: 0,
+          borderRadius: 3,
+          border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
+          backgroundColor: active ? '#fff' : 'transparent',
+          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        }}>
+          {active && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          )}
+        </span>
+      )}
       {/* Single-line label — clips with an ellipsis instead of wrapping
           and blowing up the fixed-width grid cell's row height. */}
       <span style={{
