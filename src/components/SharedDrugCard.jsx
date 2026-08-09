@@ -224,7 +224,7 @@ export default function SharedDrugCard({
           <div style={{
             fontSize:     13,
             fontWeight:   400,
-            color:        'var(--color-accent)',
+            color:        'var(--color-text-tertiary)',
             lineHeight:   1.4,
             marginTop:    2,
             overflow:     'hidden',
