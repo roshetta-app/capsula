@@ -307,7 +307,7 @@ export default function DrugsScreen() {
           onFilter={() => setFilterOpen(true)}
           hasActiveFilters={hasFilters}
         />
-        <div style={{ paddingTop: 'var(--space-5)' }}>
+        <div>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         {/* Search bar — same single-wrapper shape as the category-list view's
             copy below, on purpose (see 2026-07-19 note at the top of this
@@ -424,7 +424,7 @@ export default function DrugsScreen() {
         onFilter={() => setFilterOpen(true)}
         hasActiveFilters={hasFilters}
       />
-      <div style={{ paddingTop: 'var(--space-5)' }}>
+      <div>
         <DrugsHero heroRef={heroRef} isDark={isDark} />
         {/* Same single-wrapper shape as the search-results view's copy
             above, on purpose — see 2026-07-19 note at the top of this file. */}
