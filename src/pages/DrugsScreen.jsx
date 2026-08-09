@@ -458,38 +458,7 @@ export default function DrugsScreen() {
             full 15-item history instead of silently truncating what's
             visible. */}
         {recentDrugs.length > 0 && (
-          <button
-            onClick={() => setShowRecentSheet(true)}
-            style={{
-              display:                 'flex',
-              alignItems:              'center',
-              gap:                     'var(--space-2)',
-              width:                   '100%',
-              backgroundColor:         'transparent',
-              border:                  '1px solid var(--color-border-subtle)',
-              borderRadius:            'var(--radius-lg)',
-              padding:                 'var(--space-2) var(--space-3)',
-              marginBottom:            'var(--space-3)',
-              cursor:                  'pointer',
-              fontFamily:              'var(--font-body)',
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Clock size={14} strokeWidth={1.8} color="var(--color-text-tertiary)" />
-            <span style={{
-              flex:       1,
-              textAlign:  'left',
-              fontSize:   13,
-              fontWeight: 500,
-              color:      'var(--color-text-secondary)',
-            }}>
-              Recently viewed
-            </span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </button>
+          <RecentlyViewedButton onTap={() => setShowRecentSheet(true)} />
         )}
 
         {/* Loading progress ring */}
@@ -859,29 +828,37 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
 // to --shadow-ambient-selector. Radius (--radius-lg) unchanged. Still a card,
 // unlike the flat drug row — kept deliberately distinct per 4.21.
 //
-// 2026-08-09: shadow removed, then restructured from a horizontal icon-left
-// row into an icon-top grid tile (rendered 2-up — see call site above).
-// With DrugsHero (the title card) and the search bar both using the same
-// full-width white-card shape, the category list below read as more of the
-// same stacked block rather than a distinct set of options. Giving it a
-// different shape entirely (compact tile, icon stacked above the label,
-// no chevron — the whole tile is the tap target) makes it read as a picker
-// grid, not a fourth copy of the header. Name kept as CategoryRow rather
-// than renamed to avoid touching every call site + prop-passing above for
-// what is still conceptually "one row's worth of category".
+// 2026-08-09 (2nd pass): added the same tap-feedback treatment
+// SharedDrugCard uses — pointer handlers driving a `pressed` boolean that
+// swaps backgroundColor to var(--color-surface-muted) and scales the tile
+// to 0.99, both animated via var(--motion-fast)/var(--ease-settle) — so
+// every tappable surface on this screen (drug rows, this grid, the
+// Recently Viewed button below) responds to touch the same way.
 
 function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
+  const [pressed, setPressed] = useState(false)
+
   return (
     <div
       onClick={onTap}
+      role="button"
+      tabIndex={0}
+      onKeyDown={e => e.key === 'Enter' && onTap()}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
         border: '1px solid var(--color-border-subtle)',
         borderRadius: 'var(--radius-lg)',
         padding: 'var(--space-3)',
         cursor: 'pointer',
+        outline: 'none',
         WebkitTapHighlightColor: 'transparent',
+        transform: pressed ? 'scale(0.99)' : 'scale(1)',
+        transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
       {/* Icon in tinted circle */}
@@ -899,6 +876,58 @@ function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
         {label}
       </div>
     </div>
+  )
+}
+
+// ─── RecentlyViewedButton ───────────────────────────────────────────────────
+// 2026-08-09: extracted from an inline <button> in the category-list view
+// (see call site above) so it can carry its own `pressed` state — same
+// SharedDrugCard-style tap feedback as CategoryRow above, for the same
+// reason (this button sits directly above the category grid, so it needs
+// to feel like part of the same tappable surface, not a plain form button).
+
+function RecentlyViewedButton({ onTap }) {
+  const [pressed, setPressed] = useState(false)
+
+  return (
+    <button
+      onClick={onTap}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     'var(--space-2)',
+        width:                   '100%',
+        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
+        border:                  '1px solid var(--color-border-subtle)',
+        borderRadius:            'var(--radius-lg)',
+        padding:                 'var(--space-2) var(--space-3)',
+        marginBottom:            'var(--space-3)',
+        cursor:                  'pointer',
+        fontFamily:              'var(--font-body)',
+        outline:                 'none',
+        WebkitTapHighlightColor: 'transparent',
+        transform:               pressed ? 'scale(0.99)' : 'scale(1)',
+        transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+      }}
+    >
+      <Clock size={14} strokeWidth={1.8} color="var(--color-text-tertiary)" />
+      <span style={{
+        flex:       1,
+        textAlign:  'left',
+        fontSize:   13,
+        fontWeight: 500,
+        color:      'var(--color-text-secondary)',
+      }}>
+        Recently viewed
+      </span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </button>
   )
 }
 
