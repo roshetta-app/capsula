@@ -165,9 +165,6 @@ import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomS
 import SpecialtySelector       from '../components/conditions/SpecialtySelector'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
-import { useConditionSearch }  from '../hooks/useConditionSearch'
-import { useRecentlyViewed }   from '../hooks/useRecentlyViewed'
-import { useSortToggle }       from '../hooks/useSortToggle'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
@@ -687,10 +684,15 @@ function StickyLogoHeader({
 
 export default function ConditionsScreen() {
   const navigate = useNavigate()
-  const { conditions, specialties, loading } = useConditionContext()
+  const {
+    conditions, specialties, loading,
+    recentlyViewed, recentOrder,
+    sortMode, cycleSortMode, SORT_LABELS,
+    query, setQuery,
+    activeSpecialty, setActiveSpecialty,
+    results, resultCount,
+  } = useConditionContext()
   const { isConditionFavourited }             = useFavouritesContext()
-  const { recentlyViewed, recentOrder }      = useRecentlyViewed()
-  const { sortMode, cycleSortMode, SORT_LABELS } = useSortToggle()
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
@@ -804,15 +806,6 @@ export default function ConditionsScreen() {
     // Small delay so scroll completes before focus pulls the keyboard up
     setTimeout(() => searchInputRef.current?.focus(), 300)
   }
-
-  const {
-    query,
-    setQuery,
-    activeSpecialty,
-    setActiveSpecialty,
-    results,
-    resultCount,
-  } = useConditionSearch(conditions, sortMode, recentOrder, 'capsula_conditions_specialty')
 
   const isSearching        = query.length >= 1
   const activeSpecialtyObj = activeSpecialty !== 'all'
@@ -1112,4 +1105,5 @@ export default function ConditionsScreen() {
     </Layout>
   )
 }
+
 
