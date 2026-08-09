@@ -24,7 +24,7 @@ import {
   Microscope, HeartPulse, Hospital, BriefcaseMedical, Dna,
   Activity, Scan, FlaskConical, Thermometer, Ambulance, Scissors,
   UserRound, Layers, Wind, Droplets, ShieldPlus,
-  Radiation, TestTube, Zap, Sun, Smile, Bug, Tablets,
+  Radiation, TestTube, Zap, Sun, Smile, Bug, Tablets, Frown,
 } from 'lucide-react'
 
 // ─── Phosphor (medical / clinical) ───────────────────────────────────────────
@@ -93,6 +93,7 @@ export const LUCIDE_ICON_OPTIONS = [
   { key: 'UserRound',        label: 'General Practitioner',       Icon: UserRound,       lib: 'lucide'   },
   { key: 'Bug',              label: 'Antimicrobial / Bacteria',   Icon: Bug,             lib: 'lucide'   },
   { key: 'Tablets',          label: 'Vitamins & Minerals',        Icon: Tablets,         lib: 'lucide'   },
+  { key: 'Frown',            label: 'Analgesic / Pain Relief',    Icon: Frown,           lib: 'lucide'   },
 
   // ── Phosphor — medical / clinical ─────────────────────────────────────────
   { key: 'Ph:Heartbeat',     label: 'Cardiology (ECG)',           Icon: Heartbeat,       lib: 'phosphor' },
