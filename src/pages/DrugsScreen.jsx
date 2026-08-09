@@ -675,7 +675,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
               margin:        0,
               letterSpacing: '-0.2px',
             }}>
-              Drugs
+              Drug Library
             </h1>
             <div style={{
               fontSize:   12,
@@ -683,7 +683,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
               color:      'var(--color-text-tertiary)',
               marginTop:  1,
             }}>
-              Browse the drug library
+              Your trusted medicine reference
             </div>
           </div>
         </div>
@@ -789,7 +789,7 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
               letterSpacing: '-0.2px',
               minWidth:      0,
             }}>
-              Drugs
+              Drug Library
             </div>
           </div>
         </div>
