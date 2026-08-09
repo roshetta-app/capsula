@@ -233,7 +233,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 
         {/* Form / Route — instant-apply, see toggleForm above */}
         <FilterSection label="Form / Route">
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
             {FORM_OPTIONS.map(opt => {
               const active = filters.forms.includes(opt.value)
               return (
@@ -348,8 +348,9 @@ function ToggleChip({ label, active, onToggle }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '6px 14px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        width: '100%', boxSizing: 'border-box',
+        padding: '6px 10px',
         borderRadius: 'var(--radius-full)',
         fontSize: 13, fontWeight: 500,
         cursor: 'pointer',
