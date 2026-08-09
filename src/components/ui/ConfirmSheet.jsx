@@ -28,6 +28,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import useBackGestureClose from '../../hooks/useBackGestureClose'
 
 export default function ConfirmSheet({
   isOpen,
@@ -66,6 +67,8 @@ export default function ConfirmSheet({
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
+
+  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

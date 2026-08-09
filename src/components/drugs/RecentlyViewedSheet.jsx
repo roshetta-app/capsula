@@ -35,6 +35,7 @@
 import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard'
+import useBackGestureClose from '../../hooks/useBackGestureClose'
 
 export default function RecentlyViewedSheet({
   isOpen,
@@ -69,6 +70,8 @@ export default function RecentlyViewedSheet({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 

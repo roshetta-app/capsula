@@ -20,6 +20,7 @@
  */
 
 import { useEffect, useState } from 'react'
+import useBackGestureClose from '../../../hooks/useBackGestureClose'
 
 export default function DoseAdjustmentsBottomSheet({
   isOpen,
@@ -51,6 +52,8 @@ export default function DoseAdjustmentsBottomSheet({
     document.body.style.overflow = isOpen ? 'hidden' : ''
     return () => { document.body.style.overflow = '' }
   }, [isOpen])
+
+  useBackGestureClose(isOpen, onClose)
 
   if (!shouldRender) return null
 
