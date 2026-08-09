@@ -240,9 +240,16 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             file header note above for why this section is different from
             every other one in this sheet. */}
         {onModeChange && (
-          <FilterSection label="Search By">
-            <ModeToggle mode={mode} onChange={handleModeChange} />
-          </FilterSection>
+          <>
+            <FilterSection label="Search By">
+              <ModeToggle mode={mode} onChange={handleModeChange} />
+            </FilterSection>
+            <div style={{
+              height: 1,
+              backgroundColor: 'var(--color-border)',
+              margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
+            }} />
+          </>
         )}
 
         {/* Form / Route — instant-apply, see toggleForm above. 'All Forms'
@@ -317,7 +324,12 @@ function ModeToggle({ mode, onChange }) {
   // pattern as ToggleChip's own press feedback, just keyed per-button.
   const [pressedMode, setPressedMode] = useState(null)
   return (
-    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+    <div style={{
+      display: 'flex',
+      borderRadius: 'var(--radius-full)',
+      border: '1.5px solid var(--color-accent)',
+      overflow: 'hidden',
+    }}>
       {['brand', 'generic'].map(m => (
         <button
           key={m}
@@ -330,15 +342,14 @@ function ModeToggle({ mode, onChange }) {
           style={{
             flex: 1,
             padding: '8px 14px',
-            borderRadius: 'var(--radius-full)',
             fontSize: 13, fontWeight: 500,
             cursor: 'pointer',
-            border: mode === m ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+            border: 'none',
             backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
-            color: mode === m ? '#fff' : 'var(--color-text-secondary)',
+            color: mode === m ? '#fff' : 'var(--color-accent)',
             fontFamily: 'var(--font-body)',
             transform: pressedMode === m ? 'scale(0.96)' : 'scale(1)',
-            transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+            transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
             WebkitTapHighlightColor: 'transparent',
             outline: 'none',
           }}
