@@ -141,10 +141,12 @@ import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPan
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
+import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useCategories } from '../hooks/useCategories'
+import { useBackToTop } from '../hooks/useBackToTop'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
@@ -221,6 +223,7 @@ export default function DrugsScreen() {
   } = useDrugContext()
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
+  const { visible: showBackToTop, scrollToTop: handleBackToTop } = useBackToTop()
   const isDark = useIsDark()
   const heroRef = useRef(null)
 
@@ -634,6 +637,9 @@ export default function DrugsScreen() {
         isOpen={showInfoSheet}
         onClose={() => setShowInfoSheet(false)}
       />
+
+      {/* Back to top */}
+      <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
       {/* drug-filter-instant-apply — one shared confirm dialog for all
           three ClearFiltersButton spots. Only handleClearFilters (the
@@ -1248,4 +1254,3 @@ function NarrowResultsHint() {
       Keep typing to narrow these results
     </div>
   )
-}
