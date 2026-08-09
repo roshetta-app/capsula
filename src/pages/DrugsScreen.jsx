@@ -113,6 +113,7 @@ import Layout from '../components/layout'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
+import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -123,7 +124,8 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 
 const RECENT_KEY = 'capsula_recent_drugs'
-const MAX_RECENT = 5
+const MAX_RECENT = 15 // 2026-08-09: was 5 (chip strip fit ~5 on one line).
+                       // Now backs the "Recently viewed" sheet's full list.
 
 // ─── Recently viewed drugs (localStorage) ────────────────────────────────────
 
@@ -201,15 +203,25 @@ export default function DrugsScreen() {
     toggleDrug(id)
   }
 
-  const [activeCategory, setActiveCategory] = useState(null) // null = category list
-  const [filterOpen,     setFilterOpen]     = useState(false)
-  const [activeFilters,  setActiveFilters]  = useState(null)
-  const [recentDrugs,    setRecentDrugs]    = useState(() => readRecentDrugs())
+  const [activeCategory,   setActiveCategory]   = useState(null) // null = category list
+  const [filterOpen,       setFilterOpen]       = useState(false)
+  const [activeFilters,    setActiveFilters]    = useState(null)
+  const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
+  const [showRecentSheet,  setShowRecentSheet]  = useState(false)
 
   // Refresh recent list when navigating back
   useEffect(() => {
     setRecentDrugs(readRecentDrugs())
   }, [])
+
+  // Recently-viewed sheet needs full drug records (SharedDrugCard's props),
+  // not just the {id, name, slug} shape stored in localStorage — resolved
+  // here against the already-loaded catalog, in stored (most-recent-first)
+  // order. Entries no longer present in the live catalog are dropped
+  // rather than shown as broken rows.
+  const recentDrugObjects = recentDrugs
+    .map(d => drugs.find(x => x.id === d.id))
+    .filter(Boolean)
 
   // ── Sliding sticky header: visible once DrugsHero leaves viewport ────────
   // Same IntersectionObserver approach as FavouritesScreen's heroRef watch
@@ -438,99 +450,46 @@ export default function DrugsScreen() {
           />
         </div>
 
-        {/* Recently viewed — matches RecentlyViewedChips.jsx exactly (plan
-            §7 step 1b.2, decision 4.8): clock icon + label, thin separator,
-            plain-text links with · dots, single scrollable line, right-edge
-            fade hint. Inlined here rather than importing the Conditions
-            component since it navigates to condition routes/props, not
-            drug ones — same visual pattern, different data shape. */}
+        {/* Recently viewed — 2026-08-09: replaced the horizontal chip strip
+            with a single button that opens RecentlyViewedSheet, a full list
+            of the last MAX_RECENT (15) drugs rendered as normal
+            SharedDrugCard rows. The strip only ever showed ~5 names before
+            running out of horizontal room; a button + sheet scales to the
+            full 15-item history instead of silently truncating what's
+            visible. */}
         {recentDrugs.length > 0 && (
-          <div style={{
-            position:     'relative',
-            marginBottom: 'var(--space-3)',
-          }}>
-            <div style={{
+          <button
+            onClick={() => setShowRecentSheet(true)}
+            style={{
               display:                 'flex',
               alignItems:              'center',
               gap:                     'var(--space-2)',
-              overflowX:               'auto',
-              scrollbarWidth:          'none',
-              msOverflowStyle:         'none',
-              WebkitOverflowScrolling: 'touch',
-              whiteSpace:              'nowrap',
+              width:                   '100%',
+              backgroundColor:         'transparent',
+              border:                  '1px solid var(--color-border-subtle)',
+              borderRadius:            'var(--radius-lg)',
+              padding:                 'var(--space-2) var(--space-3)',
+              marginBottom:            'var(--space-3)',
+              cursor:                  'pointer',
+              fontFamily:              'var(--font-body)',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Clock size={14} strokeWidth={1.8} color="var(--color-text-tertiary)" />
+            <span style={{
+              flex:       1,
+              textAlign:  'left',
+              fontSize:   13,
+              fontWeight: 500,
+              color:      'var(--color-text-secondary)',
             }}>
-              {/* Clock + label — fixed, never scrolls away */}
-              <div style={{
-                display:    'flex',
-                alignItems: 'center',
-                gap:        5,
-                flexShrink: 0,
-                color:      'var(--color-text-tertiary)',
-              }}>
-                <Clock size={12} strokeWidth={1.8} />
-                <span style={{
-                  fontSize:      11,
-                  fontWeight:    500,
-                  fontFamily:    'var(--font-body)',
-                  letterSpacing: '0.02em',
-                }}>
-                  Recent
-                </span>
-              </div>
-
-              {/* Separator line */}
-              <div style={{
-                width:           1,
-                height:          12,
-                backgroundColor: 'var(--color-border)',
-                flexShrink:      0,
-              }} />
-
-              {/* Drug names as inline text links with · separators */}
-              {recentDrugs.map((d, index) => (
-                <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexShrink: 0 }}>
-                  {index > 0 && (
-                    <span style={{
-                      color:      'var(--color-border)',
-                      fontSize:   12,
-                      userSelect: 'none',
-                    }}>·</span>
-                  )}
-                  <button
-                    onClick={() => navigate(ROUTES.DRUG_DETAIL(d.slug || d.id))}
-                    style={{
-                      background:              'none',
-                      border:                  'none',
-                      padding:                 0,
-                      cursor:                  'pointer',
-                      fontSize:                13,
-                      fontFamily:              'var(--font-body)',
-                      color:                   'var(--color-text-secondary)',
-                      outline:                 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      whiteSpace:              'nowrap',
-                    }}
-                  >
-                    {d.name}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Right-edge fade — hints more items are off-screen */}
-            <div
-              aria-hidden="true"
-              style={{
-                position:      'absolute',
-                top:           0,
-                right:         0,
-                bottom:        0,
-                width:         32,
-                background:    'linear-gradient(to right, transparent, var(--color-bg))',
-                pointerEvents: 'none',
-              }}
-            />
-          </div>
+              Recently viewed
+            </span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-tertiary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </button>
         )}
 
         {/* Loading progress ring */}
@@ -597,6 +556,15 @@ export default function DrugsScreen() {
         onApply={handleApplyFilters}
         mode={mode}
         onModeChange={setMode}
+      />
+
+      <RecentlyViewedSheet
+        isOpen={showRecentSheet}
+        onClose={() => setShowRecentSheet(false)}
+        drugs={recentDrugObjects}
+        categories={categories}
+        isDark={isDark}
+        onSelectDrug={handleDrugTap}
       />
     </Layout>
   )
