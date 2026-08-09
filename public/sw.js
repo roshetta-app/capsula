@@ -44,6 +44,21 @@ const STATIC_CACHE  = CACHE_VERSION + '-static'
 // so the browser gets the correct Vite-hashed asset filenames after each deploy.
 const URLS_TO_PRECACHE = []
 
+// Static files served directly from public/ (no Vite content hash) that are
+// safe to cache-first: they're small, rarely change, and CACHE_VERSION nukes
+// the whole cache on every deploy anyway, so there's no real staleness risk —
+// same reasoning that already covers /capsula/icons/ below.
+// Deliberately excludes 404.html, manifest.json, and sw.js itself: the 404
+// fallback and manifest should stay live, and a service worker should never
+// cache-first its own file.
+const PUBLIC_ROOT_CACHE_FIRST = [
+  '/capsula/logo.svg',
+  '/capsula/favicon.svg',
+  '/capsula/favicon.ico',
+  '/capsula/favicon-32.png',
+  '/capsula/icons.svg',
+]
+
 // ─── Install ──────────────────────────────────────────────────────────────────
 
 self.addEventListener('install', event => {
@@ -159,10 +174,12 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Vite-hashed assets + icons + fonts → cache-first (hashes guarantee freshness)
+  // Vite-hashed assets + icons + fonts + a small set of static public-root
+  // files (see PUBLIC_ROOT_CACHE_FIRST above) → cache-first
   if (
     url.pathname.startsWith('/capsula/assets/') ||
     url.pathname.startsWith('/capsula/icons/')  ||
+    PUBLIC_ROOT_CACHE_FIRST.includes(url.pathname) ||
     request.destination === 'font'
   ) {
     event.respondWith(

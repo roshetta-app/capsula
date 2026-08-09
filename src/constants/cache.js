@@ -14,6 +14,7 @@ export const CACHE_KEYS = {
   DRUGS:      'capsula_drugs_cache',
   CONDITIONS: 'capsula_conditions_cache',
   CATEGORIES: 'capsula_categories_cache',
+  ICONS:      'capsula_icons_cache',
 }
 
 /** Supabase table used for cache invalidation timestamps */

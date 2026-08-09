@@ -14,6 +14,18 @@
  * map so a third slice (categories) could be added without touching every
  * function's branching logic. Categories watches the same drugs_updated_at
  * timestamp as 'drugs' (see useCategories.js) — no new app_metadata column.
+ *
+ * Icon cache (below, separate from the slice functions above): custom
+ * specialty SVG icons fetched from Supabase Storage in specialtyIcon.jsx.
+ * Not modeled as a fourth slice because the slice functions above are
+ * array-shaped (writeCache guards on Array.isArray(data)) — icons are
+ * naturally a { url: svgMarkup } map, keyed by Storage URL, so they get
+ * their own small pair of functions instead. Invalidated the same way as
+ * categories — off drugs_updated_at — but read from the categories cache's
+ * already-stored timestamp (getCacheTimestamp('categories')) rather than a
+ * fresh fetch, since icon edits already bump the same timestamp category
+ * edits do and this avoids adding a network round-trip to what's otherwise
+ * a pure local read.
  */
 
 import { CACHE_KEYS, CACHE_TTL_MS, DRUGS_CACHE_SCHEMA_VERSION } from '../constants/cache'
@@ -127,18 +139,79 @@ export function isCacheExpired(key) {
 
 /**
  * Clear one or more cache slices.
- * @param {'drugs'|'conditions'|'categories'|'all'} key
+ * @param {'drugs'|'conditions'|'categories'|'icons'|'all'} key
  */
 export function clearCache(key = 'all') {
   try {
     if (key === 'all' || key === 'conditions') localStorage.removeItem(CACHE_KEYS.CONDITIONS)
     if (key === 'all' || key === 'categories') localStorage.removeItem(CACHE_KEYS.CATEGORIES)
+    if (key === 'all' || key === 'icons') localStorage.removeItem(CACHE_KEYS.ICONS)
     if (key === 'all' || key === 'drugs') {
       localStorage.removeItem(CACHE_KEYS.DRUGS) // legacy key from before the IndexedDB move — harmless no-op cleanup
       clearDrugsCache() // fire-and-forget; the real drugs cache now lives in IndexedDB, see below
     }
   } catch {
     // fail silently
+  }
+}
+
+// ─── Icon cache (custom specialty SVGs, keyed by Storage URL) ────────────────
+//
+// Shape on disk: { version: string, icons: { [url]: svgMarkup } }
+// version is the drugs_updated_at value that was current at write time,
+// read from the categories cache (see file header comment above for why).
+
+/**
+ * Read a cached icon's SVG markup, or null if missing or stale.
+ * Stale means: the categories cache has a newer drugs_updated_at than the
+ * icon cache was written with. If there's no categories timestamp yet
+ * (cold start), the icon cache is treated as unusable — same cold-start
+ * behavior as the other slices.
+ * @param {string} url — the Supabase Storage URL for the icon
+ */
+export function getIconCache(url) {
+  try {
+    const currentVersion = getCacheTimestamp('categories')
+    if (!currentVersion) return null
+    const raw = localStorage.getItem(CACHE_KEYS.ICONS)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (parsed?.version !== currentVersion) return null
+    return parsed?.icons?.[url] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Persist one icon's SVG markup, stamped with the categories cache's current
+ * drugs_updated_at. If the stored version differs from the current one
+ * (categories cache has moved on since this icon was last written), the
+ * whole icons map is reset first — otherwise entries written under an old
+ * version could keep passing the version check forever alongside newer ones.
+ * Silently no-ops if there's no categories timestamp yet, or on any storage
+ * error — same fail-silent behavior as the other cache functions here.
+ * @param {string} url — the Supabase Storage URL for the icon
+ * @param {string} svg — the raw fetched SVG markup
+ */
+export function writeIconCache(url, svg) {
+  if (!url || !svg) return
+  try {
+    const currentVersion = getCacheTimestamp('categories')
+    if (!currentVersion) return
+
+    const raw = localStorage.getItem(CACHE_KEYS.ICONS)
+    const parsed = raw ? JSON.parse(raw) : null
+    const icons = parsed?.version === currentVersion ? { ...parsed.icons } : {}
+
+    icons[url] = svg
+
+    localStorage.setItem(CACHE_KEYS.ICONS, JSON.stringify({
+      version: currentVersion,
+      icons,
+    }))
+  } catch {
+    // localStorage full or unavailable — fail silently
   }
 }
 

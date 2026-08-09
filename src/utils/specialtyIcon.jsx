@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect } from 'react'
+import { getIconCache, writeIconCache } from './cache'
 
 // ─── Lucide (general purpose) ─────────────────────────────────────────────────
 import {
@@ -144,6 +145,11 @@ export function useIsDark() {
 }
 
 // ─── In-memory SVG cache ──────────────────────────────────────────────────────
+//
+// Fastest path within a single app session. Below it, InlineSvg also checks
+// the durable localStorage-backed icon cache (utils/cache.js) before hitting
+// the network, so custom icons survive an app restart too — not just a
+// single session. See utils/cache.js's file header for the invalidation story.
 
 const svgCache = new Map()
 
@@ -219,12 +225,22 @@ function InlineSvg({ url, size, color, style }) {
       setMarkup(svgCache.get(url))
       return
     }
+
+    // Durable cache (survives app restarts) — checked before the network.
+    const stored = getIconCache(url)
+    if (stored) {
+      svgCache.set(url, stored)
+      setMarkup(stored)
+      return
+    }
+
     let cancelled = false
     fetch(url)
       .then(r => r.text())
       .then(text => {
         if (cancelled) return
         svgCache.set(url, text)
+        writeIconCache(url, text)
         setMarkup(text)
       })
       .catch(() => {})
