@@ -46,6 +46,14 @@
  *             of a two-child flex row. No call site needs a code change:
  *             the component still just fills whatever width its parent
  *             gives it.
+ * drugs-searchbar-filter-alignment — filter button's edge inset now matches
+ *             the search icon's left inset (16px, same value already used
+ *             for the base paddingRight below) instead of a smaller
+ *             hardcoded 6px, so the two ends of the pill read as symmetric.
+ *             Filter button also gained press feedback (scale down on
+ *             press/touch, release on up/leave), mirroring the input's own
+ *             existing onFocus/onBlur direct-style-mutation pattern rather
+ *             than importing a pattern from another component.
  *
  * Props:
  *   value            string
@@ -74,8 +82,10 @@ const SearchBar = forwardRef(function SearchBar({
   // Right-edge icon cluster, innermost first: the filter trigger always
   // sits at the very edge when present; the clear button sits just inside
   // it so the two never overlap. Input padding grows to match whichever of
-  // the two are actually present.
-  const filterEdge   = 6
+  // the two are actually present. filterEdge matches the search icon's
+  // left inset (16px) so both ends of the pill sit at the same distance
+  // from their edge.
+  const filterEdge   = 16
   const clearEdge    = onFilter ? filterEdge + 34 : 8
   const paddingRight = 16 + (onFilter ? 34 : 0) + (value ? 30 : 0)
 
@@ -156,7 +166,7 @@ const SearchBar = forwardRef(function SearchBar({
             position:        'absolute',
             right:           filterEdge,
             top:             '50%',
-            transform:       'translateY(-50%)',
+            transform:       'translateY(-50%) scale(1)',
             width:           30,
             height:          30,
             borderRadius:    '50%',
@@ -171,6 +181,11 @@ const SearchBar = forwardRef(function SearchBar({
             WebkitTapHighlightColor: 'transparent',
             transition:      'all 0.15s ease',
           }}
+          onMouseDown={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(0.9)' }}
+          onMouseUp={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
+          onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
+          onTouchStart={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(0.9)' }}
+          onTouchEnd={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
         >
           <SlidersHorizontal size={15} />
         </button>
