@@ -234,10 +234,22 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           </FilterSection>
         )}
 
-        {/* Form / Route — instant-apply, see toggleForm above */}
+        {/* Form / Route — instant-apply, see toggleForm above. 'All Forms'
+            gets its own full-width row (it's a single exclusive reset, not
+            a grid item alongside the multi-select chips) with centered
+            text; the rest sit in the 3-column grid below. */}
         <FilterSection label="Form / Route">
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <ToggleChip
+              label="All Forms"
+              active={filters.forms.includes('all')}
+              onToggle={() => toggleForm('all')}
+              showCheckbox={false}
+              centered
+            />
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
-            {FORM_OPTIONS.map(opt => {
+            {FORM_OPTIONS.filter(opt => opt.value !== 'all').map(opt => {
               const active = filters.forms.includes(opt.value)
               return (
                 <ToggleChip
@@ -245,7 +257,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
                   label={opt.label}
                   active={active}
                   onToggle={() => toggleForm(opt.value)}
-                  showCheckbox={opt.value !== 'all'}
                 />
               )
             })}
@@ -374,7 +385,7 @@ function ClearAllButton({ onClick, disabled }) {
 // be active at once) rather than looking like a single-choice segmented
 // toggle. Checked state (filled box + checkmark) mirrors the chip's own
 // active state exactly, no separate logic.
-function ToggleChip({ label, active, onToggle, showCheckbox = true }) {
+function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -384,7 +395,7 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 5,
+        display: 'flex', alignItems: 'center', justifyContent: centered ? 'center' : 'flex-start', gap: 5,
         width: '100%', minWidth: 0, boxSizing: 'border-box',
         padding: '6px 8px',
         borderRadius: 'var(--radius-full)',
@@ -400,16 +411,17 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true }) {
         outline: 'none',
       }}
     >
-      {/* Checkbox indicator — square outline when unselected, filled with
-          a checkmark when selected, signals "pick any number of these"
-          rather than "pick one". Omitted for the 'All' chip: picking it
-          isn't a multi-select tick, it's a single exclusive reset, so it
-          reads as a plain selectable pill instead (see showCheckbox). */}
+      {/* Selection indicator — circle outline when unselected, filled
+          white with a checkmark when selected, signals "pick any number
+          of these" rather than "pick one". Omitted for the 'All Forms'
+          chip: picking it isn't a multi-select tick, it's a single
+          exclusive reset, so it reads as a plain selectable pill instead
+          (see showCheckbox). */}
       {showCheckbox && (
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 14, height: 14, flexShrink: 0,
-          borderRadius: 3,
+          borderRadius: '50%',
           border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
           backgroundColor: active ? '#fff' : 'transparent',
           transition: 'background-color 0.15s ease, border-color 0.15s ease',
