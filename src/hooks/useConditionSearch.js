@@ -72,8 +72,16 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     const subIndex = buildConditionIndex(pool)
     const matched  = searchConditions(subIndex, pool, q) ?? pool
 
-    // Step 3: sort
-    const sorted = applySortMode(matched, sortMode, recentlyViewedIds)
+    // Step 3: sort — only for the plain browse view (no typed query).
+    // sortMode ('az' | 'recent') is a browse-list ordering choice; applying
+    // it while searching was overwriting searchConditions' own match-
+    // relevance order with an alphabetical/recency one, so a search no
+    // longer read as "best match first" the moment a sort mode other than
+    // relevance was active. Search results now keep whatever order
+    // searchConditions returned them in.
+    const sorted = q.trim().length === 0
+      ? applySortMode(matched, sortMode, recentlyViewedIds)
+      : matched
     setResults(sorted)
 
     // Log zero-result gaps (only meaningful at 3+ chars where fuzzy ran)
@@ -108,3 +116,4 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     resultCount: results.length,
   }
 }
+
