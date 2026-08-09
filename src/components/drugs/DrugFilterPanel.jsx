@@ -241,7 +241,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             every other one in this sheet. */}
         {onModeChange && (
           <>
-            <FilterSection label="Search By">
+            <FilterSection label="Search Mode">
               <ModeToggle mode={mode} onChange={handleModeChange} />
             </FilterSection>
             <div style={{
@@ -267,7 +267,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
               centered
             />
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
             {FORM_OPTIONS.filter(opt => opt.value !== 'all').map(opt => {
               const active = filters.forms.includes(opt.value)
               return (
@@ -300,8 +300,8 @@ function FilterSection({ label, children }) {
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
       <div style={{
-        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-        textTransform: 'uppercase', color: 'var(--color-text-tertiary)',
+        fontSize: 16, fontWeight: 700,
+        color: 'var(--color-text-primary)',
         marginBottom: 'var(--space-2)',
       }}>
         {label}
