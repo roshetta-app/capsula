@@ -83,15 +83,16 @@ import { useToast } from '../../context/ToastContext'
 // id used for selection state - it is not necessarily a raw form value
 // itself anymore now that Tab/Capsule and Drops each cover several.
 export const FORM_OPTIONS = [
-  { value: 'all',         label: 'All Forms',    matches: [] },
-  { value: 'tablet',      label: 'Tab / Capsule', matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
-  { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops'] },
-  { value: 'syrup',       label: 'Syrup',         matches: ['syrup', 'suspension', 'solution'] },
-  { value: 'injection',   label: 'Injection',     matches: ['injection', 'vial', 'ampoule', 'syringe', 'pen', 'vaccine'] },
-  { value: 'suppository', label: 'Suppository',   matches: ['suppository', 'enema', 'vaginal douche'] },
-  { value: 'sachet',      label: 'Sachet',        matches: ['sachet', 'powder'] },
+  { value: 'all',         label: 'All Forms',     matches: [] },
+  { value: 'tablet',      label: 'Tab / Cap.',    matches: ['tablet', 'capsule', 'effervescent', 'lozenges'] },
+  { value: 'syrup',       label: 'Syrup/Susp.',   matches: ['syrup', 'suspension', 'solution'] },
+  { value: 'drops',       label: 'Drops',         matches: ['eye drops', 'oral drops', 'ear drops', 'nasal drops', 'mouth drops', 'drops'] },
+  { value: 'sachet',      label: 'Sachet',        matches: ['sachet', 'powder', 'power'] },
   { value: 'inhaler',     label: 'Inhaled',       matches: ['inhaler', 'inhalation solution'] },
-  { value: 'cream',       label: 'Topical',       matches: ['cream', 'ointment', 'gel', 'lotion', 'shampoo', 'soap', 'antiseptic solution', 'facial wash', 'conditioner', 'foam', 'paint', 'hair oil', 'oil', 'serum', 'patch', 'wipes', 'gauze dressing'] },
+  { value: 'spray',       label: 'Spray',         matches: ['spray'] },
+  { value: 'injection',   label: 'Inj.',          matches: ['injection', 'vial', 'ampoule', 'syringe', 'pen', 'vaccine'] },
+  { value: 'suppository', label: 'Supp.',         matches: ['suppository', 'enema', 'vaginal douche'] },
+  { value: 'cream',       label: 'Topical',       matches: ['cream', 'ointment', 'eye ointment', 'gel', 'lotion', 'shampoo', 'soap', 'antiseptic solution', 'facial wash', 'conditioner', 'foam', 'paint', 'hair oil', 'oil', 'serum', 'patch', 'wipes', 'gauze dressing'] },
   { value: 'other',       label: 'Other',         matches: ['piece', 'mouth wash', 'film', 'bottle', 'other'] },
 ]
 
