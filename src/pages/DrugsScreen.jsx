@@ -585,9 +585,13 @@ export default function DrugsScreen() {
 // accepted now, unused, so step 1a.2 can measure this element for its
 // sticky-header scroll trigger without another edit to this file.
 
-function DrugsHero({ heroRef, isDark }) {
-  const colors = resolveToken(FALLBACK_TOKEN, isDark)
+// 2026-08-09: icon badge switched from a light-tinted circle (category
+// fallback token + colored icon) to a solid circle + white icon — the same
+// treatment FavouritesHero's own badge uses (backgroundColor: FAV_ACCENT,
+// white Heart). Uses the identical var(--color-favourite) token so the two
+// headers' badges render as the exact same color, not just a similar blue.
 
+function DrugsHero({ heroRef, isDark }) {
   return (
     <div ref={heroRef} style={{
       backgroundColor: 'var(--color-surface)',
@@ -603,13 +607,13 @@ function DrugsHero({ heroRef, isDark }) {
             width:           38,
             height:          38,
             borderRadius:    '50%',
-            backgroundColor: colors.bg,
+            backgroundColor: 'var(--color-favourite)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
           }}>
-            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={18} color={colors.fg} />
+            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={18} color="#fff" />
           </div>
 
           <div style={{ minWidth: 0 }}>
