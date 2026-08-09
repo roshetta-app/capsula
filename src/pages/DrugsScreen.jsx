@@ -683,7 +683,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
               color:      'var(--color-text-tertiary)',
               marginTop:  1,
             }}>
-              Your trusted medicine reference
+              Know your meds
             </div>
           </div>
         </div>
