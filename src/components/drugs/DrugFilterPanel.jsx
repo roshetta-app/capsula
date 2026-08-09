@@ -348,11 +348,11 @@ function ToggleChip({ label, active, onToggle }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        width: '100%', boxSizing: 'border-box',
-        padding: '6px 10px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+        width: '100%', minWidth: 0, boxSizing: 'border-box',
+        padding: '6px 8px',
         borderRadius: 'var(--radius-full)',
-        fontSize: 13, fontWeight: 500,
+        fontSize: 12, fontWeight: 500,
         cursor: 'pointer',
         border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
         backgroundColor: active ? 'var(--color-accent)' : 'transparent',
@@ -381,7 +381,14 @@ function ToggleChip({ label, active, onToggle }) {
           </svg>
         )}
       </span>
-      {label}
+      {/* Single-line label — clips with an ellipsis instead of wrapping
+          and blowing up the fixed-width grid cell's row height. */}
+      <span style={{
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+        minWidth: 0,
+      }}>
+        {label}
+      </span>
     </button>
   )
 }
