@@ -118,6 +118,16 @@
  * three URLs, React Router re-renders rather than remounts it — query text,
  * active filters, and recent-drugs state all survive tapping into and out
  * of a category.
+ *
+ * drug-filter-instant-apply (results-line clear filters) — added a
+ * "Clear filters" link inline with the results-count line in the search
+ * results view, matching the two spots ClearFiltersButton already appeared
+ * (category back-row, "Browse by category" row). All three now go through
+ * a shared confirm step (ConfirmSheet) rather than clearing immediately —
+ * requestClearFilters() opens the sheet; handleClearFilters() (the actual
+ * clear) only runs on confirm. ClearFiltersButton also gained the same
+ * pointer-driven press feedback already used elsewhere in this file
+ * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
 import { X } from 'lucide-react'
@@ -130,6 +140,7 @@ import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -217,6 +228,10 @@ export default function DrugsScreen() {
   const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
+  // drug-filter-instant-apply — gates the actual clear behind a confirm
+  // step; requestClearFilters() (below) opens this, handleClearFilters()
+  // only runs from ConfirmSheet's onConfirm.
+  const [showClearFiltersConfirm, setShowClearFiltersConfirm] = useState(false)
 
   // Refresh recent list when navigating back
   useEffect(() => {
@@ -267,6 +282,13 @@ export default function DrugsScreen() {
 
   function handleClearFilters() {
     setActiveFilters(null)
+  }
+
+  // drug-filter-instant-apply — opens the confirm step instead of clearing
+  // directly. Every ClearFiltersButton in this file calls this now, not
+  // handleClearFilters itself.
+  function requestClearFilters() {
+    setShowClearFiltersConfirm(true)
   }
 
   function handleQueryChange(val) {
@@ -372,7 +394,7 @@ export default function DrugsScreen() {
                     search bar's placeholder (1a.3). */}
                 {categoryLabel}
               </button>
-              {hasFilters && <ClearFiltersButton onClick={handleClearFilters} />}
+              {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
             </div>
           )}
 
@@ -398,9 +420,19 @@ export default function DrugsScreen() {
                 </button>
               )}
 
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)' }}>
-                {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
-                {query && ` for "${query}"`}
+              {/* drug-filter-instant-apply — results count now sits in a
+                  flex row with a Clear filters link, same space-between
+                  pattern as the two other ClearFiltersButton spots in this
+                  file, rather than a bare div. */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginBottom: 'var(--space-3)',
+              }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+                  {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+                  {query && ` for "${query}"`}
+                </div>
+                {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
 
               {displayed.length === 0 ? (
@@ -508,7 +540,7 @@ export default function DrugsScreen() {
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
                 Browse by category
               </div>
-              {hasFilters && <ClearFiltersButton onClick={handleClearFilters} />}
+              {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
               <CategoryRow
@@ -569,6 +601,19 @@ export default function DrugsScreen() {
       <DrugsInfoSheet
         isOpen={showInfoSheet}
         onClose={() => setShowInfoSheet(false)}
+      />
+
+      {/* drug-filter-instant-apply — one shared confirm dialog for all
+          three ClearFiltersButton spots. Only handleClearFilters (the
+          actual clear) runs, and only on confirm. */}
+      <ConfirmSheet
+        isOpen={showClearFiltersConfirm}
+        onClose={() => setShowClearFiltersConfirm(false)}
+        onConfirm={handleClearFilters}
+        title="Clear filters?"
+        message="This removes your current Form/Route filter."
+        confirmLabel="Clear filters"
+        destructive
       />
     </Layout>
   )
@@ -1042,15 +1087,28 @@ function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
 }
 
 // ─── ClearFiltersButton ─────────────────────────────────────────────────────
-// Small text link, shown only when hasFilters is true, next to "Browse by
-// category" and inline with the category back button. Style matches the
-// other lightweight text links already in this file ("Search all drugs
-// instead", "Clear search") rather than introducing a new button treatment.
+// Small text link, shown only when hasFilters is true — appears in three
+// spots: next to "Browse by category", inline with the category back
+// button, and (drug-filter-instant-apply) inline with the results-count
+// line in the search results view. Style matches the other lightweight
+// text links already in this file ("Search all drugs instead", "Clear
+// search") rather than introducing a new button treatment.
+//
+// drug-filter-instant-apply — onClick now opens a confirm step
+// (requestClearFilters, wired at each call site) rather than clearing
+// directly; the actual clear only happens if the user confirms. Also
+// added the same pointer-driven press feedback used elsewhere in this
+// file (CategoryRow, RecentlyViewedButton) rather than a new pattern.
 
 function ClearFiltersButton({ onClick }) {
+  const [pressed, setPressed] = useState(false)
   return (
     <button
       onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
         background: 'none', border: 'none', cursor: 'pointer',
@@ -1058,6 +1116,8 @@ function ClearFiltersButton({ onClick }) {
         fontFamily: 'var(--font-body)', padding: 0,
         lineHeight: 1,
         flexShrink: 0,
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',
       }}
     >
