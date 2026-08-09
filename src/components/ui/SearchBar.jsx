@@ -54,6 +54,10 @@
  *             press/touch, release on up/leave), mirroring the input's own
  *             existing onFocus/onBlur direct-style-mutation pattern rather
  *             than importing a pattern from another component.
+ * drugs-filter-scope-trim — active-filter state no longer fills the button
+ *             with a solid accent circle. Instead the icon itself turns
+ *             var(--color-accent) and a small 7px dot appears in the
+ *             button's top-right corner when hasActiveFilters is true.
  *
  * Props:
  *   value            string
@@ -171,8 +175,8 @@ const SearchBar = forwardRef(function SearchBar({
             height:          30,
             borderRadius:    '50%',
             border:          'none',
-            backgroundColor: hasActiveFilters ? 'var(--color-accent)' : 'transparent',
-            color:           hasActiveFilters ? '#fff' : 'var(--color-text-secondary)',
+            backgroundColor: 'transparent',
+            color:           hasActiveFilters ? 'var(--color-accent)' : 'var(--color-text-secondary)',
             cursor:          'pointer',
             display:         'flex',
             alignItems:      'center',
@@ -188,6 +192,21 @@ const SearchBar = forwardRef(function SearchBar({
           onTouchEnd={e => { e.currentTarget.style.transform = 'translateY(-50%) scale(1)' }}
         >
           <SlidersHorizontal size={15} />
+          {hasActiveFilters && (
+            <span
+              aria-hidden="true"
+              style={{
+                position:        'absolute',
+                top:             4,
+                right:           4,
+                width:           7,
+                height:          7,
+                borderRadius:    '50%',
+                backgroundColor: 'var(--color-accent)',
+                border:          '1.5px solid var(--color-surface)',
+              }}
+            />
+          )}
         </button>
       )}
     </div>

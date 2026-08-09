@@ -33,13 +33,18 @@ import { useEffect, useState } from 'react'
  * (well above the nav), shouldRender/animateIn mount-timing pair so the
  * sheet stays present through its 280ms exit transition instead of
  * vanishing instantly, Escape-key close, and body-scroll lock while open.
- * Filter content below (Search By / Form-Route / Pregnancy / Breastfeeding
- * sections, Clear All / Apply buttons) is unchanged — only this shell.
+ * Filter content below (Search By / Form-Route sections, Clear All / Apply
+ * buttons) is unchanged — only this shell.
+ *
+ * drugs-filter-scope-trim — removed the Pregnancy and Breastfeeding
+ * sections (and their pregnancySafe/pregnancyUnsafe/bfSafe/bfUnsafe filter
+ * fields) per user decision. Search By + Form/Route are the only sections
+ * left. filters shape is now just { forms }.
  *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
- *   onApply          (filters) => void   filters: { forms, pregnancySafe, pregnancyUnsafe, bfSafe, bfUnsafe }
+ *   onApply          (filters) => void   filters: { forms }
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
  */
@@ -62,11 +67,7 @@ export const FORM_OPTIONS = [
 ]
 
 const EMPTY = {
-  forms:          ['all'],
-  pregnancySafe:  false,
-  pregnancyUnsafe: false,
-  bfSafe:         false,
-  bfUnsafe:       false,
+  forms: ['all'],
 }
 
 export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onModeChange }) {
@@ -113,10 +114,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onMode
       const next = prev.forms.includes(val) ? without : [...without, val]
       return { ...prev, forms: next.length ? next : ['all'] }
     })
-  }
-
-  function toggle(key) {
-    setFilters(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   function handleClear() {
@@ -191,22 +188,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onMode
                 <ToggleChip key={opt.value} label={opt.label} active={active} onToggle={() => toggleForm(opt.value)} />
               )
             })}
-          </div>
-        </FilterSection>
-
-        {/* Pregnancy */}
-        <FilterSection label="Pregnancy">
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <ToggleChip label="Safe (Cat A/B)" active={filters.pregnancySafe} onToggle={() => toggle('pregnancySafe')} />
-            <ToggleChip label="Unsafe (Cat C/D/X)" active={filters.pregnancyUnsafe} onToggle={() => toggle('pregnancyUnsafe')} />
-          </div>
-        </FilterSection>
-
-        {/* Breastfeeding */}
-        <FilterSection label="Breastfeeding">
-          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <ToggleChip label="Safe" active={filters.bfSafe} onToggle={() => toggle('bfSafe')} />
-            <ToggleChip label="Unsafe / Caution" active={filters.bfUnsafe} onToggle={() => toggle('bfUnsafe')} />
           </div>
         </FilterSection>
 

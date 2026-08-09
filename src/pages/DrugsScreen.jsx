@@ -174,20 +174,6 @@ function applyFilters(drugs, filters) {
     result = result.filter(d => activeFormMatches.has(d.form?.toLowerCase()))
   }
 
-  // Pregnancy
-  if (filters.pregnancySafe && !filters.pregnancyUnsafe) {
-    result = result.filter(d => ['A', 'B'].includes(d.pregnancyCategory))
-  } else if (filters.pregnancyUnsafe && !filters.pregnancySafe) {
-    result = result.filter(d => ['C', 'D', 'X'].includes(d.pregnancyCategory))
-  }
-
-  // Breastfeeding
-  if (filters.bfSafe && !filters.bfUnsafe) {
-    result = result.filter(d => d.breastfeedingSafety === 'safe')
-  } else if (filters.bfUnsafe && !filters.bfSafe) {
-    result = result.filter(d => ['caution', 'unsafe'].includes(d.breastfeedingSafety))
-  }
-
   return result
 }
 
@@ -274,7 +260,7 @@ export default function DrugsScreen() {
 
   function handleApplyFilters(filters) {
     // Check if anything is actually active
-    const hasActive = !filters.forms.includes('all') || filters.pregnancySafe || filters.pregnancyUnsafe || filters.bfSafe || filters.bfUnsafe
+    const hasActive = !filters.forms.includes('all')
     setActiveFilters(hasActive ? filters : null)
   }
 
