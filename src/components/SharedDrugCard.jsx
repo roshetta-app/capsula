@@ -224,7 +224,7 @@ export default function SharedDrugCard({
           <div style={{
             fontSize:     13,
             fontWeight:   500,
-            color:        'var(--color-text-secondary)',
+            color:        'var(--color-accent)',
             lineHeight:   1.4,
             marginTop:    2,
             overflow:     'hidden',
@@ -240,9 +240,27 @@ export default function SharedDrugCard({
         )}
       </div>
 
-      {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 */}
-      <div style={{ flexShrink: 0 }}>
+      {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 —
+          + chevron, same trailing-group pattern as ConditionCard.jsx */}
+      <div style={{
+        display:    'flex',
+        alignItems: 'center',
+        gap:        'var(--space-1)',
+        flexShrink: 0,
+      }}>
         {trailing}
+        <svg
+          width="12" height="12" viewBox="0 0 24 24"
+          fill="none" stroke="currentColor" strokeWidth="2.5"
+          strokeLinecap="round" strokeLinejoin="round"
+          style={{
+            color:      'var(--color-text-tertiary)',
+            opacity:    0.5,
+            flexShrink: 0,
+          }}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
       </div>
     </div>
   )
