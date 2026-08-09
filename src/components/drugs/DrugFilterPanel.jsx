@@ -254,8 +254,9 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 
         {/* Form / Route — instant-apply, see toggleForm above. 'All Forms'
             gets its own full-width row (it's a single exclusive reset, not
-            a grid item alongside the multi-select chips) with centered
-            text; the rest sit in the 3-column grid below. */}
+            a list item alongside the multi-select chips) with centered
+            text; the rest sit one-per-line below, matching the reference
+            layout the sheet was redesigned against. */}
         <FilterSection label="Form / Route">
           <div style={{ marginBottom: 'var(--space-2)' }}>
             <ToggleChip
@@ -266,7 +267,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
               centered
             />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {FORM_OPTIONS.filter(opt => opt.value !== 'all').map(opt => {
               const active = filters.forms.includes(opt.value)
               return (
@@ -417,11 +418,11 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = f
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: centered ? 'center' : 'flex-start', gap: 5,
+        display: 'flex', alignItems: 'center', justifyContent: centered ? 'center' : 'flex-start', gap: 8,
         width: '100%', minWidth: 0, boxSizing: 'border-box',
-        padding: '6px 8px',
+        padding: '10px 14px',
         borderRadius: 'var(--radius-full)',
-        fontSize: 12, fontWeight: 500,
+        fontSize: 14, fontWeight: 500,
         cursor: 'pointer',
         border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
         backgroundColor: active ? 'var(--color-accent)' : 'transparent',
@@ -442,14 +443,14 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = f
       {showCheckbox && (
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 14, height: 14, flexShrink: 0,
+          width: 18, height: 18, flexShrink: 0,
           borderRadius: '50%',
           border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
           backgroundColor: active ? '#fff' : 'transparent',
           transition: 'background-color 0.15s ease, border-color 0.15s ease',
         }}>
           {active && (
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           )}
