@@ -442,6 +442,18 @@
  *    existing SpecialtySelector/SpecialtiesBottomSheet components are reused
  *    as-is (opened by the manager sheet's Specialty row) — no new specialty
  *    UI built from scratch.
+ *
+ * Phase 15 — SwipeToRemoveRow's swipe-to-delete on condition rows removed
+ *  (component deleted, nothing else used it). Removing a favourite is
+ *  tap-only again: star → ConfirmSheet, same as it's always been for the
+ *  Drugs tab. That gesture was the reason the Phase 3 swipe-to-switch-tabs
+ *  gesture got pulled in Phase 4 — a touch starting on a row fired both
+ *  gesture systems at once. With rows no longer capturing their own
+ *  horizontal drag, swipe-to-switch-tabs is reinstated on the tab-content
+ *  wrapper (handleTabTouchStart/Move/End), reusing the same dx-vs-dy
+ *  axis-lock approach SwipeToRemoveRow used, and driving the existing
+ *  switchTab/tabDirection/hasSwitchedRef slide-animation machinery exactly
+ *  as tap already did.
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react'
@@ -450,7 +462,6 @@ import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search,
 import Layout from '../components/layout'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
-import SwipeToRemoveRow from '../components/conditions/SwipeToRemoveRow'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -490,6 +501,11 @@ const FAV_ACCENT = 'var(--color-favourite)'
 // the animation visually shows.
 const ROW_EXIT_MS  = 220
 const ROW_ENTER_MS = 280
+
+// Swipe-to-switch-tabs thresholds — mirror the values SwipeToRemoveRow used
+// for its own axis-lock/drag detection.
+const TAB_AXIS_LOCK_SLOP  = 6  // px of movement before we decide horizontal vs. vertical
+const TAB_SWIPE_THRESHOLD = 50 // px of horizontal drag needed to switch tabs on release
 
 // Sort labels for this screen's own useSortToggle instance (separate
 // storage key from ConditionsScreen — see Phase 14 note below). 'recent'
@@ -1778,32 +1794,11 @@ export default function FavouritesScreen() {
     })
   }
 
-  // Swipe-to-remove path (SwipeToRemoveRow) — deliberately skips ConfirmSheet.
-  // The reveal-then-tap gesture is itself the deliberate step; the safety
-  // net here is Undo in the snackbar instead of a confirm modal.
-  function handleSwipeRemoveCondition(condition) {
-    const id = condition.id
-    const index = favourites.conditions.indexOf(id)
-    beginRowExit(id)
-    setTimeout(() => {
-      toggleCondition(id)
-      endRowExit(id)
-    }, ROW_EXIT_MS)
-    showSnack('Removed from favourites', {
-      label: 'Undo',
-      onAction: () => {
-        restoreConditionAt(id, index)
-        beginRowRestore(id)
-      },
-    })
-  }
-
-  // ── Tab switching (Phase 3, swipe removed) ──────────────────────────────────
-  // Tap-only now — the swipe-to-switch-tabs gesture was removed because it
-  // conflicted with SwipeToRemoveRow's own swipe (a touch starting on a row
-  // could fire both gesture systems at once). tabDirection is still needed:
-  // it decides which side the incoming tab's CSS keyframe slides in from,
-  // and hasSwitchedRef still guards against the animation playing on mount.
+  // ── Tab switching (swipe restored) ──────────────────────────────────────────
+  // tabDirection decides which side the incoming tab's CSS keyframe slides in
+  // from; hasSwitchedRef guards against the animation playing on mount. Both
+  // are driven by switchTab regardless of whether it's called from a tab-bar
+  // tap or the swipe gesture below.
   const tabDirection = useRef(1) // +1 = forward (slide from right), -1 = backward (slide from left)
   const hasSwitchedRef = useRef(false)
 
@@ -1814,6 +1809,51 @@ export default function FavouritesScreen() {
     tabDirection.current = toIndex > fromIndex ? 1 : -1
     hasSwitchedRef.current = true
     setActiveTab(key)
+  }
+
+  // Swipe-to-switch-tabs gesture on the tab-content area. Same axis-lock
+  // approach SwipeToRemoveRow used to use for its own rows (dx-vs-dy
+  // dominance, decided once per gesture) — safe to reintroduce now that no
+  // row underneath captures its own horizontal drag.
+  const tabTouchStartX = useRef(null)
+  const tabTouchStartY = useRef(null)
+  const tabAxisLocked  = useRef(null) // 'x' | 'y' | null, decided once per gesture
+
+  function handleTabTouchStart(e) {
+    tabTouchStartX.current = e.touches[0].clientX
+    tabTouchStartY.current = e.touches[0].clientY
+    tabAxisLocked.current  = null
+  }
+
+  function handleTabTouchMove(e) {
+    if (tabTouchStartX.current === null) return
+    const dx = e.touches[0].clientX - tabTouchStartX.current
+    const dy = e.touches[0].clientY - tabTouchStartY.current
+
+    if (tabAxisLocked.current === null) {
+      if (Math.abs(dx) < TAB_AXIS_LOCK_SLOP && Math.abs(dy) < TAB_AXIS_LOCK_SLOP) return
+      tabAxisLocked.current = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+    }
+    if (tabAxisLocked.current !== 'x') return // vertical drag — let the page scroll
+
+    e.preventDefault() // we own this gesture now
+  }
+
+  function handleTabTouchEnd(e) {
+    if (tabTouchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - tabTouchStartX.current
+
+    if (tabAxisLocked.current === 'x' && Math.abs(dx) > TAB_SWIPE_THRESHOLD) {
+      const fromIndex = FAVOURITES_TABS.findIndex(t => t.key === activeTab)
+      const toIndex   = dx < 0 ? fromIndex + 1 : fromIndex - 1 // swipe left = next tab
+      if (toIndex >= 0 && toIndex < FAVOURITES_TABS.length) {
+        switchTab(FAVOURITES_TABS[toIndex].key)
+      }
+    }
+
+    tabTouchStartX.current = null
+    tabTouchStartY.current = null
+    tabAxisLocked.current  = null
   }
 
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
@@ -1935,10 +1975,14 @@ export default function FavouritesScreen() {
           {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
         </div>
 
-        {/* Tab content area — tap-only tab switching now (see switchTab
-            above). Keyed by activeTab so the slide animation replays on
-            every real switch. */}
-        <div>
+        {/* Tab content area — swipeable again (see handleTabTouch* above),
+            plus tap via the tab bar. Keyed by activeTab so the slide
+            animation replays on every real switch. */}
+        <div
+          onTouchStart={handleTabTouchStart}
+          onTouchMove={handleTabTouchMove}
+          onTouchEnd={handleTabTouchEnd}
+        >
           <div
             key={activeTab}
             style={{
@@ -2010,10 +2054,6 @@ export default function FavouritesScreen() {
                             }
                           />
                         )
-                        // Swipe-to-remove only outside manage mode — manage mode
-                        // already has its own removal path (checkboxes + bulk
-                        // action bar), and dragging a row while selecting would
-                        // conflict with tap-to-select.
                         if (isManaging) return card
 
                         const exitState  = exitingRows.get(condition.id)
@@ -2042,9 +2082,7 @@ export default function FavouritesScreen() {
                                 }
                             }
                           >
-                            <SwipeToRemoveRow onRemove={() => handleSwipeRemoveCondition(condition)}>
-                              {card}
-                            </SwipeToRemoveRow>
+                            {card}
                           </div>
                         )
                       })}
