@@ -264,6 +264,10 @@ export default function DrugsScreen() {
     setActiveFilters(hasActive ? filters : null)
   }
 
+  function handleClearFilters() {
+    setActiveFilters(null)
+  }
+
   function handleQueryChange(val) {
     setQuery(val)
   }
@@ -346,24 +350,29 @@ export default function DrugsScreen() {
 
           {/* Back to categories button (only when in a category, not searching) */}
           {!hasQuery && activeCategory !== null && (
-            <button
-              onClick={() => navigate(ROUTES.DRUGS)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                fontFamily: 'var(--font-body)', padding: '4px 0',
-                marginBottom: 'var(--space-3)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="15 18 9 12 15 6"/>
-              </svg>
-              {/* categoryLabel computed above, shared with the sticky
-                  search bar's placeholder (1a.3). */}
-              {categoryLabel}
-            </button>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 'var(--space-3)',
+            }}>
+              <button
+                onClick={() => navigate(ROUTES.DRUGS)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                  fontFamily: 'var(--font-body)', padding: '4px 0',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+                {/* categoryLabel computed above, shared with the sticky
+                    search bar's placeholder (1a.3). */}
+                {categoryLabel}
+              </button>
+              {hasFilters && <ClearFiltersButton onClick={handleClearFilters} />}
+            </div>
           )}
 
           {hasQuery && queryTooShort ? (
@@ -491,8 +500,14 @@ export default function DrugsScreen() {
             mockup. */}
         {!loading && (
           <>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-2)' }}>
-              Browse by category
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              marginBottom: 'var(--space-2)',
+            }}>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                Browse by category
+              </div>
+              {hasFilters && <ClearFiltersButton onClick={handleClearFilters} />}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
               <CategoryRow
@@ -1020,6 +1035,29 @@ function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
       >
         <polyline points="9 18 15 12 9 6"/>
       </svg>
+    </button>
+  )
+}
+
+// ─── ClearFiltersButton ─────────────────────────────────────────────────────
+// Small text link, shown only when hasFilters is true, next to "Browse by
+// category" and inline with the category back button. Style matches the
+// other lightweight text links already in this file ("Search all drugs
+// instead", "Clear search") rather than introducing a new button treatment.
+
+function ClearFiltersButton({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer',
+        color: 'var(--color-accent)', fontSize: 13, fontWeight: 500,
+        fontFamily: 'var(--font-body)', padding: '4px 0',
+        flexShrink: 0,
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      Clear filters
     </button>
   )
 }

@@ -118,10 +118,20 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onMode
 
   function handleClear() {
     setFilters(EMPTY)
+    onApply(EMPTY)
+    onClose()
   }
 
   function handleApply() {
     onApply(filters)
+    onClose()
+  }
+
+  // Mode (Brand/Generic) is instant and not part of 'filters' — see file
+  // header note. Switching it has nothing left to "Apply", so it closes
+  // the sheet immediately instead of waiting for Apply Filters.
+  function handleModeChange(m) {
+    onModeChange(m)
     onClose()
   }
 
@@ -175,7 +185,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, mode, onMode
             every other one in this sheet. */}
         {onModeChange && (
           <FilterSection label="Search By">
-            <ModeToggle mode={mode} onChange={onModeChange} />
+            <ModeToggle mode={mode} onChange={handleModeChange} />
           </FilterSection>
         )}
 
