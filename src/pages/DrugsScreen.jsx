@@ -326,10 +326,13 @@ export default function DrugsScreen() {
   // below, shared by both — instead of once per branch (step 1f.2).
   let content
   // drug-search-sort-cheapest — gates DrugFilterPanel's Sort By section.
-  // True only once a query is active AND actually produced results; set
-  // inside the search-results branch below, left false otherwise (category
-  // browsing, no query yet, or an empty/no-match result has nothing to sort).
-  let hasSearchResults = false
+  // True as soon as a query is typed, regardless of whether it matched
+  // anything — sorting is a property of the search itself (Relevance vs
+  // Cheapest First), not of having results to show right now, so a
+  // no-match/"did you mean" state still keeps the option available for
+  // whatever the person searches next. False for category browsing (no
+  // query at all), same as before.
+  let hasSearchQuery = false
 
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
@@ -357,7 +360,7 @@ export default function DrugsScreen() {
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
-    hasSearchResults = hasQuery && displayed.length > 0
+    hasSearchQuery = hasQuery
 
     // activeCategory holds the category's stable slug (see plan's decided
     // design — generics.category stores a drug_categories.slug, not the
@@ -612,7 +615,7 @@ export default function DrugsScreen() {
         activeFilters={activeFilters}
         mode={mode}
         onModeChange={setMode}
-        hasSearchResults={hasSearchResults}
+        hasSearchResults={hasSearchQuery}
         sortMode={sortMode}
         onSortChange={setSortMode}
       />

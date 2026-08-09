@@ -76,9 +76,9 @@ import { useToast } from '../../context/ToastContext'
  *                    sheet opens
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
- *   hasSearchResults boolean | undefined — true only when a search query is active AND returned
- *                    results on screen; gates the Sort By section (drug-search-sort-cheapest) — no
- *                    query, or an empty/no-match result, means nothing to sort
+ *   hasSearchResults boolean | undefined — true as soon as a search query is typed, regardless
+ *                    of whether it matched anything; gates the Sort By section
+ *                    (drug-search-sort-cheapest). False for category browsing (no query at all)
  *   sortMode         'relevance' | 'cheapest' | undefined — current sort mode, for the Sort By section
  *   onSortChange     (mode) => void | undefined — instant, not gated by Apply; sheet stays open
  */
@@ -268,10 +268,11 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             below (not a single instant-choice-then-close action like Search
             Mode above, since 'relevance' vs 'cheapest' has no analogous
             "brand mode vs generic mode" full context switch to announce).
-            Only shown while a search query is active AND actually returned
-            results — sorting has nothing to act on otherwise (category
-            browsing, empty results, "did you mean" state). 'sortMode' lives
-            in DrugContext (see drug-search-sort-cheapest note there) so it
+            Shown as soon as a search query is typed, whether or not it
+            matched anything — sorting is a property of the search itself,
+            not of currently having results on screen. Hidden only for
+            category browsing (no query at all). 'sortMode' lives in
+            DrugContext (see drug-search-sort-cheapest note there) so it
             survives navigation the same way Search Mode and Form/Route
             already do, and stays applied if the query is cleared and
             retyped later. */}
@@ -462,9 +463,9 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = f
       style={{
         display: 'flex', alignItems: 'center', justifyContent: centered ? 'center' : 'flex-start', gap: 8,
         width: '100%', minWidth: 0, boxSizing: 'border-box',
-        padding: '10px 14px',
+        padding: '8px 14px',
         borderRadius: 'var(--radius-full)',
-        fontSize: 14, fontWeight: 500,
+        fontSize: 13, fontWeight: 500,
         cursor: 'pointer',
         border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
         backgroundColor: active ? 'var(--color-accent)' : 'transparent',
@@ -485,14 +486,14 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = f
       {showCheckbox && (
         <span style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 18, height: 18, flexShrink: 0,
+          width: 15, height: 15, flexShrink: 0,
           borderRadius: '50%',
           border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
           backgroundColor: active ? '#fff' : 'transparent',
           transition: 'background-color 0.15s ease, border-color 0.15s ease',
         }}>
           {active && (
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
           )}
