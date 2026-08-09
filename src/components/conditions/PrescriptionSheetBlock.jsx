@@ -546,7 +546,7 @@ function UnifiedDrugRow({ index, row, formulation, drugs, navigate, dividerType 
                   {cluster.doseLines?.length > 0
                     ? <>
                         {cluster.doseLines.map(line => (
-                          <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} />
+                          <DoseLine key={line.id} title={line.bracket_title} text={doseLineInstructionText(line)} note={line.note} />
                         ))}
                         {cluster.doseMax && <MaxDoseLine text={cluster.doseMax} />}
                       </>
@@ -718,8 +718,14 @@ const ARABIC_RE_DOSE = /[\u0600-\u06FF\u0750-\u077F]/
 // instruction text next to it, per the requested visual hierarchy (title
 // bold, instruction lighter). Omitted entirely for a hand-typed 'dose'
 // (no bracket, no title) — that case renders exactly as before.
-function DoseLine({ title, text }) {
+// NOTE FIELD ADDENDUM (2026-08-09): optional 'note' prop — a bracket's own
+// note (e.g. "Give with food"), rendered as a smaller italic line below the
+// title/instruction. Mirrors the note field that already worked on
+// formulations.doses_structured (Practical Doses) but was never carried
+// through to dose_lines until now. Omitted entirely when absent.
+function DoseLine({ title, text, note }) {
   const isArabic = ARABIC_RE_DOSE.test(text?.trim().charAt(0)) || ARABIC_RE_DOSE.test(text ?? '')
+  const noteIsArabic = ARABIC_RE_DOSE.test(note?.trim().charAt(0)) || ARABIC_RE_DOSE.test(note ?? '')
   return (
     <div dir="auto" style={{ marginTop: 8, paddingInlineStart: 6, textAlign: isArabic ? 'right' : 'left', unicodeBidi: 'plaintext' }}>
       {title && (
@@ -740,6 +746,18 @@ function DoseLine({ title, text }) {
       }}>
         {text}
       </span>
+      {note && (
+        <div dir="auto" style={{
+          fontSize: 12,
+          fontStyle: 'italic',
+          color: 'var(--color-text-tertiary)',
+          lineHeight: 1.5,
+          marginTop: 2,
+          textAlign: noteIsArabic ? 'right' : 'left',
+        }}>
+          {note}
+        </div>
+      )}
     </div>
   )
 }

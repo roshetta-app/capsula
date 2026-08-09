@@ -388,6 +388,7 @@ function buildDoseLinesFromPopulation(population) {
       bracket_title: bracket.bracket?.trim() || null,
       instruction: bracket.instruction.trim(),
       text: null,
+      note: bracket.note?.trim() || null,
     }))
   return {
     dose: null,
@@ -494,6 +495,14 @@ function EditableDoseLine({
               <Check size={13} />
             </button>
           </div>
+          <textarea
+            value={line.note ?? ''}
+            onChange={e => onUpdateField('note', e.target.value || null)}
+            placeholder="Note for this bracket only (optional) — shown under this card on the app"
+            dir="auto"
+            rows={1}
+            style={{ ...editLineInputStyle, resize: 'vertical', fontStyle: 'italic' }}
+          />
         </div>
       ) : (
         <div
@@ -514,12 +523,19 @@ function EditableDoseLine({
               color: 'var(--color-text-secondary)',
             }}
           >
-            {line.bracket_title && (
-              <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {line.bracket_title}{': '}
-              </span>
+            <div>
+              {line.bracket_title && (
+                <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                  {line.bracket_title}{': '}
+                </span>
+              )}
+              {displayInstruction}
+            </div>
+            {line.note && (
+              <div style={{ fontSize: 11, fontStyle: 'italic', color: 'var(--color-text-tertiary)' }}>
+                {line.note}
+              </div>
             )}
-            {displayInstruction}
           </div>
           {/* Action icons only render once hovered — isSaved still shows its
               accent color the moment the row is next hovered after a save,
@@ -2500,6 +2516,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
       bracket_title: null,
       instruction: carryLegacyText ? (group.dose?.trim() || '') : '',
       text: null,
+      note: null,
     }
     const nextGroups = groups.map((g, gi) =>
       gi === groupIdx
@@ -2638,6 +2655,7 @@ export default function UnifiedDrugRowEditor({ row, onChange }) {
             ...bracket,
             bracket: line.bracket_title ?? '',
             instruction: line.instruction ?? '',
+            note: line.note ?? '',
           }
         }),
       }))
@@ -3606,3 +3624,4 @@ export function PromoteAlternativeDialog({ row, onPromote, onDeleteAll, onCancel
     </div>
   )
 }
+

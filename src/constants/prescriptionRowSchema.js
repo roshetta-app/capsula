@@ -135,7 +135,7 @@ export const ROW_TYPES = {
  *                                              gap. Defaults to null; additive — existing rows have no
  *                                              main-drug per-drug note, so this is null on migration,
  *                                              same as AlternativeDrug.note was when it was introduced.
- * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null, note:string|null}>} dose_lines
  *   - Added for the Practical Doses redesign (CMS_LIBRARY_PLAN.md decision
  *     25). Populated only when the admin picks a patient group with more
  *     than one dosing note from formulations.doses_structured — every
@@ -161,6 +161,16 @@ export const ROW_TYPES = {
  *     is the single place every reader (CMS, app, future refresh tool)
  *     falls back from 'instruction' to legacy 'text', so this logic is
  *     never duplicated.
+ *   - NOTE FIELD ADDENDUM (2026-08-09): 'note' mirrors the per-bracket
+ *     note that already existed on formulations.doses_structured brackets
+ *     (Practical Doses) — until now it was dropped entirely when a
+ *     bracket was picked into a prescription row's dose_lines. It is now
+ *     carried over automatically on pick (buildDoseLinesFromPopulation),
+ *     editable in the row editor the same way bracket_title/instruction
+ *     are, and included when a line is saved back to the library
+ *     (saveLineToLibrary). Defaults to null. Rendered on the app under
+ *     its DoseLine, same italic supporting-text treatment RowNote uses
+ *     elsewhere on the sheet.
  * @property {boolean} drug_link_enabled     - whether the brand/formulation name links through to
  *                                              its drug detail page in the app
  *
@@ -253,7 +263,7 @@ export const DRUG_ROW_TEMPLATE = {
  *   - PHASE 3 (2026-06-20), new. Same rule as DrugRow.dose_who: the raw
  *     doses_structured 'who' key picked at add-time, display-only, not
  *     cleared by hand-editing 'dose' afterward.
- * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null, note:string|null}>} dose_lines
  *   - Same rule as DrugRow.dose_lines: populated only via a multi-note
  *     population pick, empty array otherwise. Only ever set on an
  *     alternative that does NOT share the parent's formulation_id (see
@@ -670,7 +680,7 @@ export const DRUG_OPTION_TEMPLATE = {
  * @property {DrugOption[]} options   - display order within the group
  * @property {string|null} dose
  * @property {string|null} dose_who
- * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null}>} dose_lines
+ * @property {Array<{id:string, bracket_id:string|null, bracket_title:string|null, instruction:string|null, text:string|null, note:string|null}>} dose_lines
  *   - Mirrors DrugRow.dose_lines — see that field's docstring.
  * @property {string|null} dose_max
  *   - FIELD-SEPARATION ADDENDUM (2026-08-06). Mirrors DrugRow.dose_max —
