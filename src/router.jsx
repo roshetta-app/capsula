@@ -10,7 +10,8 @@
  * AppRoutes renders the <Routes> tree — drop it inside <BrowserRouter>.
  */
 
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Outlet } from 'react-router-dom'
+import Layout from './components/layout'
 
 // ─── Public screens ───────────────────────────────────────────────────────────
 
@@ -73,15 +74,24 @@ export default function AppRoutes() {
 
       {/* ── Public routes ────────────────────────────────────────────────── */}
 
-      <Route path="/"                    element={<ConditionsScreen />} />
-      <Route path="/conditions"          element={<ConditionsScreen />} />
+      {/* Conditions, Drugs, and Favourites share one Layout instance that
+          stays mounted while switching between them — this is what keeps
+          NotificationsBanner (rendered inside Layout) from resetting its
+          state on every tab switch. Layout suppresses its own header/
+          padding for these routes internally (see HEADER_SUPPRESSED_ROUTES
+          in layout.jsx), so nothing else needed to change here. */}
+      <Route element={<Layout><Outlet /></Layout>}>
+        <Route path="/"                    element={<ConditionsScreen />} />
+        <Route path="/conditions"          element={<ConditionsScreen />} />
+        <Route path="/drugs"                        element={<DrugsScreen />} />
+        <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
+        <Route path="/favourites"          element={<FavouritesScreen />} />
+      </Route>
+
+      {/* Detail screens render their own header/scroll setup and stay
+          outside the shared Layout entirely — unchanged from before. */}
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
-
-      <Route path="/drugs"                        element={<DrugsScreen />} />
-      <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
       <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
-
-      <Route path="/favourites"          element={<FavouritesScreen />} />
 
       {/* ── Admin routes ─────────────────────────────────────────────────── */}
 

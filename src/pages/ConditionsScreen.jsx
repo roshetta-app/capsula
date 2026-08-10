@@ -153,7 +153,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, ListFilter, Heart } from 'lucide-react'
-import Layout                  from '../components/layout'
 import BackToTopButton         from '../components/ui/BackToTopButton'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -931,7 +930,7 @@ export default function ConditionsScreen() {
 
   if (loading && conditions.length === 0) {
     return (
-      <Layout>
+      <>
         <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
             <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
@@ -941,14 +940,14 @@ export default function ConditionsScreen() {
         <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
         <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
         {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
-      </Layout>
+      </>
     )
   }
 
   // ── Main render ──────────────────────────────────────────────────────────────
 
   return (
-    <Layout>
+    <>
 
       {/* Sliding sticky logo header — appears once BrandRow scrolls out of view */}
       <StickyLogoHeader
@@ -1102,7 +1101,7 @@ export default function ConditionsScreen() {
         isOpen={bottomSheetOpen}
       />
 
-    </Layout>
+    </>
   )
 }
 

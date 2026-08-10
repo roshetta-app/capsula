@@ -134,7 +134,6 @@ import { X } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
-import Layout from '../components/layout'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
@@ -586,7 +585,7 @@ export default function DrugsScreen() {
   }
 
   return (
-    <Layout>
+    <>
       {content}
 
       <DrugFilterPanel
@@ -630,7 +629,7 @@ export default function DrugsScreen() {
         confirmLabel="Clear filters"
         destructive
       />
-    </Layout>
+    </>
   )
 }
 
@@ -1232,3 +1231,4 @@ function NarrowResultsHint() {
     </div>
   )
 }
+

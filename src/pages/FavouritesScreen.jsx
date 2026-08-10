@@ -459,7 +459,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
-import Layout from '../components/layout'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -1877,7 +1876,7 @@ export default function FavouritesScreen() {
   }, [])
 
   return (
-    <Layout>
+    <>
 
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
       <StickyFavouritesHeader
@@ -2196,6 +2195,6 @@ export default function FavouritesScreen() {
         actionLabel={snackAction?.label}
         onAction={snackAction ? handleSnackAction : undefined}
       />
-    </Layout>
+    </>
   )
 }
