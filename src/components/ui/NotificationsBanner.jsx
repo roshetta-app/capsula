@@ -38,7 +38,11 @@ export default function NotificationsBanner() {
     // of silently losing the signup with no feedback at all.
     dismiss()
     subscribeToPush().then((ok) => {
-      if (!ok) toast.error('Could not enable notifications. Please try again.')
+      if (ok) {
+        toast.success('Notifications enabled')
+      } else {
+        toast.error('Could not enable notifications. Please try again.')
+      }
     })
   }
 
