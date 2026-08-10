@@ -4,7 +4,7 @@
  *
  * Shown once to users who haven't subscribed yet.
  * Dismissed permanently via localStorage key: capsula_notif_dismissed
- * Disappears automatically after subscribing.
+ * Disappears automatically after subscribing successfully.
  *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
@@ -31,8 +31,8 @@ export default function NotificationsBanner() {
   }
 
   async function handleEnable() {
-    await subscribeToPush()
-    dismiss()
+    const ok = await subscribeToPush()
+    if (ok) dismiss()
   }
 
   // Don't show if: not supported, already dismissed, subscribed, or permission denied

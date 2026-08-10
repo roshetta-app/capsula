@@ -18,7 +18,9 @@
  *
  * Call subscribeToPush() once (e.g. on first app load or from a settings
  * screen). Safe to call multiple times — checks for an existing token row
- * first.
+ * first. Returns true on real success, false on any failure — callers
+ * (e.g. NotificationsBanner) should only treat this as "done" when it
+ * resolves true, not just when it resolves at all.
  */
 
 import { useState, useEffect } from 'react'
@@ -60,14 +62,14 @@ export function usePushSubscription() {
   }, [])
 
   async function subscribeToPush() {
-    if (!supported) return
+    if (!supported) return false
     setLoading(true)
     setError(null)
     try {
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
         setError('Notification permission denied')
-        return
+        return false
       }
 
       // Wait for the existing sw.js registration (main.jsx registers it on
@@ -81,7 +83,7 @@ export function usePushSubscription() {
 
       if (!token) {
         setError('Could not get a notification token')
-        return
+        return false
       }
 
       const { data: { user } } = await supabase.auth.getUser()
@@ -111,8 +113,10 @@ export function usePushSubscription() {
       }
 
       setSubscribed(true)
+      return true
     } catch (e) {
       setError(e.message ?? 'Failed to subscribe')
+      return false
     } finally {
       setLoading(false)
     }
