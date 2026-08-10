@@ -147,27 +147,10 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
-
-const RECENT_KEY = 'capsula_recent_drugs'
-const MAX_RECENT = 15 // 2026-08-09: was 5 (chip strip fit ~5 on one line).
-                       // Now backs the "Recently viewed" sheet's full list.
-
-// ─── Recently viewed drugs (localStorage) ────────────────────────────────────
-
-function readRecentDrugs() {
-  try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') } catch { return [] }
-}
-function addRecentDrug(drug) {
-  try {
-    const prev    = readRecentDrugs()
-    const filtered = prev.filter(d => d.id !== drug.id)
-    const next    = [{ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id }, ...filtered].slice(0, MAX_RECENT)
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next))
-  } catch { /* ignore */ }
-}
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
 
@@ -242,19 +225,14 @@ export default function DrugsScreen() {
   // "all"), anything else = that category's slug, taken as-is from the URL.
   const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
 
+  const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
   const [filterOpen,       setFilterOpen]       = useState(false)
-  const [recentDrugs,      setRecentDrugs]      = useState(() => readRecentDrugs())
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
   // drug-filter-instant-apply — gates the actual clear behind a confirm
   // step; requestClearFilters() (below) opens this, handleClearFilters()
   // only runs from ConfirmSheet's onConfirm.
   const [showClearFiltersConfirm, setShowClearFiltersConfirm] = useState(false)
-
-  // Refresh recent list when navigating back
-  useEffect(() => {
-    setRecentDrugs(readRecentDrugs())
-  }, [])
 
   // Recently-viewed sheet needs full drug records (SharedDrugCard's props),
   // not just the {id, name, slug} shape stored in localStorage — resolved
@@ -287,8 +265,7 @@ export default function DrugsScreen() {
   }, [])
 
   function handleDrugTap(drug) {
-    addRecentDrug(drug)
-    setRecentDrugs(readRecentDrugs())
+    addRecentDrug({ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id })
     navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))
   }
 

@@ -3,17 +3,33 @@
  * Phase 2C — Conditions Screen
  * Updated — full recency history for "Recent first" sort
  *
- * Manages the viewed-conditions history in localStorage.
+ * Phase F3 — Personal Data Migration: generalized to back both conditions
+ * and drugs (previously DrugsScreen.jsx kept a separate, near-identical
+ * inline copy of this same logic — see that file's history). Call with
+ * useRecentlyViewed('drug') for the drugs list; existing callers are
+ * unaffected since itemType defaults to 'condition'.
  *
- * Storage key: capsula_recent_conditions
- * Format:      [{ id, name, slug }]  — ALL viewed conditions, newest first
- * History cap: MAX_HISTORY_ITEMS — prevents unbounded localStorage growth
+ * Also made account-aware (D1): signed out (guest) behaves exactly as
+ * before, localStorage only. Signed in, it loads from the 'recently_viewed'
+ * table on sign-in and writes through on every view (optimistic — local
+ * state updates immediately alongside the database call). The local copy
+ * becomes a fast mirror, not the source of truth, once a user is present.
+ * The mirror is cleared the moment the user signs out.
+ *
+ * Storage keys (unchanged, so existing local history isn't lost):
+ *   condition: capsula_recent_conditions
+ *   drug:      capsula_recent_drugs
+ * Format:      [{ id, name, slug }]  — newest first
  *
  * Exposes:
- *   recentlyViewed  — newest MAX_CHIP_ITEMS entries (for RecentlyViewedChips)
- *   recentOrder     — ids of ALL viewed conditions, newest first
- *                      (used by useConditionSearch to sort the full list
- *                      by recency; items not in this array fall back to A–Z)
+ *   history         — full capped history, newest first (drug caller uses
+ *                      this directly, resolving each id against the live
+ *                      catalog itself, same as before)
+ *   recentlyViewed  — newest MAX_CHIP_ITEMS entries (for RecentlyViewedChips;
+ *                      only meaningful for the condition caller)
+ *   recentOrder     — ids of ALL viewed items, newest first (used by
+ *                      useConditionSearch to sort the full conditions list
+ *                      by recency; not used on the drugs side)
  *
  * Usage in ConditionDetailScreen (called on mount):
  *   const { addRecentlyViewed } = useRecentlyViewed()
@@ -21,71 +37,150 @@
  *
  * Usage in ConditionsScreen (read the list):
  *   const { recentlyViewed, recentOrder } = useRecentlyViewed()
+ *
+ * Usage in DrugsScreen (read the list):
+ *   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
  */
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuth } from './useAuth'
+import { supabase } from '../lib/supabase'
 
-const STORAGE_KEY        = 'capsula_recent_conditions'
-const MAX_CHIP_ITEMS      = 5    // entries shown in the RecentlyViewedChips strip
-const MAX_HISTORY_ITEMS   = 200  // safety cap on stored view history
+const MAX_CHIP_ITEMS = 5 // entries shown in the RecentlyViewedChips strip (conditions only)
 
-function readFromStorage() {
+const CONFIG = {
+  condition: { storageKey: 'capsula_recent_conditions', maxHistory: 200 },
+  drug:      { storageKey: 'capsula_recent_drugs',       maxHistory: 15  },
+}
+
+function readFromStorage(storageKey) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const raw = localStorage.getItem(storageKey)
     return raw ? JSON.parse(raw) : []
   } catch {
     return []
   }
 }
 
-function writeToStorage(items) {
+function writeToStorage(storageKey, items) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    localStorage.setItem(storageKey, JSON.stringify(items))
   } catch {
     // Storage may be full or unavailable — fail silently
   }
 }
 
-export function useRecentlyViewed() {
-  const [history, setHistory] = useState(() => readFromStorage())
+function clearStorage(storageKey) {
+  try {
+    localStorage.removeItem(storageKey)
+  } catch {
+    // Storage unavailable — fail silently
+  }
+}
+
+export function useRecentlyViewed(itemType = 'condition') {
+  const { storageKey, maxHistory } = CONFIG[itemType]
+  const { user } = useAuth()
+  const [history, setHistory] = useState(() => readFromStorage(storageKey))
+  const prevUserRef = useRef(user)
+
+  // Load from the database once signed in, and whenever the signed-in
+  // user changes.
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+
+    supabase
+      .from('recently_viewed')
+      .select('item_id, item_name, item_slug, viewed_at')
+      .eq('item_type', itemType)
+      .order('viewed_at', { ascending: false })
+      .limit(maxHistory)
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
+        const next = data.map(r => ({ id: r.item_id, name: r.item_name, slug: r.item_slug }))
+        writeToStorage(storageKey, next)
+        setHistory(next)
+      })
+
+    return () => { cancelled = true }
+  }, [user, itemType, storageKey, maxHistory])
+
+  // Sign-out transition: clear the local mirror immediately.
+  useEffect(() => {
+    if (prevUserRef.current && !user) {
+      clearStorage(storageKey)
+      setHistory([])
+    }
+    prevUserRef.current = user
+  }, [user, storageKey])
 
   /**
-   * Record a condition as viewed.
-   * Deduplicates by id. Newest item goes to front. Trims to MAX_HISTORY_ITEMS.
+   * Record an item as viewed.
+   * Deduplicates by id. Newest item goes to front. Trims to this type's
+   * history cap.
    *
-   * @param {{ id: string, name: string, slug: string }} condition
+   * @param {{ id: string, name: string, slug: string }} item
    */
-  const addRecentlyViewed = useCallback((condition) => {
-    if (!condition?.id) return
+  const addRecentlyViewed = useCallback((item) => {
+    if (!item?.id) return
 
     setHistory(prev => {
-      // Remove existing entry for this condition (dedup)
-      const filtered = prev.filter(c => c.id !== condition.id)
-      // Add to front
+      const filtered = prev.filter(x => x.id !== item.id)
       const updated = [
-        { id: condition.id, name: condition.name, slug: condition.slug },
+        { id: item.id, name: item.name, slug: item.slug },
         ...filtered,
-      ].slice(0, MAX_HISTORY_ITEMS)
+      ].slice(0, maxHistory)
 
-      writeToStorage(updated)
+      writeToStorage(storageKey, updated)
       return updated
     })
-  }, [])
+
+    if (user) {
+      supabase
+        .from('recently_viewed')
+        .upsert(
+          {
+            user_id:    user.id,
+            item_type:  itemType,
+            item_id:    item.id,
+            item_name:  item.name,
+            item_slug:  item.slug,
+            viewed_at:  new Date().toISOString(),
+          },
+          { onConflict: 'user_id,item_type,item_id' }
+        )
+        .then(({ error }) => {
+          if (error) console.error('Failed to sync recently viewed:', error)
+        })
+    }
+  }, [user, itemType, storageKey, maxHistory])
 
   /**
-   * Clear the entire view history.
+   * Clear the entire view history for this item type.
    */
   const clearRecentlyViewed = useCallback(() => {
-    writeToStorage([])
+    writeToStorage(storageKey, [])
     setHistory([])
-  }, [])
+
+    if (user) {
+      supabase
+        .from('recently_viewed')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('item_type', itemType)
+        .then(({ error }) => {
+          if (error) console.error('Failed to clear recently viewed:', error)
+        })
+    }
+  }, [user, itemType, storageKey])
 
   // Chips strip only ever shows the most recent few
   const recentlyViewed = history.slice(0, MAX_CHIP_ITEMS)
 
   // Full recency order (newest first) — drives "Recent first" sort across
   // the entire conditions list, not just the last few viewed
-  const recentOrder = history.map(c => c.id)
+  const recentOrder = history.map(x => x.id)
 
-  return { recentlyViewed, recentOrder, addRecentlyViewed, clearRecentlyViewed }
+  return { history, recentlyViewed, recentOrder, addRecentlyViewed, clearRecentlyViewed }
 }

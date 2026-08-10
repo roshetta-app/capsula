@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react
 import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import { useDirtyState } from '../../hooks/useDirtyState'
+import { useNotes } from '../../hooks/useNotes'
 
 /**
  * PersonalNotes — personal note for a condition (Phase 3.5).
@@ -75,15 +76,19 @@ import { useDirtyState } from '../../hooks/useDirtyState'
  *   - Delete-confirmation copy simplified to "This action can't be
  *     undone."
  *
+ * Phase F3 — Personal Data Migration:
+ *   - Storage moved out of this component into useNotes.js, which adds
+ *     account-aware syncing (D1) — signed out still behaves exactly as
+ *     before (localStorage only), signed in now also backs up to the
+ *     user's account and clears the local copy on sign-out. Nothing
+ *     about the UI, layout, or copy in this file changed.
+ *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
-  const storageKey = `capsula_notes_${conditionId}`
+  const { savedValue, save } = useNotes(conditionId)
 
-  const [savedValue, setSavedValue] = useState(() => {
-    try { return localStorage.getItem(storageKey) ?? '' } catch { return '' }
-  })
   const [draft, setDraft] = useState(savedValue)
   const [isEditing, setIsEditing] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
@@ -143,9 +148,8 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   function handleSave() {
-    try { localStorage.setItem(storageKey, draft) } catch { /* ignore */ }
     if (!savedValue && draft) setJustPopulated(true)
-    setSavedValue(draft)
+    save(draft)
     setIsEditing(false)
     triggerSaved()
   }
