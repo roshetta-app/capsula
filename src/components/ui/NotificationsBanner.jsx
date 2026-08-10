@@ -72,7 +72,7 @@ export default function NotificationsBanner() {
         padding:    12,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         {/* Icon tile */}
         <div style={{
           flexShrink:      0,
@@ -93,7 +93,7 @@ export default function NotificationsBanner() {
         </div>
 
         {/* Title + subtitle */}
-        <div style={{ flex: 1, minWidth: 0, paddingTop: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontSize: 14, fontWeight: 600, color: '#0F172A', lineHeight: 1.3,
           }}>
@@ -118,6 +118,7 @@ export default function NotificationsBanner() {
             color:                   '#94A3B8',
             padding:                 4,
             flexShrink:              0,
+            alignSelf:               'flex-start',
             display:                 'flex',
             alignItems:              'center',
             WebkitTapHighlightColor: 'transparent',
@@ -131,8 +132,8 @@ export default function NotificationsBanner() {
         </button>
       </div>
 
-      {/* Enable action */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+      {/* Enable action — indented to sit under the text column, not the icon */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8, paddingLeft: 48 }}>
         <button
           onClick={handleEnable}
           style={{
