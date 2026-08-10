@@ -2,20 +2,35 @@
  * src/components/ui/NotificationsBanner.jsx
  * Phase 3K — Push Notifications prompt banner
  *
- * Shown once to users who haven't subscribed yet.
- * Dismissed permanently via localStorage key: capsula_notif_dismissed
- * Disappears automatically after subscribing successfully.
+ * Shown to users who haven't subscribed yet, following a soft-ask pattern
+ * (industry standard for permission prompts): non-blocking, capped number
+ * of unanswered attempts, then retires itself.
  *
- * Stage 2 follow-up: restyled as a floating card (icon tile + title +
- * subtitle + Enable, all in one row) instead of an inline strip.
- * - Sits above BottomNav, same bottom offset ToastContext already uses
- *   (60px nav height + safe-area + margin), instead of the top of the
- *   screen.
- * - First appearance is delayed (APPEAR_DELAY_MS) instead of showing the
- *   instant the app opens.
- * - Enable dismisses with a brief exit animation and lets
- *   subscribeToPush() finish in the background; only a failure surfaces
- *   a toast — a successful enable stays silent (Option A).
+ * Memory model — three separate things remembered, on purpose:
+ *  1. Explicit "no" (X tapped, or Enable tapped) → capsula_notif_dismissed
+ *     in localStorage. Permanent, forever, on this device.
+ *  2. "Already shown this visit" → capsula_notif_shown_session in
+ *     sessionStorage. Prevents the banner re-triggering every time the
+ *     user navigates between screens in the same sitting (this was a
+ *     real bug — the banner was remounting per screen and restarting its
+ *     delay/animation cycle each time).
+ *  3. Ignored across separate visits → capsula_notif_attempts (count) and
+ *     capsula_notif_last_shown (timestamp), both in localStorage. Allowed
+ *     to reappear on up to MAX_ATTEMPTS separate app-opens total, with at
+ *     least COOLDOWN_MS between attempts so it can't hit the same person
+ *     twice in one day. Once attempts are used up without an explicit
+ *     answer, it retires permanently — same as an explicit dismiss.
+ *
+ * Never blocks app usage — this is a non-modal floating card, the app is
+ * fully usable underneath at all times, matching how every major
+ * platform treats a notification-permission ask.
+ *
+ * Stage 2 follow-up: floating card (icon tile + title + subtitle +
+ * Enable, all in one row), sits above BottomNav (same bottom offset
+ * ToastContext already uses), delayed first appearance, gentle
+ * enter/exit animation instead of an instant snap. Enable dismisses and
+ * lets subscribeToPush() finish in the background; only a failure
+ * surfaces a toast — a successful enable stays silent (Option A).
  *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
@@ -24,9 +39,15 @@ import { useState, useEffect } from 'react'
 import { usePushSubscription } from '../../hooks/usePushSubscription'
 import { useToast } from '../../context/ToastContext'
 
-const DISMISSED_KEY   = 'capsula_notif_dismissed'
-const APPEAR_DELAY_MS = 2500
-const EXIT_DURATION_MS = 220
+const DISMISSED_KEY    = 'capsula_notif_dismissed'
+const ATTEMPTS_KEY     = 'capsula_notif_attempts'
+const LAST_SHOWN_KEY   = 'capsula_notif_last_shown'
+const SESSION_SHOWN_KEY = 'capsula_notif_shown_session'
+
+const MAX_ATTEMPTS      = 3
+const COOLDOWN_MS       = 24 * 60 * 60 * 1000 // 24h between un-actioned attempts
+const APPEAR_DELAY_MS   = 2500
+const EXIT_DURATION_MS  = 220
 
 export default function NotificationsBanner() {
   const { supported, subscribed, subscribeToPush } = usePushSubscription()
@@ -43,17 +64,45 @@ export default function NotificationsBanner() {
     if ('Notification' in window) setPermission(Notification.permission)
   }, [])
 
-  // Gate the first appearance behind a short delay instead of showing the
-  // instant the app opens. Only starts the timer once every eligibility
-  // check has a real answer (permission starts as null until the effect
-  // above resolves it).
+  // Decide whether this is a real attempt to show the banner — and if so,
+  // after how long — based on the three-part memory described above.
   useEffect(() => {
     if (!supported) return
     if (permanentlyDismissed) return
     if (subscribed) return
     if (permission === null || permission === 'denied') return
 
-    const timer = setTimeout(() => setPhase('visible'), APPEAR_DELAY_MS)
+    // Already shown once this visit — don't restart the cycle just
+    // because the user navigated to another screen.
+    if (sessionStorage.getItem(SESSION_SHOWN_KEY) === 'true') return
+
+    const attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0', 10)
+
+    if (attempts >= MAX_ATTEMPTS) {
+      // Used up every chance without an explicit answer — retire it
+      // permanently, same as if they'd tapped the X.
+      localStorage.setItem(DISMISSED_KEY, 'true')
+      setPermanentlyDismissed(true)
+      return
+    }
+
+    const lastShown = parseInt(localStorage.getItem(LAST_SHOWN_KEY) || '0', 10)
+    if (attempts > 0 && Date.now() - lastShown < COOLDOWN_MS) {
+      // Shown before, but too soon to try again — skip this visit
+      // entirely without counting it as a fresh attempt.
+      return
+    }
+
+    const timer = setTimeout(() => {
+      // Only now — right as it's actually about to appear — record the
+      // attempt, so a visit that never reaches this point (e.g. user
+      // left the page before the delay finished) doesn't get charged.
+      sessionStorage.setItem(SESSION_SHOWN_KEY, 'true')
+      localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1))
+      localStorage.setItem(LAST_SHOWN_KEY, String(Date.now()))
+      setPhase('visible')
+    }, APPEAR_DELAY_MS)
+
     return () => clearTimeout(timer)
   }, [supported, permanentlyDismissed, subscribed, permission])
 
