@@ -7,30 +7,28 @@
  * of unanswered attempts, then retires itself.
  *
  * Memory model — three separate things remembered, on purpose:
- *  1. Explicit "no" (X tapped, or Enable tapped) → capsula_notif_dismissed
- *     in localStorage. Permanent, forever, on this device.
+ *  1. Explicit "no" (Allow Notifications tapped and handled) →
+ *     capsula_notif_dismissed in localStorage. Permanent, forever, on
+ *     this device.
  *  2. "Already shown this visit" → capsula_notif_shown_session in
  *     sessionStorage. Prevents the banner re-triggering every time the
- *     user navigates between screens in the same sitting (this was a
- *     real bug — the banner was remounting per screen and restarting its
- *     delay/animation cycle each time).
- *  3. Ignored across separate visits → capsula_notif_attempts (count) and
- *     capsula_notif_last_shown (timestamp), both in localStorage. Allowed
- *     to reappear on up to MAX_ATTEMPTS separate app-opens total, with at
- *     least COOLDOWN_MS between attempts so it can't hit the same person
- *     twice in one day. Once attempts are used up without an explicit
- *     answer, it retires permanently — same as an explicit dismiss.
+ *     user navigates between screens in the same sitting.
+ *  3. "Ask Later" / ignored across separate visits →
+ *     capsula_notif_attempts (count) and capsula_notif_last_shown
+ *     (timestamp), both in localStorage. Allowed to reappear on up to
+ *     MAX_ATTEMPTS separate app-opens total, with at least COOLDOWN_MS
+ *     between attempts. Once attempts are used up, it retires
+ *     permanently — same as an explicit "no". "Ask Later" does NOT set
+ *     the permanent flag — it just closes this instance and lets the
+ *     normal cap/cooldown decide when (or whether) to ask again.
  *
- * Never blocks app usage — this is a non-modal floating card, the app is
- * fully usable underneath at all times, matching how every major
- * platform treats a notification-permission ask.
+ * Never blocks app usage — non-modal floating card, app fully usable
+ * underneath at all times.
  *
- * Stage 2 follow-up: floating card (icon tile + title + subtitle +
- * Enable, all in one row), sits above BottomNav (same bottom offset
- * ToastContext already uses), delayed first appearance, gentle
- * enter/exit animation instead of an instant snap. Enable dismisses and
- * lets subscribeToPush() finish in the background; only a failure
- * surfaces a toast — a successful enable stays silent (Option A).
+ * Design: app icon tile + concise one-line body copy (no "Capsula"
+ * title), two actions — "Ask Later" (secondary, soft decline) and
+ * "Allow Notifications" (primary, grants + subscribes) — side by side,
+ * mirroring the standard two-button soft-ask pattern.
  *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
@@ -64,23 +62,16 @@ export default function NotificationsBanner() {
     if ('Notification' in window) setPermission(Notification.permission)
   }, [])
 
-  // Decide whether this is a real attempt to show the banner — and if so,
-  // after how long — based on the three-part memory described above.
   useEffect(() => {
     if (!supported) return
     if (permanentlyDismissed) return
     if (subscribed) return
     if (permission === null || permission === 'denied') return
-
-    // Already shown once this visit — don't restart the cycle just
-    // because the user navigated to another screen.
     if (sessionStorage.getItem(SESSION_SHOWN_KEY) === 'true') return
 
     const attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0', 10)
 
     if (attempts >= MAX_ATTEMPTS) {
-      // Used up every chance without an explicit answer — retire it
-      // permanently, same as if they'd tapped the X.
       localStorage.setItem(DISMISSED_KEY, 'true')
       setPermanentlyDismissed(true)
       return
@@ -88,15 +79,10 @@ export default function NotificationsBanner() {
 
     const lastShown = parseInt(localStorage.getItem(LAST_SHOWN_KEY) || '0', 10)
     if (attempts > 0 && Date.now() - lastShown < COOLDOWN_MS) {
-      // Shown before, but too soon to try again — skip this visit
-      // entirely without counting it as a fresh attempt.
       return
     }
 
     const timer = setTimeout(() => {
-      // Only now — right as it's actually about to appear — record the
-      // attempt, so a visit that never reaches this point (e.g. user
-      // left the page before the delay finished) doesn't get charged.
       sessionStorage.setItem(SESSION_SHOWN_KEY, 'true')
       localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1))
       localStorage.setItem(LAST_SHOWN_KEY, String(Date.now()))
@@ -106,30 +92,31 @@ export default function NotificationsBanner() {
     return () => clearTimeout(timer)
   }, [supported, permanentlyDismissed, subscribed, permission])
 
-  function finalizeDismiss() {
-    localStorage.setItem(DISMISSED_KEY, 'true')
-    setPermanentlyDismissed(true)
-    setPhase('hidden')
+  function closeWithAnimation(after) {
+    setPhase('leaving')
+    setTimeout(after, EXIT_DURATION_MS)
   }
 
-  function handleDismissClick() {
-    setPhase('leaving')
-    setTimeout(finalizeDismiss, EXIT_DURATION_MS)
-  }
-
-  function handleEnable() {
-    // Play the exit animation, then dismiss for real and let
-    // registration keep running in the background. Success stays silent
-    // (Option A) — a toast only appears on failure.
-    setPhase('leaving')
-    setTimeout(() => {
-      finalizeDismiss()
+  // Primary action — grants permission, subscribes, permanent (never asks again).
+  function handleAllow() {
+    closeWithAnimation(() => {
+      localStorage.setItem(DISMISSED_KEY, 'true')
+      setPermanentlyDismissed(true)
+      setPhase('hidden')
       subscribeToPush().then((ok) => {
         if (!ok) {
           toast.error('Could not enable notifications. Please try again.')
         }
       })
-    }, EXIT_DURATION_MS)
+    })
+  }
+
+  // Secondary action — soft decline. Does NOT set the permanent flag;
+  // the existing attempt cap/cooldown decides if/when to ask again.
+  function handleAskLater() {
+    closeWithAnimation(() => {
+      setPhase('hidden')
+    })
   }
 
   if (!supported) return null
@@ -163,96 +150,72 @@ export default function NotificationsBanner() {
           background: '#FFFFFF',
           borderRadius: 18,
           boxShadow:  '0 8px 24px rgba(15, 23, 42, 0.16), 0 1px 2px rgba(15, 23, 42, 0.08)',
-          padding:    12,
+          padding:    14,
           animation:  phase === 'leaving'
             ? `notif-banner-out ${EXIT_DURATION_MS}ms ease forwards`
             : 'notif-banner-in 260ms ease',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {/* Icon tile */}
-          <div style={{
-            flexShrink:      0,
-            width:           38,
-            height:          38,
-            borderRadius:    10,
-            backgroundColor: '#2563EB',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
+        {/* Icon + copy */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img
+            src="/capsula/icons/icon-192.png"
+            alt=""
+            aria-hidden="true"
+            style={{
+              flexShrink:   0,
+              width:        42,
+              height:       42,
+              borderRadius: 11,
+              objectFit:    'cover',
+            }}
+          />
+          <p style={{
+            flex: 1, minWidth: 0, margin: 0,
+            fontSize: 14, fontWeight: 500, color: '#1E293B', lineHeight: 1.4,
           }}>
-            <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
-              stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
-              aria-hidden="true">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </div>
+            Get notified the moment there's new drug or condition info.
+          </p>
+        </div>
 
-          {/* Title + subtitle */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: 14, fontWeight: 600, color: '#0F172A', lineHeight: 1.3,
-            }}>
-              Capsula
-            </div>
-            <div style={{
-              fontSize: 13, fontWeight: 400, color: '#64748B', lineHeight: 1.35,
-              marginTop: 1,
-            }}>
-              Enable notifications to get notified about new updates
-            </div>
-          </div>
-
-          {/* Dismiss (top) + Enable (bottom), stacked so Enable stays in
-              the same row as the icon/text instead of a separate row */}
-          <div style={{
-            flexShrink:     0,
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'flex-end',
-            gap:            6,
-          }}>
-            <button
-              onClick={handleDismissClick}
-              aria-label="Dismiss notifications banner"
-              style={{
-                background:              'none',
-                border:                  'none',
-                cursor:                  'pointer',
-                color:                   '#94A3B8',
-                padding:                 2,
-                display:                 'flex',
-                alignItems:              'center',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"/>
-                <line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            </button>
-
-            <button
-              onClick={handleEnable}
-              style={{
-                backgroundColor:         '#2563EB',
-                color:                   '#fff',
-                border:                  'none',
-                borderRadius:            999,
-                padding:                 '6px 14px',
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                cursor:                  'pointer',
-                whiteSpace:              'nowrap',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Enable
-            </button>
-          </div>
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <button
+            onClick={handleAskLater}
+            style={{
+              flex:                    1,
+              backgroundColor:         '#F1F5F9',
+              color:                   '#334155',
+              border:                  'none',
+              borderRadius:            999,
+              padding:                 '9px 0',
+              fontSize:                13,
+              fontWeight:              600,
+              fontFamily:              'var(--font-body)',
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Ask Later
+          </button>
+          <button
+            onClick={handleAllow}
+            style={{
+              flex:                    1.4,
+              backgroundColor:         '#2563EB',
+              color:                   '#fff',
+              border:                  'none',
+              borderRadius:            999,
+              padding:                 '9px 0',
+              fontSize:                13,
+              fontWeight:              600,
+              fontFamily:              'var(--font-body)',
+              cursor:                  'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Allow Notifications
+          </button>
         </div>
       </div>
     </>
