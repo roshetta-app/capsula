@@ -2,22 +2,48 @@
  * src/hooks/usePushSubscription.js
  * Phase 3K — Push Notification Subscription
  *
- * Call subscribeToPush() once (e.g. on first app load or from a settings screen).
- * Saves the subscription to Supabase push_subscriptions table.
- * Safe to call multiple times — checks for existing subscription first.
+ * Stage 2 (F4 notification rebuild) — this now registers through Firebase
+ * Cloud Messaging (FCM) via @capacitor-firebase/messaging instead of raw
+ * Web Push, and saves the resulting token to Supabase's push_tokens table
+ * (replacing the old push_subscriptions table, removed in Stage 5).
+ *
+ * Reuses the app's existing service worker (public/sw.js, registered in
+ * main.jsx) instead of installing a separate firebase-messaging-sw.js —
+ * avoids two competing service workers on the same origin.
+ *
+ * push_tokens.user_id is nullable (D21): a signed-out visitor can still
+ * enable notifications, and the row gets "claimed" for their account the
+ * next time subscribeToPush() runs while signed in — no delete+reinsert
+ * needed.
+ *
+ * Call subscribeToPush() once (e.g. on first app load or from a settings
+ * screen). Safe to call multiple times — checks for an existing token row
+ * first.
  */
 
 import { useState, useEffect } from 'react'
+import { initializeApp, getApps } from 'firebase/app'
+import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { supabase } from '../lib/supabase'
 
-const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY
-
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const raw     = atob(base64)
-  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)))
+const firebaseConfig = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 }
+
+// Initialize the Firebase app once at module load. Guarded with getApps()
+// so this stays safe if the module is ever evaluated twice (e.g. Vite HMR
+// during development) — initializeApp() throws on a second call otherwise.
+if (!getApps().length) {
+  initializeApp(firebaseConfig)
+}
+
+const FCM_VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY
 
 export function usePushSubscription() {
   const [supported,  setSupported]  = useState(false)
@@ -26,7 +52,11 @@ export function usePushSubscription() {
   const [error,      setError]      = useState(null)
 
   useEffect(() => {
-    setSupported('serviceWorker' in navigator && 'PushManager' in window)
+    setSupported(
+      'serviceWorker' in navigator &&
+      'PushManager' in window &&
+      'Notification' in window
+    )
   }, [])
 
   async function subscribeToPush() {
@@ -40,30 +70,43 @@ export function usePushSubscription() {
         return
       }
 
-      const reg = await navigator.serviceWorker.ready
+      // Wait for the existing sw.js registration (main.jsx registers it on
+      // window 'load') rather than registering a second service worker.
+      const registration = await navigator.serviceWorker.ready
 
-      // Check if already subscribed in browser
-      let sub = await reg.pushManager.getSubscription()
-      if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly:      true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        })
+      const { token } = await FirebaseMessaging.getToken({
+        vapidKey: FCM_VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      })
+
+      if (!token) {
+        setError('Could not get a notification token')
+        return
       }
 
-      const subJson = sub.toJSON()
+      const { data: { user } } = await supabase.auth.getUser()
 
-      // Check if endpoint already saved in DB to avoid duplicates
+      // Check if this token is already saved to avoid duplicates, and to
+      // find out whether it needs claiming for the current signed-in user.
       const { data: existing } = await supabase
-        .from('push_subscriptions')
-        .select('id')
-        .eq('subscription->>endpoint', subJson.endpoint)
+        .from('push_tokens')
+        .select('id, user_id')
+        .eq('token', token)
         .maybeSingle()
 
       if (!existing) {
         const { error: dbErr } = await supabase
-          .from('push_subscriptions')
-          .insert({ subscription: subJson })
+          .from('push_tokens')
+          .insert({ token, platform: 'web', user_id: user?.id ?? null })
+        if (dbErr) throw dbErr
+      } else if (user && existing.user_id !== user.id) {
+        // Claim an unclaimed token for the now-signed-in user. If the row
+        // already belongs to a different signed-in user, RLS silently
+        // leaves it untouched (0 rows affected) rather than erroring.
+        const { error: dbErr } = await supabase
+          .from('push_tokens')
+          .update({ user_id: user.id })
+          .eq('id', existing.id)
         if (dbErr) throw dbErr
       }
 
