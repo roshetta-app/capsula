@@ -30,6 +30,12 @@
  * "Allow Notifications" (primary, grants + subscribes) — side by side,
  * mirroring the standard two-button soft-ask pattern.
  *
+ * Auto-dismiss: if the user doesn't interact within AUTO_DISMISS_MS of
+ * the banner becoming visible, it closes itself the same way "Ask
+ * Later" does — soft decline, no permanent flag, still governed by the
+ * existing attempt cap/cooldown. Keeps this a single soft-decline path
+ * instead of adding a second one.
+ *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
 
@@ -46,6 +52,7 @@ const MAX_ATTEMPTS      = 3
 const COOLDOWN_MS       = 24 * 60 * 60 * 1000 // 24h between un-actioned attempts
 const APPEAR_DELAY_MS   = 2500
 const EXIT_DURATION_MS  = 220
+const AUTO_DISMISS_MS   = 8000 // auto-close as a soft decline if untouched
 
 export default function NotificationsBanner() {
   const { supported, subscribed, subscribeToPush } = usePushSubscription()
@@ -92,6 +99,19 @@ export default function NotificationsBanner() {
     return () => clearTimeout(timer)
   }, [supported, permanentlyDismissed, subscribed, permission])
 
+  // Auto-dismiss: once visible, close on its own like "Ask Later" if the
+  // user hasn't interacted within AUTO_DISMISS_MS. Cancelled if the user
+  // acts first (phase leaves 'visible') or the banner unmounts.
+  useEffect(() => {
+    if (phase !== 'visible') return
+
+    const timer = setTimeout(() => {
+      handleAskLater()
+    }, AUTO_DISMISS_MS)
+
+    return () => clearTimeout(timer)
+  }, [phase])
+
   function closeWithAnimation(after) {
     setPhase('leaving')
     setTimeout(after, EXIT_DURATION_MS)
@@ -113,6 +133,7 @@ export default function NotificationsBanner() {
 
   // Secondary action — soft decline. Does NOT set the permanent flag;
   // the existing attempt cap/cooldown decides if/when to ask again.
+  // Also used by the auto-dismiss timer above.
   function handleAskLater() {
     closeWithAnimation(() => {
       setPhase('hidden')
