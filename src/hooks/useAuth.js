@@ -19,14 +19,17 @@ import { supabase } from '../lib/supabase'
  *   signOut:           () => Promise<void>
  */
 
-// Phase F3 bug fix — notes are stored per-condition ('capsula_notes_' +
-// conditionId), unlike favourites/recently-viewed which live under one
-// single key mirrored by an always-mounted hook. That meant a note's own
-// sign-out clear only fired while its exact condition page happened to be
-// mounted at the moment of sign-out — any note saved earlier, on a
-// condition no longer on screen, was silently left behind. This sweep
-// clears every note key at once, from the one place sign-out always runs
-// through regardless of what page is currently open.
+// Phase F3 bug fix — both notes and recently-viewed clear their own local
+// storage reactively, but only while their exact screen/condition happens
+// to be mounted at the moment of sign-out (see useNotes.js /
+// useRecentlyViewed.js). Favourites doesn't have this problem — it's
+// mirrored by an always-mounted context, so its own effect always fires.
+// This sweeps the remaining two directly, from the one place sign-out
+// always runs through regardless of what page is open. Storage keys are
+// duplicated from useNotes.js's prefix and useRecentlyViewed.js's CONFIG
+// on purpose (importing back into useAuth.js from hooks that already
+// import useAuth would create a circular dependency) — if either hook's
+// storage-key naming changes, update both spots.
 function clearAllNotesStorage() {
   try {
     const keysToRemove = []
@@ -35,6 +38,15 @@ function clearAllNotesStorage() {
       if (key && key.startsWith('capsula_notes_')) keysToRemove.push(key)
     }
     keysToRemove.forEach(key => localStorage.removeItem(key))
+  } catch {
+    // localStorage unavailable — silently ignore
+  }
+}
+
+function clearAllRecentlyViewedStorage() {
+  try {
+    localStorage.removeItem('capsula_recent_conditions')
+    localStorage.removeItem('capsula_recent_drugs')
   } catch {
     // localStorage unavailable — silently ignore
   }
@@ -102,8 +114,16 @@ export function useAuth() {
     return { error }
   }
 
+  // Notes and recently-viewed each own storage keys that only get cleared
+  // reactively while their specific screen/condition is on-screen (see
+  // clearAllNotesStorage / clearAllRecentlyViewedStorage for why). Signing
+  // out sweeps both from here, the one place guaranteed to run regardless
+  // of what page is currently open. Favourites doesn't need the same
+  // treatment — it's mirrored by an always-mounted context, so its own
+  // sign-out effect already covers every case.
   async function signOut() {
     clearAllNotesStorage()
+    clearAllRecentlyViewedStorage()
     await supabase.auth.signOut()
   }
 
