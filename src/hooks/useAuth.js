@@ -18,6 +18,28 @@ import { supabase } from '../lib/supabase'
  *   signInWithGoogle:  () => Promise<{ error }>                 — end users (D2)
  *   signOut:           () => Promise<void>
  */
+
+// Phase F3 bug fix — notes are stored per-condition ('capsula_notes_' +
+// conditionId), unlike favourites/recently-viewed which live under one
+// single key mirrored by an always-mounted hook. That meant a note's own
+// sign-out clear only fired while its exact condition page happened to be
+// mounted at the moment of sign-out — any note saved earlier, on a
+// condition no longer on screen, was silently left behind. This sweep
+// clears every note key at once, from the one place sign-out always runs
+// through regardless of what page is currently open.
+function clearAllNotesStorage() {
+  try {
+    const keysToRemove = []
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key && key.startsWith('capsula_notes_')) keysToRemove.push(key)
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key))
+  } catch {
+    // localStorage unavailable — silently ignore
+  }
+}
+
 export function useAuth() {
   const [user, setUser]       = useState(null)
   const [profile, setProfile] = useState(null)
@@ -81,6 +103,7 @@ export function useAuth() {
   }
 
   async function signOut() {
+    clearAllNotesStorage()
     await supabase.auth.signOut()
   }
 
