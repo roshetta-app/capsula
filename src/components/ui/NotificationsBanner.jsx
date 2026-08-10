@@ -11,11 +11,13 @@
 
 import { useState, useEffect } from 'react'
 import { usePushSubscription } from '../../hooks/usePushSubscription'
+import { useToast } from '../../context/ToastContext'
 
 const DISMISSED_KEY = 'capsula_notif_dismissed'
 
 export default function NotificationsBanner() {
-  const { supported, subscribed, loading, subscribeToPush } = usePushSubscription()
+  const { supported, subscribed, subscribeToPush } = usePushSubscription()
+  const { toast } = useToast()
   const [dismissed, setDismissed] = useState(
     () => localStorage.getItem(DISMISSED_KEY) === 'true'
   )
@@ -30,9 +32,14 @@ export default function NotificationsBanner() {
     setDismissed(true)
   }
 
-  async function handleEnable() {
-    const ok = await subscribeToPush()
-    if (ok) dismiss()
+  function handleEnable() {
+    // Dismiss immediately — registration keeps running in the background.
+    // If it turns out to have failed, a toast lets the user know instead
+    // of silently losing the signup with no feedback at all.
+    dismiss()
+    subscribeToPush().then((ok) => {
+      if (!ok) toast.error('Could not enable notifications. Please try again.')
+    })
   }
 
   // Don't show if: not supported, already dismissed, subscribed, or permission denied
@@ -76,7 +83,6 @@ export default function NotificationsBanner() {
       {/* Enable button */}
       <button
         onClick={handleEnable}
-        disabled={loading}
         style={{
           backgroundColor:         '#2563EB',
           color:                   '#fff',
@@ -86,13 +92,12 @@ export default function NotificationsBanner() {
           fontSize:                12,
           fontWeight:              600,
           fontFamily:              'var(--font-body)',
-          cursor:                  loading ? 'not-allowed' : 'pointer',
-          opacity:                 loading ? 0.7 : 1,
+          cursor:                  'pointer',
           flexShrink:              0,
           WebkitTapHighlightColor: 'transparent',
         }}
       >
-        {loading ? 'Enabling…' : 'Enable'}
+        Enable
       </button>
 
       {/* Dismiss button */}
