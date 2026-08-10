@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
 
     <!--
+      Performance: open the connections to Supabase and Firebase's push
+      services as soon as the page loads, instead of paying that ~1-time
+      connection-setup cost when the user clicks "Enable notifications."
+      %VITE_SUPABASE_URL% is replaced at build time by Vite with the real
+      value from the VITE_SUPABASE_URL env var/secret — same mechanism
+      already used for the other VITE_ variables in this project.
+    -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+    <link rel="preconnect" href="https://firebaseinstallations.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fcmregistrations.googleapis.com" crossorigin />
+
+    <!--
       Prevent the browser from HTTP-caching this file.
       After a Vite build, asset filenames change (content hashes). If the
       browser serves a stale index.html it requests old hashed filenames
