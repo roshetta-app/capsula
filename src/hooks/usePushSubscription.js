@@ -47,6 +47,18 @@ if (!getApps().length) {
 
 const FCM_VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY
 
+// Wraps a promise so it fails with a clear error instead of hanging forever
+// if something (e.g. a service worker that failed to register) never
+// resolves — see the 503-on-deploy case documented in index.html.
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out waiting for ${label}`)), ms)
+    ),
+  ])
+}
+
 export function usePushSubscription() {
   const [supported,  setSupported]  = useState(false)
   const [subscribed, setSubscribed] = useState(false)
@@ -65,10 +77,8 @@ export function usePushSubscription() {
     if (!supported) return false
     setLoading(true)
     setError(null)
-    const t0 = performance.now()
     try {
       const permission = await Notification.requestPermission()
-      console.log(`[push timing] permission: ${(performance.now() - t0).toFixed(0)}ms`)
       if (permission !== 'granted') {
         setError('Notification permission denied')
         return false
@@ -76,42 +86,40 @@ export function usePushSubscription() {
 
       // Wait for the existing sw.js registration (main.jsx registers it on
       // window 'load') rather than registering a second service worker.
-      const t1 = performance.now()
-      const registration = await navigator.serviceWorker.ready
-      console.log(`[push timing] sw ready: ${(performance.now() - t1).toFixed(0)}ms`)
+      // Timed out (not just awaited) — if registration failed (e.g. a
+      // 503 fetching sw.js during GH Pages CDN propagation), this promise
+      // never resolves on its own and would otherwise hang the button
+      // forever with no feedback.
+      const registration = await withTimeout(
+        navigator.serviceWorker.ready,
+        10000,
+        'the notification service to be ready'
+      )
 
-      const t2 = performance.now()
       const { token } = await FirebaseMessaging.getToken({
         vapidKey: FCM_VAPID_KEY,
         serviceWorkerRegistration: registration,
       })
-      console.log(`[push timing] fcm getToken: ${(performance.now() - t2).toFixed(0)}ms`)
 
       if (!token) {
         setError('Could not get a notification token')
         return false
       }
 
-      const t3 = performance.now()
       const { data: { user } } = await supabase.auth.getUser()
-      console.log(`[push timing] supabase getUser: ${(performance.now() - t3).toFixed(0)}ms`)
 
       // Check if this token is already saved to avoid duplicates, and to
       // find out whether it needs claiming for the current signed-in user.
-      const t4 = performance.now()
       const { data: existing } = await supabase
         .from('push_tokens')
         .select('id, user_id')
         .eq('token', token)
         .maybeSingle()
-      console.log(`[push timing] check existing: ${(performance.now() - t4).toFixed(0)}ms`)
 
       if (!existing) {
-        const t5 = performance.now()
         const { error: dbErr } = await supabase
           .from('push_tokens')
           .insert({ token, platform: 'web', user_id: user?.id ?? null })
-        console.log(`[push timing] insert: ${(performance.now() - t5).toFixed(0)}ms`)
         if (dbErr) throw dbErr
       } else if (user && existing.user_id !== user.id) {
         // Claim an unclaimed token for the now-signed-in user. If the row
@@ -125,10 +133,8 @@ export function usePushSubscription() {
       }
 
       setSubscribed(true)
-      console.log(`[push timing] TOTAL: ${(performance.now() - t0).toFixed(0)}ms`)
       return true
     } catch (e) {
-      console.log(`[push timing] FAILED after ${(performance.now() - t0).toFixed(0)}ms`)
       setError(e.message ?? 'Failed to subscribe')
       return false
     } finally {
