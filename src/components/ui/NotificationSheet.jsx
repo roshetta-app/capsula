@@ -38,6 +38,12 @@
  * renders the real, already-resolved state and never fires an action off
  * a stale one.
  *
+ * Fix (2026-08-11, notif-sync-and-race-fix) — now reads
+ * usePushSubscriptionContext() instead of mounting its own
+ * usePushSubscription() instance on every open, so this sheet always
+ * shows the same status the banner does — no more separate hook instance
+ * to flash a stale "Allow" state while its own re-verification catches up.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
@@ -46,7 +52,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell } from 'lucide-react'
-import { usePushSubscription } from '../../hooks/usePushSubscription'
+import { usePushSubscriptionContext } from '../../context/PushSubscriptionContext'
 import { useToast } from '../../context/ToastContext'
 
 export default function NotificationSheet({ isOpen, onClose }) {
@@ -54,7 +60,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
   const {
     supported, subscribed, permission, checking,
     subscribeToPush, unsubscribeFromPush,
-  } = usePushSubscription()
+  } = usePushSubscriptionContext()
   const { toast } = useToast()
 
   // shouldRender keeps the DOM present during the exit transition.

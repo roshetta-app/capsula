@@ -4,7 +4,7 @@
  * Phase 3K addition: wrapped with ErrorBoundary (global crash logger)
  *
  * Provider order (outermost → innermost):
- *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → OnboardingGate → AppRoutes
+ *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → PushSubscriptionProvider → OnboardingGate → AppRoutes
  */
 
 import { BrowserRouter } from 'react-router-dom'
@@ -13,6 +13,7 @@ import OnboardingGate from './components/ui/OnboardingGate'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
+import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useDarkMode } from './hooks/useDarkMode'
@@ -35,9 +36,11 @@ export default function App() {
           <ConditionProvider>
             <DrugProvider>
               <FavouritesProvider>
-                <OnboardingGate>
-                  <AppRoutes />
-                </OnboardingGate>
+                <PushSubscriptionProvider>
+                  <OnboardingGate>
+                    <AppRoutes />
+                  </OnboardingGate>
+                </PushSubscriptionProvider>
               </FavouritesProvider>
             </DrugProvider>
           </ConditionProvider>

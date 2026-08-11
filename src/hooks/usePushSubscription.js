@@ -55,6 +55,17 @@
  * granted-and-verified check has finished — success or error). Callers
  * should treat `checking === true` as "don't know yet" and avoid showing
  * or acting on `subscribed` until it's false.
+ *
+ * Fix (2026-08-11, notif-sync-and-race-fix) — the old save was two
+ * separate steps ("does a row for this token already exist?" then
+ * "insert or update"), with a real gap between them where two saves for
+ * the same token at once could both read "doesn't exist yet" and both
+ * try to insert, or a claim and a re-save could cross and one silently
+ * undo the other. Replaced with a single call to the database's
+ * claim_push_token(token, platform, user_id) function, which does the
+ * check-and-save as one atomic step. Same "never un-claim a token for a
+ * signed-out call" protection as before — that now lives inside the
+ * database function instead of being re-derived here on every call.
  */
 
 import { useState, useEffect } from 'react'
@@ -158,29 +169,17 @@ export function usePushSubscription() {
 
       const { data: { user } } = await supabase.auth.getUser()
 
-      // Check if this token is already saved to avoid duplicates, and to
-      // find out whether it needs claiming for the current signed-in user.
-      const { data: existing } = await supabase
-        .from('push_tokens')
-        .select('id, user_id')
-        .eq('token', fetchedToken)
-        .maybeSingle()
-
-      if (!existing) {
-        const { error: dbErr } = await supabase
-          .from('push_tokens')
-          .insert({ token: fetchedToken, platform: 'web', user_id: user?.id ?? null })
-        if (dbErr) throw dbErr
-      } else if (user && existing.user_id !== user.id) {
-        // Claim an unclaimed token for the now-signed-in user. If the row
-        // already belongs to a different signed-in user, RLS silently
-        // leaves it untouched (0 rows affected) rather than erroring.
-        const { error: dbErr } = await supabase
-          .from('push_tokens')
-          .update({ user_id: user.id })
-          .eq('id', existing.id)
-        if (dbErr) throw dbErr
-      }
+      // Single atomic database call — replaces the old check-then-save
+      // (select for an existing row, then insert or update), which had a
+      // real gap between the check and the write. claim_push_token does
+      // the check-and-save as one step and keeps the same "never un-claim
+      // a token on a signed-out call" protection as before.
+      const { error: dbErr } = await supabase.rpc('claim_push_token', {
+        p_token: fetchedToken,
+        p_platform: 'web',
+        p_user_id: user?.id ?? null,
+      })
+      if (dbErr) throw dbErr
 
       setToken(fetchedToken)
       setSubscribed(true)

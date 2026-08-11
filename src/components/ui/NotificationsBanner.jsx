@@ -22,11 +22,17 @@
  * NotificationSheet.jsx (opened via the bell in ConditionsScreen) is now
  * always available as a non-attempt-limited fallback.
  *
+ * Fix (2026-08-11, notif-sync-and-race-fix) — now reads
+ * usePushSubscriptionContext() instead of mounting its own
+ * usePushSubscription() instance, so its status is always the same one
+ * the bell sheet sees — one subscribe/unsubscribe in flight, one status,
+ * both places see it the instant it changes.
+ *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
 
 import { useState, useEffect } from 'react'
-import { usePushSubscription } from '../../hooks/usePushSubscription'
+import { usePushSubscriptionContext } from '../../context/PushSubscriptionContext'
 import { useToast } from '../../context/ToastContext'
 
 const DISMISSED_KEY    = 'capsula_notif_dismissed'
@@ -41,7 +47,7 @@ const EXIT_DURATION_MS  = 220
 const AUTO_DISMISS_MS   = 8000 // auto-close as a soft decline if untouched
 
 export default function NotificationsBanner() {
-  const { supported, subscribed, subscribeToPush } = usePushSubscription()
+  const { supported, subscribed, subscribeToPush } = usePushSubscriptionContext()
   const { toast } = useToast()
   const [permanentlyDismissed, setPermanentlyDismissed] = useState(
     () => localStorage.getItem(DISMISSED_KEY) === 'true'
