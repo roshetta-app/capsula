@@ -173,25 +173,45 @@ export default function NotificationSheet({ isOpen, onClose }) {
             to turn them on here.
           </p>
         ) : subscribed ? (
-          <p style={{
-            margin:     '0 0 var(--space-5)',
-            fontSize:   16,
-            fontWeight: 600,
-            lineHeight: 1.4,
-            color:      'var(--color-text-primary)',
-          }}>
-            Notifications are on
-          </p>
+          <>
+            <p style={{
+              margin:     '0 0 var(--space-2)',
+              fontSize:   16,
+              fontWeight: 600,
+              lineHeight: 1.4,
+              color:      'var(--color-text-primary)',
+            }}>
+              Notifications are on
+            </p>
+            <p style={{
+              margin:     '0 0 var(--space-5)',
+              fontSize:   14,
+              lineHeight: 1.55,
+              color:      'var(--color-text-secondary)',
+            }}>
+              You'll be notified the moment there's new drug or condition info.
+            </p>
+          </>
         ) : (
-          <p style={{
-            margin:     '0 0 var(--space-5)',
-            fontSize:   16,
-            fontWeight: 600,
-            lineHeight: 1.4,
-            color:      'var(--color-text-primary)',
-          }}>
-            Allow <strong>Capsula</strong> to send you notifications?
-          </p>
+          <>
+            <p style={{
+              margin:     '0 0 var(--space-2)',
+              fontSize:   16,
+              fontWeight: 600,
+              lineHeight: 1.4,
+              color:      'var(--color-text-primary)',
+            }}>
+              Allow <strong>Capsula</strong> to send you notifications?
+            </p>
+            <p style={{
+              margin:     '0 0 var(--space-5)',
+              fontSize:   14,
+              lineHeight: 1.55,
+              color:      'var(--color-text-secondary)',
+            }}>
+              Get notified the moment there's new drug or condition info.
+            </p>
+          </>
         )}
 
         {/* Actions — same colors/shape as NotificationsBanner's Allow /
@@ -216,23 +236,42 @@ export default function NotificationSheet({ isOpen, onClose }) {
               Close
             </button>
           ) : subscribed ? (
-            <button
-              onClick={handleTurnOff}
-              style={{
-                backgroundColor:         '#F1F5F9',
-                color:                   '#334155',
-                border:                  'none',
-                borderRadius:            999,
-                padding:                 '11px 0',
-                fontSize:                14,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                cursor:                  'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Turn Off Notifications
-            </button>
+            <>
+              <button
+                onClick={handleTurnOff}
+                style={{
+                  backgroundColor:         '#F1F5F9',
+                  color:                   '#334155',
+                  border:                  'none',
+                  borderRadius:            999,
+                  padding:                 '11px 0',
+                  fontSize:                14,
+                  fontWeight:              600,
+                  fontFamily:              'var(--font-body)',
+                  cursor:                  'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Turn Off Notifications
+              </button>
+              <button
+                onClick={onClose}
+                style={{
+                  backgroundColor:         'transparent',
+                  color:                   'var(--color-text-secondary)',
+                  border:                  'none',
+                  borderRadius:            999,
+                  padding:                 '11px 0',
+                  fontSize:                14,
+                  fontWeight:              600,
+                  fontFamily:              'var(--font-body)',
+                  cursor:                  'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                Keep Notifications On
+              </button>
+            </>
           ) : (
             <>
               <button
