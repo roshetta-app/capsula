@@ -384,7 +384,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, onOpenNotifications, bran
       }}>
         {/* Logo wordmark */}
         <img
-          src="/capsula/logo.svg"
+          src={`${import.meta.env.BASE_URL}logo.svg`}
           alt="Capsula"
           className="capsula-logo"
           style={{ display: 'block', height: 30, width: 'auto' }}
@@ -525,7 +525,7 @@ function StickyLogoHeader({
           padding:    '16px var(--space-6) 0',
         }}>
           <img
-            src="/capsula/logo.svg"
+            src={`${import.meta.env.BASE_URL}logo.svg`}
             alt="Capsula"
             className="capsula-logo"
             style={{ display: 'block', height: 27, width: 'auto', flexShrink: 0 }}

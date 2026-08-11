@@ -1,0 +1,8 @@
+{
+  "appId": "com.capsula.app",
+  "appName": "Capsula",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

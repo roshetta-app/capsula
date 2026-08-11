@@ -59,7 +59,14 @@ function swBuildStampPlugin() {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react(), swBuildStampPlugin()],
-  base: '/capsula/',
-})
+  // GitHub Pages serves the app from a /capsula/ subpath, so every asset
+  // and route needs that prefix baked in at build time. A Capacitor
+  // native build instead loads its bundled assets from its own local
+  // root with no subpath — keeping the '/capsula/' prefix there would
+  // make every asset request 404 (see App.jsx's matching basename
+  // change). `npm run build:capacitor` passes --mode capacitor to pick
+  // this branch; the normal `npm run build` (GitHub Pages) is unaffected.
+  base: mode === 'capacitor' ? '/' : '/capsula/',
+}))

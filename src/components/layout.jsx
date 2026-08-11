@@ -84,7 +84,7 @@ export default function Layout({ children }) {
             alignItems: 'center',
           }}>
             <img
-              src="/capsula/logo.svg"
+              src={`${import.meta.env.BASE_URL}logo.svg`}
               alt="Capsula"
               className="capsula-logo"
               style={{ display: 'block', height: 22, width: 'auto' }}
