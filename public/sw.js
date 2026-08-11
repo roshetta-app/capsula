@@ -117,6 +117,7 @@ self.addEventListener('push', event => {
 
   const options = {
     body,
+    icon: iconUrl,
     badge: iconUrl,
     tag: 'capsula-notification',
     renotify: true,
