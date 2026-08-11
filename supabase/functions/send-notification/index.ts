@@ -1,20 +1,20 @@
 /**
  * supabase/functions/send-notification/index.ts
  * Phase F4 Stage 3 — rebuilt on Firebase Cloud Messaging (FCM) HTTP v1.
+ * Phase F4 Stage 4 — notification_log row is now created BEFORE sending
+ * (not after), and its id is threaded through to each device's FCM data
+ * payload as log_id, so the service worker can report a tap back against
+ * the correct history row (see public/sw.js's notificationclick handler).
  *
  * Replaces the retired web-push/VAPID system. Reads device addresses from
  * push_tokens (not the old push_subscriptions table) and writes every send
  * attempt to notification_log instead of only console-logging it.
  *
- * Security: this function has no admin check at the platform level - the
- * project's public anon key alone satisfies Supabase's 'valid JWT' gate, so
- * without the check below, anyone holding the public anon key could call
- * this endpoint directly and broadcast to every device. The check below
- * reuses the project's existing is_admin() database function (same one
- * gating CMS writes) rather than inventing a second way to check admin
- * status - it runs as the caller by forwarding their own login token to a
- * scoped Supabase client, so is_admin() sees the real caller, not the
- * function's own service role.
+ * Admin-only: reuses the app's existing is_admin() Postgres function (the
+ * same one already gating CMS writes) rather than inventing a second way
+ * to check admin status - it runs as the caller by forwarding their own
+ * login token to a scoped Supabase client, so is_admin() sees the real
+ * caller, not the function's own service role.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -113,6 +113,8 @@ async function getFcmAccessToken(): Promise<string> {
 }
 
 // --- one FCM v1 send ---
+// log_id is included in the data payload so the device can report a tap
+// back against the correct notification_log row (see sw.js).
 
 async function sendToToken(
   accessToken: string,
@@ -120,6 +122,7 @@ async function sendToToken(
   title: string,
   message: string,
   type: string,
+  logId: string,
 ): Promise<{ ok: boolean; deadToken: boolean }> {
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`,
@@ -133,7 +136,7 @@ async function sendToToken(
         message: {
           token,
           notification: { title, body: message },
-          data: { type },
+          data: { type, log_id: logId },
         },
       }),
     },
@@ -181,6 +184,24 @@ Deno.serve(async (req: Request) => {
 
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
+    // --- Stage 4: create the history row FIRST, before sending. Its id is
+    // threaded through to every device's FCM payload (see sendToToken) so a
+    // later tap on the device can report back against this exact row. ---
+    const { data: logRow, error: logInsertErr } = await adminClient
+      .from('notification_log')
+      .insert({
+        type: type ?? 'info', title, message,
+        sent_by: callerUser?.id ?? null,
+        sent_count: 0,
+        failed_count: 0,
+      })
+      .select('id')
+      .single()
+
+    if (logInsertErr || !logRow) throw logInsertErr ?? new Error('Failed to create notification_log row')
+
+    const logId = logRow.id as string
+
     const { data: tokens, error: dbErr } = await adminClient
       .from('push_tokens')
       .select('id, token')
@@ -188,12 +209,11 @@ Deno.serve(async (req: Request) => {
     if (dbErr) throw dbErr
 
     if (!tokens || tokens.length === 0) {
-      await adminClient.from('notification_log').insert({
-        type: type ?? 'info', title, message,
-        sent_by: callerUser?.id ?? null,
-        sent_count: 0,
-        failed_count: 0,
-      })
+      await adminClient
+        .from('notification_log')
+        .update({ sent_count: 0, failed_count: 0 })
+        .eq('id', logId)
+
       return new Response(
         JSON.stringify({ sent: 0, failed: 0, total: 0, message: 'No devices registered' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -203,7 +223,7 @@ Deno.serve(async (req: Request) => {
     const accessToken = await getFcmAccessToken()
 
     const results = await Promise.allSettled(
-      tokens.map(row => sendToToken(accessToken, row.token, title, message, type ?? 'info')),
+      tokens.map(row => sendToToken(accessToken, row.token, title, message, type ?? 'info', logId)),
     )
 
     let sent = 0
@@ -231,12 +251,10 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    await adminClient.from('notification_log').insert({
-      type: type ?? 'info', title, message,
-      sent_by: callerUser?.id ?? null,
-      sent_count: sent,
-      failed_count: failed,
-    })
+    await adminClient
+      .from('notification_log')
+      .update({ sent_count: sent, failed_count: failed })
+      .eq('id', logId)
 
     return new Response(
       JSON.stringify({ sent, failed, total: results.length }),

@@ -22,6 +22,16 @@
  *   - Push event handler: shows notification when push message received
  *   - notificationclick handler: focuses/opens the app on tap
  *
+ * Phase F4 Stage 4 addition:
+ *   - The push payload now carries log_id (see send-notification/index.ts),
+ *     stashed on the shown notification's data. notificationclick reports
+ *     the tap back by calling the increment_notification_click Postgres
+ *     function directly over Supabase's REST endpoint. The URL/key below
+ *     are hardcoded rather than routed through vite.config.js's build-time
+ *     injection (that path was built narrowly for the version stamp only) -
+ *     this is the same public/client-safe anon key already shipped in
+ *     every page load, so hardcoding it here carries no new exposure.
+ *
  * Fix (GH Pages blank-on-deploy race):
  *   - RELOAD broadcast is delayed 4 s after activate so any in-flight
  *     404→index.html redirects finish decoding sessionStorage before the
@@ -58,6 +68,11 @@ const PUBLIC_ROOT_CACHE_FIRST = [
   '/capsula/favicon-32.png',
   '/capsula/icons.svg',
 ]
+
+// Hardcoded Supabase project values for tap-tracking (see Phase F4 Stage 4
+// addition note above). Same anon key already used client-side app-wide.
+const SUPABASE_URL      = 'https://szzsqjpmcqsmvkvncgln.supabase.co'
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6enNxanBtY3FzbXZrdm5jZ2xuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2ODU0MjcsImV4cCI6MjA5NjI2MTQyN30.OkSXQ_yul-PblXAU7Y6M8PdXomzGX58vaT-NPq396Kc'
 
 // ─── Install ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +128,10 @@ self.addEventListener('push', event => {
   const title = payload.notification?.title ?? 'Capsula'
   const body  = payload.notification?.body ?? 'New update available'
 
+  // log_id (added Phase F4 Stage 4) identifies which notification_log row
+  // this send belongs to, so a tap can report back against the right row.
+  const logId = payload.data?.log_id ?? null
+
   const iconUrl  = `${self.location.origin}/capsula/icons/icon-192.png`
   const badgeUrl = `${self.location.origin}/capsula/icons/badge-192.png`
 
@@ -122,7 +141,7 @@ self.addEventListener('push', event => {
     badge: badgeUrl,
     tag: 'capsula-notification',
     renotify: true,
-    data: { url: '/capsula/' },
+    data: { url: '/capsula/', log_id: logId },
   }
 
   event.waitUntil(
@@ -135,15 +154,31 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close()
   const target = event.notification.data?.url ?? '/capsula/'
+  const logId  = event.notification.data?.log_id ?? null
 
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      .then(clients => {
-        const existing = clients.find(c => c.url.includes('/capsula/'))
-        if (existing) return existing.focus()
-        return self.clients.openWindow(target)
-      })
-  )
+  // Reports the tap back against its notification_log row (Phase F4 Stage
+  // 4). Fire-and-forget alongside the focus/open-window work below — a
+  // failed report shouldn't block or delay opening the app.
+  const reportClick = logId
+    ? fetch(`${SUPABASE_URL}/rest/v1/rpc/increment_notification_click`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ log_id: logId }),
+      }).catch(() => { /* best-effort only — a failed report shouldn't break the tap */ })
+    : Promise.resolve()
+
+  const focusOrOpen = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    .then(clients => {
+      const existing = clients.find(c => c.url.includes('/capsula/'))
+      if (existing) return existing.focus()
+      return self.clients.openWindow(target)
+    })
+
+  event.waitUntil(Promise.all([reportClick, focusOrOpen]))
 })
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
