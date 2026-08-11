@@ -38,6 +38,15 @@ export default function NotificationSheet({ isOpen, onClose }) {
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
 
+  // Optimistic override for the toggle's visual position. subscribeToPush/
+  // unsubscribeFromPush only resolve after the real round trip (permission
+  // prompt, Firebase token fetch, Supabase write) — same slow-toggle issue
+  // NotificationsBanner.jsx already fixed with instant UI. null = show the
+  // real `subscribed` value; true/false = show this instead until the real
+  // call resolves, then drop back to null so `subscribed` takes over.
+  const [optimistic, setOptimistic] = useState(null)
+  const displayedSubscribed = optimistic !== null ? optimistic : subscribed
+
   useEffect(() => {
     if (isOpen) {
       setShouldRender(true)
@@ -64,17 +73,16 @@ export default function NotificationSheet({ isOpen, onClose }) {
 
   function handleToggle() {
     if (toggleDisabled) return
-    if (subscribed) {
-      unsubscribeFromPush()
-    } else {
-      subscribeToPush()
-    }
+    const next = !displayedSubscribed
+    setOptimistic(next)
+    const action = displayedSubscribed ? unsubscribeFromPush : subscribeToPush
+    action().finally(() => setOptimistic(null))
   }
 
   let statusText = 'Notifications are off'
   if (!supported) statusText = 'Not supported on this device'
   else if (blocked) statusText = 'Blocked in your browser settings'
-  else if (subscribed) statusText = 'Notifications are on'
+  else if (displayedSubscribed) statusText = 'Notifications are on'
 
   // Rendered via portal to document.body — same reasoning as ConfirmSheet/
   // AccountSheet: position: fixed only resolves against the viewport if no
@@ -182,15 +190,15 @@ export default function NotificationSheet({ isOpen, onClose }) {
           <button
             type="button"
             role="switch"
-            aria-checked={subscribed}
-            aria-label={subscribed ? 'Turn notifications off' : 'Turn notifications on'}
+            aria-checked={displayedSubscribed}
+            aria-label={displayedSubscribed ? 'Turn notifications off' : 'Turn notifications on'}
             onClick={handleToggle}
             disabled={toggleDisabled}
             style={{
               width: 32, height: 18,
               borderRadius: 9,
               border: 'none',
-              backgroundColor: subscribed ? 'var(--color-accent)' : 'var(--color-border)',
+              backgroundColor: displayedSubscribed ? 'var(--color-accent)' : 'var(--color-border)',
               position: 'relative',
               cursor: toggleDisabled ? 'not-allowed' : 'pointer',
               transition: 'background-color 0.2s',
@@ -200,7 +208,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
           >
             <span style={{
               position: 'absolute',
-              top: 2, left: subscribed ? 15 : 2,
+              top: 2, left: displayedSubscribed ? 15 : 2,
               width: 14, height: 14,
               borderRadius: '50%',
               backgroundColor: '#fff',
@@ -233,3 +241,4 @@ export default function NotificationSheet({ isOpen, onClose }) {
     document.body
   )
 }
+
