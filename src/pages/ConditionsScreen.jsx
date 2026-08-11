@@ -152,7 +152,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, ListFilter, Heart } from 'lucide-react'
+import { Search, ListFilter, Heart, Bell } from 'lucide-react'
 import BackToTopButton         from '../components/ui/BackToTopButton'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -162,6 +162,7 @@ import AlphabetSectionDivider  from '../components/conditions/AlphabetSectionDiv
 import ConditionsEmptyState    from '../components/conditions/ConditionsEmptyState'
 import SpecialtiesBottomSheet  from '../components/conditions/SpecialtiesBottomSheet'
 import SpecialtySelector       from '../components/conditions/SpecialtySelector'
+import NotificationSheet       from '../components/ui/NotificationSheet'
 import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDarkMode }         from '../hooks/useDarkMode'
@@ -361,7 +362,7 @@ function RotatingTagline({
 
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
-function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
+function BrandRow({ isSearching, isDark, onToggleDark, onOpenNotifications, brandRowRef }) {
   return (
     <div ref={brandRowRef} style={{
       paddingTop:    'var(--space-5)',
@@ -389,6 +390,31 @@ function BrandRow({ isSearching, isDark, onToggleDark, brandRowRef }) {
           style={{ display: 'block', height: 30, width: 'auto' }}
         />
         <span style={{ flex: 1 }} />
+
+        {/* Notification bell — opens the persistent status sheet */}
+        <button
+          onClick={onOpenNotifications}
+          aria-label="Notifications"
+          style={{
+            width:                   36,
+            height:                  36,
+            borderRadius:            'var(--radius-full)',
+            border:                  '1.5px solid var(--color-border)',
+            backgroundColor:         'var(--color-surface)',
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            cursor:                  'pointer',
+            flexShrink:              0,
+            color:                   'var(--color-text-secondary)',
+            transition:              'background-color 0.15s ease, border-color 0.15s ease',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+            marginRight:             'var(--space-2)',
+          }}
+        >
+          <Bell size={16} />
+        </button>
 
         {/* Dark mode toggle — top right */}
         <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
@@ -695,6 +721,7 @@ export default function ConditionsScreen() {
   const { isDark, toggleDark }               = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
+  const [notifSheetOpen, setNotifSheetOpen]       = useState(false)
   // showStickyHeader: plain boolean, flips once the BrandRow (logo) leaves
   // the viewport. Same approach as FavouritesScreen's showStickyHeader —
   // no continuous signal, no derived opacity/lift/shadow values. The base
@@ -993,6 +1020,7 @@ export default function ConditionsScreen() {
             isSearching={isSearching}
             isDark={isDark}
             onToggleDark={toggleDark}
+            onOpenNotifications={() => setNotifSheetOpen(true)}
             brandRowRef={brandRowRef}
           />
         </div>
@@ -1092,6 +1120,12 @@ export default function ConditionsScreen() {
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
+      {/* Notification status sheet — portals to body, placement here doesn't matter */}
+      <NotificationSheet
+        isOpen={notifSheetOpen}
+        onClose={() => setNotifSheetOpen(false)}
+      />
+
       {/* Specialties bottom sheet */}
       <SpecialtiesBottomSheet
         specialties={specialties}
@@ -1104,5 +1138,3 @@ export default function ConditionsScreen() {
     </>
   )
 }
-
-

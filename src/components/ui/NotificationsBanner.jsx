@@ -1,40 +1,26 @@
 /**
  * src/components/ui/NotificationsBanner.jsx
- * Phase 3K — Push Notifications prompt banner
  *
- * Shown to users who haven't subscribed yet, following a soft-ask pattern
- * (industry standard for permission prompts): non-blocking, capped number
- * of unanswered attempts, then retires itself.
+ * Proactive "turn on notifications" prompt. Shown at most 3 times across
+ * separate visits (24h cooldown between attempts), then retires
+ * permanently — see MAX_ATTEMPTS/COOLDOWN_MS below.
  *
- * Memory model — three separate things remembered, on purpose:
- *  1. Explicit "no" (Allow Notifications tapped and handled) →
- *     capsula_notif_dismissed in localStorage. Permanent, forever, on
- *     this device.
- *  2. "Already shown this visit" → capsula_notif_shown_session in
- *     sessionStorage. Prevents the banner re-triggering every time the
- *     user navigates between screens in the same sitting.
- *  3. "Ask Later" / ignored across separate visits →
- *     capsula_notif_attempts (count) and capsula_notif_last_shown
- *     (timestamp), both in localStorage. Allowed to reappear on up to
- *     MAX_ATTEMPTS separate app-opens total, with at least COOLDOWN_MS
- *     between attempts. Once attempts are used up, it retires
- *     permanently — same as an explicit "no". "Ask Later" does NOT set
- *     the permanent flag — it just closes this instance and lets the
- *     normal cap/cooldown decide when (or whether) to ask again.
- *
- * Never blocks app usage — non-modal floating card, app fully usable
- * underneath at all times.
- *
- * Design: app icon tile + concise one-line body copy (no "Capsula"
- * title), two actions — "Ask Later" (secondary, soft decline) and
- * "Allow Notifications" (primary, grants + subscribes) — side by side,
- * mirroring the standard two-button soft-ask pattern.
- *
- * Auto-dismiss: if the user doesn't interact within AUTO_DISMISS_MS of
+ * Auto-dismiss (2026-08-11): if left untouched for AUTO_DISMISS_MS after
  * the banner becoming visible, it closes itself the same way "Ask
  * Later" does — soft decline, no permanent flag, still governed by the
  * existing attempt cap/cooldown. Keeps this a single soft-decline path
  * instead of adding a second one.
+ *
+ * Stage 2 follow-up fix (2026-08-11) — flaw #1 from the F4 banner audit:
+ * handleAllow() previously set the permanent DISMISSED_KEY flag before
+ * knowing whether subscribeToPush() actually succeeded, so a failed
+ * subscribe silently locked the banner out forever with no way back in
+ * through this UI. Now the permanent flag is only set once subscribeToPush
+ * resolves true. On failure, the banner still closes (soft, not
+ * permanent) and the existing attempt/cooldown logic decides if/when it
+ * asks again — same as any other soft decline. Regardless of this fix,
+ * NotificationSheet.jsx (opened via the bell in ConditionsScreen) is now
+ * always available as a non-attempt-limited fallback.
  *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
@@ -117,14 +103,19 @@ export default function NotificationsBanner() {
     setTimeout(after, EXIT_DURATION_MS)
   }
 
-  // Primary action — grants permission, subscribes, permanent (never asks again).
+  // Primary action — requests permission and subscribes. The permanent
+  // "never ask again" flag is only set once subscribeToPush() actually
+  // resolves true (fix, 2026-08-11) — a failed subscribe closes the
+  // banner softly instead, leaving the normal attempt/cooldown logic in
+  // charge of whether it asks again, same as "Ask Later".
   function handleAllow() {
     closeWithAnimation(() => {
-      localStorage.setItem(DISMISSED_KEY, 'true')
-      setPermanentlyDismissed(true)
       setPhase('hidden')
       subscribeToPush().then((ok) => {
-        if (!ok) {
+        if (ok) {
+          localStorage.setItem(DISMISSED_KEY, 'true')
+          setPermanentlyDismissed(true)
+        } else {
           toast.error('Could not enable notifications. Please try again.')
         }
       })

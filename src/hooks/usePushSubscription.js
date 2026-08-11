@@ -21,6 +21,24 @@
  * first. Returns true on real success, false on any failure — callers
  * (e.g. NotificationsBanner) should only treat this as "done" when it
  * resolves true, not just when it resolves at all.
+ *
+ * Stage 2 follow-up (2026-08-11) — notification bell/status sheet
+ * (NotificationSheet.jsx): three additions to support it.
+ *   1. `permission` is now exposed directly, reading the real browser
+ *      Notification.permission rather than each caller duplicating that
+ *      check (previously only NotificationsBanner did this itself).
+ *   2. If permission is already 'granted' on mount, silently re-verifies
+ *      the real subscribed state by re-fetching the device's token and
+ *      checking it against push_tokens on the server — fixes the
+ *      "already subscribed" flaw found in the F4 banner audit, where the
+ *      old subscribed flag only ever lived in-session and was never
+ *      re-checked against anything real. Never triggers the browser's
+ *      permission prompt — only runs when permission is already granted.
+ *   3. unsubscribeFromPush() — did not exist before. Deletes the FCM
+ *      token via FirebaseMessaging.deleteToken() and removes the matching
+ *      row from push_tokens. No soft-delete/active flag — nothing else
+ *      references push_tokens rows for history, so a hard delete is the
+ *      simplest correct option.
  */
 
 import { useState, useEffect } from 'react'
@@ -61,47 +79,53 @@ function withTimeout(promise, ms, label) {
 
 export function usePushSubscription() {
   const [supported,  setSupported]  = useState(false)
+  const [permission, setPermission] = useState(null)
   const [subscribed, setSubscribed] = useState(false)
+  const [token,      setToken]      = useState(null)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState(null)
 
   useEffect(() => {
-    setSupported(
+    const isSupported =
       'serviceWorker' in navigator &&
       'PushManager' in window &&
       'Notification' in window
-    )
+    setSupported(isSupported)
+    if (isSupported) setPermission(Notification.permission)
   }, [])
+
+  // Reads or re-fetches the device's current FCM token without prompting —
+  // shared by the mount-time re-verify effect below and unsubscribeFromPush
+  // (which needs to know the token even if this hook instance never called
+  // subscribeToPush() itself, e.g. opened fresh from the bell sheet).
+  async function getCurrentToken() {
+    const registration = await withTimeout(
+      navigator.serviceWorker.ready,
+      10000,
+      'the notification service to be ready'
+    )
+    const { token: fetchedToken } = await FirebaseMessaging.getToken({
+      vapidKey: FCM_VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    })
+    return fetchedToken
+  }
 
   async function subscribeToPush() {
     if (!supported) return false
     setLoading(true)
     setError(null)
     try {
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') {
+      const permissionResult = await Notification.requestPermission()
+      setPermission(permissionResult)
+      if (permissionResult !== 'granted') {
         setError('Notification permission denied')
         return false
       }
 
-      // Wait for the existing sw.js registration (main.jsx registers it on
-      // window 'load') rather than registering a second service worker.
-      // Timed out (not just awaited) — if registration failed (e.g. a
-      // 503 fetching sw.js during GH Pages CDN propagation), this promise
-      // never resolves on its own and would otherwise hang the button
-      // forever with no feedback.
-      const registration = await withTimeout(
-        navigator.serviceWorker.ready,
-        10000,
-        'the notification service to be ready'
-      )
+      const fetchedToken = await getCurrentToken()
 
-      const { token } = await FirebaseMessaging.getToken({
-        vapidKey: FCM_VAPID_KEY,
-        serviceWorkerRegistration: registration,
-      })
-
-      if (!token) {
+      if (!fetchedToken) {
         setError('Could not get a notification token')
         return false
       }
@@ -113,13 +137,13 @@ export function usePushSubscription() {
       const { data: existing } = await supabase
         .from('push_tokens')
         .select('id, user_id')
-        .eq('token', token)
+        .eq('token', fetchedToken)
         .maybeSingle()
 
       if (!existing) {
         const { error: dbErr } = await supabase
           .from('push_tokens')
-          .insert({ token, platform: 'web', user_id: user?.id ?? null })
+          .insert({ token: fetchedToken, platform: 'web', user_id: user?.id ?? null })
         if (dbErr) throw dbErr
       } else if (user && existing.user_id !== user.id) {
         // Claim an unclaimed token for the now-signed-in user. If the row
@@ -132,6 +156,7 @@ export function usePushSubscription() {
         if (dbErr) throw dbErr
       }
 
+      setToken(fetchedToken)
       setSubscribed(true)
       return true
     } catch (e) {
@@ -142,5 +167,71 @@ export function usePushSubscription() {
     }
   }
 
-  return { supported, subscribed, loading, error, subscribeToPush }
+  async function unsubscribeFromPush() {
+    if (!supported) return false
+    setLoading(true)
+    setError(null)
+    try {
+      // No token cached on this hook instance (e.g. sheet opened fresh,
+      // never called subscribeToPush itself this session) — fetch the
+      // device's current one. Safe without prompting: only reachable from
+      // the UI when permission is already 'granted'.
+      const currentToken = token ?? await getCurrentToken()
+
+      if (currentToken) {
+        await FirebaseMessaging.deleteToken()
+        const { error: dbErr } = await supabase
+          .from('push_tokens')
+          .delete()
+          .eq('token', currentToken)
+        if (dbErr) throw dbErr
+      }
+
+      setToken(null)
+      setSubscribed(false)
+      return true
+    } catch (e) {
+      setError(e.message ?? 'Failed to disable notifications')
+      return false
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Silent re-verification: if permission is already granted, don't trust
+  // any in-memory/session flag for "subscribed" — check the real token
+  // against the server. Runs once permission is known to be 'granted'.
+  // Never prompts (requestPermission is never called here).
+  useEffect(() => {
+    if (!supported || permission !== 'granted') return
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const fetchedToken = await getCurrentToken()
+        if (!fetchedToken || cancelled) return
+        const { data: existing } = await supabase
+          .from('push_tokens')
+          .select('id')
+          .eq('token', fetchedToken)
+          .maybeSingle()
+        if (cancelled) return
+        if (existing) {
+          setToken(fetchedToken)
+          setSubscribed(true)
+        }
+      } catch {
+        // Silent check — a failure here just leaves subscribed at its
+        // current value; the person can still use the toggle manually.
+      }
+    })()
+
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supported, permission])
+
+  return {
+    supported, permission, subscribed, loading, error,
+    subscribeToPush, unsubscribeFromPush,
+  }
 }
