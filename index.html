@@ -35,14 +35,27 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Capsula" />
-    <link rel="apple-touch-icon" href="/capsula/icons/icon-192.png" />
+    <!--
+      Phase F6 Stage 2: these four links used to hardcode the '/capsula/'
+      GitHub Pages path prefix directly. That prefix doesn't exist on the
+      Capacitor (native) build — same bug class as the logo path fixed in
+      Stage 1, just not yet noticed here since these are small icons, not
+      the visible logo. %BASE_URL% is Vite's own built-in placeholder for
+      this exact situation: it's replaced at build time with whatever
+      `base` is set to in vite.config.js ('/capsula/' for the website,
+      '/' for native), so these now resolve correctly on both builds
+      automatically, the same way import.meta.env.BASE_URL already does
+      for JS-side references. Vite's base value always ends in a trailing
+      slash, so no leading slash is added after %BASE_URL% below.
+    -->
+    <link rel="apple-touch-icon" href="%BASE_URL%icons/icon-192.png" />
 
     <!-- PWA manifest -->
-    <link rel="manifest" href="/capsula/manifest.json" />
+    <link rel="manifest" href="%BASE_URL%manifest.json" />
 
     <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="/capsula/favicon.ico" />
-    <link rel="icon" type="image/png" sizes="32x32" href="/capsula/favicon-32.png" />
+    <link rel="icon" type="image/x-icon" href="%BASE_URL%favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%favicon-32.png" />
 
     <title>Capsula</title>
 
@@ -52,6 +65,13 @@
       Runs before React boots: reads sessionStorage set by 404.html,
       restores the original path via history.replaceState so React Router
       sees the correct URL on mount.
+
+      Phase F6 Stage 2 note: left unguarded deliberately. This only ever
+      does anything if the 'gh_pages_redirect' sessionStorage key is
+      present — and that key is only ever set by public/404.html, a
+      GitHub Pages-only mechanism that native never triggers (native has
+      no server-side 404 routing; local bundled files are always found
+      directly). It's already inert on native without needing a check.
     -->
     <script>
       (function() {
@@ -86,9 +106,23 @@
       giving up with a visible reload link instead of a silent blank page.
       The retry counter is cleared in main.jsx once the module actually
       starts executing, so this only ever fires on a genuine load failure.
+
+      Phase F6 Stage 2: guarded to skip entirely on native. The CDN
+      propagation delay this exists for can't happen on native — assets
+      are bundled locally at build time, not served from a rolling-out
+      CDN. If a native module load ever genuinely failed (a corrupted
+      local bundle), reloading wouldn't fix it anyway (the same broken
+      files would still be there), and the hardcoded '/capsula/' reload
+      path below would be wrong for native's unprefixed root regardless.
+      window.Capacitor is injected by Capacitor's native bridge before
+      any page script runs, so it's reliably available here without an
+      import.
     -->
     <script>
       window.__mainLoadFailed = function () {
+        if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+          return;
+        }
         var key = 'capsula_boot_retry_count';
         var n = parseInt(sessionStorage.getItem(key) || '0', 10);
         if (n >= 3) {

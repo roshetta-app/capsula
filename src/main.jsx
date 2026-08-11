@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Capacitor } from '@capacitor/core'
 import './index.css'
 import App from './App.jsx'
 
@@ -40,6 +41,16 @@ createRoot(document.getElementById('root')).render(
 )
 
 // ─── Service worker registration + auto-update ────────────────────────────────
+//
+// Phase F6 Stage 2: skipped entirely on native (Capacitor.isNativePlatform()
+// guard below). This whole mechanism exists to solve one problem — a browser
+// serving a stale cached build after a live GitHub Pages deploy — which a
+// native app doesn't have: its bundle is fixed locally until the next app
+// update, not fetched fresh from a live, changing website. Its cache/reload
+// logic also assumes '/capsula/'-prefixed paths that don't exist in the
+// native build, so even if it did register there, it couldn't do its job
+// correctly — this guard avoids that dead weight rather than leaving it to
+// silently do nothing useful.
 //
 // After a new SW activates it takes control (controllerchange) and sends a
 // RELOAD message. Both triggers call the same hardReload() helper.
@@ -116,7 +127,7 @@ function recentlyReloaded() {
 //   real network request, regardless of what cache headers GitHub Pages'
 //   CDN happens to send.
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
   let reloading = false
 
   function hardReload(reason) {
