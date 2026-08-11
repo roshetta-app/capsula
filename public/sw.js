@@ -113,10 +113,12 @@ self.addEventListener('push', event => {
   const title = payload.notification?.title ?? 'Capsula'
   const body  = payload.notification?.body ?? 'New update available'
 
+  const iconUrl = `${self.location.origin}/capsula/icons/icon-192.png`
+
   const options = {
     body,
-    icon: '/capsula/icons/icon-192.png',
-    badge: '/capsula/icons/icon-192.png',
+    icon: iconUrl,
+    badge: iconUrl,
     tag: 'capsula-notification',
     renotify: true,
     data: { url: '/capsula/' },
