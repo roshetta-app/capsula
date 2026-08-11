@@ -26,6 +26,18 @@
  * reporting failure — same pattern, same ToastContext, same colors as
  * the banner's Allow / Ask Later buttons.
  *
+ * Stage 2 follow-up (2026-08-11, same day) — gated on `checking`. Every
+ * time this sheet opens it mounts a fresh usePushSubscription() instance,
+ * which starts `subscribed` at false and only corrects itself once its
+ * own async re-verification finishes. Previously that showed as a flash
+ * of the wrong ("Allow") state on open, and — because the check hadn't
+ * settled yet — could let a tap on "Allow" fire subscribeToPush() again
+ * while the real subscribe was still resolving, racing against itself and
+ * coming back as a failure. Now the sheet shows a neutral "checking"
+ * state and disables the buttons until `checking` is false, so it always
+ * renders the real, already-resolved state and never fires an action off
+ * a stale one.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
@@ -40,7 +52,7 @@ import { useToast } from '../../context/ToastContext'
 export default function NotificationSheet({ isOpen, onClose }) {
   const overlayRef = useRef(null)
   const {
-    supported, subscribed, permission,
+    supported, subscribed, permission, checking,
     subscribeToPush, unsubscribeFromPush,
   } = usePushSubscription()
   const { toast } = useToast()
@@ -152,7 +164,16 @@ export default function NotificationSheet({ isOpen, onClose }) {
           <Bell size={26} color="var(--color-accent)" fill="var(--color-accent)" fillOpacity={0.15} />
         </div>
 
-        {!supported ? (
+        {checking ? (
+          <p style={{
+            margin:     '0 0 var(--space-5)',
+            fontSize:   14,
+            lineHeight: 1.55,
+            color:      'var(--color-text-secondary)',
+          }}>
+            Checking your notification status…
+          </p>
+        ) : !supported ? (
           <p style={{
             margin:     '0 0 var(--space-5)',
             fontSize:   14,
@@ -215,9 +236,30 @@ export default function NotificationSheet({ isOpen, onClose }) {
         )}
 
         {/* Actions — same colors/shape as NotificationsBanner's Allow /
-            Ask Later pair, stacked instead of side-by-side. */}
+            Ask Later pair, stacked instead of side-by-side. While
+            `checking`, a single disabled placeholder takes the same
+            padding as a real button (no fixed height) so the sheet
+            doesn't shift once the real state resolves. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {!supported || blocked ? (
+          {checking ? (
+            <button
+              disabled
+              style={{
+                backgroundColor:         '#F1F5F9',
+                color:                   'var(--color-text-secondary)',
+                border:                  'none',
+                borderRadius:            999,
+                padding:                 '11px 0',
+                fontSize:                14,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                cursor:                  'default',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Checking…
+            </button>
+          ) : !supported || blocked ? (
             <button
               onClick={onClose}
               style={{

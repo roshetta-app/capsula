@@ -39,6 +39,22 @@
  *      row from push_tokens. No soft-delete/active flag — nothing else
  *      references push_tokens rows for history, so a hard delete is the
  *      simplest correct option.
+ *
+ * Stage 2 follow-up (2026-08-11, same day) — `checking` added. Every
+ * fresh instance of this hook (e.g. NotificationSheet.jsx re-mounting
+ * each time it opens) previously started `subscribed` at false and only
+ * corrected itself once the mount-time re-verification above finished —
+ * a real device that was already subscribed would briefly render as "not
+ * subscribed" until that async check resolved. Two visible symptoms came
+ * from this single cause: the sheet flashing the wrong (off) state on
+ * open, and — because a fresh sheet instance's re-check hadn't finished
+ * settling yet — a tap on "Allow" firing subscribeToPush() again while
+ * the real state was still resolving, coming back as a race/failure.
+ * `checking` is true from mount and only flips false once the real state
+ * is known for certain (unsupported, permission not granted, or the
+ * granted-and-verified check has finished — success or error). Callers
+ * should treat `checking === true` as "don't know yet" and avoid showing
+ * or acting on `subscribed` until it's false.
  */
 
 import { useState, useEffect } from 'react'
@@ -84,6 +100,9 @@ export function usePushSubscription() {
   const [token,      setToken]      = useState(null)
   const [loading,    setLoading]    = useState(false)
   const [error,      setError]      = useState(null)
+  // True until the real subscribed state is known for certain. Starts true
+  // on every fresh instance of this hook — see file header note above.
+  const [checking,   setChecking]   = useState(true)
 
   useEffect(() => {
     const isSupported =
@@ -91,7 +110,14 @@ export function usePushSubscription() {
       'PushManager' in window &&
       'Notification' in window
     setSupported(isSupported)
-    if (isSupported) setPermission(Notification.permission)
+    if (isSupported) {
+      setPermission(Notification.permission)
+    } else {
+      // Nothing left to check — the re-verify effect below never runs
+      // when unsupported, so this is the only place that can resolve
+      // `checking` for that case.
+      setChecking(false)
+    }
   }, [])
 
   // Reads or re-fetches the device's current FCM token without prompting —
@@ -202,8 +228,22 @@ export function usePushSubscription() {
   // any in-memory/session flag for "subscribed" — check the real token
   // against the server. Runs once permission is known to be 'granted'.
   // Never prompts (requestPermission is never called here).
+  //
+  // Also resolves `checking` in every branch — not just the granted-and-
+  // verified path — so a caller waiting on `checking` never hangs: if
+  // unsupported, the mount effect above already resolved it and this
+  // effect exits without touching it again; if supported but permission
+  // is 'default' or 'denied', there is nothing to re-verify, so it
+  // resolves immediately; if permission is 'granted', it resolves once
+  // the real check finishes, success or failure alike.
   useEffect(() => {
-    if (!supported || permission !== 'granted') return
+    if (!supported) return
+
+    if (permission !== 'granted') {
+      setChecking(false)
+      return
+    }
+
     let cancelled = false
 
     ;(async () => {
@@ -223,6 +263,8 @@ export function usePushSubscription() {
       } catch {
         // Silent check — a failure here just leaves subscribed at its
         // current value; the person can still use the toggle manually.
+      } finally {
+        if (!cancelled) setChecking(false)
       }
     })()
 
@@ -231,7 +273,7 @@ export function usePushSubscription() {
   }, [supported, permission])
 
   return {
-    supported, permission, subscribed, loading, error,
+    supported, permission, subscribed, loading, error, checking,
     subscribeToPush, unsubscribeFromPush,
   }
 }
