@@ -102,14 +102,19 @@ self.addEventListener('activate', event => {
 // ─── Push ─────────────────────────────────────────────────────────────────────
 
 self.addEventListener('push', event => {
-  let data = { title: 'Capsula', message: 'New update available', type: 'info' }
+  let payload = {}
 
   if (event.data) {
-    try { data = JSON.parse(event.data.text()) } catch { /* use defaults */ }
+    try { payload = JSON.parse(event.data.text()) } catch { /* use defaults below */ }
   }
 
+  // FCM v1 sends the title/body nested under `notification`, not as flat
+  // top-level fields — matches the shape sent by send-notification/index.ts.
+  const title = payload.notification?.title ?? 'Capsula'
+  const body  = payload.notification?.body ?? 'New update available'
+
   const options = {
-    body: data.message,
+    body,
     icon: '/capsula/icons/icon-192.png',
     badge: '/capsula/icons/icon-192.png',
     tag: 'capsula-notification',
@@ -118,7 +123,7 @@ self.addEventListener('push', event => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, options)
+    self.registration.showNotification(title, options)
   )
 })
 
