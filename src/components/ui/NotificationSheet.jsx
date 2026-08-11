@@ -267,7 +267,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                Don't Allow
+                Maybe Later
               </button>
             </>
           )}
