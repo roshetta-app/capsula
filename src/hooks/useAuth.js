@@ -28,6 +28,18 @@ import { supabase } from '../lib/supabase'
 // added to Supabase's dashboard allow-list.
 const NATIVE_AUTH_CALLBACK_URL = 'com.capsula.app://auth-callback'
 
+// Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device: useAuth() is
+// called directly (no shared Context) from several components
+// (AuthGuard, AccountSheet, etc.), so each mounted copy of this hook was
+// registering its own separate appUrlOpen listener — logcat showed eight
+// registrations at once. One real Google redirect then triggered several
+// of them simultaneously, all racing to exchange the same one-time code;
+// since a PKCE code can only be used once, only one such attempt could
+// ever succeed regardless of any other fix. This module-level flag makes
+// the listener a true app-wide singleton — registered once, ever,
+// regardless of how many components use this hook.
+let oauthCallbackListenerRegistered = false
+
 // Phase F3 bug fix — both notes and recently-viewed clear their own local
 // storage reactively, but only while their exact screen/condition happens
 // to be mounted at the moment of sign-out (see useNotes.js /
@@ -116,24 +128,55 @@ export function useAuth() {
   // a no-op on web.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
+    if (oauthCallbackListenerRegistered) return
+    oauthCallbackListenerRegistered = true
 
-    const listenerPromise = App.addListener('appUrlOpen', async ({ url }) => {
+    // No cleanup/remove here on purpose — this listener is meant to live
+    // for the whole app session (any component may trigger a Google
+    // sign-in), not tied to whichever component happened to mount it
+    // first.
+    App.addListener('appUrlOpen', async ({ url }) => {
       if (!url.startsWith(NATIVE_AUTH_CALLBACK_URL)) return
 
-      const { error } = await supabase.auth.exchangeCodeForSession(url)
+      // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — the durable
+      // storage fix and the singleton-listener fix are both confirmed
+      // working; kept one more round to confirm the fix below actually
+      // resolves the exchange. Remove once the flow is confirmed working
+      // end to end.
+      console.log('[OAuth diag] appUrlOpen received', url)
+
+      // Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device:
+      // exchangeCodeForSession() expects just the one-time authorization
+      // code, not the full callback URL. Passing the whole URL sends it
+      // as-is to Supabase's token endpoint, which can't match it to the
+      // stored sign-in attempt and fails with "invalid flow state, no
+      // valid flow state found" — even though the code-verifier
+      // round-trip itself (confirmed via the diagnostic logging above)
+      // was working correctly the whole time.
+      const code = new URL(url).searchParams.get('code')
+      if (!code) {
+        console.error('OAuth callback URL had no code parameter:', url)
+        await Browser.close()
+        return
+      }
+
+      const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (error) {
+        // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once
+        // the flow is confirmed working.
+        console.log('[OAuth diag] exchangeCodeForSession failed', error.message)
         // Nothing else to do here — the sign-in UI (AccountSheet) only
         // shows an error for the initiating call, not for this
         // out-of-band callback. Session state simply won't change, and
         // the user can retry from the sign-in button.
         console.error('OAuth callback session exchange failed:', error.message)
+      } else {
+        // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once
+        // the flow is confirmed working.
+        console.log('[OAuth diag] exchangeCodeForSession succeeded')
       }
       await Browser.close()
     })
-
-    return () => {
-      listenerPromise.then(listener => listener.remove())
-    }
   }, [])
 
   async function signIn(email, password) {
