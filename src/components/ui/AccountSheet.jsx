@@ -72,10 +72,23 @@ export default function AccountSheet({
     const { error: authError } = await signInWithGoogle()
     if (authError) {
       setError(authError.message ?? 'Sign-in failed. Please try again.')
-      setBusy(false)
     }
-    // On success, Supabase navigates away through the Google OAuth flow —
-    // nothing further to do here.
+    // Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device: on native,
+    // signInWithGoogle() only opens the system browser and returns right
+    // away; it does NOT wait for the OAuth flow to finish. The old code
+    // only reset `busy` on the error branch, on the assumption that a
+    // success meant the page was about to navigate away (true on web,
+    // where this component unmounts entirely). On native nothing
+    // navigates away — this same AccountSheet instance stays mounted and
+    // `busy` stayed stuck at true. When the user later returned from
+    // Google already signed in, this component re-rendered into the
+    // signed-in view while `busy` was still true, showing the sign-out
+    // button's busy label ("Signing out…", disabled) even though sign-out
+    // was never touched. Resetting `busy` here on every path (not just
+    // the error one) fixes that — on web it's a no-op since the component
+    // is gone before it can matter; on native there's nothing left for
+    // this button to reflect once the system browser has taken over.
+    setBusy(false)
   }
 
   async function handleSignOut() {
