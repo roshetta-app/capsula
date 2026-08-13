@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../context/ToastContext'
 
 /**
  * useAuth — shared authentication hook for both admin and end users.
@@ -39,6 +40,36 @@ const NATIVE_AUTH_CALLBACK_URL = 'com.capsula.app://auth-callback'
 // the listener a true app-wide singleton — registered once, ever,
 // regardless of how many components use this hook.
 let oauthCallbackListenerRegistered = false
+
+// Stage 3 (F6) bug fix, 2026-08-13, second finding (intermittent-signin-fail)
+// — confirmed via a real on-device logcat capture: right after returning
+// from the Google browser tab, the app can briefly have no working network
+// connection. Android suspends an app's network access while it's
+// backgrounded (during the time spent in the browser signing in), and
+// there's a real window right after the app returns to the foreground
+// where that hasn't finished waking back up yet. If
+// exchangeCodeForSession() fires in that window, its request to
+// Supabase's token endpoint fails outright with a generic fetch error —
+// nothing to do with the code or the PKCE flow being wrong. One retry
+// after a short delay is enough to clear this in practice, since the
+// window is brief. Only retries on this specific network-timing failure
+// — a real rejection from Google/Supabase (expired/invalid code) is a
+// permanent failure retrying can't fix, so that still fails immediately.
+const OAUTH_EXCHANGE_RETRY_DELAY_MS = 1500
+
+function isNetworkTimingError(error) {
+  if (!error) return false
+  const message = error.message ?? ''
+  return message.includes('Failed to fetch') || message.includes('NetworkError')
+}
+
+async function exchangeCodeWithRetry(code) {
+  const first = await supabase.auth.exchangeCodeForSession(code)
+  if (!first.error || !isNetworkTimingError(first.error)) return first
+
+  await new Promise(resolve => setTimeout(resolve, OAUTH_EXCHANGE_RETRY_DELAY_MS))
+  return supabase.auth.exchangeCodeForSession(code)
+}
 
 // Phase F3 bug fix — both notes and recently-viewed clear their own local
 // storage reactively, but only while their exact screen/condition happens
@@ -77,6 +108,7 @@ export function useAuth() {
   const [user, setUser]       = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
   const loadProfile = useCallback(async (currentUser) => {
     if (!currentUser) {
@@ -153,17 +185,21 @@ export function useAuth() {
         return
       }
 
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
+      const { error } = await exchangeCodeWithRetry(code)
       if (error) {
-        // Nothing else to do here — the sign-in UI (AccountSheet) only
-        // shows an error for the initiating call, not for this
-        // out-of-band callback. Session state simply won't change, and
-        // the user can retry from the sign-in button.
+        // Bug fix, 2026-08-13 (intermittent-signin-fail) — this used to
+        // only log to the console, leaving the person back in the app
+        // still signed out with no idea why. A retry already ran inside
+        // exchangeCodeWithRetry for the transient network-timing case;
+        // reaching here means it still failed (either a real
+        // Google/Supabase rejection, or the network genuinely didn't
+        // recover), so tell them directly rather than staying silent.
         console.error('OAuth callback session exchange failed:', error.message)
+        toast.error('Sign-in failed. Please try again.')
       }
       await Browser.close()
     })
-  }, [])
+  }, [toast])
 
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
