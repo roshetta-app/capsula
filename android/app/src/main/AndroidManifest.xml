@@ -22,6 +22,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Stage 3 (F6) — Google OAuth deep-link callback. Google's
+                 sign-in flow can't complete inside an embedded WebView, so
+                 sign-in opens in the system browser instead; this
+                 intent-filter is what lets Android route the browser's
+                 redirect back into this app (into the existing instance,
+                 per launchMode="singleTask" above) rather than opening a
+                 browser tab with nowhere to go. Must match the redirectTo
+                 URL used in useAuth.js's signInWithGoogle() and the
+                 redirect URL added to Supabase's dashboard allow-list. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="com.capsula.app" android:host="auth-callback" />
+            </intent-filter>
+
         </activity>
 
         <provider

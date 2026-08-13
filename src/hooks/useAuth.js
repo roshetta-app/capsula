@@ -1,4 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
+import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 
 /**
@@ -18,6 +21,12 @@ import { supabase } from '../lib/supabase'
  *   signInWithGoogle:  () => Promise<{ error }>                 — end users (D2)
  *   signOut:           () => Promise<void>
  */
+
+// Stage 3 (F6) — the custom scheme/host the native app registers in
+// AndroidManifest.xml to catch Google's redirect back from the system
+// browser. Must stay in sync with that file and with the redirect URL
+// added to Supabase's dashboard allow-list.
+const NATIVE_AUTH_CALLBACK_URL = 'com.capsula.app://auth-callback'
 
 // Phase F3 bug fix — both notes and recently-viewed clear their own local
 // storage reactively, but only while their exact screen/condition happens
@@ -96,17 +105,69 @@ export function useAuth() {
     }
   }, [loadProfile])
 
+  // Stage 3 (F6) — native only. Google's sign-in flow can't complete
+  // inside an embedded WebView (a platform restriction on Google's side,
+  // not something configurable), so the native branch of
+  // signInWithGoogle() below opens the OAuth URL in the system browser
+  // instead of redirecting in-place. This listener is what catches the
+  // app being reopened via the deep link once that browser flow
+  // finishes, exchanges the returned code for a real session (PKCE, per
+  // supabase.js), and closes the browser tab. Registered once on mount,
+  // a no-op on web.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const listenerPromise = App.addListener('appUrlOpen', async ({ url }) => {
+      if (!url.startsWith(NATIVE_AUTH_CALLBACK_URL)) return
+
+      const { error } = await supabase.auth.exchangeCodeForSession(url)
+      if (error) {
+        // Nothing else to do here — the sign-in UI (AccountSheet) only
+        // shows an error for the initiating call, not for this
+        // out-of-band callback. Session state simply won't change, and
+        // the user can retry from the sign-in button.
+        console.error('OAuth callback session exchange failed:', error.message)
+      }
+      await Browser.close()
+    })
+
+    return () => {
+      listenerPromise.then(listener => listener.remove())
+    }
+  }, [])
+
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error }
   }
 
   // signInWithGoogle — end-user sign-in (D2: Google OAuth only, no
-  // email/password at first). Supabase handles the redirect away to
-  // Google and back; on success this tab navigates through the OAuth
-  // flow, so there's nothing further to update here — the redirected-to
-  // page picks up the new session via onAuthStateChange above.
+  // email/password at first).
+  //
+  // Web: unchanged from before — Supabase handles the redirect away to
+  // Google and back in the same tab; the redirected-to page picks up the
+  // new session via onAuthStateChange above.
+  //
+  // Native (Stage 3, F6): the same in-tab redirect can't complete inside
+  // the app's embedded WebView, so this instead asks Supabase for the
+  // OAuth URL without auto-navigating (skipBrowserRedirect), opens that
+  // URL in the system browser via the Browser plugin, and returns. The
+  // appUrlOpen listener above picks up the rest once Google redirects
+  // back to the app.
   async function signInWithGoogle() {
+    if (Capacitor.isNativePlatform()) {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: NATIVE_AUTH_CALLBACK_URL,
+          skipBrowserRedirect: true,
+        },
+      })
+      if (error) return { error }
+      await Browser.open({ url: data.url })
+      return { error: null }
+    }
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.href },
