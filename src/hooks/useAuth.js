@@ -138,13 +138,6 @@ export function useAuth() {
     App.addListener('appUrlOpen', async ({ url }) => {
       if (!url.startsWith(NATIVE_AUTH_CALLBACK_URL)) return
 
-      // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — the durable
-      // storage fix and the singleton-listener fix are both confirmed
-      // working; kept one more round to confirm the fix below actually
-      // resolves the exchange. Remove once the flow is confirmed working
-      // end to end.
-      console.log('[OAuth diag] appUrlOpen received', url)
-
       // Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device:
       // exchangeCodeForSession() expects just the one-time authorization
       // code, not the full callback URL. Passing the whole URL sends it
@@ -162,18 +155,11 @@ export function useAuth() {
 
       const { error } = await supabase.auth.exchangeCodeForSession(code)
       if (error) {
-        // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once
-        // the flow is confirmed working.
-        console.log('[OAuth diag] exchangeCodeForSession failed', error.message)
         // Nothing else to do here — the sign-in UI (AccountSheet) only
         // shows an error for the initiating call, not for this
         // out-of-band callback. Session state simply won't change, and
         // the user can retry from the sign-in button.
         console.error('OAuth callback session exchange failed:', error.message)
-      } else {
-        // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once
-        // the flow is confirmed working.
-        console.log('[OAuth diag] exchangeCodeForSession succeeded')
       }
       await Browser.close()
     })

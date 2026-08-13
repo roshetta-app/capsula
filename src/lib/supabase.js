@@ -28,24 +28,12 @@ if (!SUPABASE_URL || !SUPABASE_ANON) {
 const capacitorPreferencesStorageAdapter = {
   getItem: async (key) => {
     const { value } = await Preferences.get({ key })
-    // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — shows exactly
-    // which key the auth exchange is reading and whether it's actually
-    // there, since the earlier fix (durable storage + singleton
-    // listener) still leaves the code-verifier reported as missing at
-    // exchange time. Remove once the flow is confirmed working.
-    console.log('[OAuth diag] storage.getItem', key, value ? `found (${value.length} chars)` : 'NOT FOUND')
     return value
   },
   setItem: async (key, value) => {
-    // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once the
-    // flow is confirmed working.
-    console.log('[OAuth diag] storage.setItem', key, `(${value.length} chars)`)
     await Preferences.set({ key, value })
   },
   removeItem: async (key) => {
-    // TEMP DIAGNOSTIC (Stage 3 OAuth debug, 2026-08-13) — remove once the
-    // flow is confirmed working.
-    console.log('[OAuth diag] storage.removeItem', key)
     await Preferences.remove({ key })
   },
 }
