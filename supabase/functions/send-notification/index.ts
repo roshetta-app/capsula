@@ -137,6 +137,7 @@ async function sendToToken(
           token,
           notification: { title, body: message },
           data: { type, log_id: logId },
+          android: { priority: 'high' },
         },
       }),
     },

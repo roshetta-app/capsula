@@ -69,4 +69,18 @@ export default defineConfig(({ mode }) => ({
   // change). `npm run build:capacitor` passes --mode capacitor to pick
   // this branch; the normal `npm run build` (GitHub Pages) is unaffected.
   base: mode === 'capacitor' ? '/' : '/capsula/',
+  // strictPort (added 2026-08-13): without this, if port 5173 is already
+  // in use, Vite silently falls back to the next free port (5174, 5175,
+  // ...) and only shows the real port in this terminal's own output —
+  // nothing tells capacitor.config.json's server.url it needs updating,
+  // so the native app fails to load at all (net::ERR_CONNECTION_TIMED_OUT)
+  // until someone notices the mismatch by hand. strictPort: true makes
+  // Vite fail loudly and immediately instead — if 5173 is taken, `npm run
+  // dev` errors out right away so the real cause (something else already
+  // using 5173) gets fixed at the source, instead of drifting into a
+  // confusing native-app connection failure later.
+  server: {
+    port: 5173,
+    strictPort: true,
+  },
 }))

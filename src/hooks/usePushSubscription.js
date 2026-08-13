@@ -66,10 +66,30 @@
  * check-and-save as one atomic step. Same "never un-claim a token for a
  * signed-out call" protection as before — that now lives inside the
  * database function instead of being re-derived here on every call.
+ *
+ * Stage 4 (F6) bug fix, 2026-08-13 (native FCM verification) — this hook
+ * was only ever built and tested against the web path. The "is this
+ * supported" check (`serviceWorker`/`PushManager`/`Notification` in
+ * window) uses browser-only APIs that don't exist inside the native app's
+ * WebView at all, so on-device it always resolved to `supported: false` —
+ * this is what produced the "Notifications aren't supported on this
+ * device" message seen during Stage 4 testing, well before the flow ever
+ * got a chance to request permission or fetch a token. Same fix pattern
+ * useAuth.js already uses for Google sign-in: branch on
+ * `Capacitor.isNativePlatform()`. Native's permission check/request goes
+ * through the FCM plugin's own `checkPermissions()`/`requestPermissions()`
+ * (OS-level notification permission, not the browser's), and native's
+ * `getToken()` needs neither a `vapidKey` nor a service worker — both are
+ * web-only concepts. Also fixed alongside: `p_platform` sent to
+ * `claim_push_token` was hardcoded to `'web'` regardless of the real
+ * device, so every saved token — including ones that would have come from
+ * a native device once this fix landed — was being mislabeled. Now uses
+ * `Capacitor.getPlatform()` ('android' | 'ios' | 'web').
  */
 
 import { useState, useEffect } from 'react'
 import { initializeApp, getApps } from 'firebase/app'
+import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { supabase } from '../lib/supabase'
 
@@ -94,7 +114,9 @@ const FCM_VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY
 
 // Wraps a promise so it fails with a clear error instead of hanging forever
 // if something (e.g. a service worker that failed to register) never
-// resolves — see the 503-on-deploy case documented in index.html.
+// resolves — see the 503-on-deploy case documented in index.html. Web
+// path only — native's getToken() has no equivalent "waiting on a service
+// worker" step to hang on.
 function withTimeout(promise, ms, label) {
   return Promise.race([
     promise,
@@ -116,6 +138,20 @@ export function usePushSubscription() {
   const [checking,   setChecking]   = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
+    if (Capacitor.isNativePlatform()) {
+      // Native always "supports" push via the FCM plugin — the
+      // serviceWorker/PushManager/Notification browser checks below don't
+      // apply here at all. Permission state comes from the plugin's own
+      // OS-level check, not the browser Notification API.
+      setSupported(true)
+      FirebaseMessaging.checkPermissions().then(({ receive }) => {
+        if (!cancelled) setPermission(receive)
+      })
+      return () => { cancelled = true }
+    }
+
     const isSupported =
       'serviceWorker' in navigator &&
       'PushManager' in window &&
@@ -136,6 +172,11 @@ export function usePushSubscription() {
   // (which needs to know the token even if this hook instance never called
   // subscribeToPush() itself, e.g. opened fresh from the bell sheet).
   async function getCurrentToken() {
+    if (Capacitor.isNativePlatform()) {
+      const { token: fetchedToken } = await FirebaseMessaging.getToken()
+      return fetchedToken
+    }
+
     const registration = await withTimeout(
       navigator.serviceWorker.ready,
       10000,
@@ -153,9 +194,19 @@ export function usePushSubscription() {
     setLoading(true)
     setError(null)
     try {
-      const permissionResult = await Notification.requestPermission()
-      setPermission(permissionResult)
-      if (permissionResult !== 'granted') {
+      let permissionGranted
+
+      if (Capacitor.isNativePlatform()) {
+        const { receive } = await FirebaseMessaging.requestPermissions()
+        setPermission(receive)
+        permissionGranted = receive === 'granted'
+      } else {
+        const permissionResult = await Notification.requestPermission()
+        setPermission(permissionResult)
+        permissionGranted = permissionResult === 'granted'
+      }
+
+      if (!permissionGranted) {
         setError('Notification permission denied')
         return false
       }
@@ -176,7 +227,7 @@ export function usePushSubscription() {
       // a token on a signed-out call" protection as before.
       const { error: dbErr } = await supabase.rpc('claim_push_token', {
         p_token: fetchedToken,
-        p_platform: 'web',
+        p_platform: Capacitor.getPlatform(), // 'android' | 'ios' | 'web'
         p_user_id: user?.id ?? null,
       })
       if (dbErr) throw dbErr
@@ -226,13 +277,14 @@ export function usePushSubscription() {
   // Silent re-verification: if permission is already granted, don't trust
   // any in-memory/session flag for "subscribed" — check the real token
   // against the server. Runs once permission is known to be 'granted'.
-  // Never prompts (requestPermission is never called here).
+  // Never prompts (requestPermission/requestPermissions is never called
+  // here).
   //
   // Also resolves `checking` in every branch — not just the granted-and-
   // verified path — so a caller waiting on `checking` never hangs: if
   // unsupported, the mount effect above already resolved it and this
   // effect exits without touching it again; if supported but permission
-  // is 'default' or 'denied', there is nothing to re-verify, so it
+  // is 'default'/'prompt'/'denied', there is nothing to re-verify, so it
   // resolves immediately; if permission is 'granted', it resolves once
   // the real check finishes, success or failure alike.
   useEffect(() => {
