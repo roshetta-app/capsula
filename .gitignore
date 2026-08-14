@@ -25,12 +25,24 @@ dist-ssr
 src/components/StockManager.jsx
 # Add these lines to your existing .gitignore
 
-# Environment variables — never commit
+# Environment variables - never commit
 .env
 .env.local
 .env.*.local
 
 # Supabase local dev (if used later)
 supabase/.temp/
-.env 
-env 
+.env
+env
+
+# Android build output
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/captures/
+
+# Signing - never commit these
+android/keystore.properties
+android/app/*.jks
+android/app/*.keystore
