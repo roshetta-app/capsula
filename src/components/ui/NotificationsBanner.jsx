@@ -28,6 +28,32 @@
  * the bell sheet sees — one subscribe/unsubscribe in flight, one status,
  * both places see it the instant it changes.
  *
+ * Bug fix (2026-08-17, notif-banner-native-permission-fix) — this
+ * component was still tracking its own local `permission` state, read
+ * only from the browser's `Notification.permission`. That API doesn't
+ * exist inside the native app's WebView (same fact usePushSubscription.js
+ * documented and fixed for itself on 2026-08-13), so on native `permission`
+ * stayed `null` forever, and the banner's own show-condition
+ * (`permission === null` blocks display) meant it could never appear on
+ * native at all — not at first install, not on any later visit, regardless
+ * of the attempt/cooldown timers below. Fixed by reading `permission` from
+ * usePushSubscriptionContext() instead, the same shared, native-aware
+ * source `supported` and `subscribed` already come from. The banner's own
+ * local permission state and its Notification-reading effect are removed
+ * entirely — one source of truth, no duplicate/drifted copy.
+ *
+ * Bug fix (2026-08-17, capsula-path-sweep) — the icon image was a
+ * hardcoded `/capsula/icons/icon-192.png`, which only resolves on the
+ * website build (GitHub Pages subpath). The native app build has no such
+ * prefix, so this 404'd on-device and showed a broken-image placeholder.
+ * Fixed by routing through `import.meta.env.BASE_URL`, which Vite fills
+ * in correctly for whichever target compiled the file. A repo-wide sweep
+ * for other hardcoded `/capsula/`-prefixed paths (per project rule) found
+ * three more hits, all in main.jsx — confirmed harmless, not fixed: two
+ * are inside a block already guarded by `!Capacitor.isNativePlatform()`
+ * (never runs on native), and one is a stale comment with no matching
+ * hardcoded path in the actual code below it.
+ *
  * Usage — mounted once in layout.jsx below OfflineBanner.
  */
 
@@ -47,19 +73,14 @@ const EXIT_DURATION_MS  = 220
 const AUTO_DISMISS_MS   = 8000 // auto-close as a soft decline if untouched
 
 export default function NotificationsBanner() {
-  const { supported, subscribed, subscribeToPush } = usePushSubscriptionContext()
+  const { supported, permission, subscribed, subscribeToPush } = usePushSubscriptionContext()
   const { toast } = useToast()
   const [permanentlyDismissed, setPermanentlyDismissed] = useState(
     () => localStorage.getItem(DISMISSED_KEY) === 'true'
   )
-  const [permission, setPermission] = useState(null)
   // 'hidden' (not shown yet / gone) → 'visible' (shown, animates in)
   // → 'leaving' (animates out, then finalizes to 'hidden')
   const [phase, setPhase] = useState('hidden')
-
-  useEffect(() => {
-    if ('Notification' in window) setPermission(Notification.permission)
-  }, [])
 
   useEffect(() => {
     if (!supported) return
@@ -177,7 +198,7 @@ export default function NotificationsBanner() {
         {/* Icon + copy */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <img
-            src="/capsula/icons/icon-192.png"
+            src={`${import.meta.env.BASE_URL}icons/icon-192.png`}
             alt=""
             aria-hidden="true"
             style={{

@@ -112,6 +112,20 @@
  * @capacitor/local-notifications, so a push is visible regardless of
  * whether the app happens to be open when it arrives. Requires
  * `npm install @capacitor/local-notifications` and `npx cap sync android`.
+ *
+ * Bug fix, 2026-08-17 (banner-eager-permission-fix, same-day follow-up) —
+ * the foreground fix above originally called
+ * LocalNotifications.requestPermissions() unconditionally at the top of
+ * the notification-listener effect, which runs once on every app mount.
+ * That fired the phone's OS permission popup immediately on app open,
+ * ahead of — and regardless of — NotificationsBanner's own deliberate
+ * "Allow Notifications" ask, defeating the whole point of the banner's
+ * opt-in flow. Fixed by moving the request to fire lazily, only right
+ * before a local notification actually needs to be scheduled (inside the
+ * 'notificationReceived' handler itself). By the time a push is being
+ * received in the foreground, FCM permission was already granted through
+ * the normal banner/bell flow, so this now just silently confirms the
+ * already-granted permission instead of prompting a second time.
  */
 
 import { useState, useEffect } from 'react'
@@ -217,7 +231,7 @@ export function usePushSubscription() {
   //     'notificationActionPerformed' event, reading log_id back out of
   //     the same data payload send-notification/index.ts already sends.
   //   - Foreground: shown by our own LocalNotifications.schedule() call
-  //     above, so its tap is reported by LocalNotifications' own
+  //     below, so its tap is reported by LocalNotifications' own
   //     'localNotificationActionPerformed' event instead — which needs
   //     log_id threaded through via `extra` at schedule-time (added
   //     below), since a locally-scheduled notification has no FCM data
@@ -225,13 +239,17 @@ export function usePushSubscription() {
   // Both call the same increment_notification_click RPC the service
   // worker uses (log_id param name matches), fire-and-forget — a failed
   // report shouldn't block anything the person is doing.
+  //
+  // Bug fix, 2026-08-17 (banner-eager-permission-fix, same-day follow-up)
+  // — see file header note above. LocalNotifications.requestPermissions()
+  // used to be called here unconditionally, firing the OS permission
+  // popup on every app mount regardless of the banner. It's now called
+  // lazily inside the 'notificationReceived' handler below, right before
+  // a local notification actually needs to be scheduled — by which point
+  // FCM permission is already granted through the normal banner/bell
+  // flow, so this silently confirms rather than prompting again.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
-
-    // Separate OS permission from the notification-permission FCM already
-    // requested — LocalNotifications tracks/asks for it independently even
-    // though on Android it's backed by the same underlying permission.
-    LocalNotifications.requestPermissions()
 
     function reportClick(logId) {
       if (!logId) return
@@ -243,7 +261,15 @@ export function usePushSubscription() {
 
     const handles = []
 
-    FirebaseMessaging.addListener('notificationReceived', event => {
+    FirebaseMessaging.addListener('notificationReceived', async event => {
+      // Requested here, not eagerly on mount — see bug fix note above.
+      // Separate OS permission from the notification-permission FCM
+      // already requested — LocalNotifications tracks/asks for it
+      // independently even though on Android it's backed by the same
+      // underlying permission, so this is a silent confirm in practice,
+      // not a second real prompt.
+      await LocalNotifications.requestPermissions()
+
       const notification = event?.notification ?? event
       LocalNotifications.schedule({
         notifications: [{
