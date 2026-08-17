@@ -40,6 +40,15 @@
 
         </activity>
 
+        <!-- Stage 5 (F6) — custom notification icon for FCM. Without this,
+             push notifications fall back to a system default icon instead
+             of the app's own mark. Must be a plain white silhouette on a
+             transparent background (Android tints it itself in the status
+             bar) — see res/drawable-*/ic_stat_notify.png. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -54,4 +63,11 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Bug fix, 2026-08-17 (notif-display-fix) — required on Android 13+
+         (API 33+) for the OS to display any notification at all, separate
+         from the in-app permission prompt FirebaseMessaging.requestPermissions()
+         shows. Without this declared, FCM delivery can succeed server-side
+         while the OS silently drops the notification before it ever
+         reaches the screen. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

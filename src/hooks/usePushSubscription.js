@@ -85,12 +85,40 @@
  * device, so every saved token — including ones that would have come from
  * a native device once this fix landed — was being mislabeled. Now uses
  * `Capacitor.getPlatform()` ('android' | 'ios' | 'web').
+ *
+ * Bug fix, 2026-08-14 (stale-token-on-reinstall) — the mount-time
+ * re-verify effect below only ever *checked* the device's current token
+ * against push_tokens; when permission was already granted but the token
+ * had changed (reinstalling the app, clearing app data, or any other FCM
+ * token rotation all produce a new token), the lookup came back empty and
+ * the effect silently gave up — it never saved the new token. The result:
+ * `subscribed` stayed false with no visible error, the old/dead token was
+ * left behind in push_tokens, and every admin notification kept targeting
+ * a token the device no longer had. Fixed by calling the same
+ * claim_push_token save subscribeToPush() already uses whenever the
+ * lookup misses — this makes the app self-heal its token on every launch
+ * where permission is granted, instead of only ever saving once at the
+ * moment someone taps "Allow".
+ *
+ * Bug fix, 2026-08-17 (notif-display-fix, foreground follow-up) — FCM
+ * only auto-displays a system notification when the app is backgrounded
+ * or closed. While the app is in the foreground, a push arrives silently
+ * and nothing shows it unless something explicitly does. Confirmed via
+ * testing: notifications sent while the app was open on-screen never
+ * appeared, while ones sent while backgrounded did. Fixed by listening
+ * for FirebaseMessaging's 'notificationReceived' event (fires only in the
+ * foreground — background/closed delivery is unaffected and unchanged)
+ * and mirroring it into a local notification via
+ * @capacitor/local-notifications, so a push is visible regardless of
+ * whether the app happens to be open when it arrives. Requires
+ * `npm install @capacitor/local-notifications` and `npx cap sync android`.
  */
 
 import { useState, useEffect } from 'react'
 import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
+import { LocalNotifications } from '@capacitor/local-notifications'
 import { supabase } from '../lib/supabase'
 
 const firebaseConfig = {
@@ -167,6 +195,41 @@ export function usePushSubscription() {
     }
   }, [])
 
+  // Bug fix, 2026-08-17 (notif-display-fix, foreground follow-up) — see
+  // file header note above. Native only: the web path already gets
+  // browser-level notifications for free via the service worker even
+  // while a tab is focused, so it doesn't need this. Runs once on mount;
+  // the listener stays registered for the life of the app (this hook is
+  // only ever mounted once, via PushSubscriptionProvider at the app root).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    // Separate OS permission from the notification-permission FCM already
+    // requested — LocalNotifications tracks/asks for it independently even
+    // though on Android it's backed by the same underlying permission.
+    LocalNotifications.requestPermissions()
+
+    let listenerHandle
+    FirebaseMessaging.addListener('notificationReceived', event => {
+      const notification = event?.notification ?? event
+      LocalNotifications.schedule({
+        notifications: [{
+          id: Date.now() % 2147483647, // fits a 32-bit int; uniqueness is enough here, no need to track/reuse ids
+          title: notification?.title ?? '',
+          body: notification?.body ?? '',
+          // Without this, LocalNotifications falls back to Android's
+          // generic default icon (a plain "!") instead of the app's mark.
+          // Reuses the same drawable the manifest already points FCM's own
+          // background/closed notifications at, so foreground and
+          // background notifications look identical.
+          smallIcon: 'ic_stat_notify',
+        }],
+      })
+    }).then(handle => { listenerHandle = handle })
+
+    return () => { listenerHandle?.remove() }
+  }, [])
+
   // Reads or re-fetches the device's current FCM token without prompting —
   // shared by the mount-time re-verify effect below and unsubscribeFromPush
   // (which needs to know the token even if this hook instance never called
@@ -187,6 +250,19 @@ export function usePushSubscription() {
       serviceWorkerRegistration: registration,
     })
     return fetchedToken
+  }
+
+  // Saves a fetched token via the same atomic claim_push_token step
+  // subscribeToPush() uses. Shared so the mount-time re-verify effect can
+  // self-heal a rotated/reinstalled token without duplicating this logic.
+  async function saveToken(fetchedToken) {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error: dbErr } = await supabase.rpc('claim_push_token', {
+      p_token: fetchedToken,
+      p_platform: Capacitor.getPlatform(), // 'android' | 'ios' | 'web'
+      p_user_id: user?.id ?? null,
+    })
+    if (dbErr) throw dbErr
   }
 
   async function subscribeToPush() {
@@ -218,19 +294,12 @@ export function usePushSubscription() {
         return false
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
-
       // Single atomic database call — replaces the old check-then-save
       // (select for an existing row, then insert or update), which had a
       // real gap between the check and the write. claim_push_token does
       // the check-and-save as one step and keeps the same "never un-claim
       // a token on a signed-out call" protection as before.
-      const { error: dbErr } = await supabase.rpc('claim_push_token', {
-        p_token: fetchedToken,
-        p_platform: Capacitor.getPlatform(), // 'android' | 'ios' | 'web'
-        p_user_id: user?.id ?? null,
-      })
-      if (dbErr) throw dbErr
+      await saveToken(fetchedToken)
 
       setToken(fetchedToken)
       setSubscribed(true)
@@ -280,13 +349,21 @@ export function usePushSubscription() {
   // Never prompts (requestPermission/requestPermissions is never called
   // here).
   //
+  // If the current device token isn't found in push_tokens, it's not
+  // necessarily unsubscribed — the token itself may simply have rotated
+  // (reinstall, cleared app data, routine FCM rotation) while permission
+  // stayed granted. In that case, save the fresh token the same way
+  // subscribeToPush() does, so the app self-heals instead of silently
+  // leaving a dead token behind and never sending to this device again.
+  //
   // Also resolves `checking` in every branch — not just the granted-and-
   // verified path — so a caller waiting on `checking` never hangs: if
   // unsupported, the mount effect above already resolved it and this
   // effect exits without touching it again; if supported but permission
   // is 'default'/'prompt'/'denied', there is nothing to re-verify, so it
   // resolves immediately; if permission is 'granted', it resolves once
-  // the real check finishes, success or failure alike.
+  // the real check (and, if needed, the self-heal save) finishes, success
+  // or failure alike.
   useEffect(() => {
     if (!supported) return
 
@@ -308,6 +385,12 @@ export function usePushSubscription() {
           .maybeSingle()
         if (cancelled) return
         if (existing) {
+          setToken(fetchedToken)
+          setSubscribed(true)
+        } else {
+          // Token rotated or was never saved — self-heal by saving it now.
+          await saveToken(fetchedToken)
+          if (cancelled) return
           setToken(fetchedToken)
           setSubscribed(true)
         }
