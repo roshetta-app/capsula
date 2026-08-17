@@ -201,6 +201,30 @@ export function usePushSubscription() {
   // while a tab is focused, so it doesn't need this. Runs once on mount;
   // the listener stays registered for the life of the app (this hook is
   // only ever mounted once, via PushSubscriptionProvider at the app root).
+  //
+  // Bug fix, 2026-08-17 (click-count-fix) — the CMS's click counter
+  // (notification_log.click_count) was only ever wired up on the web
+  // path: public/sw.js's notificationclick handler is what reports a tap
+  // back via the increment_notification_click database function. Service
+  // workers are explicitly skipped entirely on native (see main.jsx's
+  // Capacitor.isNativePlatform() guard), so that handler never runs in
+  // the Android app at all — every native tap, background/closed or
+  // foreground, has been going unrecorded since native support was added.
+  // Two separate tap sources need covering on native, since they're shown
+  // by two different mechanisms:
+  //   - Background/closed: Android itself displays the notification from
+  //     the raw FCM payload, so its tap is reported by FCM's own
+  //     'notificationActionPerformed' event, reading log_id back out of
+  //     the same data payload send-notification/index.ts already sends.
+  //   - Foreground: shown by our own LocalNotifications.schedule() call
+  //     above, so its tap is reported by LocalNotifications' own
+  //     'localNotificationActionPerformed' event instead — which needs
+  //     log_id threaded through via `extra` at schedule-time (added
+  //     below), since a locally-scheduled notification has no FCM data
+  //     payload of its own to read it back from.
+  // Both call the same increment_notification_click RPC the service
+  // worker uses (log_id param name matches), fire-and-forget — a failed
+  // report shouldn't block anything the person is doing.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -209,7 +233,16 @@ export function usePushSubscription() {
     // though on Android it's backed by the same underlying permission.
     LocalNotifications.requestPermissions()
 
-    let listenerHandle
+    function reportClick(logId) {
+      if (!logId) return
+      supabase.rpc('increment_notification_click', { log_id: logId })
+        .then(({ error: rpcErr }) => {
+          if (rpcErr) console.warn('[push] Failed to report notification click:', rpcErr.message)
+        })
+    }
+
+    const handles = []
+
     FirebaseMessaging.addListener('notificationReceived', event => {
       const notification = event?.notification ?? event
       LocalNotifications.schedule({
@@ -223,11 +256,24 @@ export function usePushSubscription() {
           // background/closed notifications at, so foreground and
           // background notifications look identical.
           smallIcon: 'ic_stat_notify',
+          // Threads log_id through so a tap on this foreground-shown
+          // notification can still be reported — see click-count-fix note
+          // above. Read back out via event.notification.extra.log_id in
+          // the localNotificationActionPerformed listener below.
+          extra: { log_id: notification?.data?.log_id ?? null },
         }],
       })
-    }).then(handle => { listenerHandle = handle })
+    }).then(handle => handles.push(handle))
 
-    return () => { listenerHandle?.remove() }
+    FirebaseMessaging.addListener('notificationActionPerformed', event => {
+      reportClick(event?.notification?.data?.log_id)
+    }).then(handle => handles.push(handle))
+
+    LocalNotifications.addListener('localNotificationActionPerformed', event => {
+      reportClick(event?.notification?.extra?.log_id)
+    }).then(handle => handles.push(handle))
+
+    return () => { handles.forEach(handle => handle.remove()) }
   }, [])
 
   // Reads or re-fetches the device's current FCM token without prompting —
