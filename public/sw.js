@@ -45,6 +45,23 @@
  *     stop this in modern browsers, and GitHub Pages offers no way to set a
  *     real Cache-Control response header. cache: 'no-store' is the spec-level
  *     way to force a real network round-trip every time.
+ *
+ * Phase F9 Stage 2 (D28) addition:
+ *   - Push handler now reads an image from payload.notification.image (FCM
+ *     v1's own field, set by deliver-notification when a send has one) and
+ *     passes it through as options.image — it only renders once the
+ *     notification is expanded/pulled down, never in the collapsed row.
+ *   - Push handler's data.url now comes from the real payload
+ *     (payload.data.url, set by deliver-notification from
+ *     notification_log.deep_link_path) instead of being hardcoded to
+ *     '/capsula/'.
+ *   - notificationclick fix (D28 finding): when an app window is already
+ *     open, this used to only call .focus() on it and never actually
+ *     navigate it to the tapped notification's target — invisible before
+ *     Stage 2 because the hardcoded target was always '/capsula/' (home,
+ *     the same place focus() lands anyway), but it would have silently
+ *     broken every real deep link the moment the app was already open in a
+ *     tab. Now calls client.navigate(target) first, then focuses.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -132,6 +149,15 @@ self.addEventListener('push', event => {
   // this send belongs to, so a tap can report back against the right row.
   const logId = payload.data?.log_id ?? null
 
+  // Phase F9 Stage 2 (D28): real rich-content fields, when the send included
+  // them. imageUrl only renders once the notification is expanded/pulled
+  // down — never in the collapsed row, so its absence changes nothing about
+  // how a plain text notification looks. deepLinkUrl now comes from the
+  // actual payload (set by deliver-notification from
+  // notification_log.deep_link_path) instead of being hardcoded.
+  const imageUrl   = payload.notification?.image ?? null
+  const deepLinkUrl = payload.data?.url ?? '/capsula/'
+
   const iconUrl  = `${self.location.origin}/capsula/icons/icon-192.png`
   const badgeUrl = `${self.location.origin}/capsula/icons/badge-192.png`
 
@@ -141,7 +167,8 @@ self.addEventListener('push', event => {
     badge: badgeUrl,
     tag: 'capsula-notification',
     renotify: true,
-    data: { url: '/capsula/', log_id: logId },
+    data: { url: deepLinkUrl, log_id: logId },
+    ...(imageUrl ? { image: imageUrl } : {}),
   }
 
   event.waitUntil(
@@ -171,10 +198,17 @@ self.addEventListener('notificationclick', event => {
       }).catch(() => { /* best-effort only — a failed report shouldn't break the tap */ })
     : Promise.resolve()
 
+  // Phase F9 Stage 2 (D28) fix: previously only called .focus() on an
+  // existing app window and never navigated it, so a tap on a real deep
+  // link did nothing when the app was already open in a tab (it silently
+  // stayed on whatever page was already showing). Now navigates the
+  // existing window to `target` first, then focuses it. New-window opens
+  // (self.clients.openWindow) already always went to the right target, so
+  // that branch is unchanged.
   const focusOrOpen = self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     .then(clients => {
       const existing = clients.find(c => c.url.includes('/capsula/'))
-      if (existing) return existing.focus()
+      if (existing) return existing.navigate(target).then(client => client.focus())
       return self.clients.openWindow(target)
     })
 

@@ -1161,3 +1161,84 @@ export async function updateNotification(id, data) {
   await logAudit('update', 'notification_log', id, data.title ?? null, data)
   return { error: null }
 }
+
+/**
+ * Live search for published conditions by name, for the notification
+ * deep-link picker. Mirrors searchDrugsForPicker's shape/contract.
+ *
+ * @param {string} query
+ * @param {{ limit?: number }} [options]
+ * @returns {Promise<{ data: object[]|null, error: object|null }>}
+ */
+export async function searchConditionsForPicker(query, { limit = 30 } = {}) {
+  const term = query.trim()
+  if (!term) return { data: [], error: null }
+
+  const { data, error } = await supabase
+    .from('conditions')
+    .select('id, name, slug, is_published')
+    .eq('is_published', true)
+    .ilike('name', `%${term}%`)
+    .order('name')
+    .limit(limit)
+
+  if (error) return { data: null, error }
+  return { data: data ?? [], error: null }
+}
+
+// ─── Notification image upload (Phase F9 Stage 2, D28) ────────────────────────
+// Single-image upload, own dedicated bucket — not reused from
+// condition-images/ImageGalleryEditor.jsx, which are hard-wired to a
+// multi-image gallery shape. Mirrors uploadConditionImage's shape exactly.
+
+export async function uploadNotificationImage(file) {
+  const ext      = file.name.split('.').pop()
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const path     = `public/${filename}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('notification-images')
+    .upload(path, file, { cacheControl: '3600', upsert: false })
+
+  if (uploadError) return { url: null, error: uploadError }
+
+  const { data } = supabase.storage
+    .from('notification-images')
+    .getPublicUrl(path)
+
+  return { url: data.publicUrl, error: null }
+}
+
+// ─── Notification templates (Phase F9 Stage 2, D28) ────────────────────────────
+// Simple save/load, no versioning — a template is just a reusable starting
+// point for title/message/type, not a live-linked record.
+
+export async function fetchNotificationTemplates() {
+  const { data, error } = await supabase
+    .from('notification_templates')
+    .select('id, title, message, type, created_at')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data ?? []
+}
+
+export async function saveNotificationTemplate(data) {
+  const { data: row, error } = await supabase
+    .from('notification_templates')
+    .insert(data)
+    .select('id, title, message, type, created_at')
+    .single()
+  if (!error && row) await logAudit('create', 'notification_templates', row.id, data.title ?? null, data)
+  return { data: row, error }
+}
+
+export async function deleteNotificationTemplate(id, title = null) {
+  const { error } = await supabase
+    .from('notification_templates')
+    .delete()
+    .eq('id', id)
+  if (!error) await logAudit('delete', 'notification_templates', id, title)
+  return { error }
+}
+

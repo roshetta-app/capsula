@@ -15,14 +15,23 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, RefreshCw, Bell, Clock, Pencil, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Send, RefreshCw, Bell, Clock, Pencil, X, Check, ChevronDown, ChevronUp,
+  Image as ImageIcon, Link2, Bookmark, Trash2,
+} from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import DrugPickerModal from '../../components/admin/DrugPickerModal'
+import ConditionPickerModal from '../../components/admin/ConditionPickerModal'
 import {
   fetchPendingNotifications,
   fetchSentNotifications,
   cancelNotification,
   updateNotification,
+  uploadNotificationImage,
+  fetchNotificationTemplates,
+  saveNotificationTemplate,
+  deleteNotificationTemplate,
 } from '../../lib/adminQueries'
 
 const TYPES = [
@@ -87,6 +96,26 @@ export default function NotificationsPanel() {
   const [sendError, setSendError] = useState(null)
   const [confirmSendOpen, setConfirmSendOpen] = useState(false)
 
+  // Phase F9 Stage 2 (D28) — rich content: image, deep link, templates, real schedule.
+  const [imagePreview,  setImagePreview]  = useState(null) // local object URL, for preview only
+  const [imageUrl,      setImageUrl]      = useState(null) // uploaded Storage URL, sent with the request
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imageError,    setImageError]    = useState(null)
+
+  const [linkType,   setLinkType]   = useState('none') // 'none' | 'drug' | 'condition'
+  const [linkTarget, setLinkTarget] = useState(null)    // { label, path } | null
+  const [drugPickerOpen,      setDrugPickerOpen]      = useState(false)
+  const [conditionPickerOpen, setConditionPickerOpen] = useState(false)
+
+  const [templates,        setTemplates]        = useState([])
+  const [loadingTemplates, setLoadingTemplates] = useState(true)
+  const [templateError,    setTemplateError]    = useState(null)
+  const [savingTemplate,   setSavingTemplate]   = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState('')
+
+  const [scheduleMode,     setScheduleMode]     = useState('default') // 'default' | 'custom'
+  const [customScheduleAt, setCustomScheduleAt] = useState('')        // datetime-local string
+
   // Phase F9 Stage 1 — notifications now sit as 'pending' for 30 min before
   // deliver-notification's cron job actually sends them, giving admins a
   // real window to review, edit, or cancel before anything goes out.
@@ -136,7 +165,22 @@ export default function NotificationsPanel() {
     }
   }, [])
 
-  useEffect(() => { fetchPending(); fetchHistory() }, [fetchPending, fetchHistory])
+  // ── Fetch templates ──────────────────────────────────────────────────────────
+
+  const fetchTemplates = useCallback(async () => {
+    setLoadingTemplates(true)
+    setTemplateError(null)
+    try {
+      const rows = await fetchNotificationTemplates()
+      setTemplates(rows)
+    } catch (e) {
+      setTemplateError(e.message ?? 'Failed to load templates')
+    } finally {
+      setLoadingTemplates(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchPending(); fetchHistory(); fetchTemplates() }, [fetchPending, fetchHistory, fetchTemplates])
 
   // Live countdown ticker — only runs while there's something pending to count down.
   useEffect(() => {
@@ -156,17 +200,117 @@ export default function NotificationsPanel() {
     setSending(true)
     setSendError(null)
     try {
-      const { data, error } = await supabase.functions.invoke('send-notification', {
-        body: { title: title.trim(), message: message.trim(), type },
-      })
+      const body = { title: title.trim(), message: message.trim(), type }
+      if (imageUrl) body.image_url = imageUrl
+      if (linkTarget?.path) body.deep_link_path = linkTarget.path
+      if (scheduleMode === 'custom' && customScheduleAt) {
+        body.scheduled_send_at = fromDatetimeLocal(customScheduleAt)
+      }
+
+      const { data, error } = await supabase.functions.invoke('send-notification', { body })
       if (error) throw error
       setTitle('')
       setMessage('')
+      removeImage()
+      clearLink()
+      setScheduleMode('default')
+      setCustomScheduleAt('')
+      setSelectedTemplateId('')
       await fetchPending()
     } catch (e) {
       setSendError(e.message ?? 'Failed to schedule notification.')
     } finally {
       setSending(false)
+    }
+  }
+
+  // ── Image upload (Phase F9 Stage 2, D28) ─────────────────────────────────────
+
+  async function handleImageSelect(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImageError(null)
+    setUploadingImage(true)
+    setImagePreview(URL.createObjectURL(file))
+    try {
+      const { url, error } = await uploadNotificationImage(file)
+      if (error) throw error
+      setImageUrl(url)
+    } catch (err) {
+      setImageError(err.message ?? 'Failed to upload image')
+      setImagePreview(null)
+      setImageUrl(null)
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  function removeImage() {
+    setImagePreview(null)
+    setImageUrl(null)
+    setImageError(null)
+  }
+
+  // ── Deep-link picker (Phase F9 Stage 2, D28) ─────────────────────────────────
+  // DrugPickerModal's mode="brand" result carries the flat drug shape under
+  // _flat, whose .slug is the brand's own slug — the same field used for
+  // /drugs/:slug routing throughout the rest of the app.
+
+  function handleDrugSelected(brand) {
+    const slug = brand._flat?.slug
+    if (!slug) return
+    setLinkType('drug')
+    setLinkTarget({ label: brand.name, path: `/drugs/${slug}` })
+  }
+
+  function handleConditionSelected(condition) {
+    setLinkType('condition')
+    setLinkTarget({ label: condition.name, path: `/conditions/${condition.slug}` })
+  }
+
+  function clearLink() {
+    setLinkType('none')
+    setLinkTarget(null)
+  }
+
+  // ── Templates (Phase F9 Stage 2, D28) ────────────────────────────────────────
+
+  function applyTemplate(id) {
+    setSelectedTemplateId(id)
+    if (!id) return
+    const tpl = templates.find(t => t.id === id)
+    if (!tpl) return
+    setTitle(tpl.title)
+    setMessage(tpl.message)
+    setType(tpl.type ?? 'info')
+  }
+
+  async function handleSaveTemplate() {
+    if (!title.trim() || !message.trim()) return
+    setSavingTemplate(true)
+    setTemplateError(null)
+    try {
+      const { error } = await saveNotificationTemplate({
+        title: title.trim(), message: message.trim(), type,
+      })
+      if (error) throw error
+      await fetchTemplates()
+    } catch (e) {
+      setTemplateError(e.message ?? 'Failed to save template')
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  async function handleDeleteTemplate(id, tplTitle) {
+    setTemplateError(null)
+    try {
+      const { error } = await deleteNotificationTemplate(id, tplTitle)
+      if (error) throw error
+      if (selectedTemplateId === id) setSelectedTemplateId('')
+      await fetchTemplates()
+    } catch (e) {
+      setTemplateError(e.message ?? 'Failed to delete template')
     }
   }
 
@@ -219,7 +363,8 @@ export default function NotificationsPanel() {
   }
 
   const selectedType = TYPES.find(t => t.id === type)
-  const canSend = title.trim().length > 0 && message.trim().length > 0 && !sending
+  const canSend = title.trim().length > 0 && message.trim().length > 0 && !sending && !uploadingImage &&
+    (scheduleMode !== 'custom' || Boolean(customScheduleAt))
 
   return (
     <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
@@ -265,6 +410,59 @@ export default function NotificationsPanel() {
 
           <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             Broadcast notification
+          </div>
+
+          {/* Template load/delete (Phase F9 Stage 2, D28) */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
+              Template
+            </label>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <select
+                value={selectedTemplateId}
+                onChange={e => applyTemplate(e.target.value)}
+                disabled={loadingTemplates}
+                style={{
+                  flex: 1,
+                  padding: '9px 10px',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)',
+                  backgroundColor: 'var(--color-bg)',
+                  fontSize: 13, color: 'var(--color-text-primary)',
+                  fontFamily: 'var(--font-body)',
+                  outline: 'none',
+                }}
+              >
+                <option value="">{loadingTemplates ? 'Loading templates…' : 'Load a saved template…'}</option>
+                {templates.map(t => (
+                  <option key={t.id} value={t.id}>{t.title}</option>
+                ))}
+              </select>
+              {selectedTemplateId && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tpl = templates.find(t => t.id === selectedTemplateId)
+                    handleDeleteTemplate(selectedTemplateId, tpl?.title ?? null)
+                  }}
+                  aria-label="Delete template"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 32, height: 32,
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #FECACA',
+                    backgroundColor: 'var(--color-surface)',
+                    color: '#DC2626',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+            {templateError && (
+              <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>{templateError}</div>
+            )}
           </div>
 
           {/* Type selector */}
@@ -348,6 +546,183 @@ export default function NotificationsPanel() {
             </div>
           </div>
 
+          {/* Image (Phase F9 Stage 2, D28) */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
+              Image (optional)
+            </label>
+            {!imagePreview ? (
+              <label style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '14px',
+                borderRadius: 'var(--radius-md)',
+                border: '1.5px dashed var(--color-border)',
+                cursor: uploadingImage ? 'not-allowed' : 'pointer',
+                color: 'var(--color-text-secondary)',
+                fontSize: 13, fontFamily: 'var(--font-body)',
+              }}>
+                <ImageIcon size={16} />
+                {uploadingImage ? 'Uploading…' : 'Add an image'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  disabled={uploadingImage}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                <img
+                  src={imagePreview}
+                  alt=""
+                  style={{
+                    width: 64, height: 64, objectFit: 'cover',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)',
+                  }}
+                />
+                {uploadingImage ? (
+                  <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>Uploading…</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={removeImage}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '6px 12px', borderRadius: 'var(--radius-sm)',
+                      border: '1px solid var(--color-border)', backgroundColor: 'transparent',
+                      color: 'var(--color-text-secondary)', fontSize: 12, fontWeight: 500,
+                      fontFamily: 'var(--font-body)', cursor: 'pointer',
+                    }}
+                  >
+                    <X size={12} /> Remove
+                  </button>
+                )}
+              </div>
+            )}
+            {imageError && (
+              <div style={{ fontSize: 11, color: '#DC2626', marginTop: 4 }}>{imageError}</div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.4 }}>
+              Only shows once someone expands the notification — never in the collapsed row.
+            </div>
+          </div>
+
+          {/* Deep link (Phase F9 Stage 2, D28) */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
+              Link to (optional)
+            </label>
+            {linkType === 'none' ? (
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button
+                  type="button"
+                  onClick={() => setDrugPickerOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)',
+                    color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
+                    fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  }}
+                >
+                  <Link2 size={13} /> Pick a drug
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConditionPickerOpen(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 14px', borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)',
+                    color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
+                    fontFamily: 'var(--font-body)', cursor: 'pointer',
+                  }}
+                >
+                  <Link2 size={13} /> Pick a condition
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                  {linkTarget?.label}
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>
+                  ({linkType})
+                </span>
+                <button
+                  type="button"
+                  onClick={clearLink}
+                  aria-label="Remove link"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 24, height: 24, borderRadius: 'var(--radius-sm)',
+                    border: '1px solid var(--color-border)', backgroundColor: 'transparent',
+                    color: 'var(--color-text-secondary)', cursor: 'pointer',
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 4, lineHeight: 1.4 }}>
+              Changes what screen opens when someone taps the notification.
+            </div>
+          </div>
+
+          {/* Send time (Phase F9 Stage 2, D28) */}
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--color-text-tertiary)', display: 'block', marginBottom: 8 }}>
+              Send time
+            </label>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: scheduleMode === 'custom' ? 8 : 0 }}>
+              <button
+                type="button"
+                onClick={() => { setScheduleMode('default'); setCustomScheduleAt('') }}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 'var(--radius-full)',
+                  border: `1.5px solid ${scheduleMode === 'default' ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                  backgroundColor: scheduleMode === 'default' ? '#EFF6FF' : 'transparent',
+                  color: scheduleMode === 'default' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  fontSize: 13, fontWeight: scheduleMode === 'default' ? 600 : 400,
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                }}
+              >
+                In 30 minutes
+              </button>
+              <button
+                type="button"
+                onClick={() => setScheduleMode('custom')}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: 'var(--radius-full)',
+                  border: `1.5px solid ${scheduleMode === 'custom' ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                  backgroundColor: scheduleMode === 'custom' ? '#EFF6FF' : 'transparent',
+                  color: scheduleMode === 'custom' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                  fontSize: 13, fontWeight: scheduleMode === 'custom' ? 600 : 400,
+                  fontFamily: 'var(--font-body)', cursor: 'pointer',
+                }}
+              >
+                Pick date &amp; time
+              </button>
+            </div>
+            {scheduleMode === 'custom' && (
+              <input
+                type="datetime-local"
+                value={customScheduleAt}
+                onChange={e => setCustomScheduleAt(e.target.value)}
+                style={{
+                  padding: '8px 10px', borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--color-border)', backgroundColor: 'var(--color-bg)',
+                  fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
+                  outline: 'none',
+                }}
+              />
+            )}
+          </div>
+
           {/* Preview */}
           {(title || message) && (
             <div style={{
@@ -364,6 +739,18 @@ export default function NotificationsPanel() {
               </div>
               {title && <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{title}</div>}
               {message && <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.4 }}>{message}</div>}
+              {imagePreview && (
+                <img
+                  src={imagePreview}
+                  alt=""
+                  style={{ maxWidth: '100%', maxHeight: 140, objectFit: 'cover', borderRadius: 'var(--radius-sm)', marginTop: 4 }}
+                />
+              )}
+              {linkTarget && (
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+                  Opens: {linkTarget.label} ({linkTarget.path})
+                </div>
+              )}
             </div>
           )}
 
@@ -381,29 +768,54 @@ export default function NotificationsPanel() {
             </div>
           )}
 
-          {/* Send button */}
-          <button
-            onClick={openSendConfirm}
-            disabled={!canSend}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              padding: '12px 24px',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              backgroundColor: canSend ? 'var(--color-accent)' : 'var(--color-border)',
-              color: canSend ? '#fff' : 'var(--color-text-tertiary)',
-              fontSize: 14, fontWeight: 600,
-              fontFamily: 'var(--font-body)',
-              cursor: canSend ? 'pointer' : 'not-allowed',
-              transition: 'background-color 0.15s',
-            }}
-          >
-            <Send size={15} />
-            {sending ? 'Scheduling…' : 'Schedule send'}
-          </button>
+          {/* Send + save-as-template buttons */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button
+              onClick={openSendConfirm}
+              disabled={!canSend}
+              style={{
+                flex: 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                padding: '12px 24px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                backgroundColor: canSend ? 'var(--color-accent)' : 'var(--color-border)',
+                color: canSend ? '#fff' : 'var(--color-text-tertiary)',
+                fontSize: 14, fontWeight: 600,
+                fontFamily: 'var(--font-body)',
+                cursor: canSend ? 'pointer' : 'not-allowed',
+                transition: 'background-color 0.15s',
+              }}
+            >
+              <Send size={15} />
+              {sending ? 'Scheduling…' : 'Schedule send'}
+            </button>
+            <button
+              type="button"
+              onClick={handleSaveTemplate}
+              disabled={savingTemplate || !title.trim() || !message.trim()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '12px 16px',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-surface)',
+                color: 'var(--color-text-secondary)',
+                fontSize: 14, fontWeight: 600,
+                fontFamily: 'var(--font-body)',
+                cursor: (savingTemplate || !title.trim() || !message.trim()) ? 'not-allowed' : 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <Bookmark size={15} />
+              {savingTemplate ? 'Saving…' : 'Save as template'}
+            </button>
+          </div>
 
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-            Goes out in 30 minutes to every device that's granted notification permission —
+            {scheduleMode === 'custom' && customScheduleAt
+              ? "Goes out at the time you've picked, to every device that's granted notification permission — "
+              : "Goes out in 30 minutes to every device that's granted notification permission — "}
             you can still edit or cancel it below before then. Users can opt out at any time.
           </div>
 
@@ -414,9 +826,26 @@ export default function NotificationsPanel() {
           onClose={() => setConfirmSendOpen(false)}
           onConfirm={handleSend}
           title="Schedule this notification?"
-          message={`"${title}" will be sent to every subscribed device in 30 minutes. You'll be able to edit or cancel it from the Pending list before it goes out.`}
+          message={
+            scheduleMode === 'custom' && customScheduleAt
+              ? `"${title}" will be sent to every subscribed device at ${formatTime(fromDatetimeLocal(customScheduleAt))}. You'll be able to edit or cancel it from the Pending list before it goes out.`
+              : `"${title}" will be sent to every subscribed device in 30 minutes. You'll be able to edit or cancel it from the Pending list before it goes out.`
+          }
           confirmLabel="Schedule send"
           confirmVariant="primary"
+        />
+
+        {/* Deep-link pickers (Phase F9 Stage 2, D28) */}
+        <DrugPickerModal
+          isOpen={drugPickerOpen}
+          onClose={() => setDrugPickerOpen(false)}
+          onSelect={handleDrugSelected}
+          mode="brand"
+        />
+        <ConditionPickerModal
+          isOpen={conditionPickerOpen}
+          onClose={() => setConditionPickerOpen(false)}
+          onSelect={handleConditionSelected}
         />
 
         <ConfirmModal

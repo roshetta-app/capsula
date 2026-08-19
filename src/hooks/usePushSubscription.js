@@ -126,9 +126,33 @@
  * received in the foreground, FCM permission was already granted through
  * the normal banner/bell flow, so this now just silently confirms the
  * already-granted permission instead of prompting a second time.
+ *
+ * Phase F9 Stage 2 (D28) addition — parity with deliver-notification's new
+ * rich-content/per-type-channel payload, for the foreground display path:
+ *   - The foreground LocalNotifications.schedule() call now carries the
+ *     same image (via `attachments`, LocalNotifications' documented way to
+ *     show an image) and `channelId` the background/closed FCM-displayed
+ *     path already gets natively from deliver-notification's payload.
+ *     CHANNEL_BY_TYPE below mirrors deliver-notification/index.ts's own
+ *     mapping exactly — keep the two in sync if either changes.
+ *   - `extra` now also carries the deep-link `url` (previously only
+ *     `log_id`), read back out via event.notification.extra.url —
+ *     threaded through so the tap-navigation parity fix (making a tap on
+ *     a foreground-shown notification actually route the app to the
+ *     linked drug/condition, matching sw.js's D28 navigate fix) has the
+ *     value available.
+ *   - Tap navigation is now wired up: this hook is only ever mounted via
+ *     PushSubscriptionProvider (context/PushSubscriptionContext.jsx),
+ *     which App.jsx renders inside <BrowserRouter>, so useNavigate() is
+ *     safe to call directly here, same as any other component. Both
+ *     'notificationActionPerformed' (background/closed FCM-displayed
+ *     notifications) and 'localNotificationActionPerformed' (foreground,
+ *     scheduled via LocalNotifications above) now call navigate() with
+ *     the deep link's url after reporting the click.
  */
 
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
@@ -154,6 +178,21 @@ if (!getApps().length) {
 
 const FCM_VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY
 
+// Phase F9 Stage 2 (D28) — must match deliver-notification/index.ts's
+// CHANNEL_BY_TYPE exactly. These ids only work if a matching Android
+// notification channel has already been registered on-device (the Stage 2
+// native one-time setup step) — otherwise Android silently falls back to
+// its own default channel behavior for the foreground-scheduled local
+// notification.
+const CHANNEL_BY_TYPE = {
+  info:      'capsula_info',
+  update:    'capsula_update',
+  important: 'capsula_important',
+}
+function channelForType(type) {
+  return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
+}
+
 // Wraps a promise so it fails with a clear error instead of hanging forever
 // if something (e.g. a service worker that failed to register) never
 // resolves — see the 503-on-deploy case documented in index.html. Web
@@ -169,6 +208,7 @@ function withTimeout(promise, ms, label) {
 }
 
 export function usePushSubscription() {
+  const navigate = useNavigate()
   const [supported,  setSupported]  = useState(false)
   const [permission, setPermission] = useState(null)
   const [subscribed, setSubscribed] = useState(false)
@@ -191,6 +231,27 @@ export function usePushSubscription() {
       FirebaseMessaging.checkPermissions().then(({ receive }) => {
         if (!cancelled) setPermission(receive)
       })
+
+      // Phase F9 Stage 2 (D28) — one-time Android channel registration.
+      // AndroidManifest.xml meta-data only supports a single *default*
+      // channel, which can't cover the 3 needed here, so this uses the FCM
+      // plugin's own createChannel() instead — the plugin's documented way
+      // to register additional channels. Safe to call on every app start:
+      // Android no-ops re-creating a channel with an id that already
+      // exists (matches deliver-notification/index.ts's CHANNEL_BY_TYPE
+      // and this file's own copy above — keep all three in sync). Fire-
+      // and-forget: a failure here just means channel_id falls back to
+      // Android's own default channel behavior until the next app start.
+      for (const id of Object.values(CHANNEL_BY_TYPE)) {
+        FirebaseMessaging.createChannel({
+          id,
+          name: id === CHANNEL_BY_TYPE.important ? 'Important updates'
+            : id === CHANNEL_BY_TYPE.update ? 'Content updates' : 'General info',
+          importance: id === CHANNEL_BY_TYPE.important ? 5 : 3,
+          visibility: 1,
+        }).catch(() => { /* best-effort, see note above */ })
+      }
+
       return () => { cancelled = true }
     }
 
@@ -248,6 +309,12 @@ export function usePushSubscription() {
   // a local notification actually needs to be scheduled — by which point
   // FCM permission is already granted through the normal banner/bell
   // flow, so this silently confirms rather than prompting again.
+  //
+  // Phase F9 Stage 2 (D28) — see file header note above. The scheduled
+  // local notification now carries the same image and channelId
+  // deliver-notification's FCM payload sends for the background/closed
+  // path, and extra now also threads the deep-link url through (log_id
+  // was already there) — see file header for what's still open.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -257,6 +324,18 @@ export function usePushSubscription() {
         .then(({ error: rpcErr }) => {
           if (rpcErr) console.warn('[push] Failed to report notification click:', rpcErr.message)
         })
+    }
+
+    // Phase F9 Stage 2 (D28) tap-navigation fix — routes the app to the
+    // notification's deep link on tap, matching sw.js's own navigate fix.
+    // '/capsula/' is deliver-notification's and this hook's own fallback
+    // for "no link set" (matches the web build's basename); native's
+    // router has no such basename (see App.jsx's ROUTER_BASENAME), so
+    // it's normalized to the real home route instead of a path that
+    // doesn't exist here.
+    function navigateToDeepLink(url) {
+      if (!url) return
+      navigate(url === '/capsula/' ? '/' : url)
     }
 
     const handles = []
@@ -271,6 +350,10 @@ export function usePushSubscription() {
       await LocalNotifications.requestPermissions()
 
       const notification = event?.notification ?? event
+      const imageUrl = notification?.image ?? null
+      const deepLinkUrl = notification?.data?.url ?? '/capsula/'
+      const channelId = channelForType(notification?.data?.type ?? 'info')
+
       LocalNotifications.schedule({
         notifications: [{
           id: Date.now() % 2147483647, // fits a 32-bit int; uniqueness is enough here, no need to track/reuse ids
@@ -282,21 +365,33 @@ export function usePushSubscription() {
           // background/closed notifications at, so foreground and
           // background notifications look identical.
           smallIcon: 'ic_stat_notify',
-          // Threads log_id through so a tap on this foreground-shown
-          // notification can still be reported — see click-count-fix note
-          // above. Read back out via event.notification.extra.log_id in
-          // the localNotificationActionPerformed listener below.
-          extra: { log_id: notification?.data?.log_id ?? null },
+          // Matches the channel deliver-notification's FCM payload set for
+          // the background/closed path — requires the same on-device
+          // channel registration (Stage 2 native setup step).
+          channelId,
+          // LocalNotifications' documented way to attach an image; only
+          // included when the send actually had one, same as sw.js's push
+          // handler only setting options.image when imageUrl is present.
+          ...(imageUrl ? { attachments: [{ id: 'image', url: imageUrl }] } : {}),
+          // Threads log_id and the deep-link url through so a tap on this
+          // foreground-shown notification can still be reported (and,
+          // once the navigation piece is built, routed) — see click-
+          // count-fix note above and the file header's open item. Read
+          // back out via event.notification.extra in the
+          // localNotificationActionPerformed listener below.
+          extra: { log_id: notification?.data?.log_id ?? null, url: deepLinkUrl },
         }],
       })
     }).then(handle => handles.push(handle))
 
     FirebaseMessaging.addListener('notificationActionPerformed', event => {
       reportClick(event?.notification?.data?.log_id)
+      navigateToDeepLink(event?.notification?.data?.url)
     }).then(handle => handles.push(handle))
 
     LocalNotifications.addListener('localNotificationActionPerformed', event => {
       reportClick(event?.notification?.extra?.log_id)
+      navigateToDeepLink(event?.notification?.extra?.url)
     }).then(handle => handles.push(handle))
 
     return () => { handles.forEach(handle => handle.remove()) }
