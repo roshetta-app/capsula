@@ -62,6 +62,23 @@
  *     the same place focus() lands anyway), but it would have silently
  *     broken every real deep link the moment the app was already open in a
  *     tab. Now calls client.navigate(target) first, then focuses.
+ *
+ * Bug fix, 2026-08-19 (deep-link-web-prefix-fix) — deep_link_path is stored
+ * unprefixed (e.g. '/drugs/panadol-migraine'), which is correct for the
+ * native app's basename-less router but not for the website, which is
+ * served under GitHub Pages' /capsula/ base path. A tap on a real link
+ * notification was landing on a raw GitHub Pages 404 instead of the app's
+ * own drug/condition screen, since the browser was sent straight to
+ * '/drugs/panadol-migraine' with no /capsula/ prefix — a path that simply
+ * doesn't exist at the site root. This is the same bug class already
+ * documented for index.html/main.jsx (hardcoded /capsula/-adjacent paths
+ * outside JS, where import.meta.env.BASE_URL doesn't reach) — sw.js runs
+ * outside the Vite/React bundle entirely, so it can't use that mechanism
+ * either and needs its own explicit prefix. Fixed at the one place this
+ * payload is actually consumed for web navigation, rather than storing two
+ * versions of the same path in the database — native's own consumer
+ * (usePushSubscription.js) is unaffected, since it never had this prefix
+ * and doesn't need it.
  */
 
 const CACHE_VERSION = 'capsula-v__BUILD_SHA__'
@@ -154,9 +171,11 @@ self.addEventListener('push', event => {
   // down — never in the collapsed row, so its absence changes nothing about
   // how a plain text notification looks. deepLinkUrl now comes from the
   // actual payload (set by deliver-notification from
-  // notification_log.deep_link_path) instead of being hardcoded.
+  // notification_log.deep_link_path) instead of being hardcoded. This is
+  // stored *unprefixed* (e.g. '/drugs/panadol-migraine') — the /capsula/
+  // prefix is added only at click-time below, see 2026-08-19 fix note.
   const imageUrl   = payload.notification?.image ?? null
-  const deepLinkUrl = payload.data?.url ?? '/capsula/'
+  const deepLinkUrl = payload.data?.url ?? null
 
   const iconUrl  = `${self.location.origin}/capsula/icons/icon-192.png`
   const badgeUrl = `${self.location.origin}/capsula/icons/badge-192.png`
@@ -180,7 +199,17 @@ self.addEventListener('push', event => {
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const target = event.notification.data?.url ?? '/capsula/'
+
+  // Bug fix, 2026-08-19 (deep-link-web-prefix-fix) — see file header note.
+  // event.notification.data.url is stored unprefixed (or absent, for "no
+  // link set"). The website is served under GitHub Pages' /capsula/ base
+  // path, so every target navigated to here — including the home fallback
+  // — needs that prefix added. This is the one place this payload is
+  // consumed for web navigation, so the prefix belongs here rather than in
+  // the stored data itself (native's consumer of the same stored value
+  // never wants this prefix).
+  const rawTarget = event.notification.data?.url ?? '/'
+  const target = `/capsula${rawTarget}`
   const logId  = event.notification.data?.log_id ?? null
 
   // Reports the tap back against its notification_log row (Phase F4 Stage
