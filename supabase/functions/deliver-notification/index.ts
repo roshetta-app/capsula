@@ -13,6 +13,22 @@
  * caller-invoked one, so there's no admin JWT to check (unlike
  * send-notification, which still gates on is_admin() since a real admin
  * calls it directly from the CMS).
+ *
+ * Phase F9 Stage 2 (D28) — rich content + per-type channels:
+ *   - FCM payload gains `notification.image` (from notification_log.image_url,
+ *     when set) so the image shows once a notification is expanded/pulled
+ *     down (it never appears in the collapsed row — that's an OS/FCM
+ *     behavior, not something this function controls).
+ *   - `data.url` is now real: notification_log.deep_link_path when set,
+ *     falling back to '/capsula/' (previously always hardcoded). Read by
+ *     public/sw.js's push handler and by usePushSubscription.js's
+ *     foreground path.
+ *   - `android.notification.channel_id` is set per notification_log.type
+ *     (capsula_info / capsula_update / capsula_important) so the person
+ *     controls sound/vibration per category from their own phone's
+ *     notification settings — these channels are registered natively
+ *     (Android one-time setup, not this function) and are ignored by FCM
+ *     if the device hasn't registered a channel with a matching id.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -24,6 +40,21 @@ const FIREBASE_SERVICE_ACCOUNT_JSON = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSO
 const FCM_PROJECT_ID = JSON.parse(FIREBASE_SERVICE_ACCOUNT_JSON).project_id
 const FCM_SCOPE        = 'https://www.googleapis.com/auth/firebase.messaging'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
+
+// Phase F9 Stage 2 (D28) — one Android notification channel per
+// notification type, registered natively on-device (see the Stage 2
+// native-setup step). Unknown/legacy types fall back to capsula_info
+// rather than sending a channel_id Android has never registered — FCM
+// silently drops the whole notification if channel_id doesn't match a
+// channel that exists on the device.
+const CHANNEL_BY_TYPE: Record<string, string> = {
+  info:      'capsula_info',
+  update:    'capsula_update',
+  important: 'capsula_important',
+}
+function channelForType(type: string): string {
+  return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
+}
 
 function base64UrlFromBytes(bytes: Uint8Array): string {
   let binary = ''
@@ -101,6 +132,8 @@ async function sendToToken(
   message: string,
   type: string,
   logId: string,
+  imageUrl: string | null,
+  deepLinkPath: string | null,
 ): Promise<{ ok: boolean; deadToken: boolean }> {
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`,
@@ -113,9 +146,21 @@ async function sendToToken(
       body: JSON.stringify({
         message: {
           token,
-          notification: { title, body: message },
-          data: { type, log_id: logId },
-          android: { priority: 'high' },
+          notification: {
+            title,
+            body: message,
+            // Only shows once the notification is expanded/pulled down —
+            // never in the collapsed row. Omitted entirely (not sent as
+            // null) when there's no image, to match FCM's expected shape.
+            ...(imageUrl ? { image: imageUrl } : {}),
+          },
+          // deep_link_path falls back to '/capsula/' (home) — matches
+          // sw.js's own fallback so a missing link never opens to nothing.
+          data: { type, log_id: logId, url: deepLinkPath ?? '/capsula/' },
+          android: {
+            priority: 'high',
+            notification: { channel_id: channelForType(type) },
+          },
         },
       }),
     },
@@ -130,7 +175,11 @@ async function sendToToken(
   return { ok: false, deadToken }
 }
 
-async function deliverOne(adminClient: ReturnType<typeof createClient>, accessToken: string, logRow: { id: string; type: string; title: string; message: string }) {
+async function deliverOne(
+  adminClient: ReturnType<typeof createClient>,
+  accessToken: string,
+  logRow: { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null },
+) {
   const { data: tokens, error: dbErr } = await adminClient
     .from('push_tokens')
     .select('id, token')
@@ -146,7 +195,10 @@ async function deliverOne(adminClient: ReturnType<typeof createClient>, accessTo
   }
 
   const results = await Promise.allSettled(
-    tokens.map(row => sendToToken(accessToken, row.token, logRow.title, logRow.message, logRow.type ?? 'info', logRow.id)),
+    tokens.map(row => sendToToken(
+      accessToken, row.token, logRow.title, logRow.message, logRow.type ?? 'info', logRow.id,
+      logRow.image_url ?? null, logRow.deep_link_path ?? null,
+    )),
   )
 
   let sent = 0
@@ -184,7 +236,7 @@ Deno.serve(async (_req: Request) => {
 
     const { data: dueRows, error: dueErr } = await adminClient
       .from('notification_log')
-      .select('id, type, title, message')
+      .select('id, type, title, message, image_url, deep_link_path')
       .eq('status', 'pending')
       .lte('scheduled_send_at', new Date().toISOString())
 
@@ -198,7 +250,7 @@ Deno.serve(async (_req: Request) => {
 
     for (const row of dueRows) {
       try {
-        await deliverOne(adminClient, accessToken, row as { id: string; type: string; title: string; message: string })
+        await deliverOne(adminClient, accessToken, row as { id: string; type: string; title: string; message: string; image_url: string | null; deep_link_path: string | null })
       } catch (err) {
         console.error(`deliver-notification: failed to deliver ${row.id}:`, err)
       }

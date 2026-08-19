@@ -9,6 +9,12 @@
  * FCM send now happens in deliver-notification, invoked by a pg_cron job
  * once scheduled_send_at has passed — this gives an admin a real window to
  * cancel or edit a send before it actually goes out.
+ * Phase F9 Stage 2 (D28) — accepts optional image_url, deep_link_path, and
+ * a real admin-chosen scheduled_send_at (any future date/time, not just
+ * the fixed +30min default). scheduled_send_at is validated to be in the
+ * future when provided; when omitted, the column's own DB default
+ * (now() + 30min) still applies, so Stage 1 behavior is unchanged for
+ * callers that don't pass it.
  *
  * Admin-only: reuses the app's existing is_admin() Postgres function (the
  * same one already gating CMS writes) rather than inventing a second way
@@ -50,7 +56,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: { user: callerUser } } = await callerClient.auth.getUser()
 
-    const { title, message, type } = await req.json()
+    const { title, message, type, image_url, deep_link_path, scheduled_send_at } = await req.json()
 
     if (!title || !message) {
       return new Response(
@@ -59,19 +65,45 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Stage 2: admin can pick any future send time. Validate rather than
+    // trust blindly — a past/invalid value here would let deliver-notification
+    // pick the row up on its very next cron tick, silently skipping the
+    // review window the whole pending/deliver split exists to provide.
+    if (scheduled_send_at !== undefined && scheduled_send_at !== null) {
+      const parsed = new Date(scheduled_send_at)
+      if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+        return new Response(
+          JSON.stringify({ error: 'scheduled_send_at must be a valid future date/time' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+    }
+
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
-    // Phase F9 Stage 1: create as pending, scheduled 30 min out. No FCM
-    // call here — deliver-notification's cron job picks this up once due.
+    // Phase F9 Stage 1: create as pending. No FCM call here — deliver-
+    // notification's cron job picks this up once scheduled_send_at is due.
+    // Phase F9 Stage 2: image_url/deep_link_path are optional rich-content
+    // fields (both nullable in the DB); scheduled_send_at is only included
+    // in the insert when the admin actually supplied one, so omitting it
+    // still falls through to the column's own +30min default (Stage 1
+    // behavior, unchanged).
+    const insertRow: Record<string, unknown> = {
+      type: type ?? 'info', title, message,
+      image_url: image_url ?? null,
+      deep_link_path: deep_link_path ?? null,
+      sent_by: callerUser?.id ?? null,
+      status: 'pending',
+      sent_count: 0,
+      failed_count: 0,
+    }
+    if (scheduled_send_at) {
+      insertRow.scheduled_send_at = scheduled_send_at
+    }
+
     const { data: logRow, error: logInsertErr } = await adminClient
       .from('notification_log')
-      .insert({
-        type: type ?? 'info', title, message,
-        sent_by: callerUser?.id ?? null,
-        status: 'pending',
-        sent_count: 0,
-        failed_count: 0,
-      })
+      .insert(insertRow)
       .select('id, scheduled_send_at')
       .single()
 
