@@ -15,8 +15,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, RefreshCw, Bell } from 'lucide-react'
+import { Send, RefreshCw, Bell, Clock, Pencil, X, Check, ChevronDown, ChevronUp } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import ConfirmModal from '../../components/admin/ConfirmModal'
+import {
+  fetchPendingNotifications,
+  fetchSentNotifications,
+  cancelNotification,
+  updateNotification,
+} from '../../lib/adminQueries'
 
 const TYPES = [
   { id: 'info',      label: 'Info',      color: '#2563EB', bg: '#EFF6FF' },
@@ -41,6 +48,35 @@ function formatTime(iso) {
   })
 }
 
+// Phase F9 Stage 1 — live "sending in Xm Ys" countdown for pending rows.
+function formatCountdown(iso, nowMs) {
+  const diff = new Date(iso).getTime() - nowMs
+  if (diff <= 0) return 'Sending…'
+  const totalSec = Math.floor(diff / 1000)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m ${s}s`
+  return `${s}s`
+}
+
+function toDatetimeLocal(iso) {
+  const d = new Date(iso)
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function fromDatetimeLocal(value) {
+  return new Date(value).toISOString()
+}
+
+function deliveryRateLabel(sentCount, failedCount) {
+  const total = (sentCount ?? 0) + (failedCount ?? 0)
+  if (total === 0) return '—'
+  return `${Math.round((sentCount / total) * 100)}%`
+}
+
 export default function NotificationsPanel() {
   const navigate = useNavigate()
 
@@ -49,37 +85,74 @@ export default function NotificationsPanel() {
   const [type,    setType]    = useState('info')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(null)
+  const [confirmSendOpen, setConfirmSendOpen] = useState(false)
+
+  // Phase F9 Stage 1 — notifications now sit as 'pending' for 30 min before
+  // deliver-notification's cron job actually sends them, giving admins a
+  // real window to review, edit, or cancel before anything goes out.
+  const [pending,        setPending]        = useState([])
+  const [loadingPending, setLoadingPending] = useState(true)
+  const [pendingError,   setPendingError]   = useState(null)
+  const [now,            setNow]            = useState(Date.now())
+
+  const [editingId,  setEditingId]  = useState(null)
+  const [editDraft,  setEditDraft]  = useState({ title: '', message: '', scheduled_send_at: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [cancelTarget, setCancelTarget] = useState(null) // { id, title } | null
+  const [cancelling,   setCancelling]   = useState(false)
 
   const [history,     setHistory]     = useState([])
   const [loadingHist, setLoadingHist] = useState(true)
   const [histError,   setHistError]   = useState(null)
+  const [expandedId,  setExpandedId]  = useState(null)
 
-  // ── Fetch history ──────────────────────────────────────────────────────────
+  // ── Fetch pending ───────────────────────────────────────────────────────────
+
+  const fetchPending = useCallback(async () => {
+    setLoadingPending(true)
+    setPendingError(null)
+    try {
+      const rows = await fetchPendingNotifications()
+      setPending(rows)
+    } catch (e) {
+      setPendingError(e.message ?? 'Failed to load pending notifications')
+    } finally {
+      setLoadingPending(false)
+    }
+  }, [])
+
+  // ── Fetch history (sent only — pending/cancelled live in their own section) ─
 
   const fetchHistory = useCallback(async () => {
     setLoadingHist(true)
     setHistError(null)
-
-    const { data, error: err } = await supabase
-      .from('notification_log')
-      .select('id, type, title, message, sent_count, failed_count, click_count, sent_at')
-      .order('sent_at', { ascending: false })
-      .limit(100)
-
-    if (err) {
-      setHistError(err.message)
-    } else {
-      setHistory(data ?? [])
+    try {
+      const rows = await fetchSentNotifications()
+      setHistory(rows)
+    } catch (e) {
+      setHistError(e.message ?? 'Failed to load notification history')
+    } finally {
+      setLoadingHist(false)
     }
-    setLoadingHist(false)
   }, [])
 
-  useEffect(() => { fetchHistory() }, [fetchHistory])
+  useEffect(() => { fetchPending(); fetchHistory() }, [fetchPending, fetchHistory])
 
-  // ── Send ────────────────────────────────────────────────────────────────────
+  // Live countdown ticker — only runs while there's something pending to count down.
+  useEffect(() => {
+    if (pending.length === 0) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [pending.length])
+
+  // ── Send (now: create pending row, actual FCM send happens via cron) ────────
+
+  function openSendConfirm() {
+    if (!title.trim() || !message.trim() || sending) return
+    setConfirmSendOpen(true)
+  }
 
   async function handleSend() {
-    if (!title.trim() || !message.trim()) return
     setSending(true)
     setSendError(null)
     try {
@@ -89,11 +162,59 @@ export default function NotificationsPanel() {
       if (error) throw error
       setTitle('')
       setMessage('')
-      await fetchHistory()
+      await fetchPending()
     } catch (e) {
-      setSendError(e.message ?? 'Failed to send notification.')
+      setSendError(e.message ?? 'Failed to schedule notification.')
     } finally {
       setSending(false)
+    }
+  }
+
+  // ── Edit a pending notification ──────────────────────────────────────────────
+
+  function startEdit(row) {
+    setEditingId(row.id)
+    setEditDraft({
+      title: row.title,
+      message: row.message,
+      scheduled_send_at: toDatetimeLocal(row.scheduled_send_at),
+    })
+  }
+
+  function cancelEdit() {
+    setEditingId(null)
+  }
+
+  async function saveEdit(id) {
+    setSavingEdit(true)
+    try {
+      await updateNotification(id, {
+        title: editDraft.title.trim(),
+        message: editDraft.message.trim(),
+        scheduled_send_at: fromDatetimeLocal(editDraft.scheduled_send_at),
+      })
+      setEditingId(null)
+      await fetchPending()
+    } catch (e) {
+      setPendingError(e.message ?? 'Failed to save changes')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  // ── Cancel a pending notification ────────────────────────────────────────────
+
+  async function confirmCancel() {
+    if (!cancelTarget) return
+    setCancelling(true)
+    try {
+      await cancelNotification(cancelTarget.id, cancelTarget.title)
+      await fetchPending()
+    } catch (e) {
+      setPendingError(e.message ?? 'Failed to cancel notification')
+    } finally {
+      setCancelling(false)
+      setCancelTarget(null)
     }
   }
 
@@ -262,7 +383,7 @@ export default function NotificationsPanel() {
 
           {/* Send button */}
           <button
-            onClick={handleSend}
+            onClick={openSendConfirm}
             disabled={!canSend}
             style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -278,14 +399,274 @@ export default function NotificationsPanel() {
             }}
           >
             <Send size={15} />
-            {sending ? 'Sending…' : 'Send to all devices'}
+            {sending ? 'Scheduling…' : 'Schedule send'}
           </button>
 
           <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', lineHeight: 1.5 }}>
-            Only devices that have granted notification permission will receive this. Users can opt out at any time.
+            Goes out in 30 minutes to every device that's granted notification permission —
+            you can still edit or cancel it below before then. Users can opt out at any time.
           </div>
 
         </div>
+
+        <ConfirmModal
+          isOpen={confirmSendOpen}
+          onClose={() => setConfirmSendOpen(false)}
+          onConfirm={handleSend}
+          title="Schedule this notification?"
+          message={`"${title}" will be sent to every subscribed device in 30 minutes. You'll be able to edit or cancel it from the Pending list before it goes out.`}
+          confirmLabel="Schedule send"
+          confirmVariant="primary"
+        />
+
+        <ConfirmModal
+          isOpen={!!cancelTarget}
+          onClose={() => setCancelTarget(null)}
+          onConfirm={confirmCancel}
+          title="Cancel this notification?"
+          message={cancelTarget ? `"${cancelTarget.title}" will not be sent. This can't be undone.` : ''}
+          confirmLabel={cancelling ? 'Cancelling…' : 'Cancel send'}
+          confirmVariant="danger"
+        />
+
+        {/* ── Pending ──────────────────────────────────────────────────────── */}
+
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          marginBottom: 'var(--space-3)',
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            Pending
+            {pending.length > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--color-bg)', color: 'var(--color-text-tertiary)',
+                border: '1px solid var(--color-border)',
+              }}>
+                {pending.length}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={fetchPending}
+            disabled={loadingPending}
+            aria-label="Refresh"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              cursor: loadingPending ? 'not-allowed' : 'pointer',
+              opacity: loadingPending ? 0.5 : 1,
+            }}
+          >
+            <RefreshCw size={14} style={{ animation: loadingPending ? 'spin 1s linear infinite' : 'none' }} />
+            Refresh
+          </button>
+        </div>
+
+        {pendingError && (
+          <div style={{
+            backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+            borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
+            marginBottom: 'var(--space-4)', fontSize: 13, color: '#DC2626',
+          }}>
+            {pendingError}
+          </div>
+        )}
+
+        {!loadingPending && !pendingError && pending.length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: 'var(--space-8) var(--space-4)',
+            color: 'var(--color-text-tertiary)',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            marginBottom: 'var(--space-6)',
+            fontSize: 13,
+          }}>
+            Nothing pending — scheduled sends will show up here.
+          </div>
+        )}
+
+        {pending.length > 0 && (
+          <div style={{
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-lg)',
+            overflow: 'hidden',
+            marginBottom: 'var(--space-6)',
+          }}>
+            {pending.map((row, idx) => {
+              const typeStyle = TYPE_BY_ID[row.type] ?? TYPE_BY_ID.info
+              const isLast    = idx === pending.length - 1
+              const isEditing = editingId === row.id
+
+              if (isEditing) {
+                return (
+                  <div key={row.id} style={{
+                    padding: 'var(--space-4)',
+                    borderBottom: !isLast ? '1px solid var(--color-border-subtle)' : 'none',
+                    backgroundColor: 'var(--color-bg)',
+                    display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+                  }}>
+                    <input
+                      type="text"
+                      value={editDraft.title}
+                      onChange={e => setEditDraft(d => ({ ...d, title: e.target.value }))}
+                      maxLength={80}
+                      style={{
+                        width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-surface)', fontSize: 13, fontWeight: 600,
+                        fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)', outline: 'none',
+                      }}
+                    />
+                    <textarea
+                      value={editDraft.message}
+                      onChange={e => setEditDraft(d => ({ ...d, message: e.target.value }))}
+                      maxLength={200}
+                      rows={2}
+                      style={{
+                        width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                        borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
+                        backgroundColor: 'var(--color-surface)', fontSize: 13,
+                        fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
+                        outline: 'none', resize: 'vertical', lineHeight: 1.5,
+                      }}
+                    />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                        Send at
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={editDraft.scheduled_send_at}
+                        onChange={e => setEditDraft(d => ({ ...d, scheduled_send_at: e.target.value }))}
+                        style={{
+                          padding: '6px 10px', borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+                          fontSize: 13, fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
+                          outline: 'none',
+                        }}
+                      />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+                      <button
+                        onClick={cancelEdit}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '6px 14px', borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border)', backgroundColor: 'transparent',
+                          color: 'var(--color-text-secondary)', fontSize: 13, fontWeight: 500,
+                          fontFamily: 'var(--font-body)', cursor: 'pointer',
+                        }}
+                      >
+                        <X size={13} /> Cancel
+                      </button>
+                      <button
+                        onClick={() => saveEdit(row.id)}
+                        disabled={savingEdit || !editDraft.title.trim() || !editDraft.message.trim()}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 4,
+                          padding: '6px 14px', borderRadius: 'var(--radius-sm)', border: 'none',
+                          backgroundColor: 'var(--color-accent)', color: '#fff',
+                          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+                          cursor: savingEdit ? 'not-allowed' : 'pointer', opacity: savingEdit ? 0.7 : 1,
+                        }}
+                      >
+                        <Check size={13} /> {savingEdit ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                )
+              }
+
+              return (
+                <div key={row.id} style={{
+                  display: 'grid',
+                  gridTemplateColumns: '90px 80px minmax(0,1fr) auto auto',
+                  gap: 'var(--space-3)',
+                  alignItems: 'center',
+                  padding: 'var(--space-3) var(--space-4)',
+                  borderBottom: !isLast ? '1px solid var(--color-border-subtle)' : 'none',
+                }}>
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    fontSize: 12, fontWeight: 600, color: 'var(--color-accent)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    <Clock size={12} />
+                    {formatCountdown(row.scheduled_send_at, now)}
+                  </span>
+
+                  <span style={{
+                    display: 'inline-flex', alignItems: 'center',
+                    fontSize: 10, fontWeight: 700,
+                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    padding: '2px 8px',
+                    borderRadius: 'var(--radius-full)',
+                    backgroundColor: typeStyle.bg,
+                    color:           typeStyle.color,
+                    border:         `1px solid ${typeStyle.color}55`,
+                    whiteSpace: 'nowrap',
+                    width: 'fit-content',
+                  }}>
+                    {typeStyle.label}
+                  </span>
+
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {row.title}
+                    </div>
+                    <div style={{
+                      fontSize: 12, color: 'var(--color-text-secondary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {row.message}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => startEdit(row)}
+                    aria-label="Edit"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 28, height: 28,
+                      borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
+                      backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+
+                  <button
+                    onClick={() => setCancelTarget({ id: row.id, title: row.title })}
+                    aria-label="Cancel send"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 28, height: 28,
+                      borderRadius: 'var(--radius-sm)', border: '1px solid #FECACA',
+                      backgroundColor: 'var(--color-surface)', color: '#DC2626',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* ── History ──────────────────────────────────────────────────────── */}
 
@@ -381,80 +762,126 @@ export default function NotificationsPanel() {
               <span style={thStyle}>Sent</span>
               <span style={thStyle}>Type</span>
               <span style={thStyle}>Title / Message</span>
+              <span style={{ ...thStyle, textAlign: 'right' }}>Rate</span>
               <span style={{ ...thStyle, textAlign: 'right' }}>Sent</span>
               <span style={{ ...thStyle, textAlign: 'right' }}>Failed</span>
               <span style={{ ...thStyle, textAlign: 'right' }}>Clicks</span>
+              <span style={{ ...thStyle, textAlign: 'right' }}></span>
             </div>
 
             {/* Rows */}
             {history.map((entry, idx) => {
-              const typeStyle = TYPE_BY_ID[entry.type] ?? TYPE_BY_ID.info
-              const isLast    = idx === history.length - 1
+              const typeStyle  = TYPE_BY_ID[entry.type] ?? TYPE_BY_ID.info
+              const isLast     = idx === history.length - 1
+              const isExpanded = expandedId === entry.id
 
               return (
-                <div key={entry.id} style={{
-                  display: 'grid',
-                  gridTemplateColumns: '150px 90px minmax(0,1fr) 60px 60px 60px',
-                  gap: 'var(--space-3)',
-                  alignItems: 'center',
-                  padding: 'var(--space-3) var(--space-4)',
-                  borderBottom: !isLast ? '1px solid var(--color-border-subtle)' : 'none',
-                }}>
-
-                  {/* Sent time */}
-                  <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-                    {formatTime(entry.sent_at)}
-                  </span>
-
-                  {/* Type badge */}
-                  <span style={{
-                    display: 'inline-flex', alignItems: 'center',
-                    fontSize: 10, fontWeight: 700,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                    padding: '2px 8px',
-                    borderRadius: 'var(--radius-full)',
-                    backgroundColor: typeStyle.bg,
-                    color:           typeStyle.color,
-                    border:         `1px solid ${typeStyle.color}55`,
-                    whiteSpace: 'nowrap',
-                    width: 'fit-content',
+                <div key={entry.id}>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '140px 80px minmax(0,1fr) 55px 55px 55px 55px 32px',
+                    gap: 'var(--space-3)',
+                    alignItems: 'center',
+                    padding: 'var(--space-3) var(--space-4)',
+                    borderBottom: (!isLast || isExpanded) ? '1px solid var(--color-border-subtle)' : 'none',
+                    backgroundColor: isExpanded ? 'var(--color-bg)' : 'transparent',
                   }}>
-                    {typeStyle.label}
-                  </span>
 
-                  {/* Title / message */}
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    {/* Sent time */}
+                    <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                      {formatTime(entry.sent_at)}
+                    </span>
+
+                    {/* Type badge */}
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center',
+                      fontSize: 10, fontWeight: 700,
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-full)',
+                      backgroundColor: typeStyle.bg,
+                      color:           typeStyle.color,
+                      border:         `1px solid ${typeStyle.color}55`,
+                      whiteSpace: 'nowrap',
+                      width: 'fit-content',
                     }}>
-                      {entry.title}
+                      {typeStyle.label}
+                    </span>
+
+                    {/* Title / message */}
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {entry.title}
+                      </div>
+                      <div style={{
+                        fontSize: 12, color: 'var(--color-text-secondary)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        {entry.message}
+                      </div>
                     </div>
-                    <div style={{
-                      fontSize: 12, color: 'var(--color-text-secondary)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+
+                    {/* Delivery rate */}
+                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)', textAlign: 'right', fontWeight: 500 }}>
+                      {deliveryRateLabel(entry.sent_count, entry.failed_count)}
+                    </span>
+
+                    {/* Sent count */}
+                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)', textAlign: 'right', fontWeight: 500 }}>
+                      {entry.sent_count}
+                    </span>
+
+                    {/* Failed count */}
+                    <span style={{
+                      fontSize: 13, textAlign: 'right', fontWeight: 500,
+                      color: entry.failed_count > 0 ? '#DC2626' : 'var(--color-text-tertiary)',
                     }}>
-                      {entry.message}
+                      {entry.failed_count}
+                    </span>
+
+                    {/* Click count */}
+                    <span style={{ fontSize: 13, color: 'var(--color-text-primary)', textAlign: 'right', fontWeight: 500 }}>
+                      {entry.click_count}
+                    </span>
+
+                    {/* Expand toggle */}
+                    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        onClick={() => setExpandedId(p => p === entry.id ? null : entry.id)}
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          width: 28, height: 28,
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--color-border)',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text-secondary)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
                     </div>
                   </div>
 
-                  {/* Sent count */}
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)', textAlign: 'right', fontWeight: 500 }}>
-                    {entry.sent_count}
-                  </span>
-
-                  {/* Failed count */}
-                  <span style={{
-                    fontSize: 13, textAlign: 'right', fontWeight: 500,
-                    color: entry.failed_count > 0 ? '#DC2626' : 'var(--color-text-tertiary)',
-                  }}>
-                    {entry.failed_count}
-                  </span>
-
-                  {/* Click count */}
-                  <span style={{ fontSize: 13, color: 'var(--color-text-primary)', textAlign: 'right', fontWeight: 500 }}>
-                    {entry.click_count}
-                  </span>
+                  {/* Expanded: full title/message */}
+                  {isExpanded && (
+                    <div style={{
+                      padding: 'var(--space-3) var(--space-4)',
+                      borderBottom: !isLast ? '1px solid var(--color-border-subtle)' : 'none',
+                      backgroundColor: 'var(--color-bg)',
+                    }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 4 }}>
+                        {entry.title}
+                      </div>
+                      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                        {entry.message}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -477,7 +904,7 @@ export default function NotificationsPanel() {
 
 const theadStyle = {
   display: 'grid',
-  gridTemplateColumns: '150px 90px minmax(0,1fr) 60px 60px 60px',
+  gridTemplateColumns: '140px 80px minmax(0,1fr) 55px 55px 55px 55px 32px',
   gap: 'var(--space-3)',
   padding: 'var(--space-2) var(--space-4)',
   backgroundColor: 'var(--color-bg)',

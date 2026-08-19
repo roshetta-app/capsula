@@ -20,14 +20,17 @@ const ACTION_STYLES = {
   delete:    { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Delete'    },
   publish:   { bg: '#D1FAE5', color: '#065F46', border: '#6EE7B7', label: 'Publish'   },
   unpublish: { bg: '#FEF9C3', color: '#854D0E', border: '#FDE047', label: 'Unpublish' },
+  // Phase F9 Stage 1 — cancelling a still-pending notification
+  cancel:    { bg: '#FEE2E2', color: '#991B1B', border: '#FCA5A5', label: 'Cancel'    },
 }
 
 const TABLE_LABELS = {
-  conditions:   'Conditions',
-  generics:     'Generics',
-  formulations: 'Formulations',
-  brands:       'Brands',
-  specialties:  'Specialties',
+  conditions:       'Conditions',
+  generics:         'Generics',
+  formulations:     'Formulations',
+  brands:           'Brands',
+  specialties:      'Specialties',
+  notification_log: 'Notifications',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -344,3 +347,4 @@ const thStyle = {
   letterSpacing: '0.06em',
   color: 'var(--color-text-tertiary)',
 }
+

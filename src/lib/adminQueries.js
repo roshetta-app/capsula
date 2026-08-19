@@ -1092,3 +1092,72 @@ export async function updateCmsConfig(key, value) {
   if (error) throw error
   return { error: null }
 }
+
+// ─── Notifications (Phase F9 Stage 1) ──────────────────────────────────────────
+// notification_log rows sit as status='pending' after send-notification creates
+// them, until the pg_cron-driven deliver-notification function actually sends
+// them at scheduled_send_at. These wrap that pending/sent split for the CMS.
+
+/**
+ * All notifications still waiting to be sent, soonest first.
+ */
+export async function fetchPendingNotifications() {
+  const { data, error } = await supabase
+    .from('notification_log')
+    .select('id, type, title, message, scheduled_send_at, sent_by')
+    .eq('status', 'pending')
+    .order('scheduled_send_at', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Notifications that have actually been delivered, most recent first.
+ * (History table previously showed every row regardless of status — now
+ * scoped to 'sent' only, since 'pending'/'cancelled' rows live in their
+ * own section.)
+ */
+export async function fetchSentNotifications({ limit = 100 } = {}) {
+  const { data, error } = await supabase
+    .from('notification_log')
+    .select('id, type, title, message, sent_count, failed_count, click_count, sent_at')
+    .eq('status', 'sent')
+    .order('sent_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Cancels a still-pending notification before it goes out.
+ */
+export async function cancelNotification(id, title = null) {
+  const { error } = await supabase
+    .from('notification_log')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .eq('status', 'pending')
+
+  if (error) throw error
+  await logAudit('cancel', 'notification_log', id, title)
+  return { error: null }
+}
+
+/**
+ * Edits a still-pending notification's content and/or send time.
+ * @param {string} id
+ * @param {{ title?: string, message?: string, type?: string, scheduled_send_at?: string }} data
+ */
+export async function updateNotification(id, data) {
+  const { error } = await supabase
+    .from('notification_log')
+    .update(data)
+    .eq('id', id)
+    .eq('status', 'pending')
+
+  if (error) throw error
+  await logAudit('update', 'notification_log', id, data.title ?? null, data)
+  return { error: null }
+}
