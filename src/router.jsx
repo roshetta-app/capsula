@@ -4,6 +4,7 @@
  * Phase 3J — Added /admin/analytics route
  * Phase 3K — Added /admin/crash-logs and /admin/notifications routes
  * Phase 3L — Added /admin/audit-log route
+ * Phase F11 Stage 2 — Added /admin/users route
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -37,6 +38,7 @@ import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
 import CrashLogs            from './pages/admin/CrashLogs'
 import NotificationsPanel   from './pages/admin/NotificationsPanel'
 import AuditLog             from './pages/admin/AuditLog'
+import UsersManager         from './pages/admin/UsersManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
@@ -64,6 +66,7 @@ export const ROUTES = {
   ADMIN_CRASH_LOGS:       '/admin/crash-logs',
   ADMIN_NOTIFICATIONS:    '/admin/notifications',
   ADMIN_AUDIT_LOG:        '/admin/audit-log',
+  ADMIN_USERS:            '/admin/users',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -135,6 +138,9 @@ export default function AppRoutes() {
       />
       <Route path="/admin/audit-log"
         element={<AuthGuard><AuditLog /></AuthGuard>}
+      />
+      <Route path="/admin/users"
+        element={<AuthGuard><UsersManager /></AuthGuard>}
       />
 
     </Routes>

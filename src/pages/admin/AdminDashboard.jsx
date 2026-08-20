@@ -4,7 +4,7 @@ import { LogOut, ChevronRight } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faCapsules, faNotesMedical, faStethoscope, faTags,
-  faChartBar, faBug, faBell, faClipboardList,
+  faChartBar, faBug, faBell, faClipboardList, faUsers,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -69,6 +69,12 @@ const NAV_CARDS = [
     label:  'Audit Log',
     sub:    'History of all admin create, edit & publish actions',
     faIcon: faClipboardList,
+  },
+  {
+    path:   '/admin/users',
+    label:  'Users',
+    sub:    'Manage account roles, tiers & bans',
+    faIcon: faUsers,
   },
 ]
 

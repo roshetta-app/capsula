@@ -28,6 +28,10 @@
  *           tacked onto generic results; also added pack_size, fill_volume,
  *           and form_modifier so DrugCMS.jsx can build the full title
  *           suffix via SharedDrugCard/getDrugTitleSuffix
+ *   F11 Stage 2 — fetchAllUsers, updateUserRole, updateUserTier, banUser,
+ *           unbanUser (new): thin wrappers over the new admin-users Edge
+ *           Function, the only path that can read auth.users or write
+ *           profiles.role/tier from the CMS
  */
 
 import { supabase }  from './supabase'
@@ -1268,4 +1272,81 @@ export async function deleteNotificationTemplate(id, title = null) {
   return { error }
 }
 
+// ─── Users (Phase F11 Stage 2) ────────────────────────────────────────────────
+// Thin wrappers over the admin-users Edge Function. Unlike every other
+// section in this file, these never touch a Supabase table directly:
+// auth.users is structurally unreachable from client code (Supabase blocks
+// it by design, confirmed in the F11 Stage 1 audit), and profiles has no
+// admin write policy today — the Edge Function runs with the service role
+// and is the only place role/tier/ban can actually change.
 
+/**
+ * Fetch all accounts for the admin Users list: auth.users joined with each
+ * account's profiles row (role, tier, created_at).
+ */
+export async function fetchAllUsers() {
+  const { data, error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'list' },
+  })
+  if (error) return { data: null, error }
+  return { data: data?.users ?? [], error: null }
+}
+
+/**
+ * Set a user's role ('admin' | 'user').
+ * @param {string} userId
+ * @param {string} role
+ * @param {string|null} email — for the audit log entry only
+ */
+export async function updateUserRole(userId, role, email = null) {
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'updateRole', userId, role },
+  })
+  if (error) return { error }
+  await logAudit('update', 'profiles', userId, email, { role })
+  return { error: null }
+}
+
+/**
+ * Set a user's tier ('free' | 'paid'). Plumbing only — tier has no real
+ * billing meaning yet (F8 is still undecided); this just records the value.
+ * @param {string} userId
+ * @param {string} tier
+ * @param {string|null} email — for the audit log entry only
+ */
+export async function updateUserTier(userId, tier, email = null) {
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'updateTier', userId, tier },
+  })
+  if (error) return { error }
+  await logAudit('update', 'profiles', userId, email, { tier })
+  return { error: null }
+}
+
+/**
+ * Ban a user via Supabase Auth's native banned_until (blocks sign-in).
+ * @param {string} userId
+ * @param {string|null} email — for the audit log entry only
+ */
+export async function banUser(userId, email = null) {
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'ban', userId },
+  })
+  if (error) return { error }
+  await logAudit('ban', 'profiles', userId, email)
+  return { error: null }
+}
+
+/**
+ * Lift a ban, restoring sign-in access.
+ * @param {string} userId
+ * @param {string|null} email — for the audit log entry only
+ */
+export async function unbanUser(userId, email = null) {
+  const { error } = await supabase.functions.invoke('admin-users', {
+    body: { action: 'unban', userId },
+  })
+  if (error) return { error }
+  await logAudit('unban', 'profiles', userId, email)
+  return { error: null }
+}
