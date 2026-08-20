@@ -1146,6 +1146,32 @@ export async function cancelNotification(id, title = null) {
 }
 
 /**
+ * Sends a still-pending notification immediately, overriding its scheduled
+ * time. Brings scheduled_send_at up to now (so deliver-notification's due
+ * query picks it up) and invokes deliver-notification directly rather than
+ * waiting for the next ~1min pg_cron tick — that wait is the whole thing a
+ * manual override is meant to skip. deliver-notification processes every
+ * row that's actually due at call time, not just this one — a fine side
+ * effect, since any other row that happens to already be due would have
+ * gone out within a minute anyway via cron.
+ */
+export async function sendNotificationNow(id, title = null) {
+  const { error: updateError } = await supabase
+    .from('notification_log')
+    .update({ scheduled_send_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('status', 'pending')
+
+  if (updateError) throw updateError
+
+  const { error: invokeError } = await supabase.functions.invoke('deliver-notification')
+  if (invokeError) throw invokeError
+
+  await logAudit('send_now', 'notification_log', id, title)
+  return { error: null }
+}
+
+/**
  * Edits a still-pending notification's content and/or send time.
  * @param {string} id
  * @param {{ title?: string, message?: string, type?: string, scheduled_send_at?: string }} data
@@ -1241,4 +1267,5 @@ export async function deleteNotificationTemplate(id, title = null) {
   if (!error) await logAudit('delete', 'notification_templates', id, title)
   return { error }
 }
+
 

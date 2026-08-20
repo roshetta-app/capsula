@@ -27,6 +27,7 @@ import {
   fetchPendingNotifications,
   fetchSentNotifications,
   cancelNotification,
+  sendNotificationNow,
   updateNotification,
   uploadNotificationImage,
   fetchNotificationTemplates,
@@ -129,6 +130,7 @@ export default function NotificationsPanel() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [cancelTarget, setCancelTarget] = useState(null) // { id, title } | null
   const [cancelling,   setCancelling]   = useState(false)
+  const [sendingNowId, setSendingNowId] = useState(null) // id currently being force-sent | null
 
   const [history,     setHistory]     = useState([])
   const [loadingHist, setLoadingHist] = useState(true)
@@ -359,6 +361,22 @@ export default function NotificationsPanel() {
     } finally {
       setCancelling(false)
       setCancelTarget(null)
+    }
+  }
+
+  // ── Send a pending notification immediately (skip the wait) ──────────────────
+
+  async function handleSendNow(row) {
+    setSendingNowId(row.id)
+    setPendingError(null)
+    try {
+      await sendNotificationNow(row.id, row.title)
+      await fetchPending()
+      await fetchHistory()
+    } catch (e) {
+      setPendingError(e.message ?? 'Failed to send now')
+    } finally {
+      setSendingNowId(null)
     }
   }
 
@@ -1019,7 +1037,7 @@ export default function NotificationsPanel() {
               return (
                 <div key={row.id} style={{
                   display: 'grid',
-                  gridTemplateColumns: '90px 80px minmax(0,1fr) auto auto',
+                  gridTemplateColumns: '90px 80px minmax(0,1fr) auto auto auto',
                   gap: 'var(--space-3)',
                   alignItems: 'center',
                   padding: 'var(--space-3) var(--space-4)',
@@ -1065,14 +1083,33 @@ export default function NotificationsPanel() {
                   </div>
 
                   <button
+                    onClick={() => handleSendNow(row)}
+                    disabled={sendingNowId === row.id}
+                    aria-label="Send now"
+                    title="Send now"
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      width: 28, height: 28,
+                      borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-accent)',
+                      backgroundColor: 'var(--color-surface)', color: 'var(--color-accent)',
+                      cursor: sendingNowId === row.id ? 'not-allowed' : 'pointer',
+                      opacity: sendingNowId === row.id ? 0.5 : 1,
+                    }}
+                  >
+                    <Send size={13} style={{ animation: sendingNowId === row.id ? 'spin 1s linear infinite' : 'none' }} />
+                  </button>
+
+                  <button
                     onClick={() => startEdit(row)}
+                    disabled={sendingNowId === row.id}
                     aria-label="Edit"
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: 28, height: 28,
                       borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)',
                       backgroundColor: 'var(--color-surface)', color: 'var(--color-text-secondary)',
-                      cursor: 'pointer',
+                      cursor: sendingNowId === row.id ? 'not-allowed' : 'pointer',
+                      opacity: sendingNowId === row.id ? 0.5 : 1,
                     }}
                   >
                     <Pencil size={13} />
@@ -1080,13 +1117,15 @@ export default function NotificationsPanel() {
 
                   <button
                     onClick={() => setCancelTarget({ id: row.id, title: row.title })}
+                    disabled={sendingNowId === row.id}
                     aria-label="Cancel send"
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       width: 28, height: 28,
                       borderRadius: 'var(--radius-sm)', border: '1px solid #FECACA',
                       backgroundColor: 'var(--color-surface)', color: '#DC2626',
-                      cursor: 'pointer',
+                      cursor: sendingNowId === row.id ? 'not-allowed' : 'pointer',
+                      opacity: sendingNowId === row.id ? 0.5 : 1,
                     }}
                   >
                     <X size={14} />

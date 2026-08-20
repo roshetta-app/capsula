@@ -9,29 +9,33 @@
  * service-account JWT approach send-notification used), then sets
  * status='sent' and the real sent_at on completion.
  *
+ * Phase F9 Stage 2 (D28) — FCM payload gains notification.image,
+ * data.url (deep link), and android.notification.channel_id per type, so
+ * rich content set by the admin actually reaches the device.
+ *
  * Runs entirely as service role — this is a cron-invoked function, not a
  * caller-invoked one, so there's no admin JWT to check (unlike
  * send-notification, which still gates on is_admin() since a real admin
  * calls it directly from the CMS).
  *
- * Phase F9 Stage 2 (D28) — rich content + per-type channels:
- *   - FCM payload gains `notification.image` (from notification_log.image_url,
- *     when set) so the image shows once a notification is expanded/pulled
- *     down (it never appears in the collapsed row — that's an OS/FCM
- *     behavior, not something this function controls).
- *   - `data.url` is now real: notification_log.deep_link_path when set,
- *     falling back to '/capsula/' (previously always hardcoded). Read by
- *     public/sw.js's push handler and by usePushSubscription.js's
- *     foreground path.
- *   - `android.notification.channel_id` is set per notification_log.type
- *     (capsula_info / capsula_update / capsula_important) so the person
- *     controls sound/vibration per category from their own phone's
- *     notification settings — these channels are registered natively
- *     (Android one-time setup, not this function) and are ignored by FCM
- *     if the device hasn't registered a channel with a matching id.
+ * Bug fix, 2026-08-20 (send-now-cors-fix) — this function was only ever
+ * called server-to-server by pg_cron, which isn't subject to browser CORS
+ * enforcement, so it never needed CORS headers or OPTIONS preflight
+ * handling. The new admin "Send now" action invokes it directly from the
+ * browser (supabase.functions.invoke), which IS a real cross-origin
+ * request — without these headers the browser blocks it before it even
+ * reaches the function, surfacing as supabase-js's generic "Failed to send
+ * a request to the Edge Function" error. Mirrors send-notification's
+ * existing corsHeaders + OPTIONS handling exactly. pg_cron's own calls are
+ * unaffected by this change — CORS is a browser-only mechanism.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin':  '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
 
 const SUPABASE_URL              = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -40,21 +44,6 @@ const FIREBASE_SERVICE_ACCOUNT_JSON = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSO
 const FCM_PROJECT_ID = JSON.parse(FIREBASE_SERVICE_ACCOUNT_JSON).project_id
 const FCM_SCOPE        = 'https://www.googleapis.com/auth/firebase.messaging'
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
-
-// Phase F9 Stage 2 (D28) — one Android notification channel per
-// notification type, registered natively on-device (see the Stage 2
-// native-setup step). Unknown/legacy types fall back to capsula_info
-// rather than sending a channel_id Android has never registered — FCM
-// silently drops the whole notification if channel_id doesn't match a
-// channel that exists on the device.
-const CHANNEL_BY_TYPE: Record<string, string> = {
-  info:      'capsula_info',
-  update:    'capsula_update',
-  important: 'capsula_important',
-}
-function channelForType(type: string): string {
-  return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
-}
 
 function base64UrlFromBytes(bytes: Uint8Array): string {
   let binary = ''
@@ -135,6 +124,8 @@ async function sendToToken(
   imageUrl: string | null,
   deepLinkPath: string | null,
 ): Promise<{ ok: boolean; deadToken: boolean }> {
+  const channelId = type === 'important' ? 'capsula_important' : type === 'update' ? 'capsula_update' : 'capsula_info'
+
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${FCM_PROJECT_ID}/messages:send`,
     {
@@ -149,17 +140,19 @@ async function sendToToken(
           notification: {
             title,
             body: message,
-            // Only shows once the notification is expanded/pulled down —
-            // never in the collapsed row. Omitted entirely (not sent as
-            // null) when there's no image, to match FCM's expected shape.
             ...(imageUrl ? { image: imageUrl } : {}),
           },
-          // deep_link_path falls back to '/capsula/' (home) — matches
-          // sw.js's own fallback so a missing link never opens to nothing.
-          data: { type, log_id: logId, url: deepLinkPath ?? '/capsula/' },
+          data: {
+            type,
+            log_id: logId,
+            ...(deepLinkPath ? { url: deepLinkPath } : {}),
+          },
           android: {
             priority: 'high',
-            notification: { channel_id: channelForType(type) },
+            notification: {
+              channel_id: channelId,
+              ...(imageUrl ? { image: imageUrl } : {}),
+            },
           },
         },
       }),
@@ -230,7 +223,11 @@ async function deliverOne(
     .eq('id', logRow.id)
 }
 
-Deno.serve(async (_req: Request) => {
+Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const adminClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
@@ -243,7 +240,7 @@ Deno.serve(async (_req: Request) => {
     if (dueErr) throw dueErr
 
     if (!dueRows || dueRows.length === 0) {
-      return new Response(JSON.stringify({ delivered: 0 }), { headers: { 'Content-Type': 'application/json' } })
+      return new Response(JSON.stringify({ delivered: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     const accessToken = await getFcmAccessToken()
@@ -256,13 +253,13 @@ Deno.serve(async (_req: Request) => {
       }
     }
 
-    return new Response(JSON.stringify({ delivered: dueRows.length }), { headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ delivered: dueRows.length }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
   } catch (err) {
     console.error('deliver-notification error:', err)
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   }
 })

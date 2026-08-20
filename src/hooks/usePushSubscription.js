@@ -347,7 +347,21 @@ export function usePushSubscription() {
       // independently even though on Android it's backed by the same
       // underlying permission, so this is a silent confirm in practice,
       // not a second real prompt.
-      await LocalNotifications.requestPermissions()
+      //
+      // Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) — this used
+      // to call requestPermissions() unconditionally on every single
+      // foreground push. Confirmed on a Xiaomi/MIUI device: this can
+      // surface the OS's own "Alarms & reminders" settings screen instead
+      // of a normal notification prompt — a manufacturer-level Android
+      // customization outside this app's control, not documented behavior
+      // of the LocalNotifications plugin itself, so there's no way to
+      // suppress the redirect itself from here. Checking first and only
+      // requesting when not already granted at least cuts this from firing
+      // on every notification down to, at worst, once per app session.
+      const { display } = await LocalNotifications.checkPermissions()
+      if (display !== 'granted') {
+        await LocalNotifications.requestPermissions()
+      }
 
       const notification = event?.notification ?? event
       const imageUrl = notification?.image ?? null
