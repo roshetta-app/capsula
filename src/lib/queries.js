@@ -1,4 +1,3 @@
-
 /**
  * queries.js — Supabase data fetching
  *
@@ -467,3 +466,63 @@ export async function fetchCmsConfig(supabase, key) {
   return data?.value ?? null
 }
 
+// ─── Profile queries (F13 Mini-stage 3) ────────────────────────────────────────
+
+/**
+ * Fetch the five editable personal-info fields on the signed-in user's own
+ * profiles row. Kept separate from useAuth.js's loadProfile (which only
+ * ever needs role/tier) so every component using useAuth() doesn't carry
+ * these extra fields — only AccountScreen needs them.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} userId
+ * @returns {Promise<{ fullName: string|null, occupation: string|null, specialty: string|null, country: string|null, governorate: string|null }>}
+ */
+export async function fetchOwnProfile(supabase, userId) {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('full_name, occupation, specialty, country, governorate')
+    .eq('id', userId)
+    .single()
+
+  if (error) throw error
+
+  return {
+    fullName:    data.full_name,
+    occupation:  data.occupation,
+    specialty:   data.specialty,
+    country:     data.country,
+    governorate: data.governorate,
+  }
+}
+
+/**
+ * Update the signed-in user's own personal-info fields. Direct Supabase
+ * call, same plain style as useAuth.js's loadProfile — no wrapper layer,
+ * per D34/Mini-stage 3 (queries.js had no existing personal-data-write
+ * precedent to follow).
+ *
+ * Mini-stage 2's RLS policy + trigger already guarantee this can only ever
+ * touch the row's own owner and can never change role/tier, so this
+ * function trusts that database-level boundary rather than re-checking it
+ * here.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} userId
+ * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string }} updates
+ */
+export async function updateOwnProfile(supabase, userId, updates) {
+  const dbUpdates = {}
+  if ('fullName'    in updates) dbUpdates.full_name  = updates.fullName
+  if ('occupation'  in updates) dbUpdates.occupation  = updates.occupation
+  if ('specialty'   in updates) dbUpdates.specialty   = updates.specialty
+  if ('country'     in updates) dbUpdates.country     = updates.country
+  if ('governorate' in updates) dbUpdates.governorate = updates.governorate
+
+  const { error } = await supabase
+    .from('profiles')
+    .update(dbUpdates)
+    .eq('id', userId)
+
+  if (error) throw error
+}
