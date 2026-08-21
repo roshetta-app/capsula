@@ -10,6 +10,12 @@
  *             the same shared Layout group as Conditions/Drugs/Favourites
  *             so BottomNav stays visible and Layout's mount-once behavior
  *             (NotificationsBanner state, etc.) is unaffected.
+ * Phase F13 Mini-stage 5 (Account redesign) — Added /account/edit and
+ *             /account/faq. Both placed OUTSIDE the shared Layout group,
+ *             next to /conditions/:slug and /drugs/:slug — same reasoning
+ *             as those two: each renders its own back-arrow header and
+ *             does not show BottomNav, matching the reference design's
+ *             full-page navigation rather than the tab-style Layout group.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -27,6 +33,8 @@ import DrugsScreen           from './pages/DrugsScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
+import AccountEditScreen     from './pages/AccountEditScreen'
+import AccountFaqScreen      from './pages/AccountFaqScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
@@ -57,6 +65,8 @@ export const ROUTES = {
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
+  ACCOUNT_EDIT:      '/account/edit',
+  ACCOUNT_FAQ:       '/account/faq',
 
   // Admin
   ADMIN_LOGIN:            '/admin/login',
@@ -100,9 +110,13 @@ export default function AppRoutes() {
       </Route>
 
       {/* Detail screens render their own header/scroll setup and stay
-          outside the shared Layout entirely — unchanged from before. */}
+          outside the shared Layout entirely — unchanged from before.
+          /account/edit and /account/faq follow the same pattern (own
+          back-arrow header, no BottomNav) — see file header note above. */}
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
       <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
+      <Route path="/account/edit"        element={<AccountEditScreen />} />
+      <Route path="/account/faq"         element={<AccountFaqScreen />} />
 
       {/* ── Admin routes ─────────────────────────────────────────────────── */}
 

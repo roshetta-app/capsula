@@ -15,8 +15,18 @@
  * guards this so nothing changes for the website build; the StatusBar
  * plugin no-ops harmlessly outside a native app anyway.
  *
+ * Auth-shared-context fix — added AuthProvider, right after ToastProvider
+ * (signInWithGoogle's error path calls useToast internally) and above
+ * everything that reads sign-in state (FavouritesProvider, BottomNav,
+ * AccountScreen, AuthGuard, ProfileSetupModal). Previously useAuth() ran
+ * its own separate sign-in check per component; this makes it run once,
+ * app-wide, which also fixed a visible load delay on the Edit Profile
+ * page (F13 Mini-stage 5 follow-up).
+ *
  * Provider order (outermost → innermost):
- *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → PushSubscriptionProvider → OnboardingGate → AppRoutes
+ *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
+ *   ConditionProvider → DrugProvider → FavouritesProvider →
+ *   PushSubscriptionProvider → OnboardingGate → AppRoutes
  *   (ProfileSetupModal is mounted as a sibling to OnboardingGate, not
  *   nested inside it — F13 Mini-stage 4, added 2026-08-21. It's not a
  *   route and not gated by the device-level onboarding flow; it checks
@@ -30,6 +40,7 @@ import { StatusBar } from '@capacitor/status-bar'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
 import ProfileSetupModal from './components/ProfileSetupModal'
+import { AuthProvider } from './context/AuthContext'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
@@ -63,18 +74,20 @@ export default function App() {
     <ErrorBoundary>
       <BrowserRouter basename={ROUTER_BASENAME}>
         <ToastProvider>
-          <ConditionProvider>
-            <DrugProvider>
-              <FavouritesProvider>
-                <PushSubscriptionProvider>
-                  <OnboardingGate>
-                    <AppRoutes />
-                  </OnboardingGate>
-                  <ProfileSetupModal />
-                </PushSubscriptionProvider>
-              </FavouritesProvider>
-            </DrugProvider>
-          </ConditionProvider>
+          <AuthProvider>
+            <ConditionProvider>
+              <DrugProvider>
+                <FavouritesProvider>
+                  <PushSubscriptionProvider>
+                    <OnboardingGate>
+                      <AppRoutes />
+                    </OnboardingGate>
+                    <ProfileSetupModal />
+                  </PushSubscriptionProvider>
+                </FavouritesProvider>
+              </DrugProvider>
+            </ConditionProvider>
+          </AuthProvider>
         </ToastProvider>
       </BrowserRouter>
     </ErrorBoundary>
