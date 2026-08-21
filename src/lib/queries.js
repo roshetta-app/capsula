@@ -469,30 +469,32 @@ export async function fetchCmsConfig(supabase, key) {
 // ─── Profile queries (F13 Mini-stage 3) ────────────────────────────────────────
 
 /**
- * Fetch the five editable personal-info fields on the signed-in user's own
- * profiles row. Kept separate from useAuth.js's loadProfile (which only
- * ever needs role/tier) so every component using useAuth() doesn't carry
- * these extra fields — only AccountScreen needs them.
+ * Fetch the five editable personal-info fields, plus the one-time-prompt
+ * dismissed flag, on the signed-in user's own profiles row. Kept separate
+ * from useAuth.js's loadProfile (which only ever needs role/tier) so every
+ * component using useAuth() doesn't carry these extra fields — only
+ * AccountScreen and ProfileSetupModal need them.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
- * @returns {Promise<{ fullName: string|null, occupation: string|null, specialty: string|null, country: string|null, governorate: string|null }>}
+ * @returns {Promise<{ fullName: string|null, occupation: string|null, specialty: string|null, country: string|null, governorate: string|null, profileSetupDismissed: boolean }>}
  */
 export async function fetchOwnProfile(supabase, userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, occupation, specialty, country, governorate')
+    .select('full_name, occupation, specialty, country, governorate, profile_setup_dismissed')
     .eq('id', userId)
     .single()
 
   if (error) throw error
 
   return {
-    fullName:    data.full_name,
-    occupation:  data.occupation,
-    specialty:   data.specialty,
-    country:     data.country,
-    governorate: data.governorate,
+    fullName:              data.full_name,
+    occupation:            data.occupation,
+    specialty:             data.specialty,
+    country:               data.country,
+    governorate:           data.governorate,
+    profileSetupDismissed: data.profile_setup_dismissed,
   }
 }
 
@@ -509,15 +511,16 @@ export async function fetchOwnProfile(supabase, userId) {
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
- * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string }} updates
+ * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string, profileSetupDismissed?: boolean }} updates
  */
 export async function updateOwnProfile(supabase, userId, updates) {
   const dbUpdates = {}
-  if ('fullName'    in updates) dbUpdates.full_name  = updates.fullName
-  if ('occupation'  in updates) dbUpdates.occupation  = updates.occupation
-  if ('specialty'   in updates) dbUpdates.specialty   = updates.specialty
-  if ('country'     in updates) dbUpdates.country     = updates.country
-  if ('governorate' in updates) dbUpdates.governorate = updates.governorate
+  if ('fullName'               in updates) dbUpdates.full_name               = updates.fullName
+  if ('occupation'             in updates) dbUpdates.occupation              = updates.occupation
+  if ('specialty'              in updates) dbUpdates.specialty               = updates.specialty
+  if ('country'                in updates) dbUpdates.country                 = updates.country
+  if ('governorate'            in updates) dbUpdates.governorate             = updates.governorate
+  if ('profileSetupDismissed'  in updates) dbUpdates.profile_setup_dismissed = updates.profileSetupDismissed
 
   const { error } = await supabase
     .from('profiles')

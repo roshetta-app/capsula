@@ -17,6 +17,10 @@
  *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → ConditionProvider → DrugProvider → FavouritesProvider → PushSubscriptionProvider → OnboardingGate → AppRoutes
+ *   (ProfileSetupModal is mounted as a sibling to OnboardingGate, not
+ *   nested inside it — F13 Mini-stage 4, added 2026-08-21. It's not a
+ *   route and not gated by the device-level onboarding flow; it checks
+ *   its own signed-in-user condition internally via useAuth().)
  */
 
 import { useEffect } from 'react'
@@ -25,6 +29,7 @@ import { Capacitor } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
+import ProfileSetupModal from './components/ProfileSetupModal'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
@@ -65,6 +70,7 @@ export default function App() {
                   <OnboardingGate>
                     <AppRoutes />
                   </OnboardingGate>
+                  <ProfileSetupModal />
                 </PushSubscriptionProvider>
               </FavouritesProvider>
             </DrugProvider>
