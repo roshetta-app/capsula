@@ -61,13 +61,22 @@
  *             /drugs/:slug detail pages, same as the rest of the bar —
  *             see conversation history for why a Layout/header-based
  *             placement couldn't reach those pages either.
+ * Phase F13 Mini-stage 1 — Account tab now navigates to /account instead of
+ *             opening AccountSheet as a popup (AccountSheet itself is
+ *             unchanged — it still backs the separate auto-sign-in-nudge
+ *             flow, see useSignInPrompt/D16). accountOpen state and the
+ *             <AccountSheet> render removed from here; signInWithGoogle/
+ *             signOut are no longer needed in this component since they
+ *             were only ever passed through to the sheet. `user` is still
+ *             read for the tab's signed-in/signed-out color treatment,
+ *             which is unchanged from Phase 20.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
  *           own Conditions tab icon
  *  - Tab 2: Drugs      — Pill (Lucide)
  *  - Tab 3: Favourites — Heart (Lucide), red identity when active
- *  - Tab 4: Account    — User (Lucide), opens AccountSheet (Phase 20)
+ *  - Tab 4: Account    — User (Lucide), navigates to /account (Phase F13)
  *  - Active tab: filled icon + brand color. Inactive: stroke only + muted.
  *  - Each of the 3 route tabs takes equal width; Account tab shares the
  *    same flex-basis so all four remain evenly spaced.
@@ -84,7 +93,6 @@ import { BookOpen, Pill, Heart, User } from 'lucide-react'
 import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
 import { useBackToTop }             from '../hooks/useBackToTop'
 import { useAuth }                  from '../hooks/useAuth'
-import AccountSheet                 from './ui/AccountSheet'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -94,16 +102,15 @@ export default function BottomNav() {
 
   const keyboardOpen = useKeyboardOpen()
   const { scrollToTop } = useBackToTop()
-  const { user, signInWithGoogle, signOut } = useAuth()
+  const { user } = useAuth()
 
   // Press feedback — which tab (by path) is currently being pressed, if any.
   // Same scale-down-on-pointer-down pattern used elsewhere in the app
   // (SpecialtySelector, sticky specialty pill), just tracked per-tab here
   // since only one button in the row can be pressed at a time. Account
   // uses the same pressedPath state under a synthetic 'account' key since
-  // it isn't a route.
+  // it isn't part of the TABS array below.
   const [pressedPath, setPressedPath] = useState(null)
-  const [accountOpen, setAccountOpen] = useState(false)
 
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
@@ -160,128 +167,120 @@ export default function BottomNav() {
   const accountPressed = pressedPath === 'account'
 
   return (
-    <>
-      <nav style={{
-        position:                'fixed',
-        bottom:                  0,
-        left:                    0,
-        right:                   0,
-        zIndex:                  100,
-        backgroundColor:         'var(--color-surface)',
-        borderTop:               '1px solid var(--color-border)',
-        paddingBottom:           'env(safe-area-inset-bottom)',
-        WebkitTapHighlightColor: 'transparent',
+    <nav style={{
+      position:                'fixed',
+      bottom:                  0,
+      left:                    0,
+      right:                   0,
+      zIndex:                  100,
+      backgroundColor:         'var(--color-surface)',
+      borderTop:               '1px solid var(--color-border)',
+      paddingBottom:           'env(safe-area-inset-bottom)',
+      WebkitTapHighlightColor: 'transparent',
+    }}>
+      <div style={{
+        maxWidth:   680,
+        margin:     '0 auto',
+        display:    'flex',
+        alignItems: 'stretch',
+        height:     60,
       }}>
-        <div style={{
-          maxWidth:   680,
-          margin:     '0 auto',
-          display:    'flex',
-          alignItems: 'stretch',
-          height:     60,
-        }}>
-          {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
-            const active  = isActive(path)
-            const pressed = pressedPath === path
-            return (
-              <button
-                key={path}
-                onClick={() => handleTabTap(path)}
-                onPointerDown={() => setPressedPath(path)}
-                onPointerUp={() => setPressedPath(null)}
-                onPointerLeave={() => setPressedPath(null)}
-                aria-label={label}
-                aria-current={active ? 'page' : undefined}
-                style={{
-                  flex:                    '1 1 0',
-                  display:                 'flex',
-                  flexDirection:           'column',
-                  alignItems:              'center',
-                  justifyContent:          'center',
-                  gap:                     3,
-                  border:                  'none',
-                  background:              'none',
-                  cursor:                  'pointer',
-                  // Active: accent (or a tab's own activeColor override).
-                  // Inactive: text-secondary (was text-tertiary — increased
-                  // contrast so tabs are clearly readable at rest).
-                  color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
-                  transform:               pressed ? 'scale(0.92)' : 'scale(1)',
-                  transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
-                  fontFamily:              'var(--font-body)',
-                  padding:                 '8px 0',
-                  outline:                 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <Icon
-                  size={22}
-                  strokeWidth={active ? 2.5 : 2.0}
-                  fill={active && fillWhenActive ? 'currentColor' : 'none'}
-                />
-                <span style={{
-                  fontSize:      10,
-                  fontWeight:    active ? 600 : 500,
-                  letterSpacing: '0.01em',
-                }}>
-                  {label}
-                </span>
-              </button>
-            )
-          })}
+        {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
+          const active  = isActive(path)
+          const pressed = pressedPath === path
+          return (
+            <button
+              key={path}
+              onClick={() => handleTabTap(path)}
+              onPointerDown={() => setPressedPath(path)}
+              onPointerUp={() => setPressedPath(null)}
+              onPointerLeave={() => setPressedPath(null)}
+              aria-label={label}
+              aria-current={active ? 'page' : undefined}
+              style={{
+                flex:                    '1 1 0',
+                display:                 'flex',
+                flexDirection:           'column',
+                alignItems:              'center',
+                justifyContent:          'center',
+                gap:                     3,
+                border:                  'none',
+                background:              'none',
+                cursor:                  'pointer',
+                // Active: accent (or a tab's own activeColor override).
+                // Inactive: text-secondary (was text-tertiary — increased
+                // contrast so tabs are clearly readable at rest).
+                color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
+                transform:               pressed ? 'scale(0.92)' : 'scale(1)',
+                transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
+                fontFamily:              'var(--font-body)',
+                padding:                 '8px 0',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Icon
+                size={22}
+                strokeWidth={active ? 2.5 : 2.0}
+                fill={active && fillWhenActive ? 'currentColor' : 'none'}
+              />
+              <span style={{
+                fontSize:      10,
+                fontWeight:    active ? 600 : 500,
+                letterSpacing: '0.01em',
+              }}>
+                {label}
+              </span>
+            </button>
+          )
+        })}
 
-          {/* Account — Phase 20. Opens AccountSheet instead of navigating,
-              so it sits outside the TABS/isActive machinery above. Filled +
-              accent while signed in (mirrors the other tabs' active
-              treatment) so sign-in state reads at a glance without opening
-              the sheet; outline + muted while signed out. */}
-          <button
-            onClick={() => setAccountOpen(true)}
-            onPointerDown={() => setPressedPath('account')}
-            onPointerUp={() => setPressedPath(null)}
-            onPointerLeave={() => setPressedPath(null)}
-            aria-label="Account"
-            style={{
-              flex:                    '1 1 0',
-              display:                 'flex',
-              flexDirection:           'column',
-              alignItems:              'center',
-              justifyContent:          'center',
-              gap:                     3,
-              border:                  'none',
-              background:              'none',
-              cursor:                  'pointer',
-              color:                   user ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-              transform:               accountPressed ? 'scale(0.92)' : 'scale(1)',
-              transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
-              fontFamily:              'var(--font-body)',
-              padding:                 '8px 0',
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <User
-              size={22}
-              strokeWidth={user ? 2.5 : 2.0}
-              fill={user ? 'currentColor' : 'none'}
-            />
-            <span style={{
-              fontSize:      10,
-              fontWeight:    user ? 600 : 500,
-              letterSpacing: '0.01em',
-            }}>
-              Account
-            </span>
-          </button>
-        </div>
-      </nav>
-
-      <AccountSheet
-        isOpen={accountOpen}
-        onClose={() => setAccountOpen(false)}
-        user={user}
-        signInWithGoogle={signInWithGoogle}
-        signOut={signOut}
-      />
-    </>
+        {/* Account — Phase 20, now a real route as of Phase F13 Mini-stage 1.
+            Navigates to /account instead of opening AccountSheet, so it
+            sits outside the TABS/isActive machinery above (its color still
+            reflects sign-in state only, unchanged from Phase 20 — not tied
+            to whether /account itself is the active route). Filled + accent
+            while signed in so sign-in state reads at a glance; outline +
+            muted while signed out. */}
+        <button
+          onClick={() => navigate('/account')}
+          onPointerDown={() => setPressedPath('account')}
+          onPointerUp={() => setPressedPath(null)}
+          onPointerLeave={() => setPressedPath(null)}
+          aria-label="Account"
+          style={{
+            flex:                    '1 1 0',
+            display:                 'flex',
+            flexDirection:           'column',
+            alignItems:              'center',
+            justifyContent:          'center',
+            gap:                     3,
+            border:                  'none',
+            background:              'none',
+            cursor:                  'pointer',
+            color:                   user ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            transform:               accountPressed ? 'scale(0.92)' : 'scale(1)',
+            transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
+            fontFamily:              'var(--font-body)',
+            padding:                 '8px 0',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <User
+            size={22}
+            strokeWidth={user ? 2.5 : 2.0}
+            fill={user ? 'currentColor' : 'none'}
+          />
+          <span style={{
+            fontSize:      10,
+            fontWeight:    user ? 600 : 500,
+            letterSpacing: '0.01em',
+          }}>
+            Account
+          </span>
+        </button>
+      </div>
+    </nav>
   )
 }

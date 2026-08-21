@@ -14,8 +14,12 @@ import NotificationsBanner from './ui/NotificationsBanner'
  * Favourites and Conditions. Only the drug LIST route ('/drugs' exact) was
  * missing here — the drug DETAIL prefix ('/drugs/') was already suppressed
  * separately below, which is why this was easy to miss.
+ *
+ * '/account' added (Phase F13 Mini-stage 1) — AccountScreen renders its own
+ * "Account" heading in place of the shared logo header, same as the other
+ * three bottom-nav destinations above.
  */
-const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites', '/drugs']
+const HEADER_SUPPRESSED_ROUTES = ['/', '/conditions', '/favourites', '/drugs', '/account']
 
 /**
  * Route prefixes that render their own top section and suppress the shared

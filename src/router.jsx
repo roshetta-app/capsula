@@ -5,6 +5,11 @@
  * Phase 3K — Added /admin/crash-logs and /admin/notifications routes
  * Phase 3L — Added /admin/audit-log route
  * Phase F11 Stage 2 — Added /admin/users route
+ * Phase F13 Mini-stage 1 — Added /account route (Account tab now navigates
+ *             here instead of opening AccountSheet as a popup). Placed in
+ *             the same shared Layout group as Conditions/Drugs/Favourites
+ *             so BottomNav stays visible and Layout's mount-once behavior
+ *             (NotificationsBanner state, etc.) is unaffected.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -21,6 +26,7 @@ import ConditionDetailScreen from './pages/ConditionDetailScreen'
 import DrugsScreen           from './pages/DrugsScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
+import AccountScreen         from './pages/AccountScreen'
 
 // ─── Admin screens ────────────────────────────────────────────────────────────
 
@@ -50,6 +56,7 @@ export const ROUTES = {
   DRUGS_CATEGORY:    (slug) => `/drugs/category/${slug}`,
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
+  ACCOUNT:           '/account',
 
   // Admin
   ADMIN_LOGIN:            '/admin/login',
@@ -77,10 +84,10 @@ export default function AppRoutes() {
 
       {/* ── Public routes ────────────────────────────────────────────────── */}
 
-      {/* Conditions, Drugs, and Favourites share one Layout instance that
-          stays mounted while switching between them — this is what keeps
-          NotificationsBanner (rendered inside Layout) from resetting its
-          state on every tab switch. Layout suppresses its own header/
+      {/* Conditions, Drugs, Favourites, and Account share one Layout instance
+          that stays mounted while switching between them — this is what
+          keeps NotificationsBanner (rendered inside Layout) from resetting
+          its state on every tab switch. Layout suppresses its own header/
           padding for these routes internally (see HEADER_SUPPRESSED_ROUTES
           in layout.jsx), so nothing else needed to change here. */}
       <Route element={<Layout><Outlet /></Layout>}>
@@ -89,6 +96,7 @@ export default function AppRoutes() {
         <Route path="/drugs"                        element={<DrugsScreen />} />
         <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
         <Route path="/favourites"          element={<FavouritesScreen />} />
+        <Route path="/account"             element={<AccountScreen />} />
       </Route>
 
       {/* Detail screens render their own header/scroll setup and stay
