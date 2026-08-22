@@ -1,8 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Bug fix, 2026-08-22 (fresh-install-still-signed-in) — allowBackup
+         was left at Android's default of true, with no rules excluding
+         anything. Android's own auto-backup silently saves the app's
+         SharedPreferences to the signed-in Google account on uninstall
+         (this is exactly where the Supabase session lives — see
+         capacitorPreferencesStorageAdapter in src/lib/supabase.js) and
+         restores it automatically on the next install of this same app
+         on this same account — so an uninstall/reinstall never actually
+         produced a clean slate: the old session, and everything tied to
+         it (favourites, recently viewed), came back on its own before
+         the person ever signed back in. false stops Android from backing
+         up or restoring any of this app's data, so a real uninstall now
+         means a real clean slate, matching what "uninstall" is supposed
+         to mean. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -71,3 +85,5 @@
          reaches the screen. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>
+
+

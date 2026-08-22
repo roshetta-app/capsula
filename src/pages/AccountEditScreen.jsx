@@ -15,6 +15,11 @@
  * Reachable only from a signed-in AccountScreen row; if somehow reached
  * while signed out (e.g. a stale bookmark), redirects back to /account
  * rather than rendering a broken form with no user id to load against.
+ *
+ * account-screen-redesign — after a successful save, also calls
+ * AuthContext's refreshProfile() so the name shown on AccountScreen (now
+ * read from shared Context, not its own fetch) updates immediately
+ * instead of only after a full sign-out/sign-in.
  */
 
 import { useState, useEffect } from 'react'
@@ -57,7 +62,7 @@ function ProfileField({ label, last, children }) {
 }
 
 export default function AccountEditScreen() {
-  const { user, loading } = useAuth()
+  const { user, loading, refreshProfile } = useAuth()
   const navigate = useNavigate()
 
   const [profileFields, setProfileFields] = useState({
@@ -116,6 +121,7 @@ export default function AccountEditScreen() {
     setSaveSuccess(false)
     try {
       await updateOwnProfile(supabase, user.id, profileFields)
+      await refreshProfile()
       setSaveSuccess(true)
     } catch (err) {
       setSaveError(err.message ?? 'Could not save. Please try again.')

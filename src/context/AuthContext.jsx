@@ -1,3 +1,4 @@
+
 /**
  * src/context/AuthContext.jsx
  *
@@ -23,6 +24,15 @@
  *
  * src/hooks/useAuth.js now just re-exports useAuth from here — every
  * existing call site keeps working completely unchanged.
+ *
+ * full_name added to the profile load (account-screen-redesign task) —
+ * previously this only carried role/tier, and the person's name was
+ * fetched separately, fresh, every time AccountScreen mounted, causing a
+ * visible delay before the name/avatar appeared. Loading it here instead
+ * means it's ready at the same time as role/tier, with no extra
+ * round-trip. refreshProfile is exposed so AccountEditScreen can pull the
+ * new name in right after a save, without this only updating on the next
+ * sign-in/sign-out/token-refresh.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
@@ -130,11 +140,19 @@ export function AuthProvider({ children }) {
     }
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, tier')
+      .select('role, tier, full_name, theme_preference')
       .eq('id', currentUser.id)
       .single()
 
-    setProfile(error ? null : data)
+    // theme_preference rides along on this same already-happening request —
+    // no extra round-trip — so useDarkMode's account-sync effect has it as
+    // soon as the profile loads, same timing full_name already gets.
+    setProfile(error ? null : {
+      role:            data.role,
+      tier:            data.tier,
+      fullName:        data.full_name,
+      themePreference: data.theme_preference,
+    })
   }, [])
 
   useEffect(() => {
@@ -268,7 +286,13 @@ export function AuthProvider({ children }) {
     await supabase.auth.signOut()
   }
 
-  const value = { user, profile, loading, signIn, signInWithGoogle, signOut }
+  // account-screen-redesign — lets a screen that just changed the name
+  // (AccountEditScreen, after a successful save) pull the fresh value
+  // back into this shared Context immediately, instead of the rest of
+  // the app only seeing it on the next sign-in/sign-out/token-refresh.
+  const refreshProfile = useCallback(() => loadProfile(user), [user, loadProfile])
+
+  const value = { user, profile, loading, signIn, signInWithGoogle, signOut, refreshProfile }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }
 

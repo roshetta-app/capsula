@@ -25,8 +25,11 @@
  *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
- *   ConditionProvider → DrugProvider → FavouritesProvider →
+ *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
  *   PushSubscriptionProvider → OnboardingGate → AppRoutes
+ *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
+ *   inside AuthProvider since it reads useAuth() internally, and outside
+ *   everything that might read the theme.)
  *   (ProfileSetupModal is mounted as a sibling to OnboardingGate, not
  *   nested inside it — F13 Mini-stage 4, added 2026-08-21. It's not a
  *   route and not gated by the device-level onboarding flow; it checks
@@ -41,20 +44,28 @@ import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
 import ProfileSetupModal from './components/ProfileSetupModal'
 import { AuthProvider } from './context/AuthContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
-import { useDarkMode } from './hooks/useDarkMode'
 import { useVisualViewport } from './hooks/useVisualViewport'
 
 const ROUTER_BASENAME = import.meta.env.MODE === 'capacitor' ? '' : '/capsula'
 
+// account-theme-sync bugfix (2026-08-22): the previous fix for App.jsx
+// calling useDarkMode() outside AuthProvider's subtree (a ThemeInit
+// component, rendered as AuthProvider's child) is now superseded —
+// useDarkMode itself moved to a real shared Context (ThemeProvider,
+// below), the correct fix for a deeper bug that one only partly
+// addressed: every separate call site of the old plain-hook version held
+// its own unsynced copy of the theme. ThemeProvider needs to sit inside
+// AuthProvider (it reads useAuth() internally) and outside/around
+// everything that might read the theme (Account screen, Conditions
+// screen, both deep inside AppRoutes) — see the provider tree below.
 export default function App() {
-  useDarkMode() // applies/removes .dark on <html> based on OS preference
-
   // Keeps --viewport-height on :root in sync with the real, live visual
   // viewport height. Called once here so every screen and every shared
   // element (body, Layout) can use that single trustworthy number instead
@@ -75,21 +86,24 @@ export default function App() {
       <BrowserRouter basename={ROUTER_BASENAME}>
         <ToastProvider>
           <AuthProvider>
-            <ConditionProvider>
-              <DrugProvider>
-                <FavouritesProvider>
-                  <PushSubscriptionProvider>
-                    <OnboardingGate>
-                      <AppRoutes />
-                    </OnboardingGate>
-                    <ProfileSetupModal />
-                  </PushSubscriptionProvider>
-                </FavouritesProvider>
-              </DrugProvider>
-            </ConditionProvider>
+            <ThemeProvider>
+              <ConditionProvider>
+                <DrugProvider>
+                  <FavouritesProvider>
+                    <PushSubscriptionProvider>
+                      <OnboardingGate>
+                        <AppRoutes />
+                      </OnboardingGate>
+                      <ProfileSetupModal />
+                    </PushSubscriptionProvider>
+                  </FavouritesProvider>
+                </DrugProvider>
+              </ConditionProvider>
+            </ThemeProvider>
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>
     </ErrorBoundary>
   )
 }
+

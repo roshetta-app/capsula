@@ -70,6 +70,15 @@
  *             were only ever passed through to the sheet. `user` is still
  *             read for the tab's signed-in/signed-out color treatment,
  *             which is unchanged from Phase 20.
+ * Phase F13 Mini-stage 5 follow-up — Account tab's active (filled+accent)
+ *             state now matches how the other three tabs behave: filled
+ *             only while /account is the open screen, driven by
+ *             location.pathname like isActive/isExactScreen already do
+ *             for the TABS array. Previously it was filled+accent purely
+ *             for being signed in, regardless of which tab was open,
+ *             which didn't match the rest of the bar. Signed-in state is
+ *             now a small dot on the icon instead, shown independently of
+ *             which tab is currently active.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
@@ -166,6 +175,12 @@ export default function BottomNav() {
 
   const accountPressed = pressedPath === 'account'
 
+  // Account isn't part of TABS (it's handled separately below, same as
+  // before), but its active state now follows the exact same rule as the
+  // other three tabs — filled + accent only while /account is the actual
+  // open screen, not tied to sign-in.
+  const accountActive = location.pathname === '/account'
+
   return (
     <nav style={{
       position:                'fixed',
@@ -236,18 +251,17 @@ export default function BottomNav() {
         })}
 
         {/* Account — Phase 20, now a real route as of Phase F13 Mini-stage 1.
-            Navigates to /account instead of opening AccountSheet, so it
-            sits outside the TABS/isActive machinery above (its color still
-            reflects sign-in state only, unchanged from Phase 20 — not tied
-            to whether /account itself is the active route). Filled + accent
-            while signed in so sign-in state reads at a glance; outline +
-            muted while signed out. */}
+            Active state (filled + accent) now matches the other three tabs:
+            it reflects whether /account is the open screen, not sign-in
+            state. Signed-in state shows as a small dot on the icon instead,
+            independent of whether the tab is currently active. */}
         <button
           onClick={() => navigate('/account')}
           onPointerDown={() => setPressedPath('account')}
           onPointerUp={() => setPressedPath(null)}
           onPointerLeave={() => setPressedPath(null)}
           aria-label="Account"
+          aria-current={accountActive ? 'page' : undefined}
           style={{
             flex:                    '1 1 0',
             display:                 'flex',
@@ -258,7 +272,7 @@ export default function BottomNav() {
             border:                  'none',
             background:              'none',
             cursor:                  'pointer',
-            color:                   user ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            color:                   accountActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
             transform:               accountPressed ? 'scale(0.92)' : 'scale(1)',
             transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
             fontFamily:              'var(--font-body)',
@@ -267,14 +281,31 @@ export default function BottomNav() {
             WebkitTapHighlightColor: 'transparent',
           }}
         >
-          <User
-            size={22}
-            strokeWidth={user ? 2.5 : 2.0}
-            fill={user ? 'currentColor' : 'none'}
-          />
+          <div style={{ position: 'relative', display: 'flex' }}>
+            <User
+              size={22}
+              strokeWidth={accountActive ? 2.5 : 2.0}
+              fill={accountActive ? 'currentColor' : 'none'}
+            />
+            {user && (
+              <span
+                aria-hidden="true"
+                style={{
+                  position:        'absolute',
+                  top:             -1,
+                  right:           -1,
+                  width:           7,
+                  height:          7,
+                  borderRadius:    'var(--radius-full)',
+                  backgroundColor: 'var(--color-accent)',
+                  border:          '1.5px solid var(--color-surface)',
+                }}
+              />
+            )}
+          </div>
           <span style={{
             fontSize:      10,
-            fontWeight:    user ? 600 : 500,
+            fontWeight:    accountActive ? 600 : 500,
             letterSpacing: '0.01em',
           }}>
             Account

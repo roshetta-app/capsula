@@ -213,12 +213,41 @@ function SkeletonCard() {
 }
 
 // ─── Dark mode toggle button ──────────────────────────────────────────────────
+// account-theme-sync follow-up (2026-08-22): extended from a plain on/off to
+// the same 3-way Light/Dark/System model as the Account screen's segmented
+// control. No room here for a 3-option pill in this compact brand row, so
+// this stays a single 36px icon button that cycles Light → Dark → System →
+// Light on each tap instead — same footprint as before, all three states
+// reachable, so this no longer locks someone out of System the way the old
+// binary toggle did. Icon shown is the DESTINATION state (what tapping goes
+// to), same convention this button already used (sun shown while dark, i.e.
+// "tap for light" — not "currently light").
 
-function DarkModeToggle({ isDark, onToggle }) {
+const THEME_CYCLE = ['light', 'dark', 'system']
+
+function nextInThemeCycle(theme) {
+  const i = THEME_CYCLE.indexOf(theme)
+  return THEME_CYCLE[(i + 1) % THEME_CYCLE.length]
+}
+
+function DarkModeToggle({ theme, onCycleTheme }) {
+  // account-theme-sync follow-up (2026-08-22): this used to show the icon
+  // for `next` — the theme tapping would switch TO — while AccountScreen's
+  // 3-way control shows the CURRENTLY selected option. Same underlying
+  // value the whole time, just displayed two different ways, which read as
+  // a genuine mismatch between the two screens. Now shows `theme` (current)
+  // here too, so both screens always visually agree on what's active.
+  // Tapping still advances via nextInThemeCycle(theme) — see BrandRow's
+  // onCycleTheme prop below — only the displayed icon/label changed.
+  const labels = {
+    light:  'Light mode — tap to switch',
+    dark:   'Dark mode — tap to switch',
+    system: 'System theme — tap to switch',
+  }
   return (
     <button
-      onClick={onToggle}
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      onClick={onCycleTheme}
+      aria-label={labels[theme]}
       style={{
         width:                   36,
         height:                  36,
@@ -236,7 +265,7 @@ function DarkModeToggle({ isDark, onToggle }) {
         WebkitTapHighlightColor: 'transparent',
       }}
     >
-      {isDark ? (
+      {theme === 'light' && (
         /* Sun icon */
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -250,11 +279,25 @@ function DarkModeToggle({ isDark, onToggle }) {
           <line x1="4.22" y1="19.78"  x2="5.64" y2="18.36"/>
           <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
         </svg>
-      ) : (
+      )}
+      {theme === 'dark' && (
         /* Moon icon */
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      )}
+      {theme === 'system' && (
+        /* Monitor icon — hand-drawn to match this button's existing
+           sun/moon glyphs (24 viewBox, round caps) rather than importing
+           lucide's Monitor, even though lucide is already used elsewhere
+           in this file for other icons — keeps this one button's own
+           established icon style internally consistent. */
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
         </svg>
       )}
     </button>
@@ -362,7 +405,7 @@ function RotatingTagline({
 
 // ─── Brand row + headline ─────────────────────────────────────────────────────
 
-function BrandRow({ isSearching, isDark, onToggleDark, onOpenNotifications, brandRowRef }) {
+function BrandRow({ isSearching, theme, onCycleTheme, onOpenNotifications, brandRowRef }) {
   return (
     <div ref={brandRowRef} style={{
       paddingTop:    'var(--space-5)',
@@ -417,7 +460,7 @@ function BrandRow({ isSearching, isDark, onToggleDark, onOpenNotifications, bran
         </button>
 
         {/* Dark mode toggle — top right */}
-        <DarkModeToggle isDark={isDark} onToggle={onToggleDark} />
+        <DarkModeToggle theme={theme} onCycleTheme={onCycleTheme} />
       </div>
 
       {!isSearching && (
@@ -718,7 +761,7 @@ export default function ConditionsScreen() {
     results, resultCount,
   } = useConditionContext()
   const { isConditionFavourited }             = useFavouritesContext()
-  const { isDark, toggleDark }               = useDarkMode()
+  const { isDark, theme, setTheme }          = useDarkMode()
 
   const [bottomSheetOpen, setBottomSheetOpen]     = useState(false)
   const [notifSheetOpen, setNotifSheetOpen]       = useState(false)
@@ -1018,8 +1061,8 @@ export default function ConditionsScreen() {
         <div style={entranceStyle(0)}>
           <BrandRow
             isSearching={isSearching}
-            isDark={isDark}
-            onToggleDark={toggleDark}
+            theme={theme}
+            onCycleTheme={() => setTheme(nextInThemeCycle(theme))}
             onOpenNotifications={() => setNotifSheetOpen(true)}
             brandRowRef={brandRowRef}
           />

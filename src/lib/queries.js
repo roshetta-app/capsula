@@ -511,7 +511,7 @@ export async function fetchOwnProfile(supabase, userId) {
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
- * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string, profileSetupDismissed?: boolean }} updates
+ * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string, profileSetupDismissed?: boolean, themePreference?: 'light'|'dark'|'system' }} updates
  */
 export async function updateOwnProfile(supabase, userId, updates) {
   const dbUpdates = {}
@@ -521,6 +521,7 @@ export async function updateOwnProfile(supabase, userId, updates) {
   if ('country'                in updates) dbUpdates.country                 = updates.country
   if ('governorate'            in updates) dbUpdates.governorate             = updates.governorate
   if ('profileSetupDismissed'  in updates) dbUpdates.profile_setup_dismissed = updates.profileSetupDismissed
+  if ('themePreference'        in updates) dbUpdates.theme_preference        = updates.themePreference
 
   const { error } = await supabase
     .from('profiles')
