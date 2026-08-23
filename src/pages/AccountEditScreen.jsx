@@ -436,7 +436,7 @@ export default function AccountEditScreen() {
 
   const genderLabel = GENDER_LABELS[saved.gender] || ''
   const phoneLabel = saved.phoneNumber ? `${saved.phoneCountryCode} ${saved.phoneNumber}` : ''
-  const isPhysician = saved.occupation === 'Specialist Physician' || saved.occupation === 'Resident Physician'
+  const isPhysician = saved.occupation === 'Specialist Physician' || saved.occupation === 'Junior Resident Physician' || saved.occupation === 'Senior Resident Physician'
   const isStudent = saved.occupation === 'Medical Student'
   // Same display rules as ProfileWizard's OCCUPATION_OPTIONS: "Medical
   // Student" shows as "Student", and "Other" shows the person's own typed
@@ -514,17 +514,24 @@ export default function AccountEditScreen() {
               onClick={handleStartEdit}
               aria-label="Edit profile"
               style={{
-                border:     'none',
-                background: 'none',
-                padding:    'var(--space-1)',
-                display:    'flex',
-                alignItems: 'center',
-                cursor:     'pointer',
-                color:      'var(--color-accent)',
-                flexShrink: 0,
+                display:                 'flex',
+                alignItems:              'center',
+                gap:                     6,
+                border:                  'none',
+                backgroundColor:         'var(--color-accent-light)',
+                borderRadius:            999,
+                padding:                 'var(--space-1) var(--space-3)',
+                cursor:                  'pointer',
+                color:                   'var(--color-accent)',
+                fontSize:                13,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                flexShrink:              0,
+                WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <Pencil size={19} strokeWidth={1.8} />
+              <Pencil size={15} strokeWidth={1.8} />
+              Edit
             </button>
           ))
         )}

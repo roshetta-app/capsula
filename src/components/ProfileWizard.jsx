@@ -76,7 +76,8 @@ const GENDER_OPTIONS = [
 // repeating "student" right next to the Student Type field below it.
 const OCCUPATION_OPTIONS = [
   { value: 'Specialist Physician', label: 'Specialist Physician' },
-  { value: 'Resident Physician',   label: 'Resident Physician' },
+  { value: 'Junior Resident Physician', label: 'Junior Resident Physician' },
+  { value: 'Senior Resident Physician', label: 'Senior Resident Physician' },
   { value: 'General Practitioner', label: 'General Practitioner' },
   { value: 'Intern Doctor',        label: 'Intern Doctor' },
   { value: 'Medical Student',      label: 'Student' },
@@ -99,6 +100,7 @@ const SPECIALTY_OPTIONS = [
   'Cardiology',
   'Cardiothoracic Surgery',
   'Clinical Pathology',
+  'Critical Care Medicine (ICU)',
   'Dermatology',
   'Emergency Medicine',
   'Endocrinology & Diabetes',
@@ -760,7 +762,7 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
       const next = { ...prev, [field]: value }
       // Conditional-field clearing per the agreed spec's exact rules.
       if (field === 'occupation') {
-        if (value !== 'Specialist Physician' && value !== 'Resident Physician') next.specialty = ''
+        if (value !== 'Specialist Physician' && value !== 'Junior Resident Physician' && value !== 'Senior Resident Physician') next.specialty = ''
         if (value !== 'Medical Student') next.studentType = ''
         if (value !== 'Other') next.occupationOther = ''
       }
@@ -779,7 +781,7 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
   }
 
   const selectedCountry     = COUNTRIES.find(c => c.iso2 === DIAL_TO_ISO2[values.phoneCountryCode])
-  const showSpecialty       = values.occupation === 'Specialist Physician' || values.occupation === 'Resident Physician'
+  const showSpecialty       = values.occupation === 'Specialist Physician' || values.occupation === 'Junior Resident Physician' || values.occupation === 'Senior Resident Physician'
   const showStudentType     = values.occupation === 'Medical Student'
   const showOccupationOther = values.occupation === 'Other'
 
@@ -846,6 +848,47 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
     <div style={{
       fontFamily: 'var(--font-body)',
     }}>
+      {/* wizard-header-both-steps: avatar + email render above the progress
+          bar on both step 1 and step 2 — swapped ahead of the progress bar
+          (was below it) per explicit ordering request, same day. */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
+        {avatarUrl && !avatarError ? (
+          <img
+            src={avatarUrl}
+            alt=""
+            onError={() => setAvatarError(true)}
+            style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-border)' }}
+          />
+        ) : (
+          <div style={{
+            width:           72,
+            height:          72,
+            borderRadius:    '50%',
+            backgroundColor: 'var(--color-accent)',
+            color:           '#fff',
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            fontSize:        24,
+            fontWeight:      600,
+          }}>
+            {initials}
+          </div>
+        )}
+      </div>
+
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        gap:            'var(--space-1)',
+        color:          'var(--color-text-secondary)',
+        marginBottom:   'var(--space-4)',
+      }}>
+        <Mail size={15} strokeWidth={1.8} />
+        <span style={{ fontSize: 15 }}>{user?.email ?? ''}</span>
+      </div>
+
       {/* ── Progress bar (2 segments), with Skip alongside it ──
           profile-nudge-system: Skip only ever renders on step 1, and only
           when the caller passed onSkip (the forced first-time signup
@@ -922,49 +965,6 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
             <h2 style={{ margin: '0 0 var(--space-4)', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>
               Personal info
             </h2>
-
-            {/* Photo — read-only, pulled live from Google sign-in data, never uploaded/stored */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-              {avatarUrl && !avatarError ? (
-                <img
-                  src={avatarUrl}
-                  alt=""
-                  onError={() => setAvatarError(true)}
-                  style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-border)' }}
-                />
-              ) : (
-                <div style={{
-                  width:           72,
-                  height:          72,
-                  borderRadius:    '50%',
-                  backgroundColor: 'var(--color-accent)',
-                  color:           '#fff',
-                  display:         'flex',
-                  alignItems:      'center',
-                  justifyContent:  'center',
-                  fontSize:        24,
-                  fontWeight:      600,
-                }}>
-                  {initials}
-                </div>
-              )}
-            </div>
-
-            {/* wizard-email-under-avatar: read-only email row, same
-                icon+text treatment AccountScreen's own profile header uses
-                (Mail size 15, text-secondary color) — moved here from its
-                own WizardField further down the card. */}
-            <div style={{
-              display:        'flex',
-              alignItems:     'center',
-              justifyContent: 'center',
-              gap:            'var(--space-1)',
-              color:          'var(--color-text-secondary)',
-              marginBottom:   'var(--space-4)',
-            }}>
-              <Mail size={15} strokeWidth={1.8} />
-              <span style={{ fontSize: 15 }}>{user?.email ?? ''}</span>
-            </div>
 
             <div style={wizardCardStyle}>
               <WizardField

@@ -186,6 +186,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDarkMode } from '../hooks/useDarkMode'
+import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
 import NotificationSheet from '../components/ui/NotificationSheet'
 import InfoSheet from '../components/ui/InfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -232,7 +233,7 @@ function GoogleIcon({ size = 16 }) {
 // the row's own content. The <button> inside still carries the transform,
 // now scale(0.98) (was 0.97) — one notch calmer, since even the lighter
 // full-width-row scale still read as too aggressive in practice.
-function MenuRow({ icon, label, onClick, last }) {
+function MenuRow({ icon, label, stateLabel, onClick, last }) {
   const [pressed, setPressed] = useState(false)
   return (
     <div style={{
@@ -282,6 +283,15 @@ function MenuRow({ icon, label, onClick, last }) {
         }}>
           {label}
         </span>
+        {stateLabel && (
+          <span style={{
+            fontSize:   13,
+            fontWeight: 500,
+            color:      'var(--color-text-tertiary)',
+          }}>
+            {stateLabel}
+          </span>
+        )}
         <ChevronRight size={18} color="var(--color-text-tertiary)" />
       </button>
     </div>
@@ -482,6 +492,7 @@ function SectionLabel({ children }) {
 export default function AccountScreen() {
   const { user, profile, loading, signInWithGoogle, signOut } = useAuth()
   const { theme, setTheme } = useDarkMode()
+  const { subscribed: notificationsOn } = usePushSubscriptionContext()
   const navigate = useNavigate()
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState(null)
@@ -770,8 +781,8 @@ export default function AccountScreen() {
           marginBottom:    'var(--space-3)',
         }}>
           <div style={{
-            width:           56,
-            height:          56,
+            width:           48,
+            height:          48,
             borderRadius:    'var(--radius-full)',
             backgroundColor: 'var(--color-bg)',
             display:         'flex',
@@ -779,7 +790,7 @@ export default function AccountScreen() {
             justifyContent:  'center',
             margin:          '0 auto var(--space-3)',
           }}>
-            <User size={28} color="var(--color-text-secondary)" strokeWidth={1.8} />
+            <User size={22} color="var(--color-text-secondary)" strokeWidth={1.8} />
           </div>
 
           <div style={{
@@ -788,7 +799,7 @@ export default function AccountScreen() {
             color:        'var(--color-text-primary)',
             marginBottom: 'var(--space-2)',
           }}>
-            Create a free account
+            Sign in or create account
           </div>
           <p style={{
             margin:     '0 0 var(--space-4)',
@@ -796,7 +807,7 @@ export default function AccountScreen() {
             lineHeight: 1.55,
             color:      'var(--color-text-secondary)',
           }}>
-            Sign in with Google to keep your favourites synced across devices.
+            Sync your favourites across devices with your Google account.
           </p>
 
           {error && (
@@ -960,6 +971,7 @@ export default function AccountScreen() {
         <MenuRow
           icon={<Bell size={17} strokeWidth={1.8} />}
           label="Notifications"
+          stateLabel={notificationsOn ? 'On' : 'Off'}
           onClick={() => setNotificationsOpen(true)}
           last
         />

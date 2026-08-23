@@ -3,6 +3,7 @@ import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { useNotes } from '../../hooks/useNotes'
+import { useNotesActivityContext } from '../../context/NotesActivityContext'
 
 /**
  * PersonalNotes — personal note for a condition (Phase 3.5).
@@ -83,11 +84,20 @@ import { useNotes } from '../../hooks/useNotes'
  *     user's account and clears the local copy on sign-out. Nothing
  *     about the UI, layout, or copy in this file changed.
  *
+ * Sign-in nudge extension (this session):
+ *   - A signed-out user's first-ever note save for a condition now also
+ *     reports to NotesActivityContext, so the same D12/D16 sign-in prompt
+ *     that already fires after a first favourite can fire after a first
+ *     note too. Reuses the existing empty->populated detection this
+ *     component already computes for its own save-flash animation —
+ *     no new state, just one extra call at that same moment.
+ *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
   const { savedValue, save } = useNotes(conditionId)
+  const { markNoteSaved } = useNotesActivityContext()
 
   const [draft, setDraft] = useState(savedValue)
   const [isEditing, setIsEditing] = useState(false)
@@ -148,7 +158,14 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   function handleSave() {
-    if (!savedValue && draft) setJustPopulated(true)
+    const isFirstSaveForThisCondition = !savedValue && draft
+    if (isFirstSaveForThisCondition) {
+      setJustPopulated(true)
+      // Sign-in nudge (D12/D16 extension) — tell the app-wide notes
+      // signal about this first save, the same way favourites' own count
+      // already triggers the nudge. See NotesActivityContext.jsx.
+      markNoteSaved()
+    }
     save(draft)
     setIsEditing(false)
     triggerSaved()

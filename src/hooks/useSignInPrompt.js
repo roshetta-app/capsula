@@ -5,7 +5,7 @@ const DISMISS_KEY = 'capsula_signin_prompt_dismissed_forever' // localStorage �
 
 /**
  * useSignInPrompt — decides when to auto-open the sign-in popup after a
- * user's first favourite of a visit.
+ * signed-out user's first genuinely useful action of a visit.
  *
  * Per D16: re-asks each new visit (sessionStorage — resets on a fresh
  * tab/session) rather than dismiss-once-forever, unless the user
@@ -13,28 +13,36 @@ const DISMISS_KEY = 'capsula_signin_prompt_dismissed_forever' // localStorage �
  * already signed in — in either of those cases the prompt never
  * auto-opens again.
  *
- * `favouritesCount` should be the total count of favourited items
- * (drugs + conditions combined). The hook watches for it going from 0
- * to 1+ — a first favourite this visit — to trigger the prompt. It only
- * ever auto-fires once per visit even if the count keeps changing.
+ * Two independent triggers, either of which can fire the prompt:
+ *   favouritesCount     — total favourited items (drugs + conditions).
+ *   notesActivityCount  — bumped once per condition the first time a
+ *                          personal note is saved for it this visit (see
+ *                          NotesActivityContext.jsx). Extension added
+ *                          this session — previously favourites-only.
+ * The hook watches each for its own first 0-to-1+ transition. Once either
+ * one has fired the prompt this visit, the session flag stops it firing
+ * again — it's still one prompt per visit, not one per trigger type.
  *
  * Usage:
  *   const { shouldAutoOpen, consumeAutoOpen, dismissForever } =
- *     useSignInPrompt({ isSignedIn: !!user, favouritesCount })
+ *     useSignInPrompt({ isSignedIn: !!user, favouritesCount, notesActivityCount })
  *
  *   useEffect(() => {
  *     if (shouldAutoOpen) { openAccountSheet(); consumeAutoOpen() }
  *   }, [shouldAutoOpen])
  */
-export function useSignInPrompt({ isSignedIn, favouritesCount }) {
+export function useSignInPrompt({ isSignedIn, favouritesCount, notesActivityCount = 0 }) {
   const [shouldAutoOpen, setShouldAutoOpen] = useState(false)
-  const prevCount = useRef(favouritesCount)
+  const prevFavouritesCount = useRef(favouritesCount)
+  const prevNotesActivityCount = useRef(notesActivityCount)
 
   useEffect(() => {
-    const wentFromZero = prevCount.current === 0 && favouritesCount > 0
-    prevCount.current = favouritesCount
+    const favouritesWentFromZero = prevFavouritesCount.current === 0 && favouritesCount > 0
+    const notesWentFromZero = prevNotesActivityCount.current === 0 && notesActivityCount > 0
+    prevFavouritesCount.current = favouritesCount
+    prevNotesActivityCount.current = notesActivityCount
 
-    if (!wentFromZero) return
+    if (!favouritesWentFromZero && !notesWentFromZero) return
     if (isSignedIn) return
 
     let dismissedForever = false
@@ -54,7 +62,7 @@ export function useSignInPrompt({ isSignedIn, favouritesCount }) {
 
     setShouldAutoOpen(true)
     try { sessionStorage.setItem(SESSION_KEY, 'true') } catch { /* ignore */ }
-  }, [favouritesCount, isSignedIn])
+  }, [favouritesCount, notesActivityCount, isSignedIn])
 
   const consumeAutoOpen = useCallback(() => setShouldAutoOpen(false), [])
 

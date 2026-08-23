@@ -23,20 +23,28 @@
  * app-wide, which also fixed a visible load delay on the Edit Profile
  * page (F13 Mini-stage 5 follow-up).
  *
+ * Sign-in nudge fix (this session) — added NotesActivityProvider, inside
+ * FavouritesProvider (no dependency between the two, just grouped with
+ * its sibling), and mounted SignInNudge alongside ProfileSetupRedirect.
+ * SignInNudge is the actual fix: AccountSheet and useSignInPrompt both
+ * already existed but nothing ever rendered them together, so the D12/D16
+ * "prompt after first favourite" nudge never fired. This also extends the
+ * trigger to a signed-out user's first personal note, not just their
+ * first favourite (see NotesActivityContext.jsx).
+ *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
  *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
- *   PushSubscriptionProvider → OnboardingGate → AppRoutes
+ *   NotesActivityProvider → PushSubscriptionProvider → OnboardingGate →
+ *   AppRoutes
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
- *   (ProfileSetupRedirect is mounted as a sibling to OnboardingGate, not
- *   nested inside it — same spot ProfileSetupModal used to sit (F13
- *   Mini-stage 4, 2026-08-21). It's not a route and not gated by the
- *   device-level onboarding flow; it checks its own signed-in-user
- *   condition internally via useAuth(), then navigates rather than
- *   rendering a popup — profile-wizard-redesign, replacing the modal with
- *   a route-based wizard shared by both entry points.)
+ *   (ProfileSetupRedirect and SignInNudge are both mounted as siblings of
+ *   OnboardingGate, not nested inside it — same spot ProfileSetupModal
+ *   used to sit (F13 Mini-stage 4, 2026-08-21). Neither is a route and
+ *   neither is gated by the device-level onboarding flow; both read their
+ *   own conditions internally via context.)
  */
 
 import { useEffect } from 'react'
@@ -46,11 +54,13 @@ import { StatusBar } from '@capacitor/status-bar'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
+import SignInNudge from './components/SignInNudge'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
+import { NotesActivityProvider } from './context/NotesActivityContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -93,12 +103,15 @@ export default function App() {
               <ConditionProvider>
                 <DrugProvider>
                   <FavouritesProvider>
-                    <PushSubscriptionProvider>
-                      <OnboardingGate>
-                        <AppRoutes />
-                      </OnboardingGate>
-                      <ProfileSetupRedirect />
-                    </PushSubscriptionProvider>
+                    <NotesActivityProvider>
+                      <PushSubscriptionProvider>
+                        <OnboardingGate>
+                          <AppRoutes />
+                        </OnboardingGate>
+                        <ProfileSetupRedirect />
+                        <SignInNudge />
+                      </PushSubscriptionProvider>
+                    </NotesActivityProvider>
                   </FavouritesProvider>
                 </DrugProvider>
               </ConditionProvider>
