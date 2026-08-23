@@ -109,6 +109,54 @@
  *             (GoogleIcon, local to this file) before the label for
  *             credibility — same treatment used industry-wide for this
  *             exact button, not a new visual pattern for the app.
+ * account-menu-row-feedback-fix (2026-08-22) — Two fixes to MenuRow's
+ *             press feedback, reported after on-device use: (1) the row
+ *             divider (borderBottom) used to live directly on the
+ *             transformed <button>, so every tap visibly shrank/moved the
+ *             divider line along with the row content — dividers are a
+ *             static layout element between rows, not something that
+ *             should react to a press. Fixed by moving borderBottom onto
+ *             a new non-transformed wrapper <div>, with the <button>
+ *             (still holding the transform) nested inside it — the
+ *             divider now stays perfectly still regardless of press
+ *             state. (2) MenuRow's squeeze toned down further,
+ *             scale(0.97) → scale(0.98) — still visibly distinct from
+ *             rest state but reads calmer for a plain list row. Only
+ *             MenuRow changed; ThemeRow's theme-option pills and the
+ *             standalone Edit Profile / Continue with Google / Logout
+ *             buttons are unaffected (not reported as an issue, and
+ *             ThemeRow was never affected by the divider bug since its
+ *             border lives on its own non-transformed row wrapper
+ *             already).
+ * account-header-logout-icon (2026-08-22) — Logout moved out of a
+ *             standalone full-width button at the very bottom of the page
+ *             into a small icon-only button in the sticky title bar,
+ *             right-aligned opposite the UserCog/title on the left. Same
+ *             ConfirmSheet ("Sign out?") gate as before — only the
+ *             button's location and shape changed, not its behavior.
+ * account-upgrade-card-guest-visibility (2026-08-22) — Plan/Upgrade-to-Pro
+ *             card was previously nested inside the `{user && (...)}`
+ *             block alongside the avatar/name/email profile header, so it
+ *             only ever rendered for signed-in users. Split out into its
+ *             own block that renders unconditionally, right after the
+ *             (still signed-in-only) profile header and before the
+ *             signed-out sign-in card. For a guest, `profile` is null, so
+ *             `profile?.tier === 'pro'` is false and the free-tier
+ *             "Upgrade to Capsula PRO" card shows — same placeholder as
+ *             before, still non-interactive (real trial/paywall logic is
+ *             F8, still blocked). No visual change for signed-in users;
+ *             spacing preserved by moving the outer var(--space-3) bottom
+ *             margin onto the new standalone card wrapper.
+ * account-header-tweaks (2026-08-23) — Sticky title bar: leading UserCog
+ *             icon and its accent-tinted badge circle removed, title now
+ *             stands alone. Title font size 17px -> 15px. Logout button
+ *             gains a "Log out" text label before its icon (was icon-only).
+ * header-skip-country-tweaks (2026-08-23) — Reverses part of the tweak
+ *             directly above, same day: leading UserCog icon + its
+ *             accent-tinted badge circle are back, title bumped
+ *             15px -> 17px (matches AccountEditScreen/AccountFaqScreen
+ *             header size), and the Logout icon shrunk 20px -> 16px so it
+ *             sits proportionally next to its "Log out" text label.
  *
  * Replaces the old AccountSheet popup as the destination for the bottom-nav
  * Account tab. AccountSheet.jsx itself is untouched — it still backs the
@@ -130,11 +178,11 @@
  * header is suppressed for it (see HEADER_SUPPRESSED_ROUTES in layout.jsx).
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  User, LogOut, ChevronRight, Pencil, Bell, HelpCircle, Info, UserCog, Mail,
-  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck,
+  User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
+  Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -178,56 +226,65 @@ function GoogleIcon({ size = 16 }) {
 // Same press-down scale used on BottomNav (pointerdown/up/leave driving a
 // transform via var(--motion-fast)/var(--ease-settle)), just a lighter
 // scale for a full-width row than BottomNav's small icon buttons use.
+// account-menu-row-feedback-fix: the row divider now lives on this outer,
+// non-transformed wrapper — previously it lived directly on the <button>
+// below, so every press visibly shrank/moved the divider line along with
+// the row's own content. The <button> inside still carries the transform,
+// now scale(0.98) (was 0.97) — one notch calmer, since even the lighter
+// full-width-row scale still read as too aggressive in practice.
 function MenuRow({ icon, label, onClick, last }) {
   const [pressed, setPressed] = useState(false)
   return (
-    <button
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      style={{
-        width:                   '100%',
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     'var(--space-3)',
-        padding:                 'var(--space-3)',
-        border:                  'none',
-        borderBottom:            last ? 'none' : '1px solid var(--color-border)',
-        backgroundColor:         'transparent',
-        fontFamily:              'var(--font-body)',
-        textAlign:               'left',
-        cursor:                  'pointer',
-        transform:               pressed ? 'scale(0.97)' : 'scale(1)',
-        transition:              'transform var(--motion-fast) var(--ease-settle)',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      {/* account-screen-visual-refresh: single accent blue (was muted
-          text-secondary on a neutral bg) — see file header note. */}
-      <div style={{
-        width:           32,
-        height:          32,
-        borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-accent-light)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        flexShrink:      0,
-        color:           'var(--color-accent)',
-      }}>
-        {icon}
-      </div>
-      <span style={{
-        flex:       1,
-        fontSize:   14,
-        fontWeight: 500,
-        color:      'var(--color-text-primary)',
-      }}>
-        {label}
-      </span>
-      <ChevronRight size={18} color="var(--color-text-tertiary)" />
-    </button>
+    <div style={{
+      borderBottom: last ? 'none' : '1px solid var(--color-border)',
+    }}>
+      <button
+        onClick={onClick}
+        onPointerDown={() => setPressed(true)}
+        onPointerUp={() => setPressed(false)}
+        onPointerLeave={() => setPressed(false)}
+        style={{
+          width:                   '100%',
+          display:                 'flex',
+          alignItems:              'center',
+          gap:                     'var(--space-3)',
+          padding:                 'var(--space-3)',
+          border:                  'none',
+          backgroundColor:         'transparent',
+          fontFamily:              'var(--font-body)',
+          textAlign:               'left',
+          cursor:                  'pointer',
+          transform:               pressed ? 'scale(0.98)' : 'scale(1)',
+          transition:              'transform var(--motion-fast) var(--ease-settle)',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+      >
+        {/* account-screen-visual-refresh: single accent blue (was muted
+            text-secondary on a neutral bg) — see file header note. */}
+        <div style={{
+          width:           32,
+          height:          32,
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'var(--color-accent-light)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          flexShrink:      0,
+          color:           'var(--color-accent)',
+        }}>
+          {icon}
+        </div>
+        <span style={{
+          flex:       1,
+          fontSize:   14,
+          fontWeight: 500,
+          color:      'var(--color-text-primary)',
+        }}>
+          {label}
+        </span>
+        <ChevronRight size={18} color="var(--color-text-tertiary)" />
+      </button>
+    </div>
   )
 }
 
@@ -320,6 +377,94 @@ function ThemeRow({ theme, onChange, last }) {
   )
 }
 
+// profile-nudge-system: same physician-occupation check AccountEditScreen.jsx
+// already uses to decide whether Specialty applies to this person — kept in
+// sync with that file rather than imported, since it's a two-value string
+// comparison, not worth its own shared util for this.
+function isPhysicianOccupation(occupation) {
+  return occupation === 'Specialist Physician' || occupation === 'Resident Physician'
+}
+
+// profile-nudge-banner-redesign: counts how many required fields are
+// filled in, out of how many apply to this person. Email is counted as
+// always-filled (base 1 of 5, or 1 of 6 for a physician) — every signed-in
+// user has one by definition (Google sign-in), so treating it as real
+// progress means the bar is never fully empty, even on a totally blank
+// profile. The other 4 (name, phone, occupation, country) are counted
+// normally, plus specialty for physicians only.
+function getProfileCompleteness(data) {
+  let total = 5     // email (always) + name + phone + occupation + country
+  let completed = 1 // email always counts
+  if (data?.fullName?.trim())   completed++
+  if (data?.phoneNumber?.trim()) completed++
+  if (data?.occupation?.trim()) completed++
+  if (data?.country?.trim())    completed++
+  if (isPhysicianOccupation(data?.occupation)) {
+    total += 1
+    if (data?.specialty?.trim()) completed++
+  }
+  return { completed, total }
+}
+
+// profile-nudge-banner-redesign: persistent, non-dismissible reminder
+// shown near the top of the signed-in view whenever completed < total. No
+// dismiss/close control by design (independent of wizard-skip state, it
+// should stay until the fields are actually filled) — tapping it is the
+// only way to act on it, same press-feedback convention as the Edit
+// Profile pill above it. Option B from the redesign discussion: title +
+// a slim progress bar only, no fraction/percentage text underneath.
+function ProfileNudgeCard({ completed, total, onClick }) {
+  const [pressed, setPressed] = useState(false)
+  const percent = total > 0 ? Math.round((completed / total) * 100) : 0
+  return (
+    <button
+      onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      style={{
+        width:                   '100%',
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     'var(--space-3)',
+        padding:                 'var(--space-3) var(--space-4)',
+        borderRadius:            'var(--radius-lg)',
+        border:                  '1px solid var(--color-accent)',
+        backgroundColor:         'color-mix(in srgb, var(--color-accent) 10%, transparent)',
+        textAlign:               'left',
+        cursor:                  'pointer',
+        marginBottom:            'var(--space-3)',
+        transform:               pressed ? 'scale(0.98)' : 'scale(1)',
+        transition:              'transform var(--motion-fast) var(--ease-settle)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      <AlertCircle size={20} strokeWidth={1.8} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', marginBottom: 6 }}>
+          Finish setting up your profile
+        </div>
+        <div style={{
+          width:           '100%',
+          height:          6,
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'var(--color-border)',
+          overflow:        'hidden',
+        }}>
+          <div style={{
+            width:           `${percent}%`,
+            height:          '100%',
+            borderRadius:    'var(--radius-full)',
+            backgroundColor: 'var(--color-accent)',
+            transition:      'width var(--motion-fast) var(--ease-settle)',
+          }} />
+        </div>
+      </div>
+      <ChevronRight size={18} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+    </button>
+  )
+}
+
 function SectionLabel({ children }) {
   return (
     <div style={{
@@ -347,6 +492,28 @@ export default function AccountScreen() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [aboutOpen, setAboutOpen]                 = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
+  // account-avatar-broken-image-fallback: a truthy URL doesn't mean the
+  // image actually loads — Google's avatar URLs can 403/expire/CORS-block
+  // depending on session state, which previously left the browser's own
+  // broken-image icon showing instead of falling back to initials. This
+  // tracks a real load failure, not just URL presence.
+  // react-310-hooks-order-fix (2026-08-22): this hook used to sit below
+  // the `if (loading) return null` early return further down — on the
+  // render where loading was still true, React never ran this hook at
+  // all, then ran it on every render after loading flipped to false,
+  // which is exactly what triggers React error #310 ("rendered more
+  // hooks than during the previous render"). Every hook must run
+  // unconditionally on every render, so it moves up here with the rest.
+  const [avatarError, setAvatarError] = useState(false)
+
+  // profile-nudge-instant-load: completeness is now computed directly from
+  // AuthContext's `profile`, which already carries phone/occupation/
+  // country/specialty as of the fix in AuthContext.jsx — no separate fetch,
+  // no wait. `profile` is null until AuthContext's own load finishes, at
+  // which point `loading` (checked below) has already gone false, so by
+  // the time this ever renders, completeness is already known — this is
+  // what removes the beat-long delay before the banner used to appear.
+  const completeness = user ? getProfileCompleteness(profile) : null
 
   async function handleGoogleSignIn() {
     if (busy) return
@@ -386,6 +553,11 @@ export default function AccountScreen() {
 
   const fullName = profile?.fullName
   const initials = user ? getInitials(fullName, user.email) : ''
+  // account-avatar-google-pic: same source AccountEditScreen.jsx and
+  // ProfileWizard.jsx already read — live Google avatar, never
+  // uploaded/stored separately. Falls back to the initials circle below
+  // when signed in without a photo (or on a non-Google-avatar session).
+  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
 
   return (
     <div>
@@ -403,51 +575,122 @@ export default function AccountScreen() {
         zIndex:          50,
         marginLeft:      'calc(-1 * var(--space-6))',
         marginRight:     'calc(-1 * var(--space-6))',
-        backgroundColor: 'var(--color-surface)',
-        borderBottom:    '1px solid var(--color-border)',
-        padding:         'var(--space-3) var(--space-6)',
+        backgroundColor: 'var(--color-bg)',
+        padding:         'var(--space-5) var(--space-6) var(--space-3)',
         marginBottom:    'var(--space-5)',
       }}>
         <div style={{
-          display:    'flex',
-          alignItems: 'center',
-          gap:        'var(--space-3)',
-          maxWidth:   680,
-          margin:     '0 auto',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          gap:            'var(--space-3)',
+          maxWidth:       680,
+          margin:         '0 auto',
         }}>
-          {/* Padding box matches the back button's box model on
-              AccountEditScreen/AccountFaqScreen (var(--space-1) padding,
-              22px icon) so this bar's height lines up with theirs even
-              though this icon isn't a button. */}
           <div style={{
             display:    'flex',
             alignItems: 'center',
-            padding:    'var(--space-1)',
+            gap:        'var(--space-3)',
           }}>
-            <UserCog size={22} strokeWidth={1.8} color="var(--color-text-secondary)" />
+            {/* header-skip-country-tweaks (2026-08-23): leading icon
+                restored — same accent-tinted badge-circle treatment
+                MenuRow already uses for its own icons below (32px circle,
+                var(--color-accent-light) fill, icon in var(--color-accent)),
+                not a new pattern. Title bumped 15px -> 17px to match, same
+                size AccountEditScreen/AccountFaqScreen already use for
+                their own sticky headers. */}
+            <div style={{
+              width:           32,
+              height:          32,
+              borderRadius:    'var(--radius-full)',
+              backgroundColor: 'var(--color-accent-light)',
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+              color:           'var(--color-accent)',
+            }}>
+              <UserCog size={18} strokeWidth={1.8} />
+            </div>
+            <h1 style={{
+              margin:     0,
+              fontSize:   17,
+              fontWeight: 700,
+              color:      'var(--color-text-primary)',
+            }}>
+              Account &amp; Settings
+            </h1>
           </div>
-          <h1 style={{
-            margin:     0,
-            fontSize:   17,
-            fontWeight: 700,
-            color:      'var(--color-text-primary)',
-          }}>
-            Account &amp; Settings
-          </h1>
+
+          {/* account-header-logout-icon: Logout moved from a standalone
+              full-width button at the bottom of the page into a small icon
+              button here, right-aligned in the sticky title bar — same
+              padding-box treatment as the leading UserCog icon above so it
+              lines up vertically, still gated behind the same ConfirmSheet
+              ("Sign out?") as before. Only the icon's location changed. */}
+          {user && (
+            <button
+              onClick={() => setSignOutConfirmOpen(true)}
+              onPointerDown={() => setLogoutPressed(true)}
+              onPointerUp={() => setLogoutPressed(false)}
+              onPointerLeave={() => setLogoutPressed(false)}
+              aria-label="Log out"
+              style={{
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                gap:                     6,
+                padding:                 'var(--space-1) var(--space-2)',
+                border:                  'none',
+                background:              'transparent',
+                cursor:                  'pointer',
+                flexShrink:              0,
+                transform:               logoutPressed ? 'scale(0.9)' : 'scale(1)',
+                transition:              'transform var(--motion-fast) var(--ease-settle)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <span style={{
+                fontSize:   13,
+                fontWeight: 600,
+                color:      'var(--color-danger)',
+              }}>
+                Log out
+              </span>
+              {/* header-skip-country-tweaks (2026-08-23): shrunk
+                  20px -> 16px so it reads proportional to the "Log out"
+                  text label added alongside it in the prior session —
+                  same rough icon-to-text ratio as the Manage Profile
+                  pill's UserCog(14)/text(13) pairing below. */}
+              <LogOut size={16} strokeWidth={1.8} color="var(--color-danger)" />
+            </button>
+          )}
         </div>
       </div>
 
       {user && (
         <div style={{
-          marginBottom: 'var(--space-3)',
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          textAlign:      'center',
+          marginBottom:   'var(--space-4)',
         }}>
-          <div style={{
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            textAlign:      'center',
-            marginBottom:   'var(--space-4)',
-          }}>
+          {avatarUrl && !avatarError ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              onError={() => setAvatarError(true)}
+              style={{
+                width:        72,
+                height:       72,
+                borderRadius: 'var(--radius-full)',
+                objectFit:    'cover',
+                flexShrink:   0,
+                marginBottom: 'var(--space-2)',
+              }}
+            />
+          ) : (
             <div style={{
               width:           72,
               height:          72,
@@ -464,123 +707,56 @@ export default function AccountScreen() {
             }}>
               {initials}
             </div>
+          )}
 
-            {fullName?.trim() && (
-              <div style={{
-                fontSize:     19,
-                fontWeight:   600,
-                color:        'var(--color-text-primary)',
-                marginBottom: 4,
-              }}>
-                {fullName.trim()}
-              </div>
-            )}
-
+          {fullName?.trim() && (
             <div style={{
-              display:    'flex',
-              alignItems: 'center',
-              gap:        'var(--space-1)',
-              color:      'var(--color-text-secondary)',
-              marginBottom: 'var(--space-2)',
+              fontSize:     19,
+              fontWeight:   600,
+              color:        'var(--color-text-primary)',
+              marginBottom: 4,
             }}>
-              <Mail size={15} strokeWidth={1.8} />
-              <span style={{ fontSize: 15 }}>{user.email}</span>
-            </div>
-
-            <button
-              onClick={() => navigate(ROUTES.ACCOUNT_EDIT)}
-              onPointerDown={() => setEditPressed(true)}
-              onPointerUp={() => setEditPressed(false)}
-              onPointerLeave={() => setEditPressed(false)}
-              style={{
-                display:                 'inline-flex',
-                alignItems:              'center',
-                gap:                     'var(--space-2)',
-                padding:                 'var(--space-2) var(--space-4)',
-                borderRadius:            'var(--radius-full)',
-                border:                  '1px solid var(--color-border)',
-                backgroundColor:         'var(--color-surface)',
-                color:                   'var(--color-text-primary)',
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                cursor:                  'pointer',
-                transform:               editPressed ? 'scale(0.97)' : 'scale(1)',
-                transition:              'transform var(--motion-fast) var(--ease-settle)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Pencil size={14} strokeWidth={1.8} />
-              Edit Profile
-            </button>
-          </div>
-
-          {/* Real trial/paywall logic is F8, still blocked on an undecided
-              business question (roadmap Section 5) — this card is a
-              non-interactive placeholder, not yet wired to anything. */}
-          {profile?.tier === 'pro' ? (
-            <div style={{
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              gap:             'var(--space-2)',
-              padding:         'var(--space-2) var(--space-4)',
-              backgroundColor: 'var(--color-bg)',
-              borderRadius:    'var(--radius-sm)',
-            }}>
-              <span style={{
-                display:       'inline-block',
-                backgroundColor: 'var(--color-accent)',
-                color:         '#fff',
-                fontSize:      10,
-                fontWeight:    700,
-                letterSpacing: '0.04em',
-                padding:       '2px 6px',
-                borderRadius:  4,
-              }}>
-                PRO
-              </span>
-              <span style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>plan</span>
-            </div>
-          ) : (
-            <div style={{
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'space-between',
-              gap:             'var(--space-3)',
-              padding:         'var(--space-3)',
-              backgroundColor: 'var(--color-accent)',
-              borderRadius:    'var(--radius-lg)',
-            }}>
-              <div>
-                <div style={{
-                  fontSize:     14,
-                  fontWeight:   600,
-                  color:        '#fff',
-                  marginBottom: 2,
-                }}>
-                  Upgrade to Capsula{' '}
-                  <span style={{
-                    display:       'inline-block',
-                    backgroundColor: '#fff',
-                    color:         'var(--color-accent)',
-                    fontSize:      10,
-                    fontWeight:    700,
-                    letterSpacing: '0.04em',
-                    padding:       '2px 6px',
-                    borderRadius:  4,
-                    verticalAlign: 'middle',
-                  }}>
-                    PRO
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-                  Unlock the full drug &amp; condition library
-                </div>
-              </div>
-              <ChevronRight size={18} color="#fff" style={{ flexShrink: 0 }} />
+              {fullName.trim()}
             </div>
           )}
+
+          <div style={{
+            display:    'flex',
+            alignItems: 'center',
+            gap:        'var(--space-1)',
+            color:      'var(--color-text-secondary)',
+            marginBottom: 'var(--space-2)',
+          }}>
+            <Mail size={15} strokeWidth={1.8} />
+            <span style={{ fontSize: 15 }}>{user.email}</span>
+          </div>
+
+          <button
+            onClick={() => navigate(ROUTES.ACCOUNT_EDIT)}
+            onPointerDown={() => setEditPressed(true)}
+            onPointerUp={() => setEditPressed(false)}
+            onPointerLeave={() => setEditPressed(false)}
+            style={{
+              display:                 'inline-flex',
+              alignItems:              'center',
+              gap:                     'var(--space-2)',
+              padding:                 'var(--space-2) var(--space-4)',
+              borderRadius:            'var(--radius-full)',
+              border:                  '1px solid var(--color-border)',
+              backgroundColor:         'var(--color-surface)',
+              color:                   'var(--color-text-primary)',
+              fontSize:                13,
+              fontWeight:              600,
+              fontFamily:              'var(--font-body)',
+              cursor:                  'pointer',
+              transform:               editPressed ? 'scale(0.97)' : 'scale(1)',
+              transition:              'transform var(--motion-fast) var(--ease-settle)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <UserCog size={14} strokeWidth={1.8} />
+            Manage Profile
+          </button>
         </div>
       )}
 
@@ -680,6 +856,95 @@ export default function AccountScreen() {
         </div>
       )}
 
+      {/* profile-nudge-system: signed-in only, independent of whether the
+          wizard was ever formally completed — driven purely by whether
+          the required fields are actually filled in.
+          open-wizard-directly: passes an explicit flag so tapping this
+          always opens the wizard, even for someone who already dismissed
+          setup once (e.g. via Skip) — AccountEditScreen only opened the
+          wizard automatically for a never-dismissed profile before. */}
+      {user && completeness && completeness.completed < completeness.total && (
+        <ProfileNudgeCard
+          completed={completeness.completed}
+          total={completeness.total}
+          onClick={() => navigate(ROUTES.ACCOUNT_EDIT, { state: { openWizard: true } })}
+        />
+      )}
+
+      {/* account-upgrade-card-guest-visibility: renders regardless of
+          sign-in state (previously nested inside the profile-header block
+          above, signed-in only). For a guest, profile is null, so this
+          always resolves to the free-tier Upgrade card — still a
+          non-interactive placeholder, real trial/paywall logic is F8,
+          still blocked on an undecided business question (roadmap
+          Section 5). Moved below the guest sign-in card (was above) per
+          explicit placement request, same day. */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        {profile?.tier === 'pro' ? (
+          <div style={{
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            gap:             'var(--space-2)',
+            padding:         'var(--space-2) var(--space-4)',
+            backgroundColor: 'var(--color-bg)',
+            borderRadius:    'var(--radius-sm)',
+          }}>
+            <span style={{
+              display:       'inline-block',
+              backgroundColor: 'var(--color-accent)',
+              color:         '#fff',
+              fontSize:      10,
+              fontWeight:    700,
+              letterSpacing: '0.04em',
+              padding:       '2px 6px',
+              borderRadius:  4,
+            }}>
+              PRO
+            </span>
+            <span style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>plan</span>
+          </div>
+        ) : (
+          <div style={{
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'space-between',
+            gap:             'var(--space-3)',
+            padding:         'var(--space-3)',
+            backgroundColor: 'var(--color-accent)',
+            borderRadius:    'var(--radius-lg)',
+          }}>
+            <div>
+              <div style={{
+                fontSize:     14,
+                fontWeight:   600,
+                color:        '#fff',
+                marginBottom: 2,
+              }}>
+                Upgrade to Capsula{' '}
+                <span style={{
+                  display:       'inline-block',
+                  backgroundColor: '#fff',
+                  color:         'var(--color-accent)',
+                  fontSize:      10,
+                  fontWeight:    700,
+                  letterSpacing: '0.04em',
+                  padding:       '2px 6px',
+                  borderRadius:  4,
+                  verticalAlign: 'middle',
+                }}>
+                  PRO
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
+                Unlock the full drug &amp; condition library
+              </div>
+            </div>
+            <ChevronRight size={18} color="#fff" style={{ flexShrink: 0 }} />
+          </div>
+        )}
+      </div>
+
       <SectionLabel>Settings</SectionLabel>
       <div style={{
         backgroundColor: 'var(--color-surface)',
@@ -756,37 +1021,6 @@ export default function AccountScreen() {
           last
         />
       </div>
-
-      {user && (
-        <button
-          onClick={() => setSignOutConfirmOpen(true)}
-          onPointerDown={() => setLogoutPressed(true)}
-          onPointerUp={() => setLogoutPressed(false)}
-          onPointerLeave={() => setLogoutPressed(false)}
-          style={{
-            width:                   '100%',
-            display:                 'flex',
-            alignItems:              'center',
-            justifyContent:          'center',
-            gap:                     'var(--space-2)',
-            padding:                 'var(--space-3)',
-            borderRadius:            'var(--radius-lg)',
-            border:                  '1px solid var(--color-danger)',
-            backgroundColor:         'var(--color-surface)',
-            color:                   'var(--color-danger)',
-            fontSize:                14,
-            fontWeight:              600,
-            fontFamily:              'var(--font-body)',
-            cursor:                  'pointer',
-            transform:               logoutPressed ? 'scale(0.97)' : 'scale(1)',
-            transition:              'transform var(--motion-fast) var(--ease-settle)',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <LogOut size={17} strokeWidth={1.8} />
-          Logout
-        </button>
-      )}
 
       <NotificationSheet
         isOpen={notificationsOpen}

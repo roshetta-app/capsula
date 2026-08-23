@@ -1,4 +1,3 @@
-
 /**
  * src/context/AuthContext.jsx
  *
@@ -33,6 +32,23 @@
  * round-trip. refreshProfile is exposed so AccountEditScreen can pull the
  * new name in right after a save, without this only updating on the next
  * sign-in/sign-out/token-refresh.
+ *
+ * phone_number/occupation/country/specialty added (profile-nudge-instant-
+ * load, 2026-08-23) — same reasoning as full_name above. AccountScreen's
+ * "finish setting up your profile" banner used to run its own separate
+ * fetchOwnProfile() call on every mount and wait on it before deciding
+ * whether to show anything, which is exactly the delay that was reported.
+ * Now that these four fields ride along with the rest of the profile load
+ * that already happens once per app session, AccountScreen reads them
+ * straight off `profile` with no extra round-trip and no visible wait.
+ *
+ * account-header-tweaks (2026-08-23) — profile_setup_dismissed added to
+ * the same load (see loadProfile), and a real SIGNED_IN event now
+ * re-enters `loading` for the duration of that fetch (see the
+ * onAuthStateChange subscription below). Together these close the gap
+ * that let AccountScreen render signed-in for a beat before
+ * ProfileSetupRedirect.jsx could redirect a first-time signup to the
+ * wizard — see that file's own note for the full picture.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
@@ -140,18 +156,36 @@ export function AuthProvider({ children }) {
     }
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, tier, full_name, theme_preference')
+      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed')
       .eq('id', currentUser.id)
       .single()
 
     // theme_preference rides along on this same already-happening request —
     // no extra round-trip — so useDarkMode's account-sync effect has it as
     // soon as the profile loads, same timing full_name already gets.
+    // profile-nudge-instant-load: phone_number/occupation/country/specialty
+    // ride along the same way — AccountScreen's completeness banner used to
+    // run its own separate fetchOwnProfile() on every mount, which is the
+    // visible delay before the banner appeared. Now that data loads here,
+    // at the same time as everything else this Context already carries, and
+    // AccountScreen just reads it straight off `profile` with no wait.
+    // account-header-tweaks (2026-08-23): profile_setup_dismissed added the
+    // same way — ProfileSetupRedirect.jsx used to run its own separate
+    // fetchOwnProfile() call to get this one flag, which resolved later
+    // than (and independently of) this already-in-flight load, and that
+    // gap is what let AccountScreen render signed-in for a beat before the
+    // redirect to the wizard kicked in. Reading it straight off `profile`
+    // like everything else here closes that gap.
     setProfile(error ? null : {
-      role:            data.role,
-      tier:            data.tier,
-      fullName:        data.full_name,
-      themePreference: data.theme_preference,
+      role:                  data.role,
+      tier:                  data.tier,
+      fullName:              data.full_name,
+      themePreference:       data.theme_preference,
+      phoneNumber:           data.phone_number,
+      occupation:            data.occupation,
+      country:               data.country,
+      specialty:             data.specialty,
+      profileSetupDismissed: data.profile_setup_dismissed,
     })
   }, [])
 
@@ -170,8 +204,25 @@ export function AuthProvider({ children }) {
       if (!cancelled) setLoading(false)
     })
 
-    // Subscribe to auth state changes (sign in / sign out / token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Subscribe to auth state changes (sign in / sign out / token refresh).
+    // account-header-tweaks (2026-08-23): a real SIGNED_IN event now
+    // re-enters `loading` for the duration of the profile fetch, the same
+    // way the initial getSession() check above already does. Previously
+    // this handler set `user` immediately but left `loading` false the
+    // whole time profile loaded, so anything gated on `loading` (e.g.
+    // AccountScreen's own `if (loading) return null`) rendered signed-in
+    // right away, before profile_setup_dismissed was known — that's the
+    // gap that let AccountScreen flash briefly before ProfileSetupRedirect
+    // (see that file) could redirect a first-time signup to the wizard.
+    // Scoped to SIGNED_IN only, not TOKEN_REFRESHED/other events, so a
+    // routine background token refresh doesn't re-trigger a loading gate.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        setLoading(true)
+        setUser(session?.user ?? null)
+        loadProfile(session?.user ?? null).finally(() => setLoading(false))
+        return
+      }
       setUser(session?.user ?? null)
       loadProfile(session?.user ?? null)
     })

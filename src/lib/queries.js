@@ -469,20 +469,25 @@ export async function fetchCmsConfig(supabase, key) {
 // ─── Profile queries (F13 Mini-stage 3) ────────────────────────────────────────
 
 /**
- * Fetch the five editable personal-info fields, plus the one-time-prompt
+ * Fetch the editable personal-info fields, plus the one-time-prompt
  * dismissed flag, on the signed-in user's own profiles row. Kept separate
  * from useAuth.js's loadProfile (which only ever needs role/tier) so every
  * component using useAuth() doesn't carry these extra fields — only
- * AccountScreen and ProfileSetupModal need them.
+ * AccountEditScreen/ProfileWizard need them.
+ *
+ * profile-wizard-redesign: added gender, phoneCountryCode, phoneNumber,
+ * studentType (new profiles columns: gender, phone_country_code,
+ * phone_number, student_type). ProfileSetupModal is gone — replaced by
+ * ProfileSetupRedirect + the shared ProfileWizard on AccountEditScreen.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
- * @returns {Promise<{ fullName: string|null, occupation: string|null, specialty: string|null, country: string|null, governorate: string|null, profileSetupDismissed: boolean }>}
+ * @returns {Promise<{ fullName: string|null, occupation: string|null, occupationOther: string|null, specialty: string|null, studentType: string|null, country: string|null, governorate: string|null, gender: string|null, phoneCountryCode: string|null, phoneNumber: string|null, profileSetupDismissed: boolean }>}
  */
 export async function fetchOwnProfile(supabase, userId) {
   const { data, error } = await supabase
     .from('profiles')
-    .select('full_name, occupation, specialty, country, governorate, profile_setup_dismissed')
+    .select('full_name, occupation, occupation_other, specialty, student_type, country, governorate, gender, phone_country_code, phone_number, profile_setup_dismissed')
     .eq('id', userId)
     .single()
 
@@ -491,9 +496,14 @@ export async function fetchOwnProfile(supabase, userId) {
   return {
     fullName:              data.full_name,
     occupation:            data.occupation,
+    occupationOther:       data.occupation_other,
     specialty:             data.specialty,
+    studentType:           data.student_type,
     country:               data.country,
     governorate:           data.governorate,
+    gender:                data.gender,
+    phoneCountryCode:      data.phone_country_code,
+    phoneNumber:           data.phone_number,
     profileSetupDismissed: data.profile_setup_dismissed,
   }
 }
@@ -509,17 +519,29 @@ export async function fetchOwnProfile(supabase, userId) {
  * function trusts that database-level boundary rather than re-checking it
  * here.
  *
+ * profile-wizard-redesign bugfix (2026-08-22): gender, phoneCountryCode,
+ * phoneNumber, studentType were added to fetchOwnProfile's select/return
+ * but were missed here in updateOwnProfile's field map — so the wizard's
+ * Save call silently dropped those four fields on every write (no error,
+ * they just never reached the database). Added them to the map below,
+ * matching fetchOwnProfile's field list exactly.
+ *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} userId
- * @param {{ fullName?: string, occupation?: string, specialty?: string, country?: string, governorate?: string, profileSetupDismissed?: boolean, themePreference?: 'light'|'dark'|'system' }} updates
+ * @param {{ fullName?: string, occupation?: string, occupationOther?: string, specialty?: string, studentType?: string, country?: string, governorate?: string, gender?: string, phoneCountryCode?: string, phoneNumber?: string, profileSetupDismissed?: boolean, themePreference?: 'light'|'dark'|'system' }} updates
  */
 export async function updateOwnProfile(supabase, userId, updates) {
   const dbUpdates = {}
   if ('fullName'               in updates) dbUpdates.full_name               = updates.fullName
   if ('occupation'             in updates) dbUpdates.occupation              = updates.occupation
+  if ('occupationOther'        in updates) dbUpdates.occupation_other        = updates.occupationOther
   if ('specialty'              in updates) dbUpdates.specialty               = updates.specialty
+  if ('studentType'            in updates) dbUpdates.student_type            = updates.studentType
   if ('country'                in updates) dbUpdates.country                 = updates.country
   if ('governorate'            in updates) dbUpdates.governorate             = updates.governorate
+  if ('gender'                 in updates) dbUpdates.gender                  = updates.gender
+  if ('phoneCountryCode'       in updates) dbUpdates.phone_country_code      = updates.phoneCountryCode
+  if ('phoneNumber'            in updates) dbUpdates.phone_number            = updates.phoneNumber
   if ('profileSetupDismissed'  in updates) dbUpdates.profile_setup_dismissed = updates.profileSetupDismissed
   if ('themePreference'        in updates) dbUpdates.theme_preference        = updates.themePreference
 
@@ -529,4 +551,25 @@ export async function updateOwnProfile(supabase, userId, updates) {
     .eq('id', userId)
 
   if (error) throw error
+}
+
+/**
+ * Permanently deletes the signed-in user's own account — their login and
+ * all data across every table that holds it (favourites, notes,
+ * push_tokens, recently_viewed, profiles). Irreversible.
+ *
+ * profile-danger-zone (2026-08-23) — thin wrapper over the delete-account
+ * Edge Function, same shape as adminQueries.js's admin-users wrappers.
+ * Unlike updateOwnProfile above, this can't be a direct table write: the
+ * actual login (auth.users) is structurally unreachable from client code,
+ * and only a service-role Edge Function can remove it. The Edge Function
+ * itself derives which account to delete from the caller's own verified
+ * token — this wrapper never needs to (and doesn't) pass a userId.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<{ error: object|null }>}
+ */
+export async function deleteOwnAccount(supabase) {
+  const { error } = await supabase.functions.invoke('delete-account')
+  return { error }
 }

@@ -18,7 +18,7 @@
  * Auth-shared-context fix — added AuthProvider, right after ToastProvider
  * (signInWithGoogle's error path calls useToast internally) and above
  * everything that reads sign-in state (FavouritesProvider, BottomNav,
- * AccountScreen, AuthGuard, ProfileSetupModal). Previously useAuth() ran
+ * AccountScreen, AuthGuard, ProfileSetupRedirect). Previously useAuth() ran
  * its own separate sign-in check per component; this makes it run once,
  * app-wide, which also fixed a visible load delay on the Edit Profile
  * page (F13 Mini-stage 5 follow-up).
@@ -30,10 +30,13 @@
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
- *   (ProfileSetupModal is mounted as a sibling to OnboardingGate, not
- *   nested inside it — F13 Mini-stage 4, added 2026-08-21. It's not a
- *   route and not gated by the device-level onboarding flow; it checks
- *   its own signed-in-user condition internally via useAuth().)
+ *   (ProfileSetupRedirect is mounted as a sibling to OnboardingGate, not
+ *   nested inside it — same spot ProfileSetupModal used to sit (F13
+ *   Mini-stage 4, 2026-08-21). It's not a route and not gated by the
+ *   device-level onboarding flow; it checks its own signed-in-user
+ *   condition internally via useAuth(), then navigates rather than
+ *   rendering a popup — profile-wizard-redesign, replacing the modal with
+ *   a route-based wizard shared by both entry points.)
  */
 
 import { useEffect } from 'react'
@@ -42,7 +45,7 @@ import { Capacitor } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
-import ProfileSetupModal from './components/ProfileSetupModal'
+import ProfileSetupRedirect from './components/ProfileSetupRedirect'
 import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
@@ -94,7 +97,7 @@ export default function App() {
                       <OnboardingGate>
                         <AppRoutes />
                       </OnboardingGate>
-                      <ProfileSetupModal />
+                      <ProfileSetupRedirect />
                     </PushSubscriptionProvider>
                   </FavouritesProvider>
                 </DrugProvider>
@@ -106,4 +109,3 @@ export default function App() {
     </ErrorBoundary>
   )
 }
-
