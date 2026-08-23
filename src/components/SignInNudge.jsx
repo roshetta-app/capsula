@@ -2,14 +2,15 @@
  * src/components/SignInNudge.jsx
  *
  * Mounts the sign-in popup (AccountSheet) and its trigger sensor
- * (useSignInPrompt) together, app-wide. Both pieces already existed in the
- * codebase — AccountSheet.jsx and useSignInPrompt.js — but nothing ever
- * rendered them together, so the D12/D16 "prompt after first favourite"
- * nudge never actually fired. This component is the missing connection.
+ * (useSignInPrompt) together, app-wide. Watches a signed-out user's first
+ * favourite or first personal note of a visit and opens AccountSheet when
+ * either happens (see useSignInPrompt.js for the exact trigger/cap rules).
  *
- * This session also extends the trigger to a signed-out user's first
- * personal note, not just their first favourite (see
- * NotesActivityContext.jsx and useSignInPrompt.js).
+ * Redesign (this session): AccountSheet no longer takes a separate
+ * `dismissForever` callback — useSignInPrompt's single `dismiss()` now
+ * handles closing the sheet AND recording the lifetime impression (with
+ * its own accidental-tap debounce) in one call, so this component just
+ * wires it straight through as `onClose`.
  *
  * Mounted once in App.jsx, in the same spot ProfileSetupRedirect sits — as
  * a sibling of OnboardingGate/AppRoutes, inside AuthProvider,
@@ -33,7 +34,7 @@ export default function SignInNudge() {
 
   const favouritesCount = favourites.drugs.length + favourites.conditions.length
 
-  const { shouldAutoOpen, consumeAutoOpen, dismissForever } = useSignInPrompt({
+  const { shouldAutoOpen, dismiss } = useSignInPrompt({
     isSignedIn: !!user,
     favouritesCount,
     notesActivityCount,
@@ -42,11 +43,10 @@ export default function SignInNudge() {
   return (
     <AccountSheet
       isOpen={shouldAutoOpen}
-      onClose={consumeAutoOpen}
+      onClose={dismiss}
       user={user}
       signInWithGoogle={signInWithGoogle}
       signOut={signOut}
-      onDismissForever={dismissForever}
     />
   )
 }

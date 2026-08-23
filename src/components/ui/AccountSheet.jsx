@@ -1,30 +1,46 @@
 /**
  * src/components/ui/AccountSheet.jsx
  *
- * The sign-in popup — opened either manually (header icon in layout.jsx)
- * or automatically after a user's first favourite of a visit (D12/D16,
- * via useSignInPrompt). Never gates content on its own; it's just a
+ * The sign-in nudge — opened automatically after a signed-out user's first
+ * favourite or first personal note of a visit (D12, extended per this
+ * session's redesign). Never gates content on its own; it's just a
  * dismissible surface.
  *
- * Built on ConfirmSheet.jsx's pattern (portal to body,
- * shouldRender/animateIn delayed-unmount, fade+scale entrance,
- * token-based styling) rather than inventing a separate visual language
- * for this one popup.
+ * Redesign (this session):
+ *   - Rebuilt as a true bottom sheet, on the same pattern
+ *     SpecialtiesBottomSheet.jsx already uses elsewhere in the app (fixed
+ *     backdrop, slide-up sheet, drag handle, rounded top corners, safe-area
+ *     bottom padding, closes on backdrop tap / Escape) — replacing the old
+ *     centered pop-up.
+ *   - Signed-out content is now the same "Sign in or create account" card
+ *     used on the Account screen (AccountScreen.jsx) — same icon, headline,
+ *     subtext, error handling, and Google button (including the real
+ *     multi-color Google mark, copied from AccountScreen.jsx's local
+ *     GoogleIcon) — instead of separate wording/styling living in two
+ *     places.
+ *   - Dismissal simplified to a single "Not now" action. The old separate
+ *     "Don't ask again" button is gone — permanent silence is now handled
+ *     by useSignInPrompt's lifetime impression cap instead of an explicit
+ *     opt-out button. This supersedes D16's original "explicit permanent
+ *     dismiss button" model — see useSignInPrompt.js for the new mechanic.
  *
  * Props:
  *   isOpen             boolean
- *   onClose            () => void
+ *   onClose            () => void   — call on any dismissal (backdrop tap,
+ *                                     Escape, or the "Not now" link).
+ *                                     useSignInPrompt's dismiss() already
+ *                                     handles the accidental-tap debounce
+ *                                     and impression counting — this
+ *                                     component doesn't need to know about
+ *                                     either.
  *   user               SupabaseUser | null
  *   signInWithGoogle    () => Promise<{ error }>
  *   signOut             () => Promise<void>
- *   onDismissForever    () => void   — signed-out only; "don't ask again" (D16).
- *                                      Omit to hide that option (e.g. when
- *                                      opened manually via the header icon,
- *                                      where it isn't relevant).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { User } from 'lucide-react'
 
 export default function AccountSheet({
   isOpen,
@@ -32,14 +48,14 @@ export default function AccountSheet({
   user,
   signInWithGoogle,
   signOut,
-  onDismissForever,
 }) {
-  const overlayRef = useRef(null)
-  const [busy, setBusy]   = useState(false)
-  const [error, setError] = useState(null)
+  const [busy, setBusy]     = useState(false)
+  const [error, setError]   = useState(null)
+  const [googlePressed, setGooglePressed] = useState(false)
 
   // shouldRender keeps the DOM present during the exit transition.
-  // animateIn drives the CSS open/closed visual state.
+  // animateIn drives the CSS open/closed visual position — same
+  // shouldRender/animateIn pattern SpecialtiesBottomSheet.jsx uses.
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
 
@@ -50,18 +66,24 @@ export default function AccountSheet({
       setError(null)
     } else {
       setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 220)
+      const t = setTimeout(() => setShouldRender(false), 280)
       return () => clearTimeout(t)
     }
   }, [isOpen])
 
-  // Close on Escape
   useEffect(() => {
     if (!isOpen) return
     function onKey(e) { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [isOpen, onClose])
+
+  // Same body-scroll lock SpecialtiesBottomSheet.jsx uses while a bottom
+  // sheet is open.
+  useEffect(() => {
+    document.body.style.overflow = isOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [isOpen])
 
   if (!shouldRender) return null
 
@@ -75,19 +97,10 @@ export default function AccountSheet({
     }
     // Stage 3 (F6) bug fix, 2026-08-13 — confirmed on-device: on native,
     // signInWithGoogle() only opens the system browser and returns right
-    // away; it does NOT wait for the OAuth flow to finish. The old code
-    // only reset `busy` on the error branch, on the assumption that a
-    // success meant the page was about to navigate away (true on web,
-    // where this component unmounts entirely). On native nothing
-    // navigates away — this same AccountSheet instance stays mounted and
-    // `busy` stayed stuck at true. When the user later returned from
-    // Google already signed in, this component re-rendered into the
-    // signed-in view while `busy` was still true, showing the sign-out
-    // button's busy label ("Signing out…", disabled) even though sign-out
-    // was never touched. Resetting `busy` here on every path (not just
-    // the error one) fixes that — on web it's a no-op since the component
-    // is gone before it can matter; on native there's nothing left for
-    // this button to reflect once the system browser has taken over.
+    // away; it does NOT wait for the OAuth flow to finish. Resetting
+    // `busy` on every path (not just the error one) keeps the button from
+    // getting stuck in a busy state once the user returns already signed
+    // in — unchanged from the previous version of this file.
     setBusy(false)
   }
 
@@ -99,52 +112,58 @@ export default function AccountSheet({
     onClose()
   }
 
-  function handleDismissForever() {
-    onDismissForever?.()
-    onClose()
-  }
-
-  // Rendered via portal to document.body — same reasoning as ConfirmSheet:
-  // position: fixed only resolves against the viewport if no ancestor has
-  // a transform/filter/etc that creates its own containing block, and
-  // this can be opened from screens that do (e.g. condition detail's
-  // tab-swipe wrapper).
+  // Rendered via portal to document.body — same reasoning as ConfirmSheet
+  // and SpecialtiesBottomSheet: position: fixed only resolves against the
+  // viewport if no ancestor has a transform/filter/etc that creates its
+  // own containing block, and this can be opened from screens that do
+  // (e.g. condition detail's tab-swipe wrapper).
   return createPortal(
-    <div
-      ref={overlayRef}
-      onClick={e => { if (e.target === overlayRef.current) onClose() }}
-      style={{
-        position:        'fixed',
-        inset:           0,
-        zIndex:          1000,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-        padding:         'var(--space-4)',
-        opacity:         animateIn ? 1 : 0,
-        transition:      'opacity var(--motion-base) var(--ease-reveal)',
-      }}
-    >
+    <>
+      <div
+        onClick={onClose}
+        aria-hidden="true"
+        style={{
+          position:        'fixed',
+          inset:           0,
+          zIndex:          1000,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          opacity:         animateIn ? 1 : 0,
+          transition:      'opacity var(--motion-base) var(--ease-reveal)',
+        }}
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-label={user ? 'Account' : 'Sign in'}
         style={{
-          width:           '100%',
-          maxWidth:        360,
+          position:        'fixed',
+          bottom:          0,
+          left:            0,
+          right:           0,
+          zIndex:          1001,
           backgroundColor: 'var(--color-surface)',
-          borderRadius:    'var(--radius-lg)',
-          boxShadow:       '0 24px 64px rgba(0,0,0,0.18)',
-          padding:         'var(--space-5)',
+          borderRadius:    '16px 16px 0 0',
+          padding:         'var(--space-5) var(--space-4)',
+          paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
           fontFamily:      'var(--font-body)',
-          opacity:         animateIn ? 1 : 0,
-          transform:       animateIn ? 'scale(1)' : 'scale(0.96)',
-          transition:      'opacity var(--motion-base) var(--ease-reveal), transform var(--motion-base) var(--ease-settle)',
+          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
+          transition:      'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
+        {/* Drag handle — same visual affordance SpecialtiesBottomSheet.jsx
+            uses, signaling "swipe down to close" even though the sheet
+            itself doesn't need a drag gesture handler to close (backdrop
+            tap / Escape / Not now already cover it). */}
+        <div style={{
+          width:           40,
+          height:          4,
+          borderRadius:    2,
+          backgroundColor: 'var(--color-border)',
+          margin:          '0 auto var(--space-5)',
+        }} />
+
         {user ? (
-          <>
+          <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize:     16,
               fontWeight:   700,
@@ -162,36 +181,49 @@ export default function AccountSheet({
             }}>
               {user.email}
             </p>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
-              <button onClick={onClose} style={secondaryButtonStyle}>
-                Close
-              </button>
-              <button
-                onClick={handleSignOut}
-                disabled={busy}
-                style={primaryButtonStyle({ busy, destructive: true })}
-              >
-                {busy ? 'Signing out…' : 'Sign out'}
-              </button>
-            </div>
-          </>
+            <button
+              onClick={handleSignOut}
+              disabled={busy}
+              style={secondaryButtonStyle}
+            >
+              {busy ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         ) : (
-          <>
+          // Signed-out content — the exact same card as AccountScreen.jsx's
+          // "Sign in or create account" section: same icon, headline,
+          // subtext, error handling, and Google button. The sheet itself
+          // stands in for that card's own bordered box, so no extra border
+          // is added here.
+          <div style={{ textAlign: 'center' }}>
+            <div style={{
+              width:           48,
+              height:          48,
+              borderRadius:    'var(--radius-full)',
+              backgroundColor: 'var(--color-bg)',
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              margin:          '0 auto var(--space-3)',
+            }}>
+              <User size={22} color="var(--color-text-secondary)" strokeWidth={1.8} />
+            </div>
+
             <div style={{
               fontSize:     16,
               fontWeight:   700,
               color:        'var(--color-text-primary)',
               marginBottom: 'var(--space-2)',
             }}>
-              Create a free account
+              Sign in or create account
             </div>
             <p style={{
-              margin:     '0 0 var(--space-5)',
+              margin:     '0 0 var(--space-4)',
               fontSize:   14,
               lineHeight: 1.55,
               color:      'var(--color-text-secondary)',
             }}>
-              Sign in with Google to keep your favourites synced across devices.
+              Sync your favourites across devices with your Google account.
             </p>
 
             {error && (
@@ -203,7 +235,8 @@ export default function AccountSheet({
                 borderRadius:    'var(--radius-sm)',
                 padding:         'var(--space-2) var(--space-3)',
                 lineHeight:      1.4,
-                marginBottom:    'var(--space-4)',
+                marginBottom:    'var(--space-3)',
+                textAlign:       'left',
               }}>
                 {error}
               </div>
@@ -211,37 +244,77 @@ export default function AccountSheet({
 
             <button
               onClick={handleGoogleSignIn}
+              onPointerDown={() => setGooglePressed(true)}
+              onPointerUp={() => setGooglePressed(false)}
+              onPointerLeave={() => setGooglePressed(false)}
               disabled={busy}
               style={{
-                ...primaryButtonStyle({ busy, destructive: false }),
-                width:        '100%',
-                marginBottom: 'var(--space-3)',
+                width:                   '100%',
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                gap:                     'var(--space-2)',
+                padding:                 'var(--space-2) var(--space-4)',
+                borderRadius:            'var(--radius-sm)',
+                border:                  'none',
+                backgroundColor:         busy ? 'var(--color-border)' : 'var(--color-accent)',
+                color:                   busy ? 'var(--color-text-tertiary)' : '#fff',
+                fontSize:                14,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                cursor:                  busy ? 'not-allowed' : 'pointer',
+                transform:               googlePressed ? 'scale(0.97)' : 'scale(1)',
+                transition:              'transform var(--motion-fast) var(--ease-settle)',
+                WebkitTapHighlightColor: 'transparent',
+                marginBottom:            'var(--space-3)',
               }}
             >
+              {!busy && (
+                <span style={{
+                  display:         'inline-flex',
+                  backgroundColor: '#fff',
+                  borderRadius:    'var(--radius-sm)',
+                  padding:         2,
+                }}>
+                  <GoogleIcon size={16} />
+                </span>
+              )}
               {busy ? 'Opening Google…' : 'Continue with Google'}
             </button>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button onClick={onClose} style={linkButtonStyle}>
-                Not now
-              </button>
-              {onDismissForever && (
-                <button onClick={handleDismissForever} style={linkButtonStyle}>
-                  Don't ask again
-                </button>
-              )}
-            </div>
-          </>
+            {/* Single dismiss action — replaces the old two-button row
+                ("Not now" / "Don't ask again"). Permanent silence is now
+                handled by useSignInPrompt's lifetime impression cap
+                instead of an explicit opt-out button (D16 supersession —
+                see useSignInPrompt.js). */}
+            <button onClick={onClose} style={linkButtonStyle}>
+              Not now
+            </button>
+          </div>
         )}
       </div>
-    </div>,
+    </>,
     document.body
   )
 }
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
+// ─── Local components & styles ─────────────────────────────────────────────
+
+// Copied verbatim from AccountScreen.jsx's local GoogleIcon so the popup's
+// Google button matches the Account screen's exactly, pixel for pixel.
+function GoogleIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z" />
+    </svg>
+  )
+}
 
 const secondaryButtonStyle = {
+  width:           '100%',
   padding:         'var(--space-2) var(--space-4)',
   borderRadius:    'var(--radius-sm)',
   border:          '1px solid var(--color-border)',
@@ -251,22 +324,6 @@ const secondaryButtonStyle = {
   fontWeight:      500,
   fontFamily:      'var(--font-body)',
   cursor:          'pointer',
-}
-
-function primaryButtonStyle({ busy, destructive }) {
-  return {
-    padding:         'var(--space-2) var(--space-4)',
-    borderRadius:    'var(--radius-sm)',
-    border:          'none',
-    backgroundColor: busy
-      ? 'var(--color-border)'
-      : destructive ? 'var(--color-danger)' : 'var(--color-accent)',
-    color:           busy ? 'var(--color-text-tertiary)' : '#fff',
-    fontSize:        14,
-    fontWeight:      600,
-    fontFamily:      'var(--font-body)',
-    cursor:          busy ? 'not-allowed' : 'pointer',
-  }
 }
 
 const linkButtonStyle = {
