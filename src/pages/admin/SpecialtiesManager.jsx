@@ -16,9 +16,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Plus, GripVertical, Pencil, Trash2,
+  Plus, GripVertical, Pencil, Trash2,
   ToggleLeft, ToggleRight, ChevronUp, ChevronDown, ChevronRight,
   Upload, Check,
 } from 'lucide-react'
@@ -555,7 +554,6 @@ function SpecialtyModal({ open, specialty, onClose, onSaved, nextOrder }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpecialtiesManager() {
-  const navigate      = useNavigate()
   const { toast }     = useToast()
 
   // ── FIX: store toast in a ref so load() never needs it as a dep ──────────
@@ -696,17 +694,11 @@ export default function SpecialtiesManager() {
       padding:   'var(--space-4)',
       fontFamily:'var(--font-body)',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--space-5)' }}>
-        <button onClick={() => navigate('/admin')} style={iconBtn}>
-          <ArrowLeft size={16} />
-        </button>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-          Specialties
-        </h1>
+      {/* Add action — page title/back-nav now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-5)' }}>
         <button
           onClick={() => { setEditTarget(null); setModalOpen(true) }}
-          style={{ ...btnPrimary, marginLeft: 'auto' }}
+          style={btnPrimary}
         >
           <Plus size={14} /> Add
         </button>
