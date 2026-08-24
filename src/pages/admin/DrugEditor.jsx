@@ -34,8 +34,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { Plus, Save, Trash2, AlertTriangle, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { useDrugContext } from '../../context/DrugContext'
 import GenericEditor from '../../components/admin/GenericEditor'
@@ -77,7 +77,6 @@ const EMPTY_FORMULATION = {
 
 export default function DrugEditor() {
   const { genericId } = useParams()
-  const navigate      = useNavigate()
   const { toast }     = useToast()
   const { refresh }   = useDrugContext()
 
@@ -365,13 +364,13 @@ export default function DrugEditor() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <Shell name="Loading…" onBack={() => navigate(-1)}>
+    <Shell name="Loading…">
       <LoadingSkeleton />
     </Shell>
   )
 
   if (fetchErr) return (
-    <Shell name="Error" onBack={() => navigate(-1)}>
+    <Shell name="Error">
       <ErrorBanner message={fetchErr} />
     </Shell>
   )
@@ -379,7 +378,7 @@ export default function DrugEditor() {
   const genericValid = generic?.ingredients?.length > 0 && generic?.category
 
   return (
-    <Shell name={generic?.name_en ?? 'Drug'} onBack={() => navigate(-1)}>
+    <Shell name={generic?.name_en ?? 'Drug'}>
 
       {globalError && (
         <ErrorBanner message={globalError} onDismiss={() => setGlobalError(null)} />
@@ -606,40 +605,26 @@ export default function DrugEditor() {
 }
 
 // ─── Shell ────────────────────────────────────────────────────────────────────
+// Breadcrumb/back-button chrome dropped — AdminLayout's sidebar owns nav now.
+// The drug name stays: it identifies which specific generic is being edited
+// (the sidebar's nav label just says "Drugs"), useful while scrolling this
+// dense, multi-section form.
 
-function Shell({ children, name, onBack }) {
+function Shell({ children, name }) {
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
-      <header style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
+    <div style={{
+      maxWidth: 680, margin: '0 auto',
+      padding: 'var(--space-5) var(--space-4) var(--space-16)',
+      fontFamily: 'var(--font-body)',
+    }}>
+      <h1 style={{
+        fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
+        margin: '0 0 var(--space-5)',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
-        <button onClick={onBack} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-          fontFamily: 'var(--font-body)', padding: '4px 0',
-          display: 'flex', alignItems: 'center', gap: 2,
-        }}>
-          <ChevronLeft size={16} />
-          Drug Library
-        </button>
-        <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-        <span style={{
-          fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {name}
-        </span>
-      </header>
-      <main style={{
-        maxWidth: 680, margin: '0 auto',
-        padding: 'var(--space-5) var(--space-4) var(--space-16)',
-      }}>
-        {children}
-      </main>
+        {name}
+      </h1>
+      {children}
     </div>
   )
 }
