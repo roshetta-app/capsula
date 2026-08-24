@@ -165,71 +165,40 @@ export default function AddDrugFlow() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
+      maxWidth: 600, margin: '0 auto',
+      padding: 'var(--space-6) var(--space-4) var(--space-12)',
       fontFamily: 'var(--font-body)',
     }}>
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/admin/drugs')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-              display: 'flex', alignItems: 'center', gap: 2,
-            }}
-          >
-            <ChevronLeft size={16} />
-            {step > 0 ? STEPS[step - 1] : 'Drug Library'}
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Add Drug
-          </span>
-        </div>
-
-        {/* Step indicator */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          {STEPS.map((label, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-              <div style={{
-                width: 24, height: 24,
-                borderRadius: 'var(--radius-full)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 11, fontWeight: 700,
-                backgroundColor: i < step ? 'var(--color-instock)'
-                  : i === step ? 'var(--color-accent)' : 'var(--color-border)',
-                color: i <= step ? '#fff' : 'var(--color-text-tertiary)',
-                transition: 'background-color 0.2s ease',
-              }}>
-                {i < step ? <Check size={13} /> : i + 1}
-              </div>
-              {i < STEPS.length - 1 && (
-                <div style={{
-                  width: 16, height: 2,
-                  backgroundColor: i < step ? 'var(--color-instock)' : 'var(--color-border)',
-                  borderRadius: 2,
-                }} />
-              )}
+      {/* Step progress indicator — not chrome, this is the wizard's actual
+          progress state, so it moves down into content instead of being
+          dropped along with the breadcrumb/back-button header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+        {STEPS.map((label, i) => (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <div style={{
+              width: 24, height: 24,
+              borderRadius: 'var(--radius-full)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 700,
+              backgroundColor: i < step ? 'var(--color-instock)'
+                : i === step ? 'var(--color-accent)' : 'var(--color-border)',
+              color: i <= step ? '#fff' : 'var(--color-text-tertiary)',
+              transition: 'background-color 0.2s ease',
+            }}>
+              {i < step ? <Check size={13} /> : i + 1}
             </div>
-          ))}
-        </div>
-      </header>
+            {i < STEPS.length - 1 && (
+              <div style={{
+                width: 16, height: 2,
+                backgroundColor: i < step ? 'var(--color-instock)' : 'var(--color-border)',
+                borderRadius: 2,
+              }} />
+            )}
+          </div>
+        ))}
+      </div>
 
-      {/* Content */}
-      <main style={{
-        maxWidth: 600, margin: '0 auto',
-        padding: 'var(--space-6) var(--space-4) var(--space-12)',
-      }}>
 
         {/* Step title */}
         <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -319,7 +288,6 @@ export default function AddDrugFlow() {
             </button>
           )}
         </div>
-      </main>
     </div>
   )
 }
