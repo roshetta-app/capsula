@@ -248,7 +248,15 @@ export default function DrugCMS() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <AdminShell onAdd={() => navigate('/admin/drugs/new')}>
+    <div style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
+
+      {/* Add Generic action — page title/back-nav now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+        <button onClick={() => navigate('/admin/drugs/new')} style={primaryBtnStyle}>
+          <Plus size={15} />
+          Add Generic
+        </button>
+      </div>
 
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
@@ -608,51 +616,6 @@ export default function DrugCMS() {
         />
       )}
 
-    </AdminShell>
-  )
-}
-
-// ─── AdminShell ───────────────────────────────────────────────────────────────
-
-function AdminShell({ children, onAdd }) {
-  const navigate = useNavigate()
-
-  return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-              display: 'flex', alignItems: 'center',
-            }}
-          >
-            ‹ Admin
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Drug Library
-          </span>
-        </div>
-
-        <button onClick={onAdd} style={primaryBtnStyle}>
-          <Plus size={15} />
-          Add Generic
-        </button>
-      </header>
-
-      <main style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
-        {children}
-      </main>
     </div>
   )
 }
