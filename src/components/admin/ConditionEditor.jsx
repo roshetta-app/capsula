@@ -21,7 +21,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ChevronLeft, Plus, AlertTriangle, X } from 'lucide-react'
+import { Plus, AlertTriangle, X } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import TagInput from '../../components/admin/TagInput'
@@ -39,6 +39,7 @@ import {
 } from '../../lib/adminQueries'
 
 import { SectionCard, SectionCardHeader, FieldLabel } from './adminSectionPrimitives'
+import AdminPageHeader from './AdminPageHeader'
 
 // ─── Text input ───────────────────────────────────────────────────────────────
 
@@ -437,75 +438,35 @@ export default function ConditionEditor() {
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)',
-        color: 'var(--color-text-tertiary)', fontSize: 14,
-      }}>
-        Loading…
-      </div>
+      <AdminPageHeader title="Loading…">
+        <div style={{ padding: 'var(--space-12)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+          Loading…
+        </div>
+      </AdminPageHeader>
     )
   }
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
-      fontFamily: 'var(--font-body)',
-      color: 'var(--color-text-primary)',
-    }}>
-
-      {/* ── Sticky header ─────────────────────────────────────────────────── */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        backgroundColor: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
-      }}>
-        <div style={{
-          maxWidth: 680, margin: '0 auto',
-          padding: 'var(--space-3) var(--space-4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <button
-              onClick={() => navigate('/admin/conditions')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                fontFamily: 'var(--font-body)', padding: '4px 0',
-                display: 'flex', alignItems: 'center', gap: 2,
-              }}
-            >
-              <ChevronLeft size={16} />
-              Conditions
-            </button>
-            <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              {isEdit ? 'Edit condition' : 'New condition'}
-            </span>
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={!isValid() || saving}
-            style={{
-              padding: '7px 18px', borderRadius: 'var(--radius-md)',
-              fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',
-              border: 'none',
-              backgroundColor: 'var(--color-accent)',
-              color: '#fff', fontFamily: 'var(--font-body)',
-              opacity: !isValid() || saving ? 0.6 : 1,
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            }}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </button>
-        </div>
-      </header>
-
-      {/* ── Page body ─────────────────────────────────────────────────────── */}
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-4) var(--space-4) var(--space-12)' }}>
-
+    <AdminPageHeader
+      title={isEdit ? 'Edit condition' : 'New condition'}
+      actions={
+        <button
+          onClick={handleSave}
+          disabled={!isValid() || saving}
+          style={{
+            padding: '7px 18px', borderRadius: 'var(--radius-md)',
+            fontSize: 13, fontWeight: 600, cursor: !isValid() || saving ? 'default' : 'pointer',
+            border: 'none',
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff', fontFamily: 'var(--font-body)',
+            opacity: !isValid() || saving ? 0.6 : 1,
+            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+          }}
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+      }
+    >
         {/* Error banner */}
         {error && (
           <div style={{
@@ -631,8 +592,6 @@ export default function ConditionEditor() {
           />
         </SectionCard>
 
-      </main>
-
       {/* ── Inline specialty creator ──────────────────────────────────────── */}
       <NewSpecialtyModal
         isOpen={newSpecialtyOpen}
@@ -640,7 +599,6 @@ export default function ConditionEditor() {
         onCreated={handleSpecialtyCreated}
       />
 
-    </div>
+    </AdminPageHeader>
   )
 }
-
