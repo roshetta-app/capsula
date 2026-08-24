@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import { faUsers, faCapsules, faNotesMedical } from '@fortawesome/free-solid-svg-icons'
 import { supabase } from '../../lib/supabase'
 import { fetchAllUsers } from '../../lib/adminQueries'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 /**
  * AdminSummary — /admin's index route content (D3).
@@ -65,21 +66,7 @@ export default function AdminSummary() {
   }, [])
 
   return (
-    <div style={{
-      padding: 'var(--space-6) var(--space-5)',
-      maxWidth: 900,
-      width: '100%',
-    }}>
-      <div style={{
-        fontSize: 22,
-        fontWeight: 700,
-        fontFamily: 'var(--font-body)',
-        color: 'var(--color-text-primary)',
-        marginBottom: 'var(--space-5)',
-      }}>
-        Overview
-      </div>
-
+    <AdminPageHeader title="Overview" maxWidth={900}>
       {error && (
         <div style={{
           color: 'var(--color-danger, #d33)',
@@ -143,6 +130,6 @@ export default function AdminSummary() {
           </div>
         ))}
       </div>
-    </div>
+    </AdminPageHeader>
   )
 }

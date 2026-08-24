@@ -39,6 +39,7 @@ import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon } from 'lucide-re
 import { useToast }   from '../../context/ToastContext'
 import Modal          from '../../components/admin/Modal'
 import ConfirmModal   from '../../components/admin/ConfirmModal'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchAllUsers,
   updateUserRole,
@@ -313,20 +314,7 @@ export default function UsersManager() {
   const totalBanned = rows.filter(isBanned).length
 
   return (
-    <div style={{
-      maxWidth:   960,
-      padding:    'var(--space-6) var(--space-5)',
-      fontFamily: 'var(--font-body)',
-    }}>
-      <div style={{
-        fontSize: 22,
-        fontWeight: 700,
-        color: 'var(--color-text-primary)',
-        marginBottom: 'var(--space-5)',
-      }}>
-        Users
-      </div>
-
+    <AdminPageHeader title="Users" maxWidth={960}>
       {/* Stat cards */}
       <div style={{
         display: 'grid',
@@ -431,7 +419,7 @@ export default function UsersManager() {
         onConfirm={() => { setConfirmOpen(false); confirmConfig.onConfirm?.() }}
         onClose={() => setConfirmOpen(false)}
       />
-    </div>
+    </AdminPageHeader>
   )
 }
 
