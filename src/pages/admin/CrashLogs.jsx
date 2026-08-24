@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { RefreshCw, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -114,7 +113,6 @@ function CrashRow({ log }) {
 }
 
 export default function CrashLogs() {
-  const navigate = useNavigate()
   const [logs,       setLogs]       = useState([])
   const [loading,    setLoading]    = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -143,33 +141,10 @@ export default function CrashLogs() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-            }}
-          >
-            ‹ Admin
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Crash Logs
-          </span>
-        </div>
-
+      {/* Refresh action — breadcrumb/title now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
         <button
           onClick={() => load(true)}
           disabled={refreshing}
@@ -186,9 +161,8 @@ export default function CrashLogs() {
           <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
-      </header>
+      </div>
 
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
 
         {loading && (
           <div style={{ textAlign: 'center', padding: 'var(--space-12)', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
@@ -257,7 +231,6 @@ export default function CrashLogs() {
             </div>
           </div>
         )}
-      </main>
-    </div>
+      </div>
   )
 }
