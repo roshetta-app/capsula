@@ -78,6 +78,15 @@
  *     with no visible reason why. onBack is now undefined for that flow —
  *     Skip for now is the only step-1 exit, and it does persist the
  *     dismissal. Existing users (canCancel true) are unaffected.
+ * unify-profile-avatar (2026-08-25) — ProfileHero's hand-built avatar
+ *     circle (photo-with-initials-fallback, broken-image handling) is now
+ *     the shared ProfileAvatar.jsx component, also used by
+ *     AccountScreen.jsx and ProfileWizard.jsx, so the three screens can't
+ *     drift out of sync with each other again. This screen's circle grows
+ *     from 64px to the standard 72px, and its one-letter initials become
+ *     two, matching the other two screens. ReadOnlySkeleton's placeholder
+ *     circle is bumped to 72px too, so there's no layout jump when the
+ *     real avatar loads in.
  */
 
 import { useState, useEffect } from 'react'
@@ -89,6 +98,7 @@ import { supabase } from '../lib/supabase'
 import { fetchOwnProfile, updateOwnProfile, deleteOwnAccount } from '../lib/queries'
 import { ROUTES } from '../router'
 import ProfileWizard from '../components/ProfileWizard'
+import ProfileAvatar from '../components/ui/ProfileAvatar'
 import DeleteAccountSheet from '../components/ui/DeleteAccountSheet'
 
 const EMPTY_FIELDS = {
@@ -169,15 +179,6 @@ function ReadOnlyGroup({ children }) {
 }
 
 function ProfileHero({ user, fullName, occupationLine }) {
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-  const initials = (fullName || user?.email || '?').trim().charAt(0).toUpperCase()
-  // account-avatar-broken-image-fallback: a truthy URL doesn't mean the
-  // image actually loads — Google's avatar URLs can 403/expire/CORS-block
-  // depending on session state, which previously left the browser's own
-  // broken-image icon showing instead of falling back to initials. This
-  // tracks a real load failure, not just URL presence.
-  const [avatarError, setAvatarError] = useState(false)
-
   return (
     <div style={{
       display:       'flex',
@@ -186,36 +187,12 @@ function ProfileHero({ user, fullName, occupationLine }) {
       textAlign:     'center',
       marginBottom:  'var(--space-6)',
     }}>
-      {avatarUrl && !avatarError ? (
-        <img
-          src={avatarUrl}
-          alt=""
-          onError={() => setAvatarError(true)}
-          style={{
-            width:        64,
-            height:       64,
-            borderRadius: 'var(--radius-full)',
-            objectFit:    'cover',
-            marginBottom: 'var(--space-3)',
-          }}
-        />
-      ) : (
-        <div style={{
-          width:           64,
-          height:          64,
-          borderRadius:    'var(--radius-full)',
-          backgroundColor: 'var(--color-accent)',
-          color:           '#fff',
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          fontSize:        22,
-          fontWeight:      700,
-          marginBottom:    'var(--space-3)',
-        }}>
-          {initials}
-        </div>
-      )}
+      {/* unify-profile-avatar: shared ProfileAvatar component — see that
+          file for the photo/initials/broken-image-fallback logic, now
+          common to this screen, Account screen, and Profile Wizard.
+          marginBottom keeps this screen's original spacing to the
+          name/occupation text below it. */}
+      <ProfileAvatar user={user} fullName={fullName} style={{ marginBottom: 'var(--space-3)' }} />
       <h2 style={{
         margin:     0,
         fontSize:   17,
@@ -258,7 +235,7 @@ function ReadOnlySkeleton() {
         alignItems:    'center',
         marginBottom:  'var(--space-6)',
       }}>
-        <div className="capsula-skeleton" style={{ width: 64, height: 64, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-3)' }} />
+        <div className="capsula-skeleton" style={{ width: 72, height: 72, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-3)' }} />
         <div className="capsula-skeleton" style={{ width: 140, height: 16, marginBottom: 'var(--space-2)' }} />
         <div className="capsula-skeleton" style={{ width: 100, height: 12 }} />
       </div>

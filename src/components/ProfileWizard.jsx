@@ -53,6 +53,13 @@
  *     step 1's card to directly under the avatar/initials circle at the
  *     top, using the same small-icon-plus-text treatment AccountScreen's
  *     own profile header already uses for email.
+ *
+ * unify-profile-avatar (2026-08-25) — the hand-built avatar circle (initials
+ * fallback, broken-image handling, plus a border this screen alone had) is
+ * now the shared ProfileAvatar.jsx component, also used by AccountScreen.jsx
+ * and AccountEditScreen.jsx, so the three screens can't drift out of sync
+ * with each other again. The prior border around the photo is dropped as
+ * part of standardizing on one look across all three.
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react'
@@ -61,6 +68,7 @@ import {
   Stethoscope, PenLine, HeartPulse, GraduationCap, MapPin,
 } from 'lucide-react'
 import { AsYouType, isValidPhoneNumber, validatePhoneNumberLength } from 'libphonenumber-js'
+import ProfileAvatar from './ui/ProfileAvatar'
 
 // ─── Static option data ─────────────────────────────────────────────────────
 
@@ -290,16 +298,6 @@ const wizardCardStyle = {
 }
 
 const fieldIconStyle = { flexShrink: 0 }
-
-function getInitials(fullName, email) {
-  const source = (fullName || '').trim()
-  if (source) {
-    const parts = source.split(/\s+/).filter(Boolean)
-    if (parts.length === 1) return parts[0][0].toUpperCase()
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-  }
-  return (email?.[0] || '?').toUpperCase()
-}
 
 // ─── Field wrapper ───────────────────────────────────────────────────────────
 
@@ -806,16 +804,6 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
     && (!showOccupationOther || values.occupationOther.trim().length > 0)
     && (!showSpecialty || values.specialty.trim().length > 0)
 
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-  const initials  = getInitials(values.fullName, user?.email)
-  // account-avatar-broken-image-fallback: a truthy URL doesn't mean the
-  // image actually loads — Google's avatar URLs can 403/expire/CORS-block
-  // depending on session state, which previously left the browser's own
-  // broken-image icon showing instead of falling back to initials. This
-  // tracks a real load failure, not just URL presence. Same fix as
-  // AccountScreen.jsx / AccountEditScreen.jsx, which read the same field.
-  const [avatarError, setAvatarError] = useState(false)
-
   async function handleFormSubmit(e) {
     e.preventDefault()
     // Step 1's "Continue" and step 2's "Save" are both type="submit" so
@@ -850,31 +838,13 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
     }}>
       {/* wizard-header-both-steps: avatar + email render above the progress
           bar on both step 1 and step 2 — swapped ahead of the progress bar
-          (was below it) per explicit ordering request, same day. */}
+          (was below it) per explicit ordering request, same day.
+          unify-profile-avatar: now the shared ProfileAvatar component —
+          see that file for the photo/initials/broken-image-fallback logic,
+          now common to this screen, Account screen, and Edit Profile.
+          Initials reflect the name as it's being typed, live. */}
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-        {avatarUrl && !avatarError ? (
-          <img
-            src={avatarUrl}
-            alt=""
-            onError={() => setAvatarError(true)}
-            style={{ width: 72, height: 72, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--color-border)' }}
-          />
-        ) : (
-          <div style={{
-            width:           72,
-            height:          72,
-            borderRadius:    '50%',
-            backgroundColor: 'var(--color-accent)',
-            color:           '#fff',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            fontSize:        24,
-            fontWeight:      600,
-          }}>
-            {initials}
-          </div>
-        )}
+        <ProfileAvatar user={user} fullName={values.fullName} />
       </div>
 
       <div style={{
