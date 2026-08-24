@@ -669,7 +669,6 @@ export default function CategoriesManager() {
   return (
     <AdminPageHeader
       title="Drug Categories"
-      maxWidth={680}
       actions={
         <button
           onClick={() => { setEditTarget(null); setModalOpen(true) }}

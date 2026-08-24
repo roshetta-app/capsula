@@ -314,7 +314,7 @@ export default function UsersManager() {
   const totalBanned = rows.filter(isBanned).length
 
   return (
-    <AdminPageHeader title="Users" maxWidth={960}>
+    <AdminPageHeader title="Users">
       {/* Stat cards */}
       <div style={{
         display: 'grid',

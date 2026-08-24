@@ -15,8 +15,13 @@
  *
  * - No margin: '0 auto' centering — left-aligned, matching both reference
  *   screens.
- * - Padding and title style are fixed for every screen; only `maxWidth`
- *   and the title/actions content vary per screen.
+ * - Every screen fills the full content area width (no per-screen
+ *   `maxWidth` cap) — only padding and title style were ever meant to be
+ *   identical; width being capped per-screen was the original approach,
+ *   revised once the narrow list screens (Categories etc.) visibly
+ *   trailed off short of the content area once left-aligned instead of
+ *   centered. `maxWidth` stays as an optional prop, unused by any screen
+ *   today, in case a future screen genuinely needs a cap.
  * - `title` accepts a node, not just a string — DrugEditor's title is the
  *   live drug name, not fixed text.
  * - `actions` is optional — each screen's existing Add/Refresh/Export

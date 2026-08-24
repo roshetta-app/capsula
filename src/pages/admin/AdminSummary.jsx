@@ -66,7 +66,7 @@ export default function AdminSummary() {
   }, [])
 
   return (
-    <AdminPageHeader title="Overview" maxWidth={900}>
+    <AdminPageHeader title="Overview">
       {error && (
         <div style={{
           color: 'var(--color-danger, #d33)',
