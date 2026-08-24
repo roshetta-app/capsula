@@ -11,7 +11,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { RefreshCw, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -311,7 +310,6 @@ function exportCSV(activeTab, data) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboard() {
-  const navigate    = useNavigate()
   const [activeTab, setActiveTab] = useState('health')
   const [data,      setData]      = useState(null)
   const [loading,   setLoading]   = useState(true)
@@ -340,85 +338,61 @@ export default function AnalyticsDashboard() {
   const activeData = data ? data[activeTab] : null
 
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-              display: 'flex', alignItems: 'center',
-            }}
-          >
-            ‹ Admin
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Analytics
-          </span>
-        </div>
+      {/* Export/Refresh actions — breadcrumb/title now owned by AdminLayout */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+        {/* CSV export */}
+        <button
+          onClick={() => exportCSV(activeTab, data)}
+          disabled={!data}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+            padding: 'var(--space-2) var(--space-3)',
+            borderRadius: 'var(--radius-sm)',
+            border: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-surface)',
+            color: 'var(--color-text-secondary)',
+            fontSize: 13, fontWeight: 500,
+            fontFamily: 'var(--font-body)',
+            cursor: data ? 'pointer' : 'not-allowed',
+            opacity: data ? 1 : 0.5,
+          }}
+        >
+          <Download size={14} />
+          Export CSV
+        </button>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          {/* CSV export */}
-          <button
-            onClick={() => exportCSV(activeTab, data)}
-            disabled={!data}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--color-border)',
-              backgroundColor: 'var(--color-surface)',
-              color: 'var(--color-text-secondary)',
-              fontSize: 13, fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              cursor: data ? 'pointer' : 'not-allowed',
-              opacity: data ? 1 : 0.5,
-            }}
-          >
-            <Download size={14} />
-            Export CSV
-          </button>
+        {/* Refresh */}
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+            padding: 'var(--space-2) var(--space-3)',
+            borderRadius: 'var(--radius-sm)',
+            border: 'none',
+            backgroundColor: 'var(--color-accent)',
+            color: '#fff',
+            fontSize: 13, fontWeight: 600,
+            fontFamily: 'var(--font-body)',
+            cursor: refreshing ? 'not-allowed' : 'pointer',
+            opacity: refreshing ? 0.7 : 1,
+          }}
+        >
+          <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
+      </div>
 
-          {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              backgroundColor: 'var(--color-accent)',
-              color: '#fff',
-              fontSize: 13, fontWeight: 600,
-              fontFamily: 'var(--font-body)',
-              cursor: refreshing ? 'not-allowed' : 'pointer',
-              opacity: refreshing ? 0.7 : 1,
-            }}
-          >
-            <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
-            {refreshing ? 'Refreshing…' : 'Refresh'}
-          </button>
-        </div>
-      </header>
-
-      {/* Tab bar */}
+      {/* Tab bar — reference pattern for any screen needing a sub-row (per
+          plan §1); stays exactly as before, now sitting inside the content
+          area's width instead of stretching edge-to-edge under the old
+          sticky header */}
       <div style={{
         display: 'flex', gap: 0,
         borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        paddingLeft: 'var(--space-4)',
+        marginBottom: 'var(--space-5)',
         overflowX: 'auto',
       }}>
         {TABS.map(tab => (
@@ -442,8 +416,6 @@ export default function AnalyticsDashboard() {
         ))}
       </div>
 
-      {/* Content */}
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
 
         {/* Loading skeleton */}
         {loading && (
@@ -481,7 +453,6 @@ export default function AnalyticsDashboard() {
             {activeTab === 'usage'    && <UsageTab         data={activeData} />}
           </>
         )}
-      </main>
 
       {/* Spin keyframe */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
