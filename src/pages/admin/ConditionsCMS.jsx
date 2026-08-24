@@ -18,6 +18,7 @@ import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } fro
 import { fetchAllConditions } from '../../lib/queries'
 import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -109,15 +110,9 @@ export default function ConditionsCMS() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{
-      maxWidth: 680, margin: '0 auto',
-      padding: 'var(--space-4) var(--space-4) var(--space-12)',
-      fontFamily: 'var(--font-body)',
-      color: 'var(--color-text-primary)',
-    }}>
-
-      {/* Add New action — page title/back-nav now owned by AdminLayout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+    <AdminPageHeader
+      title="Conditions"
+      actions={
         <button
           onClick={() => navigate('/admin/conditions/new')}
           style={{
@@ -131,8 +126,8 @@ export default function ConditionsCMS() {
           <Plus size={15} />
           Add New
         </button>
-      </div>
-
+      }
+    >
       {/* Search */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
           <input
@@ -233,7 +228,7 @@ export default function ConditionsCMS() {
         confirmLabel={deleting ? 'Deleting…' : 'Delete'}
         confirmVariant="danger"
       />
-    </div>
+    </AdminPageHeader>
   )
 }
 
