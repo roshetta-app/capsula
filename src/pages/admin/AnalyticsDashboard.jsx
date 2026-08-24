@@ -13,6 +13,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 import ContentHealthTab from './analytics/ContentHealthTab'
 import SearchGapsTab    from './analytics/SearchGapsTab'
@@ -338,53 +339,54 @@ export default function AnalyticsDashboard() {
   const activeData = data ? data[activeTab] : null
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
+    <AdminPageHeader
+      title="Analytics"
+      actions={
+        <>
+          {/* CSV export */}
+          <button
+            onClick={() => exportCSV(activeTab, data)}
+            disabled={!data}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface)',
+              color: 'var(--color-text-secondary)',
+              fontSize: 13, fontWeight: 500,
+              fontFamily: 'var(--font-body)',
+              cursor: data ? 'pointer' : 'not-allowed',
+              opacity: data ? 1 : 0.5,
+            }}
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
 
-      {/* Export/Refresh actions — breadcrumb/title now owned by AdminLayout */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-        {/* CSV export */}
-        <button
-          onClick={() => exportCSV(activeTab, data)}
-          disabled={!data}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            borderRadius: 'var(--radius-sm)',
-            border: '1px solid var(--color-border)',
-            backgroundColor: 'var(--color-surface)',
-            color: 'var(--color-text-secondary)',
-            fontSize: 13, fontWeight: 500,
-            fontFamily: 'var(--font-body)',
-            cursor: data ? 'pointer' : 'not-allowed',
-            opacity: data ? 1 : 0.5,
-          }}
-        >
-          <Download size={14} />
-          Export CSV
-        </button>
-
-        {/* Refresh */}
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            borderRadius: 'var(--radius-sm)',
-            border: 'none',
-            backgroundColor: 'var(--color-accent)',
-            color: '#fff',
-            fontSize: 13, fontWeight: 600,
-            fontFamily: 'var(--font-body)',
-            cursor: refreshing ? 'not-allowed' : 'pointer',
-            opacity: refreshing ? 0.7 : 1,
-          }}
-        >
-          <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
-          {refreshing ? 'Refreshing…' : 'Refresh'}
-        </button>
-      </div>
-
+          {/* Refresh */}
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              backgroundColor: 'var(--color-accent)',
+              color: '#fff',
+              fontSize: 13, fontWeight: 600,
+              fontFamily: 'var(--font-body)',
+              cursor: refreshing ? 'not-allowed' : 'pointer',
+              opacity: refreshing ? 0.7 : 1,
+            }}
+          >
+            <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
+            {refreshing ? 'Refreshing…' : 'Refresh'}
+          </button>
+        </>
+      }
+    >
       {/* Tab bar — reference pattern for any screen needing a sub-row (per
           plan §1); stays exactly as before, now sitting inside the content
           area's width instead of stretching edge-to-edge under the old
@@ -456,6 +458,6 @@ export default function AnalyticsDashboard() {
 
       {/* Spin keyframe */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </AdminPageHeader>
   )
 }
