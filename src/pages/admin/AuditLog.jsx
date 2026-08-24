@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 // ─── Action badge colours ─────────────────────────────────────────────────────
 
@@ -87,10 +88,9 @@ export default function AuditLog() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
-
-      {/* Refresh action — breadcrumb/title now owned by AdminLayout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+    <AdminPageHeader
+      title="Audit Log"
+      actions={
         <button
           onClick={fetchEntries}
           disabled={loading}
@@ -111,8 +111,8 @@ export default function AuditLog() {
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           Refresh
         </button>
-      </div>
-
+      }
+    >
 
         {/* Error */}
         {error && (
@@ -296,7 +296,7 @@ export default function AuditLog() {
           </div>
         )}
 
-      </div>
+      </AdminPageHeader>
   )
 }
 
