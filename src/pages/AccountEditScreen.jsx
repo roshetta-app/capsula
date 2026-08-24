@@ -87,6 +87,17 @@
  *     two, matching the other two screens. ReadOnlySkeleton's placeholder
  *     circle is bumped to 72px too, so there's no layout jump when the
  *     real avatar loads in.
+ * welcome-header-skip (2026-08-25) — First-time signup header: title text
+ *     shortened to just "Welcome" (the actual grab-attention welcome
+ *     headline moved down into ProfileWizard's own body, above Personal
+ *     info, where there's room for it — see that file). The "Skip for
+ *     now" link also moved here, into the header's top-right corner
+ *     (previously a small text link next to the Step 1/2 progress bar in
+ *     the wizard body) — same handleSkip action as before, just
+ *     relocated to where people expect a Skip option on a welcome
+ *     screen, and where this header already had empty space for the
+ *     first-time case. Existing users editing via the pencil icon are
+ *     unaffected either way — this only changes the forced first-time path.
  */
 
 import { useState, useEffect } from 'react'
@@ -287,6 +298,11 @@ export default function AccountEditScreen() {
   // in flight, same convention as AccountScreen's sign-out confirm.
   const [deleteSheetOpen, setDeleteSheetOpen] = useState(false)
   const [deleting, setDeleting]               = useState(false)
+  // welcome-header-skip: header-level Skip link's busy state, guards
+  // against a double-tap firing handleSkip twice while it's in flight.
+  // Previously this lived inside ProfileWizard itself, alongside its own
+  // Skip for now link — moved here along with the link, see header below.
+  const [skipping, setSkipping] = useState(false)
 
   useEffect(() => {
     if (!user) {
@@ -406,8 +422,8 @@ export default function AccountEditScreen() {
   // (no saved profile to cancel back to — same condition canCancel above
   // already keys off) gets its own friendly title instead of the normal
   // "Manage Profile" header, and drops the back arrow since there's
-  // nothing meaningful to go back to on a first-time signup — the
-  // wizard's own Skip button (see onSkip below) is already the escape
+  // nothing meaningful to go back to on a first-time signup — the header's
+  // own Skip button (see welcome-header-skip below) is already the escape
   // hatch for this view.
   const isFirstTimeSetup = editing && !canCancel
 
@@ -464,7 +480,7 @@ export default function AccountEditScreen() {
             fontWeight: 700,
             color:      'var(--color-text-primary)',
           }}>
-            {isFirstTimeSetup ? 'Tell us a bit more about yourself' : 'Manage Profile'}
+            {isFirstTimeSetup ? 'Welcome' : 'Manage Profile'}
           </h1>
         </div>
 
@@ -485,6 +501,45 @@ export default function AccountEditScreen() {
               }}
             >
               <X size={20} strokeWidth={1.8} />
+            </button>
+          ) : isFirstTimeSetup ? (
+            // welcome-header-skip: moved here from inside the wizard body
+            // (was a quiet text link next to the Step 1/2 progress bar,
+            // easy to miss under the avatar/name field above it) — the
+            // top-right corner of a welcome screen is the spot people
+            // already expect a Skip option, and it was sitting empty here
+            // for this exact case (no back arrow, no Edit/Cancel button).
+            <button
+              onClick={async () => {
+                if (skipping) return
+                setSkipping(true)
+                try {
+                  await handleSkip()
+                } finally {
+                  // handleSkip navigates away on success, so this mostly
+                  // only matters if it throws — keeps the link from
+                  // getting stuck disabled/busy on a failed attempt.
+                  setSkipping(false)
+                }
+              }}
+              disabled={skipping}
+              aria-label="Skip for now"
+              style={{
+                border:                  'none',
+                background:              'none',
+                padding:                 'var(--space-1)',
+                fontSize:                13,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                color:                   'var(--color-text-secondary)',
+                textDecoration:          'underline',
+                cursor:                  skipping ? 'default' : 'pointer',
+                opacity:                 skipping ? 0.6 : 1,
+                flexShrink:              0,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {skipping ? 'Skipping…' : 'Skip'}
             </button>
           ) : (!editing && (
             <button
@@ -532,20 +587,20 @@ export default function AccountEditScreen() {
             // footer Back button without ever persisting
             // profileSetupDismissed — so the next time they opened Manage
             // Profile, this screen forced them straight back into the same
-            // wizard, with no visible reason why. Skip for now already
-            // persists the dismissal and is meant to be the only step-1
-            // exit for this flow (see onSkip below) — passing undefined
-            // here hides the footer Back button on step 1 entirely, same
+            // wizard, with no visible reason why. The header's own Skip
+            // button already persists the dismissal and is meant to be the
+            // only step-1 exit for this flow — passing undefined here hides the footer Back button on step 1 entirely, same
             // as the header's own back arrow already being dropped for
             // this case. Step 2 -> step 1 navigation inside the wizard is
             // unaffected either way. Existing users editing via the pencil
             // icon (canCancel true) are unaffected.
             onBack={canCancel ? handleCancelEdit : undefined}
-            // profile-nudge-system: Skip only ever shows on the forced
-            // first-time path (canCancel false, i.e. setup was never
-            // dismissed before) — an existing user editing their profile
-            // via the pencil icon never sees it.
-            onSkip={canCancel ? undefined : handleSkip}
+            // welcome-header-skip: Skip itself moved to the header button
+            // above — the wizard just needs to know whether this is the
+            // first-time welcome flow, to show its big welcome headline
+            // (see ProfileWizard.jsx). Same canCancel condition as before,
+            // just renamed for clarity now that it's not tied to Skip.
+            isWelcome={!canCancel}
           />
         ) : (
           <div>

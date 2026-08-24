@@ -60,6 +60,21 @@
  * and AccountEditScreen.jsx, so the three screens can't drift out of sync
  * with each other again. The prior border around the photo is dropped as
  * part of standardizing on one look across all three.
+ *
+ * name-field-error-scope-fix (2026-08-25) — the "Your name is required"
+ * error under the name field was wrongly tied to step1Valid as a whole (any
+ * invalid field on step 1 — e.g. a phone number that stopped matching after
+ * changing the country code — showed up as a false name error). Now scoped
+ * to values.fullName specifically, matching how Phone and Country already
+ * only check their own field.
+ *
+ * welcome-header-skip (2026-08-25) — replaces the onSkip prop with a plain
+ * isWelcome boolean. The Skip action itself moved out of this file into
+ * AccountEditScreen's header (top-right corner, first-time-only) — this
+ * component no longer owns any Skip button or its busy state. In its place,
+ * step 1 now shows a big two-line welcome headline (only when isWelcome is
+ * true) above Personal info, giving the first-time signup screen an actual
+ * welcoming moment instead of a small title buried in the header bar.
  */
 
 import { useState, useMemo, useRef, useEffect } from 'react'
@@ -715,12 +730,12 @@ function isPhoneInvalid(dialCode, digits) {
  * @param {object} props.user — the signed-in auth user (for read-only photo + email)
  * @param {(values: object) => Promise<void>} props.onComplete — called on final Save; the wizard awaits it and shows its own saving/error state
  * @param {() => void} [props.onBack] — called if the person backs out of step 1 entirely (no history to fall back on otherwise)
- * @param {() => void} [props.onSkip] — profile-nudge-system: called if the person taps Skip on step 1. Only
- *   ever passed on the forced first-time signup path (never when editing an existing profile) — its presence
- *   is what makes the Skip link render at all. Only offered on step 1; once someone has moved on to step 2
- *   they're close enough to done that we no longer offer an early exit.
+ * @param {boolean} [props.isWelcome] — welcome-header-skip: true only on the forced first-time signup path
+ *   (never when editing an existing profile). Shows the big two-line welcome headline above Personal info on
+ *   step 1. The actual Skip action now lives in AccountEditScreen's header, not here — this prop is just the
+ *   headline's on/off switch.
  */
-export default function ProfileWizard({ initialValues, user, onComplete, onBack, onSkip }) {
+export default function ProfileWizard({ initialValues, user, onComplete, onBack, isWelcome }) {
   const [step, setStep]     = useState(1)
   const [values, setValues] = useState({
     fullName:         initialValues?.fullName ?? '',
@@ -735,12 +750,6 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
   })
   const [saving, setSaving]     = useState(false)
   const [saveError, setSaveError] = useState(null)
-  // header-skip-country-tweaks: press-feedback + busy state for the Skip
-  // link, same pointerdown/up/leave scale-transform pattern every other
-  // wizard/AccountEditScreen button already uses (BottomNav/MenuRow/Edit
-  // Profile pill/Logout button).
-  const [skipPressed, setSkipPressed]   = useState(false)
-  const [skipping, setSkipping]         = useState(false)
   const [phoneSheetOpen, setPhoneSheetOpen] = useState(false)
   // Focus state for the plain text inputs (Full name, Other occupation,
   // phone number) — WizardDropdown tracks its own `open` state instead,
@@ -859,61 +868,12 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
         <span style={{ fontSize: 15 }}>{user?.email ?? ''}</span>
       </div>
 
-      {/* ── Progress bar (2 segments), with Skip alongside it ──
-          profile-nudge-system: Skip only ever renders on step 1, and only
-          when the caller passed onSkip (the forced first-time signup
-          path) — editing an existing profile never gets this link. A
-          plain text link, not a button, so it doesn't compete visually
-          with the Continue CTA below. */}
+      {/* ── Progress bar (2 segments) ──
+          welcome-header-skip: the Skip link that used to sit here moved to
+          AccountEditScreen's header (top-right corner) — see that file. */}
       <div style={{ marginBottom: 'var(--space-2)' }}>
-        <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          gap:            'var(--space-3)',
-          marginBottom:   'var(--space-2)',
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            Step {step} of 2
-          </div>
-          {step === 1 && onSkip && (
-            <button
-              type="button"
-              disabled={skipping}
-              onClick={async () => {
-                if (skipping) return
-                setSkipping(true)
-                try {
-                  await onSkip()
-                } finally {
-                  // onSkip navigates away on success, so this mostly only
-                  // matters if it throws — keeps the link from getting
-                  // stuck disabled/busy on a failed attempt.
-                  setSkipping(false)
-                }
-              }}
-              onPointerDown={() => setSkipPressed(true)}
-              onPointerUp={() => setSkipPressed(false)}
-              onPointerLeave={() => setSkipPressed(false)}
-              style={{
-                border:                  'none',
-                background:              'none',
-                padding:                 0,
-                fontSize:                13,
-                fontWeight:              600,
-                fontFamily:              'var(--font-body)',
-                color:                   'var(--color-text-secondary)',
-                textDecoration:          'underline',
-                cursor:                  skipping ? 'default' : 'pointer',
-                opacity:                 skipping ? 0.6 : 1,
-                transform:               skipPressed ? 'scale(0.97)' : 'scale(1)',
-                transition:              'transform var(--motion-fast) var(--ease-settle), opacity var(--motion-fast) var(--ease-settle)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {skipping ? 'Skipping…' : 'Skip for now'}
-            </button>
-          )}
+        <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
+          Step {step} of 2
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {[1, 2].map(i => (
@@ -932,6 +892,24 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
 
         {step === 1 && (
           <>
+            {/* welcome-header-skip: big two-line welcome headline, only for
+                the forced first-time signup path — existing users editing
+                via the pencil icon (isWelcome false) never see this, they
+                go straight to Personal info like before. Sits in the
+                scrolling body rather than the header, so it actually has
+                room to read as a real welcome moment. */}
+            {isWelcome && (
+              <div style={{
+                fontSize:   26,
+                fontWeight: 800,
+                lineHeight: 1.2,
+                color:      'var(--color-text-primary)',
+                margin:     '0 0 var(--space-5)',
+              }}>
+                Welcome to Capsula<br />Let's set up your profile
+              </div>
+            )}
+
             <h2 style={{ margin: '0 0 var(--space-4)', fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)' }}>
               Personal info
             </h2>
@@ -940,7 +918,7 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
               <WizardField
                 label="Your name"
                 icon={<Contact size={14} strokeWidth={1.8} color="var(--color-text-secondary)" style={fieldIconStyle} />}
-                error={attemptedStep1 && !step1Valid ? 'Your name is required' : null}
+                error={attemptedStep1 && !values.fullName.trim() ? 'Your name is required' : null}
               >
                 <input
                   type="text"
@@ -953,7 +931,7 @@ export default function ProfileWizard({ initialValues, user, onComplete, onBack,
                     ...pillInputStyle,
                     ...(fullNameFocused
                       ? pillInputFocusStyle
-                      : (attemptedStep1 && !step1Valid ? pillInputErrorStyle : {})),
+                      : (attemptedStep1 && !values.fullName.trim() ? pillInputErrorStyle : {})),
                   }}
                 />
               </WizardField>
