@@ -22,6 +22,7 @@ import { supabase } from '../../lib/supabase'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import DrugPickerModal from '../../components/admin/DrugPickerModal'
 import ConditionPickerModal from '../../components/admin/ConditionPickerModal'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchPendingNotifications,
   fetchSentNotifications,
@@ -382,8 +383,7 @@ export default function NotificationsPanel() {
     (scheduleMode !== 'custom' || Boolean(customScheduleAt))
 
   return (
-    <div style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-6) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
-
+    <AdminPageHeader title="Notifications">
 
         <div style={{
           backgroundColor: 'var(--color-surface)',
@@ -1333,7 +1333,7 @@ export default function NotificationsPanel() {
           </div>
         )}
 
-      </div>
+    </AdminPageHeader>
   )
 }
 
