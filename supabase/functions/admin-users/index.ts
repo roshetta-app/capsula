@@ -16,19 +16,31 @@
  *
  * 'list' reads auth.users via supabase.auth.admin.listUsers() (service
  * role only — structurally unreachable from client code, per F11 Stage 1
- * audit) and joins each user with their profiles row (role/tier/
- * created_at — the table's only 4 columns). updateRole/updateTier write
- * profiles directly with the service-role client — profiles has no admin
- * write policy today (F11 Stage 1 audit), so this function is the only
- * path that can change role/tier. That boundary matters beyond this
- * stage too: D34's future own-row profile-update policy for the Account
- * page is explicitly scoped to exclude role/tier so a user can't
- * self-promote — this function stays the sole writer of those two
- * columns. ban/unban use Supabase Auth's native banned_until via
- * updateUserById's ban_duration field — no custom ban logic invented.
+ * audit) and joins each user with their profiles row. updateRole/
+ * updateTier write profiles directly with the service-role client —
+ * profiles has no admin write policy today (F11 Stage 1 audit), so this
+ * function is the only path that can change role/tier. That boundary
+ * matters beyond this stage too: D34's future own-row profile-update
+ * policy for the Account page is explicitly scoped to exclude role/tier
+ * so a user can't self-promote — this function stays the sole writer of
+ * those two columns. ban/unban use Supabase Auth's native banned_until
+ * via updateUserById's ban_duration field — no custom ban logic invented.
  * ban_duration takes a duration string; there's no built-in "forever",
  * so ban sets a 100-year duration as an effectively-permanent ban and
  * unban passes 'none' to lift it immediately.
+ *
+ * Admin CMS sidebar redesign, Users migration (D6/D7) — 'list' now also
+ * selects the profiles columns the profile wizard has grown since this
+ * function was first written (full_name, occupation, occupation_other,
+ * specialty, student_type, country, gender, phone_country_code,
+ * phone_number). These are shown view-only in the CMS (D7 — admins don't
+ * get an editing UI for a user's personal/professional info; only
+ * role/tier/ban stay admin-writable). 'governorate' is intentionally
+ * left out — confirmed dead per the redesign plan's live DB check, the
+ * profile wizard stopped collecting it 2026-08-23 and nothing reads or
+ * writes it anymore. profile_setup_dismissed / theme_preference are also
+ * left out — UI-state fields with nothing for an admin to act on, not
+ * account information.
  */
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -80,7 +92,11 @@ Deno.serve(async (req: Request) => {
 
       const { data: profiles, error: profilesErr } = await adminClient
         .from('profiles')
-        .select('id, role, tier, created_at')
+        .select(`
+          id, role, tier, created_at,
+          full_name, occupation, occupation_other, specialty, student_type,
+          country, gender, phone_country_code, phone_number
+        `)
       if (profilesErr) throw profilesErr
 
       const profileById = new Map((profiles ?? []).map((p: Record<string, unknown>) => [p.id, p]))
@@ -88,13 +104,22 @@ Deno.serve(async (req: Request) => {
       const users = listData.users.map(u => {
         const profile = profileById.get(u.id) as Record<string, unknown> | undefined
         return {
-          id:              u.id,
-          email:           u.email ?? null,
-          created_at:      profile?.created_at ?? u.created_at,
-          last_sign_in_at: u.last_sign_in_at ?? null,
-          banned_until:    u.banned_until ?? null,
-          role:            profile?.role ?? 'user',
-          tier:            profile?.tier ?? 'free',
+          id:                  u.id,
+          email:               u.email ?? null,
+          created_at:          profile?.created_at ?? u.created_at,
+          last_sign_in_at:     u.last_sign_in_at ?? null,
+          banned_until:        u.banned_until ?? null,
+          role:                profile?.role ?? 'user',
+          tier:                profile?.tier ?? 'free',
+          full_name:           profile?.full_name ?? null,
+          occupation:          profile?.occupation ?? null,
+          occupation_other:    profile?.occupation_other ?? null,
+          specialty:           profile?.specialty ?? null,
+          student_type:        profile?.student_type ?? null,
+          country:             profile?.country ?? null,
+          gender:              profile?.gender ?? null,
+          phone_country_code:  profile?.phone_country_code ?? null,
+          phone_number:        profile?.phone_number ?? null,
         }
       })
 

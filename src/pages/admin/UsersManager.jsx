@@ -1,15 +1,31 @@
 /**
  * src/pages/admin/UsersManager.jsx
  * Phase F11 Stage 2 — Users CMS.
+ * Admin CMS sidebar redesign, Users migration (D4/D6/D7):
+ *  - Own header, back-button, and outer width wrapper removed — this
+ *    screen now renders only its content, inside AdminLayout's shell
+ *    (D4). Width widened from the old flat-list's 680 to 960 to make
+ *    room for a real table instead of stacked buttons.
+ *  - Redesigned from a flat list of tappable rows into a stat-card row
+ *    (Total Users / Admins / Banned) + a real table (D6), computed
+ *    client-side from the same fetchAllUsers() payload — no extra query
+ *    needed for the stats.
+ *  - Detail modal now also shows the newer profile fields (full name,
+ *    occupation, specialty, country, gender, phone, student type) that
+ *    the admin-users Edge Function's 'list' action was widened to
+ *    return. These are display-only — D7: admins do not get an editing
+ *    UI for a user's personal/professional info from the CMS, matching
+ *    the existing ownership boundary (only role/tier/ban are
+ *    admin-writable; self-editing is scoped to the row's own owner).
  *
  * Modeled on CategoriesManager.jsx's load()/toast/ConfirmModal shape.
- * Differences from that near-twin, both driven by what this data actually
- * is:
- *  - No drag-reorder, no active/inactive toggle, no add/delete — accounts
- *    are created by Google sign-in, not from this screen, and there is no
- *    "order" concept for a user list.
- *  - Flat list only (10 real accounts today, per the F11 Stage 1 audit) —
- *    no search/filter bar, matching D33's scope.
+ * Differences from that near-twin, both driven by what this data
+ * actually is:
+ *  - No drag-reorder, no active/inactive toggle, no add/delete —
+ *    accounts are created by Google sign-in, not from this screen, and
+ *    there is no "order" concept for a user list.
+ *  - No search/filter bar (10 real accounts today, per the F11 Stage 1
+ *    audit) — matching D33's original scope, unchanged by this redesign.
  *  - Tap a row to open a detail modal for role/tier/ban, instead of an
  *    inline toggle — role and ban are consequential enough to want an
  *    explicit save step, and ban specifically goes through ConfirmModal
@@ -19,8 +35,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, ShieldCheck, Ban, CircleUserRound } from 'lucide-react'
+import { ShieldCheck, Ban, CircleUserRound, Users as UsersIcon } from 'lucide-react'
 import { useToast }   from '../../context/ToastContext'
 import Modal          from '../../components/admin/Modal'
 import ConfirmModal   from '../../components/admin/ConfirmModal'
@@ -45,6 +60,19 @@ function isBanned(user) {
   return !!user.banned_until && new Date(user.banned_until).getTime() > Date.now()
 }
 
+function formatOccupation(user) {
+  if (!user.occupation) return null
+  if (user.occupation === 'Other' && user.occupation_other) return user.occupation_other
+  return user.occupation
+}
+
+function formatPhone(user) {
+  if (!user.phone_number) return null
+  return user.phone_country_code
+    ? `${user.phone_country_code} ${user.phone_number}`
+    : user.phone_number
+}
+
 // ─── UserModal — role / tier / ban detail view ──────────────────────────────
 
 function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
@@ -63,6 +91,19 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
   if (!user) return null
 
   const banned = isBanned(user)
+
+  // View-only profile fields (D7) — only render the ones the account
+  // actually has a value for, so accounts filled out before a given
+  // field existed don't show a wall of "—".
+  const profileFields = [
+    ['Full name',    user.full_name],
+    ['Occupation',   formatOccupation(user)],
+    ['Specialty',    user.specialty],
+    ['Student type', user.student_type],
+    ['Country',      user.country],
+    ['Gender',       user.gender],
+    ['Phone',        formatPhone(user)],
+  ].filter(([, value]) => !!value)
 
   async function handleSave() {
     setBusy(true)
@@ -102,13 +143,31 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
   }
 
   return (
-    <Modal isOpen={open} title={user.email ?? 'User'} onClose={onClose}>
+    <Modal isOpen={open} title={user.full_name || user.email || 'User'} onClose={onClose}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: 'var(--color-text-tertiary)' }}>
           <div>Joined {formatDate(user.created_at)}</div>
           <div>Last sign-in {formatDate(user.last_sign_in_at)}</div>
         </div>
+
+        {profileFields.length > 0 && (
+          <div style={{
+            display:      'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap:          '8px 16px',
+            padding:      '10px 12px',
+            borderRadius: 8,
+            backgroundColor: 'var(--color-surface-muted)',
+          }}>
+            {profileFields.map(([label, value]) => (
+              <div key={label}>
+                <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{label}</div>
+                <div style={{ fontSize: 13, color: 'var(--color-text-primary)', fontWeight: 500 }}>{value}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         <label style={labelStyle}>
           Role
@@ -161,10 +220,45 @@ function UserModal({ open, user, onClose, onSaved, onRequestBanConfirm }) {
   )
 }
 
+// ─── Stat cards ─────────────────────────────────────────────────────────────
+
+function StatCard({ label, value, faIconAsLucide: Icon }) {
+  return (
+    <div style={{
+      display:         'flex',
+      alignItems:      'center',
+      gap:             'var(--space-3)',
+      padding:         'var(--space-4)',
+      backgroundColor: 'var(--color-surface)',
+      border:          '1px solid var(--color-border)',
+      borderRadius:    'var(--radius-lg)',
+      boxShadow:       'var(--shadow-card)',
+    }}>
+      <div style={{
+        width: 40, height: 40,
+        borderRadius: 'var(--radius-md)',
+        backgroundColor: 'var(--color-accent-light)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        flexShrink: 0,
+        color: 'var(--color-accent)',
+      }}>
+        <Icon size={18} />
+      </div>
+      <div>
+        <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.2 }}>
+          {value}
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
+          {label}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function UsersManager() {
-  const navigate  = useNavigate()
   const { toast } = useToast()
 
   // Store toast in a ref so load() never needs it as a dep — same fix as
@@ -214,21 +308,35 @@ export default function UsersManager() {
     load()
   }
 
+  const totalUsers  = rows.length
+  const totalAdmins = rows.filter(u => u.role === 'admin').length
+  const totalBanned = rows.filter(isBanned).length
+
   return (
     <div style={{
-      maxWidth:   680,
-      margin:     '0 auto',
-      padding:    'var(--space-4)',
+      maxWidth:   960,
+      padding:    'var(--space-6) var(--space-5)',
       fontFamily: 'var(--font-body)',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--space-5)' }}>
-        <button onClick={() => navigate('/admin')} style={iconBtn}>
-          <ArrowLeft size={16} />
-        </button>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-          Users
-        </h1>
+      <div style={{
+        fontSize: 22,
+        fontWeight: 700,
+        color: 'var(--color-text-primary)',
+        marginBottom: 'var(--space-5)',
+      }}>
+        Users
+      </div>
+
+      {/* Stat cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: 'var(--space-4)',
+        marginBottom: 'var(--space-5)',
+      }}>
+        <StatCard label="Total Users" value={loading ? '—' : totalUsers} faIconAsLucide={UsersIcon} />
+        <StatCard label="Admins"      value={loading ? '—' : totalAdmins} faIconAsLucide={ShieldCheck} />
+        <StatCard label="Banned"      value={loading ? '—' : totalBanned} faIconAsLucide={Ban} />
       </div>
 
       {loading && (
@@ -237,66 +345,74 @@ export default function UsersManager() {
         </div>
       )}
 
-      {!loading && rows.map(user => {
-        const banned = isBanned(user)
-        return (
-          <button
-            key={user.id}
-            onClick={() => openDetail(user)}
-            style={{
-              display:         'flex',
-              alignItems:      'center',
-              gap:             10,
-              width:           '100%',
-              padding:         '10px 12px',
-              border:          '1px solid var(--color-border)',
-              borderRadius:    10,
-              marginBottom:    8,
-              backgroundColor: 'var(--color-surface)',
-              cursor:          'pointer',
-              textAlign:       'left',
-              fontFamily:      'var(--font-body)',
-              opacity:         banned ? 0.65 : 1,
-            }}
-          >
-            <div style={{
-              width: 36, height: 36, borderRadius: 8, flexShrink: 0,
-              backgroundColor: 'var(--color-surface-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <CircleUserRound size={18} color="var(--color-text-secondary)" />
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{
-                fontWeight: 600, fontSize: 14, color: 'var(--color-text-primary)',
-                overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
-              }}>
-                {user.email ?? user.id}
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                Joined {formatDate(user.created_at)}
-              </div>
-            </div>
-
-            {user.role === 'admin' && (
-              <span style={{ ...badgeStyle, color: 'var(--color-accent)', borderColor: 'var(--color-accent)' }}>
-                <ShieldCheck size={11} /> Admin
-              </span>
-            )}
-
-            <span style={badgeStyle}>
-              {user.tier === 'paid' ? 'Paid' : 'Free'}
-            </span>
-
-            {banned && (
-              <span style={{ ...badgeStyle, color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}>
-                <Ban size={11} /> Banned
-              </span>
-            )}
-          </button>
-        )
-      })}
+      {/* Table */}
+      {!loading && (
+        <div style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+          backgroundColor: 'var(--color-surface)',
+        }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ backgroundColor: 'var(--color-surface-muted)' }}>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Email</th>
+                <th style={thStyle}>Role</th>
+                <th style={thStyle}>Tier</th>
+                <th style={thStyle}>Status</th>
+                <th style={thStyle}>Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(user => {
+                const banned = isBanned(user)
+                return (
+                  <tr
+                    key={user.id}
+                    onClick={() => openDetail(user)}
+                    style={{
+                      cursor: 'pointer',
+                      borderTop: '1px solid var(--color-border)',
+                      opacity: banned ? 0.65 : 1,
+                    }}
+                  >
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <CircleUserRound size={16} color="var(--color-text-secondary)" />
+                        {user.full_name || '—'}
+                      </div>
+                    </td>
+                    <td style={{ ...tdStyle, color: 'var(--color-text-secondary)' }}>
+                      {user.email ?? user.id}
+                    </td>
+                    <td style={tdStyle}>
+                      {user.role === 'admin'
+                        ? <span style={{ ...badgeStyle, color: 'var(--color-accent)', borderColor: 'var(--color-accent)' }}>
+                            <ShieldCheck size={11} /> Admin
+                          </span>
+                        : <span style={badgeStyle}>User</span>
+                      }
+                    </td>
+                    <td style={tdStyle}>{user.tier === 'paid' ? 'Paid' : 'Free'}</td>
+                    <td style={tdStyle}>
+                      {banned
+                        ? <span style={{ ...badgeStyle, color: 'var(--color-error, #ef4444)', borderColor: 'var(--color-error, #ef4444)' }}>
+                            <Ban size={11} /> Banned
+                          </span>
+                        : <span style={badgeStyle}>Active</span>
+                      }
+                    </td>
+                    <td style={{ ...tdStyle, color: 'var(--color-text-tertiary)' }}>
+                      {formatDate(user.created_at)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <UserModal
         open={detailOpen}
@@ -357,20 +473,6 @@ const btnDanger = {
   cursor:          'pointer',
 }
 
-const iconBtn = {
-  display:         'flex',
-  alignItems:      'center',
-  justifyContent:  'center',
-  width:           28,
-  height:          28,
-  borderRadius:    6,
-  border:          '1px solid var(--color-border)',
-  backgroundColor: 'transparent',
-  color:           'var(--color-text-secondary)',
-  cursor:          'pointer',
-  padding:         0,
-}
-
 const labelStyle = {
   display:       'flex',
   flexDirection: 'column',
@@ -406,4 +508,19 @@ const badgeStyle = {
   fontWeight:      500,
   color:           'var(--color-text-secondary)',
   flexShrink:      0,
+}
+
+const thStyle = {
+  textAlign:    'left',
+  padding:      '10px 12px',
+  fontSize:     11,
+  fontWeight:   600,
+  textTransform: 'uppercase',
+  letterSpacing: '0.03em',
+  color:        'var(--color-text-tertiary)',
+}
+
+const tdStyle = {
+  padding: '10px 12px',
+  color:   'var(--color-text-primary)',
 }
