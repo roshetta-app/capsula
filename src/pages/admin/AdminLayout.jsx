@@ -26,6 +26,14 @@ import { useAuth } from '../../hooks/useAuth'
 
 const NAV_GROUPS = [
   {
+    // Home — its own group, separated from the rest by a divider like any
+    // other group. exact: true since '/admin' would otherwise startsWith-
+    // match every other admin route and show active everywhere.
+    items: [
+      { path: '/admin', label: 'Home', faIcon: faHouse, exact: true },
+    ],
+  },
+  {
     // Content
     items: [
       { path: '/admin/drugs',      label: 'Drug Library',    faIcon: faCapsules },
@@ -107,36 +115,8 @@ export default function AdminLayout() {
           </div>
         </div>
 
-        {/* Home — takes you to the /admin summary dashboard (AdminSummary),
-            kept separate from NAV_GROUPS since it isn't one of the 9 CMS
-            sections, it's the index route itself */}
-        <div style={{ padding: 'var(--space-3) var(--space-3) 0' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-2) var(--space-3)',
-              borderRadius: 'var(--radius-sm)',
-              border: 'none',
-              backgroundColor: location.pathname === '/admin' ? 'var(--color-accent-light)' : 'transparent',
-              color: location.pathname === '/admin' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-              fontSize: 14,
-              fontWeight: location.pathname === '/admin' ? 600 : 500,
-              fontFamily: 'var(--font-body)',
-              textAlign: 'left',
-              cursor: 'pointer',
-              width: '100%',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <FontAwesomeIcon icon={faHouse} style={{ width: 16, height: 16, flexShrink: 0 }} />
-            Home
-          </button>
-        </div>
-
-        {/* Nav list */}
+        {/* Nav list — Home is NAV_GROUPS[0], a group of its own, so it gets
+            the same divider treatment as Content/Users/Analytics below */}
         <nav style={{
           flex: 1,
           padding: 'var(--space-3)',
@@ -155,14 +135,16 @@ export default function AdminLayout() {
                 }} />
               )}
               {group.items.map(item => {
-                const active = location.pathname === item.path
-                  || location.pathname.startsWith(item.path + '/')
+                const active = item.exact
+                  ? location.pathname === item.path
+                  : (location.pathname === item.path || location.pathname.startsWith(item.path + '/'))
 
                 return (
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
                     style={{
+                      position: 'relative',
                       display: 'flex',
                       alignItems: 'center',
                       gap: 'var(--space-3)',
@@ -183,6 +165,23 @@ export default function AdminLayout() {
                       marginBottom: 2,
                     }}
                   >
+                    {/* Tree connector — vertical line down to mid-height,
+                        then a short horizontal tick into the icon, so
+                        indented items read as nested under the item above
+                        them rather than just shifted right */}
+                    {item.indent && (
+                      <span aria-hidden="true" style={{
+                        position: 'absolute',
+                        left: 'calc(var(--space-3) + 8px)',
+                        top: 0,
+                        height: '50%',
+                        width: 8,
+                        borderLeft: '1.5px solid var(--color-border)',
+                        borderBottom: '1.5px solid var(--color-border)',
+                        borderBottomLeftRadius: 4,
+                        pointerEvents: 'none',
+                      }} />
+                    )}
                     <FontAwesomeIcon icon={item.faIcon} style={{ width: item.indent ? 13 : 16, height: item.indent ? 13 : 16, flexShrink: 0 }} />
                     {item.label}
                   </button>
