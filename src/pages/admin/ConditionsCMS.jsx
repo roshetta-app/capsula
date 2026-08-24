@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, Edit2, Trash2, ChevronLeft } from 'lucide-react'
+import { Plus, Edit2, Trash2 } from 'lucide-react'
 import { useConditionContext } from '../../context/ConditionContext'
 import { useToast } from '../../context/ToastContext'
 import { deleteCondition, toggleConditionPublished, fetchSpecialtiesForCMS } from '../../lib/adminQueries'
@@ -110,62 +110,30 @@ export default function ConditionsCMS() {
 
   return (
     <div style={{
-      minHeight: '100dvh',
-      backgroundColor: 'var(--color-bg)',
+      maxWidth: 680, margin: '0 auto',
+      padding: 'var(--space-4) var(--space-4) var(--space-12)',
       fontFamily: 'var(--font-body)',
       color: 'var(--color-text-primary)',
     }}>
 
-      {/* Header */}
-      <header style={{
-        position: 'sticky', top: 0, zIndex: 50,
-        backgroundColor: 'var(--color-surface)',
-        borderBottom: '1px solid var(--color-border)',
-      }}>
-        <div style={{
-          maxWidth: 680, margin: '0 auto',
-          padding: 'var(--space-3) var(--space-4)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-            <button
-              onClick={() => navigate('/admin')}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                fontFamily: 'var(--font-body)', padding: '4px 0',
-                display: 'flex', alignItems: 'center', gap: 2,
-              }}
-            >
-              <ChevronLeft size={16} />
-              Dashboard
-            </button>
-            <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-            <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-              Conditions
-            </span>
-          </div>
+      {/* Add New action — page title/back-nav now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+        <button
+          onClick={() => navigate('/admin/conditions/new')}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
+            padding: '7px 14px', borderRadius: 'var(--radius-md)',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff',
+            fontFamily: 'var(--font-body)',
+          }}
+        >
+          <Plus size={15} />
+          Add New
+        </button>
+      </div>
 
-          {/* FIX: navigate to full editor instead of opening ConditionFormModal */}
-          <button
-            onClick={() => navigate('/admin/conditions/new')}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-1)',
-              padding: '7px 14px', borderRadius: 'var(--radius-md)',
-              fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              border: 'none', backgroundColor: 'var(--color-accent)', color: '#fff',
-              fontFamily: 'var(--font-body)',
-            }}
-          >
-            <Plus size={15} />
-            Add New
-          </button>
-        </div>
-      </header>
-
-      <main style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-4) var(--space-4) var(--space-12)' }}>
-
-        {/* Search */}
+      {/* Search */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
           <input
             type="search"
@@ -250,7 +218,6 @@ export default function ConditionsCMS() {
             })}
           </div>
         )}
-      </main>
 
       {/* Delete confirm modal */}
       <ConfirmModal
