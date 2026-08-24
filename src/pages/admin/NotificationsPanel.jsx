@@ -14,7 +14,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Send, RefreshCw, Bell, Clock, Pencil, X, Check, ChevronDown, ChevronUp,
   Image as ImageIcon, Link2, Bookmark, Trash2,
@@ -88,8 +87,6 @@ function deliveryRateLabel(sentCount, failedCount) {
 }
 
 export default function NotificationsPanel() {
-  const navigate = useNavigate()
-
   const [title,   setTitle]   = useState('')
   const [message, setMessage] = useState('')
   const [type,    setType]    = useState('info')
@@ -385,35 +382,8 @@ export default function NotificationsPanel() {
     (scheduleMode !== 'custom' || Boolean(customScheduleAt))
 
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-6) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-            }}
-          >
-            ‹ Admin
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Notifications
-          </span>
-        </div>
-      </header>
-
-      <main style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-6) var(--space-4) var(--space-12)' }}>
 
         <div style={{
           backgroundColor: 'var(--color-surface)',
@@ -1363,8 +1333,7 @@ export default function NotificationsPanel() {
           </div>
         )}
 
-      </main>
-    </div>
+      </div>
   )
 }
 
