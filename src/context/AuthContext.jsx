@@ -51,7 +51,7 @@
  * wizard — see that file's own note for the full picture.
  */
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
@@ -149,6 +149,19 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
+  // admin-cms-shell-flash fix (2026-08-24) — tracks whichever user id is
+  // currently loaded so onAuthStateChange (below) can tell a genuine new
+  // sign-in apart from supabase-js re-firing SIGNED_IN for the SAME user
+  // on browser tab/window refocus (a documented supabase-js behavior:
+  // the client re-validates its session on visibilitychange, and that
+  // re-validation itself dispatches SIGNED_IN, not just TOKEN_REFRESHED).
+  // Confirmed as the cause of the whole admin CMS shell (sidebar +
+  // content) flashing on every tab switch, once all 11 admin routes
+  // started sharing one AuthGuard/AdminLayout instance — previously each
+  // screen had its own AuthGuard, so the same spurious event only
+  // reloaded one screen instead of the whole shell.
+  const userIdRef = useRef(null)
+
   const loadProfile = useCallback(async (currentUser) => {
     if (!currentUser) {
       setProfile(null)
@@ -199,6 +212,7 @@ export function AuthProvider({ children }) {
     // in App.jsx), not once per screen that calls useAuth().
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
+      userIdRef.current = session?.user?.id ?? null
       setUser(session?.user ?? null)
       await loadProfile(session?.user ?? null)
       if (!cancelled) setLoading(false)
@@ -217,12 +231,32 @@ export function AuthProvider({ children }) {
     // Scoped to SIGNED_IN only, not TOKEN_REFRESHED/other events, so a
     // routine background token refresh doesn't re-trigger a loading gate.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const incomingUserId = session?.user?.id ?? null
+
+      // admin-cms-shell-flash fix (2026-08-24) — a SIGNED_IN event for the
+      // SAME user already loaded is supabase-js's tab-refocus session
+      // re-validation, not a real sign-in. Update state quietly in the
+      // background without touching `loading`, so AuthGuard never
+      // unmounts an already-authenticated screen for it. A SIGNED_IN
+      // event that actually changes the user id (real sign-in, or a
+      // different account) still goes through the original loading gate
+      // below, unchanged — this keeps the profile_setup_dismissed timing
+      // fix (account-header-tweaks) intact for genuine sign-ins.
+      if (event === 'SIGNED_IN' && incomingUserId === userIdRef.current) {
+        setUser(session?.user ?? null)
+        loadProfile(session?.user ?? null)
+        return
+      }
+
       if (event === 'SIGNED_IN') {
+        userIdRef.current = incomingUserId
         setLoading(true)
         setUser(session?.user ?? null)
         loadProfile(session?.user ?? null).finally(() => setLoading(false))
         return
       }
+
+      userIdRef.current = incomingUserId
       setUser(session?.user ?? null)
       loadProfile(session?.user ?? null)
     })
