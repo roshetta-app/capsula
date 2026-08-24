@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, ChevronDown, ChevronUp, CheckCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 function formatDate(iso) {
   if (!iso) return '—'
@@ -141,10 +142,9 @@ export default function CrashLogs() {
   useEffect(() => { load() }, [load])
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
-
-      {/* Refresh action — breadcrumb/title now owned by AdminLayout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+    <AdminPageHeader
+      title="Crash Logs"
+      actions={
         <button
           onClick={() => load(true)}
           disabled={refreshing}
@@ -161,76 +161,75 @@ export default function CrashLogs() {
           <RefreshCw size={14} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} />
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
-      </div>
+      }
+    >
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 'var(--space-12)', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
+          Loading…
+        </div>
+      )}
 
+      {error && (
+        <div style={{
+          padding: 'var(--space-4)', borderRadius: 'var(--radius-md)',
+          backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+          color: '#991B1B', fontSize: 13,
+        }}>
+          {error}
+        </div>
+      )}
 
-        {loading && (
-          <div style={{ textAlign: 'center', padding: 'var(--space-12)', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-            Loading…
+      {!loading && !error && logs.length === 0 && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          gap: 'var(--space-3)', padding: 'var(--space-16)',
+          color: 'var(--color-text-tertiary)',
+        }}>
+          <CheckCircle size={40} strokeWidth={1.5} color="var(--color-success, #16a34a)" />
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            No crashes logged
           </div>
-        )}
+          <div style={{ fontSize: 13 }}>The app is running without errors.</div>
+        </div>
+      )}
 
-        {error && (
+      {!loading && logs.length > 0 && (
+        <div style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-lg)',
+          overflow: 'hidden',
+        }}>
+          {/* Column headers */}
           <div style={{
-            padding: 'var(--space-4)', borderRadius: 'var(--radius-md)',
-            backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-            color: '#991B1B', fontSize: 13,
+            display: 'grid',
+            gridTemplateColumns: '160px 1fr 80px',
+            gap: 'var(--space-3)',
+            padding: 'var(--space-2) var(--space-4)',
+            borderBottom: '1px solid var(--color-border)',
+            backgroundColor: 'var(--color-bg)',
           }}>
-            {error}
+            {['Timestamp', 'Error message', ''].map(h => (
+              <span key={h} style={{
+                fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+                letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
+              }}>
+                {h}
+              </span>
+            ))}
           </div>
-        )}
 
-        {!loading && !error && logs.length === 0 && (
+          {logs.map(log => <CrashRow key={log.id} log={log} />)}
+
           <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            gap: 'var(--space-3)', padding: 'var(--space-16)',
-            color: 'var(--color-text-tertiary)',
+            padding: 'var(--space-2) var(--space-4)',
+            fontSize: 12, color: 'var(--color-text-tertiary)',
+            borderTop: '1px solid var(--color-border-subtle)',
           }}>
-            <CheckCircle size={40} strokeWidth={1.5} color="var(--color-success, #16a34a)" />
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-              No crashes logged
-            </div>
-            <div style={{ fontSize: 13 }}>The app is running without errors.</div>
+            Showing last {logs.length} entries
           </div>
-        )}
-
-        {!loading && logs.length > 0 && (
-          <div style={{
-            backgroundColor: 'var(--color-surface)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-lg)',
-            overflow: 'hidden',
-          }}>
-            {/* Column headers */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: '160px 1fr 80px',
-              gap: 'var(--space-3)',
-              padding: 'var(--space-2) var(--space-4)',
-              borderBottom: '1px solid var(--color-border)',
-              backgroundColor: 'var(--color-bg)',
-            }}>
-              {['Timestamp', 'Error message', ''].map(h => (
-                <span key={h} style={{
-                  fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
-                  letterSpacing: '0.06em', color: 'var(--color-text-tertiary)',
-                }}>
-                  {h}
-                </span>
-              ))}
-            </div>
-
-            {logs.map(log => <CrashRow key={log.id} log={log} />)}
-
-            <div style={{
-              padding: 'var(--space-2) var(--space-4)',
-              fontSize: 12, color: 'var(--color-text-tertiary)',
-              borderTop: '1px solid var(--color-border-subtle)',
-            }}>
-              Showing last {logs.length} entries
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
+    </AdminPageHeader>
   )
 }
