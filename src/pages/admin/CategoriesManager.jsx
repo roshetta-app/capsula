@@ -16,9 +16,8 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Plus, GripVertical, Pencil, Trash2,
+  Plus, GripVertical, Pencil, Trash2,
   ToggleLeft, ToggleRight, ChevronUp, ChevronDown,
   Upload, Check,
 } from 'lucide-react'
@@ -553,7 +552,6 @@ function CategoryModal({ open, category, onClose, onSaved, nextOrder }) {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function CategoriesManager() {
-  const navigate      = useNavigate()
   const { toast }     = useToast()
 
   // Store toast in a ref so load() never needs it as a dep — same fix as
@@ -674,17 +672,11 @@ export default function CategoriesManager() {
       padding:   'var(--space-4)',
       fontFamily:'var(--font-body)',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--space-5)' }}>
-        <button onClick={() => navigate('/admin')} style={iconBtn}>
-          <ArrowLeft size={16} />
-        </button>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-          Categories
-        </h1>
+      {/* Add action — page title/back-nav now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-5)' }}>
         <button
           onClick={() => { setEditTarget(null); setModalOpen(true) }}
-          style={{ ...btnPrimary, marginLeft: 'auto' }}
+          style={btnPrimary}
         >
           <Plus size={14} /> Add
         </button>
