@@ -8,7 +8,6 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { RefreshCw, ChevronDown, ChevronUp, ClipboardList } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
@@ -51,8 +50,6 @@ function formatTime(iso) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function AuditLog() {
-  const navigate = useNavigate()
-
   const [entries,   setEntries]   = useState([])
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
@@ -90,34 +87,10 @@ export default function AuditLog() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ minHeight: '100dvh', backgroundColor: 'var(--color-bg)', fontFamily: 'var(--font-body)' }}>
+    <div style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
 
-      {/* Header */}
-      <header style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: 'var(--space-3) var(--space-4)',
-        borderBottom: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
-        position: 'sticky', top: 0, zIndex: 50,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-              fontFamily: 'var(--font-body)', padding: '4px 0',
-              display: 'flex', alignItems: 'center',
-            }}
-          >
-            ‹ Admin
-          </button>
-          <span style={{ color: 'var(--color-border)', fontSize: 16 }}>/</span>
-          <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-            Audit Log
-          </span>
-        </div>
-
+      {/* Refresh action — breadcrumb/title now owned by AdminLayout */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
         <button
           onClick={fetchEntries}
           disabled={loading}
@@ -138,9 +111,8 @@ export default function AuditLog() {
           <RefreshCw size={14} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           Refresh
         </button>
-      </header>
+      </div>
 
-      <main style={{ maxWidth: 820, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)' }}>
 
         {/* Error */}
         {error && (
@@ -324,8 +296,7 @@ export default function AuditLog() {
           </div>
         )}
 
-      </main>
-    </div>
+      </div>
   )
 }
 
@@ -347,4 +318,3 @@ const thStyle = {
   letterSpacing: '0.06em',
   color: 'var(--color-text-tertiary)',
 }
-
