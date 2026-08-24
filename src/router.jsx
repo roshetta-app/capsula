@@ -16,6 +16,13 @@
  *             as those two: each renders its own back-arrow header and
  *             does not show BottomNav, matching the reference design's
  *             full-page navigation rather than the tab-style Layout group.
+ * Admin CMS sidebar redesign (D1/D2) — All 11 admin screens now nest under
+ *             one shared <AuthGuard><AdminLayout/></AuthGuard> group,
+ *             mirroring the same pathless-layout-route pattern already used
+ *             above for Conditions/Drugs/Favourites/Account. AdminDashboard
+ *             is retired as a route; /admin now renders AdminSummary as the
+ *             group's index content. Each individual admin route no longer
+ *             wraps its own AuthGuard.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -40,7 +47,8 @@ import AccountFaqScreen      from './pages/AccountFaqScreen'
 
 import AuthGuard            from './components/admin/AuthGuard'
 import AdminLogin           from './pages/admin/AdminLogin'
-import AdminDashboard       from './pages/admin/AdminDashboard'
+import AdminLayout          from './pages/admin/AdminLayout'
+import AdminSummary         from './pages/admin/AdminSummary'
 import DrugCMS              from './pages/admin/DrugCMS'
 import AddDrugFlow          from './pages/admin/AddDrugFlow'
 import DrugEditor           from './pages/admin/DrugEditor'
@@ -51,7 +59,7 @@ import CategoriesManager    from './pages/admin/CategoriesManager'
 import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
 import CrashLogs            from './pages/admin/CrashLogs'
 import NotificationsPanel   from './pages/admin/NotificationsPanel'
-import AuditLog             from './pages/admin/AuditLog'
+import AuditLog              from './pages/admin/AuditLog'
 import UsersManager         from './pages/admin/UsersManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
@@ -122,48 +130,55 @@ export default function AppRoutes() {
 
       <Route path="/admin/login"         element={<AdminLogin />} />
 
-      <Route path="/admin"
-        element={<AuthGuard><AdminDashboard /></AuthGuard>}
-      />
-      <Route path="/admin/drugs"
-        element={<AuthGuard><DrugCMS /></AuthGuard>}
-      />
-      <Route path="/admin/drugs/new"
-        element={<AuthGuard><AddDrugFlow /></AuthGuard>}
-      />
-      <Route path="/admin/drugs/generic/:genericId"
-        element={<AuthGuard><DrugEditor /></AuthGuard>}
-      />
-      <Route path="/admin/categories"
-        element={<AuthGuard><CategoriesManager /></AuthGuard>}
-      />
-      <Route path="/admin/conditions"
-        element={<AuthGuard><ConditionsCMS /></AuthGuard>}
-      />
-      <Route path="/admin/conditions/new"
-        element={<AuthGuard><ConditionEditor /></AuthGuard>}
-      />
-      <Route path="/admin/conditions/:id"
-        element={<AuthGuard><ConditionEditor /></AuthGuard>}
-      />
-      <Route path="/admin/specialties"
-        element={<AuthGuard><SpecialtiesManager /></AuthGuard>}
-      />
-      <Route path="/admin/analytics"
-        element={<AuthGuard><AnalyticsDashboard /></AuthGuard>}
-      />
-      <Route path="/admin/crash-logs"
-        element={<AuthGuard><CrashLogs /></AuthGuard>}
-      />
-      <Route path="/admin/notifications"
-        element={<AuthGuard><NotificationsPanel /></AuthGuard>}
-      />
-      <Route path="/admin/audit-log"
-        element={<AuthGuard><AuditLog /></AuthGuard>}
-      />
-      <Route path="/admin/users"
-        element={<AuthGuard><UsersManager /></AuthGuard>}
-      />
+      {/* All 11 admin screens share one AdminLayout instance (sidebar +
+          content pane), gated once by AuthGuard here instead of each
+          screen wrapping its own — same pathless-layout-route pattern as
+          the public Layout group above. /admin itself renders AdminSummary
+          as the shell's landing content (D3). */}
+      <Route element={<AuthGuard><AdminLayout /></AuthGuard>}>
+        <Route path="/admin"
+          element={<AdminSummary />}
+        />
+        <Route path="/admin/drugs"
+          element={<DrugCMS />}
+        />
+        <Route path="/admin/drugs/new"
+          element={<AddDrugFlow />}
+        />
+        <Route path="/admin/drugs/generic/:genericId"
+          element={<DrugEditor />}
+        />
+        <Route path="/admin/categories"
+          element={<CategoriesManager />}
+        />
+        <Route path="/admin/conditions"
+          element={<ConditionsCMS />}
+        />
+        <Route path="/admin/conditions/new"
+          element={<ConditionEditor />}
+        />
+        <Route path="/admin/conditions/:id"
+          element={<ConditionEditor />}
+        />
+        <Route path="/admin/specialties"
+          element={<SpecialtiesManager />}
+        />
+        <Route path="/admin/analytics"
+          element={<AnalyticsDashboard />}
+        />
+        <Route path="/admin/crash-logs"
+          element={<CrashLogs />}
+        />
+        <Route path="/admin/notifications"
+          element={<NotificationsPanel />}
+        />
+        <Route path="/admin/audit-log"
+          element={<AuditLog />}
+        />
+        <Route path="/admin/users"
+          element={<UsersManager />}
+        />
+      </Route>
 
     </Routes>
   )
