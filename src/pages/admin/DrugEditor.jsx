@@ -54,6 +54,7 @@ import {
   touchAppMetadata,
 } from '../../lib/adminQueries'
 import { supabase } from '../../lib/supabase'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 // ─── Empty states ─────────────────────────────────────────────────────────────
 
@@ -364,21 +365,21 @@ export default function DrugEditor() {
   // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return (
-    <Shell name="Loading…">
+    <AdminPageHeader title="Loading…">
       <LoadingSkeleton />
-    </Shell>
+    </AdminPageHeader>
   )
 
   if (fetchErr) return (
-    <Shell name="Error">
+    <AdminPageHeader title="Error">
       <ErrorBanner message={fetchErr} />
-    </Shell>
+    </AdminPageHeader>
   )
 
   const genericValid = generic?.ingredients?.length > 0 && generic?.category
 
   return (
-    <Shell name={generic?.name_en ?? 'Drug'}>
+    <AdminPageHeader title={generic?.name_en ?? 'Drug'}>
 
       {globalError && (
         <ErrorBanner message={globalError} onDismiss={() => setGlobalError(null)} />
@@ -600,32 +601,7 @@ export default function DrugEditor() {
         />
       )}
 
-    </Shell>
-  )
-}
-
-// ─── Shell ────────────────────────────────────────────────────────────────────
-// Breadcrumb/back-button chrome dropped — AdminLayout's sidebar owns nav now.
-// The drug name stays: it identifies which specific generic is being edited
-// (the sidebar's nav label just says "Drugs"), useful while scrolling this
-// dense, multi-section form.
-
-function Shell({ children, name }) {
-  return (
-    <div style={{
-      maxWidth: 680, margin: '0 auto',
-      padding: 'var(--space-5) var(--space-4) var(--space-16)',
-      fontFamily: 'var(--font-body)',
-    }}>
-      <h1 style={{
-        fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
-        margin: '0 0 var(--space-5)',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {name}
-      </h1>
-      {children}
-    </div>
+    </AdminPageHeader>
   )
 }
 
