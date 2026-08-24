@@ -88,7 +88,7 @@
  *     circle is bumped to 72px too, so there's no layout jump when the
  *     real avatar loads in.
  * welcome-header-skip (2026-08-25) — First-time signup header: title text
- *     shortened to just "Welcome" (the actual grab-attention welcome
+ *     replaced with the app logo (the actual grab-attention welcome
  *     headline moved down into ProfileWizard's own body, above Personal
  *     info, where there's room for it — see that file). The "Skip for
  *     now" link also moved here, into the header's top-right corner
@@ -474,14 +474,23 @@ export default function AccountEditScreen() {
               <ArrowLeft size={22} />
             </button>
           )}
-          <h1 style={{
-            margin:     0,
-            fontSize:   17,
-            fontWeight: 700,
-            color:      'var(--color-text-primary)',
-          }}>
-            {isFirstTimeSetup ? 'Welcome' : 'Manage Profile'}
-          </h1>
+          {isFirstTimeSetup ? (
+            // welcome-header-logo: app logo in place of a plain "Welcome"
+            // text label — public/logo.svg, served from the app's public
+            // folder root, same as favicon/icons already are. Sized to sit
+            // comfortably in this same slim header bar; nudge the height if
+            // it looks off once you see it on device.
+            <img src="/logo.svg" alt="Capsula" style={{ height: 24, width: 'auto' }} />
+          ) : (
+            <h1 style={{
+              margin:     0,
+              fontSize:   17,
+              fontWeight: 700,
+              color:      'var(--color-text-primary)',
+            }}>
+              Manage Profile
+            </h1>
+          )}
         </div>
 
         {!profileLoading && (
