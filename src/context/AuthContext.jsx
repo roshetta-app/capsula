@@ -57,6 +57,7 @@ import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
+import { writeCachedAuthSnapshot, clearCachedAuthSnapshot } from '../utils/authSnapshot'
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
 // AndroidManifest.xml to catch Google's redirect back from the system
@@ -165,6 +166,11 @@ export function AuthProvider({ children }) {
   const loadProfile = useCallback(async (currentUser) => {
     if (!currentUser) {
       setProfile(null)
+      // account-instant-load: no one is signed in, so any remembered
+      // snapshot from a previous session is stale — wipe it. Otherwise
+      // AccountScreen could show a signed-out visitor the last signed-in
+      // person's name/photo for an instant on next load.
+      clearCachedAuthSnapshot()
       return
     }
     const { data, error } = await supabase
@@ -199,6 +205,20 @@ export function AuthProvider({ children }) {
       country:               data.country,
       specialty:             data.specialty,
       profileSetupDismissed: data.profile_setup_dismissed,
+    })
+
+    // account-instant-load: remember just enough to render AccountScreen's
+    // header instantly on the next open — written every time a real
+    // profile load succeeds, so it's always as fresh as the last real
+    // check. Written even if `error` was truthy (no profile row yet, e.g.
+    // right after first sign-up) since the name/email/avatar shown on
+    // AccountScreen comes from the auth user object either way, not from
+    // the missing profile row.
+    writeCachedAuthSnapshot({
+      id:        currentUser.id,
+      email:     currentUser.email ?? null,
+      fullName:  error ? null : data.full_name,
+      avatarUrl: currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || null,
     })
   }, [])
 
@@ -368,6 +388,12 @@ export function AuthProvider({ children }) {
   async function signOut() {
     clearAllNotesStorage()
     clearAllRecentlyViewedStorage()
+    // account-instant-load: wipe the remembered name/photo/email right
+    // away, on the same guaranteed sign-out path as the other storage
+    // cleanup above — don't rely on the next loadProfile(null) call to
+    // catch this, so there's no window where a signed-out AccountScreen
+    // could still show the last signed-in person's info.
+    clearCachedAuthSnapshot()
     await supabase.auth.signOut()
   }
 

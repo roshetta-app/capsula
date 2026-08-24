@@ -11,10 +11,16 @@ export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /** localStorage key names for each cache slice */
 export const CACHE_KEYS = {
-  DRUGS:      'capsula_drugs_cache',
-  CONDITIONS: 'capsula_conditions_cache',
-  CATEGORIES: 'capsula_categories_cache',
-  ICONS:      'capsula_icons_cache',
+  DRUGS:         'capsula_drugs_cache',
+  CONDITIONS:    'capsula_conditions_cache',
+  CATEGORIES:    'capsula_categories_cache',
+  ICONS:         'capsula_icons_cache',
+  // account-instant-load: NOT part of the CACHE_KEY_MAP slice system below
+  // (utils/cache.js) — that system invalidates on a 7-day TTL/version
+  // check, which doesn't apply here. This one is invalidated by identity
+  // instead: written on a successful sign-in, wiped on sign-out or when a
+  // different account signs in. See utils/authSnapshot.js.
+  AUTH_SNAPSHOT: 'capsula_auth_snapshot',
 }
 
 /** Supabase table used for cache invalidation timestamps */

@@ -185,6 +185,7 @@ import {
   Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
 import NotificationSheet from '../components/ui/NotificationSheet'
@@ -516,6 +517,19 @@ export default function AccountScreen() {
   // hooks than during the previous render"). Every hook must run
   // unconditionally on every render, so it moves up here with the rest.
   const [avatarError, setAvatarError] = useState(false)
+  // account-avatar-flash-fix (2026-08-24): tracks whether the photo has
+  // actually finished loading — separate from avatarError above, which
+  // only tracks a real load failure. Lets the initials circle stay
+  // visible underneath the whole time, with the real photo fading in
+  // over it once it's ready, instead of there being a gap with nothing
+  // shown while the photo is in flight.
+  const [avatarLoaded, setAvatarLoaded] = useState(false)
+
+  // account-instant-load (2026-08-24): read once, on mount only — this is
+  // only ever used as a placeholder for the brief window while the real
+  // check (`loading` below) is still running, so it never needs to react
+  // to anything changing after that.
+  const [snapshot] = useState(() => getCachedAuthSnapshot())
 
   // profile-nudge-instant-load: completeness is now computed directly from
   // AuthContext's `profile`, which already carries phone/occupation/
@@ -557,18 +571,31 @@ export default function AccountScreen() {
   function handleTermsOfUse() {}
   function handlePrivacyPolicy() {}
 
-  // Same convention AccountEditScreen.jsx uses — wait for AuthContext's
-  // initial session+profile check to resolve before rendering, so nothing
-  // (avatar, name, email) ever flashes empty/wrong for a moment first.
-  if (loading) return null
+  // account-instant-load (2026-08-24): previously this waited for
+  // AuthContext's real check every single time, which is exactly what
+  // made this screen feel slower to open than the others — a blank
+  // screen on every visit while the check re-ran. Now, if there's a
+  // remembered snapshot from last time, fall through and show that
+  // instead of blocking — the real check still runs in the background
+  // and quietly takes over the moment it resolves (see `fullName`,
+  // `displayEmail`, `avatarUrl` below). Only a true first-ever visit,
+  // with no snapshot yet, still shows nothing until the real check
+  // finishes — there's nothing to show in that one case.
+  const showingProvisional = loading && !!snapshot
+  if (loading && !snapshot) return null
 
-  const fullName = profile?.fullName
-  const initials = user ? getInitials(fullName, user.email) : ''
+  const fullName    = showingProvisional ? snapshot.fullName : profile?.fullName
+  const displayEmail = showingProvisional ? snapshot.email : user?.email
+  const initials     = (user || showingProvisional) ? getInitials(fullName, displayEmail) : ''
   // account-avatar-google-pic: same source AccountEditScreen.jsx and
   // ProfileWizard.jsx already read — live Google avatar, never
   // uploaded/stored separately. Falls back to the initials circle below
   // when signed in without a photo (or on a non-Google-avatar session).
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+  // account-instant-load: uses the remembered photo while provisional,
+  // same fallback chain otherwise.
+  const avatarUrl = showingProvisional
+    ? snapshot.avatarUrl
+    : (user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null)
 
   return (
     <div>
@@ -638,8 +665,12 @@ export default function AccountScreen() {
               button here, right-aligned in the sticky title bar — same
               padding-box treatment as the leading UserCog icon above so it
               lines up vertically, still gated behind the same ConfirmSheet
-              ("Sign out?") as before. Only the icon's location changed. */}
-          {user && (
+              ("Sign out?") as before. Only the icon's location changed.
+              account-instant-load: shown during the provisional state too
+              — it triggers the real signOut() from context either way,
+              so there's no risk in it appearing a beat before the real
+              check confirms. */}
+          {(user || showingProvisional) && (
             <button
               onClick={() => setSignOutConfirmOpen(true)}
               onPointerDown={() => setLogoutPressed(true)}
@@ -679,7 +710,14 @@ export default function AccountScreen() {
         </div>
       </div>
 
-      {user && (
+      {/* account-instant-load: renders during the provisional state too,
+          using the remembered snapshot values above (fullName,
+          displayEmail, avatarUrl already account for this) — this is the
+          part of the screen meant to appear instantly. The completeness
+          banner and Upgrade/PRO card further down stay gated on the real
+          `user`/`completeness` values, so they intentionally still wait
+          for the real check. */}
+      {(user || showingProvisional) && (
         <div style={{
           display:        'flex',
           flexDirection:  'column',
@@ -687,38 +725,56 @@ export default function AccountScreen() {
           textAlign:      'center',
           marginBottom:   'var(--space-4)',
         }}>
-          {avatarUrl && !avatarError ? (
-            <img
-              src={avatarUrl}
-              alt=""
-              onError={() => setAvatarError(true)}
-              style={{
-                width:        72,
-                height:       72,
-                borderRadius: 'var(--radius-full)',
-                objectFit:    'cover',
-                flexShrink:   0,
-                marginBottom: 'var(--space-2)',
-              }}
-            />
-          ) : (
+          {/* account-avatar-flash-fix: initials circle is always in the
+              DOM now (not just when there's no photo), so there's never a
+              gap with nothing shown. The real photo, when present and not
+              errored, sits on top and fades in via opacity once it
+              actually finishes loading (onLoad), instead of appearing (or
+              failing) abruptly. `key={avatarUrl}` resets the fade-in state
+              if the photo URL itself ever changes (e.g. after switching
+              Google accounts) rather than carrying over a stale loaded
+              state for a different image. */}
+          <div style={{
+            position:     'relative',
+            width:        72,
+            height:       72,
+            flexShrink:   0,
+            marginBottom: 'var(--space-2)',
+          }}>
             <div style={{
-              width:           72,
-              height:          72,
+              position:        'absolute',
+              inset:           0,
               borderRadius:    'var(--radius-full)',
               backgroundColor: 'var(--color-accent)',
               display:         'flex',
               alignItems:      'center',
               justifyContent:  'center',
-              flexShrink:      0,
               fontSize:        22,
               fontWeight:      600,
               color:           '#fff',
-              marginBottom:    'var(--space-2)',
             }}>
               {initials}
             </div>
-          )}
+            {avatarUrl && !avatarError && (
+              <img
+                key={avatarUrl}
+                src={avatarUrl}
+                alt=""
+                onLoad={() => setAvatarLoaded(true)}
+                onError={() => setAvatarError(true)}
+                style={{
+                  position:     'absolute',
+                  inset:        0,
+                  width:        '100%',
+                  height:       '100%',
+                  borderRadius: 'var(--radius-full)',
+                  objectFit:    'cover',
+                  opacity:      avatarLoaded ? 1 : 0,
+                  transition:   'opacity var(--motion-fast) var(--ease-settle)',
+                }}
+              />
+            )}
+          </div>
 
           {fullName?.trim() && (
             <div style={{
@@ -739,7 +795,7 @@ export default function AccountScreen() {
             marginBottom: 'var(--space-2)',
           }}>
             <Mail size={15} strokeWidth={1.8} />
-            <span style={{ fontSize: 15 }}>{user.email}</span>
+            <span style={{ fontSize: 15 }}>{displayEmail}</span>
           </div>
 
           <button
@@ -771,7 +827,11 @@ export default function AccountScreen() {
         </div>
       )}
 
-      {!user && (
+      {/* account-instant-load: also held back during the provisional
+          state — a remembered snapshot means someone was signed in last
+          time, so showing "sign in" here would be wrong for that brief
+          window even though `user` itself hasn't resolved yet. */}
+      {!user && !showingProvisional && (
         <div style={{
           backgroundColor: 'var(--color-surface)',
           borderRadius:    'var(--radius-lg)',
