@@ -45,6 +45,7 @@ import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import ConfirmModal from '../../components/admin/ConfirmModal'
 import SharedDrugCard from '../../components/SharedDrugCard'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import {
   fetchGenericsPage,
   toggleGenericPublished,
@@ -248,16 +249,15 @@ export default function DrugCMS() {
   // ─────────────────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-12)', fontFamily: 'var(--font-body)' }}>
-
-      {/* Add Generic action — page title/back-nav now owned by AdminLayout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-4)' }}>
+    <AdminPageHeader
+      title="Drug Library"
+      actions={
         <button onClick={() => navigate('/admin/drugs/new')} style={primaryBtnStyle}>
           <Plus size={15} />
           Add Generic
         </button>
-      </div>
-
+      }
+    >
       {/* Search */}
       <div style={{ position: 'relative', marginBottom: 'var(--space-3)' }}>
         <Search size={15} style={{
@@ -616,7 +616,7 @@ export default function DrugCMS() {
         />
       )}
 
-    </div>
+    </AdminPageHeader>
   )
 }
 
