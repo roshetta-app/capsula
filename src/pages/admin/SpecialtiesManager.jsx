@@ -24,6 +24,7 @@ import {
 import { useToast }       from '../../context/ToastContext'
 import Modal              from '../../components/admin/Modal'
 import ConfirmModal       from '../../components/admin/ConfirmModal'
+import AdminPageHeader    from '../../components/admin/AdminPageHeader'
 import { SpecialtyIcon, LUCIDE_ICON_OPTIONS } from '../../utils/specialtyIcon'
 import { SPECIALTY_TOKENS, TOKEN_KEYS, resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
 import {
@@ -688,22 +689,17 @@ export default function SpecialtiesManager() {
   const nextOrder = rows.length + 1
 
   return (
-    <div style={{
-      maxWidth:  680,
-      margin:    '0 auto',
-      padding:   'var(--space-4)',
-      fontFamily:'var(--font-body)',
-    }}>
-      {/* Add action — page title/back-nav now owned by AdminLayout */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-5)' }}>
+    <AdminPageHeader
+      title="Specialties"
+      actions={
         <button
           onClick={() => { setEditTarget(null); setModalOpen(true) }}
           style={btnPrimary}
         >
           <Plus size={14} /> Add
         </button>
-      </div>
-
+      }
+    >
       {loading && (
         <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-tertiary)' }}>
           Loading…
@@ -911,7 +907,7 @@ export default function SpecialtiesManager() {
         onConfirm={() => { setConfirmOpen(false); confirmConfig.onConfirm?.() }}
         onClose={() => setConfirmOpen(false)}
       />
-    </div>
+    </AdminPageHeader>
   )
 }
 
