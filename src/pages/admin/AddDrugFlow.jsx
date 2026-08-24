@@ -6,6 +6,7 @@ import { useDrugContext } from '../../context/DrugContext'
 import GenericEditor from '../../components/admin/GenericEditor'
 import FormulationEditor from '../../components/admin/FormulationEditor'
 import BrandEditor from '../../components/admin/BrandEditor'
+import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
 /**
  * AddDrugFlow — /admin/drugs/new
@@ -164,15 +165,11 @@ export default function AddDrugFlow() {
   // --- Render -----------------------------------------------------------------------
 
   return (
-    <div style={{
-      maxWidth: 600, margin: '0 auto',
-      padding: 'var(--space-6) var(--space-4) var(--space-12)',
-      fontFamily: 'var(--font-body)',
-    }}>
+    <AdminPageHeader title="Add Drug">
 
       {/* Step progress indicator — not chrome, this is the wizard's actual
-          progress state, so it moves down into content instead of being
-          dropped along with the breadcrumb/back-button header */}
+          progress state, so it stays as content below the title (D13) rather
+          than being dropped or folded into actions */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
         {STEPS.map((label, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
@@ -199,96 +196,95 @@ export default function AddDrugFlow() {
         ))}
       </div>
 
-
-        {/* Step title */}
-        <div style={{ marginBottom: 'var(--space-5)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-            Step {step + 1} of {STEPS.length}
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            {step === 0 && 'Generic information'}
-            {step === 1 && 'Formulation details'}
-            {step === 2 && 'Brands'}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
-            {step === 0 && "The drug's scientific identity - shared across all formulations"}
-            {step === 1 && 'The specific strength, form, and route for this formulation'}
-            {step === 2 && 'Commercial brands available for this formulation'}
-          </div>
+      {/* Step title */}
+      <div style={{ marginBottom: 'var(--space-5)' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
+          Step {step + 1} of {STEPS.length}
         </div>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          {step === 0 && 'Generic information'}
+          {step === 1 && 'Formulation details'}
+          {step === 2 && 'Brands'}
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 4 }}>
+          {step === 0 && "The drug's scientific identity - shared across all formulations"}
+          {step === 1 && 'The specific strength, form, and route for this formulation'}
+          {step === 2 && 'Commercial brands available for this formulation'}
+        </div>
+      </div>
 
-        {/* Error banner */}
-        {error && (
-          <div style={{
-            display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
-            backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
-            borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
-            marginBottom: 'var(--space-4)', fontSize: 13, color: '#DC2626',
-          }}>
-            <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            {error}
-          </div>
-        )}
-
-        {/* Active step editor */}
+      {/* Error banner */}
+      {error && (
         <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: 'var(--space-5)',
-          boxShadow: 'var(--shadow-card)',
-          marginBottom: 'var(--space-5)',
+          display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)',
+          backgroundColor: '#FEF2F2', border: '1px solid #FECACA',
+          borderRadius: 'var(--radius-md)', padding: 'var(--space-3)',
+          marginBottom: 'var(--space-4)', fontSize: 13, color: '#DC2626',
         }}>
-          {step === 0 && (
-            <GenericEditor generic={generic} onChange={patchGeneric} disabled={saving} />
-          )}
-          {step === 1 && (
-            <FormulationEditor
-              formulation={formulation}
-              ingredients={generic.ingredients ?? []}
-              onChange={patchFormulation}
-              disabled={saving}
-            />
-          )}
-          {step === 2 && (
-            <BrandEditor brands={brands} onChange={setBrands} disabled={saving} />
-          )}
+          <AlertTriangle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          {error}
         </div>
+      )}
 
-        {/* Navigation buttons */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+      {/* Active step editor */}
+      <div style={{
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: 'var(--space-5)',
+        boxShadow: 'var(--shadow-card)',
+        marginBottom: 'var(--space-5)',
+      }}>
+        {step === 0 && (
+          <GenericEditor generic={generic} onChange={patchGeneric} disabled={saving} />
+        )}
+        {step === 1 && (
+          <FormulationEditor
+            formulation={formulation}
+            ingredients={generic.ingredients ?? []}
+            onChange={patchFormulation}
+            disabled={saving}
+          />
+        )}
+        {step === 2 && (
+          <BrandEditor brands={brands} onChange={setBrands} disabled={saving} />
+        )}
+      </div>
+
+      {/* Navigation buttons */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
+        <button
+          type="button"
+          onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/admin/drugs')}
+          style={secondaryBtn}
+        >
+          <ChevronLeft size={15} />
+          {step === 0 ? 'Cancel' : 'Back'}
+        </button>
+
+        {step < STEPS.length - 1 ? (
           <button
             type="button"
-            onClick={() => step > 0 ? setStep(s => s - 1) : navigate('/admin/drugs')}
-            style={secondaryBtn}
+            onClick={() => setStep(s => s + 1)}
+            disabled={!stepValid()}
+            style={primaryBtn(!stepValid())}
           >
-            <ChevronLeft size={15} />
-            {step === 0 ? 'Cancel' : 'Back'}
+            Next: {STEPS[step + 1]}
+            <ChevronRight size={15} />
           </button>
-
-          {step < STEPS.length - 1 ? (
-            <button
-              type="button"
-              onClick={() => setStep(s => s + 1)}
-              disabled={!stepValid()}
-              style={primaryBtn(!stepValid())}
-            >
-              Next: {STEPS[step + 1]}
-              <ChevronRight size={15} />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!stepValid() || saving}
-              style={primaryBtn(!stepValid() || saving)}
-            >
-              {saving ? 'Saving...' : 'Save drug'}
-              {!saving && <Check size={15} />}
-            </button>
-          )}
-        </div>
-    </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!stepValid() || saving}
+            style={primaryBtn(!stepValid() || saving)}
+          >
+            {saving ? 'Saving...' : 'Save drug'}
+            {!saving && <Check size={15} />}
+          </button>
+        )}
+      </div>
+    </AdminPageHeader>
   )
 }
 
