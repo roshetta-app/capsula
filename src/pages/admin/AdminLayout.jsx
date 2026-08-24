@@ -2,7 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { LogOut } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
-  faCapsules, faNotesMedical, faStethoscope, faTags,
+  faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
   faChartBar, faBug, faBell, faClipboardList, faUsers,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
@@ -24,51 +24,30 @@ import { useAuth } from '../../hooks/useAuth'
  * home now that that header is gone.
  */
 
-const NAV_ITEMS = [
+const NAV_GROUPS = [
   {
-    path:   '/admin/drugs',
-    label:  'Drug Library',
-    faIcon: faCapsules,
+    // Content
+    items: [
+      { path: '/admin/drugs',      label: 'Drug Library',    faIcon: faCapsules },
+      { path: '/admin/categories', label: 'Drug Categories', faIcon: faTags,        indent: true },
+      { path: '/admin/conditions', label: 'Conditions',      faIcon: faNotesMedical },
+      { path: '/admin/specialties',label: 'Specialties',     faIcon: faStethoscope, indent: true },
+    ],
   },
   {
-    path:   '/admin/categories',
-    label:  'Categories',
-    faIcon: faTags,
+    // Users + Notifications
+    items: [
+      { path: '/admin/users',         label: 'Users',         faIcon: faUsers },
+      { path: '/admin/notifications', label: 'Notifications', faIcon: faBell },
+    ],
   },
   {
-    path:   '/admin/conditions',
-    label:  'Conditions',
-    faIcon: faNotesMedical,
-  },
-  {
-    path:   '/admin/specialties',
-    label:  'Specialties',
-    faIcon: faStethoscope,
-  },
-  {
-    path:   '/admin/analytics',
-    label:  'Analytics',
-    faIcon: faChartBar,
-  },
-  {
-    path:   '/admin/crash-logs',
-    label:  'Crash Logs',
-    faIcon: faBug,
-  },
-  {
-    path:   '/admin/notifications',
-    label:  'Notifications',
-    faIcon: faBell,
-  },
-  {
-    path:   '/admin/audit-log',
-    label:  'Audit Log',
-    faIcon: faClipboardList,
-  },
-  {
-    path:   '/admin/users',
-    label:  'Users',
-    faIcon: faUsers,
+    // Analytics + logs
+    items: [
+      { path: '/admin/analytics',  label: 'Analytics',  faIcon: faChartBar },
+      { path: '/admin/crash-logs', label: 'Crash Logs', faIcon: faBug },
+      { path: '/admin/audit-log',  label: 'Audit Log',  faIcon: faClipboardList },
+    ],
   },
 ]
 
@@ -89,7 +68,8 @@ export default function AdminLayout() {
       display: 'flex',
     }}>
 
-      {/* Sidebar */}
+      {/* Sidebar — sticky to the viewport so it stays put while the
+          content pane scrolls, instead of scrolling away with it */}
       <aside style={{
         width: 248,
         flexShrink: 0,
@@ -97,7 +77,10 @@ export default function AdminLayout() {
         flexDirection: 'column',
         borderRight: '1px solid var(--color-border)',
         backgroundColor: 'var(--color-surface)',
-        minHeight: '100dvh',
+        position: 'sticky',
+        top: 0,
+        alignSelf: 'flex-start',
+        height: '100dvh',
       }}>
 
         {/* Brand */}
@@ -124,6 +107,35 @@ export default function AdminLayout() {
           </div>
         </div>
 
+        {/* Home — takes you to the /admin summary dashboard (AdminSummary),
+            kept separate from NAV_GROUPS since it isn't one of the 9 CMS
+            sections, it's the index route itself */}
+        <div style={{ padding: 'var(--space-3) var(--space-3) 0' }}>
+          <button
+            onClick={() => navigate('/admin')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-3)',
+              padding: 'var(--space-2) var(--space-3)',
+              borderRadius: 'var(--radius-sm)',
+              border: 'none',
+              backgroundColor: location.pathname === '/admin' ? 'var(--color-accent-light)' : 'transparent',
+              color: location.pathname === '/admin' ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              fontSize: 14,
+              fontWeight: location.pathname === '/admin' ? 600 : 500,
+              fontFamily: 'var(--font-body)',
+              textAlign: 'left',
+              cursor: 'pointer',
+              width: '100%',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <FontAwesomeIcon icon={faHouse} style={{ width: 16, height: 16, flexShrink: 0 }} />
+            Home
+          </button>
+        </div>
+
         {/* Nav list */}
         <nav style={{
           flex: 1,
@@ -133,37 +145,51 @@ export default function AdminLayout() {
           gap: 2,
           overflowY: 'auto',
         }}>
-          {NAV_ITEMS.map(item => {
-            const active = location.pathname === item.path
-              || location.pathname.startsWith(item.path + '/')
+          {NAV_GROUPS.map((group, groupIndex) => (
+            <div key={groupIndex}>
+              {groupIndex > 0 && (
+                <div style={{
+                  height: 1,
+                  backgroundColor: 'var(--color-border)',
+                  margin: 'var(--space-2) 0',
+                }} />
+              )}
+              {group.items.map(item => {
+                const active = location.pathname === item.path
+                  || location.pathname.startsWith(item.path + '/')
 
-            return (
-              <button
-                key={item.path}
-                onClick={() => navigate(item.path)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 'var(--space-3)',
-                  padding: 'var(--space-2) var(--space-3)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: 'none',
-                  backgroundColor: active ? 'var(--color-accent-light)' : 'transparent',
-                  color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-                  fontSize: 14,
-                  fontWeight: active ? 600 : 500,
-                  fontFamily: 'var(--font-body)',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  width: '100%',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <FontAwesomeIcon icon={item.faIcon} style={{ width: 16, height: 16, flexShrink: 0 }} />
-                {item.label}
-              </button>
-            )
-          })}
+                return (
+                  <button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 'var(--space-3)',
+                      padding: item.indent
+                        ? 'var(--space-2) var(--space-3) var(--space-2) calc(var(--space-3) + 20px)'
+                        : 'var(--space-2) var(--space-3)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: 'none',
+                      backgroundColor: active ? 'var(--color-accent-light)' : 'transparent',
+                      color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+                      fontSize: item.indent ? 13 : 14,
+                      fontWeight: active ? 600 : 500,
+                      fontFamily: 'var(--font-body)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      width: '100%',
+                      WebkitTapHighlightColor: 'transparent',
+                      marginBottom: 2,
+                    }}
+                  >
+                    <FontAwesomeIcon icon={item.faIcon} style={{ width: item.indent ? 13 : 16, height: item.indent ? 13 : 16, flexShrink: 0 }} />
+                    {item.label}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </nav>
 
         {/* Sign out */}
