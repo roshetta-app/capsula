@@ -32,6 +32,8 @@
  *           unbanUser (new): thin wrappers over the new admin-users Edge
  *           Function, the only path that can read auth.users or write
  *           profiles.role/tier from the CMS
+ *   App Gate Phase 1 Step 2a — listReleases, createRelease,
+ *           setMinimumSupported (new)
  */
 
 import { supabase }  from './supabase'
@@ -1349,4 +1351,76 @@ export async function unbanUser(userId, email = null) {
   if (error) return { error }
   await logAudit('unban', 'profiles', userId, email)
   return { error: null }
+}
+
+// ─── App Releases (App Gate System — Phase 1 Step 2a) ─────────────────────
+
+/**
+ * List releases, newest first. Pass a platform to filter to just that one
+ * (used by the Releases screen's platform tabs); omit it to get everything.
+ * @param {{ platform?: 'web'|'android'|'ios'|null }} [opts]
+ */
+export async function listReleases({ platform = null } = {}) {
+  let query = supabase
+    .from('app_releases')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (platform) query = query.eq('platform', platform)
+
+  const { data, error } = await query
+  return { data: data ?? [], error }
+}
+
+/**
+ * Insert a new release row.
+ * @param {{
+ *   platform: 'web'|'android'|'ios',
+ *   version: string,
+ *   release_notes?: string|null,
+ *   status?: 'live'|'deprecated'|'blocked',
+ *   released_at?: string|null,
+ *   created_by?: string|null,
+ * }} data
+ */
+export async function createRelease(data) {
+  const { data: row, error } = await supabase
+    .from('app_releases')
+    .insert(data)
+    .select('id, version, platform')
+    .single()
+  if (!error && row) {
+    await logAudit('create', 'app_releases', row.id, `${row.platform} ${row.version}`, data)
+  }
+  return { data: row, error }
+}
+
+/**
+ * Flag one release as the minimum-supported version for its platform,
+ * turning on Force Update for anyone below it. Only one release per
+ * platform may hold this flag — the database enforces that with a partial
+ * unique index, so this clears any existing flag for the platform first
+ * (as its own statement) before setting the new one, rather than relying
+ * on a single update that could momentarily violate that constraint.
+ *
+ * @param {string} id — the release row to flag
+ * @param {'web'|'android'|'ios'} platform
+ * @param {string|null} [versionLabel] — for the audit log entry only
+ */
+export async function setMinimumSupported(id, platform, versionLabel = null) {
+  const { error: clearError } = await supabase
+    .from('app_releases')
+    .update({ is_minimum_supported: false })
+    .eq('platform', platform)
+    .eq('is_minimum_supported', true)
+  if (clearError) return { error: clearError }
+
+  const { error } = await supabase
+    .from('app_releases')
+    .update({ is_minimum_supported: true })
+    .eq('id', id)
+  if (!error) {
+    await logAudit('update', 'app_releases', id, versionLabel, { is_minimum_supported: true, platform })
+  }
+  return { error }
 }
