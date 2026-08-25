@@ -32,6 +32,15 @@
  * trigger to a signed-out user's first personal note, not just their
  * first favourite (see NotesActivityContext.jsx).
  *
+ * App Gate System Phase 1 Step 4c — added AppGateResumeListener below,
+ * which re-checks for a Force Update / message every time the app resumes
+ * from the background (so a device doesn't have to be fully relaunched to
+ * pick up something just switched on in the CMS), with a cooldown so a
+ * quick app-switcher flick can't trigger a refetch on every single resume.
+ * NOT rendered anywhere yet — it reads AppGateContext internally, and
+ * AppGateProvider isn't mounted until Step 4e, so this has no effect at
+ * all until then.
+ *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
  *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
@@ -45,12 +54,16 @@
  *   used to sit (F13 Mini-stage 4, 2026-08-21). Neither is a route and
  *   neither is gated by the device-level onboarding flow; both read their
  *   own conditions internally via context.)
+ *   (AppGateProvider + AppGate land here too, Step 4e — outside
+ *   OnboardingGate entirely, so a maintenance/force-update block can show
+ *   before onboarding even does.)
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { BrowserRouter } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
+import { App as CapacitorApp } from '@capacitor/app'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
@@ -62,11 +75,43 @@ import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { NotesActivityProvider } from './context/NotesActivityContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
+import { useAppGateContext } from './context/AppGateContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useVisualViewport } from './hooks/useVisualViewport'
 
 const ROUTER_BASENAME = import.meta.env.MODE === 'capacitor' ? '' : '/capsula'
+
+// How long to wait after a check before a resume is allowed to trigger
+// another one — a quick app-switcher flick backgrounds/foregrounds Capsula
+// repeatedly within seconds, and there's no reason to refetch on every
+// single one of those.
+const APP_GATE_RESUME_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
+
+// App Gate System Phase 1 Step 4c. Renders nothing — just re-runs
+// AppGateContext's refresh() on app resume, with the cooldown above. Reads
+// useAppGateContext(), so it can only ever be mounted inside
+// AppGateProvider; Step 4e is what actually adds <AppGateResumeListener />
+// to the tree once that provider exists.
+function AppGateResumeListener() {
+  const { refresh } = useAppGateContext()
+  const lastCheckedRef = useRef(Date.now())
+
+  useEffect(() => {
+    const listenerPromise = CapacitorApp.addListener('resume', () => {
+      const now = Date.now()
+      if (now - lastCheckedRef.current < APP_GATE_RESUME_COOLDOWN_MS) return
+      lastCheckedRef.current = now
+      refresh()
+    })
+
+    return () => {
+      listenerPromise.then(handle => handle.remove())
+    }
+  }, [refresh])
+
+  return null
+}
 
 // account-theme-sync bugfix (2026-08-22): the previous fix for App.jsx
 // calling useDarkMode() outside AuthProvider's subtree (a ThemeInit
