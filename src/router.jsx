@@ -25,6 +25,8 @@
  *             wraps its own AuthGuard.
  * App Gate System Phase 1 Step 2c — Added /admin/releases route
  *             (ReleasesManager.jsx), inside the same AdminLayout group.
+ * App Gate System Phase 1 Step 3c — Added /admin/messages route
+ *             (GatesManager.jsx), inside the same AdminLayout group.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -64,6 +66,7 @@ import NotificationsPanel   from './pages/admin/NotificationsPanel'
 import AuditLog              from './pages/admin/AuditLog'
 import UsersManager         from './pages/admin/UsersManager'
 import ReleasesManager      from './pages/admin/ReleasesManager'
+import GatesManager         from './pages/admin/GatesManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
@@ -96,6 +99,7 @@ export const ROUTES = {
   ADMIN_AUDIT_LOG:        '/admin/audit-log',
   ADMIN_USERS:            '/admin/users',
   ADMIN_RELEASES:         '/admin/releases',
+  ADMIN_MESSAGES:         '/admin/messages',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -184,6 +188,9 @@ export default function AppRoutes() {
         />
         <Route path="/admin/releases"
           element={<ReleasesManager />}
+        />
+        <Route path="/admin/messages"
+          element={<GatesManager />}
         />
       </Route>
 

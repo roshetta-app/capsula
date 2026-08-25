@@ -3,7 +3,7 @@ import { LogOut } from 'lucide-react'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
-  faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket,
+  faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -51,9 +51,10 @@ const NAV_GROUPS = [
   },
   {
     // App Control — release tracking / Force Update + remote messages.
-    // Releases lands here in Step 2c; Messages joins it in Step 3c.
+    // Releases landed here in Step 2c; Messages joined it in Step 3c.
     items: [
       { path: '/admin/releases', label: 'Releases', faIcon: faRocket },
+      { path: '/admin/messages', label: 'Messages',  faIcon: faBullhorn },
     ],
   },
   {
