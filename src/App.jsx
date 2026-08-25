@@ -37,15 +37,19 @@
  * from the background (so a device doesn't have to be fully relaunched to
  * pick up something just switched on in the CMS), with a cooldown so a
  * quick app-switcher flick can't trigger a refetch on every single resume.
- * NOT rendered anywhere yet — it reads AppGateContext internally, and
- * AppGateProvider isn't mounted until Step 4e, so this has no effect at
- * all until then.
+ *
+ * App Gate System Step 4e — AppGateProvider and AppGate are now mounted,
+ * wrapping OnboardingGate entirely (not nested inside it), so a
+ * maintenance banner or force-update block can show before onboarding
+ * even gets a chance to render. AppGateResumeListener is rendered inside
+ * AppGateProvider so it can reach useAppGateContext(); this is the step
+ * that goes live for everyone.
  *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
  *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
- *   NotesActivityProvider → PushSubscriptionProvider → OnboardingGate →
- *   AppRoutes
+ *   NotesActivityProvider → PushSubscriptionProvider → AppGateProvider →
+ *   AppGate → OnboardingGate → AppRoutes
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
@@ -54,9 +58,12 @@
  *   used to sit (F13 Mini-stage 4, 2026-08-21). Neither is a route and
  *   neither is gated by the device-level onboarding flow; both read their
  *   own conditions internally via context.)
- *   (AppGateProvider + AppGate land here too, Step 4e — outside
- *   OnboardingGate entirely, so a maintenance/force-update block can show
- *   before onboarding even does.)
+ *   (AppGateProvider + AppGate sit outside OnboardingGate entirely, Step
+ *   4e — so a maintenance/force-update block can show before onboarding
+ *   even does. ProfileSetupRedirect and SignInNudge stay siblings of
+ *   OnboardingGate, both now nested inside AppGateProvider along with it —
+ *   neither reads AppGateContext, they're just grouped with the rest of
+ *   the app-shell-level components at this depth.)
  */
 
 import { useEffect, useRef } from 'react'
@@ -66,6 +73,7 @@ import { StatusBar } from '@capacitor/status-bar'
 import { App as CapacitorApp } from '@capacitor/app'
 import AppRoutes from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
+import AppGate from './components/ui/AppGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
 import SignInNudge from './components/SignInNudge'
 import { AuthProvider } from './context/AuthContext'
@@ -75,7 +83,7 @@ import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { NotesActivityProvider } from './context/NotesActivityContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
-import { useAppGateContext } from './context/AppGateContext'
+import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useVisualViewport } from './hooks/useVisualViewport'
@@ -91,8 +99,8 @@ const APP_GATE_RESUME_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
 // App Gate System Phase 1 Step 4c. Renders nothing — just re-runs
 // AppGateContext's refresh() on app resume, with the cooldown above. Reads
 // useAppGateContext(), so it can only ever be mounted inside
-// AppGateProvider; Step 4e is what actually adds <AppGateResumeListener />
-// to the tree once that provider exists.
+// AppGateProvider — Step 4e is what actually places <AppGateResumeListener />
+// inside that provider in the tree below.
 function AppGateResumeListener() {
   const { refresh } = useAppGateContext()
   const lastCheckedRef = useRef(Date.now())
@@ -150,11 +158,16 @@ export default function App() {
                   <FavouritesProvider>
                     <NotesActivityProvider>
                       <PushSubscriptionProvider>
-                        <OnboardingGate>
-                          <AppRoutes />
-                        </OnboardingGate>
-                        <ProfileSetupRedirect />
-                        <SignInNudge />
+                        <AppGateProvider>
+                          <AppGateResumeListener />
+                          <AppGate>
+                            <OnboardingGate>
+                              <AppRoutes />
+                            </OnboardingGate>
+                          </AppGate>
+                          <ProfileSetupRedirect />
+                          <SignInNudge />
+                        </AppGateProvider>
                       </PushSubscriptionProvider>
                     </NotesActivityProvider>
                   </FavouritesProvider>
