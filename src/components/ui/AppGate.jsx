@@ -19,12 +19,20 @@
  * store instead of inside the app's own WebView, falling back to a plain
  * window.open on the website build.
  *
- * Not rendered anywhere yet — Step 4e mounts <AppGateProvider> and drops
- * <AppGate /> into App.jsx, which is what actually goes live.
+ * Admin-route exemption (bugfix, this session) — AppGate is mounted once
+ * at the very top of the app, above every route, which meant it was
+ * blocking /admin/* the same as everywhere else. That's a real lockout
+ * risk: a non-dismissible gate could stop the admin from ever reaching
+ * the CMS to turn it back off, with no way out short of a direct database
+ * edit. AppGate now checks the current path via useLocation() and renders
+ * nothing at all on any /admin route — admins never see gates or the
+ * Force Update block; that entire system is for the app's regular users
+ * only.
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocation } from 'react-router-dom'
 import { Browser } from '@capacitor/browser'
 import { useAppGateContext } from '../../context/AppGateContext'
 
@@ -238,6 +246,12 @@ function AppGateSheet({ gate, onDismiss }) {
 
 export default function AppGate() {
   const { gate, dismiss } = useAppGateContext()
+  const location = useLocation()
+
+  // Admins must always be able to reach the CMS to turn a gate off, even a
+  // non-dismissible one — the App Gate system is for the app's regular
+  // users, not the admin panel itself. See bugfix note at top of file.
+  if (location.pathname.startsWith('/admin')) return null
 
   if (!gate) return null
 
