@@ -34,6 +34,8 @@
  *           profiles.role/tier from the CMS
  *   App Gate Phase 1 Step 2a — listReleases, createRelease,
  *           setMinimumSupported (new)
+ *   App Gate Phase 1 Step 3a — listGates, createGate, updateGate,
+ *           toggleGateActive (new)
  */
 
 import { supabase }  from './supabase'
@@ -1422,5 +1424,83 @@ export async function setMinimumSupported(id, platform, versionLabel = null) {
   if (!error) {
     await logAudit('update', 'app_releases', id, versionLabel, { is_minimum_supported: true, platform })
   }
+  return { error }
+}
+
+// ─── App Gates / Remote Messages (App Gate System — Phase 1 Step 3a) ──────
+
+/**
+ * List all gates (messages), newest first. Used by GatesManager's list —
+ * unlike listReleases there's no platform filter here since a single gate
+ * can already target multiple platforms via its own `platforms` column.
+ */
+export async function listGates() {
+  const { data, error } = await supabase
+    .from('app_gates')
+    .select('*')
+    .order('created_at', { ascending: false })
+  return { data: data ?? [], error }
+}
+
+/**
+ * Insert a new gate. Created inactive by default at the database level
+ * (see app_gates.active default) so a half-filled draft can never go live
+ * by accident — GatesManager flips it on explicitly via toggleGateActive.
+ *
+ * @param {{
+ *   type: 'force_update'|'maintenance'|'critical_announcement'|'promo',
+ *   title: string,
+ *   message: string,
+ *   image_url?: string|null,
+ *   cta_label?: string|null,
+ *   cta_url?: string|null,
+ *   dismissible?: boolean,
+ *   platforms?: ('web'|'android'|'ios')[],
+ *   min_version?: string|null,
+ *   starts_at?: string|null,
+ *   ends_at?: string|null,
+ *   created_by?: string|null,
+ * }} data
+ */
+export async function createGate(data) {
+  const { data: row, error } = await supabase
+    .from('app_gates')
+    .insert(data)
+    .select('id, title, type')
+    .single()
+  if (!error && row) {
+    await logAudit('create', 'app_gates', row.id, `${row.type}: ${row.title}`, data)
+  }
+  return { data: row, error }
+}
+
+/**
+ * Update an existing gate's fields (edit form save).
+ * @param {string} id
+ * @param {object} data — partial column updates
+ */
+export async function updateGate(id, data) {
+  const { error } = await supabase
+    .from('app_gates')
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (!error) await logAudit('update', 'app_gates', id, data.title ?? null, data)
+  return { error }
+}
+
+/**
+ * Flip a gate's active flag — the instant on/off switch. Turning one on
+ * shows it to matching users immediately; turning it off hides it
+ * immediately. No deploy, no app-store wait either direction.
+ * @param {string} id
+ * @param {boolean} isActive
+ * @param {string|null} [title] — for the audit log entry only
+ */
+export async function toggleGateActive(id, isActive, title = null) {
+  const { error } = await supabase
+    .from('app_gates')
+    .update({ active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
 }
