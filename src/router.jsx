@@ -23,6 +23,8 @@
  *             is retired as a route; /admin now renders AdminSummary as the
  *             group's index content. Each individual admin route no longer
  *             wraps its own AuthGuard.
+ * App Gate System Phase 1 Step 2c — Added /admin/releases route
+ *             (ReleasesManager.jsx), inside the same AdminLayout group.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
@@ -61,6 +63,7 @@ import CrashLogs            from './pages/admin/CrashLogs'
 import NotificationsPanel   from './pages/admin/NotificationsPanel'
 import AuditLog              from './pages/admin/AuditLog'
 import UsersManager         from './pages/admin/UsersManager'
+import ReleasesManager      from './pages/admin/ReleasesManager'
 
 // ─── Route path constants ─────────────────────────────────────────────────────
 
@@ -92,6 +95,7 @@ export const ROUTES = {
   ADMIN_NOTIFICATIONS:    '/admin/notifications',
   ADMIN_AUDIT_LOG:        '/admin/audit-log',
   ADMIN_USERS:            '/admin/users',
+  ADMIN_RELEASES:         '/admin/releases',
 }
 
 // ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
@@ -177,6 +181,9 @@ export default function AppRoutes() {
         />
         <Route path="/admin/users"
           element={<UsersManager />}
+        />
+        <Route path="/admin/releases"
+          element={<ReleasesManager />}
         />
       </Route>
 
