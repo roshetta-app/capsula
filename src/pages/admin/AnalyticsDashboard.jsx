@@ -2,12 +2,19 @@
  * src/pages/admin/AnalyticsDashboard.jsx
  * Phase 3J — Analytics Dashboard
  *
- * 4 tabs: Content Health | Search Gaps | Coverage | Usage
+ * 5 tabs: Content Health | Search Gaps | Coverage | Usage | Messages
  * Refresh button (re-fetches all data)
  * CSV export button (exports current tab data)
  *
  * Route: /admin/analytics  (added to router.jsx)
  * Entry: AdminDashboard nav card (added to AdminDashboard.jsx)
+ *
+ * Messages tab (Phase 2, App Gate System plan §10.5, this session) —
+ * extends this existing usage_events pattern rather than a parallel
+ * tracking system, per the plan's confirmed decision. Reads the four
+ * gate_* event types logged by useAppGate.js / AppGate.jsx (impression,
+ * dismiss, maybe_later, cta_click) and aggregates per gate by
+ * entity_name, same convention every other event type here already uses.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -19,6 +26,7 @@ import ContentHealthTab from './analytics/ContentHealthTab'
 import SearchGapsTab    from './analytics/SearchGapsTab'
 import CoverageTab      from './analytics/CoverageTab'
 import UsageTab         from './analytics/UsageTab'
+import MessagesTab      from './analytics/MessagesTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 
@@ -27,6 +35,7 @@ const TABS = [
   { id: 'gaps',     label: 'Search Gaps'    },
   { id: 'coverage', label: 'Coverage'       },
   { id: 'usage',    label: 'Usage'          },
+  { id: 'messages', label: 'Messages'       },
 ]
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -45,6 +54,7 @@ async function fetchAllAnalytics() {
     topViewCondRes,
     topSearchCondRes,
     topViewDrugRes,
+    gateEventsRes,
   ] = await Promise.all([
 
     // Conditions: total + published counts + missing definition
@@ -114,6 +124,12 @@ async function fetchAllAnalytics() {
       .select('entity_name')
       .eq('event_type', 'drug_view')
       .not('entity_name', 'is', null),
+
+    // App Gate events: impressions, dismisses, maybe-laters, CTA clicks
+    supabase
+      .from('usage_events')
+      .select('event_type, entity_name')
+      .in('event_type', ['gate_impression', 'gate_dismiss', 'gate_maybe_later', 'gate_cta_click']),
   ])
 
   // ── Content Health ───────────────────────────────────────────────────────────
@@ -206,6 +222,30 @@ async function fetchAllAnalytics() {
       .slice(0, n)
   }
 
+  // ── Messages (App Gate analytics) ─────────────────────────────────────────────
+  const gateEvents = gateEventsRes.data ?? []
+
+  function countGateType(type) {
+    return gateEvents.filter(e => e.event_type === type).length
+  }
+
+  function topGates(rows, n = 10) {
+    const map = {}
+    ;(rows ?? []).forEach(r => {
+      if (!r.entity_name) return
+      if (!map[r.entity_name]) {
+        map[r.entity_name] = { name: r.entity_name, impressions: 0, dismisses: 0, maybeLater: 0, ctaClicks: 0 }
+      }
+      if (r.event_type === 'gate_impression')  map[r.entity_name].impressions++
+      if (r.event_type === 'gate_dismiss')     map[r.entity_name].dismisses++
+      if (r.event_type === 'gate_maybe_later') map[r.entity_name].maybeLater++
+      if (r.event_type === 'gate_cta_click')   map[r.entity_name].ctaClicks++
+    })
+    return Object.values(map)
+      .sort((a, b) => b.impressions - a.impressions)
+      .slice(0, n)
+  }
+
   return {
     health: {
       totalConditions,
@@ -238,6 +278,13 @@ async function fetchAllAnalytics() {
       topViewedConditions:    topNames(topViewCondRes.data),
       topSearchedConditions:  topNames(topSearchCondRes.data),
       topViewedDrugs:         topNames(topViewDrugRes.data),
+    },
+    messages: {
+      totalImpressions: countGateType('gate_impression'),
+      totalDismisses:   countGateType('gate_dismiss'),
+      totalMaybeLater:  countGateType('gate_maybe_later'),
+      totalCtaClicks:   countGateType('gate_cta_click'),
+      topGates:         topGates(gateEvents),
     },
   }
 }
@@ -296,6 +343,20 @@ function exportCSV(activeTab, data) {
       ...d.topViewedDrugs.map((r, i) => [`${i + 1}. ${r.name}`, r.count]),
     ]
     filename = 'capsula-usage.csv'
+
+  } else if (activeTab === 'messages') {
+    const d = data.messages
+    rows = [
+      ['Metric', 'Value'],
+      ['Total Impressions', d.totalImpressions],
+      ['Total Dismisses',   d.totalDismisses],
+      ['Total Maybe Later', d.totalMaybeLater],
+      ['Total CTA Clicks',  d.totalCtaClicks],
+      ['', ''],
+      ['Message', 'Impressions', 'Dismisses', 'Maybe Later', 'CTA Clicks'],
+      ...d.topGates.map(g => [g.name, g.impressions, g.dismisses, g.maybeLater, g.ctaClicks]),
+    ]
+    filename = 'capsula-messages.csv'
   }
 
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -453,6 +514,7 @@ export default function AnalyticsDashboard() {
             {activeTab === 'gaps'     && <SearchGapsTab    data={activeData} />}
             {activeTab === 'coverage' && <CoverageTab      data={activeData} />}
             {activeTab === 'usage'    && <UsageTab         data={activeData} />}
+            {activeTab === 'messages' && <MessagesTab      data={activeData} />}
           </>
         )}
 

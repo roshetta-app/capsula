@@ -1,6 +1,7 @@
 /**
  * src/hooks/useAppGate.js
  * App Gate System Phase 1 Step 4a.
+ * Phase 2 addition (this session) — Maybe Later + analytics, see below.
  *
  * Fetches whatever should currently be shown to this device — a Force
  * Update block, or a maintenance / critical_announcement / promo message —
@@ -25,6 +26,25 @@
  * actually down right now outranks a one-off announcement), then
  * critical_announcement, then promo.
  *
+ * TWO separate "don't show this again" lists, on purpose (Phase 2, plan
+ * §10.2) — these are not the same mechanism with different labels:
+ *   - Permanent (X button / dismiss()): stored in @capacitor/preferences
+ *     (D — not localStorage), survives app close/reopen, forever, until a
+ *     NEW gate row is created. This is the pre-existing behavior.
+ *   - Session-only (Maybe Later / maybeLater()): plain React state, never
+ *     persisted anywhere. Resets the moment the hook remounts — i.e. next
+ *     time the app actually opens — by design, that's the whole point of
+ *     "later" meaning something different from "never."
+ *
+ * Analytics (Phase 2, plan §10.5) — extends the existing usageEvents.js
+ * pattern rather than a parallel system. gate_impression fires at most
+ * once per gate becoming the one actually shown (tracked via a ref, not
+ * on every refresh() re-poll of the same still-showing gate).
+ * gate_dismiss / gate_maybe_later fire from their respective functions
+ * below. gate_cta_click is NOT logged here — that's a direct user click
+ * on a specific button, only AppGate.jsx knows it happened, so it logs
+ * that one itself.
+ *
  * Per-device dismissals are stored in @capacitor/preferences (D — not
  * localStorage, the safer of the two options on native) so a dismissed
  * gate doesn't resurface for that device until it's switched off and a
@@ -35,12 +55,13 @@
  * the app comes back to the foreground.
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Preferences } from '@capacitor/preferences'
 import { supabase } from '../lib/supabase'
 import { fetchActiveGates, fetchMinimumSupportedVersion } from '../lib/queries'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 const DISMISSED_GATES_KEY = 'capsula_dismissed_gate_ids'
 
@@ -93,13 +114,21 @@ async function addDismissedId(id) {
  *     dismissible: boolean,
  *   },
  *   loading: boolean,
- *   dismiss: (id: string) => Promise<void>,
+ *   dismiss: (id: string, title?: string) => Promise<void>,
+ *   maybeLater: (id: string, title?: string) => void,
  *   refresh: () => Promise<void>,
  * }}
  */
 export function useAppGate() {
-  const [gate, setGate]       = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [gate, setGate]         = useState(null)
+  const [loading, setLoading]   = useState(true)
+  // Session-only "later" list — see file header. Deliberately plain state,
+  // never written to Preferences or anywhere else persistent.
+  const [snoozedIds, setSnoozedIds] = useState([])
+  // Tracks which gate id we last logged an impression for, so refresh()
+  // re-polling the same still-active gate doesn't log a fresh impression
+  // every cooldown-interval resume — only an actual change counts.
+  const lastImpressionIdRef = useRef(null)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -136,25 +165,50 @@ export function useAppGate() {
       for (const g of gates) {
         if (g.type === 'force_update') continue // handled above, version-driven only
         if (dismissedIds.includes(g.id)) continue
+        if (snoozedIds.includes(g.id)) continue // Maybe Later — session-only skip
         candidates.push(g)
       }
 
       candidates.sort((a, b) => TYPE_PRIORITY.indexOf(a.type) - TYPE_PRIORITY.indexOf(b.type))
 
-      setGate(candidates[0] ?? null)
+      const next = candidates[0] ?? null
+      setGate(next)
+
+      if (next && next.id !== lastImpressionIdRef.current) {
+        lastImpressionIdRef.current = next.id
+        logUsageEvent('gate_impression', next.id, next.title)
+      } else if (!next) {
+        lastImpressionIdRef.current = null
+      }
     } finally {
       setLoading(false)
     }
+    // snoozedIds intentionally omitted: refresh already reads the latest
+    // value via closure at call time (called from effects/listeners after
+    // state updates commit), and including it here would redefine refresh
+    // on every maybeLater() call, which would re-fire the resume listener's
+    // effect in App.jsx unnecessarily.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  const dismiss = useCallback(async (id) => {
+  const dismiss = useCallback(async (id, title) => {
     setGate(current => (current?.id === id ? null : current))
     await addDismissedId(id)
+    logUsageEvent('gate_dismiss', id, title ?? null)
   }, [])
 
-  return { gate, loading, dismiss, refresh }
+  // Maybe Later — session-only, see file header. Does NOT touch
+  // Preferences at all; a full app close/reopen clears this list simply
+  // by virtue of the hook (and this state) remounting from scratch.
+  const maybeLater = useCallback((id, title) => {
+    setGate(current => (current?.id === id ? null : current))
+    setSnoozedIds(ids => (ids.includes(id) ? ids : [...ids, id]))
+    logUsageEvent('gate_maybe_later', id, title ?? null)
+  }, [])
+
+  return { gate, loading, dismiss, maybeLater, refresh }
 }
