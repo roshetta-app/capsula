@@ -573,3 +573,71 @@ export async function deleteOwnAccount(supabase) {
   const { error } = await supabase.functions.invoke('delete-account')
   return { error }
 }
+
+// ─── App Gate System queries (Force Update / Remote Messages) ─────────────────
+//
+// App Gate System Phase 1 Step 4a. Both reads are public/unauthenticated —
+// app_releases and app_gates copy app_metadata's public-read/admin-write RLS
+// pattern (see plan doc §3/§4), so these run with the same plain unauth'd
+// supabase client every other public read in this file uses. Consumed by
+// src/hooks/useAppGate.js.
+
+/**
+ * Fetch the version flagged as minimum-supported for a platform, if any.
+ * This — not a force_update-type app_gates row's own min_version field —
+ * is the single source of truth for whether Force Update should block the
+ * app; a database-level unique index already guarantees at most one row
+ * per platform can carry this flag at a time.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {'web'|'android'|'ios'} platform
+ * @returns {Promise<string | null>}
+ */
+export async function fetchMinimumSupportedVersion(supabase, platform) {
+  const { data, error } = await supabase
+    .from('app_releases')
+    .select('version')
+    .eq('platform', platform)
+    .eq('is_minimum_supported', true)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.version ?? null
+}
+
+/**
+ * Fetch every currently-active app_gates row targeting a platform, with the
+ * scheduling window (starts_at/ends_at, both nullable) applied client-side
+ * — a plain .lte/.gte chain in the query would wrongly exclude open-ended
+ * rows that have no start or end set.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {'web'|'android'|'ios'} platform
+ * @returns {Promise<Array<{ id: string, type: 'force_update'|'maintenance'|'critical_announcement'|'promo', title: string, message: string, imageUrl: string|null, ctaLabel: string|null, ctaUrl: string|null, dismissible: boolean, platforms: string[], minVersion: string|null }>>}
+ */
+export async function fetchActiveGates(supabase, platform) {
+  const { data, error } = await supabase
+    .from('app_gates')
+    .select('id, type, title, message, image_url, cta_label, cta_url, dismissible, platforms, min_version, starts_at, ends_at')
+    .eq('active', true)
+    .contains('platforms', [platform])
+
+  if (error) throw error
+
+  const nowIso = new Date().toISOString()
+
+  return (data ?? [])
+    .filter(g => (!g.starts_at || g.starts_at <= nowIso) && (!g.ends_at || g.ends_at >= nowIso))
+    .map(g => ({
+      id:          g.id,
+      type:        g.type,
+      title:       g.title,
+      message:     g.message,
+      imageUrl:    g.image_url,
+      ctaLabel:    g.cta_label,
+      ctaUrl:      g.cta_url,
+      dismissible: g.dismissible,
+      platforms:   g.platforms,
+      minVersion:  g.min_version,
+    }))
+}
