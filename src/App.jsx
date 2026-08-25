@@ -38,18 +38,27 @@
  * pick up something just switched on in the CMS), with a cooldown so a
  * quick app-switcher flick can't trigger a refetch on every single resume.
  *
- * App Gate System Step 4e — AppGateProvider and AppGate are now mounted,
- * wrapping OnboardingGate entirely (not nested inside it), so a
- * maintenance banner or force-update block can show before onboarding
- * even gets a chance to render. AppGateResumeListener is rendered inside
- * AppGateProvider so it can reach useAppGateContext(); this is the step
- * that goes live for everyone.
+ * App Gate System Step 4e — AppGateProvider and AppGate are now mounted.
+ * AppGate is rendered as a SIBLING of OnboardingGate, not a wrapper around
+ * it — unlike OnboardingGate, AppGate takes no children prop; it draws its
+ * own full-screen, fixed-position overlay (zIndex 2000) when a gate is
+ * active and renders nothing at all otherwise. Passing OnboardingGate/
+ * AppRoutes to it as children was tried first and produced a permanent
+ * blank screen (children were silently discarded on every load, gate or
+ * no gate) — fixed same-session once caught. Sitting as a sibling still
+ * achieves the plan's intent (a maintenance/force-update block can cover
+ * the screen before onboarding even shows) since AppGate's overlay simply
+ * paints on top of everything below it when active. AppGateResumeListener
+ * is rendered inside AppGateProvider so it can reach useAppGateContext();
+ * this is the step that goes live for everyone.
  *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
  *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
  *   NotesActivityProvider → PushSubscriptionProvider → AppGateProvider →
- *   AppGate → OnboardingGate → AppRoutes
+ *   [AppGateResumeListener, AppGate, OnboardingGate → AppRoutes,
+ *   ProfileSetupRedirect, SignInNudge] (all five as siblings inside
+ *   AppGateProvider — AppGate does not wrap OnboardingGate, see note above)
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
@@ -160,11 +169,10 @@ export default function App() {
                       <PushSubscriptionProvider>
                         <AppGateProvider>
                           <AppGateResumeListener />
-                          <AppGate>
-                            <OnboardingGate>
-                              <AppRoutes />
-                            </OnboardingGate>
-                          </AppGate>
+                          <AppGate />
+                          <OnboardingGate>
+                            <AppRoutes />
+                          </OnboardingGate>
                           <ProfileSetupRedirect />
                           <SignInNudge />
                         </AppGateProvider>
