@@ -343,7 +343,22 @@ export default function AppGate() {
   // Admins must always be able to reach the CMS to turn a gate off, even a
   // non-dismissible one — the App Gate system is for the app's regular
   // users, not the admin panel itself.
-  if (location.pathname.startsWith('/admin')) return null
+  const onAdminRoute = location.pathname.startsWith('/admin')
+
+  // Locks the page's own scroll for as long as a gate is showing, on top
+  // of the dimmed backdrop — without this, someone could still scroll the
+  // real app underneath the message even though tapping it does nothing,
+  // which defeats the point of a "must focus on this" surface. Applies to
+  // both the bottom sheet and the full-bleed block equally. Never engages
+  // on /admin, matching the exemption above.
+  useEffect(() => {
+    if (!gate || onAdminRoute) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = previousOverflow }
+  }, [gate, onAdminRoute])
+
+  if (onAdminRoute) return null
 
   if (!gate) return null
 

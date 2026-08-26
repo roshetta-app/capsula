@@ -1,7 +1,8 @@
 /**
  * src/hooks/useAppGate.js
  * App Gate System Phase 1 Step 4a.
- * Phase 2 addition (this session) — Maybe Later + analytics, see below.
+ * Phase 2 additions (this session) — Maybe Later (persistent, capped +
+ * spaced-out), analytics, and a default Force Update CTA. See below.
  *
  * Fetches whatever should currently be shown to this device — a Force
  * Update block, or a maintenance / critical_announcement / promo message —
@@ -15,9 +16,20 @@
  * plan decision, that field is informational only, kept in sync by hand by
  * whoever writes the message. If an active force_update-type gate exists
  * for this platform, its title/message/image/cta are used as the block
- * screen's copy; otherwise sensible defaults are used. dismissible is
- * always forced to false here regardless of any stored value — Force
- * Update is always the hard, non-dismissible block, by design.
+ * screen's copy; otherwise sensible defaults are used, INCLUDING a
+ * default ctaUrl pointing at Capsula's Play Store listing (Phase 2 fix —
+ * previously a Force Update block with no custom message configured had
+ * no action button at all, since GateCta renders nothing without a URL).
+ * dismissible is always forced to false here regardless of any stored
+ * value — Force Update is always the hard, non-dismissible block, by
+ * design.
+ *
+ * Known limitation, surfaced during Phase 2 testing, NOT fixed here:
+ * App.getInfo().version has no web implementation, so runningVersion is
+ * always null on the website build — Force Update can never trigger
+ * there no matter what's flagged in Releases for platform 'web'. Real
+ * web support would need a different version source entirely (e.g. a
+ * build-time-injected constant) and is out of scope for this pass.
  *
  * The other three types are decided purely by app_gates: active + platform
  * match + inside its scheduling window (fetchActiveGates already applies
@@ -26,29 +38,34 @@
  * actually down right now outranks a one-off announcement), then
  * critical_announcement, then promo.
  *
- * TWO separate "don't show this again" lists, on purpose (Phase 2, plan
- * §10.2) — these are not the same mechanism with different labels:
- *   - Permanent (X button / dismiss()): stored in @capacitor/preferences
- *     (D — not localStorage), survives app close/reopen, forever, until a
- *     NEW gate row is created. This is the pre-existing behavior.
- *   - Session-only (Maybe Later / maybeLater()): plain React state, never
- *     persisted anywhere. Resets the moment the hook remounts — i.e. next
- *     time the app actually opens — by design, that's the whole point of
- *     "later" meaning something different from "never."
+ * TWO separate "don't show this again" mechanisms, on purpose (plan
+ * §10.2/§10.3) — not the same thing with different labels:
  *
- * Analytics (Phase 2, plan §10.5) — extends the existing usageEvents.js
- * pattern rather than a parallel system. gate_impression fires at most
- * once per gate becoming the one actually shown (tracked via a ref, not
- * on every refresh() re-poll of the same still-showing gate).
- * gate_dismiss / gate_maybe_later fire from their respective functions
- * below. gate_cta_click is NOT logged here — that's a direct user click
- * on a specific button, only AppGate.jsx knows it happened, so it logs
- * that one itself.
+ *   - Permanent (X button / dismiss()): stored in @capacitor/preferences,
+ *     survives app close/reopen, forever, until a NEW gate row is
+ *     created. Unchanged from Phase 1.
  *
- * Per-device dismissals are stored in @capacitor/preferences (D — not
- * localStorage, the safer of the two options on native) so a dismissed
- * gate doesn't resurface for that device until it's switched off and a
- * different one (or a new instance of the same message) takes its place.
+ *   - Maybe Later (maybeLater()) — REWRITTEN this session, was
+ *     session-only (in-memory, cleared the moment the app reopened),
+ *     which meant it resurfaced on literally the very next open — not
+ *     the intended "later" behavior at all. Now persistent, capped, and
+ *     spaced out:
+ *       - MAX_MAYBE_LATER (3): after the 3rd time someone taps Maybe
+ *         Later on the same gate, it converts to a permanent dismiss —
+ *         it will not keep coming back indefinitely.
+ *       - SKIP_OPENS (2): after tapping Maybe Later, the gate is
+ *         suppressed for the next 2 app opens and only becomes eligible
+ *         to show again on the 3rd. "App open" here means this hook
+ *         remounting (a real cold start / relaunch) — NOT every
+ *         resume-from-background, which just calls refresh() on the
+ *         already-mounted hook and does not advance this counter.
+ *
+ * Analytics (plan §10.5) — extends the existing usageEvents.js pattern.
+ * gate_impression fires at most once per gate becoming the one actually
+ * shown (tracked via a ref, not on every refresh() re-poll of the same
+ * still-showing gate). gate_dismiss / gate_maybe_later fire from their
+ * respective functions below. gate_cta_click is logged in AppGate.jsx,
+ * not here — only that component knows a specific button was tapped.
  *
  * This hook only fetches + computes — it does not decide when to re-check.
  * App.jsx's resume listener (Step 4c) is what calls refresh() again when
@@ -63,7 +80,16 @@ import { supabase } from '../lib/supabase'
 import { fetchActiveGates, fetchMinimumSupportedVersion } from '../lib/queries'
 import { logUsageEvent } from '../analytics/usageEvents'
 
-const DISMISSED_GATES_KEY = 'capsula_dismissed_gate_ids'
+const DISMISSED_GATES_KEY  = 'capsula_dismissed_gate_ids'
+const MAYBE_LATER_KEY      = 'capsula_gate_maybe_later_state'
+const APP_OPEN_COUNT_KEY   = 'capsula_app_open_count'
+
+const MAX_MAYBE_LATER = 3 // total times a gate can be snoozed before it's treated as a permanent dismiss
+const SKIP_OPENS      = 2 // app opens to suppress after a Maybe Later, before it's eligible to show again
+
+// Used only when a Force Update block has no admin-configured CTA link —
+// see file header note. Matches capacitor.config.json's appId.
+const DEFAULT_FORCE_UPDATE_CTA_URL = 'https://play.google.com/store/apps/details?id=com.capsula.app'
 
 // force_update always wins (it's the hard block); maintenance outranks a
 // one-off announcement; promo is lowest priority, never worth interrupting
@@ -104,6 +130,40 @@ async function addDismissedId(id) {
   }
 }
 
+async function getMaybeLaterState() {
+  try {
+    const { value } = await Preferences.get({ key: MAYBE_LATER_KEY })
+    return value ? JSON.parse(value) : {}
+  } catch {
+    return {}
+  }
+}
+
+async function setMaybeLaterState(state) {
+  try {
+    await Preferences.set({ key: MAYBE_LATER_KEY, value: JSON.stringify(state) })
+  } catch {
+    // best-effort — worst case a snooze isn't remembered, not worth surfacing an error for
+  }
+}
+
+async function incrementAndGetOpenCount() {
+  let current = 0
+  try {
+    const { value } = await Preferences.get({ key: APP_OPEN_COUNT_KEY })
+    current = value ? parseInt(value, 10) || 0 : 0
+  } catch {
+    current = 0
+  }
+  const next = current + 1
+  try {
+    await Preferences.set({ key: APP_OPEN_COUNT_KEY, value: String(next) })
+  } catch {
+    // best-effort — worst case the skip-opens count resets, not fatal
+  }
+  return next
+}
+
 /**
  * @returns {{
  *   gate: null | {
@@ -115,16 +175,19 @@ async function addDismissedId(id) {
  *   },
  *   loading: boolean,
  *   dismiss: (id: string, title?: string) => Promise<void>,
- *   maybeLater: (id: string, title?: string) => void,
+ *   maybeLater: (id: string, title?: string) => Promise<void>,
  *   refresh: () => Promise<void>,
  * }}
  */
 export function useAppGate() {
-  const [gate, setGate]         = useState(null)
-  const [loading, setLoading]   = useState(true)
-  // Session-only "later" list — see file header. Deliberately plain state,
-  // never written to Preferences or anywhere else persistent.
-  const [snoozedIds, setSnoozedIds] = useState([])
+  const [gate, setGate]       = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  // This app-open's number, per incrementAndGetOpenCount() — set once at
+  // mount (a real cold start), read synchronously by refresh() thereafter.
+  // Not state: changing it should never itself trigger a re-render.
+  const openCountRef = useRef(0)
+
   // Tracks which gate id we last logged an impression for, so refresh()
   // re-polling the same still-active gate doesn't log a fresh impression
   // every cooldown-interval resume — only an actual change counts.
@@ -135,11 +198,12 @@ export function useAppGate() {
     try {
       const platform = Capacitor.getPlatform() // 'android' | 'ios' | 'web'
 
-      const [gates, minimumSupported, runningVersion, dismissedIds] = await Promise.all([
+      const [gates, minimumSupported, runningVersion, dismissedIds, maybeLaterState] = await Promise.all([
         fetchActiveGates(supabase, platform),
         fetchMinimumSupportedVersion(supabase, platform),
         CapacitorApp.getInfo().then(info => info.version).catch(() => null),
         getDismissedIds(),
+        getMaybeLaterState(),
       ])
 
       const forceUpdateNeeded = Boolean(
@@ -156,8 +220,8 @@ export function useAppGate() {
           title:       forceUpdateGate?.title ?? 'Update required',
           message:     forceUpdateGate?.message ?? 'A new version of Capsula is required to continue.',
           imageUrl:    forceUpdateGate?.imageUrl ?? null,
-          ctaLabel:    forceUpdateGate?.ctaLabel ?? null,
-          ctaUrl:      forceUpdateGate?.ctaUrl ?? null,
+          ctaLabel:    forceUpdateGate?.ctaLabel ?? 'Update now',
+          ctaUrl:      forceUpdateGate?.ctaUrl ?? DEFAULT_FORCE_UPDATE_CTA_URL,
           dismissible: false,
         })
       }
@@ -165,7 +229,10 @@ export function useAppGate() {
       for (const g of gates) {
         if (g.type === 'force_update') continue // handled above, version-driven only
         if (dismissedIds.includes(g.id)) continue
-        if (snoozedIds.includes(g.id)) continue // Maybe Later — session-only skip
+
+        const ml = maybeLaterState[g.id]
+        if (ml && openCountRef.current < ml.skipUntilOpen) continue // still within the skip window
+
         candidates.push(g)
       }
 
@@ -183,16 +250,19 @@ export function useAppGate() {
     } finally {
       setLoading(false)
     }
-    // snoozedIds intentionally omitted: refresh already reads the latest
-    // value via closure at call time (called from effects/listeners after
-    // state updates commit), and including it here would redefine refresh
-    // on every maybeLater() call, which would re-fire the resume listener's
-    // effect in App.jsx unnecessarily.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Runs once per real app mount (cold start / relaunch) — increments the
+  // persistent open-count BEFORE the first refresh() so Maybe Later's
+  // skip-window check has an accurate number to compare against on this
+  // very first load, not just from the second load onward.
   useEffect(() => {
-    refresh()
+    let cancelled = false
+    ;(async () => {
+      openCountRef.current = await incrementAndGetOpenCount()
+      if (!cancelled) refresh()
+    })()
+    return () => { cancelled = true }
   }, [refresh])
 
   const dismiss = useCallback(async (id, title) => {
@@ -201,12 +271,24 @@ export function useAppGate() {
     logUsageEvent('gate_dismiss', id, title ?? null)
   }, [])
 
-  // Maybe Later — session-only, see file header. Does NOT touch
-  // Preferences at all; a full app close/reopen clears this list simply
-  // by virtue of the hook (and this state) remounting from scratch.
-  const maybeLater = useCallback((id, title) => {
+  const maybeLater = useCallback(async (id, title) => {
     setGate(current => (current?.id === id ? null : current))
-    setSnoozedIds(ids => (ids.includes(id) ? ids : [...ids, id]))
+
+    const state = await getMaybeLaterState()
+    const prev  = state[id] ?? { count: 0 }
+    const nextCount = prev.count + 1
+
+    if (nextCount >= MAX_MAYBE_LATER) {
+      // Cap reached — stop offering "later" and just treat this as final,
+      // same as tapping the X, so it never resurfaces at all going forward.
+      delete state[id]
+      await setMaybeLaterState(state)
+      await addDismissedId(id)
+    } else {
+      state[id] = { count: nextCount, skipUntilOpen: openCountRef.current + SKIP_OPENS }
+      await setMaybeLaterState(state)
+    }
+
     logUsageEvent('gate_maybe_later', id, title ?? null)
   }, [])
 
