@@ -1427,6 +1427,65 @@ export async function setMinimumSupported(id, platform, versionLabel = null) {
   return { error }
 }
 
+/**
+ * Clear the minimum-supported flag for whichever release currently holds
+ * it on this platform — turns Force Update off for that platform with no
+ * replacement version set. Distinct from setMinimumSupported, which always
+ * moves the flag to a specific release; this is the "turn it off" path
+ * that had no button anywhere in the CMS before.
+ *
+ * @param {'web'|'android'|'ios'} platform
+ * @param {string|null} [versionLabel] — for the audit log entry only
+ */
+export async function clearMinimumSupported(platform, versionLabel = null) {
+  const { error } = await supabase
+    .from('app_releases')
+    .update({ is_minimum_supported: false })
+    .eq('platform', platform)
+    .eq('is_minimum_supported', true)
+  if (!error) {
+    await logAudit('update', 'app_releases', null, versionLabel, { is_minimum_supported: false, platform })
+  }
+  return { error }
+}
+
+/**
+ * Look up the release currently flagged as minimum-supported for a
+ * platform, if any. Used by GatesManager to show the real, live value
+ * next to a Force Update message instead of the old free-text field that
+ * looked functional but didn't actually control anything.
+ *
+ * @param {'web'|'android'|'ios'} platform
+ */
+export async function getMinimumSupported(platform) {
+  const { data, error } = await supabase
+    .from('app_releases')
+    .select('id, version, platform')
+    .eq('platform', platform)
+    .eq('is_minimum_supported', true)
+    .maybeSingle()
+  return { data, error }
+}
+
+/**
+ * Find the existing Force Update message that already targets a given
+ * platform, if one exists — used by the "customize what people see" step
+ * in ReleasesManager to decide whether to update the existing message or
+ * create a new one, so flagging a minimum version and writing its message
+ * become one connected action instead of two separate screens to remember.
+ *
+ * @param {'web'|'android'|'ios'} platform
+ */
+export async function getForceUpdateGate(platform) {
+  const { data, error } = await supabase
+    .from('app_gates')
+    .select('*')
+    .eq('type', 'force_update')
+    .contains('platforms', [platform])
+    .maybeSingle()
+  return { data, error }
+}
+
 // ─── App Gates / Remote Messages (App Gate System — Phase 1 Step 3a) ──────
 
 /**
@@ -1504,3 +1563,4 @@ export async function toggleGateActive(id, isActive, title = null) {
   if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
 }
+

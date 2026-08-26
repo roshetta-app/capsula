@@ -15,7 +15,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Plus, Megaphone } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import Modal from '../../components/admin/Modal'
-import { listGates, createGate, updateGate, toggleGateActive } from '../../lib/adminQueries'
+import { listGates, createGate, updateGate, toggleGateActive, getMinimumSupported } from '../../lib/adminQueries'
 
 const TYPE_OPTIONS = ['force_update', 'maintenance', 'critical_announcement', 'promo']
 const PLATFORM_OPTIONS = ['web', 'android', 'ios']
@@ -29,7 +29,6 @@ const EMPTY_FORM = {
   cta_url: '',
   dismissible: true,
   platforms: [...PLATFORM_OPTIONS],
-  min_version: '',
   starts_at: '',
   ends_at: '',
 }
@@ -41,6 +40,17 @@ export default function GatesManager() {
   const [editingId, setEditingId] = useState(null)
   const [form, setForm]           = useState(EMPTY_FORM)
   const [saving, setSaving]       = useState(false)
+  const [minVersions, setMinVersions] = useState({}) // { web: '4.2.0', android: null, ios: null }
+
+  const loadMinVersions = useCallback(async () => {
+    const entries = await Promise.all(
+      PLATFORM_OPTIONS.map(async p => {
+        const { data } = await getMinimumSupported(p)
+        return [p, data?.version ?? null]
+      })
+    )
+    setMinVersions(Object.fromEntries(entries))
+  }, [])
 
   const loadGates = useCallback(async () => {
     setLoading(true)
@@ -50,6 +60,7 @@ export default function GatesManager() {
   }, [])
 
   useEffect(() => { loadGates() }, [loadGates])
+  useEffect(() => { loadMinVersions() }, [loadMinVersions])
 
   function openCreate() {
     setEditingId(null)
@@ -68,7 +79,6 @@ export default function GatesManager() {
       cta_url: gate.cta_url ?? '',
       dismissible: gate.type === 'force_update' ? false : gate.dismissible,
       platforms: gate.platforms ?? [...PLATFORM_OPTIONS],
-      min_version: gate.min_version ?? '',
       starts_at: gate.starts_at ? gate.starts_at.slice(0, 16) : '',
       ends_at: gate.ends_at ? gate.ends_at.slice(0, 16) : '',
     })
@@ -97,7 +107,6 @@ export default function GatesManager() {
       cta_url: form.type === 'force_update' ? null : (form.cta_url.trim() || null),
       dismissible: form.type === 'force_update' ? false : form.dismissible,
       platforms: form.platforms.length ? form.platforms : [...PLATFORM_OPTIONS],
-      min_version: form.type === 'force_update' ? (form.min_version.trim() || null) : null,
       starts_at: form.starts_at ? new Date(form.starts_at).toISOString() : null,
       ends_at: form.ends_at ? new Date(form.ends_at).toISOString() : null,
     }
@@ -154,7 +163,6 @@ export default function GatesManager() {
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-mono)' }}>
                   {(g.platforms ?? []).join(', ')}
-                  {g.min_version ? ` · min v${g.min_version}` : ''}
                 </div>
               </div>
 
@@ -210,17 +218,21 @@ export default function GatesManager() {
           </label>
 
           {form.type === 'force_update' ? (
-            <label style={styles.fieldLabel}>
-              Minimum version (informational — the actual block is driven by
-              Releases → "Set as minimum")
-              <input
-                type="text"
-                value={form.min_version}
-                onChange={e => setForm(f => ({ ...f, min_version: e.target.value }))}
-                placeholder="e.g. 4.2.0"
-                style={styles.input}
-              />
-            </label>
+            <div style={styles.fieldLabel}>
+              Minimum version (read-only — set from Releases → "Set as minimum")
+              <div style={styles.minVersionDisplay}>
+                {form.platforms.length === 0 ? (
+                  <span style={{ color: 'var(--color-text-tertiary)' }}>No platforms selected</span>
+                ) : (
+                  form.platforms.map(p => (
+                    <div key={p} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ textTransform: 'capitalize' }}>{p}</span>
+                      <span>{minVersions[p] ? `v${minVersions[p]}` : 'None set'}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           ) : (
             <>
               <label style={styles.fieldLabel}>
@@ -411,6 +423,19 @@ const styles = {
     color: 'var(--color-text-secondary)',
     fontFamily: 'var(--font-body)',
   },
+  minVersionDisplay: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 4,
+    padding: 'var(--space-2) var(--space-3)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid var(--color-border)',
+    backgroundColor: 'var(--color-bg)',
+    fontSize: 13,
+    fontWeight: 500,
+    color: 'var(--color-text-primary)',
+    fontFamily: 'var(--font-mono)',
+  },
   input: {
     padding: 'var(--space-2) var(--space-3)',
     borderRadius: 'var(--radius-sm)',
@@ -451,3 +476,4 @@ const styles = {
     fontFamily: 'var(--font-body)',
   },
 }
+

@@ -13,7 +13,18 @@ import { Plus, ShieldAlert } from 'lucide-react'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 import Modal from '../../components/admin/Modal'
 import ConfirmModal from '../../components/admin/ConfirmModal'
-import { listReleases, createRelease, setMinimumSupported } from '../../lib/adminQueries'
+import {
+  listReleases,
+  createRelease,
+  setMinimumSupported,
+  clearMinimumSupported,
+  getForceUpdateGate,
+  createGate,
+  updateGate,
+} from '../../lib/adminQueries'
+
+const DEFAULT_FORCE_UPDATE_TITLE = 'Update required'
+const DEFAULT_FORCE_UPDATE_MESSAGE = 'A required update is available. Please update the app to continue.'
 
 const PLATFORMS = ['web', 'android', 'ios']
 const STATUS_OPTIONS = ['live', 'deprecated', 'blocked']
@@ -24,6 +35,10 @@ export default function ReleasesManager() {
   const [platformFilter, setPlatformFilter] = useState('all')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [confirmTarget, setConfirmTarget] = useState(null)
+  const [unsetTarget, setUnsetTarget]     = useState(null)
+  const [messageStep, setMessageStep]     = useState(null) // { platform, version } while the customize-message step is open
+  const [messageForm, setMessageForm]     = useState({ title: '', message: '' })
+  const [messageSaving, setMessageSaving] = useState(false)
   const [form, setForm]                   = useState({ platform: 'web', version: '', release_notes: '', status: 'live' })
   const [saving, setSaving]               = useState(false)
 
@@ -59,8 +74,54 @@ export default function ReleasesManager() {
       confirmTarget.platform,
       `${confirmTarget.platform} ${confirmTarget.version}`
     )
+    const { platform, version } = confirmTarget
     setConfirmTarget(null)
     loadReleases()
+
+    // Offer the optional customize-message step right away, instead of
+    // sending the admin to a separate Messages screen to remember later.
+    const { data: existingGate } = await getForceUpdateGate(platform)
+    setMessageForm({
+      title:   existingGate?.title   ?? '',
+      message: existingGate?.message ?? '',
+    })
+    setMessageStep({ platform, version, existingGateId: existingGate?.id ?? null })
+  }
+
+  async function handleConfirmUnset() {
+    if (!unsetTarget) return
+    await clearMinimumSupported(unsetTarget.platform, `${unsetTarget.platform} ${unsetTarget.version}`)
+    setUnsetTarget(null)
+    loadReleases()
+  }
+
+  function skipMessageStep() {
+    setMessageStep(null)
+    setMessageForm({ title: '', message: '' })
+  }
+
+  async function saveMessageStep() {
+    if (!messageStep) return
+    setMessageSaving(true)
+
+    const title   = messageForm.title.trim()   || DEFAULT_FORCE_UPDATE_TITLE
+    const message = messageForm.message.trim() || DEFAULT_FORCE_UPDATE_MESSAGE
+
+    if (messageStep.existingGateId) {
+      await updateGate(messageStep.existingGateId, { title, message })
+    } else {
+      await createGate({
+        type: 'force_update',
+        title,
+        message,
+        dismissible: false,
+        active: true,
+        platforms: [messageStep.platform],
+      })
+    }
+
+    setMessageSaving(false)
+    skipMessageStep()
   }
 
   return (
@@ -115,7 +176,11 @@ export default function ReleasesManager() {
                 )}
               </div>
 
-              {!r.is_minimum_supported && (
+              {r.is_minimum_supported ? (
+                <button onClick={() => setUnsetTarget(r)} style={styles.unsetMinButton}>
+                  Unset minimum
+                </button>
+              ) : (
                 <button onClick={() => setConfirmTarget(r)} style={styles.setMinButton}>
                   Set as minimum
                 </button>
@@ -200,6 +265,72 @@ export default function ReleasesManager() {
         confirmLabel="Set as minimum"
         confirmVariant="danger"
       />
+
+      {/* Confirm before clearing a minimum-supported flag */}
+      <ConfirmModal
+        isOpen={!!unsetTarget}
+        onClose={() => setUnsetTarget(null)}
+        onConfirm={handleConfirmUnset}
+        title="Unset minimum supported version?"
+        message={
+          unsetTarget
+            ? `Force Update will turn off for ${unsetTarget.platform} — no version will be required until you set a new minimum. This takes effect immediately.`
+            : ''
+        }
+        confirmLabel="Unset minimum"
+        confirmVariant="danger"
+      />
+
+      {/* Optional: customize what people see, right after flagging a minimum version */}
+      <Modal
+        isOpen={!!messageStep}
+        onClose={skipMessageStep}
+        title="Customize what people see? (optional)"
+        size="sm"
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            {messageStep
+              ? `Skip this and anyone below ${messageStep.version} on ${messageStep.platform} still sees the standard update screen. Fill it in to customize the title and message they'll see.`
+              : ''}
+          </div>
+
+          <label style={styles.fieldLabel}>
+            Title
+            <input
+              type="text"
+              value={messageForm.title}
+              onChange={e => setMessageForm(f => ({ ...f, title: e.target.value }))}
+              placeholder={DEFAULT_FORCE_UPDATE_TITLE}
+              style={styles.input}
+            />
+          </label>
+
+          <label style={styles.fieldLabel}>
+            Message
+            <textarea
+              value={messageForm.message}
+              onChange={e => setMessageForm(f => ({ ...f, message: e.target.value }))}
+              rows={3}
+              placeholder={DEFAULT_FORCE_UPDATE_MESSAGE}
+              style={{ ...styles.input, resize: 'vertical' }}
+            />
+          </label>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-2)' }}>
+            <button onClick={skipMessageStep} style={styles.cancelButton}>
+              Skip
+            </button>
+            <button
+              onClick={saveMessageStep}
+              disabled={messageSaving}
+              style={{ ...styles.saveButton, opacity: messageSaving ? 0.6 : 1 }}
+            >
+              {messageSaving ? 'Saving…' : 'Save message'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </AdminPageHeader>
   )
 }
@@ -296,6 +427,18 @@ const styles = {
     border: '1px solid var(--color-border)',
     backgroundColor: 'transparent',
     color: 'var(--color-text-secondary)',
+    fontSize: 13,
+    fontWeight: 500,
+    fontFamily: 'var(--font-body)',
+    cursor: 'pointer',
+    flexShrink: 0,
+  },
+  unsetMinButton: {
+    padding: 'var(--space-2) var(--space-3)',
+    borderRadius: 'var(--radius-sm)',
+    border: '1px solid rgba(239,68,68,0.4)',
+    backgroundColor: 'transparent',
+    color: '#dc2626',
     fontSize: 13,
     fontWeight: 500,
     fontFamily: 'var(--font-body)',
