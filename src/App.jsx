@@ -96,6 +96,7 @@ import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useVisualViewport } from './hooks/useVisualViewport'
+import { initDeviceSessionTracking } from './analytics/deviceSession'
 
 const ROUTER_BASENAME = import.meta.env.MODE === 'capacitor' ? '' : '/capsula'
 
@@ -154,6 +155,14 @@ export default function App() {
     if (Capacitor.isNativePlatform()) {
       StatusBar.setOverlaysWebView({ overlay: false })
     }
+  }, [])
+
+  // F10 Stage 2, Batch C — registers the app-open/background/resume
+  // session-tracking listener once, app-wide. Works on both native and
+  // web (Capacitor's appStateChange event falls back to the browser's
+  // visibilitychange on web), unlike the status bar effect above.
+  useEffect(() => {
+    initDeviceSessionTracking()
   }, [])
 
   return (

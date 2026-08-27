@@ -58,6 +58,7 @@ import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot } from '../utils/authSnapshot'
+import { setCurrentUserId } from '../analytics/deviceSession'
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
 // AndroidManifest.xml to catch Google's redirect back from the system
@@ -233,6 +234,11 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
       userIdRef.current = session?.user?.id ?? null
+      // F10 Stage 2, Batch C — links this device's analytics events to
+      // the signed-in account (or clears the link on a signed-out
+      // check), same nullable "claim on sign-in" pattern push_tokens
+      // already uses.
+      setCurrentUserId(userIdRef.current)
       setUser(session?.user ?? null)
       await loadProfile(session?.user ?? null)
       if (!cancelled) setLoading(false)
@@ -252,6 +258,10 @@ export function AuthProvider({ children }) {
     // routine background token refresh doesn't re-trigger a loading gate.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       const incomingUserId = session?.user?.id ?? null
+      // F10 Stage 2, Batch C — keeps analytics events linked to whichever
+      // account (if any) is actually signed in, covering every branch
+      // below including sign-out (incomingUserId is null there).
+      setCurrentUserId(incomingUserId)
 
       // admin-cms-shell-flash fix (2026-08-24) — a SIGNED_IN event for the
       // SAME user already loaded is supabase-js's tab-refocus session

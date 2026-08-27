@@ -2,7 +2,12 @@
  * usageEvents.js — Analytics event tracking
  *
  * Logs usage events to Supabase (table: usage_events).
- * No personal data. No user IDs. No device IDs.
+ *
+ * F10 Stage 2, Batch C — every event now also carries device_id, user_id
+ * (nullable), platform, and session_id, read from deviceSession.js at
+ * call time. No call site needs to change to pick this up — it's the
+ * same event names and same call signature as before, just with real
+ * device/session identity attached automatically instead of nothing.
  *
  * Event types:
  *   condition_view    — user opened a condition detail screen
@@ -17,6 +22,7 @@
  */
 
 import { supabase } from '../lib/supabase'
+import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './deviceSession'
 
 /**
  * Log a usage event to Supabase.
@@ -30,6 +36,10 @@ export async function logUsageEvent(eventType, entityId = null, entityName = nul
     event_type:  eventType,
     entity_id:   entityId,
     entity_name: entityName,
+    device_id:   getDeviceId(),
+    user_id:     getCurrentUserId(),
+    platform:    getPlatform(),
+    session_id:  getSessionId(),
   })
   if (error) {
     console.error('[Analytics] logUsageEvent failed:', error.message, error.details, error.hint, { eventType, entityId, entityName })
