@@ -553,7 +553,7 @@ export async function fetchConditionForEdit(id) {
     .from('conditions')
     .select(`
       id, name, slug, card_tagline,
-      is_published, specialty_id,
+      is_published, needs_review, specialty_id,
       condition_blocks ( id, block_type, order_index, data )
     `)
     .eq('id', id)
@@ -1563,4 +1563,3 @@ export async function toggleGateActive(id, isActive, title = null) {
   if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
 }
-
