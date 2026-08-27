@@ -44,6 +44,15 @@
  * it re-runs the query with that name, which then matches normally via the
  * prefix check.
  *
+ * F10 Batch A — Analytics Revamp (D30/D31): same per-session dedup pattern
+ * as useConditionSearch — a term is logged at most once per gap/search type
+ * for as long as this hook instance lives. drug_search is now logged
+ * (previously dead) once per settled query of 2+ characters, independent
+ * of result count, matching the shared 2+ char threshold from D31 (the
+ * hook's own zero-result gap logging keeps its existing, different 4+ char
+ * threshold below — those two thresholds serve different purposes and
+ * aren't meant to match).
+ *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
@@ -64,6 +73,7 @@ import {
   getDrugSearchSuggestion,
 } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 export function useDrugSearch(drugs, mode = 'brand') {
   const [query,          setQuery]          = useState('')
@@ -79,6 +89,10 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const genericIndexRef    = useRef(null)
   const ingredientIndexRef = useRef(null)
   const drugsByIdRef       = useRef(null)
+
+  // Per-session dedup (F10 Batch A / D30, D31) — see header comment.
+  const loggedSearchTermsRef = useRef(new Set())
+  const loggedGapTermsRef    = useRef(new Set())
 
   useEffect(() => {
     brandIndexRef.current      = buildDrugBrandIndex(drugs)
@@ -126,10 +140,20 @@ export function useDrugSearch(drugs, mode = 'brand') {
         : null
     )
 
+    const normalized = trimmed.toLowerCase()
+
+    // Log a real, settled search (F10 Batch A / D31) — once per normalized
+    // term per session, independent of result count.
+    if (normalized.length >= 2 && !loggedSearchTermsRef.current.has(normalized)) {
+      loggedSearchTermsRef.current.add(normalized)
+      logUsageEvent('drug_search', null, normalized)
+    }
+
     // Zero-result gap logging — only meaningful at 4+ chars where fuzzy ran
     // (2-3 char tiers are exact start-of-field checks, so an empty result
     // there isn't a relevance gap).
-    if (trimmed.length >= 4 && matched.length === 0) {
+    if (trimmed.length >= 4 && matched.length === 0 && !loggedGapTermsRef.current.has(normalized)) {
+      loggedGapTermsRef.current.add(normalized)
       logSearchGap(trimmed, 'drugs')
     }
   }, [drugs])

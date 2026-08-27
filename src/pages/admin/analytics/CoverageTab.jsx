@@ -6,6 +6,11 @@
  *   - 4 stat cards: total specialties, conditions, drugs, brands
  *   - Coverage by Specialty table
  *   - Top Drug Groups horizontal bar chart
+ *
+ * F10 Batch B — Analytics Revamp (D30): the Prescriptions column is
+ * removed entirely, not reconnected. It queried a `prescriptions` table
+ * that doesn't exist in the schema — a retired legacy concept, fully
+ * superseded by the `clinical_blocks` block system.
  */
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
@@ -63,7 +68,6 @@ function CoverageTable({ rows }) {
         <span style={thStyle}>Specialty</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Conditions</span>
         <span style={{ ...thStyle, textAlign: 'right' }}>Published</span>
-        <span style={{ ...thStyle, textAlign: 'right' }}>Prescriptions</span>
         <span style={thStyle}>Publish Rate</span>
       </div>
 
@@ -90,7 +94,6 @@ function CoverageTable({ rows }) {
               </span>
               <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'right' }}>{row.total}</span>
               <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'right' }}>{row.published}</span>
-              <span style={{ fontSize: 13, color: 'var(--color-text-secondary)', textAlign: 'right' }}>{row.prescriptions}</span>
 
               {/* Progress bar */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
@@ -222,7 +225,7 @@ export default function CoverageTab({ data }) {
 
 const gridStyle = {
   display: 'grid',
-  gridTemplateColumns: 'minmax(120px,1fr) 80px 80px 100px minmax(100px,1fr)',
+  gridTemplateColumns: 'minmax(120px,1fr) 80px 80px minmax(100px,1fr)',
   gap: 'var(--space-3)',
   alignItems: 'center',
   padding: 'var(--space-2) var(--space-4)',

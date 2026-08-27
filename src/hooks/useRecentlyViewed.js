@@ -31,6 +31,15 @@
  *                      useConditionSearch to sort the full conditions list
  *                      by recency; not used on the drugs side)
  *
+ * F10 Batch A — Analytics Revamp (D30): recentOrder is now memoized on
+ * `history` instead of recomputed with a new array identity on every
+ * render. Previously, any unrelated re-render anywhere under
+ * ConditionProvider produced a new recentOrder array, which flowed into
+ * useConditionSearch's runSearch dependency chain and reset its 150ms
+ * debounce timer — silently re-firing (and re-logging) the same stale
+ * search on every re-render for as long as it sat in the box. This is the
+ * root cause of the search_gaps spam bug (one term logged 2,000+ times).
+ *
  * Usage in ConditionDetailScreen (called on mount):
  *   const { addRecentlyViewed } = useRecentlyViewed()
  *   useEffect(() => { addRecentlyViewed(condition) }, [condition.id])
@@ -42,7 +51,7 @@
  *   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 
@@ -179,8 +188,12 @@ export function useRecentlyViewed(itemType = 'condition') {
   const recentlyViewed = history.slice(0, MAX_CHIP_ITEMS)
 
   // Full recency order (newest first) — drives "Recent first" sort across
-  // the entire conditions list, not just the last few viewed
-  const recentOrder = history.map(x => x.id)
+  // the entire conditions list, not just the last few viewed.
+  // Memoized on `history` (F10 Batch A / D30) so this array keeps the same
+  // identity across re-renders that don't actually change history — see
+  // header comment for why an unmemoized version caused the search_gaps
+  // spam bug.
+  const recentOrder = useMemo(() => history.map(x => x.id), [history])
 
   return { history, recentlyViewed, recentOrder, addRecentlyViewed, clearRecentlyViewed }
 }

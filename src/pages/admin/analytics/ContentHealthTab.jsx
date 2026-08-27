@@ -5,13 +5,22 @@
  * Shows:
  *   - Overall health score (circular progress ring)
  *   - Warning flags (auto-detected issues)
- *   - Three expandable rows: Conditions Health, Drugs Health, Prescriptions Health
+ *   - Two expandable rows: Conditions Health, Drugs Health
  *
- * Weights (per masterplan):
- *   conditions published rate  30%
- *   drugs with brands          25%
- *   drugs with doses           25%
- *   prescriptions with sources 20%
+ * F10 Batch B — Analytics Revamp (D30): the Prescriptions row and its 20%
+ * weight are removed entirely — `prescriptions` doesn't exist as a table,
+ * a retired legacy concept superseded by `clinical_blocks`. The remaining
+ * three weights are rescaled from 30/25/25 (summing to 80%) up to the same
+ * relative proportions at 100%:
+ *
+ * Weights (per D30):
+ *   conditions published rate  37.5%
+ *   drugs with brands          31.25%
+ *   drugs with doses           31.25%
+ *
+ * "Published rate" and "with brands" both now read a real needs_review-
+ * aware completeness signal from AnalyticsDashboard.jsx's fetch, not a
+ * bare is_published/existence check (D30 decision 5, D32).
  */
 
 import { useState } from 'react'
@@ -195,20 +204,17 @@ export default function ContentHealthTab({ data }) {
   const {
     totalConditions, publishedConditions,
     totalGenerics, genericsWithBrands, genericsWithDoses,
-    totalPrescriptions, prescriptionsWithSource,
   } = data
 
   // ── Score computation ──────────────────────────────────────────────────────
   const condPublishRate  = totalConditions  ? (publishedConditions / totalConditions)   * 100 : 0
   const drugsWithBrands  = totalGenerics    ? (genericsWithBrands  / totalGenerics)     * 100 : 0
   const drugsWithDoses   = totalGenerics    ? (genericsWithDoses   / totalGenerics)     * 100 : 0
-  const rxWithSource     = totalPrescriptions ? (prescriptionsWithSource / totalPrescriptions) * 100 : 0
 
   const score = Math.round(
-    condPublishRate * 0.30 +
-    drugsWithBrands * 0.25 +
-    drugsWithDoses  * 0.25 +
-    rxWithSource    * 0.20
+    condPublishRate * 0.375  +
+    drugsWithBrands * 0.3125 +
+    drugsWithDoses  * 0.3125
   )
 
   // ── Warning flags ──────────────────────────────────────────────────────────
@@ -226,16 +232,12 @@ export default function ContentHealthTab({ data }) {
   // ── Per-section issues ─────────────────────────────────────────────────────
   const condIssues = []
   const unpubCount = totalConditions - publishedConditions
-  if (unpubCount  > 0) condIssues.push(`${unpubCount} unpublished condition${unpubCount !== 1 ? 's' : ''}`)
+  if (unpubCount  > 0) condIssues.push(`${unpubCount} unpublished or flagged condition${unpubCount !== 1 ? 's' : ''}`)
   if (noDefCount  > 0) condIssues.push(`${noDefCount} condition${noDefCount !== 1 ? 's' : ''} missing definition`)
 
   const drugIssues = []
   if (noBrandsCount > 0) drugIssues.push(`${noBrandsCount} generic${noBrandsCount !== 1 ? 's' : ''} have no brands`)
   if (noDosesCount  > 0) drugIssues.push(`${noDosesCount} generic${noDosesCount !== 1 ? 's' : ''} have no doses`)
-
-  const rxIssues = []
-  const rxNoSrc = totalPrescriptions - prescriptionsWithSource
-  if (rxNoSrc > 0) rxIssues.push(`${rxNoSrc} prescription${rxNoSrc !== 1 ? 's' : ''} missing a source label`)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -308,12 +310,6 @@ export default function ContentHealthTab({ data }) {
           completeness={Math.round((drugsWithBrands + drugsWithDoses) / 2)}
           issueCount={drugIssues.length}
           issues={drugIssues}
-        />
-        <HealthRow
-          title="Prescriptions Health"
-          completeness={Math.round(rxWithSource)}
-          issueCount={rxIssues.length}
-          issues={rxIssues}
         />
       </div>
 

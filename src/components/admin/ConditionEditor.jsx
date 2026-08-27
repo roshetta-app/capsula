@@ -1,4 +1,5 @@
 
+
 /**
  * ConditionEditor — /admin/conditions/new  OR  /admin/conditions/:id
  *
@@ -280,6 +281,7 @@ const EMPTY_CONDITION = {
   name:         '',
   specialty_id: '',
   is_published: false,
+  needs_review: false, // F10 Batch B / D32 — flags a published condition as incomplete without unpublishing it
   card_tagline: '',
 }
 
@@ -334,6 +336,7 @@ export default function ConditionEditor() {
         name:         data.name         ?? '',
         specialty_id: data.specialty_id ?? '',
         is_published: data.is_published ?? false,
+        needs_review: data.needs_review ?? false,
         card_tagline: data.card_tagline ?? '',
       })
 
@@ -378,6 +381,7 @@ export default function ConditionEditor() {
       slug,
       specialty_id: form.specialty_id,
       is_published: form.is_published,
+      needs_review: form.needs_review,
       card_tagline: form.card_tagline.trim() || null,
     }
 
@@ -579,6 +583,44 @@ export default function ConditionEditor() {
             </span>
           </div>
 
+          {/* Needs Review toggle — F10 Batch B / D32. Same switch style as
+              Published above; flags a condition as incomplete/in-progress
+              without unpublishing it, mirroring the brands table's
+              needs_review column. Feeds the Content Health score in the
+              Analytics dashboard. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <FieldLabel>Needs Review</FieldLabel>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.needs_review}
+              onClick={() => !saving && patch('needs_review', !form.needs_review)}
+              disabled={saving}
+              style={{
+                width: 42, height: 24,
+                borderRadius: 12,
+                border: 'none',
+                backgroundColor: form.needs_review ? 'var(--color-warning)' : 'var(--color-border)',
+                position: 'relative', cursor: saving ? 'not-allowed' : 'pointer',
+                transition: 'background-color 0.2s',
+                flexShrink: 0,
+              }}
+            >
+              <span style={{
+                position: 'absolute',
+                top: 3, left: form.needs_review ? 21 : 3,
+                width: 18, height: 18,
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                transition: 'left 0.2s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+              }} />
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+              {form.needs_review ? 'Flagged — counts as incomplete' : 'Complete'}
+            </span>
+          </div>
+
         </SectionCard>
 
         {/* ── Content Blocks card ────────────────────────────────────────── */}
@@ -602,3 +644,5 @@ export default function ConditionEditor() {
     </AdminPageHeader>
   )
 }
+
+

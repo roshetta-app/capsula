@@ -15,6 +15,14 @@
  * gate_* event types logged by useAppGate.js / AppGate.jsx (impression,
  * dismiss, maybe_later, cta_click) and aggregates per gate by
  * entity_name, same convention every other event type here already uses.
+ *
+ * F10 Batch B — Analytics Revamp (D30/D32): the `prescriptions` fetch is
+ * removed entirely — that table doesn't exist in the schema, a retired
+ * legacy concept superseded by the `clinical_blocks` block system.
+ * `genericsWithBrands`/`genericsWithDoses` and `publishedConditions` all
+ * switch from an unfiltered/`is_published`-only existence check to a real
+ * `needs_review`-aware completeness check (published AND NOT flagged for
+ * review) — see the fetch query and computation below.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -46,7 +54,6 @@ async function fetchAllAnalytics() {
     genericsRes,
     brandsRes,
     formulationsRes,
-    prescriptionsRes,
     specialtiesRes,
     gapsRes,
     usageViewRes,
@@ -57,15 +64,15 @@ async function fetchAllAnalytics() {
     gateEventsRes,
   ] = await Promise.all([
 
-    // Conditions: total + published counts + missing definition
+    // Conditions: total + published counts + needs_review + missing definition
     supabase
       .from('conditions')
-      .select('id, is_published, definition, specialty_id, specialties!conditions_specialty_id_fkey(name_en)'),
+      .select('id, is_published, needs_review, definition, specialty_id, specialties!conditions_specialty_id_fkey(name_en)'),
 
-    // Generics: category grouping + has any brands/doses
+    // Generics: category grouping + has any real (published, not-flagged) brands/doses
     supabase
       .from('generics')
-      .select('id, category, is_published, formulations(id, doses_structured, brands(id))'),
+      .select('id, category, is_published, formulations(id, doses_structured, brands(id, is_published, needs_review))'),
 
     // Total brands
     supabase
@@ -76,11 +83,6 @@ async function fetchAllAnalytics() {
     supabase
       .from('formulations')
       .select('id, doses_structured'),
-
-    // Prescriptions: total + has source label
-    supabase
-      .from('prescriptions')
-      .select('id, label'),
 
     // Specialties for coverage table
     supabase
@@ -136,15 +138,24 @@ async function fetchAllAnalytics() {
   const conditions   = conditionsRes.data   ?? []
   const generics     = genericsRes.data     ?? []
   const formulations = formulationsRes.data ?? []
-  const prescriptions= prescriptionsRes.data?? []
 
   const totalConditions       = conditions.length
-  const publishedConditions   = conditions.filter(c => c.is_published).length
+  // Real completeness: published AND NOT flagged for review (D32) — a
+  // condition sitting at is_published=true with needs_review=true no
+  // longer counts as "done."
+  const publishedConditions   = conditions.filter(c => c.is_published && !c.needs_review).length
   const condsMissingDef       = conditions.filter(c => !c.definition || c.definition.trim() === '').length
+
+  // A brand only counts toward "has a real brand" if it's published and
+  // not flagged for review (D30 decision 5) — previously this was a bare
+  // existence check with no quality filter at all.
+  function isRealBrand(b) {
+    return (b.is_published ?? true) && !(b.needs_review ?? false)
+  }
 
   const totalGenerics         = generics.length
   const genericsWithBrands    = generics.filter(g =>
-    (g.formulations ?? []).some(f => (f.brands ?? []).length > 0)
+    (g.formulations ?? []).some(f => (f.brands ?? []).some(isRealBrand))
   ).length
   const genericsWithDoses     = generics.filter(g =>
     (g.formulations ?? []).some(f => f.doses_structured && f.doses_structured.length > 0)
@@ -152,10 +163,6 @@ async function fetchAllAnalytics() {
 
   const totalBrands           = brandsRes.count ?? 0
   const formulationsWithNoDose= formulations.filter(f => !f.doses_structured || f.doses_structured.length === 0).length
-
-  const totalPrescriptions    = prescriptions.length
-  // "source" not a dedicated column — use label as proxy (non-empty label = has context)
-  const prescriptionsWithSource = prescriptions.filter(p => p.label && p.label.trim().length > 0).length
 
   // ── Search Gaps ─────────────────────────────────────────────────────────────
   const gaps = gapsRes.data ?? []
@@ -182,13 +189,10 @@ async function fetchAllAnalytics() {
   // Build specialty coverage rows
   const specialtyCoverage = specialties.map(sp => {
     const spConds = conditions.filter(c => c.specialty_id === sp.id)
-    // prescription count would need a join — use conditions proxy
-    const rxCount = spConds.reduce((acc, c) => acc + (c.prescriptions?.length ?? 0), 0)
     return {
       specialty:     sp.name_en,
       total:         spConds.length,
       published:     spConds.filter(c => c.is_published).length,
-      prescriptions: rxCount,
     }
   }).filter(r => r.total > 0)
     .sort((a, b) => b.total - a.total)
@@ -255,8 +259,6 @@ async function fetchAllAnalytics() {
       genericsWithBrands,
       genericsWithDoses,
       formulationsWithNoDose,
-      totalPrescriptions,
-      prescriptionsWithSource,
     },
     gaps: {
       drugGaps,
@@ -308,8 +310,6 @@ function exportCSV(activeTab, data) {
       ['Generics With Brands',      d.genericsWithBrands],
       ['Generics With Doses',       d.genericsWithDoses],
       ['Formulations With No Dose', d.formulationsWithNoDose],
-      ['Total Prescriptions',       d.totalPrescriptions],
-      ['Prescriptions With Source', d.prescriptionsWithSource],
     ]
     filename = 'capsula-content-health.csv'
 

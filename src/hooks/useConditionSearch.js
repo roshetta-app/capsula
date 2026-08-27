@@ -15,11 +15,22 @@
  * from the autocomplete dropdown UI, which was deleted app-wide earlier.
  * Tier behavior itself (1-char prefix, 2-char prefix-or-word-start, 3+ char
  * fuzzy) is unchanged — this file only drops the unused suggestion output.
+ *
+ * F10 Batch A — Analytics Revamp (D30/D31): this hook sits in the same
+ * fragile spot (debounce + dependency-array chain) that caused the
+ * search_gaps spam bug, so every logging call here is guarded by a
+ * per-session dedup Set — a term is logged at most once per gap/search
+ * type for as long as this hook instance lives, no matter how many times
+ * the debounce re-fires for the same unchanged query. condition_search is
+ * now logged (previously dead — nothing called logUsageEvent from here)
+ * once per settled query of 2+ characters, independent of result count,
+ * inside the same 150ms-debounced runSearch that already logged gaps.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { buildConditionIndex, searchConditions } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 function applySortMode(items, mode, recentIds) {
   if (mode === 'recent') {
@@ -53,6 +64,14 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
   const [results,         setResults]         = useState(conditions)
 
   const fuseRef = useRef(null)
+
+  // Per-session dedup (F10 Batch A / D30, D31): one log per normalized term
+  // per event type, for as long as this hook instance lives. Two separate
+  // Sets — a term can legitimately log once as a real search and once as a
+  // zero-result gap; those are different tables/purposes.
+  const loggedSearchTermsRef = useRef(new Set())
+  const loggedGapTermsRef    = useRef(new Set())
+
   useEffect(() => {
     fuseRef.current = buildConditionIndex(conditions)
     runSearch(query, activeSpecialty)
@@ -84,8 +103,20 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
       : matched
     setResults(sorted)
 
+    const trimmed    = q.trim()
+    const normalized = trimmed.toLowerCase()
+
+    // Log a real, settled search (F10 Batch A / D31) — once per normalized
+    // term per session, independent of result count. Matches the same
+    // 2+ char threshold the rest of the app treats as "a real query."
+    if (normalized.length >= 2 && !loggedSearchTermsRef.current.has(normalized)) {
+      loggedSearchTermsRef.current.add(normalized)
+      logUsageEvent('condition_search', null, normalized)
+    }
+
     // Log zero-result gaps (only meaningful at 3+ chars where fuzzy ran)
-    if (q.trim().length >= 3 && matched.length === 0) {
+    if (trimmed.length >= 3 && matched.length === 0 && !loggedGapTermsRef.current.has(normalized)) {
+      loggedGapTermsRef.current.add(normalized)
       logSearchGap(q, 'conditions')
     }
   }, [conditions, sortMode, recentlyViewedIds])
@@ -116,4 +147,3 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     resultCount: results.length,
   }
 }
-
