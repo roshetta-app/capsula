@@ -25,12 +25,25 @@ import { Capacitor } from '@capacitor/core'
 const DEVICE_ID_STORAGE_KEY = 'capsula_device_id'
 const SESSION_IDLE_ROTATE_MS = 30 * 60 * 1000 // 30 minutes
 
-function newSessionId() {
-  return crypto.randomUUID()
+function generateId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  // Fallback for any environment where crypto.randomUUID isn't available —
+  // not a real UUID, but unique enough for a client-side analytics id, and
+  // critically, this never throws.
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 let cachedDeviceId = null
-let currentSessionId = newSessionId()
+// Deliberately NOT generated here at module load — every value on this
+// module is created lazily, on first real use, inside a function. A
+// value generated eagerly at the top level runs the instant this file is
+// imported, before the app has even started rendering; if that ever
+// fails for any reason, it takes the whole app down with it (a blank
+// screen, with nothing left standing to show an error) rather than
+// failing safely inside a normal function call.
+let currentSessionId = null
 let currentUserId = null
 let lastBackgroundedAt = null
 let listenerRegistered = false
@@ -45,7 +58,7 @@ export function getDeviceId() {
   try {
     let stored = localStorage.getItem(DEVICE_ID_STORAGE_KEY)
     if (!stored) {
-      stored = crypto.randomUUID()
+      stored = generateId()
       localStorage.setItem(DEVICE_ID_STORAGE_KEY, stored)
     }
     cachedDeviceId = stored
@@ -53,13 +66,14 @@ export function getDeviceId() {
   } catch {
     // localStorage unavailable — fall back to a runtime-only id so events
     // still carry something, even though it won't persist across reloads.
-    if (!cachedDeviceId) cachedDeviceId = crypto.randomUUID()
+    if (!cachedDeviceId) cachedDeviceId = generateId()
     return cachedDeviceId
   }
 }
 
 /** Current session id — fresh per app open, rotates after 30 min idle. */
 export function getSessionId() {
+  if (!currentSessionId) currentSessionId = generateId()
   return currentSessionId
 }
 
@@ -103,7 +117,7 @@ export function initDeviceSessionTracking() {
     // last real activity, which previously had no session boundary at
     // all to mark it as a fresh visit.
     if (lastBackgroundedAt && Date.now() - lastBackgroundedAt >= SESSION_IDLE_ROTATE_MS) {
-      currentSessionId = newSessionId()
+      currentSessionId = generateId()
     }
     lastBackgroundedAt = null
   })
