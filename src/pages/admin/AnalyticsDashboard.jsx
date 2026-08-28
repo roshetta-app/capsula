@@ -26,9 +26,10 @@
  *
  * F10 Batch D (D38), steps 8a/8b — two new queries added below
  * (`usageDetailRes`, `profilesRes`) to power the Engagement, Retention,
- * and Identity/Segment tabs. `profilesRes` powers Identity/Segment (8c).
- * `usageDetailRes` powers Engagement (8d, this step) and will also power
- * Retention (8e) — none of the existing 6 queries or tabs change here.
+ * and Identity/Segment tabs. `profilesRes` powers Identity/Segment (8c)
+ * and Retention (8e, via the `id` column added in that step).
+ * `usageDetailRes` powers both Engagement (8d) and Retention (8e) —
+ * none of the existing 6 queries or tabs change here.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -43,16 +44,19 @@ import UsageTab           from './analytics/UsageTab'
 import MessagesTab        from './analytics/MessagesTab'
 import IdentitySegmentTab from './analytics/IdentitySegmentTab'
 import EngagementTab      from './analytics/EngagementTab'
+import RetentionTab       from './analytics/RetentionTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 // F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
-// 'engagement' right after it, matching D15's five-layer order (identity,
-// engagement, retention, quality, monetization). Retention/monetization
-// land in later steps — 'health' stays as-is until step 8h relabels it.
+// 'engagement', step 8e adds 'retention' — both matching D15's five-layer
+// order (identity, engagement, retention, quality, monetization).
+// Monetization lands in a later step — 'health' stays as-is until step
+// 8h relabels it.
 
 const TABS = [
   { id: 'identity',   label: 'Identity & Segment' },
   { id: 'engagement', label: 'Engagement'          },
+  { id: 'retention',  label: 'Retention'           },
   { id: 'health',     label: 'Content Health'      },
   { id: 'gaps',       label: 'Search Gaps'         },
   { id: 'coverage',   label: 'Coverage'            },
@@ -162,10 +166,11 @@ async function fetchAllAnalytics() {
     // collected at sign-up. Direct table read, not through the
     // admin-users edge function (that function exists for auth.users
     // email/last-sign-in-at, not needed here). Powers the Identity/
-    // Segment tab.
+    // Segment tab. `id` added in step 8e so Retention can link a signup
+    // to that person's later usage_events rows.
     supabase
       .from('profiles')
-      .select('specialty, country, occupation, created_at'),
+      .select('id, specialty, country, occupation, created_at'),
   ])
 
   // ── Content Health ───────────────────────────────────────────────────────────
@@ -354,6 +359,56 @@ async function fetchAllAnalytics() {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
+  // ── Retention ────────────────────────────────────────────────────────────────
+  // F10 Batch D (D38), step 8e. "D-N retained" = at least one usage_events
+  // row for that person in the N days after signup (not counting signup
+  // day itself). A cohort/horizon only gets a number once N days have
+  // actually elapsed since signup for everyone in it — otherwise it's
+  // left as null so the UI can show '—' instead of a misleading 0%.
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const nowMs = Date.now()
+
+  const eventTimesByUser = {}
+  usageDetail.forEach(e => {
+    if (!e.user_id) return
+    if (!eventTimesByUser[e.user_id]) eventTimesByUser[e.user_id] = []
+    eventTimesByUser[e.user_id].push(new Date(e.created_at).getTime())
+  })
+
+  function returnedWithin(userId, signupMs, days) {
+    const events = eventTimesByUser[userId]
+    if (!events) return false
+    const windowEnd = signupMs + DAY_MS * days
+    return events.some(t => t > signupMs && t <= windowEnd)
+  }
+
+  function cohortRate(users, days) {
+    const eligible = users.filter(p => nowMs - new Date(p.created_at).getTime() >= DAY_MS * days)
+    if (eligible.length === 0) return null
+    const retained = eligible.filter(p => returnedWithin(p.id, new Date(p.created_at).getTime(), days)).length
+    return Math.round((retained / eligible.length) * 100)
+  }
+
+  const cohortsByWeek = {}
+  profiles.forEach(p => {
+    if (!p.id || !p.created_at) return
+    const wk = weekKey(p.created_at)
+    if (!cohortsByWeek[wk]) cohortsByWeek[wk] = []
+    cohortsByWeek[wk].push(p)
+  })
+
+  const retentionByWeek = Object.entries(cohortsByWeek)
+    .map(([week, users]) => ({
+      week,
+      totalUsers: users.length,
+      d1:  cohortRate(users, 1),
+      d7:  cohortRate(users, 7),
+      d30: cohortRate(users, 30),
+    }))
+    .sort((a, b) => a.week.localeCompare(b.week))
+
+  const usersWithIdAndSignup = profiles.filter(p => p.id && p.created_at)
+
   return {
     identity: {
       totalAccounts: profiles.length,
@@ -365,6 +420,12 @@ async function fetchAllAnalytics() {
       totalSessions,
       sessionsPerWeek,
       repeatVisitContent,
+    },
+    retention: {
+      overallD1:  cohortRate(usersWithIdAndSignup, 1),
+      overallD7:  cohortRate(usersWithIdAndSignup, 7),
+      overallD30: cohortRate(usersWithIdAndSignup, 30),
+      retentionByWeek,
     },
     health: {
       totalConditions,
@@ -436,6 +497,23 @@ function exportCSV(activeTab, data) {
     rows.push(['Content', 'Distinct Sessions'])
     d.repeatVisitContent.forEach(r => rows.push([r.name, r.count]))
     filename = 'capsula-engagement.csv'
+
+  } else if (activeTab === 'retention') {
+    const d = data.retention
+    rows = [
+      ['Overall D1', d.overallD1 == null ? '' : `${d.overallD1}%`],
+      ['Overall D7', d.overallD7 == null ? '' : `${d.overallD7}%`],
+      ['Overall D30', d.overallD30 == null ? '' : `${d.overallD30}%`],
+      ['', ''],
+      ['Signup Week', 'Signups', 'D1', 'D7', 'D30'],
+    ]
+    d.retentionByWeek.forEach(r => rows.push([
+      r.week, r.totalUsers,
+      r.d1 == null ? '' : `${r.d1}%`,
+      r.d7 == null ? '' : `${r.d7}%`,
+      r.d30 == null ? '' : `${r.d30}%`,
+    ]))
+    filename = 'capsula-retention.csv'
 
   } else if (activeTab === 'health') {
     const d = data.health
@@ -650,6 +728,7 @@ export default function AnalyticsDashboard() {
           <>
             {activeTab === 'identity'   && <IdentitySegmentTab data={activeData} />}
             {activeTab === 'engagement' && <EngagementTab      data={activeData} />}
+            {activeTab === 'retention'  && <RetentionTab       data={activeData} />}
             {activeTab === 'health'     && <ContentHealthTab   data={activeData} />}
             {activeTab === 'gaps'       && <SearchGapsTab      data={activeData} />}
             {activeTab === 'coverage'   && <CoverageTab        data={activeData} />}
