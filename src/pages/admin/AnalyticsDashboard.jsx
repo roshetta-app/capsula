@@ -28,8 +28,10 @@
  * (`usageDetailRes`, `profilesRes`) to power the Engagement, Retention,
  * and Identity/Segment tabs. `profilesRes` powers Identity/Segment (8c)
  * and Retention (8e, via the `id` column added in that step).
- * `usageDetailRes` powers both Engagement (8d) and Retention (8e) —
- * none of the existing 6 queries or tabs change here.
+ * `usageDetailRes` powers Engagement (8d), Retention (8e), and now
+ * Monetization (8f, via the `pro_feature_click` event already present in
+ * that same 90-day pull) — none of the existing 6 queries or tabs change
+ * here.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -45,6 +47,7 @@ import MessagesTab        from './analytics/MessagesTab'
 import IdentitySegmentTab from './analytics/IdentitySegmentTab'
 import EngagementTab      from './analytics/EngagementTab'
 import RetentionTab       from './analytics/RetentionTab'
+import MonetizationTab    from './analytics/MonetizationTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
 // F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
@@ -53,15 +56,25 @@ import RetentionTab       from './analytics/RetentionTab'
 // Monetization lands in a later step — 'health' stays as-is until step
 // 8h relabels it.
 
+// F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
+// 'engagement', step 8e adds 'retention', step 8f adds 'monetization' —
+// all four match D15's five-layer order (identity, engagement, retention,
+// quality, monetization). 'monetization' sits right after 'retention'
+// rather than after 'health' so the five-layer order stays intact even
+// though step 8h (relabeling 'health' to the fifth layer, "quality") is
+// still pending — health/gaps/coverage/usage/messages stay as-is until
+// then.
+
 const TABS = [
-  { id: 'identity',   label: 'Identity & Segment' },
-  { id: 'engagement', label: 'Engagement'          },
-  { id: 'retention',  label: 'Retention'           },
-  { id: 'health',     label: 'Content Health'      },
-  { id: 'gaps',       label: 'Search Gaps'         },
-  { id: 'coverage',   label: 'Coverage'            },
-  { id: 'usage',      label: 'Usage'               },
-  { id: 'messages',   label: 'Messages'            },
+  { id: 'identity',     label: 'Identity & Segment' },
+  { id: 'engagement',   label: 'Engagement'          },
+  { id: 'retention',    label: 'Retention'           },
+  { id: 'monetization', label: 'Monetization'        },
+  { id: 'health',       label: 'Content Health'      },
+  { id: 'gaps',         label: 'Search Gaps'         },
+  { id: 'coverage',     label: 'Coverage'            },
+  { id: 'usage',        label: 'Usage'               },
+  { id: 'messages',     label: 'Messages'            },
 ]
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -409,6 +422,27 @@ async function fetchAllAnalytics() {
 
   const usersWithIdAndSignup = profiles.filter(p => p.id && p.created_at)
 
+  // ── Monetization ────────────────────────────────────────────────────────────
+  // F10 Batch D (D38), step 8f. Fake-door tap counter for the "Upgrade to
+  // Capsula PRO" banner (8g) — no real paid tier exists yet. Built from the
+  // same 90-day usageDetail pull as Engagement/Retention above, no new
+  // query needed: pro_feature_click events were already included in that
+  // broad, unfiltered usage_events select. Every tap counts here (unlike
+  // Engagement's per-session sessionsPerWeek dedup) since the thing being
+  // measured is raw interest in the banner, not distinct visits.
+  const proClicks = usageDetail.filter(e => e.event_type === 'pro_feature_click')
+
+  const clickWeekMap = {}
+  proClicks.forEach(e => {
+    const wk = weekKey(e.created_at)
+    clickWeekMap[wk] = (clickWeekMap[wk] ?? 0) + 1
+  })
+  const clicksPerWeek = Object.entries(clickWeekMap)
+    .map(([week, count]) => ({ week, count }))
+    .sort((a, b) => a.week.localeCompare(b.week))
+
+  const totalProClicks = proClicks.length
+
   return {
     identity: {
       totalAccounts: profiles.length,
@@ -426,6 +460,10 @@ async function fetchAllAnalytics() {
       overallD7:  cohortRate(usersWithIdAndSignup, 7),
       overallD30: cohortRate(usersWithIdAndSignup, 30),
       retentionByWeek,
+    },
+    monetization: {
+      totalProClicks,
+      clicksPerWeek,
     },
     health: {
       totalConditions,
@@ -514,6 +552,16 @@ function exportCSV(activeTab, data) {
       r.d30 == null ? '' : `${r.d30}%`,
     ]))
     filename = 'capsula-retention.csv'
+
+  } else if (activeTab === 'monetization') {
+    const d = data.monetization
+    rows = [
+      ['Total "Upgrade to PRO" Taps (last 90 days)', d.totalProClicks],
+      ['', ''],
+      ['Week', 'Taps'],
+    ]
+    d.clicksPerWeek.forEach(r => rows.push([r.week, r.count]))
+    filename = 'capsula-monetization.csv'
 
   } else if (activeTab === 'health') {
     const d = data.health
@@ -729,6 +777,7 @@ export default function AnalyticsDashboard() {
             {activeTab === 'identity'   && <IdentitySegmentTab data={activeData} />}
             {activeTab === 'engagement' && <EngagementTab      data={activeData} />}
             {activeTab === 'retention'  && <RetentionTab       data={activeData} />}
+            {activeTab === 'monetization' && <MonetizationTab  data={activeData} />}
             {activeTab === 'health'     && <ContentHealthTab   data={activeData} />}
             {activeTab === 'gaps'       && <SearchGapsTab      data={activeData} />}
             {activeTab === 'coverage'   && <CoverageTab        data={activeData} />}
