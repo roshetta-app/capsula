@@ -197,8 +197,10 @@ import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
 import NotificationSheet from '../components/ui/NotificationSheet'
 import InfoSheet from '../components/ui/InfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
+import ProComingSoonSheet from '../components/ui/ProComingSoonSheet'
 import ProfileAvatar from '../components/ui/ProfileAvatar'
 import { ROUTES } from '../router'
+import { logUsageEvent } from '../analytics/usageEvents'
 
 // Google "G" mark — local to this file, used only on the Continue with
 // Google button so the CTA reads as a real Google sign-in rather than a
@@ -493,6 +495,7 @@ export default function AccountScreen() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [aboutOpen, setAboutOpen]                 = useState(false)
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false)
+  const [proSheetOpen, setProSheetOpen]           = useState(false)
 
   // profile-nudge-instant-load: completeness is now computed directly from
   // AuthContext's `profile`, which already carries phone/occupation/
@@ -533,6 +536,17 @@ export default function AccountScreen() {
   function handleReportProblem() {}
   function handleTermsOfUse() {}
   function handlePrivacyPolicy() {}
+
+  // F10 Stage 2, Batch D, item 8g — the free-tier "Upgrade to Capsula PRO"
+  // banner below was previously decorative (no onClick at all). This is the
+  // fake-door tap counter: log one pro_feature_click per tap via the
+  // existing generic logUsageEvent (no change needed to that function),
+  // then show the ProComingSoonSheet. No real paywall/purchase flow yet —
+  // see roadmap Section 5, still blocked on an undecided business question.
+  function handleUpgradeClick() {
+    logUsageEvent('pro_feature_click', null, 'Upgrade to Capsula PRO banner')
+    setProSheetOpen(true)
+  }
 
   // Same convention AccountEditScreen.jsx uses — wait for AuthContext's
   // initial session+profile check to resolve before rendering, so nothing
@@ -861,15 +875,23 @@ export default function AccountScreen() {
             <span style={{ fontSize: 14, color: 'var(--color-text-secondary)' }}>plan</span>
           </div>
         ) : (
-          <div style={{
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'space-between',
-            gap:             'var(--space-3)',
-            padding:         'var(--space-3)',
-            backgroundColor: 'var(--color-accent)',
-            borderRadius:    'var(--radius-lg)',
-          }}>
+          <div
+            onClick={handleUpgradeClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') handleUpgradeClick() }}
+            style={{
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'space-between',
+              gap:             'var(--space-3)',
+              padding:         'var(--space-3)',
+              backgroundColor: 'var(--color-accent)',
+              borderRadius:    'var(--radius-lg)',
+              cursor:          'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
             <div>
               <div style={{
                 fontSize:     14,
@@ -1003,6 +1025,11 @@ export default function AccountScreen() {
         message="You can sign back in with Google anytime."
         confirmLabel={busy ? 'Signing out…' : 'Sign out'}
         destructive
+      />
+
+      <ProComingSoonSheet
+        isOpen={proSheetOpen}
+        onClose={() => setProSheetOpen(false)}
       />
     </div>
   )
