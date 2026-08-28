@@ -23,6 +23,12 @@
  * switch from an unfiltered/`is_published`-only existence check to a real
  * `needs_review`-aware completeness check (published AND NOT flagged for
  * review) — see the fetch query and computation below.
+ *
+ * F10 Batch D (D38), steps 8a/8b — two new queries added below
+ * (`usageDetailRes`, `profilesRes`) to power the upcoming Engagement,
+ * Retention, and Identity/Segment tabs. Neither is consumed yet — that
+ * lands in later steps — and none of the existing 6 queries or tabs
+ * change here.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,6 +68,8 @@ async function fetchAllAnalytics() {
     topSearchCondRes,
     topViewDrugRes,
     gateEventsRes,
+    usageDetailRes,
+    profilesRes,
   ] = await Promise.all([
 
     // Conditions: total + published counts + needs_review + missing definition
@@ -132,6 +140,24 @@ async function fetchAllAnalytics() {
       .from('usage_events')
       .select('event_type, entity_name')
       .in('event_type', ['gate_impression', 'gate_dismiss', 'gate_maybe_later', 'gate_cta_click']),
+
+    // F10 Batch D (D38), step 8a — full usage_events rows with device/
+    // session/user context, bounded to the last 90 days. Powers the
+    // upcoming Engagement and Retention tabs. Not consumed yet; the 6
+    // queries above are untouched.
+    supabase
+      .from('usage_events')
+      .select('event_type, entity_name, device_id, user_id, session_id, created_at')
+      .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()),
+
+    // F10 Batch D (D38), step 8b — identity/segment fields already
+    // collected at sign-up. Direct table read, not through the
+    // admin-users edge function (that function exists for auth.users
+    // email/last-sign-in-at, not needed here). Not consumed yet; the
+    // upcoming Identity/Segment tab reads this.
+    supabase
+      .from('profiles')
+      .select('specialty, country, occupation, created_at'),
   ])
 
   // ── Content Health ───────────────────────────────────────────────────────────
