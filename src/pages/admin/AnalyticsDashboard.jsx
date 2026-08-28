@@ -25,10 +25,10 @@
  * review) — see the fetch query and computation below.
  *
  * F10 Batch D (D38), steps 8a/8b — two new queries added below
- * (`usageDetailRes`, `profilesRes`) to power the upcoming Engagement,
- * Retention, and Identity/Segment tabs. Neither is consumed yet — that
- * lands in later steps — and none of the existing 6 queries or tabs
- * change here.
+ * (`usageDetailRes`, `profilesRes`) to power the Engagement, Retention,
+ * and Identity/Segment tabs. `profilesRes` powers Identity/Segment (8c).
+ * `usageDetailRes` powers Engagement (8d, this step) and will also power
+ * Retention (8e) — none of the existing 6 queries or tabs change here.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -42,19 +42,22 @@ import CoverageTab        from './analytics/CoverageTab'
 import UsageTab           from './analytics/UsageTab'
 import MessagesTab        from './analytics/MessagesTab'
 import IdentitySegmentTab from './analytics/IdentitySegmentTab'
+import EngagementTab      from './analytics/EngagementTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
-// F10 Batch D (D38), step 8c: 'identity' added at the front. The rest of
-// D15's five layers (engagement, retention, quality/monetization) land
-// in later steps — 'health' stays as-is until step 8h relabels it.
+// F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
+// 'engagement' right after it, matching D15's five-layer order (identity,
+// engagement, retention, quality, monetization). Retention/monetization
+// land in later steps — 'health' stays as-is until step 8h relabels it.
 
 const TABS = [
-  { id: 'identity', label: 'Identity & Segment' },
-  { id: 'health',   label: 'Content Health' },
-  { id: 'gaps',     label: 'Search Gaps'    },
-  { id: 'coverage', label: 'Coverage'       },
-  { id: 'usage',    label: 'Usage'          },
-  { id: 'messages', label: 'Messages'       },
+  { id: 'identity',   label: 'Identity & Segment' },
+  { id: 'engagement', label: 'Engagement'          },
+  { id: 'health',     label: 'Content Health'      },
+  { id: 'gaps',       label: 'Search Gaps'         },
+  { id: 'coverage',   label: 'Coverage'            },
+  { id: 'usage',      label: 'Usage'               },
+  { id: 'messages',   label: 'Messages'            },
 ]
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -148,8 +151,8 @@ async function fetchAllAnalytics() {
 
     // F10 Batch D (D38), step 8a — full usage_events rows with device/
     // session/user context, bounded to the last 90 days. Powers the
-    // upcoming Engagement and Retention tabs. Not consumed yet; the 6
-    // queries above are untouched.
+    // Engagement tab (8d) and the upcoming Retention tab (8e). Not
+    // consumed by any other tab; the 6 queries above are untouched.
     supabase
       .from('usage_events')
       .select('event_type, entity_name, device_id, user_id, session_id, created_at')
@@ -158,8 +161,8 @@ async function fetchAllAnalytics() {
     // F10 Batch D (D38), step 8b — identity/segment fields already
     // collected at sign-up. Direct table read, not through the
     // admin-users edge function (that function exists for auth.users
-    // email/last-sign-in-at, not needed here). Not consumed yet; the
-    // upcoming Identity/Segment tab reads this.
+    // email/last-sign-in-at, not needed here). Powers the Identity/
+    // Segment tab.
     supabase
       .from('profiles')
       .select('specialty, country, occupation, created_at'),
@@ -299,12 +302,69 @@ async function fetchAllAnalytics() {
       .sort((a, b) => b.count - a.count)
   }
 
+  // ── Engagement ───────────────────────────────────────────────────────────────
+  // F10 Batch D (D38), step 8d. Built entirely from the 90-day
+  // usageDetailRes pulled in step 8a above — no new query needed.
+  const usageDetail = usageDetailRes.data ?? []
+
+  // Monday-of-week label ("2026-08-24") for a given ISO timestamp, so
+  // sessions bucket into calendar weeks rather than arbitrary 7-day
+  // windows.
+  function weekKey(dateStr) {
+    const d = new Date(dateStr)
+    const day = d.getDay()
+    const diffToMonday = (day === 0 ? -6 : 1) - day
+    const monday = new Date(d)
+    monday.setDate(d.getDate() + diffToMonday)
+    return monday.toISOString().slice(0, 10)
+  }
+
+  // One row per distinct session, bucketed by the week of its earliest
+  // event in the 90-day window.
+  const sessionFirstSeen = {}
+  usageDetail.forEach(e => {
+    if (!e.session_id) return
+    if (!sessionFirstSeen[e.session_id] || e.created_at < sessionFirstSeen[e.session_id]) {
+      sessionFirstSeen[e.session_id] = e.created_at
+    }
+  })
+  const weekMap = {}
+  Object.values(sessionFirstSeen).forEach(dateStr => {
+    const wk = weekKey(dateStr)
+    weekMap[wk] = (weekMap[wk] ?? 0) + 1
+  })
+  const sessionsPerWeek = Object.entries(weekMap)
+    .map(([week, count]) => ({ week, count }))
+    .sort((a, b) => a.week.localeCompare(b.week))
+
+  const totalSessions = Object.keys(sessionFirstSeen).length
+
+  // Repeat-visit content — condition/drug pages viewed across more than
+  // one distinct session, ranked by how many distinct sessions returned.
+  const contentSessions = {}
+  usageDetail
+    .filter(e => (e.event_type === 'condition_view' || e.event_type === 'drug_view') && e.entity_name && e.session_id)
+    .forEach(e => {
+      if (!contentSessions[e.entity_name]) contentSessions[e.entity_name] = new Set()
+      contentSessions[e.entity_name].add(e.session_id)
+    })
+  const repeatVisitContent = Object.entries(contentSessions)
+    .map(([name, sessions]) => ({ name, count: sessions.size }))
+    .filter(r => r.count > 1)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
   return {
     identity: {
       totalAccounts: profiles.length,
       bySpecialty:   groupCount(profiles, 'specialty'),
       byCountry:     groupCount(profiles, 'country'),
       byOccupation:  groupCount(profiles, 'occupation'),
+    },
+    engagement: {
+      totalSessions,
+      sessionsPerWeek,
+      repeatVisitContent,
     },
     health: {
       totalConditions,
@@ -366,6 +426,16 @@ function exportCSV(activeTab, data) {
     rows.push(['Occupation', 'Count'])
     d.byOccupation.forEach(r => rows.push([r.name, r.count]))
     filename = 'capsula-identity-segment.csv'
+
+  } else if (activeTab === 'engagement') {
+    const d = data.engagement
+    rows = [['Sessions (last 90 days)', d.totalSessions], ['', '']]
+    rows.push(['Week', 'Sessions'])
+    d.sessionsPerWeek.forEach(r => rows.push([r.week, r.count]))
+    rows.push(['', ''])
+    rows.push(['Content', 'Distinct Sessions'])
+    d.repeatVisitContent.forEach(r => rows.push([r.name, r.count]))
+    filename = 'capsula-engagement.csv'
 
   } else if (activeTab === 'health') {
     const d = data.health
@@ -578,12 +648,13 @@ export default function AnalyticsDashboard() {
         {/* Tabs */}
         {!loading && !error && (
           <>
-            {activeTab === 'identity' && <IdentitySegmentTab data={activeData} />}
-            {activeTab === 'health'   && <ContentHealthTab data={activeData} />}
-            {activeTab === 'gaps'     && <SearchGapsTab    data={activeData} />}
-            {activeTab === 'coverage' && <CoverageTab      data={activeData} />}
-            {activeTab === 'usage'    && <UsageTab         data={activeData} />}
-            {activeTab === 'messages' && <MessagesTab      data={activeData} />}
+            {activeTab === 'identity'   && <IdentitySegmentTab data={activeData} />}
+            {activeTab === 'engagement' && <EngagementTab      data={activeData} />}
+            {activeTab === 'health'     && <ContentHealthTab   data={activeData} />}
+            {activeTab === 'gaps'       && <SearchGapsTab      data={activeData} />}
+            {activeTab === 'coverage'   && <CoverageTab        data={activeData} />}
+            {activeTab === 'usage'      && <UsageTab           data={activeData} />}
+            {activeTab === 'messages'   && <MessagesTab        data={activeData} />}
           </>
         )}
 
