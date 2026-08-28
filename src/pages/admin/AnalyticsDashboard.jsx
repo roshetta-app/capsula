@@ -36,15 +36,20 @@ import { RefreshCw, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
-import ContentHealthTab from './analytics/ContentHealthTab'
-import SearchGapsTab    from './analytics/SearchGapsTab'
-import CoverageTab      from './analytics/CoverageTab'
-import UsageTab         from './analytics/UsageTab'
-import MessagesTab      from './analytics/MessagesTab'
+import ContentHealthTab   from './analytics/ContentHealthTab'
+import SearchGapsTab      from './analytics/SearchGapsTab'
+import CoverageTab        from './analytics/CoverageTab'
+import UsageTab           from './analytics/UsageTab'
+import MessagesTab        from './analytics/MessagesTab'
+import IdentitySegmentTab from './analytics/IdentitySegmentTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
+// F10 Batch D (D38), step 8c: 'identity' added at the front. The rest of
+// D15's five layers (engagement, retention, quality/monetization) land
+// in later steps — 'health' stays as-is until step 8h relabels it.
 
 const TABS = [
+  { id: 'identity', label: 'Identity & Segment' },
   { id: 'health',   label: 'Content Health' },
   { id: 'gaps',     label: 'Search Gaps'    },
   { id: 'coverage', label: 'Coverage'       },
@@ -276,7 +281,31 @@ async function fetchAllAnalytics() {
       .slice(0, n)
   }
 
+  // ── Identity / Segment ───────────────────────────────────────────────────────
+  // F10 Batch D (D38), step 8c. Buckets missing values as 'Not set' rather
+  // than dropping them, so an incomplete profile is still visible in the
+  // breakdown instead of silently disappearing.
+  const profiles = profilesRes.data ?? []
+
+  function groupCount(rows, field) {
+    const map = {}
+    rows.forEach(r => {
+      const raw = r[field]
+      const key = raw && String(raw).trim() !== '' ? raw : 'Not set'
+      map[key] = (map[key] ?? 0) + 1
+    })
+    return Object.entries(map)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+  }
+
   return {
+    identity: {
+      totalAccounts: profiles.length,
+      bySpecialty:   groupCount(profiles, 'specialty'),
+      byCountry:     groupCount(profiles, 'country'),
+      byOccupation:  groupCount(profiles, 'occupation'),
+    },
     health: {
       totalConditions,
       publishedConditions,
@@ -325,7 +354,20 @@ function exportCSV(activeTab, data) {
   let rows = []
   let filename = 'capsula-analytics.csv'
 
-  if (activeTab === 'health') {
+  if (activeTab === 'identity') {
+    const d = data.identity
+    rows = [['Total Accounts', d.totalAccounts], ['', '']]
+    rows.push(['Specialty', 'Count'])
+    d.bySpecialty.forEach(r => rows.push([r.name, r.count]))
+    rows.push(['', ''])
+    rows.push(['Country', 'Count'])
+    d.byCountry.forEach(r => rows.push([r.name, r.count]))
+    rows.push(['', ''])
+    rows.push(['Occupation', 'Count'])
+    d.byOccupation.forEach(r => rows.push([r.name, r.count]))
+    filename = 'capsula-identity-segment.csv'
+
+  } else if (activeTab === 'health') {
     const d = data.health
     rows = [
       ['Metric', 'Value'],
@@ -536,6 +578,7 @@ export default function AnalyticsDashboard() {
         {/* Tabs */}
         {!loading && !error && (
           <>
+            {activeTab === 'identity' && <IdentitySegmentTab data={activeData} />}
             {activeTab === 'health'   && <ContentHealthTab data={activeData} />}
             {activeTab === 'gaps'     && <SearchGapsTab    data={activeData} />}
             {activeTab === 'coverage' && <CoverageTab      data={activeData} />}
