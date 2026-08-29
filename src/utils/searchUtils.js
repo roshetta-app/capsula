@@ -563,6 +563,17 @@ const FORM_WORD_ENTRIES = [
 // tell those two apart, no matter how much of it is typed.
 const MIN_FORM_FRAGMENT_LETTERS = 2
 
+// True if 'fragmentNormalized' is the COMPLETE, exact text of a known form
+// word/abbreviation (not just a prefix of one) — used for single-word
+// queries (see the pa/patch fix note below), where a mere prefix match is
+// too risky to trust.
+function resolveExactFormOption(fragmentNormalized) {
+  for (const { word, option } of FORM_WORD_ENTRIES) {
+    if (normalizeSearchText(word) === fragmentNormalized) return option
+  }
+  return null
+}
+
 // True if every FORM_WORD_ENTRIES entry whose word/phrase starts with
 // 'fragmentNormalized' belongs to the same chip — i.e. this fragment is
 // enough, on its own, to know for certain which form was meant. Returns the
@@ -633,10 +644,23 @@ export function extractFormFromQuery(query) {
     // Single-token fragment — covers every one-word form and any two-word
     // phrase whose first word alone is already enough to resolve it (e.g.
     // "oral" already only means "oral drops" — no need to wait for "drops").
+    //
+    // pa/patch fix (2026-08-30, live report): when this token is the ONLY
+    // thing typed in the whole query, a mere prefix match is too risky to
+    // trust — "pa", "dr", "ca", "oi", "se" and others are each a unique
+    // prefix of exactly one form word (patch/drops/capsule/oil/serum), but
+    // are far more likely to be the start of a drug name than someone
+    // deliberately typing a form word and stopping partway. Only a COMPLETE,
+    // exact word/abbreviation match is trusted when nothing else is typed;
+    // the "still typing" prefix leniency stays exactly as before whenever
+    // there's a second token in the query (e.g. "panadol ta"), since a real
+    // drug name is already present alongside it in that case.
     const oneWordText = tokens[i].text
     const oneFragment = normalizeSearchText(oneWordText)
     if (oneFragment.length >= MIN_FORM_FRAGMENT_LETTERS) {
-      const option = resolveUniqueFormOption(oneFragment)
+      const option = tokens.length > 1
+        ? resolveUniqueFormOption(oneFragment)
+        : resolveExactFormOption(oneFragment)
       if (option) {
         const remainingText = (text.slice(0, tokens[i].start) + text.slice(tokens[i].end))
           .replace(/\s+/g, ' ')
