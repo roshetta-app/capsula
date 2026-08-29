@@ -130,7 +130,7 @@
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
-import { X } from 'lucide-react'
+import { FilterX } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -454,12 +454,12 @@ export default function DrugsScreen() {
                   {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
                   {query && ` for "${query}"`}
                 </div>
-                {hasFilters && hasQuery && <ClearFiltersButton onClick={requestClearFilters} />}
+                {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
 
               {displayed.length === 0 ? (
                 isFilterMasked ? (
-                  <FilterMaskedState count={base.length} onClearFilter={requestClearFilters} />
+                  <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
                 ) : suggestion ? (
                   <DidYouMeanState
                     suggestion={suggestion}
@@ -656,10 +656,9 @@ export default function DrugsScreen() {
         isOpen={showClearFiltersConfirm}
         onClose={() => setShowClearFiltersConfirm(false)}
         onConfirm={handleClearFilters}
-        title="Clear filters?"
+        title="Clear filter?"
         message="This removes your current Form/Route filter."
-        confirmLabel="Clear filters"
-        destructive
+        confirmLabel="Clear filter"
       />
     </>
   )
@@ -1133,15 +1132,13 @@ function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
 }
 
 // ─── FilledHintButton ───────────────────────────────────────────────────────
-// Phase 5 (§4.3/§5d, user decision 2026-08-29): shared filled/bordered
-// treatment for this screen's "next action" hints — reuses DrugFilterPanel's
-// ClearAllButton look (solid red fill, white text) rather than introducing a
-// new style, just applied here at an inline/compact size instead of that
-// button's full-width sheet-footer size. Both "Search all drugs instead" and
-// ClearFiltersButton are built on this now, replacing their old plain-text-
-// link appearance. Same pointer-driven press feedback already used
-// elsewhere in this file (CategoryRow, RecentlyViewedButton, the old
-// ClearFiltersButton) rather than a new pattern.
+// Phase 5 (§4.3/§5d, CORRECTED 2026-08-29 after on-device testing): shared
+// filled/bordered treatment for this screen's "next action" hints. Uses
+// var(--color-accent) — the app's existing single action color, already
+// used for every other actionable text/link on this screen — rather than
+// red, since red is this app's destructive/error color elsewhere and
+// clearing a filter isn't destructive. "Search all drugs instead" and
+// ClearFiltersButton both build on this.
 
 function FilledHintButton({ onClick, children, style }) {
   const [pressed, setPressed] = useState(false)
@@ -1155,8 +1152,8 @@ function FilledHintButton({ onClick, children, style }) {
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
         cursor: 'pointer',
-        border: '1.5px solid #DC2626',
-        backgroundColor: '#DC2626',
+        border: '1.5px solid var(--color-accent)',
+        backgroundColor: 'var(--color-accent)',
         color: '#fff',
         fontSize: 13, fontWeight: 600,
         fontFamily: 'var(--font-body)',
@@ -1183,12 +1180,15 @@ function FilledHintButton({ onClick, children, style }) {
 // drug-filter-instant-apply — onClick opens a confirm step
 // (requestClearFilters, wired at each call site) rather than clearing
 // directly; the actual clear only happens if the user confirms.
+//
+// CORRECTED (2026-08-29): label is singular "Clear filter" — only one
+// filter type (Form/Route) exists on this screen — and no longer carries
+// its own icon, matching the plain-text-button look of FilledHintButton.
 
 function ClearFiltersButton({ onClick }) {
   return (
     <FilledHintButton onClick={onClick}>
-      <X size={13} />
-      Clear filters
+      Clear filter
     </FilledHintButton>
   )
 }
@@ -1223,27 +1223,32 @@ function EmptyState({ query, onClear }) {
 }
 
 // ─── FilterMaskedState ──────────────────────────────────────────────────────
-// Phase 5 (§4.3, step 5b): shown instead of EmptyState/DidYouMeanState when
-// the search itself found real results but the active Form/Route filter hid
-// all of them (see isFilterMasked, computed above where base/filtered
-// exist) — the most actionable cause, so it takes priority over both other
-// empty states. onClearFilter is requestClearFilters, so this goes through
-// the exact same confirm step every other Clear Filters button in this file
-// already uses — no new confirmation pattern introduced.
+// Phase 5 (§4.3, step 5b; copy/visuals CORRECTED 2026-08-29 after on-device
+// testing): shown instead of EmptyState/DidYouMeanState when the search
+// itself found real results but the active Form/Route filter hid all of
+// them (see isFilterMasked, computed above where base/filtered exist) — the
+// most actionable cause, so it takes priority over both other empty states.
+// Icon is filter-off, not a magnifying glass — a magnifying glass reads as
+// "nothing found," which contradicts the message here (results exist, the
+// filter hid them). Headline states the cause first; the count/query is a
+// secondary supporting line. onClearFilter is requestClearFilters, so this
+// goes through the exact same confirm step every other Clear Filters button
+// in this file already uses — no new confirmation pattern introduced.
 
-function FilterMaskedState({ count, onClearFilter }) {
+function FilterMaskedState({ count, query, onClearFilter }) {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <FilterX size={28} color="var(--color-text-tertiary)" />
       </div>
-      <div style={{ fontSize: 15, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
-        {count} drug{count !== 1 ? 's' : ''} match — hidden by your filter
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        Your filter is hiding these results
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        {count} drug{count !== 1 ? 's' : ''} match{query ? ` "${query}"` : ''}
       </div>
       <FilledHintButton onClick={onClearFilter}>
-        Clear filters
+        Clear filter
       </FilledHintButton>
     </div>
   )
