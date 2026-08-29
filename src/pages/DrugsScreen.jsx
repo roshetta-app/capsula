@@ -130,7 +130,7 @@
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
-import { FilterX, Search } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -1200,7 +1200,7 @@ function EmptyState({ query, onClear }) {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <Search size={28} color="var(--color-text-tertiary)" />
+        <SearchX size={28} color="var(--color-text-tertiary)" />
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
         No matches{query ? ` for "${query}"` : ''}
@@ -1258,13 +1258,13 @@ function DidYouMeanState({ query, suggestion, onSelect }) {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <Search size={28} color="var(--color-text-tertiary)" />
+        <Lightbulb size={28} color="var(--color-accent)" />
       </div>
-      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        No exact match{query ? ` for "${query}"` : ''}
+      <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 4, color: 'var(--color-accent)' }}>
+        Did you mean <span style={{ fontWeight: 700 }}>{suggestion}</span>?
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
-        Did you mean {suggestion}?
+        No exact match{query ? ` for "${query}"` : ''}
       </div>
       <FilledHintButton onClick={onSelect}>
         Search {suggestion}
