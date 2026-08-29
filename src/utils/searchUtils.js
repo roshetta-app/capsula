@@ -435,28 +435,51 @@ const STRENGTH_PATTERN = new RegExp(
   'i'
 )
 
+// Bare-number fallback (added 2026-08-29, after live testing surfaced
+// "panadol 500" — no unit typed — returning nothing): real people
+// frequently drop the unit entirely. Only used when STRENGTH_PATTERN above
+// finds nothing. \b on both sides means a number glued to a letter, like
+// the "3" in "d3" or "12" in "b12", is never picked up — \b only exists
+// between a digit and a genuine non-word character (space, start/end of
+// string, punctuation), not between two word characters. So this stays
+// narrow to an actual standalone number, not vitamin/ingredient shorthand.
+const BARE_NUMBER_PATTERN = /\b(\d+(?:\.\d+)?)\b/
+
 /**
- * Pulls a strength (a number + unit, e.g. "500mg") out of a typed drug
- * search query, if one is there. Returns null when no strength-shaped text
- * is found, so a plain name-only query is untouched.
+ * Pulls a strength out of a typed drug search query, if one is there.
+ * Prefers a number directly paired with a unit ("500mg") — if none is
+ * found, falls back to a bare standalone number ("500", unit unset), since
+ * people commonly drop the unit. Returns null when nothing strength-shaped
+ * is found at all, so a plain name-only query is untouched.
  *
  * @param {string} query — the raw typed search text (not yet normalized)
- * @returns {{ value: string, unit: string, remainingText: string }|null}
- *   value/unit as typed (unit lowercased); remainingText is the query with
- *   the matched strength removed and spacing cleaned up — the piece that
- *   still needs to be matched against the drug name.
+ * @returns {{ value: string, unit: string|null, remainingText: string }|null}
+ *   value/unit as typed (unit lowercased, or null when no unit was typed —
+ *   see drugMatchesStrength for how an unset unit is matched). remainingText
+ *   is the query with the matched strength removed and spacing cleaned up —
+ *   the piece that still needs to be matched against the drug name.
  */
 export function extractStrengthFromQuery(query) {
   const text = (query ?? '').trim()
-  const match = text.match(STRENGTH_PATTERN)
-  if (!match) return null
 
-  const [fullMatch, value, unit] = match
-  const remainingText = (text.slice(0, match.index) + text.slice(match.index + fullMatch.length))
+  const withUnit = text.match(STRENGTH_PATTERN)
+  if (withUnit) {
+    const [fullMatch, value, unit] = withUnit
+    const remainingText = (text.slice(0, withUnit.index) + text.slice(withUnit.index + fullMatch.length))
+      .replace(/\s+/g, ' ')
+      .trim()
+    return { value, unit: unit.toLowerCase(), remainingText }
+  }
+
+  const bare = text.match(BARE_NUMBER_PATTERN)
+  if (!bare) return null
+
+  const [fullMatch, value] = bare
+  const remainingText = (text.slice(0, bare.index) + text.slice(bare.index + fullMatch.length))
     .replace(/\s+/g, ' ')
     .trim()
 
-  return { value, unit: unit.toLowerCase(), remainingText }
+  return { value, unit: null, remainingText }
 }
 
 // ─── Query facet extraction — form (DRUG_SEARCH_REFINEMENT_PLAN.md §4.5,
@@ -697,6 +720,12 @@ function searchBrandAtTier(pool, lower, tier) {
  * match a stored "1500mg" or "5000mg" — the same word-boundary caution
  * applied to form matching, adapted for numbers (a plain substring check
  * has no notion of "whole word" for digits the way \b does for letters).
+ *
+ * When `strength.unit` is null (a bare number was typed, no unit — see
+ * extractStrengthFromQuery's 2026-08-29 fallback), the person didn't say
+ * which unit they meant, so this tries every known unit in turn — "500"
+ * matches a stored "500mg" just as readily as a stored "500mcg" — plus the
+ * bare number with no unit at all, for the rare stored value that has none.
  */
 function drugMatchesStrength(drug, strength) {
   if (!strength) return true
@@ -704,9 +733,12 @@ function drugMatchesStrength(drug, strength) {
   const raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
   if (!raw) return false
 
-  const target = escapeRegExp(`${strength.value}${strength.unit}`.toLowerCase().replace(/\s+/g, ''))
-  const pattern = new RegExp(`(^|[^0-9])${target}([^0-9]|$)`)
-  return pattern.test(raw)
+  const unitsToTry = strength.unit !== null ? [strength.unit] : [...STRENGTH_UNITS, '']
+
+  return unitsToTry.some(unit => {
+    const target = escapeRegExp(`${strength.value}${unit}`.toLowerCase().replace(/\s+/g, ''))
+    return new RegExp(`(^|[^0-9])${target}([^0-9]|$)`).test(raw)
+  })
 }
 
 /**
