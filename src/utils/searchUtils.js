@@ -459,29 +459,57 @@ export function extractStrengthFromQuery(query) {
 // really the name "panadol" plus the form "tablet", not one phrase.
 //
 // Per the plan's decision (§5): reuses FORM_OPTIONS from DrugFilterPanel.jsx
-// as-is — no new word list. The words this recognizes are the real raw
-// `matches` values already used to drive the Form filter chips (e.g.
-// "tablet", "syrup", "eye drops", "injection"), not abbreviations like "tab"
-// — so this only catches a query where the person typed (or nearly typed) a
-// real form word, not a short chip-label fragment.
+// as-is for the real stored form words (e.g. "tablet", "syrup", "eye drops",
+// "injection") — no changes to the filter panel or its chip data.
 //
+// Abbreviations (added after the initial 3c build, per direct request,
+// before 3d locks the behavior in): real people type shorthand in a search
+// box even though FORM_OPTIONS' own chip data intentionally doesn't include
+// it. Rather than touching FORM_OPTIONS/DrugFilterPanel.jsx — the plan is
+// explicit that this feature makes no filter-panel changes — the
+// abbreviations live in their own small map here, search-only, each one
+// resolving back to a real FORM_OPTIONS chip so it carries that chip's same
+// `matches`/`routes` for the step-3d filter check. Kept short and
+// unambiguous on purpose: only common, low-risk shorthand that a person
+// would recognize as themselves having typed, not anything that could read
+// as a real word with a different meaning.
+const FORM_ABBREVIATIONS = {
+  tablet:      ['tab', 'tabs', 'cap', 'caps'],
+  syrup:       ['syr', 'susp', 'sol', 'soln'],
+  sachet:      ['sach'],
+  inhaler:     ['inh'],
+  injection:   ['inj', 'amp', 'vax'],
+  suppository: ['supp', 'supps'],
+  cream:       ['crm', 'oint', 'ung'],
+}
+
+const FORM_OPTIONS_BY_VALUE = new Map(FORM_OPTIONS.map(opt => [opt.value, opt]))
+
 // Flattened once at module load into a single word/phrase → option lookup
-// list, sorted longest-first. The longest-first order matters: several
-// options share overlapping words (e.g. "oil" alone under Topical, and "hair
-// oil" also under Topical; "solution" alone under Syrup/Susp., and
-// "inhalation solution" under Inhaled) — checking longer phrases first means
-// a query containing "hair oil" is recognized as that whole phrase rather
-// than incorrectly stopping at the shorter "oil" and leaving "hair" stranded
-// in the name text.
-const FORM_WORD_ENTRIES = FORM_OPTIONS
-  .filter(opt => opt.value !== 'all')
-  .flatMap(opt => opt.matches.map(word => ({ word, option: opt })))
-  .sort((a, b) => b.word.length - a.word.length)
+// list (real words first, abbreviations appended after), sorted
+// longest-first. The longest-first order matters: several options share
+// overlapping words (e.g. "oil" alone under Topical, and "hair oil" also
+// under Topical; "solution" alone under Syrup/Susp., and "inhalation
+// solution" under Inhaled) — checking longer phrases first means a query
+// containing "hair oil" is recognized as that whole phrase rather than
+// incorrectly stopping at the shorter "oil" and leaving "hair" stranded in
+// the name text. Every entry is matched on a strict word boundary (see
+// below), so a short abbreviation like "tab" can never accidentally match
+// inside a longer real word like "tablet" regardless of list order.
+const FORM_WORD_ENTRIES = [
+  ...FORM_OPTIONS
+    .filter(opt => opt.value !== 'all')
+    .flatMap(opt => opt.matches.map(word => ({ word, option: opt }))),
+  ...Object.entries(FORM_ABBREVIATIONS)
+    .flatMap(([value, words]) => words.map(word => ({ word, option: FORM_OPTIONS_BY_VALUE.get(value) }))),
+].sort((a, b) => b.word.length - a.word.length)
 
 /**
  * Pulls a known form word/phrase (e.g. "tablet", "eye drops", "injection")
- * out of a typed drug search query, if one is there. Matches on a whole word
- * or phrase only (not mid-word — "tablet" won't match inside "tabletop"),
+ * OR a recognized abbreviation of one (e.g. "tab", "syr", "inj" — see
+ * FORM_ABBREVIATIONS) out of a typed drug search query, if one is there.
+ * Matches on a whole word or phrase only (not mid-word — "tablet" won't
+ * match inside "tabletop", and "tab" won't match inside "tablet"),
  * case-insensitively. Returns null when nothing form-shaped is found, so a
  * plain name-only query is untouched.
  *
