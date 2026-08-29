@@ -144,6 +144,8 @@ import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
+import { logUsageEvent } from '../analytics/usageEvents'
+import { normalizeSearchText } from '../utils/searchUtils'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
@@ -233,6 +235,11 @@ export default function DrugsScreen() {
   // only runs from ConfirmSheet's onConfirm.
   const [showClearFiltersConfirm, setShowClearFiltersConfirm] = useState(false)
 
+  // Phase 5 (§4.3/§4.7) — dedup key is "mode:normalizedTerm", same shape as
+  // useDrugSearch.js's near-miss/gap refs, so a repeated search for the same
+  // term in the same mode only logs once per session.
+  const loggedFilterMaskedTermsRef = useRef(new Set())
+
   // Recently-viewed sheet needs full drug records (SharedDrugCard's props),
   // not just the {id, name, slug} shape stored in localStorage — resolved
   // here against the already-loaded catalog, in stored (most-recent-first)
@@ -313,6 +320,11 @@ export default function DrugsScreen() {
   // whatever the person searches next. False for category browsing (no
   // query at all), same as before.
   let hasSearchQuery = false
+  // Phase 5 (§4.3) — true when the search itself found real results but the
+  // active Form/Route filter hid all of them (before/after count compare,
+  // set inside the search-results branch below where `base`/`filtered`
+  // exist). Hoisted so the useEffect further down can read it.
+  let isFilterMasked = false
 
   // ── Search results view ───────────────────────────────────────────────────
   if (hasQuery || (activeCategory !== null)) {
@@ -333,6 +345,14 @@ export default function DrugsScreen() {
     // untouched. Browsing (no query) has no such ranking to preserve, so it
     // sorts alphabetically by brand name instead of the old genericName sort.
     const filtered = applyFilters(base, activeFilters)
+
+    // Phase 5 (§4.3, step 5a) — standard before/after comparison: if the
+    // search/category scope actually had results and the Form/Route filter
+    // zeroed them out, that's the filter's doing, not a missing drug. Only
+    // meaningful for a real search (hasQuery) — see file header note above
+    // the useEffect below for why category-only browsing isn't included.
+    isFilterMasked = hasQuery && hasFilters && base.length > 0 && filtered.length === 0
+
     // drug-search-sort-cheapest — Cheapest First re-orders the already-
     // filtered results by price; Relevance (default) leaves searchDrugsTiered's
     // ranked order untouched, same as before this feature existed.
@@ -413,18 +433,12 @@ export default function DrugsScreen() {
                   inside the category can still be hiding the drug they
                   actually want under a different one (see file header). */}
               {hasQuery && activeCategory && activeCategory !== '__all' && (
-                <button
+                <FilledHintButton
                   onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
-                  style={{
-                    display: 'block', background: 'none', border: 'none', cursor: 'pointer',
-                    color: 'var(--color-accent)', fontSize: 13, fontWeight: 500,
-                    fontFamily: 'var(--font-body)', padding: '4px 0',
-                    marginBottom: 'var(--space-2)',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
+                  style={{ display: 'block', marginBottom: 'var(--space-2)' }}
                 >
                   Search all drugs instead
-                </button>
+                </FilledHintButton>
               )}
 
               {/* drug-filter-instant-apply — only shown while a search
@@ -444,7 +458,9 @@ export default function DrugsScreen() {
               </div>
 
               {displayed.length === 0 ? (
-                suggestion ? (
+                isFilterMasked ? (
+                  <FilterMaskedState count={base.length} onClearFilter={requestClearFilters} />
+                ) : suggestion ? (
                   <DidYouMeanState
                     suggestion={suggestion}
                     onSelect={() => handleQueryChange(suggestion)}
@@ -583,6 +599,22 @@ export default function DrugsScreen() {
       </>
     )
   }
+
+  // Phase 5 (§4.3, step 5c) — wires the filter-masked usageEvent (added in
+  // Phase 4 step 4a) from the detection point above. Plain unconditional
+  // hook call like every other hook in this component; isFilterMasked/
+  // query/mode are just closed-over values from whichever branch ran this
+  // render. Only ever true when hasQuery was also true (set above), so this
+  // never fires for plain category browsing.
+  useEffect(() => {
+    if (!isFilterMasked) return
+    const normalized = normalizeSearchText(query)
+    if (normalized.length < 2) return
+    const key = `${mode}:${normalized}`
+    if (loggedFilterMaskedTermsRef.current.has(key)) return
+    loggedFilterMaskedTermsRef.current.add(key)
+    logUsageEvent('drug_search_filter_masked', null, normalized, mode)
+  }, [isFilterMasked, query, mode])
 
   return (
     <>
@@ -1100,21 +1132,18 @@ function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
   )
 }
 
-// ─── ClearFiltersButton ─────────────────────────────────────────────────────
-// Small text link, shown only when hasFilters is true — appears in three
-// spots: next to "Browse by category", inline with the category back
-// button, and (drug-filter-instant-apply) inline with the results-count
-// line in the search results view. Style matches the other lightweight
-// text links already in this file ("Search all drugs instead", "Clear
-// search") rather than introducing a new button treatment.
-//
-// drug-filter-instant-apply — onClick now opens a confirm step
-// (requestClearFilters, wired at each call site) rather than clearing
-// directly; the actual clear only happens if the user confirms. Also
-// added the same pointer-driven press feedback used elsewhere in this
-// file (CategoryRow, RecentlyViewedButton) rather than a new pattern.
+// ─── FilledHintButton ───────────────────────────────────────────────────────
+// Phase 5 (§4.3/§5d, user decision 2026-08-29): shared filled/bordered
+// treatment for this screen's "next action" hints — reuses DrugFilterPanel's
+// ClearAllButton look (solid red fill, white text) rather than introducing a
+// new style, just applied here at an inline/compact size instead of that
+// button's full-width sheet-footer size. Both "Search all drugs instead" and
+// ClearFiltersButton are built on this now, replacing their old plain-text-
+// link appearance. Same pointer-driven press feedback already used
+// elsewhere in this file (CategoryRow, RecentlyViewedButton, the old
+// ClearFiltersButton) rather than a new pattern.
 
-function ClearFiltersButton({ onClick }) {
+function FilledHintButton({ onClick, children, style }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -1124,20 +1153,43 @@ function ClearFiltersButton({ onClick }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', gap: 4,
-        background: 'none', border: 'none', cursor: 'pointer',
-        color: '#DC2626', fontSize: 13, fontWeight: 500,
-        fontFamily: 'var(--font-body)', padding: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        cursor: 'pointer',
+        border: '1.5px solid #DC2626',
+        backgroundColor: '#DC2626',
+        color: '#fff',
+        fontSize: 13, fontWeight: 600,
+        fontFamily: 'var(--font-body)',
+        padding: '6px 12px',
+        borderRadius: 'var(--radius-md)',
         lineHeight: 1,
         flexShrink: 0,
         transform: pressed ? 'scale(0.96)' : 'scale(1)',
         transition: 'transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',
+        ...style,
       }}
     >
+      {children}
+    </button>
+  )
+}
+
+// ─── ClearFiltersButton ─────────────────────────────────────────────────────
+// Appears in three spots: next to "Browse by category", inline with the
+// category back button, and (drug-filter-instant-apply) inline with the
+// results-count line in the search results view.
+//
+// drug-filter-instant-apply — onClick opens a confirm step
+// (requestClearFilters, wired at each call site) rather than clearing
+// directly; the actual clear only happens if the user confirms.
+
+function ClearFiltersButton({ onClick }) {
+  return (
+    <FilledHintButton onClick={onClick}>
       <X size={13} />
       Clear filters
-    </button>
+    </FilledHintButton>
   )
 }
 
@@ -1166,6 +1218,33 @@ function EmptyState({ query, onClear }) {
       >
         Clear search
       </button>
+    </div>
+  )
+}
+
+// ─── FilterMaskedState ──────────────────────────────────────────────────────
+// Phase 5 (§4.3, step 5b): shown instead of EmptyState/DidYouMeanState when
+// the search itself found real results but the active Form/Route filter hid
+// all of them (see isFilterMasked, computed above where base/filtered
+// exist) — the most actionable cause, so it takes priority over both other
+// empty states. onClearFilter is requestClearFilters, so this goes through
+// the exact same confirm step every other Clear Filters button in this file
+// already uses — no new confirmation pattern introduced.
+
+function FilterMaskedState({ count, onClearFilter }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ marginBottom: 'var(--space-3)', opacity: 0.4 }}>
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        {count} drug{count !== 1 ? 's' : ''} match — hidden by your filter
+      </div>
+      <FilledHintButton onClick={onClearFilter}>
+        Clear filters
+      </FilledHintButton>
     </div>
   )
 }
@@ -1231,4 +1310,3 @@ function NarrowResultsHint() {
     </div>
   )
 }
-
