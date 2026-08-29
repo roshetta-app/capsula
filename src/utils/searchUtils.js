@@ -516,58 +516,128 @@ const FORM_ABBREVIATIONS = {
 const FORM_OPTIONS_BY_VALUE = new Map(FORM_OPTIONS.map(opt => [opt.value, opt]))
 
 // Flattened once at module load into a single word/phrase → option lookup
-// list (real words first, abbreviations appended after), sorted
-// longest-first. The longest-first order matters: several options share
-// overlapping words (e.g. "oil" alone under Topical, and "hair oil" also
-// under Topical; "solution" alone under Syrup/Susp., and "inhalation
-// solution" under Inhaled) — checking longer phrases first means a query
-// containing "hair oil" is recognized as that whole phrase rather than
-// incorrectly stopping at the shorter "oil" and leaving "hair" stranded in
-// the name text. Every entry is matched on a strict word boundary (see
-// below), so a short abbreviation like "tab" can never accidentally match
-// inside a longer real word like "tablet" regardless of list order.
+// list (real words first, abbreviations appended after). Order no longer
+// matters for correctness (see the partial-match rework below) — kept
+// unsorted, it's just the master list extractFormFromQuery scans.
 const FORM_WORD_ENTRIES = [
   ...FORM_OPTIONS
     .filter(opt => opt.value !== 'all')
     .flatMap(opt => opt.matches.map(word => ({ word, option: opt }))),
   ...Object.entries(FORM_ABBREVIATIONS)
     .flatMap(([value, words]) => words.map(word => ({ word, option: FORM_OPTIONS_BY_VALUE.get(value) }))),
-].sort((a, b) => b.word.length - a.word.length)
+]
+
+// ─── Form matching — partial/still-typing support (2026-08-29, user request,
+// confirmed against the real FORM_OPTIONS data pulled from
+// DrugFilterPanel.jsx) ───────────────────────────────────────────────────────
+// The original 3c build only recognized a form word once it was typed in
+// full (or matched one of the fixed FORM_ABBREVIATIONS shortcuts) — so "eye"
+// did nothing until "eye drops" was fully typed, and "ta" did nothing until
+// "tab"/"tablet". Real people expect it to start working as they type.
+//
+// The catch, confirmed against the real word list above: several form words
+// share the same first couple of letters but mean genuinely different
+// things — e.g. "in" is the start of both "inhaler" and "injection"; "sy" is
+// the start of both "syrup" and "syringe" (injection); "su" is the start of
+// both "suspension" (syrup) and "suppository"; "va" is the start of both
+// "vaccine" (injection) and "vaginal douche" (suppository); "so" is the
+// start of both "solution" (syrup) and "soap" (cream); and two of the
+// two-word phrases share an identical first word — "eye drops" vs.
+// "eye ointment", and "mouth drops" vs. "mouth wash". Locking in a flat
+// minimum length (e.g. always 2 letters) would force a wrong guess on any
+// of these the moment that shared prefix is typed.
+//
+// Decision (user-confirmed): no fixed minimum length. Instead, a typed
+// fragment is recognized the moment it can ONLY be the start of one option —
+// as short as 2 letters for anything unambiguous (most form words have no
+// overlap at all), automatically waiting for one more letter on the small
+// set of words above that do overlap, and — for the two "same first word"
+// phrase pairs — waiting for the first letter of the SECOND word ("eye d"
+// vs. "eye o", "mouth d" vs. "mouth w") since the first word alone can never
+// tell those two apart, no matter how much of it is typed.
+const MIN_FORM_FRAGMENT_LETTERS = 2
+
+// True if every FORM_WORD_ENTRIES entry whose word/phrase starts with
+// 'fragmentNormalized' belongs to the same chip — i.e. this fragment is
+// enough, on its own, to know for certain which form was meant. Returns the
+// shared option if so, otherwise null (either no entries matched at all, or
+// more than one different chip is still possible and it's too early to
+// guess).
+function resolveUniqueFormOption(fragmentNormalized) {
+  let resolvedOption = null
+  for (const { word, option } of FORM_WORD_ENTRIES) {
+    if (!normalizeSearchText(word).startsWith(fragmentNormalized)) continue
+    if (resolvedOption === null) {
+      resolvedOption = option
+    } else if (resolvedOption.value !== option.value) {
+      return null // two different chips both still possible — too early to tell
+    }
+  }
+  return resolvedOption
+}
 
 /**
- * Pulls a known form word/phrase (e.g. "tablet", "eye drops", "injection")
- * OR a recognized abbreviation of one (e.g. "tab", "syr", "inj" — see
- * FORM_ABBREVIATIONS) out of a typed drug search query, if one is there.
- * Matches on a whole word or phrase only (not mid-word — "tablet" won't
- * match inside "tabletop", and "tab" won't match inside "tablet"),
- * case-insensitively. Returns null when nothing form-shaped is found, so a
- * plain name-only query is untouched.
+ * Pulls a known form word/phrase out of a typed drug search query — fully
+ * typed ("tablet", "eye drops"), a recognized abbreviation (see
+ * FORM_ABBREVIATIONS), or a still-being-typed fragment of either, as soon as
+ * that fragment can only mean one thing (see the block above for exactly how
+ * short that can be for each word). Case-insensitive. Returns null when
+ * nothing form-shaped is found (or what's typed so far is still ambiguous
+ * between two different forms), so a plain name-only query is untouched.
  *
  * @param {string} query — the raw typed search text (not yet normalized)
  * @returns {{ value: string, matches: string[], routes: string[]|undefined,
  *   matchedText: string, remainingText: string }|null}
  *   value/matches/routes are the matched FORM_OPTIONS chip's own fields —
- *   `matches` is what step 3d will check the drug's stored form against,
- *   `routes` (only present on the Inhaled chip today) is what it'll check
- *   the drug's stored route against. matchedText is the literal word/phrase
- *   found in the query. remainingText is the query with that word/phrase
- *   removed and spacing cleaned up — the piece that still needs to be
- *   matched against the drug name.
+ *   'matches' is what the search checks the drug's stored form against,
+ *   'routes' (only present on the Inhaled chip today) is what it checks the
+ *   drug's stored route against. matchedText is the literal fragment found
+ *   in the query (whatever length the person actually typed). remainingText
+ *   is the query with that fragment removed and spacing cleaned up — the
+ *   piece that still needs to be matched against the drug name.
  */
 export function extractFormFromQuery(query) {
   const text = (query ?? '').trim()
   if (text.length === 0) return null
 
-  for (const { word, option } of FORM_WORD_ENTRIES) {
-    const pattern = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'i')
-    const match = text.match(pattern)
-    if (!match) continue
+  // Each word-boundary start in the query is a place a form word could
+  // begin. Tried left to right so the first (leftmost) resolvable fragment
+  // wins, same convention as the old whole-word version.
+  const tokens = [...text.matchAll(/\S+/g)].map(m => ({ text: m[0], start: m.index, end: m.index + m[0].length }))
 
-    const remainingText = (text.slice(0, match.index) + text.slice(match.index + match[0].length))
-      .replace(/\s+/g, ' ')
-      .trim()
+  for (let i = 0; i < tokens.length; i++) {
+    // Try the two-word window first (start of this token + the next one) —
+    // this is what lets "eye d"/"mouth w" resolve the two phrase pairs that
+    // share an identical first word, since a wider fragment is always at
+    // least as specific as a narrower one starting at the same place.
+    if (i + 1 < tokens.length) {
+      const twoWordText = text.slice(tokens[i].start, tokens[i + 1].end)
+      const fragment = normalizeSearchText(twoWordText)
+      if (fragment.replace(/\s/g, '').length >= MIN_FORM_FRAGMENT_LETTERS) {
+        const option = resolveUniqueFormOption(fragment)
+        if (option) {
+          const remainingText = (text.slice(0, tokens[i].start) + text.slice(tokens[i + 1].end))
+            .replace(/\s+/g, ' ')
+            .trim()
+          return { value: option.value, matches: option.matches, routes: option.routes, matchedText: twoWordText, remainingText }
+        }
+      }
+    }
 
-    return { value: option.value, matches: option.matches, routes: option.routes, matchedText: match[0], remainingText }
+    // Single-token fragment — covers every one-word form and any two-word
+    // phrase whose first word alone is already enough to resolve it (e.g.
+    // "oral" already only means "oral drops" — no need to wait for "drops").
+    const oneWordText = tokens[i].text
+    const oneFragment = normalizeSearchText(oneWordText)
+    if (oneFragment.length >= MIN_FORM_FRAGMENT_LETTERS) {
+      const option = resolveUniqueFormOption(oneFragment)
+      if (option) {
+        const remainingText = (text.slice(0, tokens[i].start) + text.slice(tokens[i].end))
+          .replace(/\s+/g, ' ')
+          .trim()
+        return { value: option.value, matches: option.matches, routes: option.routes, matchedText: oneWordText, remainingText }
+      }
+    }
   }
 
   return null
@@ -791,10 +861,11 @@ function drugMatchesForm(drug, form) {
  * actually found in the query is true at once: name AND (strength, if typed)
  * AND (form, if typed) — not "any of these" (§5's explicit decision). A query
  * with no strength or form behaves exactly as before. A query that's ONLY a
- * strength/form ("500mg", "tablet", "brufen 500mg tab" minus "brufen"... i.e.
- * "500mg tab" alone) leaves no name text to tier-match — that's treated as
- * "every drug passes the name check", the same as an empty query does today,
- * letting the strength/form checks below do all the narrowing on their own.
+ * strength/form ("500mg", "tablet", "500mg tab" alone) leaves no name text to
+ * tier-match — 2026-08-29 (user decision, supersedes the original Phase 3
+ * fallback): this now returns NO results, rather than treating it as "every
+ * drug passes the name check." A strength or form is only ever meant to
+ * narrow a typed drug name, never to stand in for one on its own.
  *
  * @param {object[]} pool    — the raw drugs array to filter
  * @param {string}   query
@@ -818,9 +889,12 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
 
   let nameMatched
   if (lower.length === 0) {
-    // Nothing left to match by name (query was strength/form only) — every
-    // drug passes the name check; strength/form filtering below narrows it.
-    nameMatched = pool
+    // 2026-08-29 (user decision, supersedes the original Phase 3 fallback
+    // below): a strength or form typed with NO drug name isn't a real,
+    // intentional search on its own — a stray "500mg" or "tab" alone should
+    // not surface every drug at that strength/form. Returns nothing instead;
+    // strength/form only ever narrows a typed name, never stands in for one.
+    nameMatched = []
   } else {
     // Tier 3 (substring anywhere) only kicks in at 4+ characters — see
     // fieldMatchesAtTier's header note for why.
