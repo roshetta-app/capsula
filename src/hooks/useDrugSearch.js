@@ -22,7 +22,10 @@
  * that needed its own flattened index rather than Fuse's built-in
  * array-field scoring). `ingredientIndexRef`/`drugsByIdRef` below are built
  * once alongside the two mode indexes and passed through to generic-mode
- * searches as `fuzzyExtras`; Brand mode ignores them. Still current.
+ * searches as `fuzzyExtras`; Brand mode ignores them.
+ * NO LONGER CURRENT as of Phase 6 v2 (2026-08-29) — see that note further
+ * down, next to where these refs are declared. `fuzzyExtras` is gone;
+ * "Did you mean" now works directly off the plain `drugs` array.
  *
  * drug_search_plan rebuild (2026-07-19, DRUG_SEARCH_PLAN.md §5): a 1-char
  * query is now intercepted before it ever reaches a search tier — it just
@@ -119,6 +122,12 @@ export function useDrugSearch(drugs, mode = 'brand') {
   // just picks which already-built index to search against. ingredientIndexRef
   // and drugsByIdRef (1e.2) support Generic mode's fair per-ingredient scoring;
   // Brand mode never uses them.
+  // Phase 6 v2 note (2026-08-29): none of the four refs below are read by
+  // runSearch's "Did you mean" call anymore — that now works directly off
+  // the plain `drugs` array (see searchUtils.js). Left in place deliberately
+  // rather than removed as part of this fix, to keep the change scoped to
+  // the accuracy bug; a follow-up cleanup pass can remove this block once
+  // confirmed nothing else needs it.
   const brandIndexRef      = useRef(null)
   const genericIndexRef    = useRef(null)
   const ingredientIndexRef = useRef(null)
@@ -141,8 +150,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = useCallback((q, currentMode) => {
-    const fuseIndex = currentMode === 'brand' ? brandIndexRef.current : genericIndexRef.current
-    if (!fuseIndex) return
+    if (!drugs) return
 
     const trimmed = q.trim()
 
@@ -158,10 +166,6 @@ export function useDrugSearch(drugs, mode = 'brand') {
     }
     setQueryTooShort(false)
 
-    const fuzzyExtras = currentMode === 'generic'
-      ? { ingredientIndex: ingredientIndexRef.current, drugsById: drugsByIdRef.current }
-      : {}
-
     // Strict "starts with" match, every length — replaces the old
     // 2-3-char-prefix/4+-char-fuzzy split (drug_search_plan §5 final form).
     const matched = trimmed.length >= 1
@@ -171,13 +175,15 @@ export function useDrugSearch(drugs, mode = 'brand') {
     setResults(matched)
 
     // Only when the prefix check found nothing: offer up to 3 ranked
-    // "Did you mean" candidates, reusing the same fuzzy indexes built below.
-    // Computed as a local value (not just via setSuggestions) so the gap-
-    // logging check below can use it in this same run, rather than reading
-    // the `suggestions` state, which wouldn't reflect this run until the
-    // next render (§4.6/§4.7).
+    // "Did you mean" candidates. Phase 6 v2 (2026-08-29, live-data audit):
+    // matching is now a direct letter-difference check against the plain
+    // drug list, not a prebuilt fuzzy-search index — see searchUtils.js for
+    // why. Computed as a local value (not just via setSuggestions) so the
+    // gap-logging check below can use it in this same run, rather than
+    // reading the `suggestions` state, which wouldn't reflect this run
+    // until the next render (§4.6/§4.7).
     const suggestionValue = trimmed.length >= 1 && matched.length === 0
-      ? getDrugSearchSuggestion(fuseIndex, trimmed, currentMode, fuzzyExtras)
+      ? getDrugSearchSuggestion(drugs, trimmed, currentMode)
       : []
     setSuggestions(suggestionValue)
 
@@ -240,4 +246,3 @@ export function useDrugSearch(drugs, mode = 'brand') {
     suggestions,
   }
 }
-

@@ -150,6 +150,12 @@
  * ('searchGenericDrugsFuzzy' for Generic mode, plain 'fuseIndex.search' +
  * floor filter for Brand mode), just takes only the top-ranked result's name
  * instead of returning the whole list.
+ * SUPERSEDED — see "Did you mean" letter-difference matching, Phase 6 v2,
+ * further down this file. 'getDrugSearchSuggestion' no longer reuses the
+ * fuzzy indexes or 'RELEVANCE_FLOOR' described above, and no longer returns
+ * only one name — it now takes the plain drugs array directly and returns
+ * up to 3 ranked names using a length-scaled letter-difference check. This
+ * paragraph is left as historical record of the design it replaced.
  *
  * drug_search_plan ingredient reorder-on-match (2026-07-19, later still, same
  * day, DRUG_SEARCH_PLAN.md §6, decision 4.31, checklist 1e.3): when Generic
@@ -916,61 +922,124 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   return nameMatched.filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
 }
 
+// ─── "Did you mean" letter-difference matching (Phase 6 v2, DRUG_SEARCH_
+// REFINEMENT_PLAN.md §4.8, live-data audit 2026-08-29) ─────────────────────
+// Replaces the old flat RELEVANCE_FLOOR fuzzy-score cutoff above. That
+// cutoff applied the same closeness requirement no matter how much text was
+// actually being compared, which a live audit against the real drug table
+// confirmed caused two concrete failures: short leftover text (after a
+// dose/form was split off) let unrelated names through as if they were
+// equally good guesses (e.g. "amryl" surfacing "Mast-Amyl" and "Caladryl"
+// alongside the real answer, "Amaryl"), while some legitimate longer typos
+// were rejected outright ("pandel" for "Panadol" returned nothing at all).
+// This is replaced with a direct, easier-to-reason-about measure: how many
+// single-letter changes, insertions, or deletions turn the typed text into
+// a real name — with the tolerance for that number scaled to how much text
+// there is, and a same-first-letter requirement (real typos essentially
+// never land on the very first letter, per the audit).
+
+// Classic edit distance (Levenshtein) between two already-normalized
+// strings — the number of single-letter changes/insertions/deletions
+// needed to turn `a` into `b`.
+function editDistance(a, b) {
+  const m = a.length, n = b.length
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
+  for (let i = 0; i <= m; i++) dp[i][0] = i
+  for (let j = 0; j <= n; j++) dp[0][j] = j
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+    }
+  }
+  return dp[m][n]
+}
+
+// How many letters are allowed to be wrong, based on how much text is being
+// compared. Short text gets no guess at all — not just a lower score — since
+// 1-2 letters isn't enough to guess safely; longer text gets a little more
+// room, matching the standard "tighter leash for short words" approach.
+function maxAllowedEdits(length) {
+  if (length <= 2) return -1
+  if (length <= 5) return 1
+  return 2
+}
+
 /**
  * Ranked "Did you mean" suggestions — only meant to be called when
- * 'searchDrugsTiered' comes back empty. Phase 6 (§4.8) rework: now uses the
- * same query-parsing 'searchDrugsTiered' already does (Phase 3, step 3d) —
- * strength/form are pulled out first via extractStrengthFromQuery/
- * extractFormFromQuery, and only the remaining name text is fuzzy-matched.
- * A typo'd "panadol 500mg" now fuzzy-matches just "panadol" against name
- * data, then AND-filters those candidates against the extracted 500mg
- * facet via drugMatchesStrength/drugMatchesForm — mirroring
- * searchDrugsTiered's own "name AND strength AND form" logic exactly,
- * rather than fuzzy-matching the whole raw string as one blob against a
- * field that was never shaped like that.
+ * 'searchDrugsTiered' comes back empty. Same facet handling as before
+ * (Phase 6, §4.8): strength/form are pulled out first via
+ * extractStrengthFromQuery/extractFormFromQuery, and only the remaining
+ * name text is matched; a drug only qualifies if its name is close enough
+ * AND (if typed) its strength/form actually matches.
  *
- * Returns up to the top 3 candidates scoring within RELEVANCE_FLOOR,
- * de-duped by display name (two formulations can share an identical
- * tradenameClean/genericName, which would otherwise render two identical
- * suggestions). Reuses the same fuzzy search and relevance floor the old
- * single-guess version used.
+ * Closeness itself (v2, this rework) is judged by editDistance against
+ * maxAllowedEdits, with a same-first-letter requirement — see the section
+ * header above for why this replaced the old fuzzy-score cutoff.
  *
- * @param {Fuse}   fuseIndex — buildDrugBrandIndex or buildDrugGenericIndex output
- * @param {string} query
+ * Returns up to the top 3 candidates, closest first, de-duped by display
+ * name (two formulations can share an identical tradenameClean/genericName,
+ * which would otherwise render two identical suggestions).
+ *
+ * @param {object[]} drugs — the raw drugs array (same pool searchDrugsTiered uses)
+ * @param {string}   query
  * @param {'brand'|'generic'} mode
- * @param {object} [fuzzyExtras] — generic mode only, for fair ingredient scoring
- *   (1e.2): { ingredientIndex: buildDrugIngredientIndex output, drugsById: Map }
  * @returns {string[]} — up to 3 suggested drug display names, or [] if
- *   nothing scored within the relevance floor (or the query was only a
- *   strength/form with no name text to fuzzy-match, same "name required"
- *   rule as searchDrugsTiered)
+ *   nothing was close enough (or the leftover name text was too short to
+ *   guess safely, or the query was only a strength/form with no name text,
+ *   same "name required" rule as searchDrugsTiered)
  */
-export function getDrugSearchSuggestion(fuseIndex, query, mode = 'brand', fuzzyExtras = {}) {
+export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
   const q = query.trim()
   if (q.length === 0) return []
 
   // Same facet extraction as searchDrugsTiered — whatever's left after
-  // strength/form is the text that actually gets fuzzy-matched.
+  // strength/form is the text that actually gets matched for closeness.
   const strength      = extractStrengthFromQuery(q)
   const afterStrength = strength ? strength.remainingText : q
   const form          = extractFormFromQuery(afterStrength)
   const nameText       = form ? form.remainingText : afterStrength
 
   const lower = normalizeSearchText(nameText)
-  if (lower.length === 0) return [] // strength/form alone, no name — nothing to fuzzy-match
+  if (lower.length === 0) return [] // strength/form alone, no name — nothing to match
 
-  const fuzzyMatches = (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById)
-    ? searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, lower)
-    : fuseIndex.search(lower).filter(r => r.score <= RELEVANCE_FLOOR).map(r => r.item)
+  const allowed = maxAllowedEdits(lower.length)
+  if (allowed < 0) return [] // too little text left to guess safely
 
-  // AND the strength/form facets on top, same as searchDrugsTiered — a
-  // fuzzy name match on the wrong strength/form isn't a real suggestion.
-  const facetMatched = (!strength && !form)
-    ? fuzzyMatches
-    : fuzzyMatches.filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
+  const scored = []
+  for (const drug of drugs) {
+    if (strength && !drugMatchesStrength(drug, strength)) continue
+    if (form && !drugMatchesForm(drug, form)) continue
+
+    let best = null
+    if (mode === 'generic') {
+      // Same fields Generic mode's own prefix check considers (combined
+      // genericName plus each individual ingredient) — whichever scores
+      // closest wins, same "best of name or ingredient" idea the old
+      // per-ingredient fuzzy index existed to provide.
+      for (const field of genericPrefixFields(drug)) {
+        const candidate = normalizeSearchText(field)
+        if (!candidate || candidate[0] !== lower[0]) continue
+        const d = editDistance(lower, candidate)
+        if (d <= allowed && (best === null || d < best)) best = d
+      }
+    } else {
+      const candidate = normalizeSearchText(drugFieldForMode(drug, 'brand'))
+      if (candidate && candidate[0] === lower[0]) {
+        const d = editDistance(lower, candidate)
+        if (d <= allowed) best = d
+      }
+    }
+    if (best !== null) scored.push({ drug, d: best })
+  }
+
+  scored.sort((a, b) => {
+    if (a.d !== b.d) return a.d - b.d
+    return drugFieldForMode(a.drug, mode).localeCompare(drugFieldForMode(b.drug, mode))
+  })
 
   const names = []
-  for (const drug of facetMatched) {
+  for (const { drug } of scored) {
     const name = drugFieldForMode(drug, mode)
     if (name && !names.includes(name)) names.push(name)
     if (names.length === 3) break
