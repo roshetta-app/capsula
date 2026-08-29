@@ -1262,6 +1262,17 @@ function FilterMaskedState({ count, query, onClearFilter }) {
 // equal-weight FilledHintButton chip in a wrapping row — user-confirmed
 // design, so there's no "primary vs secondary" distinction to maintain.
 
+// Lets a chip's own drug-name text wrap onto multiple lines and shrink to
+// fit the screen, overriding FilledHintButton's normal one-line/no-shrink
+// default — see the note where this is used below for why.
+const CHIP_WRAP_STYLE = {
+  maxWidth: '100%',
+  flexShrink: 1,
+  minWidth: 0,
+  whiteSpace: 'normal',
+  textAlign: 'center',
+}
+
 function DidYouMeanState({ query, suggestions, onSelect }) {
   const single = suggestions.length === 1
   return (
@@ -1282,13 +1293,25 @@ function DidYouMeanState({ query, suggestions, onSelect }) {
         No exact match{query ? ` for "${query}"` : ''}
       </div>
       {single ? (
-        <FilledHintButton onClick={() => onSelect(suggestions[0])}>
+        // 2026-08-29 (live report — a long combo generic name, e.g. "caffeine
+        // + chlorpheniramine + ibuprofen + phenylpropanolamine", pushed this
+        // button wider than the screen and forced the whole page to scroll
+        // sideways): FilledHintButton defaults to never shrinking or wrapping
+        // its text, which is right for its other short-label call sites
+        // (ClearFiltersButton, "Search all drugs instead") but wrong once the
+        // label is a full drug name of unpredictable length. Overridden only
+        // here, not in the shared component, so those other buttons keep
+        // their original one-line behavior.
+        <FilledHintButton
+          onClick={() => onSelect(suggestions[0])}
+          style={CHIP_WRAP_STYLE}
+        >
           Search {suggestions[0]}
         </FilledHintButton>
       ) : (
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
           {suggestions.map(name => (
-            <FilledHintButton key={name} onClick={() => onSelect(name)}>
+            <FilledHintButton key={name} onClick={() => onSelect(name)} style={CHIP_WRAP_STYLE}>
               {name}
             </FilledHintButton>
           ))}
