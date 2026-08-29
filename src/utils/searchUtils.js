@@ -398,6 +398,59 @@ function searchGenericDrugsFuzzy(genericIndex, ingredientIndex, drugsById, query
   return passed.map(v => v.drug)
 }
 
+// ─── Query facet extraction — strength (DRUG_SEARCH_REFINEMENT_PLAN.md §4.4,
+// Phase 3, step 3b) ─────────────────────────────────────────────────────────
+// Not wired into search yet (that's step 3d) — this is just the standalone
+// piece that recognizes a strength inside a typed query, e.g. "panadol
+// 500mg" is really the name "panadol" plus the strength "500mg", not one
+// phrase to match as a whole.
+//
+// Checked against the real, live data before building this (step 3a):
+// 5,347 of 11,813 published formulations have a strength at all. Of those,
+// ~3,800 (71%) are the simple, dominant shape this matches — a number
+// stuck directly to a unit, e.g. "500mg", "1g", "1%" — with or without a
+// space in between. The stored 'concentration' text field is what this is
+// meant to compare against later (step 3d), not the separate structured
+// strength columns — those are only populated for ~4,400 of the 5,347, so
+// matching against them alone would miss real strengths. Units are the
+// ones that actually show up in the data (mg/mcg/g/% most common, iu/ml
+// less so); "per volume" strengths like "5mg / ml" and combo strengths
+// like "10mg/80mg" are real but a different kind of question than "what's
+// the total strength" — not something this extraction needs to solve.
+const STRENGTH_UNITS = ['mcg', 'mg', 'iu', 'ml', 'g', '%']
+// Longest unit first (e.g. 'mcg' before 'mg') so "500mcg" isn't mistakenly
+// read as "500mc" + a stray "g". '(?![a-z])' stops a real word starting
+// right after the unit from being swallowed in (so "500ml" doesn't also
+// swallow a following "milk", for instance, if that were ever typed).
+const STRENGTH_PATTERN = new RegExp(
+  `(\\d+(?:\\.\\d+)?)\\s*(${STRENGTH_UNITS.join('|')})(?![a-z])`,
+  'i'
+)
+
+/**
+ * Pulls a strength (a number + unit, e.g. "500mg") out of a typed drug
+ * search query, if one is there. Returns null when no strength-shaped text
+ * is found, so a plain name-only query is untouched.
+ *
+ * @param {string} query — the raw typed search text (not yet normalized)
+ * @returns {{ value: string, unit: string, remainingText: string }|null}
+ *   value/unit as typed (unit lowercased); remainingText is the query with
+ *   the matched strength removed and spacing cleaned up — the piece that
+ *   still needs to be matched against the drug name.
+ */
+export function extractStrengthFromQuery(query) {
+  const text = (query ?? '').trim()
+  const match = text.match(STRENGTH_PATTERN)
+  if (!match) return null
+
+  const [fullMatch, value, unit] = match
+  const remainingText = (text.slice(0, match.index) + text.slice(match.index + fullMatch.length))
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return { value, unit: unit.toLowerCase(), remainingText }
+}
+
 function drugFieldForMode(drug, mode) {
   // Brand mode reads tradenameClean (not the raw 'name' field) — see
   // DRUG_GENERIC_FUSE_OPTIONS' neighbor for the 2026-07-19 fix note
