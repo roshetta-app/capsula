@@ -1012,28 +1012,43 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
     if (form && !drugMatchesForm(drug, form)) continue
 
     let best = null
+    // 2026-08-29 (live report — Generic mode surfacing only buried-ingredient
+    // combo matches, e.g. "paraceoimol" never surfacing plain "Paracetamol"
+    // even though it's the more obvious answer): a match on the drug's OWN
+    // combined genericName is now always preferred over a match found only
+    // via one of its individual ingredients, mirroring the same "own name
+    // beats buried ingredient" precedent genericMatchRank already uses for
+    // the main tiered search above. Ingredients are only checked at all when
+    // the genericName itself doesn't qualify — not "whichever scores
+    // closest" as before, which let a combo's alphabetically-earlier name
+    // outrank a plain single-ingredient drug's own exact-name match on a tie.
+    let matchedOwnName = false
     if (mode === 'generic') {
-      // Same fields Generic mode's own prefix check considers (combined
-      // genericName plus each individual ingredient) — whichever scores
-      // closest wins, same "best of name or ingredient" idea the old
-      // per-ingredient fuzzy index existed to provide.
-      for (const field of genericPrefixFields(drug)) {
-        const candidate = normalizeSearchText(field)
-        if (!candidate || candidate[0] !== lower[0]) continue
-        const d = editDistance(lower, candidate)
-        if (d <= allowed && (best === null || d < best)) best = d
+      const genericCandidate = normalizeSearchText(drug.genericName ?? '')
+      if (genericCandidate && genericCandidate[0] === lower[0]) {
+        const d = editDistance(lower, genericCandidate)
+        if (d <= allowed) { best = d; matchedOwnName = true }
+      }
+      if (best === null && Array.isArray(drug.ingredients)) {
+        for (const ingredient of drug.ingredients) {
+          const candidate = normalizeSearchText(ingredient)
+          if (!candidate || candidate[0] !== lower[0]) continue
+          const d = editDistance(lower, candidate)
+          if (d <= allowed && (best === null || d < best)) best = d
+        }
       }
     } else {
       const candidate = normalizeSearchText(drugFieldForMode(drug, 'brand'))
       if (candidate && candidate[0] === lower[0]) {
         const d = editDistance(lower, candidate)
-        if (d <= allowed) best = d
+        if (d <= allowed) { best = d; matchedOwnName = true }
       }
     }
-    if (best !== null) scored.push({ drug, d: best })
+    if (best !== null) scored.push({ drug, d: best, matchedOwnName })
   }
 
   scored.sort((a, b) => {
+    if (a.matchedOwnName !== b.matchedOwnName) return a.matchedOwnName ? -1 : 1
     if (a.d !== b.d) return a.d - b.d
     return drugFieldForMode(a.drug, mode).localeCompare(drugFieldForMode(b.drug, mode))
   })
