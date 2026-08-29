@@ -166,6 +166,7 @@
  */
 
 import Fuse from 'fuse.js'
+import { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 
 // ─── Shared text normalization (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1/§5, Phase 1) ──
 // One shared helper so every drug-search comparison treats punctuation/spacing
@@ -449,6 +450,69 @@ export function extractStrengthFromQuery(query) {
     .trim()
 
   return { value, unit: unit.toLowerCase(), remainingText }
+}
+
+// ─── Query facet extraction — form (DRUG_SEARCH_REFINEMENT_PLAN.md §4.5,
+// Phase 3, step 3c) ─────────────────────────────────────────────────────────
+// Not wired into search yet (that's step 3d) — this is the standalone piece
+// that recognizes a form word inside a typed query, e.g. "panadol tablet" is
+// really the name "panadol" plus the form "tablet", not one phrase.
+//
+// Per the plan's decision (§5): reuses FORM_OPTIONS from DrugFilterPanel.jsx
+// as-is — no new word list. The words this recognizes are the real raw
+// `matches` values already used to drive the Form filter chips (e.g.
+// "tablet", "syrup", "eye drops", "injection"), not abbreviations like "tab"
+// — so this only catches a query where the person typed (or nearly typed) a
+// real form word, not a short chip-label fragment.
+//
+// Flattened once at module load into a single word/phrase → option lookup
+// list, sorted longest-first. The longest-first order matters: several
+// options share overlapping words (e.g. "oil" alone under Topical, and "hair
+// oil" also under Topical; "solution" alone under Syrup/Susp., and
+// "inhalation solution" under Inhaled) — checking longer phrases first means
+// a query containing "hair oil" is recognized as that whole phrase rather
+// than incorrectly stopping at the shorter "oil" and leaving "hair" stranded
+// in the name text.
+const FORM_WORD_ENTRIES = FORM_OPTIONS
+  .filter(opt => opt.value !== 'all')
+  .flatMap(opt => opt.matches.map(word => ({ word, option: opt })))
+  .sort((a, b) => b.word.length - a.word.length)
+
+/**
+ * Pulls a known form word/phrase (e.g. "tablet", "eye drops", "injection")
+ * out of a typed drug search query, if one is there. Matches on a whole word
+ * or phrase only (not mid-word — "tablet" won't match inside "tabletop"),
+ * case-insensitively. Returns null when nothing form-shaped is found, so a
+ * plain name-only query is untouched.
+ *
+ * @param {string} query — the raw typed search text (not yet normalized)
+ * @returns {{ value: string, matches: string[], routes: string[]|undefined,
+ *   matchedText: string, remainingText: string }|null}
+ *   value/matches/routes are the matched FORM_OPTIONS chip's own fields —
+ *   `matches` is what step 3d will check the drug's stored form against,
+ *   `routes` (only present on the Inhaled chip today) is what it'll check
+ *   the drug's stored route against. matchedText is the literal word/phrase
+ *   found in the query. remainingText is the query with that word/phrase
+ *   removed and spacing cleaned up — the piece that still needs to be
+ *   matched against the drug name.
+ */
+export function extractFormFromQuery(query) {
+  const text = (query ?? '').trim()
+  if (text.length === 0) return null
+
+  for (const { word, option } of FORM_WORD_ENTRIES) {
+    const pattern = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    const match = text.match(pattern)
+    if (!match) continue
+
+    const remainingText = (text.slice(0, match.index) + text.slice(match.index + match[0].length))
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    return { value: option.value, matches: option.matches, routes: option.routes, matchedText: match[0], remainingText }
+  }
+
+  return null
 }
 
 function drugFieldForMode(drug, mode) {
