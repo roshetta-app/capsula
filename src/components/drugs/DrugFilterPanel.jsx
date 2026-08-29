@@ -65,6 +65,19 @@ import { useToast } from '../../context/ToastContext'
  * ToggleChip's was already fixed — weight is now constant, active state
  * reads through color/border/background only.
  *
+ * drugs-filter-panel-restyle (2026-08-29) — visual-density pass, no
+ * behavior change. Search Mode and Sort By's PillToggle now renders inline
+ * next to its section label (via FilterSection's new 'action' slot)
+ * instead of stacked full-width below it, and PillToggle itself shrinks to
+ * fit its content with a quiet track + solid dark active-pill look instead
+ * of stretching edge-to-edge with an accent-blue fill. "All Forms" moves
+ * the same way — out of its own full-width centered row above the grid,
+ * into the inline slot next to "Form / Route" — same ToggleChip, same tap
+ * behavior (exclusive reset, no checkbox), just repositioned and sized to
+ * its content (see ToggleChip's new 'fitContent' prop) instead of
+ * width:100%. The rest of the form chip grid is untouched — it already had
+ * no collapse/expand logic, so it stays exactly as it was, always visible.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -243,19 +256,26 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 
         {/* Search By — Brand/Generic, instant-switch, not gated by Apply. See
             file header note above for why this section is different from
-            every other one in this sheet. */}
+            every other one in this sheet.
+            drugs-filter-panel-restyle: PillToggle now passed as
+            FilterSection's inline 'action' instead of a full-width child
+            below the label — no children, so the section header row is
+            the whole section. */}
         {onModeChange && (
           <>
-            <FilterSection label="Search Mode">
-              <PillToggle
-                value={mode}
-                onChange={handleModeChange}
-                options={[
-                  { value: 'brand',   label: 'Brand' },
-                  { value: 'generic', label: 'Generic' },
-                ]}
-              />
-            </FilterSection>
+            <FilterSection
+              label="Search Mode"
+              action={
+                <PillToggle
+                  value={mode}
+                  onChange={handleModeChange}
+                  options={[
+                    { value: 'brand',   label: 'Brand' },
+                    { value: 'generic', label: 'Generic' },
+                  ]}
+                />
+              }
+            />
             <div style={{
               height: 1,
               backgroundColor: 'var(--color-border)',
@@ -275,35 +295,46 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             DrugContext (see drug-search-sort-cheapest note there) so it
             survives navigation the same way Search Mode and Form/Route
             already do, and stays applied if the query is cleared and
-            retyped later. */}
+            retyped later.
+            drugs-filter-panel-restyle: same inline-action treatment as
+            Search Mode above. */}
         {hasSearchResults && (
-          <FilterSection label="Sort By">
-            <PillToggle
-              value={sortMode}
-              onChange={onSortChange}
-              options={[
-                { value: 'relevance', label: 'Relevance' },
-                { value: 'cheapest',  label: 'Cheapest First' },
-              ]}
-            />
-          </FilterSection>
+          <FilterSection
+            label="Sort By"
+            action={
+              <PillToggle
+                value={sortMode}
+                onChange={onSortChange}
+                options={[
+                  { value: 'relevance', label: 'Relevance' },
+                  { value: 'cheapest',  label: 'Cheapest First' },
+                ]}
+              />
+            }
+          />
         )}
 
-        {/* Form / Route — instant-apply, see toggleForm above. 'All Forms'
-            gets its own full-width row (it's a single exclusive reset, not
-            a list item alongside the multi-select chips) with centered
-            text; the rest sit one-per-line below, matching the reference
-            layout the sheet was redesigned against. */}
-        <FilterSection label="Form / Route">
-          <div style={{ marginBottom: 'var(--space-2)' }}>
+        {/* Form / Route — instant-apply, see toggleForm above.
+            drugs-filter-panel-restyle: "All Forms" moved from its own
+            full-width centered row above the grid into FilterSection's
+            inline 'action' slot next to the "Form / Route" label — same
+            ToggleChip, same exclusive-reset tap behavior, no checkbox,
+            just sized to its content (fitContent) instead of width:100%.
+            The rest of the chips still sit in the grid below, unchanged —
+            there was never any collapse/expand behavior here, so nothing
+            about the grid itself changed. */}
+        <FilterSection
+          label="Form / Route"
+          action={
             <ToggleChip
               label="All Forms"
               active={filters.forms.includes('all')}
               onToggle={() => toggleForm('all')}
               showCheckbox={false}
-              centered
+              fitContent
             />
-          </div>
+          }
+        >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)' }}>
             {FORM_OPTIONS.filter(opt => opt.value !== 'all').map(opt => {
               const active = filters.forms.includes(opt.value)
@@ -333,25 +364,30 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function FilterSection({ label, children }) {
+// drugs-filter-panel-restyle — added the optional 'action' slot so a
+// control (PillToggle, or the "All Forms" ToggleChip) can render inline to
+// the right of the section label instead of stacked full-width beneath it.
+// Header row's marginBottom only applies when there are children below it
+// (Form / Route's chip grid) — sections with no children (Search Mode,
+// Sort By) don't need the extra gap since the header row is the whole
+// section.
+function FilterSection({ label, action, children }) {
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
       <div style={{
-        fontSize: 16, fontWeight: 700,
-        color: 'var(--color-text-primary)',
-        marginBottom: 'var(--space-2)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
+        marginBottom: children ? 'var(--space-2)' : 0,
       }}>
-        {label}
+        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+          {label}
+        </div>
+        {action}
       </div>
       {children}
     </div>
   )
 }
 
-// Segmented Brand/Generic control. Moved here from DrugsScreen.jsx
-// (2026-07-19) — same markup/logic as the old inline toggle, just full-width
-// to match this sheet's other rows instead of a compact pill-sized control.
-//
 // drug-filter-instant-apply — fontWeight used to jump 400 -> 600 on active,
 // which visibly resized the pill since bold text is wider (same bug already
 // fixed on ToggleChip below). Weight is now constant; active/inactive reads
@@ -362,6 +398,14 @@ function FilterSection({ label, children }) {
 // drive the Sort By toggle (Relevance/Cheapest First), since both are
 // "pick exactly one of two" controls that should look identical rather
 // than duplicating this styling in a second component.
+//
+// drugs-filter-panel-restyle — restyled from a full-width (flex:1 per
+// option) accent-blue bordered/filled track to a compact, fit-content
+// "nested pill" look: a quiet var(--color-border) track holding a solid
+// var(--color-text-primary) capsule around whichever option is active,
+// inactive option reading as plain muted text with no border. This is what
+// lets it sit inline next to a section label instead of needing its own
+// full-width row.
 function PillToggle({ value, onChange, options }) {
   // Tracks which of the two buttons (if any) is currently pressed, since
   // both share this one component instance — same onPointer* + scale
@@ -369,38 +413,43 @@ function PillToggle({ value, onChange, options }) {
   const [pressedValue, setPressedValue] = useState(null)
   return (
     <div style={{
-      display: 'flex',
+      display: 'inline-flex',
+      backgroundColor: 'var(--color-border)',
       borderRadius: 'var(--radius-full)',
-      border: '1.5px solid var(--color-accent)',
-      overflow: 'hidden',
+      padding: 2,
+      gap: 2,
     }}>
-      {options.map(opt => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(opt.value)}
-          onPointerDown={() => setPressedValue(opt.value)}
-          onPointerUp={() => setPressedValue(null)}
-          onPointerLeave={() => setPressedValue(null)}
-          onPointerCancel={() => setPressedValue(null)}
-          style={{
-            flex: 1,
-            padding: '8px 14px',
-            fontSize: 13, fontWeight: 500,
-            cursor: 'pointer',
-            border: 'none',
-            backgroundColor: value === opt.value ? 'var(--color-accent)' : 'transparent',
-            color: value === opt.value ? '#fff' : 'var(--color-accent)',
-            fontFamily: 'var(--font-body)',
-            transform: pressedValue === opt.value ? 'scale(0.96)' : 'scale(1)',
-            transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
-            WebkitTapHighlightColor: 'transparent',
-            outline: 'none',
-          }}
-        >
-          {opt.label}
-        </button>
-      ))}
+      {options.map(opt => {
+        const active = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onChange(opt.value)}
+            onPointerDown={() => setPressedValue(opt.value)}
+            onPointerUp={() => setPressedValue(null)}
+            onPointerLeave={() => setPressedValue(null)}
+            onPointerCancel={() => setPressedValue(null)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 'var(--radius-full)',
+              fontSize: 13, fontWeight: 500,
+              cursor: 'pointer',
+              border: 'none',
+              whiteSpace: 'nowrap',
+              backgroundColor: active ? 'var(--color-text-primary)' : 'transparent',
+              color: active ? 'var(--color-surface)' : 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              transform: pressedValue === opt.value ? 'scale(0.96)' : 'scale(1)',
+              transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+              WebkitTapHighlightColor: 'transparent',
+              outline: 'none',
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
     </div>
   )
 }
@@ -451,7 +500,13 @@ function ClearAllButton({ onClick, disabled }) {
 // be active at once) rather than looking like a single-choice segmented
 // toggle. Checked state (filled box + checkmark) mirrors the chip's own
 // active state exactly, no separate logic.
-function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = false }) {
+//
+// drugs-filter-panel-restyle — replaced the 'centered' prop (only ever
+// used by the old full-width "All Forms" row, which no longer exists)
+// with 'fitContent': shrinks the chip to its content width instead of
+// width:100%, for use inline next to a FilterSection label rather than as
+// a block-level row or grid cell.
+function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -461,8 +516,8 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, centered = f
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: centered ? 'center' : 'flex-start', gap: 8,
-        width: '100%', minWidth: 0, boxSizing: 'border-box',
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8,
+        width: fitContent ? 'auto' : '100%', minWidth: 0, boxSizing: 'border-box',
         padding: '8px 14px',
         borderRadius: 'var(--radius-full)',
         fontSize: 13, fontWeight: 500,
