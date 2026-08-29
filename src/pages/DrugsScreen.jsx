@@ -130,7 +130,7 @@
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -1388,7 +1388,13 @@ function DidYouMeanState({ query, suggestions, onSelect }) {
 function TooShortState() {
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ fontSize: 15, color: 'var(--color-text-secondary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <Search size={28} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        Keep typing
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
         Type at least 2 characters to search
       </div>
     </div>
