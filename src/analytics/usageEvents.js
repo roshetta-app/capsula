@@ -45,8 +45,11 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
  * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'} eventType
  * @param {string|null} entityId   — UUID of the entity, or null for search events
  * @param {string|null} entityName — Name snapshot at time of event
+ * @param {'brand'|'generic'|null} [mode] — Brand/Generic mode, for drug-search
+ *   related events only (added Drug Search Refinement Phase 4, §4.6/§4.7).
+ *   Omit or pass null for event types with no mode concept.
  */
-export async function logUsageEvent(eventType, entityId = null, entityName = null) {
+export async function logUsageEvent(eventType, entityId = null, entityName = null, mode = null) {
   const { error } = await supabase.from('usage_events').insert({
     event_type:  eventType,
     entity_id:   entityId,
@@ -55,8 +58,9 @@ export async function logUsageEvent(eventType, entityId = null, entityName = nul
     user_id:     getCurrentUserId(),
     platform:    getPlatform(),
     session_id:  getSessionId(),
+    mode,
   })
   if (error) {
-    console.error('[Analytics] logUsageEvent failed:', error.message, error.details, error.hint, { eventType, entityId, entityName })
+    console.error('[Analytics] logUsageEvent failed:', error.message, error.details, error.hint, { eventType, entityId, entityName, mode })
   }
 }

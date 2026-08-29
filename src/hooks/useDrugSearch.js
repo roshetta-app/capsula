@@ -70,6 +70,14 @@
  *     Generic are different fields, so a miss in one says nothing about
  *     the other) — see searchGaps.js and DRUG_SEARCH_REFINEMENT_PLAN.md §5.
  *
+ * Drug Search Refinement Phase 4, step 4c (2026-08-29): near-miss logging
+ * wired up at the same point "Did you mean" is computed — when the search
+ * comes back empty but a suggestion exists, that's logged as
+ * `drug_search_near_miss` (mode-tagged, per-session deduped) instead of
+ * being silently indistinguishable from a real gap. `usage_events` needed
+ * its own `mode` column for this, same correction as `search_gaps` in 4b
+ * — see plan doc §5 CORRECTED notes.
+ *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
@@ -109,10 +117,12 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const drugsByIdRef       = useRef(null)
 
   // Per-session dedup (F10 Batch A / D30, D31) — see header comment.
-  // loggedGapTermsRef keys are "mode:normalizedTerm" (§4.6/§4.7) so the
-  // same term in a different mode isn't treated as already-logged.
-  const loggedSearchTermsRef = useRef(new Set())
-  const loggedGapTermsRef    = useRef(new Set())
+  // loggedGapTermsRef / loggedNearMissTermsRef keys are "mode:normalizedTerm"
+  // (§4.6/§4.7) so the same term in a different mode isn't treated as
+  // already-logged.
+  const loggedSearchTermsRef   = useRef(new Set())
+  const loggedGapTermsRef      = useRef(new Set())
+  const loggedNearMissTermsRef = useRef(new Set())
 
   useEffect(() => {
     brandIndexRef.current      = buildDrugBrandIndex(drugs)
@@ -172,14 +182,28 @@ export function useDrugSearch(drugs, mode = 'brand') {
       logUsageEvent('drug_search', null, normalized)
     }
 
+    const normalizedForGap = normalizeSearchText(trimmed)
+
+    // Near-miss (§4.6/§4.7, Phase 4 step 4c): the search itself found
+    // nothing, but "Did you mean" DID have a guess to offer. Not a content
+    // gap — logged separately as tuning input for §4.8's later "Did you
+    // mean" refinement, so it never pollutes the real-gap count below.
+    if (
+      suggestionValue &&
+      normalizedForGap.length >= 2 &&
+      !loggedNearMissTermsRef.current.has(`${currentMode}:${normalizedForGap}`)
+    ) {
+      loggedNearMissTermsRef.current.add(`${currentMode}:${normalizedForGap}`)
+      logUsageEvent('drug_search_near_miss', null, normalizedForGap, currentMode)
+    }
+
     // Real content gap (§4.6/§4.7): the search itself found nothing AND
     // "Did you mean" also had nothing to offer — the genuine "we don't
-    // have this" signal, as opposed to a near-miss (Phase 4 step 4c) or a
+    // have this" signal, as opposed to a near-miss (above) or a
     // filter-masked result (Phase 5). Logged at 2+ chars (matching the
     // shared threshold above, replacing the old stale 4+ gate), using the
     // §4.1-normalized term, deduped per mode+term per session so a Brand
     // miss and a Generic miss on the same word are tracked separately.
-    const normalizedForGap = normalizeSearchText(trimmed)
     const gapDedupKey = `${currentMode}:${normalizedForGap}`
     if (
       normalizedForGap.length >= 2 &&
