@@ -430,10 +430,18 @@ export default function DrugsScreen() {
             <TooShortState />
           ) : (
             <>
-              {/* Only category-scoped searches get this — a true match
-                  inside the category can still be hiding the drug they
-                  actually want under a different one (see file header). */}
-              {hasQuery && activeCategory && activeCategory !== '__all' && (
+              {/* search-all-drugs-placement (refined): a category-scoped
+                  search that already found something shouldn't have a
+                  loud full-width CTA sitting above the very result the
+                  person was looking for — every other hint on this screen
+                  (FilterMaskedState, EmptyState, CrossModeHintState,
+                  DidYouMeanState) only takes the full-width treatment when
+                  the list is genuinely empty, and this one now matches
+                  that. When displayed.length > 0 the same FilledHintButton
+                  moves inline next to the results count instead (below);
+                  this block is only the empty-list case, right above
+                  where EmptyState/etc. would otherwise render alone. */}
+              {hasQuery && activeCategory && activeCategory !== '__all' && displayed.length === 0 && (
                 <FilledHintButton
                   onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
                   style={{ display: 'block', marginBottom: 'var(--space-2)' }}
@@ -462,7 +470,21 @@ export default function DrugsScreen() {
                       unscoped state (categoryLabel would just say "All Drugs"). */}
                   {activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
                 </div>
-                {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
+                {/* search-all-drugs-placement (refined) — the button lives
+                    here, same row as the count, only once a match already
+                    exists in-category (the empty case has its own
+                    full-width block above instead). Grouped with
+                    ClearFiltersButton in one flex container so the two
+                    can sit side by side without fighting the row's
+                    space-between when both are present. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {hasQuery && activeCategory && activeCategory !== '__all' && displayed.length > 0 && (
+                    <FilledHintButton onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}>
+                      Search all drugs instead
+                    </FilledHintButton>
+                  )}
+                  {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
+                </div>
               </div>
 
               {displayed.length === 0 ? (
