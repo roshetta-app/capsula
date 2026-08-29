@@ -10,6 +10,12 @@
  * Built entirely from the 90-day usage_events pull already added in step
  * 8a (`usageDetailRes` in AnalyticsDashboard.jsx) — no new query needed.
  *
+ * F10 Batch D (D38), item 9 — session-linking tracking (device_id/
+ * session_id) only started 2026-08-27, so anything before that date can't
+ * be attributed to a session. This tab will look sparse for a while, not
+ * because usage is low. Plain note added below rather than reconstructing
+ * old sessions from data that doesn't have the signal to support it.
+ *
  * Self-contained by convention (same as every other tab in this folder —
  * no components shared across tabs), so StatCard/RankedList are
  * duplicated here rather than imported from IdentitySegmentTab.jsx.
@@ -255,6 +261,12 @@ export default function EngagementTab({ data }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+
+      {/* F10 Batch D (D38), item 9 — explains why this tab looks sparse
+          rather than letting it read as "nobody uses the app" */}
+      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+        Tracking that links activity to a session started August 27, 2026 — activity from before that date isn't included here.
+      </div>
 
       {/* Stat card */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>

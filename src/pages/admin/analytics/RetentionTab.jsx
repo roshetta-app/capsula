@@ -12,6 +12,12 @@
  * Built from the same 90-day usageDetailRes pulled in step 8a, joined
  * against profiles.id (added in step 8e) and profiles.created_at.
  *
+ * F10 Batch D (D38), item 9 — session-linking tracking only started
+ * 2026-08-27, and every signup on record predates that, so "did they come
+ * back?" has almost nothing recent to compare against yet. Plain note
+ * added below rather than reconstructing old cohorts from data that
+ * doesn't have the signal to support it.
+ *
  * Self-contained by convention (same as every other tab in this folder —
  * no components shared across tabs), so StatCard is duplicated here
  * rather than imported from another tab.
@@ -155,6 +161,12 @@ export default function RetentionTab({ data }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+
+      {/* F10 Batch D (D38), item 9 — explains why cohorts/return rates
+          look sparse rather than letting it read as "nobody comes back" */}
+      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+        Tracking that links activity to a session started August 27, 2026 — activity from before that date isn't included here.
+      </div>
 
       {/* Stat cards */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3)' }}>

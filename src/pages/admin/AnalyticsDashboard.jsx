@@ -2,19 +2,35 @@
  * src/pages/admin/AnalyticsDashboard.jsx
  * Phase 3J — Analytics Dashboard
  *
- * 5 tabs: Content Health | Search Gaps | Coverage | Usage | Messages
+ * F10 Batch D (D38), step 8h+ — tab consolidation: 9 tabs collapsed to 6.
+ *   - 'quality' replaces 'health' + 'gaps' + 'coverage' (all three were
+ *     different views of the same content library — rendered via
+ *     ContentQualityTab.jsx, three stacked sections, no computation changed)
+ *   - 'promos' replaces 'messages' + 'monetization' (both were stat-card-
+ *     plus-chart views of banner/prompt interaction — rendered via
+ *     PromptsUpgradesTab.jsx, two stacked sections, no computation changed)
+ * Final six: Identity & Segment | Engagement | Retention | Usage |
+ * Content Quality | Prompts & Upgrades.
+ *
+ * Same pass also fixes the tab bar showing an unwanted vertical scrollbar:
+ * the bar only sets overflowX, and per the CSS spec, when one overflow axis
+ * is 'auto' and the other is left as the default 'visible', the browser
+ * force-computes the visible one to 'auto' too — so overflowY was silently
+ * becoming scrollable. Explicit overflowY: 'hidden' below fixes it.
+ *
  * Refresh button (re-fetches all data)
  * CSV export button (exports current tab data)
  *
  * Route: /admin/analytics  (added to router.jsx)
  * Entry: AdminDashboard nav card (added to AdminDashboard.jsx)
  *
- * Messages tab (Phase 2, App Gate System plan §10.5, this session) —
- * extends this existing usage_events pattern rather than a parallel
- * tracking system, per the plan's confirmed decision. Reads the four
- * gate_* event types logged by useAppGate.js / AppGate.jsx (impression,
- * dismiss, maybe_later, cta_click) and aggregates per gate by
- * entity_name, same convention every other event type here already uses.
+ * Messages analytics (Phase 2, App Gate System plan §10.5) — extends the
+ * existing usage_events pattern rather than a parallel tracking system,
+ * per the plan's confirmed decision. Reads the four gate_* event types
+ * logged by useAppGate.js / AppGate.jsx (impression, dismiss, maybe_later,
+ * cta_click) and aggregates per gate by entity_name, same convention every
+ * other event type here already uses. Now rendered inside
+ * PromptsUpgradesTab.jsx rather than its own tab.
  *
  * F10 Batch B — Analytics Revamp (D30/D32): the `prescriptions` fetch is
  * removed entirely — that table doesn't exist in the schema, a retired
@@ -24,14 +40,14 @@
  * `needs_review`-aware completeness check (published AND NOT flagged for
  * review) — see the fetch query and computation below.
  *
- * F10 Batch D (D38), steps 8a/8b — two new queries added below
- * (`usageDetailRes`, `profilesRes`) to power the Engagement, Retention,
- * and Identity/Segment tabs. `profilesRes` powers Identity/Segment (8c)
- * and Retention (8e, via the `id` column added in that step).
- * `usageDetailRes` powers Engagement (8d), Retention (8e), and now
- * Monetization (8f, via the `pro_feature_click` event already present in
- * that same 90-day pull) — none of the existing 6 queries or tabs change
- * here.
+ * F10 Batch D (D38), steps 8a/8b — two queries (`usageDetailRes`,
+ * `profilesRes`) power the Engagement, Retention, and Identity/Segment
+ * tabs. `profilesRes` powers Identity/Segment (8c) and Retention (8e, via
+ * the `id` column added in that step). `usageDetailRes` powers Engagement
+ * (8d), Retention (8e), and Monetization (8f, via the `pro_feature_click`
+ * event already present in that same 90-day pull) — now folded into
+ * `promos.monetization` below. None of the queries or computations below
+ * changed in this pass, only how the results are packaged and rendered.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -39,42 +55,28 @@ import { RefreshCw, Download } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
 
-import ContentHealthTab   from './analytics/ContentHealthTab'
-import SearchGapsTab      from './analytics/SearchGapsTab'
-import CoverageTab        from './analytics/CoverageTab'
-import UsageTab           from './analytics/UsageTab'
-import MessagesTab        from './analytics/MessagesTab'
-import IdentitySegmentTab from './analytics/IdentitySegmentTab'
-import EngagementTab      from './analytics/EngagementTab'
-import RetentionTab       from './analytics/RetentionTab'
-import MonetizationTab    from './analytics/MonetizationTab'
+import IdentitySegmentTab  from './analytics/IdentitySegmentTab'
+import EngagementTab       from './analytics/EngagementTab'
+import RetentionTab        from './analytics/RetentionTab'
+import UsageTab            from './analytics/UsageTab'
+import ContentQualityTab   from './analytics/ContentQualityTab'
+import PromptsUpgradesTab  from './analytics/PromptsUpgradesTab'
 
 // ─── Tab config ───────────────────────────────────────────────────────────────
-// F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
-// 'engagement', step 8e adds 'retention' — both matching D15's five-layer
-// order (identity, engagement, retention, quality, monetization).
-// Monetization lands in a later step — 'health' stays as-is until step
-// 8h relabels it.
-
-// F10 Batch D (D38), step 8c: 'identity' added at the front. Step 8d adds
-// 'engagement', step 8e adds 'retention', step 8f adds 'monetization' —
-// all four match D15's five-layer order (identity, engagement, retention,
-// quality, monetization). 'monetization' sits right after 'retention'
-// rather than after 'health' so the five-layer order stays intact even
-// though step 8h (relabeling 'health' to the fifth layer, "quality") is
-// still pending — health/gaps/coverage/usage/messages stay as-is until
-// then.
+// F10 Batch D (D38), step 8h+: 'health' + 'gaps' + 'coverage' merged into
+// 'quality'; 'messages' + 'monetization' merged into 'promos'. 'usage'
+// stays separate from 'engagement' — Usage is unbounded, event-count based;
+// Engagement is 90-day, session-based, and depends on the session-linking
+// tracking that only started 2026-08-27, so combining them would put solid
+// long-run numbers next to a still-mostly-empty section in the same tab.
 
 const TABS = [
-  { id: 'identity',     label: 'Identity & Segment' },
-  { id: 'engagement',   label: 'Engagement'          },
-  { id: 'retention',    label: 'Retention'           },
-  { id: 'monetization', label: 'Monetization'        },
-  { id: 'health',       label: 'Content Health'      },
-  { id: 'gaps',         label: 'Search Gaps'         },
-  { id: 'coverage',     label: 'Coverage'            },
-  { id: 'usage',        label: 'Usage'               },
-  { id: 'messages',     label: 'Messages'            },
+  { id: 'identity',   label: 'Identity & Segment' },
+  { id: 'engagement', label: 'Engagement'          },
+  { id: 'retention',  label: 'Retention'           },
+  { id: 'usage',      label: 'Usage'               },
+  { id: 'quality',    label: 'Content Quality'     },
+  { id: 'promos',     label: 'Prompts & Upgrades'  },
 ]
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
@@ -168,8 +170,8 @@ async function fetchAllAnalytics() {
 
     // F10 Batch D (D38), step 8a — full usage_events rows with device/
     // session/user context, bounded to the last 90 days. Powers the
-    // Engagement tab (8d) and the upcoming Retention tab (8e). Not
-    // consumed by any other tab; the 6 queries above are untouched.
+    // Engagement tab (8d) and Retention tab (8e). Not consumed by any
+    // other tab; the 6 queries above are untouched.
     supabase
       .from('usage_events')
       .select('event_type, entity_name, device_id, user_id, session_id, created_at')
@@ -461,31 +463,6 @@ async function fetchAllAnalytics() {
       overallD30: cohortRate(usersWithIdAndSignup, 30),
       retentionByWeek,
     },
-    monetization: {
-      totalProClicks,
-      clicksPerWeek,
-    },
-    health: {
-      totalConditions,
-      publishedConditions,
-      conditionsMissingDefinition: condsMissingDef,
-      totalGenerics,
-      genericsWithBrands,
-      genericsWithDoses,
-      formulationsWithNoDose,
-    },
-    gaps: {
-      drugGaps,
-      conditionGaps,
-    },
-    coverage: {
-      totalSpecialties,
-      totalConditions,
-      totalGenerics,
-      totalBrands,
-      specialtyCoverage,
-      drugGroups,
-    },
     usage: {
       totalConditionViews:    countByType('condition_view'),
       totalConditionSearches: countByType('condition_search'),
@@ -495,12 +472,46 @@ async function fetchAllAnalytics() {
       topSearchedConditions:  topNames(topSearchCondRes.data),
       topViewedDrugs:         topNames(topViewDrugRes.data),
     },
-    messages: {
-      totalImpressions: countGateType('gate_impression'),
-      totalDismisses:   countGateType('gate_dismiss'),
-      totalMaybeLater:  countGateType('gate_maybe_later'),
-      totalCtaClicks:   countGateType('gate_cta_click'),
-      topGates:         topGates(gateEvents),
+    // F10 Batch D (D38), step 8h+: former top-level 'health' + 'gaps' +
+    // 'coverage' now nested here, rendered together by ContentQualityTab.
+    quality: {
+      health: {
+        totalConditions,
+        publishedConditions,
+        conditionsMissingDefinition: condsMissingDef,
+        totalGenerics,
+        genericsWithBrands,
+        genericsWithDoses,
+        formulationsWithNoDose,
+      },
+      coverage: {
+        totalSpecialties,
+        totalConditions,
+        totalGenerics,
+        totalBrands,
+        specialtyCoverage,
+        drugGroups,
+      },
+      gaps: {
+        drugGaps,
+        conditionGaps,
+      },
+    },
+    // F10 Batch D (D38), step 8h+: former top-level 'messages' +
+    // 'monetization' now nested here, rendered together by
+    // PromptsUpgradesTab.
+    promos: {
+      messages: {
+        totalImpressions: countGateType('gate_impression'),
+        totalDismisses:   countGateType('gate_dismiss'),
+        totalMaybeLater:  countGateType('gate_maybe_later'),
+        totalCtaClicks:   countGateType('gate_cta_click'),
+        topGates:         topGates(gateEvents),
+      },
+      monetization: {
+        totalProClicks,
+        clicksPerWeek,
+      },
     },
   }
 }
@@ -553,44 +564,6 @@ function exportCSV(activeTab, data) {
     ]))
     filename = 'capsula-retention.csv'
 
-  } else if (activeTab === 'monetization') {
-    const d = data.monetization
-    rows = [
-      ['Total "Upgrade to PRO" Taps (last 90 days)', d.totalProClicks],
-      ['', ''],
-      ['Week', 'Taps'],
-    ]
-    d.clicksPerWeek.forEach(r => rows.push([r.week, r.count]))
-    filename = 'capsula-monetization.csv'
-
-  } else if (activeTab === 'health') {
-    const d = data.health
-    rows = [
-      ['Metric', 'Value'],
-      ['Total Conditions',          d.totalConditions],
-      ['Published Conditions',      d.publishedConditions],
-      ['Conditions Missing Def',    d.conditionsMissingDefinition],
-      ['Total Generics',            d.totalGenerics],
-      ['Generics With Brands',      d.genericsWithBrands],
-      ['Generics With Doses',       d.genericsWithDoses],
-      ['Formulations With No Dose', d.formulationsWithNoDose],
-    ]
-    filename = 'capsula-content-health.csv'
-
-  } else if (activeTab === 'gaps') {
-    rows = [['Term', 'Context', 'Count']]
-    data.gaps.conditionGaps.forEach(r => rows.push([r.term, 'conditions', r.count]))
-    data.gaps.drugGaps.forEach(r => rows.push([r.term, 'drugs', r.count]))
-    filename = 'capsula-search-gaps.csv'
-
-  } else if (activeTab === 'coverage') {
-    rows = [['Specialty', 'Total Conditions', 'Published', 'Publish Rate %']]
-    data.coverage.specialtyCoverage.forEach(r => {
-      const rate = r.total > 0 ? Math.round((r.published / r.total) * 100) : 0
-      rows.push([r.specialty, r.total, r.published, rate])
-    })
-    filename = 'capsula-coverage.csv'
-
   } else if (activeTab === 'usage') {
     const d = data.usage
     rows = [
@@ -608,19 +581,51 @@ function exportCSV(activeTab, data) {
     ]
     filename = 'capsula-usage.csv'
 
-  } else if (activeTab === 'messages') {
-    const d = data.messages
+  } else if (activeTab === 'quality') {
+    const { health, coverage, gaps } = data.quality
     rows = [
-      ['Metric', 'Value'],
-      ['Total Impressions', d.totalImpressions],
-      ['Total Dismisses',   d.totalDismisses],
-      ['Total Maybe Later', d.totalMaybeLater],
-      ['Total CTA Clicks',  d.totalCtaClicks],
+      ['Content Health', ''],
+      ['Total Conditions',          health.totalConditions],
+      ['Published Conditions',      health.publishedConditions],
+      ['Conditions Missing Def',    health.conditionsMissingDefinition],
+      ['Total Generics',            health.totalGenerics],
+      ['Generics With Brands',      health.genericsWithBrands],
+      ['Generics With Doses',       health.genericsWithDoses],
+      ['Formulations With No Dose', health.formulationsWithNoDose],
+      ['', ''],
+      ['Coverage by Specialty', ''],
+      ['Specialty', 'Total Conditions', 'Published', 'Publish Rate %'],
+      ...coverage.specialtyCoverage.map(r => [
+        r.specialty, r.total, r.published,
+        r.total > 0 ? Math.round((r.published / r.total) * 100) : 0,
+      ]),
+      ['', ''],
+      ['Search Gaps', ''],
+      ['Term', 'Context', 'Count'],
+      ...gaps.conditionGaps.map(r => [r.term, 'conditions', r.count]),
+      ...gaps.drugGaps.map(r => [r.term, 'drugs', r.count]),
+    ]
+    filename = 'capsula-content-quality.csv'
+
+  } else if (activeTab === 'promos') {
+    const { messages, monetization } = data.promos
+    rows = [
+      ['In-App Messages', ''],
+      ['Total Impressions', messages.totalImpressions],
+      ['Total Dismisses',   messages.totalDismisses],
+      ['Total Maybe Later', messages.totalMaybeLater],
+      ['Total CTA Clicks',  messages.totalCtaClicks],
       ['', ''],
       ['Message', 'Impressions', 'Dismisses', 'Maybe Later', 'CTA Clicks'],
-      ...d.topGates.map(g => [g.name, g.impressions, g.dismisses, g.maybeLater, g.ctaClicks]),
+      ...messages.topGates.map(g => [g.name, g.impressions, g.dismisses, g.maybeLater, g.ctaClicks]),
+      ['', ''],
+      ['Upgrade to PRO', ''],
+      ['Total "Upgrade to PRO" Taps (last 90 days)', monetization.totalProClicks],
+      ['', ''],
+      ['Week', 'Taps'],
+      ...monetization.clicksPerWeek.map(r => [r.week, r.count]),
     ]
-    filename = 'capsula-messages.csv'
+    filename = 'capsula-prompts-upgrades.csv'
   }
 
   const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -636,7 +641,7 @@ function exportCSV(activeTab, data) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function AnalyticsDashboard() {
-  const [activeTab, setActiveTab] = useState('health')
+  const [activeTab, setActiveTab] = useState('identity')
   const [data,      setData]      = useState(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState(null)
@@ -713,14 +718,17 @@ export default function AnalyticsDashboard() {
       }
     >
       {/* Tab bar — reference pattern for any screen needing a sub-row (per
-          plan §1); stays exactly as before, now sitting inside the content
-          area's width instead of stretching edge-to-edge under the old
-          sticky header */}
+          plan §1). overflowY is now set explicitly to 'hidden': leaving it
+          unset let the browser force-compute it to 'auto' (per spec,
+          pairing overflowX:'auto' with an unset/'visible' overflowY makes
+          the browser treat the unset axis as 'auto' too), which is what
+          was causing the stray vertical scrollbar on this strip. */}
       <div style={{
         display: 'flex', gap: 0,
         borderBottom: '1px solid var(--color-border)',
         marginBottom: 'var(--space-5)',
         overflowX: 'auto',
+        overflowY: 'hidden',
       }}>
         {TABS.map(tab => (
           <button
@@ -777,12 +785,9 @@ export default function AnalyticsDashboard() {
             {activeTab === 'identity'   && <IdentitySegmentTab data={activeData} />}
             {activeTab === 'engagement' && <EngagementTab      data={activeData} />}
             {activeTab === 'retention'  && <RetentionTab       data={activeData} />}
-            {activeTab === 'monetization' && <MonetizationTab  data={activeData} />}
-            {activeTab === 'health'     && <ContentHealthTab   data={activeData} />}
-            {activeTab === 'gaps'       && <SearchGapsTab      data={activeData} />}
-            {activeTab === 'coverage'   && <CoverageTab        data={activeData} />}
             {activeTab === 'usage'      && <UsageTab           data={activeData} />}
-            {activeTab === 'messages'   && <MessagesTab        data={activeData} />}
+            {activeTab === 'quality'    && <ContentQualityTab  data={activeData} />}
+            {activeTab === 'promos'     && <PromptsUpgradesTab data={activeData} />}
           </>
         )}
 
