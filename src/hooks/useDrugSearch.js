@@ -89,6 +89,15 @@
  * gap-logging checks below switch from truthy-string checks to
  * suggestionValue.length comparisons — same logic, array-shaped.
  *
+ * cross-mode-search-hint (2026-08-29): added 'crossModeMatch' (boolean) —
+ * true when the same-mode search found nothing but the same query matches
+ * something under the OTHER mode (e.g. typing a generic name while in
+ * Brand mode). Reuses searchDrugsTiered as-is with the opposite mode; no
+ * new matching logic needed since brand/generic data already lives on the
+ * same FlatDrug record. Also excluded from §4.6/§4.7's content-gap logging
+ * the same way a near-miss is — the content genuinely exists, just under
+ * the other mode, so it isn't a real "we don't have this" gap.
+ *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
@@ -98,6 +107,8 @@
  *   suggestions      — up to 3 "Did you mean" drug names, [] if none —
  *                      only ever populated when results is empty and
  *                      something close exists
+ *   crossModeMatch   — true when results is empty but the query matches
+ *                      something under the other mode (Brand/Generic)
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -117,6 +128,16 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
   const [suggestions,    setSuggestions]    = useState([])
+  // cross-mode-search-hint (2026-08-29): true when the strict tiered search
+  // found nothing in the current mode, but the SAME query matches something
+  // in the other mode (e.g. typing a generic name while in Brand mode).
+  // Reuses searchDrugsTiered as-is, just called with the opposite mode — no
+  // new matching logic needed, since brand/generic data already lives on
+  // the same FlatDrug record (see queries.js). DrugsScreen shows this as a
+  // "switch mode" hint, ranked above the same-mode "Did you mean" guess
+  // since an exact hit in the other mode is a more certain answer than a
+  // same-mode fuzzy typo guess.
+  const [crossModeMatch, setCrossModeMatch] = useState(false)
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -162,6 +183,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
       setQueryTooShort(true)
       setResults(drugs)
       setSuggestions([])
+      setCrossModeMatch(false)
       return
     }
     setQueryTooShort(false)
@@ -186,6 +208,16 @@ export function useDrugSearch(drugs, mode = 'brand') {
       ? getDrugSearchSuggestion(drugs, trimmed, currentMode)
       : []
     setSuggestions(suggestionValue)
+
+    // cross-mode-search-hint: only checked when the same-mode search came
+    // up empty — no point checking the other mode if the current one
+    // already found something. Reuses searchDrugsTiered, just flipping
+    // 'brand'/'generic'.
+    const otherMode = currentMode === 'brand' ? 'generic' : 'brand'
+    const crossModeMatchValue = trimmed.length >= 1 && matched.length === 0
+      ? (searchDrugsTiered(drugs, trimmed, otherMode) ?? []).length > 0
+      : false
+    setCrossModeMatch(crossModeMatchValue)
 
     const normalized = trimmed.toLowerCase()
 
@@ -218,11 +250,19 @@ export function useDrugSearch(drugs, mode = 'brand') {
     // shared threshold above, replacing the old stale 4+ gate), using the
     // §4.1-normalized term, deduped per mode+term per session so a Brand
     // miss and a Generic miss on the same word are tracked separately.
+    //
+    // cross-mode-search-hint: a cross-mode match is excluded here the same
+    // way a near-miss is — the content genuinely exists (just under the
+    // other mode), so counting it as "we don't have this" would misreport
+    // real catalog gaps as missing content. Not logged as its own event
+    // type, to stay minimally scoped and leave Phase 4's event schema as
+    // decided in the plan doc.
     const gapDedupKey = `${currentMode}:${normalizedForGap}`
     if (
       normalizedForGap.length >= 2 &&
       matched.length === 0 &&
       suggestionValue.length === 0 &&
+      !crossModeMatchValue &&
       !loggedGapTermsRef.current.has(gapDedupKey)
     ) {
       loggedGapTermsRef.current.add(gapDedupKey)
@@ -244,5 +284,6 @@ export function useDrugSearch(drugs, mode = 'brand') {
     results,
     queryTooShort,
     suggestions,
+    crossModeMatch,
   }
 }

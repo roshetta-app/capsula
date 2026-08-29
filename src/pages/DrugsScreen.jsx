@@ -130,7 +130,7 @@
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
-import { FilterX, SearchX, Lightbulb } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -204,6 +204,7 @@ export default function DrugsScreen() {
     results:         searchResults,
     queryTooShort,
     suggestions,
+    crossModeMatch,
   } = useDrugContext()
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
@@ -460,6 +461,15 @@ export default function DrugsScreen() {
               {displayed.length === 0 ? (
                 isFilterMasked ? (
                   <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
+                ) : crossModeMatch ? (
+                  // cross-mode-search-hint — ranked above DidYouMeanState: an
+                  // exact hit in the other mode is a more certain answer than
+                  // a same-mode fuzzy typo guess.
+                  <CrossModeHintState
+                    query={query}
+                    mode={mode}
+                    onSwitchMode={() => setMode(mode === 'brand' ? 'generic' : 'brand')}
+                  />
                 ) : suggestions.length > 0 ? (
                   <DidYouMeanState
                     query={query}
@@ -1215,6 +1225,40 @@ function EmptyState({ query, onClear }) {
   )
 }
 
+// ─── CrossModeHintState ─────────────────────────────────────────────────────
+// cross-mode-search-hint (2026-08-29): shown instead of DidYouMeanState/
+// EmptyState when the strict search finds nothing in the current mode, but
+// crossModeMatch (useDrugSearch.js) confirms the same query matches
+// something under the OTHER mode — e.g. typing a generic name while in
+// Brand mode. Ranked above DidYouMeanState (see the call site) since an
+// exact hit in the other mode is a more certain answer than a same-mode
+// fuzzy typo guess. Same icon → headline → supporting-line → button shape
+// as the other empty states on this screen, reusing FilledHintButton, so it
+// reads as a native member of this family rather than a bolted-on addition.
+// Copy differs only by current mode; onSwitchMode flips mode and the
+// existing query re-searches automatically (mode is already a dependency
+// of useDrugSearch's debounce effect).
+
+function CrossModeHintState({ query, mode, onSwitchMode }) {
+  const otherModeLabel = mode === 'brand' ? 'generic' : 'brand'
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <ArrowLeftRight size={28} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        No matches{query ? ` for "${query}"` : ''}
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        It's a {otherModeLabel} name
+      </div>
+      <FilledHintButton onClick={onSwitchMode}>
+        See {otherModeLabel} results
+      </FilledHintButton>
+    </div>
+  )
+}
+
 // ─── FilterMaskedState ──────────────────────────────────────────────────────
 // Phase 5 (§4.3, step 5b; copy/visuals CORRECTED 2026-08-29 after on-device
 // testing): shown instead of EmptyState/DidYouMeanState when the search
@@ -1349,3 +1393,4 @@ function NarrowResultsHint() {
     </div>
   )
 }
+

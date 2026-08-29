@@ -40,6 +40,11 @@ const DrugContext = createContext(null)
  * 'suggestion' (string|null) became 'suggestions' (string[]) — this file
  * needed no code change since searchValue is spread through as-is; only
  * this doc comment and useDrugContext's below were updated to match.
+ *
+ * cross-mode-search-hint (2026-08-29): useDrugSearch now also returns
+ * 'crossModeMatch' (boolean) — again no code change needed here, since
+ * searchValue is spread through as-is; only this doc comment and
+ * useDrugContext's below were updated to match.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -55,7 +60,7 @@ export function DrugProvider({ children }) {
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
  * setActiveFilters, sortMode, setSortMode, query, setQuery, results,
- * queryTooShort, suggestions }
+ * queryTooShort, suggestions, crossModeMatch }
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)
