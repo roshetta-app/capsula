@@ -63,7 +63,15 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
   const [activeSpecialty, setActiveSpecialty] = useState(() => readStoredSpecialty(storageKey))
   const [results,         setResults]         = useState(conditions)
 
-  const fuseRef = useRef(null)
+  // Holds the pool (specialty-filtered condition list) and its matching
+  // search index. Rebuilt only when the actual pool changes (below) —
+  // not on every keystroke, which is what happened before
+  // (conditions-search-audit #4: runSearch used to rebuild a fresh index
+  // from scratch on every debounced call, even though nothing about the
+  // pool had changed since the previous one; the old fuseRef built once
+  // here was never actually read).
+  const poolRef  = useRef(conditions)
+  const indexRef = useRef(null)
 
   // Per-session dedup (F10 Batch A / D30, D31): one log per normalized term
   // per event type, for as long as this hook instance lives. Two separate
@@ -73,23 +81,22 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
   const loggedGapTermsRef    = useRef(new Set())
 
   useEffect(() => {
-    fuseRef.current = buildConditionIndex(conditions)
+    const pool = activeSpecialty === 'all'
+      ? conditions
+      : conditions.filter(c => c.specialtyId === activeSpecialty)
+    poolRef.current  = pool
+    indexRef.current = buildConditionIndex(pool)
     runSearch(query, activeSpecialty)
-  }, [conditions]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [conditions, activeSpecialty]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = useCallback((q, specialty) => {
-    if (!fuseRef.current) return
+    if (!indexRef.current) return
 
-    // Step 1: specialty filter
-    let pool = conditions
-    if (specialty !== 'all') {
-      pool = conditions.filter(c => c.specialtyId === specialty)
-    }
-
-    // Step 2: tiered search
-    // Build a sub-index from the pool for fuzzy tier (3+ chars)
-    const subIndex = buildConditionIndex(pool)
-    const matched  = searchConditions(subIndex, pool, q) ?? pool
+    // Step 1 + 2: use the pool/index already built for the current
+    // specialty filter (kept current by the effect above) instead of
+    // re-filtering conditions and rebuilding the index on every call.
+    const pool    = poolRef.current
+    const matched = searchConditions(indexRef.current, pool, q) ?? pool
 
     // Step 3: sort — only for the plain browse view (no typed query).
     // sortMode ('az' | 'recent') is a browse-list ordering choice; applying
@@ -147,3 +154,5 @@ export function useConditionSearch(conditions, sortMode = 'az', recentlyViewedId
     resultCount: results.length,
   }
 }
+
+

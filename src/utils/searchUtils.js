@@ -208,7 +208,13 @@ const CONDITION_FUSE_OPTIONS = {
     { name: 'tags',         weight: 0.15 },
   ],
   threshold:          0.25,
-  minMatchCharLength: 3,
+  // 2 (was 3), conditions-search-audit #3: this index is now also used as
+  // a fallback for 2-letter searches (searchConditions tier 2), and a
+  // minimum matched span of 3 characters would never be satisfiable by a
+  // 2-character query — the fallback would silently return nothing every
+  // time. Tier 3 (3+ char queries) is unaffected, since it never sends a
+  // query shorter than 3 characters in the first place.
+  minMatchCharLength: 2,
   includeScore:       true,
   ignoreLocation:     true,
 }
@@ -231,18 +237,31 @@ export function searchConditions(fuseIndex, pool, query) {
   if (q.length === 0) return null
 
   if (q.length === 1) {
-    // Tier 1: name must START with the letter — fast, zero noise
-    const lower = q.toLowerCase()
-    return pool.filter(c => c.name?.toLowerCase().startsWith(lower))
+    // Tier 1: name must START with the letter — fast, zero noise.
+    // Normalized (not just lowercased, conditions-search-audit #2) — strips
+    // hyphens/extra spacing on both sides so punctuation differences (e.g.
+    // a condition name with a hyphen) don't hide a real match, same fix
+    // already applied to Drugs search (normalizeSearchText, above).
+    const lower = normalizeSearchText(q)
+    return pool.filter(c => normalizeSearchText(c.name).startsWith(lower))
   }
 
   if (q.length === 2) {
-    // Tier 2: name starts with query OR any word in name starts with query
-    const lower = q.toLowerCase()
-    return pool.filter(c => {
-      const name = c.name?.toLowerCase() ?? ''
+    // Tier 2: name starts with query OR any word in name starts with query.
+    // Same normalization as Tier 1.
+    const lower = normalizeSearchText(q)
+    const strict = pool.filter(c => {
+      const name = normalizeSearchText(c.name)
       return name.startsWith(lower) || name.split(/\s+/).some(word => word.startsWith(lower))
     })
+    if (strict.length > 0) return strict
+
+    // conditions-search-audit #3: a strict 2-letter check with no fallback
+    // meant a small typo at exactly 2 letters showed nothing, even though
+    // the same typo at 3+ letters would already be caught below. Falling
+    // through to the same fuzzy tier closes that gap.
+    const fuzzy = fuseIndex.search(q)
+    return fuzzy.map(r => r.item)
   }
 
   // Tier 3: full fuzzy (3+ chars)
