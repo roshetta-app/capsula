@@ -48,10 +48,27 @@
  * as useConditionSearch — a term is logged at most once per gap/search type
  * for as long as this hook instance lives. drug_search is now logged
  * (previously dead) once per settled query of 2+ characters, independent
- * of result count, matching the shared 2+ char threshold from D31 (the
- * hook's own zero-result gap logging keeps its existing, different 4+ char
- * threshold below — those two thresholds serve different purposes and
- * aren't meant to match).
+ * of result count, matching the shared 2+ char threshold from D31.
+ *
+ * Drug Search Refinement Phase 4, §4.6/§4.7 (2026-08-29): the gap-logging
+ * block below was rewritten —
+ *   - Threshold dropped from the old stale 4+ chars to 2+, matching the
+ *     drug_search event's own threshold and how search actually behaves
+ *     today post-Phase 2 (tiers 1-2 already run at 2+ chars, so a 2-3 char
+ *     empty result is just as real a "search ran, found nothing" as a
+ *     longer one — the old 4+ gate was left over from a design that no
+ *     longer matches how search works, per §4.6).
+ *   - Now only logs when "Did you mean" ALSO found nothing — a near-miss
+ *     (search empty, but a suggestion exists) is a different signal (see
+ *     Phase 4 step 4c) and must not also count as a content gap. Computed
+ *     as a local `suggestionValue` rather than reading the `suggestion`
+ *     state, since state updates lag a render behind and this check needs
+ *     the value from *this* run.
+ *   - Logs the §4.1-normalized term (via `normalizeSearchText`, not a bare
+ *     `.toLowerCase()`) so punctuation/spacing variants of the same term
+ *     collapse into one gap, and now also logs+dedupes by mode (Brand vs
+ *     Generic are different fields, so a miss in one says nothing about
+ *     the other) — see searchGaps.js and DRUG_SEARCH_REFINEMENT_PLAN.md §5.
  *
  * Exposes:
  *   query           — current search string
@@ -71,6 +88,7 @@ import {
   buildDrugIngredientIndex,
   searchDrugsTiered,
   getDrugSearchSuggestion,
+  normalizeSearchText,
 } from '../utils/searchUtils'
 import { logSearchGap } from '../analytics/searchGaps'
 import { logUsageEvent } from '../analytics/usageEvents'
@@ -91,6 +109,8 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const drugsByIdRef       = useRef(null)
 
   // Per-session dedup (F10 Batch A / D30, D31) — see header comment.
+  // loggedGapTermsRef keys are "mode:normalizedTerm" (§4.6/§4.7) so the
+  // same term in a different mode isn't treated as already-logged.
   const loggedSearchTermsRef = useRef(new Set())
   const loggedGapTermsRef    = useRef(new Set())
 
@@ -134,11 +154,14 @@ export function useDrugSearch(drugs, mode = 'brand') {
 
     // Only when the prefix check found nothing: offer a single best-guess
     // "Did you mean" name, reusing the same fuzzy indexes built below.
-    setSuggestion(
-      trimmed.length >= 1 && matched.length === 0
-        ? getDrugSearchSuggestion(fuseIndex, trimmed, currentMode, fuzzyExtras)
-        : null
-    )
+    // Computed as a local value (not just via setSuggestion) so the gap-
+    // logging check below can use it in this same run, rather than reading
+    // the `suggestion` state, which wouldn't reflect this run until the
+    // next render (§4.6/§4.7).
+    const suggestionValue = trimmed.length >= 1 && matched.length === 0
+      ? getDrugSearchSuggestion(fuseIndex, trimmed, currentMode, fuzzyExtras)
+      : null
+    setSuggestion(suggestionValue)
 
     const normalized = trimmed.toLowerCase()
 
@@ -149,12 +172,23 @@ export function useDrugSearch(drugs, mode = 'brand') {
       logUsageEvent('drug_search', null, normalized)
     }
 
-    // Zero-result gap logging — only meaningful at 4+ chars where fuzzy ran
-    // (2-3 char tiers are exact start-of-field checks, so an empty result
-    // there isn't a relevance gap).
-    if (trimmed.length >= 4 && matched.length === 0 && !loggedGapTermsRef.current.has(normalized)) {
-      loggedGapTermsRef.current.add(normalized)
-      logSearchGap(trimmed, 'drugs')
+    // Real content gap (§4.6/§4.7): the search itself found nothing AND
+    // "Did you mean" also had nothing to offer — the genuine "we don't
+    // have this" signal, as opposed to a near-miss (Phase 4 step 4c) or a
+    // filter-masked result (Phase 5). Logged at 2+ chars (matching the
+    // shared threshold above, replacing the old stale 4+ gate), using the
+    // §4.1-normalized term, deduped per mode+term per session so a Brand
+    // miss and a Generic miss on the same word are tracked separately.
+    const normalizedForGap = normalizeSearchText(trimmed)
+    const gapDedupKey = `${currentMode}:${normalizedForGap}`
+    if (
+      normalizedForGap.length >= 2 &&
+      matched.length === 0 &&
+      !suggestionValue &&
+      !loggedGapTermsRef.current.has(gapDedupKey)
+    ) {
+      loggedGapTermsRef.current.add(gapDedupKey)
+      logSearchGap(trimmed, 'drugs', currentMode)
     }
   }, [drugs])
 
