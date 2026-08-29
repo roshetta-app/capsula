@@ -186,6 +186,13 @@ export function normalizeSearchText(text) {
     .trim()
 }
 
+// Shared by extractFormFromQuery and drugMatchesStrength (Phase 3) — both
+// build a RegExp out of data-driven text (a form word, a typed strength),
+// so both need the same "escape anything regex-special" step first.
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 // ─── Conditions — tiered search ───────────────────────────────────────────────
 
 const CONDITION_FUSE_OPTIONS = {
@@ -529,7 +536,7 @@ export function extractFormFromQuery(query) {
   if (text.length === 0) return null
 
   for (const { word, option } of FORM_WORD_ENTRIES) {
-    const pattern = new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+    const pattern = new RegExp(`\\b${escapeRegExp(word)}\\b`, 'i')
     const match = text.match(pattern)
     if (!match) continue
 
@@ -673,6 +680,50 @@ function searchBrandAtTier(pool, lower, tier) {
     })
 }
 
+// ─── Query facet extraction — applying extracted conditions (Phase 3, step
+// 3d) — checks a single drug against an extracted strength/form, mirroring
+// applyFilters' own form/route check in DrugsScreen.jsx exactly (same field
+// names, same OR-between-form-and-route logic) so the search box's implicit
+// form matching behaves identically to the explicit Form filter chips. ──────
+
+/**
+ * True if `drug`'s stored strength satisfies an extracted strength facet
+ * (see extractStrengthFromQuery), false otherwise. Per the plan's decision
+ * (§5): normalization-only match — strip spacing, lowercase, no unit-word
+ * tolerance — checked against the drug's `concentration` text field (the
+ * field confirmed against live data in step 3a).
+ *
+ * Digit-bounded on both sides so a search for "500mg" can't accidentally
+ * match a stored "1500mg" or "5000mg" — the same word-boundary caution
+ * applied to form matching, adapted for numbers (a plain substring check
+ * has no notion of "whole word" for digits the way \b does for letters).
+ */
+function drugMatchesStrength(drug, strength) {
+  if (!strength) return true
+
+  const raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
+  if (!raw) return false
+
+  const target = escapeRegExp(`${strength.value}${strength.unit}`.toLowerCase().replace(/\s+/g, ''))
+  const pattern = new RegExp(`(^|[^0-9])${target}([^0-9]|$)`)
+  return pattern.test(raw)
+}
+
+/**
+ * True if `drug`'s stored form/route satisfies an extracted form facet (see
+ * extractFormFromQuery), false otherwise. Exactly mirrors applyFilters' own
+ * check in DrugsScreen.jsx: a drug matches if its `form` is one of the
+ * matched chip's raw `matches` values, OR its `route` is one of that chip's
+ * `routes` values (only the Inhaled chip defines `routes` today).
+ */
+function drugMatchesForm(drug, form) {
+  if (!form) return true
+
+  const formSet  = new Set(form.matches.map(m => m.toLowerCase()))
+  const routeSet = new Set((form.routes ?? []).map(r => r.toLowerCase()))
+  return formSet.has(drug.form?.toLowerCase()) || (drug.route && routeSet.has(drug.route.toLowerCase()))
+}
+
 /**
  * Drug search — three ordered tiers, strongest to weakest, each tried only
  * when the tier(s) above come back empty (DRUG_SEARCH_REFINEMENT_PLAN.md
@@ -698,6 +749,21 @@ function searchBrandAtTier(pool, lower, tier) {
  *     those two tiers, shortest remaining text after the prefix wins, same
  *     rule as Brand mode. Ties broken alphabetically by genericName.
  *
+ * Query facet parsing (DRUG_SEARCH_REFINEMENT_PLAN.md §4.4/§4.5, Phase 3,
+ * step 3d): before any name tiering runs, a strength (extractStrengthFromQuery)
+ * and/or form (extractFormFromQuery) are pulled out of the query if present —
+ * strength is checked first, form second against whatever strength left
+ * behind (the two patterns can't overlap, so the order doesn't change what's
+ * found). Whatever text remains after both is what actually runs through the
+ * name tiers above. A drug only makes the final list if every piece that was
+ * actually found in the query is true at once: name AND (strength, if typed)
+ * AND (form, if typed) — not "any of these" (§5's explicit decision). A query
+ * with no strength or form behaves exactly as before. A query that's ONLY a
+ * strength/form ("500mg", "tablet", "brufen 500mg tab" minus "brufen"... i.e.
+ * "500mg tab" alone) leaves no name text to tier-match — that's treated as
+ * "every drug passes the name check", the same as an empty query does today,
+ * letting the strength/form checks below do all the narrowing on their own.
+ *
  * @param {object[]} pool    — the raw drugs array to filter
  * @param {string}   query
  * @param {'brand'|'generic'} mode
@@ -707,23 +773,41 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   const q = query.trim()
   if (q.length === 0) return null
 
+  // Pull strength/form facets out first — whatever's left is the name text.
+  const strength      = extractStrengthFromQuery(q)
+  const afterStrength = strength ? strength.remainingText : q
+  const form          = extractFormFromQuery(afterStrength)
+  const nameText       = form ? form.remainingText : afterStrength
+
   // Normalized, not just lowercased (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1) —
   // strips hyphens and collapses spacing so punctuation differences no
   // longer cause a real match to be missed. See normalizeSearchText above.
-  const lower = normalizeSearchText(q)
+  const lower = normalizeSearchText(nameText)
 
-  // Tier 3 (substring anywhere) only kicks in at 4+ characters — see
-  // fieldMatchesAtTier's header note for why.
-  const tiersToTry = lower.length >= 4 ? [1, 2, 3] : [1, 2]
-
-  for (const tier of tiersToTry) {
-    const matched = mode === 'generic'
-      ? searchGenericAtTier(pool, lower, tier)
-      : searchBrandAtTier(pool, lower, tier)
-    if (matched.length > 0) return matched
+  let nameMatched
+  if (lower.length === 0) {
+    // Nothing left to match by name (query was strength/form only) — every
+    // drug passes the name check; strength/form filtering below narrows it.
+    nameMatched = pool
+  } else {
+    // Tier 3 (substring anywhere) only kicks in at 4+ characters — see
+    // fieldMatchesAtTier's header note for why.
+    const tiersToTry = lower.length >= 4 ? [1, 2, 3] : [1, 2]
+    nameMatched = []
+    for (const tier of tiersToTry) {
+      const matched = mode === 'generic'
+        ? searchGenericAtTier(pool, lower, tier)
+        : searchBrandAtTier(pool, lower, tier)
+      if (matched.length > 0) { nameMatched = matched; break }
+    }
   }
 
-  return []
+  // AND the strength/form facets on top of the name result, if either was
+  // found in the query — order after tiering preserves the tier's own
+  // ranking/sort among whatever survives the filter.
+  if (!strength && !form) return nameMatched
+
+  return nameMatched.filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
 }
 
 /**
