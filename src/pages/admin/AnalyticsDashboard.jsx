@@ -40,14 +40,24 @@
  * `needs_review`-aware completeness check (published AND NOT flagged for
  * review) — see the fetch query and computation below.
  *
- * F10 Batch D (D38), steps 8a/8b — two queries (`usageDetailRes`,
+ * F10 Batch D (D38), steps 8a/8b — two queries (`usageDetail`,
  * `profilesRes`) power the Engagement, Retention, and Identity/Segment
  * tabs. `profilesRes` powers Identity/Segment (8c) and Retention (8e, via
- * the `id` column added in that step). `usageDetailRes` powers Engagement
+ * the `id` column added in that step). `usageDetail` powers Engagement
  * (8d), Retention (8e), and Monetization (8f, via the `pro_feature_click`
  * event already present in that same 90-day pull) — now folded into
- * `promos.monetization` below. None of the queries or computations below
- * changed in this pass, only how the results are packaged and rendered.
+ * `promos.monetization` below.
+ *
+ * F10 usage-tracking audit fix (follow-up pass) — the 1,000-row default
+ * cap on unpaginated Supabase reads wasn't only truncating usage_events;
+ * it was also silently truncating generics (7,270 rows live), formulations
+ * (11,817 rows), the 14-day search_gaps pull (2,410 rows), and the 90-day
+ * usage_events pull (9,080 rows) — undercounting Content Quality,
+ * Engagement, Retention, and Monetization by anywhere from 60-90%. All
+ * four now page through every row via `fetchAllRows`, the same pattern
+ * `fetchAllEventNames` already used for the Usage tab's totals and Top
+ * lists. No computation logic changed — only how much of each table
+ * actually gets loaded before those computations run.
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -81,21 +91,68 @@ const TABS = [
 
 // ─── Data fetching ────────────────────────────────────────────────────────────
 
+// F10 usage-tracking audit fix — Supabase caps any unpaginated request at
+// 1,000 rows by default. condition_view alone is already 6,539 rows live
+// (well past that cap), which was silently truncating both the "Top
+// Viewed" rankings AND (via a separate query) the Usage tab's total
+// counts. Total counts are fixed below by switching to count-only
+// queries (head: true — no rows returned, so there's nothing to cap).
+// The "Top X" rankings still need every row to rank correctly, so this
+// helper pages through in chunks of 1000, same pattern queries.js's
+// fetchAllBrandRows already uses for the brands table.
+const EVENT_PAGE_SIZE = 1000
+
+async function fetchAllEventNames(eventType) {
+  let rows = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('usage_events')
+      .select('entity_name')
+      .eq('event_type', eventType)
+      .not('entity_name', 'is', null)
+      .range(from, from + EVENT_PAGE_SIZE - 1)
+    if (error) throw error
+    rows = rows.concat(data ?? [])
+    if (!data || data.length < EVENT_PAGE_SIZE) break
+    from += EVENT_PAGE_SIZE
+  }
+  return rows
+}
+
+// F10 usage-tracking audit fix, extended — the same 1,000-row cap that
+// hit usage_events above also silently truncates every other unpaginated
+// read below. Confirmed live: generics is 7,270 rows (~14% was loading),
+// formulations is 11,817 rows (~8%), search_gaps in the last 14 days is
+// 2,410 rows (~41%), and usage_events in the last 90 days is 9,080 rows
+// (~11%) — each one was quietly feeding wrong numbers into Content
+// Quality, Engagement, Retention, and Monetization. Generic version of
+// the helper above: takes a function that builds the query fresh each
+// page (Supabase's builder can't be re-ranged after it's been awaited),
+// pages through in the same 1,000-row chunks.
+async function fetchAllRows(buildQuery) {
+  let rows = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await buildQuery().range(from, from + EVENT_PAGE_SIZE - 1)
+    if (error) throw error
+    rows = rows.concat(data ?? [])
+    if (!data || data.length < EVENT_PAGE_SIZE) break
+    from += EVENT_PAGE_SIZE
+  }
+  return rows
+}
+
 async function fetchAllAnalytics() {
   const [
     conditionsRes,
-    genericsRes,
     brandsRes,
-    formulationsRes,
     specialtiesRes,
-    gapsRes,
-    usageViewRes,
-    usageSearchRes,
-    topViewCondRes,
-    topSearchCondRes,
-    topViewDrugRes,
+    conditionViewCountRes,
+    drugViewCountRes,
+    conditionSearchCountRes,
+    drugSearchCountRes,
     gateEventsRes,
-    usageDetailRes,
     profilesRes,
   ] = await Promise.all([
 
@@ -104,20 +161,10 @@ async function fetchAllAnalytics() {
       .from('conditions')
       .select('id, is_published, needs_review, definition, specialty_id, specialties!conditions_specialty_id_fkey(name_en)'),
 
-    // Generics: category grouping + has any real (published, not-flagged) brands/doses
-    supabase
-      .from('generics')
-      .select('id, category, is_published, formulations(id, doses_structured, brands(id, is_published, needs_review))'),
-
     // Total brands
     supabase
       .from('brands')
       .select('id', { count: 'exact', head: true }),
-
-    // Formulations with no dose data
-    supabase
-      .from('formulations')
-      .select('id, doses_structured'),
 
     // Specialties for coverage table
     supabase
@@ -126,56 +173,37 @@ async function fetchAllAnalytics() {
       .eq('is_active', true)
       .order('sort_order', { ascending: true }),
 
-    // Search gaps: last 14 days
-    supabase
-      .from('search_gaps')
-      .select('term, context, created_at')
-      .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()),
-
-    // Usage: aggregate view counts
-    supabase
-      .from('usage_events')
-      .select('event_type', { count: 'exact', head: false })
-      .in('event_type', ['condition_view', 'drug_view', 'condition_search', 'drug_search']),
-
-    // Not used directly — counts extracted below
-    Promise.resolve({ data: null }),
-
-    // Top viewed conditions
+    // Usage totals — F10 audit fix: four separate head-only counts
+    // instead of one query that fetched actual rows for all four event
+    // types combined (9,058 rows worth — silently truncated to 1,000 by
+    // Supabase's default cap, undercounting every total on this tab by
+    // roughly 90%). head: true returns just a number, no rows, so there
+    // is no cap to hit no matter how large usage_events grows.
     supabase
       .from('usage_events')
-      .select('entity_name')
-      .eq('event_type', 'condition_view')
-      .not('entity_name', 'is', null),
+      .select('*', { count: 'exact', head: true })
+      .eq('event_type', 'condition_view'),
 
-    // Top searched conditions
     supabase
       .from('usage_events')
-      .select('entity_name')
-      .eq('event_type', 'condition_search')
-      .not('entity_name', 'is', null),
+      .select('*', { count: 'exact', head: true })
+      .eq('event_type', 'drug_view'),
 
-    // Top viewed drugs
     supabase
       .from('usage_events')
-      .select('entity_name')
-      .eq('event_type', 'drug_view')
-      .not('entity_name', 'is', null),
+      .select('*', { count: 'exact', head: true })
+      .eq('event_type', 'condition_search'),
+
+    supabase
+      .from('usage_events')
+      .select('*', { count: 'exact', head: true })
+      .eq('event_type', 'drug_search'),
 
     // App Gate events: impressions, dismisses, maybe-laters, CTA clicks
     supabase
       .from('usage_events')
       .select('event_type, entity_name')
       .in('event_type', ['gate_impression', 'gate_dismiss', 'gate_maybe_later', 'gate_cta_click']),
-
-    // F10 Batch D (D38), step 8a — full usage_events rows with device/
-    // session/user context, bounded to the last 90 days. Powers the
-    // Engagement tab (8d) and Retention tab (8e). Not consumed by any
-    // other tab; the 6 queries above are untouched.
-    supabase
-      .from('usage_events')
-      .select('event_type, entity_name, device_id, user_id, session_id, created_at')
-      .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()),
 
     // F10 Batch D (D38), step 8b — identity/segment fields already
     // collected at sign-up. Direct table read, not through the
@@ -188,10 +216,58 @@ async function fetchAllAnalytics() {
       .select('id, specialty, country, occupation, created_at'),
   ])
 
+  // F10 usage-tracking audit fix — every query here needs every matching
+  // row (to rank the Usage tab's "Top Viewed/Searched" lists correctly,
+  // or to compute accurate Content Quality / Engagement / Retention /
+  // Monetization figures), not just the first 1,000 Supabase would
+  // return by default. Run in parallel via fetchAllEventNames' and
+  // fetchAllRows' internal pagination (see helpers above).
+  const [
+    topViewCondNames,
+    topSearchCondNames,
+    topViewDrugNames,
+    generics,
+    formulations,
+    gaps,
+    usageDetail,
+  ] = await Promise.all([
+    fetchAllEventNames('condition_view'),
+    fetchAllEventNames('condition_search'),
+    fetchAllEventNames('drug_view'),
+
+    // Generics: category grouping + has any real (published, not-flagged)
+    // brands/doses. 7,270 rows live — was silently capped to ~1,000.
+    fetchAllRows(() => supabase
+      .from('generics')
+      .select('id, category, is_published, formulations(id, doses_structured, brands(id, is_published, needs_review))')),
+
+    // Formulations with no dose data. 11,817 rows live — was silently
+    // capped to ~1,000.
+    fetchAllRows(() => supabase
+      .from('formulations')
+      .select('id, doses_structured')),
+
+    // Search gaps: last 14 days. 2,410 rows live in that window — was
+    // silently capped to ~1,000.
+    fetchAllRows(() => supabase
+      .from('search_gaps')
+      .select('term, context, created_at')
+      .gte('created_at', new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())),
+
+    // F10 Batch D (D38), step 8a — full usage_events rows with device/
+    // session/user context, bounded to the last 90 days. Powers the
+    // Engagement tab (8d), Retention tab (8e), and Monetization (8f).
+    // 9,080 rows live in that window — was silently capped to ~1,000.
+    fetchAllRows(() => supabase
+      .from('usage_events')
+      .select('event_type, entity_name, device_id, user_id, session_id, created_at')
+      .gte('created_at', new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString())),
+  ])
+
   // ── Content Health ───────────────────────────────────────────────────────────
   const conditions   = conditionsRes.data   ?? []
-  const generics     = genericsRes.data     ?? []
-  const formulations = formulationsRes.data ?? []
+  // generics / formulations now come straight from fetchAllRows above —
+  // already plain arrays, no `.data` wrapper to unwrap.
 
   const totalConditions       = conditions.length
   // Real completeness: published AND NOT flagged for review (D32) — a
@@ -219,7 +295,8 @@ async function fetchAllAnalytics() {
   const formulationsWithNoDose= formulations.filter(f => !f.doses_structured || f.doses_structured.length === 0).length
 
   // ── Search Gaps ─────────────────────────────────────────────────────────────
-  const gaps = gapsRes.data ?? []
+  // `gaps` now comes straight from fetchAllRows above — already a plain
+  // array, no `.data` wrapper to unwrap.
 
   function aggregateGaps(rows) {
     const map = {}
@@ -263,11 +340,9 @@ async function fetchAllAnalytics() {
     .slice(0, 15)
 
   // ── Usage ────────────────────────────────────────────────────────────────────
-  const usageEvents = usageViewRes.data ?? []
-
-  function countByType(type) {
-    return usageEvents.filter(e => e.event_type === type).length
-  }
+  // F10 usage-tracking audit fix — totals now come straight from the four
+  // count-only queries above (real, uncapped numbers), not from counting
+  // a row-fetch that Supabase was silently truncating at 1,000.
 
   function topNames(rows, n = 10) {
     const map = {}
@@ -324,8 +399,8 @@ async function fetchAllAnalytics() {
 
   // ── Engagement ───────────────────────────────────────────────────────────────
   // F10 Batch D (D38), step 8d. Built entirely from the 90-day
-  // usageDetailRes pulled in step 8a above — no new query needed.
-  const usageDetail = usageDetailRes.data ?? []
+  // `usageDetail` pulled in step 8a above (now paginated via
+  // fetchAllRows — no new query needed, just fixed to load all of it).
 
   // Monday-of-week label ("2026-08-24") for a given ISO timestamp, so
   // sessions bucket into calendar weeks rather than arbitrary 7-day
@@ -464,13 +539,13 @@ async function fetchAllAnalytics() {
       retentionByWeek,
     },
     usage: {
-      totalConditionViews:    countByType('condition_view'),
-      totalConditionSearches: countByType('condition_search'),
-      totalDrugViews:         countByType('drug_view'),
-      totalDrugSearches:      countByType('drug_search'),
-      topViewedConditions:    topNames(topViewCondRes.data),
-      topSearchedConditions:  topNames(topSearchCondRes.data),
-      topViewedDrugs:         topNames(topViewDrugRes.data),
+      totalConditionViews:    conditionViewCountRes.count   ?? 0,
+      totalConditionSearches: conditionSearchCountRes.count ?? 0,
+      totalDrugViews:         drugViewCountRes.count         ?? 0,
+      totalDrugSearches:      drugSearchCountRes.count       ?? 0,
+      topViewedConditions:    topNames(topViewCondNames),
+      topSearchedConditions:  topNames(topSearchCondNames),
+      topViewedDrugs:         topNames(topViewDrugNames),
     },
     // F10 Batch D (D38), step 8h+: former top-level 'health' + 'gaps' +
     // 'coverage' now nested here, rendered together by ContentQualityTab.
