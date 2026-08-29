@@ -420,6 +420,28 @@ function genericPrefixFields(drug) {
   return fields
 }
 
+// ─── Multi-tier field matching (DRUG_SEARCH_REFINEMENT_PLAN.md §4.2, Phase 2) ──
+// Three ordered checks, strongest to weakest — searchDrugsTiered tries them
+// in order and stops at the first one that returns any results, so a true
+// tier-1 match never gets buried under noisier tier-2/3 matches:
+//   Tier 1 — field starts with the query (today's only behavior).
+//   Tier 2 — a whole word inside the field starts with the query (a real
+//     word-boundary match, e.g. "extra" matching the second word in
+//     "Panadol Extra").
+//   Tier 3 — query appears anywhere in the field, mid-word. Loosest tier,
+//     last resort only — callers gate this to 4+ character queries (see
+//     searchDrugsTiered) so short queries like "for"/"d3" never reach it;
+//     that gating is what caused the original rollback of plain substring
+//     search, per the plan's audit.
+// 'field' is raw (un-normalized) text; normalization happens here so every
+// call site compares the same way.
+function fieldMatchesAtTier(field, query, tier) {
+  const normalized = normalizeSearchText(field)
+  if (tier === 1) return normalized.startsWith(query)
+  if (tier === 2) return normalized.split(' ').some(word => word.startsWith(query))
+  return normalized.includes(query)
+}
+
 /**
  * Ranking signal for Generic-mode results (drug-card-ordering task,
  * 2026-07-19): tells searchDrugsTiered's sort whether this drug matched on
@@ -429,18 +451,22 @@ function genericPrefixFields(drug) {
  * is checked first since it's always present and is the stronger of the two
  * signals; only checks ingredients if genericName didn't match, matching
  * genericPrefixFields' own field order.
+ *
+ * 'matchTier' (Phase 2, §4.2) is which of the three field-matching tiers
+ * this call is being scored under — passed through from searchDrugsTiered so
+ * the same check ("starts with" / "word starts with" / "substring anywhere")
+ * that found this drug is also what decides which side (name vs ingredient)
+ * gets credit. Ranking math itself is unchanged regardless of matchTier, per
+ * the plan's decision to reuse "shortest remaining text wins" as-is.
  */
-function genericMatchRank(drug, lower) {
-  // 'lower' is already normalized (see searchDrugsTiered) — normalize the
-  // stored field the same way before comparing, so a stored "Co-Amoxiclav"
-  // still matches a normalized "coamoxiclav" query (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1).
-  const generic = normalizeSearchText(drug.genericName)
-  if (generic.startsWith(lower)) {
+function genericMatchRank(drug, lower, matchTier) {
+  if (fieldMatchesAtTier(drug.genericName, lower, matchTier)) {
+    const generic = normalizeSearchText(drug.genericName)
     return { tier: 0, remainder: generic.length - lower.length }
   }
 
   const hit = Array.isArray(drug.ingredients)
-    ? drug.ingredients.find(ing => normalizeSearchText(ing).startsWith(lower))
+    ? drug.ingredients.find(ing => fieldMatchesAtTier(ing, lower, matchTier))
     : undefined
 
   return { tier: 1, remainder: (hit !== undefined ? normalizeSearchText(hit).length : lower.length) - lower.length }
@@ -457,11 +483,16 @@ function genericMatchRank(drug, lower) {
  * moved to the front, leaving every other ingredient in its original
  * relative order. Drugs with no ingredient array, or no ingredient match at
  * all, are returned unchanged (same reference — no unnecessary copies).
+ *
+ * 'matchTier' (Phase 2, §4.2) — same reasoning as genericMatchRank above: an
+ * ingredient only gets reordered to the front if it actually matches under
+ * the tier that produced this drug's results, not under a stronger tier
+ * that came up empty.
  */
-function reorderIngredientsForMatch(drug, lower) {
+function reorderIngredientsForMatch(drug, lower, matchTier) {
   if (!Array.isArray(drug.ingredients)) return drug
 
-  const idx = drug.ingredients.findIndex(ing => normalizeSearchText(ing).startsWith(lower))
+  const idx = drug.ingredients.findIndex(ing => fieldMatchesAtTier(ing, lower, matchTier))
   if (idx < 2) return drug // -1 (no match) or already visible in the first 2 — nothing to do
 
   const reordered = [
@@ -472,15 +503,46 @@ function reorderIngredientsForMatch(drug, lower) {
   return { ...drug, ingredients: reordered }
 }
 
+function searchGenericAtTier(pool, lower, tier) {
+  return pool
+    .filter(d => genericPrefixFields(d).some(field => fieldMatchesAtTier(field, lower, tier)))
+    .map(d => reorderIngredientsForMatch(d, lower, tier))
+    .map(d => ({ drug: d, ...genericMatchRank(d, lower, tier) }))
+    .sort((a, b) =>
+      a.tier !== b.tier
+        ? a.tier - b.tier
+        : a.remainder !== b.remainder
+          ? a.remainder - b.remainder
+          : (a.drug.genericName ?? '').localeCompare(b.drug.genericName ?? '')
+    )
+    .map(r => r.drug)
+}
+
+function searchBrandAtTier(pool, lower, tier) {
+  return pool
+    .filter(d => fieldMatchesAtTier(drugFieldForMode(d, 'brand'), lower, tier))
+    .sort((a, b) => {
+      const aLen = drugFieldForMode(a, 'brand').length
+      const bLen = drugFieldForMode(b, 'brand').length
+      return aLen !== bLen ? aLen - bLen : drugFieldForMode(a, 'brand').localeCompare(drugFieldForMode(b, 'brand'))
+    })
+}
+
 /**
- * Drug search — strict "starts with" prefix match, every query length, no
- * fuzzy fallback baked in (see 'getDrugSearchSuggestion' for that). Field-
- * scoped per mode: Brand mode checks 'tradenameClean'; Generic mode checks
- * 'genericName' plus each individual ingredient.
+ * Drug search — three ordered tiers, strongest to weakest, each tried only
+ * when the tier(s) above come back empty (DRUG_SEARCH_REFINEMENT_PLAN.md
+ * §4.2, Phase 2): (1) starts with the query, (2) a whole word in the field
+ * starts with the query, (3) query appears anywhere, mid-word. Tiers 1-2 are
+ * available from 2 characters (today's threshold); tier 3 is gated to 4+
+ * characters so short, generic-feeling queries ("for", "d3") never reach the
+ * loosest tier and drown out real answers — the exact problem that got plain
+ * substring search rolled back once before. No fuzzy fallback baked in (see
+ * 'getDrugSearchSuggestion' for that). Field-scoped per mode: Brand mode
+ * checks 'tradenameClean'; Generic mode checks 'genericName' plus each
+ * individual ingredient.
  *
- * Ranking (drug_library_ui_ux, drug-card-ordering task, 2026-07-19): a plain
- * "starts with" filter has no inherent order, so both modes now rank their
- * matches rather than returning filter order as-is:
+ * Ranking (drug_library_ui_ux, drug-card-ordering task, 2026-07-19; reused
+ * unchanged within whichever tier actually produced results, per §4.2):
  *   - Brand mode: shortest remaining text after the matched query prefix
  *     wins (e.g. query "brufen" ranks "Brufen" above "Brufen Retard") —
  *     tradenameClean.length is the whole signal since the query is a fixed-
@@ -505,28 +567,18 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   // longer cause a real match to be missed. See normalizeSearchText above.
   const lower = normalizeSearchText(q)
 
-  if (mode === 'generic') {
-    return pool
-      .filter(d => genericPrefixFields(d).some(field => normalizeSearchText(field).startsWith(lower)))
-      .map(d => reorderIngredientsForMatch(d, lower))
-      .map(d => ({ drug: d, ...genericMatchRank(d, lower) }))
-      .sort((a, b) =>
-        a.tier !== b.tier
-          ? a.tier - b.tier
-          : a.remainder !== b.remainder
-            ? a.remainder - b.remainder
-            : (a.drug.genericName ?? '').localeCompare(b.drug.genericName ?? '')
-      )
-      .map(r => r.drug)
+  // Tier 3 (substring anywhere) only kicks in at 4+ characters — see
+  // fieldMatchesAtTier's header note for why.
+  const tiersToTry = lower.length >= 4 ? [1, 2, 3] : [1, 2]
+
+  for (const tier of tiersToTry) {
+    const matched = mode === 'generic'
+      ? searchGenericAtTier(pool, lower, tier)
+      : searchBrandAtTier(pool, lower, tier)
+    if (matched.length > 0) return matched
   }
 
-  return pool
-    .filter(d => normalizeSearchText(drugFieldForMode(d, mode)).startsWith(lower))
-    .sort((a, b) => {
-      const aLen = drugFieldForMode(a, mode).length
-      const bLen = drugFieldForMode(b, mode).length
-      return aLen !== bLen ? aLen - bLen : drugFieldForMode(a, mode).localeCompare(drugFieldForMode(b, mode))
-    })
+  return []
 }
 
 /**
