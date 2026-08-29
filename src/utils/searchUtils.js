@@ -167,6 +167,24 @@
 
 import Fuse from 'fuse.js'
 
+// ─── Shared text normalization (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1/§5, Phase 1) ──
+// One shared helper so every drug-search comparison treats punctuation/spacing
+// differences as the same text (e.g. "Co-Amoxiclav" now matches a typed
+// "amoxiclav" or "coamoxiclav"). Strips hyphens, collapses multiple/extra
+// spaces down to one, lowercases. "+" is deliberately left untouched — it's
+// meaningful here, separating two real ingredients in a combo drug name
+// (e.g. "Amoxicillin + Clavulanic Acid"); stripping it risks unrelated combos
+// starting to match each other. Comparison-only: nothing that reaches the
+// screen (drug names, ingredient names) is ever passed through this before
+// being displayed — only before being compared.
+export function normalizeSearchText(text) {
+  return (text ?? '')
+    .toLowerCase()
+    .replace(/-/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // ─── Conditions — tiered search ───────────────────────────────────────────────
 
 const CONDITION_FUSE_OPTIONS = {
@@ -413,16 +431,19 @@ function genericPrefixFields(drug) {
  * genericPrefixFields' own field order.
  */
 function genericMatchRank(drug, lower) {
-  const generic = (drug.genericName ?? '').toLowerCase()
+  // 'lower' is already normalized (see searchDrugsTiered) — normalize the
+  // stored field the same way before comparing, so a stored "Co-Amoxiclav"
+  // still matches a normalized "coamoxiclav" query (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1).
+  const generic = normalizeSearchText(drug.genericName)
   if (generic.startsWith(lower)) {
     return { tier: 0, remainder: generic.length - lower.length }
   }
 
   const hit = Array.isArray(drug.ingredients)
-    ? drug.ingredients.find(ing => ing.toLowerCase().startsWith(lower))
+    ? drug.ingredients.find(ing => normalizeSearchText(ing).startsWith(lower))
     : undefined
 
-  return { tier: 1, remainder: (hit?.length ?? lower.length) - lower.length }
+  return { tier: 1, remainder: (hit !== undefined ? normalizeSearchText(hit).length : lower.length) - lower.length }
 }
 
 /**
@@ -440,7 +461,7 @@ function genericMatchRank(drug, lower) {
 function reorderIngredientsForMatch(drug, lower) {
   if (!Array.isArray(drug.ingredients)) return drug
 
-  const idx = drug.ingredients.findIndex(ing => ing.toLowerCase().startsWith(lower))
+  const idx = drug.ingredients.findIndex(ing => normalizeSearchText(ing).startsWith(lower))
   if (idx < 2) return drug // -1 (no match) or already visible in the first 2 — nothing to do
 
   const reordered = [
@@ -479,11 +500,14 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   const q = query.trim()
   if (q.length === 0) return null
 
-  const lower = q.toLowerCase()
+  // Normalized, not just lowercased (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1) —
+  // strips hyphens and collapses spacing so punctuation differences no
+  // longer cause a real match to be missed. See normalizeSearchText above.
+  const lower = normalizeSearchText(q)
 
   if (mode === 'generic') {
     return pool
-      .filter(d => genericPrefixFields(d).some(field => field.toLowerCase().startsWith(lower)))
+      .filter(d => genericPrefixFields(d).some(field => normalizeSearchText(field).startsWith(lower)))
       .map(d => reorderIngredientsForMatch(d, lower))
       .map(d => ({ drug: d, ...genericMatchRank(d, lower) }))
       .sort((a, b) =>
@@ -497,7 +521,7 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
   }
 
   return pool
-    .filter(d => drugFieldForMode(d, mode).toLowerCase().startsWith(lower))
+    .filter(d => normalizeSearchText(drugFieldForMode(d, mode)).startsWith(lower))
     .sort((a, b) => {
       const aLen = drugFieldForMode(a, mode).length
       const bLen = drugFieldForMode(b, mode).length
