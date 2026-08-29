@@ -10,15 +10,30 @@
  * device/session identity attached automatically instead of nothing.
  *
  * Event types:
- *   condition_view    — user opened a condition detail screen
- *   drug_view         — user opened a drug detail screen
- *   condition_search  — user submitted a condition search
- *   drug_search       — user submitted a drug search
+ *   condition_view             — user opened a condition detail screen
+ *   drug_view                  — user opened a drug detail screen
+ *   condition_search           — user submitted a condition search
+ *   drug_search                — user submitted a drug search
+ *   drug_search_near_miss      — drug search found nothing, but "Did you
+ *                                 mean" had a guess to offer (added Drug
+ *                                 Search Refinement Phase 4, §4.6/§4.7 —
+ *                                 not a content gap, tuning input for the
+ *                                 later "Did you mean" rework)
+ *   drug_search_filter_masked  — drug search found a match, but an active
+ *                                 Form/Route filter hid it from view
+ *                                 (added Drug Search Refinement Phase 4,
+ *                                 §4.6/§4.7 — UX signal only, tracked
+ *                                 separately so it never counts as a
+ *                                 content gap)
  *
  * Call sites (wired up in Phase 3J):
  *   ConditionDetailScreen — on mount  → condition_view
  *   DrugDetailScreen      — on mount  → drug_view
  *   SearchBar             — on submit → condition_search / drug_search
+ *
+ * drug_search_near_miss and drug_search_filter_masked are logged from
+ * their own points in the search flow (wired up in Phase 4, steps 4c/5c)
+ * — not from SearchBar's submit handler.
  */
 
 import { supabase } from '../lib/supabase'
@@ -27,7 +42,7 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
 /**
  * Log a usage event to Supabase.
  *
- * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'} eventType
+ * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'} eventType
  * @param {string|null} entityId   — UUID of the entity, or null for search events
  * @param {string|null} entityName — Name snapshot at time of event
  */
