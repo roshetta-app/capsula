@@ -454,6 +454,13 @@ export default function DrugsScreen() {
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
                   {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
                   {query && ` for "${query}"`}
+                  {/* search-category-notice — reuses the same categoryLabel
+                      already shown in the back-to-categories row and the
+                      "Search all drugs instead" button's condition, so a
+                      person mid-search doesn't lose track of being scoped
+                      to one category. Omitted for '__all' since that's the
+                      unscoped state (categoryLabel would just say "All Drugs"). */}
+                  {activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
                 </div>
                 {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
@@ -1393,4 +1400,5 @@ function NarrowResultsHint() {
     </div>
   )
 }
+
 
