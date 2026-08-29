@@ -78,6 +78,19 @@ import { useToast } from '../../context/ToastContext'
  * width:100%. The rest of the form chip grid is untouched — it already had
  * no collapse/expand logic, so it stays exactly as it was, always visible.
  *
+ * drugs-filter-panel-refine (2026-08-29, on-device follow-up) — four
+ * corrections after the first look: (1) PillToggle's active capsule
+ * switched from black to var(--color-accent), matching the app's existing
+ * blue used everywhere else on this sheet (All Forms chip included);
+ * (2) Search Mode's and Sort By's PillToggle instances now both pass the
+ * same 'minOptionWidth', so the two toggles line up at a matching total
+ * width instead of each shrinking to its own label length; (3) restored
+ * the divider between Sort By and Form / Route, which the inline-action
+ * restyle had dropped; (4) FilterSection's label demoted from 16px/700
+ * (identical to the "Filter Drugs" sheet title) to 14px/600 in the
+ * secondary text color, so the sheet title and the section labels read as
+ * two different levels of hierarchy instead of two stacked titles.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -273,6 +286,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
                     { value: 'brand',   label: 'Brand' },
                     { value: 'generic', label: 'Generic' },
                   ]}
+                  minOptionWidth={96}
                 />
               }
             />
@@ -299,19 +313,27 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             drugs-filter-panel-restyle: same inline-action treatment as
             Search Mode above. */}
         {hasSearchResults && (
-          <FilterSection
-            label="Sort By"
-            action={
-              <PillToggle
-                value={sortMode}
-                onChange={onSortChange}
-                options={[
-                  { value: 'relevance', label: 'Relevance' },
-                  { value: 'cheapest',  label: 'Cheapest First' },
-                ]}
-              />
-            }
-          />
+          <>
+            <FilterSection
+              label="Sort By"
+              action={
+                <PillToggle
+                  value={sortMode}
+                  onChange={onSortChange}
+                  options={[
+                    { value: 'relevance', label: 'Relevance' },
+                    { value: 'cheapest',  label: 'Cheapest First' },
+                  ]}
+                  minOptionWidth={96}
+                />
+              }
+            />
+            <div style={{
+              height: 1,
+              backgroundColor: 'var(--color-border)',
+              margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
+            }} />
+          </>
         )}
 
         {/* Form / Route — instant-apply, see toggleForm above.
@@ -371,6 +393,12 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 // (Form / Route's chip grid) — sections with no children (Search Mode,
 // Sort By) don't need the extra gap since the header row is the whole
 // section.
+//
+// drugs-filter-panel-refine — label was originally styled identically to
+// the "Filter Drugs" sheet title (16px/700), which read as two stacked
+// titles with no hierarchy between them. Demoted to 14px/600 in the
+// secondary text color so "Filter Drugs" reads as the one heading and
+// these read as its subsections.
 function FilterSection({ label, action, children }) {
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
@@ -378,7 +406,7 @@ function FilterSection({ label, action, children }) {
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
         marginBottom: children ? 'var(--space-2)' : 0,
       }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
           {label}
         </div>
         {action}
@@ -402,11 +430,22 @@ function FilterSection({ label, action, children }) {
 // drugs-filter-panel-restyle — restyled from a full-width (flex:1 per
 // option) accent-blue bordered/filled track to a compact, fit-content
 // "nested pill" look: a quiet var(--color-border) track holding a solid
-// var(--color-text-primary) capsule around whichever option is active,
-// inactive option reading as plain muted text with no border. This is what
-// lets it sit inline next to a section label instead of needing its own
-// full-width row.
-function PillToggle({ value, onChange, options }) {
+// capsule around whichever option is active, inactive option reading as
+// plain muted text with no border. This is what lets it sit inline next
+// to a section label instead of needing its own full-width row.
+//
+// drugs-filter-panel-refine — two corrections after the first on-device
+// look: (1) the active capsule used var(--color-text-primary) (black),
+// which read as an unrelated new "black" affordance next to the app's
+// existing blue accent used everywhere else (All Forms chip included) —
+// switched to var(--color-accent) to match. (2) Search Mode's toggle
+// (Brand/Generic) and Sort By's toggle (Relevance/Cheapest First) were
+// each sizing to their own content, so the shorter Brand/Generic control
+// ended up visibly narrower than Sort By's — added optional
+// 'minOptionWidth' so a caller can give both toggle instances the same
+// per-button minimum width and have them line up at a matching total
+// width regardless of label length.
+function PillToggle({ value, onChange, options, minOptionWidth }) {
   // Tracks which of the two buttons (if any) is currently pressed, since
   // both share this one component instance — same onPointer* + scale
   // pattern as ToggleChip's own press feedback, just keyed per-button.
@@ -432,13 +471,15 @@ function PillToggle({ value, onChange, options }) {
             onPointerCancel={() => setPressedValue(null)}
             style={{
               padding: '6px 12px',
+              minWidth: minOptionWidth || undefined,
+              textAlign: 'center',
               borderRadius: 'var(--radius-full)',
               fontSize: 13, fontWeight: 500,
               cursor: 'pointer',
               border: 'none',
               whiteSpace: 'nowrap',
-              backgroundColor: active ? 'var(--color-text-primary)' : 'transparent',
-              color: active ? 'var(--color-surface)' : 'var(--color-text-tertiary)',
+              backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+              color: active ? '#fff' : 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
               transform: pressedValue === opt.value ? 'scale(0.96)' : 'scale(1)',
               transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
