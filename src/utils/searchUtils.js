@@ -917,26 +917,63 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
 }
 
 /**
- * Single best-guess "Did you mean" suggestion — only meant to be called when
- * 'searchDrugsTiered' comes back empty. Reuses the same fuzzy search and
- * 'RELEVANCE_FLOOR' cutoff the old auto-fuzzy tier used; just takes the
- * top-ranked match's display name instead of returning the whole list.
+ * Ranked "Did you mean" suggestions — only meant to be called when
+ * 'searchDrugsTiered' comes back empty. Phase 6 (§4.8) rework: now uses the
+ * same query-parsing 'searchDrugsTiered' already does (Phase 3, step 3d) —
+ * strength/form are pulled out first via extractStrengthFromQuery/
+ * extractFormFromQuery, and only the remaining name text is fuzzy-matched.
+ * A typo'd "panadol 500mg" now fuzzy-matches just "panadol" against name
+ * data, then AND-filters those candidates against the extracted 500mg
+ * facet via drugMatchesStrength/drugMatchesForm — mirroring
+ * searchDrugsTiered's own "name AND strength AND form" logic exactly,
+ * rather than fuzzy-matching the whole raw string as one blob against a
+ * field that was never shaped like that.
+ *
+ * Returns up to the top 3 candidates scoring within RELEVANCE_FLOOR,
+ * de-duped by display name (two formulations can share an identical
+ * tradenameClean/genericName, which would otherwise render two identical
+ * suggestions). Reuses the same fuzzy search and relevance floor the old
+ * single-guess version used.
  *
  * @param {Fuse}   fuseIndex — buildDrugBrandIndex or buildDrugGenericIndex output
  * @param {string} query
  * @param {'brand'|'generic'} mode
  * @param {object} [fuzzyExtras] — generic mode only, for fair ingredient scoring
  *   (1e.2): { ingredientIndex: buildDrugIngredientIndex output, drugsById: Map }
- * @returns {string|null} — the suggested drug's display name, or null if
- *   nothing scored within the relevance floor
+ * @returns {string[]} — up to 3 suggested drug display names, or [] if
+ *   nothing scored within the relevance floor (or the query was only a
+ *   strength/form with no name text to fuzzy-match, same "name required"
+ *   rule as searchDrugsTiered)
  */
 export function getDrugSearchSuggestion(fuseIndex, query, mode = 'brand', fuzzyExtras = {}) {
   const q = query.trim()
-  if (q.length === 0) return null
+  if (q.length === 0) return []
 
-  const matches = (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById)
-    ? searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, q)
-    : fuseIndex.search(q).filter(r => r.score <= RELEVANCE_FLOOR).map(r => r.item)
+  // Same facet extraction as searchDrugsTiered — whatever's left after
+  // strength/form is the text that actually gets fuzzy-matched.
+  const strength      = extractStrengthFromQuery(q)
+  const afterStrength = strength ? strength.remainingText : q
+  const form          = extractFormFromQuery(afterStrength)
+  const nameText       = form ? form.remainingText : afterStrength
 
-  return matches.length > 0 ? drugFieldForMode(matches[0], mode) : null
+  const lower = normalizeSearchText(nameText)
+  if (lower.length === 0) return [] // strength/form alone, no name — nothing to fuzzy-match
+
+  const fuzzyMatches = (mode === 'generic' && fuzzyExtras.ingredientIndex && fuzzyExtras.drugsById)
+    ? searchGenericDrugsFuzzy(fuseIndex, fuzzyExtras.ingredientIndex, fuzzyExtras.drugsById, lower)
+    : fuseIndex.search(lower).filter(r => r.score <= RELEVANCE_FLOOR).map(r => r.item)
+
+  // AND the strength/form facets on top, same as searchDrugsTiered — a
+  // fuzzy name match on the wrong strength/form isn't a real suggestion.
+  const facetMatched = (!strength && !form)
+    ? fuzzyMatches
+    : fuzzyMatches.filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
+
+  const names = []
+  for (const drug of facetMatched) {
+    const name = drugFieldForMode(drug, mode)
+    if (name && !names.includes(name)) names.push(name)
+    if (names.length === 3) break
+  }
+  return names
 }

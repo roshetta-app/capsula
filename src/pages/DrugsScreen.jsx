@@ -203,7 +203,7 @@ export default function DrugsScreen() {
     query, setQuery,
     results:         searchResults,
     queryTooShort,
-    suggestion,
+    suggestions,
   } = useDrugContext()
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
@@ -460,11 +460,11 @@ export default function DrugsScreen() {
               {displayed.length === 0 ? (
                 isFilterMasked ? (
                   <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
-                ) : suggestion ? (
+                ) : suggestions.length > 0 ? (
                   <DidYouMeanState
                     query={query}
-                    suggestion={suggestion}
-                    onSelect={() => handleQueryChange(suggestion)}
+                    suggestions={suggestions}
+                    onSelect={(name) => handleQueryChange(name)}
                   />
                 ) : (
                   <EmptyState query={query} onClear={() => handleQueryChange('')} />
@@ -1249,26 +1249,51 @@ function FilterMaskedState({ count, query, onClearFilter }) {
 
 // ─── DidYouMeanState ────────────────────────────────────────────────────────
 // Shown instead of EmptyState when the strict prefix check finds nothing but
-// getDrugSearchSuggestion (searchUtils.js) found one close-enough guess
-// (drug_search_plan §5 final form). Tapping the name just re-runs the search
-// with it, which then matches normally through the prefix check — no
-// separate navigation or lookup needed here.
+// getDrugSearchSuggestion (searchUtils.js) found one or more close-enough
+// guesses. Tapping any suggestion just re-runs the search with it, which then
+// matches normally through the prefix check — no separate navigation or
+// lookup needed here.
+//
+// Phase 6 (§4.8, 2026-08-29): getDrugSearchSuggestion now returns up to 3
+// ranked candidates instead of one. Single-candidate case is unchanged from
+// the Phase 5 follow-up design (bold accent headline naming the guess, one
+// button). 2-3 candidates: headline becomes the generic "Did you mean one of
+// these?" (no single guess to commit to), and every candidate renders as an
+// equal-weight FilledHintButton chip in a wrapping row — user-confirmed
+// design, so there's no "primary vs secondary" distinction to maintain.
 
-function DidYouMeanState({ query, suggestion, onSelect }) {
+function DidYouMeanState({ query, suggestions, onSelect }) {
+  const single = suggestions.length === 1
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <Lightbulb size={28} color="var(--color-accent)" />
+        <Lightbulb size={28} color={single ? 'var(--color-accent)' : 'var(--color-text-tertiary)'} />
       </div>
-      <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 4, color: 'var(--color-accent)' }}>
-        Did you mean <span style={{ fontWeight: 700 }}>{suggestion}</span>?
-      </div>
+      {single ? (
+        <div style={{ fontSize: 17, fontWeight: 500, marginBottom: 4, color: 'var(--color-accent)' }}>
+          Did you mean <span style={{ fontWeight: 700 }}>{suggestions[0]}</span>?
+        </div>
+      ) : (
+        <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+          Did you mean one of these?
+        </div>
+      )}
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
         No exact match{query ? ` for "${query}"` : ''}
       </div>
-      <FilledHintButton onClick={onSelect}>
-        Search {suggestion}
-      </FilledHintButton>
+      {single ? (
+        <FilledHintButton onClick={() => onSelect(suggestions[0])}>
+          Search {suggestions[0]}
+        </FilledHintButton>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+          {suggestions.map(name => (
+            <FilledHintButton key={name} onClick={() => onSelect(name)}>
+              {name}
+            </FilledHintButton>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

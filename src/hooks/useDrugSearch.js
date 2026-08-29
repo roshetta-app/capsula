@@ -61,7 +61,7 @@
  *   - Now only logs when "Did you mean" ALSO found nothing — a near-miss
  *     (search empty, but a suggestion exists) is a different signal (see
  *     Phase 4 step 4c) and must not also count as a content gap. Computed
- *     as a local `suggestionValue` rather than reading the `suggestion`
+ *     as a local `suggestionValue` rather than reading the `suggestions`
  *     state, since state updates lag a render behind and this check needs
  *     the value from *this* run.
  *   - Logs the §4.1-normalized term (via `normalizeSearchText`, not a bare
@@ -78,15 +78,23 @@
  * its own `mode` column for this, same correction as `search_gaps` in 4b
  * — see plan doc §5 CORRECTED notes.
  *
+ * Drug Search Refinement Phase 6, §4.8 (2026-08-29): 'suggestion' (single
+ * string|null) is now 'suggestions' (string[], possibly empty) —
+ * getDrugSearchSuggestion (searchUtils.js) is now parse-aware (fuzzy-matches
+ * only the name piece after strength/form extraction, AND-filters on those
+ * facets) and returns up to 3 ranked candidates instead of one. Near-miss/
+ * gap-logging checks below switch from truthy-string checks to
+ * suggestionValue.length comparisons — same logic, array-shaped.
+ *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
  *   results          — prefix-matched drug objects (or the full list)
  *   queryTooShort    — true for a 1-char query — caller shows a message,
  *                      not the results list
- *   suggestion       — a single "Did you mean" drug name, or null — only
- *                      ever set when results is empty and something close
- *                      exists
+ *   suggestions      — up to 3 "Did you mean" drug names, [] if none —
+ *                      only ever populated when results is empty and
+ *                      something close exists
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -105,7 +113,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const [query,          setQuery]          = useState('')
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
-  const [suggestion,     setSuggestion]     = useState(null)
+  const [suggestions,    setSuggestions]    = useState([])
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -145,7 +153,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     if (trimmed.length === 1) {
       setQueryTooShort(true)
       setResults(drugs)
-      setSuggestion(null)
+      setSuggestions([])
       return
     }
     setQueryTooShort(false)
@@ -162,16 +170,16 @@ export function useDrugSearch(drugs, mode = 'brand') {
 
     setResults(matched)
 
-    // Only when the prefix check found nothing: offer a single best-guess
-    // "Did you mean" name, reusing the same fuzzy indexes built below.
-    // Computed as a local value (not just via setSuggestion) so the gap-
+    // Only when the prefix check found nothing: offer up to 3 ranked
+    // "Did you mean" candidates, reusing the same fuzzy indexes built below.
+    // Computed as a local value (not just via setSuggestions) so the gap-
     // logging check below can use it in this same run, rather than reading
-    // the `suggestion` state, which wouldn't reflect this run until the
+    // the `suggestions` state, which wouldn't reflect this run until the
     // next render (§4.6/§4.7).
     const suggestionValue = trimmed.length >= 1 && matched.length === 0
       ? getDrugSearchSuggestion(fuseIndex, trimmed, currentMode, fuzzyExtras)
-      : null
-    setSuggestion(suggestionValue)
+      : []
+    setSuggestions(suggestionValue)
 
     const normalized = trimmed.toLowerCase()
 
@@ -189,7 +197,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     // gap — logged separately as tuning input for §4.8's later "Did you
     // mean" refinement, so it never pollutes the real-gap count below.
     if (
-      suggestionValue &&
+      suggestionValue.length > 0 &&
       normalizedForGap.length >= 2 &&
       !loggedNearMissTermsRef.current.has(`${currentMode}:${normalizedForGap}`)
     ) {
@@ -208,7 +216,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     if (
       normalizedForGap.length >= 2 &&
       matched.length === 0 &&
-      !suggestionValue &&
+      suggestionValue.length === 0 &&
       !loggedGapTermsRef.current.has(gapDedupKey)
     ) {
       loggedGapTermsRef.current.add(gapDedupKey)
@@ -229,6 +237,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     setQuery,
     results,
     queryTooShort,
-    suggestion,
+    suggestions,
   }
 }
+

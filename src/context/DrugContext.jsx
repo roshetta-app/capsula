@@ -28,13 +28,18 @@ const DrugContext = createContext(null)
  * not saved to localStorage/sessionStorage.
  *
  * drug-search-persist-navigation — 'query'/'setQuery'/'results'/
- * 'queryTooShort'/'suggestion' (from useDrugSearch) join the state above
+ * 'queryTooShort'/'suggestions' (from useDrugSearch) join the state above
  * for the exact same reason: useDrugSearch used to be called locally
  * inside DrugsScreen, so opening a drug's detail page (a separate route —
  * DrugsScreen unmounts entirely) and coming back reset the typed query,
  * and everything derived from it, to empty. useDrugSearch itself is
  * unchanged — it's just called here instead, same relocation already done
  * for mode/activeFilters/sortMode.
+ *
+ * Drug Search Refinement Phase 6, §4.8 (2026-08-29): useDrugSearch's
+ * 'suggestion' (string|null) became 'suggestions' (string[]) — this file
+ * needed no code change since searchValue is spread through as-is; only
+ * this doc comment and useDrugContext's below were updated to match.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -50,7 +55,7 @@ export function DrugProvider({ children }) {
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
  * setActiveFilters, sortMode, setSortMode, query, setQuery, results,
- * queryTooShort, suggestion }
+ * queryTooShort, suggestions }
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)
