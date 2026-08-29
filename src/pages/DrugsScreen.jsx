@@ -430,26 +430,6 @@ export default function DrugsScreen() {
             <TooShortState />
           ) : (
             <>
-              {/* search-all-drugs-placement (refined): a category-scoped
-                  search that already found something shouldn't have a
-                  loud full-width CTA sitting above the very result the
-                  person was looking for — every other hint on this screen
-                  (FilterMaskedState, EmptyState, CrossModeHintState,
-                  DidYouMeanState) only takes the full-width treatment when
-                  the list is genuinely empty, and this one now matches
-                  that. When displayed.length > 0 the same FilledHintButton
-                  moves inline next to the results count instead (below);
-                  this block is only the empty-list case, right above
-                  where EmptyState/etc. would otherwise render alone. */}
-              {hasQuery && activeCategory && activeCategory !== '__all' && displayed.length === 0 && (
-                <FilledHintButton
-                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
-                  style={{ display: 'block', marginBottom: 'var(--space-2)' }}
-                >
-                  Search all drugs instead
-                </FilledHintButton>
-              )}
-
               {/* drug-filter-instant-apply — only shown while a search
                   query is active. When just browsing a category with no
                   query, the back-to-categories row above already shows its
@@ -457,35 +437,40 @@ export default function DrugsScreen() {
                   duplicate right below it. */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginBottom: 'var(--space-3)',
+                marginBottom: 'var(--space-2)',
               }}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
                   {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
                   {query && ` for "${query}"`}
-                  {/* search-category-notice — reuses the same categoryLabel
-                      already shown in the back-to-categories row and the
-                      "Search all drugs instead" button's condition, so a
-                      person mid-search doesn't lose track of being scoped
-                      to one category. Omitted for '__all' since that's the
-                      unscoped state (categoryLabel would just say "All Drugs"). */}
-                  {activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
+                  {/* search-category-notice (corrected) — only added while a
+                      query is active. Browsing a category with no query
+                      already names it in the back-to-categories row right
+                      above, so repeating it here was redundant; it only
+                      earns its place once a query is typed and that back
+                      row disappears (see the !hasQuery condition on it
+                      below), leaving the category name with nowhere else
+                      to show. */}
+                  {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
                 </div>
-                {/* search-all-drugs-placement (refined) — the button lives
-                    here, same row as the count, only once a match already
-                    exists in-category (the empty case has its own
-                    full-width block above instead). Grouped with
-                    ClearFiltersButton in one flex container so the two
-                    can sit side by side without fighting the row's
-                    space-between when both are present. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {hasQuery && activeCategory && activeCategory !== '__all' && displayed.length > 0 && (
-                    <FilledHintButton onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}>
-                      Search all drugs instead
-                    </FilledHintButton>
-                  )}
-                  {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
-                </div>
+                {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
+
+              {/* search-all-drugs-placement (redesigned) — full-width,
+                  directly under the count line rather than above it, so it
+                  never sits on top of a result the person already found.
+                  Shown any time a query is scoped to a specific category,
+                  regardless of whether that category had a match — the
+                  count line right above it already gives the context
+                  (what was found and where), so the button reads as "go
+                  further" rather than "something's wrong." */}
+              {hasQuery && activeCategory && activeCategory !== '__all' && (
+                <FilledHintButton
+                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
+                  style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
+                >
+                  Search all drugs instead
+                </FilledHintButton>
+              )}
 
               {displayed.length === 0 ? (
                 isFilterMasked ? (
