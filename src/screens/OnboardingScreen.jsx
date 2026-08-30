@@ -4,8 +4,8 @@
  * Phase 1, steps 1.6–1.9 for the full decision trail.
  *
  * Shown only on first launch (localStorage key: capsula_onboarded absent).
- * 5 fixed slides, swipeable, no skip button, no dot-jump — every slide must
- * be moved through in order:
+ * 5 fixed slides, Next-button only — no swipe, no skip button, no dot-jump —
+ * every slide must be moved through in order:
  *   1. Welcome            — photo hero, no body text, "Lets Get Started"
  *   2. Your Medical Library, All in One Place
  *   3. Know Your Drugs
@@ -13,7 +13,10 @@
  *   5. Setting up your library — the TRUE last step, not a banner shown
  *      after onboarding. Has no Next button: a combined progress bar
  *      (weighted split — see below) tracks both libraries loading, and
- *      the screen auto-completes the instant both are actually done.
+ *      the screen auto-completes once both are actually done — held for
+ *      a minimum LOADING_FLOOR_MS so this slide is never skipped past in
+ *      under a frame when the data was already loaded before the user
+ *      ever reached it.
  *
  * Removed from the previous version, on purpose:
  *   - The notifications-permission slide — a separate in-app banner now
@@ -21,6 +24,13 @@
  *   - The install-prompt slide — installing the app is now promoted from
  *     the website instead, a separate initiative outside this component.
  *   - The Skip button — no slide can be bypassed.
+ *   - Swipe navigation — Next button only, both directions removed.
+ *
+ * Logo: uses the app's real shared mark (public/logo.svg — the same asset
+ * layout.jsx's header uses) instead of a hand-drawn stand-in, so this
+ * screen never shows a second, slightly-different version of the logo.
+ * Rendered white on the blue slides (2–5) via a CSS filter — no second
+ * image asset needed — and unmodified on slide 1's white card.
  *
  * Forced light theme, deliberately: this never reads `.dark` or any
  * dark-mode-overridden CSS variable — every color below is a literal
@@ -52,6 +62,11 @@ const COLORS = {
 }
 const FONT_BODY = '"IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif'
 
+// Same height on every slide — was 55% (slides 2–5) vs 57% (slide 1), which
+// put the white card's rounded top at a slightly different point depending
+// on the slide.
+const HERO_HEIGHT = '56%'
+
 // ─── Slide data ─────────────────────────────────────────────────────────────
 const SLIDES = [
   {
@@ -59,7 +74,7 @@ const SLIDES = [
     image: welcomeHero,
     imageIsPhoto: true,
     headline: 'Welcome to',
-    brand: true, // renders the CAPSULA wordmark under the headline
+    brand: true, // renders the CAPSULA logo under the headline
   },
   {
     id: 'library',
@@ -96,39 +111,29 @@ const LAST_INDEX = SLIDES.length - 1
 // split was chosen over a two-phase bar.
 const CONDITIONS_WEIGHT = 0.15
 
-// ─── Small brand wordmark — matches the mockups' "CAPSULA" logotype with a
-// capsule-pill accent standing in for the "P". Kept local to this file
-// rather than assuming a shared Logo component; replace with one if/when
-// this exact mark exists elsewhere in the app. ─────────────────────────────
-function CapsulaWordmark({ light }) {
-  const ink = light ? '#FFFFFF' : COLORS.textPrimary
+// Minimum time slide 5 stays visible before it's allowed to auto-complete,
+// regardless of how far along loading already is. Without this, if both
+// libraries finished loading before the user ever reached slide 5 (common,
+// since loading starts the instant the app opens), the slide would appear
+// and disappear in under a frame.
+const LOADING_FLOOR_MS = 1200
+
+// ─── Shared app logo — same asset layout.jsx's header uses (public/logo.svg),
+// rendered white via a CSS filter on the blue hero slides so no second,
+// light-on-dark image asset is needed. ─────────────────────────────────────
+function CapsulaLogo({ light, height = 28 }) {
   return (
-    <span
+    <img
+      src={`${import.meta.env.BASE_URL}logo.svg`}
+      alt="Capsula"
+      className="capsula-logo"
       style={{
-        fontFamily:    FONT_BODY,
-        fontWeight:    700,
-        fontSize:      28,
-        letterSpacing: '0.5px',
-        color:         ink,
-        display:       'inline-flex',
-        alignItems:    'center',
+        display: 'block',
+        height,
+        width:   'auto',
+        filter:  light ? 'brightness(0) invert(1)' : 'none',
       }}
-    >
-      CA
-      <span
-        style={{
-          display:         'inline-block',
-          width:           14,
-          height:          20,
-          borderRadius:    7,
-          backgroundColor: COLORS.accent,
-          margin:          '0 1px',
-          position:        'relative',
-          top:             1,
-        }}
-      />
-      SULA
-    </span>
+    />
   )
 }
 
@@ -162,9 +167,12 @@ function useCombinedLibraryProgress() {
 
 export default function OnboardingScreen({ onDone }) {
   const [current, setCurrent] = useState(0)
-  const touchStartX = useRef(null)
 
   const { fraction, done } = useCombinedLibraryProgress()
+  // Always holds the latest `done` value for use inside effects/timers
+  // without those effects needing `done` itself in their dependency array.
+  const doneRef = useRef(done)
+  doneRef.current = done
 
   const isLoadingSlide = SLIDES[current].isLoading
   const isLast = current === LAST_INDEX
@@ -174,48 +182,77 @@ export default function OnboardingScreen({ onDone }) {
     onDone()
   }
 
-  // Auto-complete the moment both libraries are actually done, but only
-  // while sitting on the final (loading) slide — matches the decision
-  // that this slide is the true last onboarding step, not a background
-  // banner: nothing advances past it until the real data is ready.
+  // ── Preload every slide image on mount ─────────────────────────────────
+  // A statically-imported image is only actually fetched by the browser
+  // once an <img> referencing it mounts. Without preloading, reaching a
+  // new slide kicked off that fetch right then — which is what let the
+  // previous slide's image visibly hang around while the new one loaded.
+  // Warming the cache for all 5 up front means every slide's image is
+  // already decoded and ready the moment it's reached.
   useEffect(() => {
-    if (isLoadingSlide && done) {
+    SLIDES.forEach(s => {
+      const preload = new Image()
+      preload.src = s.image
+    })
+  }, [])
+
+  // ── Minimum display time for the final (loading) slide ─────────────────
+  // floorElapsed only flips true after LOADING_FLOOR_MS spent on this
+  // slide, however far along loading already is; completion (below) waits
+  // on both floorElapsed AND done. alreadyDoneAtEntryRef captures whether
+  // the data was already fully loaded the moment this slide was reached —
+  // used only to decide how the bar animates (see displayFraction below),
+  // never to skip or shorten the floor itself.
+  const [floorElapsed, setFloorElapsed] = useState(false)
+  const [entryFillStarted, setEntryFillStarted] = useState(false)
+  const alreadyDoneAtEntryRef = useRef(false)
+
+  useEffect(() => {
+    if (!isLoadingSlide) {
+      setFloorElapsed(false)
+      setEntryFillStarted(false)
+      return
+    }
+    alreadyDoneAtEntryRef.current = doneRef.current
+    setEntryFillStarted(false)
+    const floorTimer = setTimeout(() => setFloorElapsed(true), LOADING_FLOOR_MS)
+    // Flips on the next frame (not synchronously) so the width change
+    // below is picked up as a CSS transition instead of an instant jump.
+    const fillFrame = requestAnimationFrame(() => setEntryFillStarted(true))
+    return () => {
+      clearTimeout(floorTimer)
+      cancelAnimationFrame(fillFrame)
+    }
+  }, [isLoadingSlide])
+
+  useEffect(() => {
+    if (isLoadingSlide && done && floorElapsed) {
       complete()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingSlide, done])
+  }, [isLoadingSlide, done, floorElapsed])
 
   function next() {
     if (!isLast) setCurrent(c => c + 1)
     // No manual action on the final slide — completion is automatic (see
-    // the effect above), matching "downloads stay fully automatic, no
+    // the effects above), matching "downloads stay fully automatic, no
     // manual tap to start" from the plan's existing decision.
   }
 
-  function handleTouchStart(e) {
-    touchStartX.current = e.touches[0].clientX
-  }
-
-  function handleTouchEnd(e) {
-    if (touchStartX.current === null) return
-    const dx = e.changedTouches[0].clientX - touchStartX.current
-    if (Math.abs(dx) > 50) {
-      if (dx < 0 && current < LAST_INDEX) setCurrent(c => c + 1)
-      // Swiping backward off the final (loading) slide is intentionally
-      // still allowed — it doesn't stop the real download, just lets
-      // someone glance at an earlier slide while it finishes.
-      if (dx > 0 && current > 0) setCurrent(c => c - 1)
-    }
-    touchStartX.current = null
-  }
+  // Real progress while genuinely still loading — unchanged from before.
+  // If the data was already done the instant this slide was reached, show
+  // a smooth synthetic fill to 100% over LOADING_FLOOR_MS instead (driven
+  // by the CSS transition below), so the bar never appears to skip ahead
+  // of what the floor timer allows.
+  const displayFraction = isLoadingSlide
+    ? (alreadyDoneAtEntryRef.current ? (entryFillStarted ? 1 : 0) : fraction)
+    : 0
 
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
 
   return (
     <div
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
       style={{
         position:   'fixed',
         inset:      0,
@@ -232,7 +269,7 @@ export default function OnboardingScreen({ onDone }) {
         style={{
           position:        'relative',
           flex:            '0 0 auto',
-          height:          heroOnBlue ? '55%' : '57%',
+          height:          HERO_HEIGHT,
           backgroundColor: heroOnBlue ? COLORS.heroBlue : COLORS.surface,
           display:         'flex',
           flexDirection:   'column',
@@ -243,7 +280,7 @@ export default function OnboardingScreen({ onDone }) {
       >
         {heroOnBlue && (
           <div style={{ paddingTop: 40, paddingBottom: 8 }}>
-            <CapsulaWordmark light />
+            <CapsulaLogo light height={26} />
           </div>
         )}
         <img
@@ -255,7 +292,11 @@ export default function OnboardingScreen({ onDone }) {
             maxHeight: heroOnBlue ? '80%' : undefined,
             objectFit: heroOnBlue ? 'contain' : 'cover',
             flex:      heroOnBlue ? undefined : 1,
-            margin:    heroOnBlue ? 'auto 0 0' : 0,
+            // 'auto 0' (top/bottom auto, left/right 0) centers the image
+            // vertically in the leftover space below the logo — it used
+            // to be 'auto 0 0' (bottom pinned to 0), which pushed the
+            // image down against the card instead of centering it.
+            margin:    heroOnBlue ? 'auto 0' : 0,
           }}
         />
       </div>
@@ -300,7 +341,7 @@ export default function OnboardingScreen({ onDone }) {
               <div style={{ fontSize: 20, color: COLORS.textSecondary, marginBottom: 6 }}>
                 {slide.headline}
               </div>
-              <CapsulaWordmark />
+              <CapsulaLogo height={32} />
             </div>
           ) : (
             <h2
@@ -336,7 +377,7 @@ export default function OnboardingScreen({ onDone }) {
         {isLoadingSlide ? (
           <div
             role="progressbar"
-            aria-valuenow={Math.round(fraction * 100)}
+            aria-valuenow={Math.round(displayFraction * 100)}
             aria-valuemin={0}
             aria-valuemax={100}
             style={{
@@ -351,11 +392,16 @@ export default function OnboardingScreen({ onDone }) {
           >
             <div
               style={{
-                width:           `${Math.max(6, fraction * 100)}%`,
+                width:           `${Math.max(6, displayFraction * 100)}%`,
                 height:          '100%',
                 borderRadius:    999,
                 backgroundColor: COLORS.accent,
-                transition:      'width 0.3s ease',
+                // Slower, deliberate fill when the data was already done
+                // on arrival (matches LOADING_FLOOR_MS); the normal quick
+                // transition otherwise, same as before.
+                transition:      alreadyDoneAtEntryRef.current
+                  ? `width ${LOADING_FLOOR_MS}ms ease`
+                  : 'width 0.3s ease',
               }}
             />
           </div>
