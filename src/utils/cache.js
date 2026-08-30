@@ -4,6 +4,13 @@
  * Three slices: 'drugs', 'conditions', 'categories'
  * Each slice: { data: [], fetchedAt: ISO string, version: string }
  *
+ * 2026-08-30 (conditions durable storage, plan §4.1/Phase 1): 'drugs' and
+ * 'conditions' both now actually live in IndexedDB (see the section below) —
+ * only 'categories' still uses the localStorage slice system described here.
+ * The write/read/isExpired functions below still accept 'conditions' as a
+ * key for backward compatibility, but nothing calls them with it anymore;
+ * see writeConditionsCache/readConditionsCache below for the real path.
+ *
  * Invalidation logic (called from useDrugs / useConditions / useCategories):
  *   1. Fetch app_metadata timestamp from Supabase (one lightweight request)
  *   2. If timestamp differs from cached version → re-fetch
@@ -28,7 +35,7 @@
  * a pure local read.
  */
 
-import { CACHE_KEYS, CACHE_TTL_MS, DRUGS_CACHE_SCHEMA_VERSION } from '../constants/cache'
+import { CACHE_KEYS, CACHE_TTL_MS, DRUGS_CACHE_SCHEMA_VERSION, CONDITIONS_CACHE_SCHEMA_VERSION } from '../constants/cache'
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -143,12 +150,15 @@ export function isCacheExpired(key) {
  */
 export function clearCache(key = 'all') {
   try {
-    if (key === 'all' || key === 'conditions') localStorage.removeItem(CACHE_KEYS.CONDITIONS)
     if (key === 'all' || key === 'categories') localStorage.removeItem(CACHE_KEYS.CATEGORIES)
     if (key === 'all' || key === 'icons') localStorage.removeItem(CACHE_KEYS.ICONS)
     if (key === 'all' || key === 'drugs') {
       localStorage.removeItem(CACHE_KEYS.DRUGS) // legacy key from before the IndexedDB move — harmless no-op cleanup
       clearDrugsCache() // fire-and-forget; the real drugs cache now lives in IndexedDB, see below
+    }
+    if (key === 'all' || key === 'conditions') {
+      localStorage.removeItem(CACHE_KEYS.CONDITIONS) // legacy key from before the IndexedDB move (2026-08-30) — harmless no-op cleanup
+      clearConditionsCache() // fire-and-forget; the real conditions cache now lives in IndexedDB, see below
     }
   } catch {
     // fail silently
@@ -215,27 +225,42 @@ export function writeIconCache(url, svg) {
   }
 }
 
-// ─── IndexedDB (drugs slice only) ──────────────────────────────────────────
+// ─── IndexedDB (drugs + conditions) ────────────────────────────────────────
 //
 // 2026-07-16: localStorage caps out around 5 MB per site — far below the
 // real size of the full drug catalog (tens of MB as JSON) — so
 // writeCache('drugs', ...) above was silently failing every single time
 // (see its catch block), and every app open was secretly a full re-download.
 // IndexedDB has no such practical size limit, so the drugs slice's saved
-// copy lives here instead. conditions/categories are both small and were
-// never affected by this — they're untouched, still on localStorage above.
+// copy lives here instead. categories is small and was never affected by
+// this — it's untouched, still on localStorage above.
+//
+// 2026-08-30 (conditions durable storage, plan §4.1/Phase 1): conditions
+// moved onto this same storage, ahead of a similar failure — not because it
+// already hit the localStorage size cap, but because it's the same trap
+// drugs already fell into once, avoidable here simply by moving it while
+// the library is still small. DB version bumped 1 → 2 so existing devices
+// get the new 'conditions' store created automatically the next time they
+// open the app; the existing 'drugs' store and its data are untouched by
+// this bump.
 
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 1
-const IDB_STORE   = 'drugs'
-const IDB_KEY     = 'drugs'
+const IDB_VERSION = 2
+const IDB_STORES  = ['drugs', 'conditions']
 
-function openDrugsDB() {
+const DRUGS_STORE      = 'drugs'
+const DRUGS_KEY        = 'drugs'
+const CONDITIONS_STORE = 'conditions'
+const CONDITIONS_KEY   = 'conditions'
+
+function openCapsulaDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, IDB_VERSION)
     req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(IDB_STORE)) {
-        req.result.createObjectStore(IDB_STORE)
+      for (const storeName of IDB_STORES) {
+        if (!req.result.objectStoreNames.contains(storeName)) {
+          req.result.createObjectStore(storeName)
+        }
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -258,10 +283,10 @@ function openDrugsDB() {
 export async function writeDrugsCache(data, version) {
   if (!Array.isArray(data) || data.length === 0) return
   try {
-    const db = await openDrugsDB()
+    const db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite')
-      tx.objectStore(IDB_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION }, IDB_KEY)
+      const tx = db.transaction(DRUGS_STORE, 'readwrite')
+      tx.objectStore(DRUGS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION }, DRUGS_KEY)
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
@@ -283,10 +308,10 @@ export async function writeDrugsCache(data, version) {
  */
 export async function readDrugsCache() {
   try {
-    const db = await openDrugsDB()
+    const db = await openCapsulaDB()
     const record = await new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readonly')
-      const req = tx.objectStore(IDB_STORE).get(IDB_KEY)
+      const tx = db.transaction(DRUGS_STORE, 'readonly')
+      const req = tx.objectStore(DRUGS_STORE).get(DRUGS_KEY)
       req.onsuccess = () => resolve(req.result ?? null)
       req.onerror   = () => reject(req.error)
     })
@@ -303,10 +328,75 @@ export async function readDrugsCache() {
  */
 export async function clearDrugsCache() {
   try {
-    const db = await openDrugsDB()
+    const db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, 'readwrite')
-      tx.objectStore(IDB_STORE).delete(IDB_KEY)
+      const tx = db.transaction(DRUGS_STORE, 'readwrite')
+      tx.objectStore(DRUGS_STORE).delete(DRUGS_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch {
+    // fail silently
+  }
+}
+
+/**
+ * Write the conditions cache to IndexedDB. Exact mirror of writeDrugsCache
+ * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
+ * step 1.1) — same record shape, same schema-version stamping, same
+ * silent-fail guarding.
+ * @param {Array}  data     — the full fetched conditions list
+ * @param {string} version  — ISO timestamp from app_metadata
+ */
+export async function writeConditionsCache(data, version) {
+  if (!Array.isArray(data) || data.length === 0) return
+  try {
+    const db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
+      tx.objectStore(CONDITIONS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: CONDITIONS_CACHE_SCHEMA_VERSION }, CONDITIONS_KEY)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch {
+    // IndexedDB unavailable (rare — e.g. some private-browsing modes) — fail silently
+  }
+}
+
+/**
+ * Read the full stored conditions record — { data, version, fetchedAt } —
+ * or null if nothing valid is saved yet. Exact mirror of readDrugsCache
+ * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
+ * step 1.1) — including the same schema-version check, so an app-side
+ * shape change safely throws out an old cached copy instead of breaking.
+ */
+export async function readConditionsCache() {
+  try {
+    const db = await openCapsulaDB()
+    const record = await new Promise((resolve, reject) => {
+      const tx = db.transaction(CONDITIONS_STORE, 'readonly')
+      const req = tx.objectStore(CONDITIONS_STORE).get(CONDITIONS_KEY)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+    if (!record || !Array.isArray(record.data) || record.data.length === 0) return null
+    if (record.schemaVersion !== CONDITIONS_CACHE_SCHEMA_VERSION) return null
+    return record
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Clear the conditions IndexedDB cache. Exact mirror of clearDrugsCache
+ * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1).
+ */
+export async function clearConditionsCache() {
+  try {
+    const db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
+      tx.objectStore(CONDITIONS_STORE).delete(CONDITIONS_KEY)
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })

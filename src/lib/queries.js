@@ -62,6 +62,11 @@
  *     pharmacokinetics is now mapped with a `?? []` fallback to match every
  *     other jsonb-list field on this table, reflecting its reshape from a
  *     fixed 5-field object to a plain bullet list (also decision 4.16).
+ *   - 2026-08-30 (conditions durable storage, plan §4.1/Phase 1, step 1.2):
+ *     added CONDITIONS_SCHEMA_VERSION, derived from CONDITIONS_SELECT the
+ *     same way FLAT_DRUG_SCHEMA_VERSION is derived from FULL_BRAND_SELECT —
+ *     lets the conditions IndexedDB cache detect a shape change, same as
+ *     the drugs cache already does.
  *   - 2026-07-26 (drug_detail_rebuild, step 1.9b, decision 4.17): added
  *     sources (generics) to FULL_BRAND_SELECT only — detail-only field,
  *     same treatment as drug_interactions/pharmacokinetics/clinical_relevance,
@@ -368,6 +373,13 @@ const CONDITIONS_SELECT = `
   condition_tags ( tags ( name ) )
 `
 
+// 2026-08-30 (conditions durable storage, plan §4.1/Phase 1, step 1.2): same
+// approach as FLAT_DRUG_SCHEMA_VERSION above — derived directly from
+// CONDITIONS_SELECT so it only changes when a column is actually added,
+// removed, or renamed, not on every deploy. Reuses the same hashString
+// helper already defined above for the drugs version.
+export const CONDITIONS_SCHEMA_VERSION = hashString(CONDITIONS_SELECT.replace(/\s+/g, ''))
+
 function mapConditions(data) {
   return data.map(c => ({
     id:                   c.id,
@@ -641,3 +653,4 @@ export async function fetchActiveGates(supabase, platform) {
       minVersion:  g.min_version,
     }))
 }
+

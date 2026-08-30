@@ -1,15 +1,24 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchConditions, fetchMetadataTimestamps } from '../lib/queries'
-import { getCacheData, getCacheTimestamp, writeCache, isCacheExpired } from '../utils/cache'
+import { readConditionsCache, writeConditionsCache } from '../utils/cache'
+import { CACHE_TTL_MS } from '../constants/cache'
 
 const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
 
 /**
  * useConditions — cache-first conditions data hook.
  *
+ * 2026-08-30 (conditions durable storage, plan §4.1/Phase 1, step 1.3):
+ * moved off the small, size-limited localStorage slice system onto the
+ * same durable IndexedDB storage the drugs library already uses — the same
+ * failure that already hit drugs once (silently failing to save, causing
+ * every app open to secretly re-download everything) is avoidable here by
+ * doing it now, while the library is still small. This hook's init flow now
+ * mirrors useDrugs.js's exactly, just with conditions' own cache functions.
+ *
  * On mount:
- *   1. Read cache synchronously → render immediately (zero delay)
+ *   1. Read the saved copy from IndexedDB → show it immediately once ready
  *   2. Fetch app_metadata.conditions_updated_at from Supabase
  *   3. If timestamp differs OR cache is older than 7 days → re-fetch silently
  *   4. Cold start (no cache) → show loading, fetch, render, cache
@@ -22,10 +31,8 @@ const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
  *   refresh     — () => void  (force re-fetch, e.g. after CMS save)
  */
 export function useConditions() {
-  const cached = getCacheData('conditions')
-
-  const [conditions, setConditions] = useState(cached ?? [])
-  const [loading,    setLoading]    = useState(!cached)
+  const [conditions, setConditions] = useState([])
+  const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
 
   // Fetch fresh data from DB, update state, write cache.
@@ -37,7 +44,7 @@ export function useConditions() {
         fetchMetadataTimestamps(supabase),
       ])
       setConditions(fresh)
-      writeCache('conditions', fresh, conditionsUpdatedAt)
+      await writeConditionsCache(fresh, conditionsUpdatedAt)
     } catch (err) {
       setError(err.message ?? 'Failed to load conditions')
     } finally {
@@ -47,16 +54,21 @@ export function useConditions() {
 
   useEffect(() => {
     async function init() {
-      const cachedTs = getCacheTimestamp('conditions')
+      const cached = await readConditionsCache()
 
-      // Cold start — no cache at all
-      if (!cachedTs) {
+      // Cold start — nothing saved yet
+      if (!cached) {
         await fetchAndCache()
         return
       }
 
+      // Show the saved copy immediately
+      setConditions(cached.data)
+      setLoading(false)
+
       // TTL expired (>7 days) — re-fetch regardless of version
-      if (isCacheExpired('conditions')) {
+      const isExpired = !cached.fetchedAt || (Date.now() - new Date(cached.fetchedAt).getTime()) > CACHE_TTL_MS
+      if (isExpired) {
         await fetchAndCache()
         return
       }
@@ -64,15 +76,11 @@ export function useConditions() {
       // Silently check server version against cached version
       try {
         const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
-        if (conditionsUpdatedAt !== cachedTs) {
+        if (conditionsUpdatedAt !== cached.version) {
           await fetchAndCache()
-        } else {
-          // Cache is fresh — ensure loading is false
-          setLoading(false)
         }
       } catch {
         // Network error — keep cached data, don't crash
-        setLoading(false)
       }
     }
 

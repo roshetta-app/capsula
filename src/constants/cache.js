@@ -4,7 +4,7 @@
  * To change TTL: edit CACHE_TTL_MS here only.
  */
 
-import { FLAT_DRUG_SCHEMA_VERSION } from '../lib/queries'
+import { FLAT_DRUG_SCHEMA_VERSION, CONDITIONS_SCHEMA_VERSION } from '../lib/queries'
 
 /** 7 days in milliseconds */
 export const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
@@ -47,3 +47,15 @@ export const METADATA_TABLE = 'app_metadata'
  * code changes.
  */
 export const DRUGS_CACHE_SCHEMA_VERSION = FLAT_DRUG_SCHEMA_VERSION
+
+/**
+ * The local conditions cache's schema version — same idea as
+ * DRUGS_CACHE_SCHEMA_VERSION above, but for the conditions shape (sourced
+ * from CONDITIONS_SCHEMA_VERSION in src/lib/queries.js, derived from
+ * CONDITIONS_SELECT). Added 2026-08-30 (conditions durable storage, plan
+ * §4.1/Phase 1, step 1.2) when conditions moved from localStorage onto the
+ * same IndexedDB storage drugs already uses (see utils/cache.js's
+ * writeConditionsCache/readConditionsCache).
+ */
+export const CONDITIONS_CACHE_SCHEMA_VERSION = CONDITIONS_SCHEMA_VERSION
+
