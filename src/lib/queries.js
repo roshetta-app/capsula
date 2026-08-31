@@ -227,6 +227,14 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
           .eq('is_published', true)
           .range(from, to)
           .then(({ data, error }) => {
+            if (error) throw error
+            loaded += 1
+            onProgress?.(loaded, totalPages)
+            return data
+          })
+      })
+    )
+
     allRows.push(...batchResults.flat())
   }
 
