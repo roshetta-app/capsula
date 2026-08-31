@@ -54,6 +54,7 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
 import { X, Wrench, AlertTriangle, Megaphone, RefreshCw, WifiOff, Sparkles } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
+import BottomNav from '../BottomNav'
 import { useAppGateContext } from '../../context/AppGateContext'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useIsPro } from '../../hooks/useIsPro'
@@ -310,6 +311,20 @@ function OfflineBlock() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Real BottomNav, rendered a second time here — dimmed and inert,
+          not a lookalike. Because it's the actual component, it already
+          shows the correct highlighted tab via its own useLocation() call,
+          with zero extra tracking code needed here. pointer-events: none
+          stops taps from doing anything (a free user can't use it as a
+          side door into cached Drugs/Conditions/Favourites); opacity
+          signals "present but not active" instead of looking broken. The
+          real nav underneath (Layout always renders one) stays fully
+          covered by this block's own opaque background, so nothing
+          double-renders visually — only this dimmed copy is seen. */}
+      <div style={{ opacity: 0.45, pointerEvents: 'none' }}>
+        <BottomNav />
       </div>
     </div>
   )
