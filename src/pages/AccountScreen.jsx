@@ -850,7 +850,11 @@ export default function AccountScreen() {
           Section 5). Moved below the guest sign-in card (was above) per
           explicit placement request, same day. */}
       <div style={{ marginBottom: 'var(--space-3)' }}>
-        {profile?.tier === 'pro' ? (
+        {/* offline-profile-account (2026-09-01) bugfix — this checked
+            'pro', but the real database value (and every other check in
+            the app, e.g. useIsPro.js) uses 'paid'. This tag could never
+            show for a real Pro account before this fix. */}
+        {profile?.tier === 'paid' ? (
           <div style={{
             display:         'flex',
             alignItems:      'center',

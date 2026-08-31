@@ -124,7 +124,29 @@ function cachedSnapshotToProfile(cached) {
     country:               cached.country ?? null,
     specialty:             cached.specialty ?? null,
     profileSetupDismissed: cached.profileSetupDismissed ?? null,
+    // offline-profile-account (2026-09-01): the four fields Manage
+    // Profile's edit screen needs that weren't cached before — added so
+    // that screen can read entirely from this shared, offline-safe
+    // profile instead of running its own separate, offline-unsafe fetch
+    // (see AccountEditScreen.jsx for the other half of this fix).
+    gender:                cached.gender ?? null,
+    phoneCountryCode:      cached.phoneCountryCode ?? null,
+    occupationOther:       cached.occupationOther ?? null,
+    studentType:           cached.studentType ?? null,
   }
+}
+
+// offline-profile-account (2026-09-01) — pulled out of loadProfile so the
+// initial mount effect below can seed `profile` from the cache and clear
+// `loading` immediately, without waiting on the network fetch that used
+// to gate it. loadProfile still calls this itself for the mid-session
+// (already-signed-in, background-refresh) case — same helper, one
+// definition, not two copies of the same "does this cached snapshot
+// belong to this user" check.
+function seedProfileFromCache(currentUser) {
+  const cached = getCachedAuthSnapshot()
+  if (cached?.id === currentUser.id) return cachedSnapshotToProfile(cached)
+  return null
 }
 
 async function exchangeCodeWithRetry(code) {
@@ -216,14 +238,14 @@ export function AuthProvider({ children }) {
     // in-memory profile from ever being downgraded by a stale cached
     // snapshot (e.g. a background token-refresh call arriving after the
     // real profile already loaded this session).
-    const cachedForSeed = getCachedAuthSnapshot()
-    if (cachedForSeed?.id === currentUser.id) {
-      setProfile(prev => prev ?? cachedSnapshotToProfile(cachedForSeed))
+    const seedForLoad = seedProfileFromCache(currentUser)
+    if (seedForLoad) {
+      setProfile(prev => prev ?? seedForLoad)
     }
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed')
+      .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed, gender, phone_country_code, occupation_other, student_type')
       .eq('id', currentUser.id)
       .single()
 
@@ -289,9 +311,9 @@ export function AuthProvider({ children }) {
       // correctly left it alone) and now needs protecting from being
       // wiped by this failed request, same reasoning as the original
       // Pro-offline bug fix above.
-      const cached = getCachedAuthSnapshot()
-      if (cached?.id === currentUser.id) {
-        setProfile(prev => prev ?? cachedSnapshotToProfile(cached))
+      const seedForRetry = seedProfileFromCache(currentUser)
+      if (seedForRetry) {
+        setProfile(prev => prev ?? seedForRetry)
       }
       return
     }
@@ -306,6 +328,13 @@ export function AuthProvider({ children }) {
       country:               data.country,
       specialty:             data.specialty,
       profileSetupDismissed: data.profile_setup_dismissed,
+      // offline-profile-account (2026-09-01): rides along the same way
+      // every other field here already does — see cachedSnapshotToProfile
+      // for why these four were missing.
+      gender:                data.gender,
+      phoneCountryCode:      data.phone_country_code,
+      occupationOther:       data.occupation_other,
+      studentType:           data.student_type,
     })
 
     // account-instant-load: remember just enough to render AccountScreen's
@@ -335,6 +364,14 @@ export function AuthProvider({ children }) {
       country:               error ? null : data.country,
       specialty:             error ? null : data.specialty,
       profileSetupDismissed: error ? null : data.profile_setup_dismissed,
+      // offline-profile-account (2026-09-01): see cachedSnapshotToProfile
+      // above — these four are what Manage Profile's edit screen needs
+      // to read from the shared, offline-safe profile instead of its own
+      // separate fetch.
+      gender:                error ? null : data.gender,
+      phoneCountryCode:      error ? null : data.phone_country_code,
+      occupationOther:       error ? null : data.occupation_other,
+      studentType:           error ? null : data.student_type,
     })
   }, [])
 
@@ -346,6 +383,20 @@ export function AuthProvider({ children }) {
     // the very first render that has a user, not one tick later. This
     // now runs exactly once for the whole app (AuthProvider mounts once
     // in App.jsx), not once per screen that calls useAuth().
+    //
+    // offline-profile-account (2026-09-01) — `loading` used to only clear
+    // once the WHOLE loadProfile() call finished, seed step and network
+    // fetch together. With no connection at all, that network fetch isn't
+    // instant — it has to actually time out before loadProfile() ever
+    // returns — so a cold, offline start sat on a blank screen (Account
+    // tab and Manage Profile both gate on `loading`) for however long
+    // that failing request took, even though the seeded, remembered
+    // profile was sitting there the whole time. `loading` now clears the
+    // moment there's a first paintable state: nobody signed in (nothing
+    // to wait for), or signed in with the cache seed already applied —
+    // the real network confirm/refresh keeps running in the background
+    // exactly as it already does for every later profile reload, it just
+    // no longer blocks the very first paint.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
       userIdRef.current = session?.user?.id ?? null
@@ -355,8 +406,14 @@ export function AuthProvider({ children }) {
       // already uses.
       setCurrentUserId(userIdRef.current)
       setUser(session?.user ?? null)
-      await loadProfile(session?.user ?? null)
+
+      if (session?.user) {
+        const seed = seedProfileFromCache(session.user)
+        if (seed) setProfile(seed)
+      }
       if (!cancelled) setLoading(false)
+
+      await loadProfile(session?.user ?? null)
     })
 
     // Subscribe to auth state changes (sign in / sign out / token refresh).

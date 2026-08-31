@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { supabase } from '../lib/supabase'
 import { updateOwnProfile } from '../lib/queries'
 
@@ -37,6 +38,16 @@ import { updateOwnProfile } from '../lib/queries'
  *
  * `toggleDark` is kept for backward compatibility with any call site
  * still using the old binary API (flips explicitly between light/dark).
+ *
+ * offline-profile-account (2026-09-01) — a theme change made while
+ * offline used to apply locally right away (fine) but silently fail to
+ * reach the server, with no retry — so the next time the profile loaded
+ * (priority 1 above), the server's still-old value would quietly win and
+ * undo the change the person just made. `pendingSyncRef` now remembers
+ * an unsaved local change; the profile-sync effect below leaves `theme`
+ * alone while one is pending instead of overwriting it, and a separate
+ * effect retries the save automatically the moment the connection comes
+ * back.
  */
 
 const ThemeCtx = createContext(null)
@@ -63,10 +74,16 @@ function getSystemPrefersDark() {
 
 export function ThemeProvider({ children }) {
   const { user, profile, refreshProfile } = useAuth()
+  const { isOnline } = useOnlineStatus()
   const [theme, setThemeState] = useState(getInitialTheme)
   const [systemDark, setSystemDark] = useState(getSystemPrefersDark)
   const isFirstRun = useRef(true)
   const syncedForUserId = useRef(null)
+  // offline-profile-account (2026-09-01) — holds { userId, value } for a
+  // theme change that was applied locally but hasn't been confirmed saved
+  // to the server yet (e.g. made while offline). null once there's
+  // nothing outstanding. See file header.
+  const pendingSyncRef = useRef(null)
 
   const isDark = theme === 'system' ? systemDark : theme === 'dark'
 
@@ -110,6 +127,13 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     if (!user || !profile?.themePreference) return
     if (syncedForUserId.current === user.id) return
+    // offline-profile-account (2026-09-01): a change made moments ago
+    // while offline hasn't reached the server yet — profile.themePreference
+    // here is still the OLD value. Applying it now would silently undo
+    // what the person just picked. Leave `theme` as-is; the retry effect
+    // below will save the pending value and mark this synced once it
+    // actually succeeds.
+    if (pendingSyncRef.current?.userId === user.id) return
     syncedForUserId.current = user.id
     setThemeState(profile.themePreference)
   }, [user, profile])
@@ -136,11 +160,42 @@ export function ThemeProvider({ children }) {
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme)
     if (user) {
+      // offline-profile-account (2026-09-01): mark this change as
+      // unsaved before attempting it, and only clear that mark once the
+      // save actually succeeds — a failed/offline attempt leaves it
+      // pending so the retry effect below can pick it up, and so the
+      // profile-sync effect above knows not to overwrite this choice
+      // with the still-old server value in the meantime.
+      pendingSyncRef.current = { userId: user.id, value: newTheme }
       updateOwnProfile(supabase, user.id, { themePreference: newTheme })
-        .then(refreshProfile)
-        .catch(() => {})
+        .then(() => {
+          if (pendingSyncRef.current?.value === newTheme) pendingSyncRef.current = null
+          refreshProfile()
+        })
+        .catch(() => {
+          // Left pending on purpose — see the reconnect-retry effect below.
+        })
     }
   }, [user, refreshProfile])
+
+  // offline-profile-account (2026-09-01) — the moment the connection
+  // comes back, retry any theme change that was made while offline (or
+  // that otherwise failed to save) instead of leaving it stranded until
+  // the person happens to touch the theme control again.
+  useEffect(() => {
+    if (!isOnline) return
+    const pending = pendingSyncRef.current
+    if (!pending || !user || pending.userId !== user.id) return
+    updateOwnProfile(supabase, user.id, { themePreference: pending.value })
+      .then(() => {
+        if (pendingSyncRef.current?.value === pending.value) pendingSyncRef.current = null
+        refreshProfile()
+      })
+      .catch(() => {
+        // Still couldn't save (e.g. "online" per the OS but not really
+        // reachable yet) — stays pending, next reconnect will try again.
+      })
+  }, [isOnline, user, refreshProfile])
 
   const toggleDark = useCallback(() => {
     setTheme(isDark ? 'light' : 'dark')

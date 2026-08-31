@@ -98,15 +98,29 @@
  *     screen, and where this header already had empty space for the
  *     first-time case. Existing users editing via the pencil icon are
  *     unaffected either way — this only changes the forced first-time path.
+ *
+ * offline-profile-account (2026-09-01) — this screen used to run its own
+ * separate fetchOwnProfile() call, independent of (and without) the
+ * offline-safe caching AuthContext.jsx already has for everything else in
+ * the app. Offline, that call simply failed, was swallowed silently, and
+ * left every field blank — including profileSetupDismissed, which then
+ * forced this screen straight into the first-time wizard, making an
+ * already-set-up person look brand new. This screen now reads its fields
+ * from AuthContext's shared `profile` instead (same offline-safe data
+ * AccountScreen already relies on) and no longer makes its own fetch at
+ * all. It also now blocks editing outright while offline (pencil and
+ * Delete Account both disabled with a short message) rather than letting
+ * someone open the wizard, type changes, and have Save silently fail.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ArrowLeft, Pencil, X, User, Phone, Mail, MapPin, Stethoscope, HeartPulse, GraduationCap, Trash2 } from 'lucide-react'
+import { ArrowLeft, Pencil, X, User, Phone, Mail, MapPin, Stethoscope, HeartPulse, GraduationCap, Trash2, WifiOff } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
-import { fetchOwnProfile, updateOwnProfile, deleteOwnAccount } from '../lib/queries'
+import { updateOwnProfile, deleteOwnAccount } from '../lib/queries'
 import { ROUTES } from '../router'
 import ProfileWizard from '../components/ProfileWizard'
 import ProfileAvatar from '../components/ui/ProfileAvatar'
@@ -278,7 +292,11 @@ function ReadOnlySkeleton() {
 }
 
 export default function AccountEditScreen() {
-  const { user, loading, refreshProfile, signOut } = useAuth()
+  const { user, profile, loading, refreshProfile, signOut } = useAuth()
+  // offline-profile-account (2026-09-01) — used to gate editing/deleting
+  // outright while offline, and to explain why those actions are disabled.
+  const { isOnline } = useOnlineStatus()
+  const isOffline = !isOnline
   const { toast } = useToast()
   const navigate = useNavigate()
   const location = useLocation()
@@ -290,9 +308,28 @@ export default function AccountEditScreen() {
   // read-only view instead of the wizard it promised.
   const openWizard = location.state?.openWizard === true
 
-  const [saved, setSaved]                   = useState(EMPTY_FIELDS)
-  const [editing, setEditing]               = useState(false)
-  const [profileLoading, setProfileLoading] = useState(true)
+  // offline-profile-account (2026-09-01) — `saved` is now derived directly
+  // from AuthContext's shared `profile` on every render instead of being
+  // its own separately-fetched state. That `profile` already carries every
+  // field this screen needs (see AuthContext.jsx) and already has the
+  // offline-safe cache fallback built in, so there is no longer a second,
+  // independent fetch here that can fail differently (or silently) than
+  // the rest of the app. While `profile` hasn't loaded yet, this reads as
+  // EMPTY_FIELDS, same blank starting point as before.
+  const saved = profile ? {
+    fullName:              profile.fullName ?? '',
+    gender:                profile.gender ?? '',
+    phoneCountryCode:      profile.phoneCountryCode ?? '',
+    phoneNumber:           profile.phoneNumber ?? '',
+    occupation:            profile.occupation ?? '',
+    occupationOther:       profile.occupationOther ?? '',
+    specialty:             profile.specialty ?? '',
+    studentType:           profile.studentType ?? '',
+    country:               profile.country ?? '',
+    profileSetupDismissed: profile.profileSetupDismissed ?? false,
+  } : EMPTY_FIELDS
+
+  const [editing, setEditing] = useState(false)
   // profile-danger-zone: sheet open state + a busy flag so the confirm
   // button can show "Deleting…" and disable itself while the request is
   // in flight, same convention as AccountScreen's sign-out confirm.
@@ -304,49 +341,28 @@ export default function AccountEditScreen() {
   // Skip for now link — moved here along with the link, see header below.
   const [skipping, setSkipping] = useState(false)
 
+  // offline-profile-account (2026-09-01) — decides once per signed-in
+  // user whether to auto-open the wizard (first-time signup, or the
+  // completeness nudge asking for it), same once-per-user guard pattern
+  // ProfileSetupRedirect.jsx already uses. Previously this lived inside
+  // the old local-fetch effect and ran once the fetch resolved; now that
+  // `saved` comes from shared, already-loading `profile`, this just waits
+  // on that same `loading` flag instead.
+  const initialEditCheckRef = useRef(null)
+
   useEffect(() => {
-    if (!user) {
-      setProfileLoading(false)
-      return
-    }
-
-    let cancelled = false
-    setProfileLoading(true)
-
-    fetchOwnProfile(supabase, user.id)
-      .then(data => {
-        if (cancelled) return
-        const loaded = {
-          fullName:              data.fullName ?? '',
-          gender:                data.gender ?? '',
-          phoneCountryCode:      data.phoneCountryCode ?? '',
-          phoneNumber:           data.phoneNumber ?? '',
-          occupation:            data.occupation ?? '',
-          occupationOther:       data.occupationOther ?? '',
-          specialty:             data.specialty ?? '',
-          studentType:           data.studentType ?? '',
-          country:               data.country ?? '',
-          profileSetupDismissed: data.profileSetupDismissed ?? false,
-        }
-        setSaved(loaded)
-        // First-time signup (routed here by ProfileSetupRedirect) — skip
-        // the view and open straight into the wizard, same as the old
-        // modal appearing automatically. open-wizard-directly: also open
-        // straight into the wizard whenever the nudge card sent us here.
-        if (!loaded.profileSetupDismissed || openWizard) setEditing(true)
-      })
-      .catch(() => {
-        // Leave fields blank on a failed load — the wizard can still be
-        // filled in and saved from scratch.
-      })
-      .finally(() => {
-        if (!cancelled) setProfileLoading(false)
-      })
-
-    return () => { cancelled = true }
-  }, [user])
+    if (!user || loading) return
+    if (initialEditCheckRef.current === user.id) return
+    initialEditCheckRef.current = user.id
+    if (!saved.profileSetupDismissed || openWizard) setEditing(true)
+  }, [user, loading, saved.profileSetupDismissed, openWizard])
 
   function handleStartEdit() {
+    // offline-profile-account (2026-09-01): the Edit button itself is
+    // disabled while offline (see the header button below) — this guard
+    // is just defensive in case handleStartEdit is ever reached another
+    // way, so editing can never open without a connection to save to.
+    if (isOffline) return
     setEditing(true)
   }
 
@@ -365,18 +381,34 @@ export default function AccountEditScreen() {
   // actual field values, independent of this flag) picks up from here
   // for anyone who still has required fields missing.
   async function handleSkip() {
+    // offline-profile-account (2026-09-01): this writes to the server, so
+    // it can't succeed offline — tell the person plainly instead of
+    // attempting it and failing silently. No dedicated error UI slot for
+    // this header-level action (unlike Save below), so a toast is the
+    // clearest way to surface it here.
+    if (isOffline) {
+      toast.error("You're offline — reconnect to continue.")
+      return
+    }
     await updateOwnProfile(supabase, user.id, { profileSetupDismissed: true })
     await refreshProfile()
     navigate(ROUTES.ACCOUNT)
   }
 
   async function handleWizardComplete(values) {
+    // offline-profile-account (2026-09-01): covers going offline after
+    // the wizard was already opened while online — Save is otherwise
+    // still reachable in that case. Throwing here surfaces through
+    // ProfileWizard's own existing saving/error state (it already awaits
+    // onComplete and shows err.message), so no new error UI is needed.
+    if (isOffline) {
+      throw new Error("You're offline — reconnect to save changes.")
+    }
     await updateOwnProfile(supabase, user.id, {
       ...values,
       profileSetupDismissed: true,
     })
     await refreshProfile()
-    setSaved({ ...values, profileSetupDismissed: true })
     setEditing(false)
     toast.success('Profile saved')
   }
@@ -389,6 +421,14 @@ export default function AccountEditScreen() {
   // there's nothing meaningful left to cancel back to on success — this
   // always ends at the signed-out /account screen.
   async function handleDeleteAccount() {
+    // offline-profile-account (2026-09-01): the Delete Account button is
+    // disabled while offline (see the Danger Zone section below) — this
+    // guard is just defensive, so a delete attempt can never fire without
+    // a connection.
+    if (isOffline) {
+      toast.error("You're offline — reconnect to delete your account.")
+      return
+    }
     setDeleting(true)
     const { error } = await deleteOwnAccount(supabase)
     if (error) {
@@ -493,7 +533,7 @@ export default function AccountEditScreen() {
           )}
         </div>
 
-        {!profileLoading && (
+        {!loading && (
           canCancel ? (
             <button
               onClick={handleCancelEdit}
@@ -551,19 +591,24 @@ export default function AccountEditScreen() {
               {skipping ? 'Skipping…' : 'Skip'}
             </button>
           ) : (!editing && (
+            // offline-profile-account (2026-09-01): disabled outright
+            // while offline rather than letting someone open the wizard
+            // and have Save fail — see the notice under the profile
+            // header below for the explanation shown alongside this.
             <button
               onClick={handleStartEdit}
+              disabled={isOffline}
               aria-label="Edit profile"
               style={{
                 display:                 'flex',
                 alignItems:              'center',
                 gap:                     6,
                 border:                  'none',
-                backgroundColor:         'var(--color-accent-light)',
+                backgroundColor:         isOffline ? 'var(--color-border)' : 'var(--color-accent-light)',
                 borderRadius:            999,
                 padding:                 'var(--space-1) var(--space-3)',
-                cursor:                  'pointer',
-                color:                   'var(--color-accent)',
+                cursor:                  isOffline ? 'not-allowed' : 'pointer',
+                color:                   isOffline ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
                 fontSize:                13,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
@@ -583,7 +628,7 @@ export default function AccountEditScreen() {
         margin:   '0 auto',
         padding:  'var(--space-6) var(--space-6) calc(var(--space-12) + 24px)',
       }}>
-        {profileLoading ? (
+        {loading ? (
           <ReadOnlySkeleton />
         ) : editing ? (
           <ProfileWizard
@@ -618,6 +663,29 @@ export default function AccountEditScreen() {
               fullName={saved.fullName}
               occupationLine={occupationLine}
             />
+
+            {/* offline-profile-account (2026-09-01): explains why Edit and
+                Delete Account are both disabled below — shown only in the
+                read-only view (editing is already blocked from opening at
+                all while offline, so there's nothing to explain there). */}
+            {isOffline && (
+              <div style={{
+                display:         'flex',
+                alignItems:      'center',
+                gap:             'var(--space-2)',
+                backgroundColor: 'var(--color-bg)',
+                border:          '1px solid var(--color-border)',
+                borderRadius:    'var(--radius-lg)',
+                padding:         'var(--space-3) var(--space-4)',
+                marginBottom:    'var(--space-5)',
+                fontSize:        13,
+                lineHeight:      1.5,
+                color:           'var(--color-text-secondary)',
+              }}>
+                <WifiOff size={16} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                <span>You're offline. Editing your profile and deleting your account are only available when you're back online.</span>
+              </div>
+            )}
 
             <GroupLabel>Personal</GroupLabel>
             <ReadOnlyGroup>
@@ -661,7 +729,8 @@ export default function AccountEditScreen() {
               overflow:        'hidden',
             }}>
               <button
-                onClick={() => setDeleteSheetOpen(true)}
+                onClick={() => { if (!isOffline) setDeleteSheetOpen(true) }}
+                disabled={isOffline}
                 style={{
                   width:                   '100%',
                   display:                 'flex',
@@ -672,8 +741,9 @@ export default function AccountEditScreen() {
                   backgroundColor:         'transparent',
                   fontFamily:              'var(--font-body)',
                   textAlign:               'left',
-                  cursor:                  'pointer',
-                  color:                   'var(--color-danger)',
+                  cursor:                  isOffline ? 'not-allowed' : 'pointer',
+                  color:                   isOffline ? 'var(--color-text-tertiary)' : 'var(--color-danger)',
+                  opacity:                 isOffline ? 0.6 : 1,
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
