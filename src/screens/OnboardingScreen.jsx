@@ -38,11 +38,27 @@
  * never applies dark mode regardless of device/app theme.
  *
  * On completion: sets capsula_onboarded = true, calls onDone() to unmount.
+ *
+ * 2026-08-31 (onboarding-download-flow hardening, plan Phase 1 addendum):
+ * useDrugs.js/useConditions.js no longer auto-download on a brand-new
+ * install — they wait for start(), called from here. This file now
+ * provides that trigger:
+ *   - Tapping Next on slide 4 (favourites) checks isOnline first. Offline
+ *     -> the tap is blocked and an inline message asks the person to
+ *     connect, instead of advancing into slide 5 just to fail immediately.
+ *     Online -> start() fires for both libraries and slide 5 begins.
+ *   - Slide 5 now reflects three real states instead of assuming success:
+ *     Downloading (the existing progress bar), Success (a brief
+ *     confirmation before completing), and Failed (an error message with
+ *     a Retry button wired to whichever library actually failed).
+ * Back-arrow navigation, a download timeout, and slide-transition polish
+ * are deliberately left for a follow-on piece — not part of this change.
  */
 
 import { useState, useRef, useEffect } from 'react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
 import welcomeHero from '../assets/onboarding/onboarding-1-welcome-hero.jpg'
 import libraryIllustration from '../assets/onboarding/onboarding-2-library-illustration.png'
@@ -59,6 +75,12 @@ const COLORS = {
   textPrimary:   '#1A1916', // --color-ink / --color-text-primary
   textSecondary: '#6B7280', // --color-text-secondary
   dotInactive:   '#D1D5DB',
+  // 2026-08-31 (onboarding-download-flow hardening): added for the
+  // offline-block message and slide 5's Failed/Success states — standard
+  // semantic red/green, matching this file's existing pattern of literal
+  // light-mode hex values (see file header, forced-light-theme note).
+  warning:       '#DC2626',
+  success:       '#16A34A',
 }
 const FONT_BODY = '"IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif'
 
@@ -118,6 +140,28 @@ const CONDITIONS_WEIGHT = 0.15
 // and disappear in under a frame.
 const LOADING_FLOOR_MS = 1200
 
+// How long the Success confirmation (checkmark + "All set!") stays on
+// screen before completing onboarding, once both libraries are actually
+// done. Mirrors LOADING_FLOOR_MS's role — without a hold here, a
+// successful load would vanish straight into the app with no visible
+// confirmation at all. (2026-08-31, onboarding-download-flow hardening.)
+const SUCCESS_HOLD_MS = 900
+
+// Shared pill-button style — used by the slide Next/Get Started button and
+// slide 5's Failed-state Retry button, so the two stay visually identical
+// without duplicating the same style object twice.
+const PRIMARY_BUTTON_STYLE = {
+  backgroundColor: COLORS.accent,
+  color:           COLORS.surface,
+  border:          'none',
+  borderRadius:    999,
+  padding:         '14px 32px',
+  fontSize:        16,
+  fontWeight:      600,
+  fontFamily:      FONT_BODY,
+  cursor:          'pointer',
+}
+
 // ─── Shared app logo — same asset layout.jsx's header uses (public/logo.svg),
 // rendered white via a CSS filter on the blue hero slides so no second,
 // light-on-dark image asset is needed. ─────────────────────────────────────
@@ -138,29 +182,65 @@ function CapsulaLogo({ light, height = 28 }) {
 }
 
 // ─── Combined progress ──────────────────────────────────────────────────────
+// 2026-08-31 (onboarding-download-flow hardening): now also surfaces
+// `failed` and exposes `start`/`retry` for both libraries together, since
+// slide 4's Next tap and slide 5's Failed-state Retry button both need to
+// act on whichever library is actually relevant without the rest of this
+// file reaching into two separate contexts itself.
 function useCombinedLibraryProgress() {
-  const { loading: conditionsLoading } = useConditionContext()
-  const { loading: drugsLoading, progress: drugsProgress } = useDrugContext()
+  const {
+    loading: conditionsLoading,
+    error:   conditionsError,
+    start:   startConditions,
+    retry:   retryConditions,
+  } = useConditionContext()
+  const {
+    loading:  drugsLoading,
+    progress: drugsProgress,
+    error:    drugsError,
+    start:    startDrugs,
+    retry:    retryDrugs,
+  } = useDrugContext()
 
   // Drugs is only truly finished (light list + full detail) once loading
   // is false AND progress has been reset to null — loading alone flips
   // false as soon as the fast list arrives, while the fuller detail fetch
   // keeps reporting progress in the background after that. Onboarding
-  // should wait for the whole thing, not just the fast list.
-  const drugsDone = !drugsLoading && drugsProgress === null
+  // should wait for the whole thing, not just the fast list. A failed
+  // attempt also leaves loading false and progress null (see
+  // useDrugs.js's fetchLightThenFull catch block), so drugsError is
+  // checked explicitly rather than letting that combination read as done.
+  const drugsDone = !drugsLoading && drugsProgress === null && !drugsError
 
-  const conditionsFraction = conditionsLoading ? 0 : 1
-  const drugsFraction = drugsProgress && drugsProgress.total > 0
-    ? Math.min(1, drugsProgress.loaded / drugsProgress.total)
-    : (drugsDone ? 1 : 0)
+  const failed = !!drugsError || !!conditionsError
+
+  const conditionsFraction = (conditionsLoading || conditionsError) ? 0 : 1
+  const drugsFraction = drugsError
+    ? 0
+    : (drugsProgress && drugsProgress.total > 0
+        ? Math.min(1, drugsProgress.loaded / drugsProgress.total)
+        : (drugsDone ? 1 : 0))
 
   const fraction =
     conditionsFraction * CONDITIONS_WEIGHT +
     drugsFraction * (1 - CONDITIONS_WEIGHT)
 
-  const done = !conditionsLoading && drugsDone
+  const done = !failed && !conditionsLoading && drugsDone
 
-  return { fraction, done }
+  function start() {
+    startDrugs()
+    startConditions()
+  }
+
+  // Only retries whichever library actually failed — calling retry() on
+  // one that already succeeded would incorrectly re-trigger its loading
+  // state over data that's already in place.
+  function retry() {
+    if (drugsError) retryDrugs()
+    if (conditionsError) retryConditions()
+  }
+
+  return { fraction, done, failed, start, retry }
 }
 
 // ─── OnboardingScreen ───────────────────────────────────────────────────────
@@ -168,7 +248,17 @@ function useCombinedLibraryProgress() {
 export default function OnboardingScreen({ onDone }) {
   const [current, setCurrent] = useState(0)
 
-  const { fraction, done } = useCombinedLibraryProgress()
+  const { fraction, done, failed, start, retry } = useCombinedLibraryProgress()
+  const { isOnline } = useOnlineStatus()
+
+  // 2026-08-31: true only right after an offline Next tap on slide 4 gets
+  // blocked — see next() below. Clears itself once the device is back
+  // online, so the message doesn't linger after the person reconnects.
+  const [offlineBlocked, setOfflineBlocked] = useState(false)
+  useEffect(() => {
+    if (isOnline) setOfflineBlocked(false)
+  }, [isOnline])
+
   // Always holds the latest `done` value for use inside effects/timers
   // without those effects needing `done` itself in their dependency array.
   const doneRef = useRef(done)
@@ -176,6 +266,7 @@ export default function OnboardingScreen({ onDone }) {
 
   const isLoadingSlide = SLIDES[current].isLoading
   const isLast = current === LAST_INDEX
+  const isFavouritesSlide = current === 3 // slide 4 — see file header
 
   function complete() {
     localStorage.setItem('capsula_onboarded', 'true')
@@ -205,12 +296,17 @@ export default function OnboardingScreen({ onDone }) {
   // never to skip or shorten the floor itself.
   const [floorElapsed, setFloorElapsed] = useState(false)
   const [entryFillStarted, setEntryFillStarted] = useState(false)
+  // 2026-08-31: true while the brief Success confirmation (checkmark +
+  // "All set!") is showing, right before complete() fires. See the effect
+  // below.
+  const [showSuccess, setShowSuccess] = useState(false)
   const alreadyDoneAtEntryRef = useRef(false)
 
   useEffect(() => {
     if (!isLoadingSlide) {
       setFloorElapsed(false)
       setEntryFillStarted(false)
+      setShowSuccess(false)
       return
     }
     alreadyDoneAtEntryRef.current = doneRef.current
@@ -225,18 +321,39 @@ export default function OnboardingScreen({ onDone }) {
     }
   }, [isLoadingSlide])
 
+  // 2026-08-31: once both libraries are genuinely done (and the minimum
+  // floor time has passed) with no error, show the brief Success
+  // confirmation instead of jumping straight into the app — then
+  // complete() after SUCCESS_HOLD_MS. Never fires while `failed` is true;
+  // the Failed state (rendered below) takes over instead.
   useEffect(() => {
-    if (isLoadingSlide && done && floorElapsed) {
-      complete()
+    if (isLoadingSlide && done && floorElapsed && !failed) {
+      setShowSuccess(true)
+      const holdTimer = setTimeout(() => complete(), SUCCESS_HOLD_MS)
+      return () => clearTimeout(holdTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingSlide, done, floorElapsed])
+  }, [isLoadingSlide, done, floorElapsed, failed])
 
   function next() {
-    if (!isLast) setCurrent(c => c + 1)
-    // No manual action on the final slide — completion is automatic (see
-    // the effects above), matching "downloads stay fully automatic, no
-    // manual tap to start" from the plan's existing decision.
+    if (isLast) return
+
+    // Slide 4 (favourites) is where the first-ever library download
+    // begins — see useDrugs.js/useConditions.js's start(). Checked here,
+    // before calling start(), so a genuinely offline device gets an
+    // inline message on this slide instead of advancing into slide 5 and
+    // watching it fail immediately (2026-08-31 decision: offline -> block
+    // Next, ask the person to connect).
+    if (isFavouritesSlide) {
+      if (!isOnline) {
+        setOfflineBlocked(true)
+        return
+      }
+      setOfflineBlocked(false)
+      start()
+    }
+
+    setCurrent(c => c + 1)
   }
 
   // Real progress while genuinely still loading — unchanged from before.
@@ -369,57 +486,90 @@ export default function OnboardingScreen({ onDone }) {
               {slide.body}
             </p>
           )}
+
+          {/* 2026-08-31: inline offline message on the favourites slide —
+              see next() above. Only ever shown here, never on slide 5,
+              since the check happens before start() is called. */}
+          {isFavouritesSlide && offlineBlocked && (
+            <p
+              style={{
+                fontSize:   14,
+                fontWeight: 600,
+                color:      COLORS.warning,
+                lineHeight: 1.5,
+                margin:     '12px 0 0',
+              }}
+            >
+              Please connect to the internet to continue.
+            </p>
+          )}
         </div>
 
-        {/* ── Bottom action: Next/Get Started button, or the combined
-              progress bar on the final slide (no button there — the
-              download is automatic and the screen advances itself). ── */}
+        {/* ── Bottom action: Next/Get Started button on slides 1–4, or
+              one of slide 5's three real states (Downloading/Success/
+              Failed) on the final slide. ── */}
         {isLoadingSlide ? (
-          <div
-            role="progressbar"
-            aria-valuenow={Math.round(displayFraction * 100)}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            style={{
-              width:           '100%',
-              height:          14,
-              borderRadius:    999,
-              border:          `2px solid ${COLORS.accent}`,
-              backgroundColor: COLORS.surface,
-              overflow:        'hidden',
-              marginTop:       12,
-            }}
-          >
+          failed ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', marginTop: 12 }}>
+              <p style={{ fontSize: 14, color: COLORS.warning, margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
+                Something went wrong loading your library. Check your connection and try again.
+              </p>
+              <button
+                onClick={retry}
+                style={PRIMARY_BUTTON_STYLE}
+                onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
+                onMouseUp={e => { e.currentTarget.style.backgroundColor = COLORS.accent }}
+              >
+                Try Again
+              </button>
+            </div>
+          ) : showSuccess ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 12 }}>
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <circle cx="12" cy="12" r="11" stroke={COLORS.success} strokeWidth="2" />
+                <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.success} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span style={{ fontSize: 15, fontWeight: 600, color: COLORS.success }}>All set!</span>
+            </div>
+          ) : (
             <div
+              role="progressbar"
+              aria-valuenow={Math.round(displayFraction * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
               style={{
-                width:           `${Math.max(6, displayFraction * 100)}%`,
-                height:          '100%',
+                width:           '100%',
+                height:          14,
                 borderRadius:    999,
-                backgroundColor: COLORS.accent,
-                // Slower, deliberate fill when the data was already done
-                // on arrival (matches LOADING_FLOOR_MS); the normal quick
-                // transition otherwise, same as before.
-                transition:      alreadyDoneAtEntryRef.current
-                  ? `width ${LOADING_FLOOR_MS}ms ease`
-                  : 'width 0.3s ease',
+                border:          `2px solid ${COLORS.accent}`,
+                backgroundColor: COLORS.surface,
+                overflow:        'hidden',
+                marginTop:       12,
               }}
-            />
-          </div>
+            >
+              <div
+                style={{
+                  width:           `${Math.max(6, displayFraction * 100)}%`,
+                  height:          '100%',
+                  borderRadius:    999,
+                  backgroundColor: COLORS.accent,
+                  // Slower, deliberate fill when the data was already done
+                  // on arrival (matches LOADING_FLOOR_MS); the normal quick
+                  // transition otherwise, same as before.
+                  transition:      alreadyDoneAtEntryRef.current
+                    ? `width ${LOADING_FLOOR_MS}ms ease`
+                    : 'width 0.3s ease',
+                }}
+              />
+            </div>
+          )
         ) : (
           <button
             onClick={next}
             style={{
-              backgroundColor: COLORS.accent,
-              color:           COLORS.surface,
-              border:          'none',
-              borderRadius:    999,
-              padding:         '14px 32px',
-              fontSize:        16,
-              fontWeight:      600,
-              fontFamily:      FONT_BODY,
-              cursor:          'pointer',
-              width:           current === 0 ? '100%' : 'auto',
-              marginTop:       12,
+              ...PRIMARY_BUTTON_STYLE,
+              width:     current === 0 ? '100%' : 'auto',
+              marginTop: 12,
             }}
             onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
             onMouseUp={e => { e.currentTarget.style.backgroundColor = COLORS.accent }}

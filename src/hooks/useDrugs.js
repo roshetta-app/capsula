@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchFlatDrugs, fetchFlatDrugsLight, fetchMetadataTimestamps } from '../lib/queries'
 import { readDrugsCache, writeDrugsCache } from '../utils/cache'
@@ -12,6 +12,14 @@ export function useDrugs() {
   // in the background; null the rest of the time — nothing to show a
   // progress ring for on a normal, already-cached open.
   const [progress, setProgress] = useState(null)
+
+  // Onboarding-download-flow hardening (plan Sec Phase 1, 1.10): on a
+  // brand-new install (no cache yet, onboarding not finished), the
+  // first-ever download waits for start() below — called from
+  // OnboardingScreen's slide 4 Next tap — instead of firing the instant
+  // this hook mounts. startedRef just guards against firing the fetch a
+  // second time if start() somehow gets called more than once.
+  const startedRef = useRef(false)
 
   async function fetchAndCache() {
     try {
@@ -30,7 +38,15 @@ export function useDrugs() {
   // then keep loading the complete data (full clinical write-ups) behind
   // the scenes and swap it in once ready. Reports real page-by-page
   // progress via `progress` while each stage is in flight.
+  //
+  // Resets loading/error at the top of every call, not just the first —
+  // this is what lets it double as a retry after a failed attempt (see
+  // retry() below) without a stale error message sitting around once a
+  // new attempt is under way.
   async function fetchLightThenFull() {
+    setLoading(true)
+    setError(null)
+
     try {
       const light = await fetchFlatDrugsLight(supabase, (loaded, total) => setProgress({ loaded, total }))
       setDrugs(light)
@@ -57,14 +73,45 @@ export function useDrugs() {
     }
   }
 
+  // Called from OnboardingScreen's slide 4 Next tap. No-ops if the
+  // first-ever download has already started (e.g. a second tap), so it
+  // never restarts an in-flight or already-finished attempt.
+  const start = useCallback(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+    fetchLightThenFull()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Called from the onboarding Failed state's Retry button. Unlike
+  // start(), this always re-attempts — that is the whole point of a
+  // retry — and marks startedRef so a stray later start() call can't
+  // also fire a second attempt on top of it.
+  const retry = useCallback(() => {
+    startedRef.current = true
+    fetchLightThenFull()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     async function init() {
       const cached = await readDrugsCache()
 
-      // Cold start — nothing saved yet. Stage the load: fast list first,
-      // full detail fills in right after, both with real progress.
+      // Cold start — nothing saved yet.
       if (!cached) {
-        await fetchLightThenFull()
+        // A brand-new install waits for start() above, called from
+        // OnboardingScreen's slide 4 Next tap, instead of downloading
+        // the instant this hook mounts (plan Sec Phase 1, 1.10 —
+        // overrides the previous "downloads are automatic" behavior for
+        // this specific first-ever-open case only). A device that's
+        // already finished onboarding once but somehow has no cache
+        // (e.g. it was cleared) has no onboarding screen left to tap
+        // Next on, so it still loads immediately, exactly as before.
+        const alreadyOnboarded = localStorage.getItem('capsula_onboarded') === 'true'
+        if (alreadyOnboarded) {
+          startedRef.current = true
+          await fetchLightThenFull()
+        }
         return
       }
 
@@ -94,5 +141,5 @@ export function useDrugs() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  return { drugs, loading, error, progress, refresh: fetchAndCache }
+  return { drugs, loading, error, progress, refresh: fetchAndCache, start, retry }
 }

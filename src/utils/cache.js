@@ -36,6 +36,7 @@
  */
 
 import { CACHE_KEYS, CACHE_TTL_MS, DRUGS_CACHE_SCHEMA_VERSION, CONDITIONS_CACHE_SCHEMA_VERSION } from '../constants/cache'
+import { logCrash } from './crashLogger'
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -243,6 +244,19 @@ export function writeIconCache(url, svg) {
 // get the new 'conditions' store created automatically the next time they
 // open the app; the existing 'drugs' store and its data are untouched by
 // this bump.
+//
+// 2026-08-31 (onboarding-download-flow hardening, plan §Phase 1, 1.16): a
+// failed save or read here used to just fail silently, same as every other
+// catch block in this file — which is exactly how the "stuck on loading
+// too many times" bug hid for as long as it did (see the 2026-07-16 note
+// above). The four IndexedDB functions below now also report a failure to
+// the app's existing crash log (crashLogger.js) before falling back to
+// their previous silent behavior, so a real, repeating problem on someone's
+// device shows up somewhere instead of vanishing without a trace. This is
+// deliberately scoped to just these four — the localStorage-based functions
+// above (categories, icons) aren't part of the bug this was chasing, and
+// logging every localStorage quota hiccup app-wide would be a much noisier,
+// separate change.
 
 const IDB_NAME    = 'capsula-cache'
 const IDB_VERSION = 2
@@ -274,9 +288,9 @@ function openCapsulaDB() {
  * current DRUGS_CACHE_SCHEMA_VERSION on every write, so a later app-side
  * shape change (new fields on the mapped drug object, independent of the
  * server-side data version) can be detected and invalidated on read even
- * when the underlying database rows themselves haven't changed. Silently
- * no-ops on empty data or any storage error, same guarding behavior as
- * writeCache above.
+ * when the underlying database rows themselves haven't changed. Reports a
+ * failure to the crash log (2026-08-31, see file header) before falling
+ * back to its previous silent no-op.
  * @param {Array}  data     — the full fetched drug list
  * @param {string} version  — ISO timestamp from app_metadata
  */
@@ -290,8 +304,11 @@ export async function writeDrugsCache(data, version) {
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
-  } catch {
-    // IndexedDB unavailable (rare — e.g. some private-browsing modes) — fail silently
+  } catch (err) {
+    // IndexedDB unavailable (rare — e.g. some private-browsing modes) —
+    // still fails silently from the caller's point of view, but now also
+    // recorded so a repeating failure on a real device can be found.
+    logCrash(err, 'utils/cache.js: writeDrugsCache')
   }
 }
 
@@ -304,7 +321,9 @@ export async function writeDrugsCache(data, version) {
  * older version of it (2026-07-18 bugfix) — an outdated shape needs a
  * real re-fetch, not just a "the data itself looks fine" pass-through,
  * since the server-side version timestamp alone can't detect an app-side
- * field change.
+ * field change. A genuine read failure (as opposed to "nothing saved yet")
+ * is reported to the crash log (2026-08-31, see file header) before
+ * falling back to null, same as writeDrugsCache above.
  */
 export async function readDrugsCache() {
   try {
@@ -318,7 +337,8 @@ export async function readDrugsCache() {
     if (!record || !Array.isArray(record.data) || record.data.length === 0) return null
     if (record.schemaVersion !== DRUGS_CACHE_SCHEMA_VERSION) return null
     return record
-  } catch {
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readDrugsCache')
     return null
   }
 }
@@ -344,7 +364,7 @@ export async function clearDrugsCache() {
  * Write the conditions cache to IndexedDB. Exact mirror of writeDrugsCache
  * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
  * step 1.1) — same record shape, same schema-version stamping, same
- * silent-fail guarding.
+ * crash-log reporting on failure (2026-08-31, see file header).
  * @param {Array}  data     — the full fetched conditions list
  * @param {string} version  — ISO timestamp from app_metadata
  */
@@ -358,8 +378,8 @@ export async function writeConditionsCache(data, version) {
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
-  } catch {
-    // IndexedDB unavailable (rare — e.g. some private-browsing modes) — fail silently
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: writeConditionsCache')
   }
 }
 
@@ -367,8 +387,8 @@ export async function writeConditionsCache(data, version) {
  * Read the full stored conditions record — { data, version, fetchedAt } —
  * or null if nothing valid is saved yet. Exact mirror of readDrugsCache
  * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
- * step 1.1) — including the same schema-version check, so an app-side
- * shape change safely throws out an old cached copy instead of breaking.
+ * step 1.1) — including the same schema-version check and the same
+ * crash-log reporting on a genuine failure (2026-08-31, see file header).
  */
 export async function readConditionsCache() {
   try {
@@ -382,7 +402,8 @@ export async function readConditionsCache() {
     if (!record || !Array.isArray(record.data) || record.data.length === 0) return null
     if (record.schemaVersion !== CONDITIONS_CACHE_SCHEMA_VERSION) return null
     return record
-  } catch {
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readConditionsCache')
     return null
   }
 }
