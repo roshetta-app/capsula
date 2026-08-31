@@ -662,7 +662,6 @@ export default function OnboardingScreen({ onDone }) {
               <span style={{ fontSize: 15, fontWeight: 600, color: COLORS.success }}>All set!</span>
             </div>
           ) : (
-          ) : (
             <div style={{ width: '100%', marginTop: 12 }}>
               <div
                 role="progressbar"
