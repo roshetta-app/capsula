@@ -603,7 +603,18 @@ export default function DrugsScreen() {
               </div>
               {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+            {/* 2026-08-31 (cosmetic-only fix): while almost every category
+                computes to zero drugs (taxonomy mismatch, separate data
+                cleanup — not fixed here), "All Drugs" was the only tile
+                that ever rendered, sitting alone in a 2-column grid with a
+                visibly empty slot next to it. Switching to a single column
+                whenever there are no real categories yet makes that one
+                tile fill the row on purpose, instead of looking like a
+                stalled/broken list. No data or category logic changed —
+                this flips back to the normal 2-column grid automatically,
+                with no further code change, the moment categoriesWithCounts
+                actually has entries again. */}
+            <div style={{ display: 'grid', gridTemplateColumns: categoriesWithCounts.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
               <CategoryRow
                 label="All Drugs"
                 iconType="lucide"
