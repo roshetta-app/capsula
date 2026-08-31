@@ -58,16 +58,24 @@ export function useDrugs() {
       return
     }
 
-    // Full fetch continues in the background. If this fails, the light
-    // list stays in place and usable — the next normal app open retries
-    // via the regular cache/version-check path below.
+    // Full fetch continues in the background. The light list stays in
+    // place and usable if this fails — but the failure itself now gets
+    // reported (2026-08-31 bugfix), instead of failing silently as
+    // before. Silently swallowing it meant nothing ever got saved to the
+    // device on a failure here, yet nothing downstream could tell —
+    // onboarding would show "All set!" and finish anyway, and every
+    // later app open would quietly restart this same download from
+    // scratch, since there was no cached copy and no record that the
+    // first attempt had failed. Reporting it the same way every other
+    // failure here does lets onboarding's Failed state and Retry button
+    // (plan step 1.13) actually catch this case instead.
     try {
       const fresh = await fetchFlatDrugs(supabase, (loaded, total) => setProgress({ loaded, total }))
       const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
       setDrugs(fresh)
       await writeDrugsCache(fresh, drugsUpdatedAt)
-    } catch {
-      // Silent — see comment above
+    } catch (err) {
+      setError(err.message ?? 'Failed to load drugs')
     } finally {
       setProgress(null)
     }

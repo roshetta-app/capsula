@@ -130,7 +130,7 @@
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -196,7 +196,7 @@ export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
   const {
-    drugs, loading, progress,
+    drugs, loading, progress, error, retry,
     mode, setMode,
     activeFilters, setActiveFilters,
     sortMode, setSortMode,
@@ -570,6 +570,18 @@ export default function DrugsScreen() {
           <LoadingProgress progress={progress} />
         )}
 
+        {/* 2026-08-31 bugfix: previously, if loading finished but nothing
+            actually came through (a failed cold-start fetch), this screen
+            fell straight through to an empty category grid with no
+            message and no way to recover short of restarting the app.
+            Now a real failure — surfaced by useDrugs.js — gets a plain
+            message and a Retry button instead. Same LoadingProgress
+            component above still owns the "still downloading" moment;
+            this only covers "finished trying, and it didn't work". */}
+        {!loading && drugs.length === 0 && error && (
+          <LibraryErrorState onRetry={retry} />
+        )}
+
         {/* Category grid — 2026-08-09: switched from a stacked full-width
             list to a 2-column grid of compact tiles. The list version used
             the same full-width white-card shape as DrugsHero and the search
@@ -580,7 +592,7 @@ export default function DrugsScreen() {
             the same". "All Drugs" stays as the first tile in the grid
             rather than pulled out as its own row, matching the agreed
             mockup. */}
-        {!loading && (
+        {!loading && !(drugs.length === 0 && error) && (
           <>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -936,6 +948,35 @@ function LoadingProgress({ progress }) {
           This only happens once
         </div>
       </div>
+    </div>
+  )
+}
+
+// ─── LibraryErrorState ──────────────────────────────────────────────────────
+// 2026-08-31 bugfix: shown when the cold-start download finishes trying but
+// didn't actually get anything — previously this fell through to an empty
+// category grid with no explanation and no way to recover without
+// restarting the app. Same icon → headline → supporting-line → button shape
+// as EmptyState/CrossModeHintState further down this file, reusing
+// FilledHintButton, so it reads as a native member of that family. onRetry
+// is useDrugs.js's retry() (via DrugContext), the same one the onboarding
+// screen's own Retry button already uses.
+
+function LibraryErrorState({ onRetry }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <WifiOff size={28} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        Couldn't load your library
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        Check your connection and try again
+      </div>
+      <FilledHintButton onClick={onRetry}>
+        Try again
+      </FilledHintButton>
     </div>
   )
 }
@@ -1413,5 +1454,3 @@ function NarrowResultsHint() {
     </div>
   )
 }
-
-
