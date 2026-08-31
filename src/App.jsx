@@ -23,14 +23,14 @@
  * app-wide, which also fixed a visible load delay on the Edit Profile
  * page (F13 Mini-stage 5 follow-up).
  *
- * Sign-in nudge fix (this session) — added NotesActivityProvider, inside
- * FavouritesProvider (no dependency between the two, just grouped with
- * its sibling), and mounted SignInNudge alongside ProfileSetupRedirect.
- * SignInNudge is the actual fix: AccountSheet and useSignInPrompt both
- * already existed but nothing ever rendered them together, so the D12/D16
- * "prompt after first favourite" nudge never fired. This also extends the
- * trigger to a signed-out user's first personal note, not just their
- * first favourite (see NotesActivityContext.jsx).
+ * Sign-in nudge fix — added NotesActivityProvider, inside FavouritesProvider
+ * (no dependency between the two, just grouped with its sibling), and
+ * mounted SignInNudge alongside ProfileSetupRedirect. SignInNudge is the
+ * actual fix: AccountSheet and useSignInPrompt both already existed but
+ * nothing ever rendered them together, so the D12/D16 "prompt after first
+ * favourite" nudge never fired. This also extends the trigger to a
+ * signed-out user's first personal note, not just their first favourite
+ * (see NotesActivityContext.jsx).
  *
  * App Gate System Phase 1 Step 4c — added AppGateResumeListener below,
  * which re-checks for a Force Update / message every time the app resumes
@@ -42,56 +42,83 @@
  * AppGate is rendered as a SIBLING of OnboardingGate, not a wrapper around
  * it — unlike OnboardingGate, AppGate takes no children prop; it draws its
  * own full-screen, fixed-position overlay (zIndex 2000) when a gate is
- * active and renders nothing at all otherwise. Passing OnboardingGate/
- * AppRoutes to it as children was tried first and produced a permanent
- * blank screen (children were silently discarded on every load, gate or
- * no gate) — fixed same-session once caught. Sitting as a sibling still
+ * active and renders nothing at all otherwise. Sitting as a sibling still
  * achieves the plan's intent (a maintenance/force-update block can cover
  * the screen before onboarding even shows) since AppGate's overlay simply
  * paints on top of everything below it when active. AppGateResumeListener
- * is rendered inside AppGateProvider so it can reach useAppGateContext();
- * this is the step that goes live for everyone.
+ * is rendered inside AppGateProvider so it can reach useAppGateContext().
  *
- * Provider order (outermost → innermost):
+ * Admin crash isolation (2026-09-01) — this is the biggest structural
+ * change to this file since the admin sidebar redesign. Previously every
+ * provider below AuthProvider (Theme, Condition, Drug, Favourites, Notes,
+ * Push, OnlineStatus, AppGate) wrapped ONE shared AppRoutes tree covering
+ * both public and admin paths — so a crash in ANY of them (e.g.
+ * ThemeContext.jsx's useOnlineStatus() call, 2026-09-01) took down
+ * /admin/* along with the public app, leaving the admin with no way to
+ * even reach the CMS to diagnose it.
+ *
+ * router.jsx's single AppRoutes() is now split into PublicRoutes() and
+ * AdminRoutes() (see that file's header) — same individual routes,
+ * unchanged. Below, the two are mounted as separate branches, each under
+ * its own ErrorBoundary, so a crash in one branch's subtree cannot reach
+ * the other: React error boundaries only catch errors from their own
+ * children, never from unrelated siblings.
+ *
+ * ConditionProvider and DrugProvider are the one deliberate exception —
+ * they stay OUTSIDE (above) the branch split, shared by both, exactly as
+ * before. Two reasons: (1) confirmed by reading both files, neither
+ * depends on Auth/Theme/OnlineStatus/Favourites/AppGate/Push — the actual
+ * crash risks — so keeping them shared doesn't reintroduce the problem
+ * this change fixes; (2) ConditionEditor.jsx, ConditionsCMS.jsx,
+ * AddDrugFlow.jsx, and DrugEditor.jsx all call `.refresh()` from these two
+ * contexts specifically to invalidate the SAME cache instance the public
+ * Conditions/Drugs screens read from, in the same tab/session — giving
+ * admin its own separate instances would silently break that live-refresh
+ * behavior instead of just isolating crash risk.
+ *
+ * Every other consumer-only provider (Theme, Favourites, NotesActivity,
+ * PushSubscription, OnlineStatus, AppGate) — none of them used by any
+ * admin screen — now lives ONLY inside the public branch.
+ *
+ * Provider tree (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
- *   OnlineStatusProvider → ThemeProvider → ConditionProvider →
- *   DrugProvider → FavouritesProvider → NotesActivityProvider →
- *   PushSubscriptionProvider → AppGateProvider →
- *   [AppGateResumeListener, AppGate, OnboardingGate → AppRoutes,
- *   ProfileSetupRedirect, SignInNudge] (all five as siblings inside
- *   AppGateProvider — AppGate does not wrap OnboardingGate, see note above)
- *   (OnlineStatusProvider added 2026-08-31, Pro-offline-lift bugfix — was a
- *   plain hook (useOnlineStatus.js) called independently by both
- *   OfflineBanner.jsx and AppGate.jsx, so each ran its own separate
- *   reachability check with no coordination, which is what made the
- *   offline block's own lift-back-online timing look inconsistent against
- *   the banner's. Needs to cover both AppGate below and OfflineBanner,
- *   mounted much deeper inside AppRoutes → Layout.)
- *   (OnlineStatusProvider moved 2026-09-01, crash fix — the
- *   offline-profile-account fix gave ThemeContext.jsx its own
- *   useOnlineStatus() call (for retry-on-reconnect theme sync), but
- *   ThemeProvider sat ABOVE OnlineStatusProvider in this tree at the
- *   time, so ThemeProvider crashed on every single mount, on every
- *   route, app-wide ("useOnlineStatus must be used inside
- *   <OnlineStatusProvider>"). OnlineStatusProvider has no dependency on
- *   anything above it in the tree — just Supabase — so it's moved here,
- *   directly inside AuthProvider and outside ThemeProvider, instead of
- *   its old spot inside PushSubscriptionProvider. Still fully covers
- *   AppGate and OfflineBanner as before, plus ThemeContext now.)
- *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
- *   inside AuthProvider since it reads useAuth() internally, and outside
- *   everything that might read the theme.)
- *   (ProfileSetupRedirect and SignInNudge are both mounted as siblings of
- *   OnboardingGate, not nested inside it — same spot ProfileSetupModal
- *   used to sit (F13 Mini-stage 4, 2026-08-21). Neither is a route and
- *   neither is gated by the device-level onboarding flow; both read their
- *   own conditions internally via context.)
- *   (AppGateProvider + AppGate sit outside OnboardingGate entirely, Step
- *   4e — so a maintenance/force-update block can show before onboarding
- *   even does. ProfileSetupRedirect and SignInNudge stay siblings of
- *   OnboardingGate, both now nested inside AppGateProvider along with it —
- *   neither reads AppGateContext, they're just grouped with the rest of
- *   the app-shell-level components at this depth.)
+ *   ConditionProvider → DrugProvider →
+ *     ┌─ ErrorBoundary → AdminRoutes                     (admin branch)
+ *     └─ ErrorBoundary → OnlineStatusProvider → ThemeProvider →
+ *          FavouritesProvider → NotesActivityProvider →
+ *          PushSubscriptionProvider → AppGateProvider →
+ *          [AppGateResumeListener, AppGate, OnboardingGate → PublicRoutes,
+ *          ProfileSetupRedirect, SignInNudge]              (public branch)
+ *
+ * The outermost ErrorBoundary (Phase 3K) stays as the last-resort fallback
+ * for anything above the split (BrowserRouter/ToastProvider/AuthProvider/
+ * ConditionProvider/DrugProvider) — all confirmed low-risk, shared
+ * infrastructure, not the consumer-specific code that actually caused
+ * today's crash.
+ *
+ * (OnlineStatusProvider added 2026-08-31, Pro-offline-lift bugfix — was a
+ * plain hook (useOnlineStatus.js) called independently by both
+ * OfflineBanner.jsx and AppGate.jsx, so each ran its own separate
+ * reachability check with no coordination, which is what made the
+ * offline block's own lift-back-online timing look inconsistent against
+ * the banner's. Needs to cover both AppGate below and OfflineBanner,
+ * mounted much deeper inside PublicRoutes → Layout.)
+ * (OnlineStatusProvider moved 2026-09-01, crash fix — ThemeContext.jsx
+ * gained its own useOnlineStatus() call for retry-on-reconnect theme
+ * sync, but ThemeProvider sat above OnlineStatusProvider at the time, so
+ * it crashed on every mount. Placed directly above ThemeProvider here so
+ * it's guaranteed to exist first.)
+ * (ThemeProvider added 2026-08-22, account-theme-sync bugfix — reads
+ * useAuth() internally, so it must stay inside AuthProvider's subtree;
+ * unchanged by the crash-isolation restructure other than which branch
+ * it now lives in.)
+ * (ProfileSetupRedirect and SignInNudge are mounted as siblings of
+ * OnboardingGate, not nested inside it. Neither is a route and neither is
+ * gated by the device-level onboarding flow; both read their own
+ * conditions internally via context.)
+ * (AppGateProvider + AppGate sit outside OnboardingGate entirely, Step 4e
+ * — so a maintenance/force-update block can show before onboarding even
+ * does.)
  */
 
 import { useEffect, useRef } from 'react'
@@ -99,7 +126,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { StatusBar } from '@capacitor/status-bar'
 import { App as CapacitorApp } from '@capacitor/app'
-import AppRoutes from './router'
+import { PublicRoutes, AdminRoutes } from './router'
 import OnboardingGate from './components/ui/OnboardingGate'
 import AppGate from './components/ui/AppGate'
 import ProfileSetupRedirect from './components/ProfileSetupRedirect'
@@ -159,8 +186,7 @@ function AppGateResumeListener() {
 // addressed: every separate call site of the old plain-hook version held
 // its own unsynced copy of the theme. ThemeProvider needs to sit inside
 // AuthProvider (it reads useAuth() internally) and outside/around
-// everything that might read the theme (Account screen, Conditions
-// screen, both deep inside AppRoutes) — see the provider tree below.
+// everything in the public branch that might read the theme.
 export default function App() {
   // Keeps --viewport-height on :root in sync with the real, live visual
   // viewport height. Called once here so every screen and every shared
@@ -190,29 +216,50 @@ export default function App() {
       <BrowserRouter basename={ROUTER_BASENAME}>
         <ToastProvider>
           <AuthProvider>
-            <OnlineStatusProvider>
-              <ThemeProvider>
-                <ConditionProvider>
-                  <DrugProvider>
-                    <FavouritesProvider>
-                      <NotesActivityProvider>
-                        <PushSubscriptionProvider>
-                          <AppGateProvider>
-                            <AppGateResumeListener />
-                            <AppGate />
-                            <OnboardingGate>
-                              <AppRoutes />
-                            </OnboardingGate>
-                            <ProfileSetupRedirect />
-                            <SignInNudge />
-                          </AppGateProvider>
-                        </PushSubscriptionProvider>
-                      </NotesActivityProvider>
-                    </FavouritesProvider>
-                  </DrugProvider>
-                </ConditionProvider>
-              </ThemeProvider>
-            </OnlineStatusProvider>
+            {/* Shared by both branches — deliberately kept outside the
+                split. See "Admin crash isolation" note above for why. */}
+            <ConditionProvider>
+              <DrugProvider>
+
+                {/* ── Admin branch ──────────────────────────────────────
+                    Only what AdminLayout/AdminRoutes actually use:
+                    AuthProvider (above) for AuthGuard/sign-out, Toast
+                    (above) for CMS form feedback, and Condition/Drug
+                    (above) for the public-cache refresh() calls. Nothing
+                    else — none of the consumer-only providers below can
+                    ever be in this branch's tree, so a crash in any of
+                    them structurally cannot reach here. */}
+                <ErrorBoundary>
+                  <AdminRoutes />
+                </ErrorBoundary>
+
+                {/* ── Public branch ─────────────────────────────────────
+                    Everything consumer-facing, unchanged from before
+                    other than living in its own branch/boundary. */}
+                <ErrorBoundary>
+                  <OnlineStatusProvider>
+                    <ThemeProvider>
+                      <FavouritesProvider>
+                        <NotesActivityProvider>
+                          <PushSubscriptionProvider>
+                            <AppGateProvider>
+                              <AppGateResumeListener />
+                              <AppGate />
+                              <OnboardingGate>
+                                <PublicRoutes />
+                              </OnboardingGate>
+                              <ProfileSetupRedirect />
+                              <SignInNudge />
+                            </AppGateProvider>
+                          </PushSubscriptionProvider>
+                        </NotesActivityProvider>
+                      </FavouritesProvider>
+                    </ThemeProvider>
+                  </OnlineStatusProvider>
+                </ErrorBoundary>
+
+              </DrugProvider>
+            </ConditionProvider>
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>

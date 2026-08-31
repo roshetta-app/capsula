@@ -27,10 +27,26 @@
  *             (ReleasesManager.jsx), inside the same AdminLayout group.
  * App Gate System Phase 1 Step 3c — Added /admin/messages route
  *             (GatesManager.jsx), inside the same AdminLayout group.
+ * Admin crash isolation (2026-09-01) — the single AppRoutes() export below
+ *             used to render both the public and admin route trees inside
+ *             one shared component, which App.jsx then mounted as one
+ *             child of the full consumer provider stack (Theme,
+ *             Favourites, AppGate, etc.). A crash in any of those
+ *             consumer-only providers took down /admin/* along with
+ *             everything else, blocking the admin's ability to even reach
+ *             the CMS to diagnose it. AppRoutes() is now split into
+ *             PublicRoutes() and AdminRoutes(), each a self-contained
+ *             <Routes> tree with the exact same individual <Route>
+ *             definitions as before (nothing about any single route
+ *             changed) — this lets App.jsx mount them under separate
+ *             provider branches with separate ErrorBoundary components.
+ *             See App.jsx's header for the full provider-tree reasoning.
  *
  * Single source of truth for all app routes.
  * Import ROUTES for programmatic navigation (useNavigate, Link).
- * AppRoutes renders the <Routes> tree — drop it inside <BrowserRouter>.
+ * PublicRoutes renders the public <Routes> tree; AdminRoutes renders the
+ * admin one. Both drop inside <BrowserRouter> (via App.jsx), each in its
+ * own provider branch.
  */
 
 import { Routes, Route, Outlet } from 'react-router-dom'
@@ -102,13 +118,11 @@ export const ROUTES = {
   ADMIN_MESSAGES:         '/admin/messages',
 }
 
-// ─── AppRoutes — rendered inside <BrowserRouter> in App.jsx ──────────────────
+// ─── PublicRoutes — rendered inside the public provider branch in App.jsx ────
 
-export default function AppRoutes() {
+export function PublicRoutes() {
   return (
     <Routes>
-
-      {/* ── Public routes ────────────────────────────────────────────────── */}
 
       {/* Conditions, Drugs, Favourites, and Account share one Layout instance
           that stays mounted while switching between them — this is what
@@ -134,7 +148,15 @@ export default function AppRoutes() {
       <Route path="/account/edit"        element={<AccountEditScreen />} />
       <Route path="/account/faq"         element={<AccountFaqScreen />} />
 
-      {/* ── Admin routes ─────────────────────────────────────────────────── */}
+    </Routes>
+  )
+}
+
+// ─── AdminRoutes — rendered inside the admin provider branch in App.jsx ──────
+
+export function AdminRoutes() {
+  return (
+    <Routes>
 
       <Route path="/admin/login"         element={<AdminLogin />} />
 
