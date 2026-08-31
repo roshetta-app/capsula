@@ -45,7 +45,6 @@ import SharedDrugCard from '../SharedDrugCard'
 import { supabase } from '../../lib/supabase'
 import { findBrandMatch, insertBrand, fetchBrandsForFormulation, searchDrugsForPicker } from '../../lib/adminQueries'
 import { useCategories } from '../../hooks/useCategories'
-import { useDarkMode } from '../../hooks/useDarkMode'
 
 // ─── Formulation query (existing) ─────────────────────────────────────────────
 
@@ -233,7 +232,14 @@ export default function DrugPickerModal({
   // SharedDrugCard's required props (brand-mode results only) — same hooks
   // the Drugs screen already uses for these cards.
   const { categories } = useCategories()
-  const { isDark }     = useDarkMode()
+  // Admin crash isolation (2026-09-01): this modal only renders inside
+  // AdminRoutes, which deliberately sits outside ThemeProvider now (see
+  // App.jsx's header). The CMS has no light/dark toggle of its own, so
+  // SharedDrugCard's required isDark prop is simply fixed to false here
+  // instead of reading a theme context that no longer exists on this
+  // branch — this was the last consumer-only dependency left in the
+  // admin tree, confirmed by re-checking every file this modal imports.
+  const isDark = false
 
   const [query,   setQuery]   = useState('')
   const [results, setResults] = useState([])
@@ -550,3 +556,4 @@ export default function DrugPickerModal({
     </Modal>
   )
 }
+
