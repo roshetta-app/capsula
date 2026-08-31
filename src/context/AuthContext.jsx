@@ -57,7 +57,7 @@ import { Browser } from '@capacitor/browser'
 import { App } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
-import { writeCachedAuthSnapshot, clearCachedAuthSnapshot } from '../utils/authSnapshot'
+import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { setCurrentUserId } from '../analytics/deviceSession'
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
@@ -211,7 +211,39 @@ export function AuthProvider({ children }) {
     // still clear it below — only a connectivity failure bails out here,
     // deliberately leaving the last known-good profile in place until a
     // real check can actually succeed.
-    if (error && isNetworkTimingError(error)) return
+    //
+    // Pro-offline-cold-start fix (2026-09-01) — the check above only
+    // helps when `profile` already holds a known-good value in memory
+    // from earlier in this same session. It did nothing for a genuine
+    // cold start while offline: the app process gets killed in the
+    // background, then relaunched with no connection, `profile` starts
+    // back at null, and this same fetch fails the same way — but there's
+    // no in-memory "last known good" left to protect, so a Pro account
+    // stayed stuck reading as not-Pro (profile null → useIsPro() false)
+    // for as long as the device was offline, showing the free-tier
+    // offline block to a paying user. Falls back to the durable snapshot
+    // (authSnapshot.js) the same way AccountScreen already falls back to
+    // it for name/photo — but only when nothing already loaded this
+    // session (the functional setProfile below leaves an existing
+    // known-good profile untouched, so this never overrides the case the
+    // check above already handles).
+    if (error && isNetworkTimingError(error)) {
+      const cached = getCachedAuthSnapshot()
+      if (cached?.id === currentUser.id && cached.tier) {
+        setProfile(prev => prev ?? {
+          role:                  null,
+          tier:                  cached.tier,
+          fullName:              cached.fullName ?? null,
+          themePreference:       null,
+          phoneNumber:           null,
+          occupation:            null,
+          country:               null,
+          specialty:             null,
+          profileSetupDismissed: null,
+        })
+      }
+      return
+    }
 
     setProfile(error ? null : {
       role:                  data.role,
@@ -232,11 +264,14 @@ export function AuthProvider({ children }) {
     // right after first sign-up) since the name/email/avatar shown on
     // AccountScreen comes from the auth user object either way, not from
     // the missing profile row.
+    // tier now included (Pro-offline-cold-start fix, 2026-09-01) — see
+    // this snapshot's own read-side fallback above.
     writeCachedAuthSnapshot({
       id:        currentUser.id,
       email:     currentUser.email ?? null,
       fullName:  error ? null : data.full_name,
       avatarUrl: currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || null,
+      tier:      error ? null : data.tier,
     })
   }, [])
 
@@ -439,4 +474,3 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
   return ctx
 }
-
