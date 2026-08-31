@@ -54,9 +54,9 @@
  *
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
- *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
- *   NotesActivityProvider → PushSubscriptionProvider → OnlineStatusProvider →
- *   AppGateProvider →
+ *   OnlineStatusProvider → ThemeProvider → ConditionProvider →
+ *   DrugProvider → FavouritesProvider → NotesActivityProvider →
+ *   PushSubscriptionProvider → AppGateProvider →
  *   [AppGateResumeListener, AppGate, OnboardingGate → AppRoutes,
  *   ProfileSetupRedirect, SignInNudge] (all five as siblings inside
  *   AppGateProvider — AppGate does not wrap OnboardingGate, see note above)
@@ -65,10 +65,19 @@
  *   OfflineBanner.jsx and AppGate.jsx, so each ran its own separate
  *   reachability check with no coordination, which is what made the
  *   offline block's own lift-back-online timing look inconsistent against
- *   the banner's. Sits just inside PushSubscriptionProvider and outside
- *   AppGateProvider — no dependency on anything else in the tree, and
- *   needs to cover both AppGate below and OfflineBanner, mounted much
- *   deeper inside AppRoutes → Layout.)
+ *   the banner's. Needs to cover both AppGate below and OfflineBanner,
+ *   mounted much deeper inside AppRoutes → Layout.)
+ *   (OnlineStatusProvider moved 2026-09-01, crash fix — the
+ *   offline-profile-account fix gave ThemeContext.jsx its own
+ *   useOnlineStatus() call (for retry-on-reconnect theme sync), but
+ *   ThemeProvider sat ABOVE OnlineStatusProvider in this tree at the
+ *   time, so ThemeProvider crashed on every single mount, on every
+ *   route, app-wide ("useOnlineStatus must be used inside
+ *   <OnlineStatusProvider>"). OnlineStatusProvider has no dependency on
+ *   anything above it in the tree — just Supabase — so it's moved here,
+ *   directly inside AuthProvider and outside ThemeProvider, instead of
+ *   its old spot inside PushSubscriptionProvider. Still fully covers
+ *   AppGate and OfflineBanner as before, plus ThemeContext now.)
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
@@ -181,13 +190,13 @@ export default function App() {
       <BrowserRouter basename={ROUTER_BASENAME}>
         <ToastProvider>
           <AuthProvider>
-            <ThemeProvider>
-              <ConditionProvider>
-                <DrugProvider>
-                  <FavouritesProvider>
-                    <NotesActivityProvider>
-                      <PushSubscriptionProvider>
-                        <OnlineStatusProvider>
+            <OnlineStatusProvider>
+              <ThemeProvider>
+                <ConditionProvider>
+                  <DrugProvider>
+                    <FavouritesProvider>
+                      <NotesActivityProvider>
+                        <PushSubscriptionProvider>
                           <AppGateProvider>
                             <AppGateResumeListener />
                             <AppGate />
@@ -197,13 +206,13 @@ export default function App() {
                             <ProfileSetupRedirect />
                             <SignInNudge />
                           </AppGateProvider>
-                        </OnlineStatusProvider>
-                      </PushSubscriptionProvider>
-                    </NotesActivityProvider>
-                  </FavouritesProvider>
-                </DrugProvider>
-              </ConditionProvider>
-            </ThemeProvider>
+                        </PushSubscriptionProvider>
+                      </NotesActivityProvider>
+                    </FavouritesProvider>
+                  </DrugProvider>
+                </ConditionProvider>
+              </ThemeProvider>
+            </OnlineStatusProvider>
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>
