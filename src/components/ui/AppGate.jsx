@@ -3,6 +3,8 @@
  * App Gate System Phase 1 Step 4d.
  * Phase 2 redesign (this session) — see plan §10.6 for the approved
  * mockup this implements.
+ * Phase 4 addition (plan: CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md, §Phase 4)
+ * — added the offline block, see its own comment below.
  *
  * Reads the current gate from AppGateContext and renders one of two
  * surfaces, chosen by gate.dismissible:
@@ -50,9 +52,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
-import { X, Wrench, AlertTriangle, Megaphone, RefreshCw } from 'lucide-react'
+import { X, Wrench, AlertTriangle, Megaphone, RefreshCw, WifiOff, Sparkles } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import { useAppGateContext } from '../../context/AppGateContext'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useIsPro } from '../../hooks/useIsPro'
+import { useDrugContext } from '../../context/DrugContext'
+import { useConditionContext } from '../../context/ConditionContext'
 import { logUsageEvent } from '../../analytics/usageEvents'
 
 // Type-based color + icon, plan §10.6. Force Update and (hard) Maintenance
@@ -201,6 +207,77 @@ function AppGateBlock({ gate }) {
   )
 }
 
+// ─── Offline block (plan: CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md, §Phase 4) ────
+// A free account, offline, with a library already cached. Deliberately NOT
+// styled like AppGateBlock's tinted, alarm-style band above — this isn't an
+// error or an admin-authored message, it's a normal, expected state, so it
+// stays quiet: a plain neutral icon, no colored band. The one spot of color
+// is a small Pro pill at the bottom, using the same accent-blue + Sparkles
+// combination ProComingSoonSheet.jsx already established elsewhere in the
+// app as "this represents Pro" — approved mockup, this session.
+function OfflineBlock() {
+  return (
+    <div style={{
+      position:        'fixed',
+      inset:           0,
+      zIndex:          2000,
+      backgroundColor: 'var(--color-surface)',
+      display:         'flex',
+      flexDirection:   'column',
+      alignItems:      'center',
+      justifyContent:  'center',
+      padding:         'var(--space-6) var(--space-5)',
+      textAlign:       'center',
+    }}>
+      <div style={{ width: '100%', maxWidth: 340 }}>
+        <WifiOff
+          size={56}
+          color="var(--color-text-secondary)"
+          strokeWidth={1.5}
+          aria-hidden="true"
+          style={{ marginBottom: 'var(--space-5)' }}
+        />
+
+        <div style={{
+          fontSize:     20,
+          fontWeight:   700,
+          color:        'var(--color-text-primary)',
+          fontFamily:   'var(--font-body)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          You&apos;re offline
+        </div>
+
+        <div style={{
+          fontSize:     14,
+          lineHeight:   1.55,
+          color:        'var(--color-text-secondary)',
+          fontFamily:   'var(--font-body)',
+          marginBottom: 'var(--space-5)',
+        }}>
+          Reconnect to keep browsing, or go Pro to keep using what you&apos;ve already saved — even offline.
+        </div>
+
+        <div style={{
+          display:         'inline-flex',
+          alignItems:      'center',
+          gap:             6,
+          backgroundColor: 'var(--color-accent-light)',
+          color:           '#0C4A6E',
+          fontSize:        12,
+          fontWeight:      500,
+          fontFamily:      'var(--font-body)',
+          padding:         '5px 12px',
+          borderRadius:    'var(--radius-full)',
+        }}>
+          <Sparkles size={13} aria-hidden="true" />
+          Pro keeps working offline
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Bottom sheet (dismissible maintenance / critical_announcement / promo) ───
 // Portal + fade/scale entrance kept from the InfoSheet.jsx-derived Phase 1
 // pattern; layout itself is the new bottom-anchored card from the Phase 2
@@ -340,25 +417,46 @@ export default function AppGate() {
   const { gate, dismiss, maybeLater } = useAppGateContext()
   const location = useLocation()
 
+  // Phase 4 (plan §4.1/§4.3): a free account, offline, with a library
+  // already cached, sees the offline block below instead of anything
+  // database-driven. Computed live on every render from Phase 2's real
+  // connectivity check, Phase 3's shared Pro check, and whatever's
+  // already loaded into Drug/ConditionContext — no explicit refresh()
+  // needed for this to clear itself the instant a real connection
+  // returns (§4.4), since it's just recalculated on the next render.
+  const { isOnline } = useOnlineStatus()
+  const isPro = useIsPro()
+  const { drugs, loading: drugsLoading } = useDrugContext()
+  const { conditions, loading: conditionsLoading } = useConditionContext()
+  const hasCachedLibrary = !drugsLoading && drugs.length > 0 && !conditionsLoading && conditions.length > 0
+  const offlineBlockActive = hasCachedLibrary && !isOnline && !isPro
+
   // Admins must always be able to reach the CMS to turn a gate off, even a
   // non-dismissible one — the App Gate system is for the app's regular
-  // users, not the admin panel itself.
+  // users, not the admin panel itself. Also exempts the offline block
+  // below, same reasoning.
   const onAdminRoute = location.pathname.startsWith('/admin')
 
-  // Locks the page's own scroll for as long as a gate is showing, on top
-  // of the dimmed backdrop — without this, someone could still scroll the
-  // real app underneath the message even though tapping it does nothing,
-  // which defeats the point of a "must focus on this" surface. Applies to
-  // both the bottom sheet and the full-bleed block equally. Never engages
-  // on /admin, matching the exemption above.
+  // Locks the page's own scroll for as long as a gate — or the offline
+  // block — is showing, on top of the dimmed backdrop — without this,
+  // someone could still scroll the real app underneath the message even
+  // though tapping it does nothing, which defeats the point of a "must
+  // focus on this" surface. Never engages on /admin, matching the
+  // exemption above.
   useEffect(() => {
-    if (!gate || onAdminRoute) return
+    if ((!gate && !offlineBlockActive) || onAdminRoute) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = previousOverflow }
-  }, [gate, onAdminRoute])
+  }, [gate, offlineBlockActive, onAdminRoute])
 
   if (onAdminRoute) return null
+
+  // Phase 4: takes priority over a database-driven gate (confirmed this
+  // session) — if the device is genuinely unreachable, a possibly-stale
+  // maintenance/promo message fetched before going offline matters less
+  // than telling the person plainly that they're offline right now.
+  if (offlineBlockActive) return <OfflineBlock />
 
   if (!gate) return null
 
