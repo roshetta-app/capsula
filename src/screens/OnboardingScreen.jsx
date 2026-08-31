@@ -63,6 +63,26 @@
  * Retry (whatever the failure reason — offline, a real error, or a
  * timeout) always re-attempts both libraries, since there's no reliable
  * way to know from a stall alone which one actually stuck.
+ *
+ * 2026-08-31 (onboarding-download-resilience): two further hardening
+ * changes, on top of 1.10-1.18 above.
+ *   - DOWNLOAD_TIMEOUT_MS's timer now resets every time real progress
+ *     happens (see the timeout effect below), instead of running once as
+ *     a flat clock from the start of the attempt. It now only fires on a
+ *     genuine stall — nothing progressing for the full window — so a
+ *     slow-but-working connection is no longer wrongly treated the same
+ *     as a stuck one.
+ *   - While the Failed state is showing, the screen now watches for the
+ *     connection coming back and resumes the download on its own — no
+ *     tap needed (see the reconnect effect below). Relies on
+ *     useOnlineStatus already confirming a real, reachable connection
+ *     (not just the device's own claim) before reporting back online.
+ *   - A single dropped page/request during either library's download now
+ *     quietly retries a few times before giving up, instead of taking
+ *     down the whole attempt over one blip — see src/lib/queries.js's
+ *     matching change. This file needed no change for that part: a
+ *     retried-and-recovered page never surfaces as a failure up here at
+ *     all.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -334,17 +354,22 @@ export default function OnboardingScreen({ onDone }) {
     }, COMPLETE_FADE_MS)
   }
 
-  // 2026-08-31 (plan step 1.14): once a real attempt is under way,
-  // give it DOWNLOAD_TIMEOUT_MS to actually finish before treating it as
-  // stuck. Re-runs (and so restarts cleanly) whenever a new attempt
-  // begins, or stops immediately once the attempt actually finishes
+  // 2026-08-31 (plan step 1.14; stall-only fix same day, onboarding-
+  // download-resilience): once a real attempt is under way, give it
+  // DOWNLOAD_TIMEOUT_MS with no progress before treating it as stuck.
+  // 'fraction' is in the dependency list specifically so this timer
+  // restarts every time real progress lands, not just once per attempt —
+  // it now only fires after a genuine stall (nothing moving for the full
+  // window), instead of a flat clock that could interrupt a slow-but-
+  // working download. Also restarts cleanly whenever a new attempt
+  // begins, and stops immediately once the attempt actually finishes
   // (done) or fails for a real reason (hookFailed) — no point letting a
   // stale timer fire after the outcome is already known.
   useEffect(() => {
     if (!isLoadingSlide || attemptId === 0 || done || hookFailed) return
     const timer = setTimeout(() => setTimedOut(true), DOWNLOAD_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [isLoadingSlide, attemptId, done, hookFailed])
+  }, [isLoadingSlide, attemptId, done, hookFailed, fraction])
 
   // ── Preload every slide image on mount ─────────────────────────────────
   // A statically-imported image is only actually fetched by the browser
@@ -452,6 +477,24 @@ export default function OnboardingScreen({ onDone }) {
     setAttemptId(id => id + 1)
     retryBoth()
   }
+
+  // 2026-08-31 (onboarding-download-resilience): while the Failed state is
+  // showing, resume automatically the moment a real connection is
+  // confirmed back, instead of waiting for a manual Retry tap.
+  // useOnlineStatus already verifies actual reachability (not just the
+  // device's own claim) before reporting isOnline true, so this only
+  // fires on a genuine, usable reconnect. Tracks the previous isOnline
+  // value so this only reacts to the false→true edge — being online
+  // already shouldn't retrigger this on every unrelated re-render.
+  const wasOnlineRef = useRef(isOnline)
+  useEffect(() => {
+    const cameBackOnline = !wasOnlineRef.current && isOnline
+    wasOnlineRef.current = isOnline
+    if (cameBackOnline && isLoadingSlide && failed) {
+      handleRetry()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline])
 
   // Real progress while genuinely still loading — unchanged from before.
   // If the data was already done the instant this slide was reached, show

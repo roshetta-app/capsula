@@ -168,6 +168,43 @@ function hashString(str) {
 
 export const FLAT_DRUG_SCHEMA_VERSION = hashString(FULL_BRAND_SELECT.replace(/\s+/g, ''))
 
+// ─── Per-request retry (transient network blips) ───────────────────────────
+//
+// 2026-08-31 (onboarding-download-resilience): a single dropped page
+// request used to throw immediately and take the entire download down
+// with it — forcing a full restart from scratch even for a one-off
+// connection blip. This wraps one individual request (one page of brands,
+// one page of conditions) so a transient failure quietly retries a few
+// times, with a short, growing pause between attempts, before finally
+// giving up and letting the error through exactly as before. Used by both
+// fetchAllBrandRows and fetchAllConditionRows below, and — since both of
+// those are shared by onboarding's first-ever download and every later
+// background refresh — this same resilience applies everywhere the app
+// downloads data, not just onboarding.
+const PAGE_RETRY_ATTEMPTS = 3
+const PAGE_RETRY_BASE_DELAY_MS = 800
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// requestPage is a function that returns a fresh promise each call (not an
+// already-started promise) — each retry needs to actually re-issue the
+// request, not re-await the same failed one.
+async function withPageRetry(requestPage) {
+  let lastError
+  for (let attempt = 0; attempt <= PAGE_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await requestPage()
+    } catch (err) {
+      lastError = err
+      if (attempt === PAGE_RETRY_ATTEMPTS) break
+      await sleep(PAGE_RETRY_BASE_DELAY_MS * (attempt + 1))
+    }
+  }
+  throw lastError
+}
+
 /**
  * Page through the full `brands` table for a given select shape. Looks up
  * the total row count first, then runs the page requests in small batches
@@ -221,17 +258,24 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
       pageIndexes.map(i => {
         const from = i * SUPABASE_MAX_ROWS
         const to   = from + SUPABASE_MAX_ROWS - 1
-        return supabase
-          .from('brands')
-          .select(selectString)
-          .eq('is_published', true)
-          .range(from, to)
-          .then(({ data, error }) => {
-            if (error) throw error
-            loaded += 1
-            onProgress?.(loaded, totalPages)
-            return data
-          })
+        return withPageRetry(() =>
+          supabase
+            .from('brands')
+            .select(selectString)
+            .eq('is_published', true)
+            .range(from, to)
+            .then(({ data, error }) => {
+              if (error) throw error
+              return data
+            })
+        ).then(data => {
+          // Only counted once this page has actually succeeded — a page
+          // that needed a quiet retry still only reports progress once,
+          // on the attempt that actually landed.
+          loaded += 1
+          onProgress?.(loaded, totalPages)
+          return data
+        })
       })
     )
 
@@ -459,15 +503,17 @@ async function fetchAllConditionRows(supabase) {
       pageIndexes.map(i => {
         const from = i * SUPABASE_MAX_ROWS
         const to   = from + SUPABASE_MAX_ROWS - 1
-        return supabase
-          .from('conditions')
-          .select(CONDITIONS_SELECT)
-          .eq('is_published', true)
-          .range(from, to)
-          .then(({ data, error }) => {
-            if (error) throw error
-            return data
-          })
+        return withPageRetry(() =>
+          supabase
+            .from('conditions')
+            .select(CONDITIONS_SELECT)
+            .eq('is_published', true)
+            .range(from, to)
+            .then(({ data, error }) => {
+              if (error) throw error
+              return data
+            })
+        )
       })
     )
 
