@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { fetchConditions, fetchMetadataTimestamps } from '../lib/queries'
 import { readConditionsCache, writeConditionsCache } from '../utils/cache'
 import { CACHE_TTL_MS } from '../constants/cache'
+import { logCrash } from '../utils/crashLogger'
 
 const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -66,6 +67,14 @@ export function useConditions() {
       await writeConditionsCache(fresh, conditionsUpdatedAt)
     } catch (err) {
       setError(err.message ?? 'Failed to load conditions')
+      // Diagnostics-only addition (download-fail investigation, 2026-08-31)
+      // — matches the same addition in useDrugs.js's fetchAndCache/
+      // fetchColdStart. Previously this failure only ever surfaced as a
+      // generic on-screen message and was otherwise discarded; routing it
+      // through the same crash logger 1.16 already uses for cache
+      // save/read failures means a real, repeating cause shows up
+      // somewhere instead of only ever being retried blind.
+      logCrash(err, 'useConditions.fetchAndCache')
     } finally {
       setLoading(false)
     }

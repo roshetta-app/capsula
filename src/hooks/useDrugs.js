@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { fetchFlatDrugs, fetchMetadataTimestamps } from '../lib/queries'
 import { readDrugsCache, writeDrugsCache } from '../utils/cache'
 import { CACHE_TTL_MS } from '../constants/cache'
+import { logCrash } from '../utils/crashLogger'
 
 export function useDrugs() {
   const [drugs,    setDrugs]    = useState([])
@@ -29,6 +30,14 @@ export function useDrugs() {
       await writeDrugsCache(fresh, drugsUpdatedAt)
     } catch (err) {
       setError(err.message ?? 'Failed to load drugs')
+      // Diagnostics-only addition (download-fail investigation, 2026-08-31):
+      // this catch previously only surfaced a message in the UI and
+      // discarded the real error — the same invisible-failure gap 1.16
+      // already fixed for cache save/read errors, just never extended to
+      // a fetch failure itself. Routes through the same crash logger as
+      // everywhere else in the app, so a real repeating failure shows up
+      // in the crash log instead of only ever being retried blind.
+      logCrash(err, 'useDrugs.fetchAndCache')
     } finally {
       setLoading(false)
     }
@@ -64,6 +73,12 @@ export function useDrugs() {
       await writeDrugsCache(fresh, drugsUpdatedAt)
     } catch (err) {
       setError(err.message ?? 'Failed to load drugs')
+      // Diagnostics-only addition (download-fail investigation, 2026-08-31)
+      // — see matching note in fetchAndCache above. This is the path
+      // onboarding's slide 4/5 actually uses, so this is the one that
+      // matters most for seeing the real error behind the repeated
+      // "Something went wrong" / Retry loop.
+      logCrash(err, 'useDrugs.fetchColdStart')
     } finally {
       setLoading(false)
       setProgress(null)
