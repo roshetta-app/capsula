@@ -52,7 +52,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
-import { X, Wrench, AlertTriangle, Megaphone, RefreshCw, WifiOff, Sparkles } from 'lucide-react'
+import { X, Wrench, AlertTriangle, Megaphone, RefreshCw, WifiOff, Sparkles, ChevronRight } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import BottomNav from '../BottomNav'
 import { useAppGateContext } from '../../context/AppGateContext'
@@ -241,16 +241,29 @@ function OfflineBlock() {
       textAlign:       'center',
     }}>
       <div style={{ width: '100%', maxWidth: 320 }}>
-        <WifiOff
-          size={48}
-          color="var(--color-text-secondary)"
-          strokeWidth={1.5}
-          aria-hidden="true"
-          style={{ display: 'block', margin: '0 auto var(--space-4)' }}
-        />
+        {/* Neutral circle behind the icon, var(--color-surface-muted) —
+            not accent/danger/warning, since being offline is a normal,
+            expected state, not an alert. Matches the reference mockup. */}
+        <div style={{
+          width:           96,
+          height:          96,
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'var(--color-surface-muted)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          margin:          '0 auto var(--space-5)',
+        }}>
+          <WifiOff
+            size={40}
+            color="var(--color-text-secondary)"
+            strokeWidth={1.5}
+            aria-hidden="true"
+          />
+        </div>
 
         <div style={{
-          fontSize:     18,
+          fontSize:     20,
           fontWeight:   700,
           color:        'var(--color-text-primary)',
           fontFamily:   'var(--font-body)',
@@ -260,56 +273,65 @@ function OfflineBlock() {
         </div>
 
         <div style={{
-          fontSize:     13,
+          fontSize:     14,
+          lineHeight:   1.5,
           color:        'var(--color-text-secondary)',
           fontFamily:   'var(--font-body)',
           marginBottom: 'var(--space-5)',
         }}>
-          Reconnect to keep browsing your saved data.
+          Connect to the internet to continue browsing Capsula.
         </div>
 
+        {/* Visual only — no upsell sheet exists yet to open, so the
+            chevron is a decorative affordance, not a real link. No
+            onClick, no cursor/hover change, no button semantics. */}
         <div style={{
           display:         'flex',
-          alignItems:      'flex-start',
-          gap:             10,
+          alignItems:      'center',
+          gap:             12,
           textAlign:       'left',
-          backgroundColor: 'var(--color-surface)',
-          border:          '1px solid var(--color-border)',
+          backgroundColor: 'var(--color-accent-light)',
           borderRadius:    'var(--radius-lg)',
           padding:         'var(--space-3) var(--space-4)',
         }}>
           <div style={{
-            width:           28,
-            height:          28,
+            width:           36,
+            height:          36,
             flexShrink:      0,
-            marginTop:       1,
             borderRadius:    'var(--radius-md)',
-            backgroundColor: 'var(--color-accent-light)',
+            backgroundColor: 'var(--color-surface)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
           }}>
-            <Sparkles size={14} color="var(--color-accent)" aria-hidden="true" />
+            <Sparkles size={16} color="var(--color-accent)" aria-hidden="true" />
           </div>
-          <div>
+          <div style={{ flex: 1 }}>
             <div style={{
-              fontSize:     13,
+              fontSize:     14,
               fontWeight:   600,
               color:        'var(--color-text-primary)',
               fontFamily:   'var(--font-body)',
               marginBottom: 2,
             }}>
-              Works offline with Pro
+              Want to use Capsula offline?
             </div>
             <div style={{
-              fontSize:   12,
-              lineHeight: 1.45,
+              fontSize:   13,
+              lineHeight: 1.4,
               color:      'var(--color-text-secondary)',
               fontFamily: 'var(--font-body)',
             }}>
-              Keep browsing everything you&apos;ve saved, connection or not.
+              Upgrade to Pro for offline access.
             </div>
           </div>
+          <ChevronRight
+            size={18}
+            color="var(--color-accent)"
+            strokeWidth={2}
+            aria-hidden="true"
+            style={{ flexShrink: 0 }}
+          />
         </div>
       </div>
 
