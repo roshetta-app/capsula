@@ -37,8 +37,15 @@ export function useDrugs() {
 
   async function fetchAndCache() {
     try {
-      const fresh = await fetchFlatDrugs(supabase)
-      const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      // 2026-08-31: fetched together instead of one after another — this
+      // used to wait for the full drug fetch to finish before even asking
+      // "is there anything new," adding one avoidable extra wait to every
+      // background refresh. Conditions already ran these two in parallel;
+      // drugs now matches that.
+      const [fresh, { drugsUpdatedAt }] = await Promise.all([
+        fetchFlatDrugs(supabase),
+        fetchMetadataTimestamps(supabase),
+      ])
       setDrugs(fresh)
       await writeDrugsCache(fresh, drugsUpdatedAt)
     } catch (err) {

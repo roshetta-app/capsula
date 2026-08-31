@@ -279,6 +279,16 @@ function openCapsulaDB() {
     }
     req.onsuccess = () => resolve(req.result)
     req.onerror   = () => reject(req.error)
+    // 2026-08-31 (storage-connections-fix): without this handler, a future
+    // storage-version bump (IDB_VERSION above — already happened once,
+    // 1 → 2, for conditions) that runs into another still-open connection
+    // holding the old version wouldn't error out at all — it would just
+    // hang here forever, with nothing on screen ever explaining why. Every
+    // read/write/clear function below now also closes its connection once
+    // it's done (see each function), so in normal use nothing should ever
+    // be left open to cause this — this handler is the safety net for if
+    // one ever is anyway.
+    req.onblocked = () => reject(new Error('Capsula storage upgrade blocked by another open connection'))
   })
 }
 
@@ -296,8 +306,14 @@ function openCapsulaDB() {
  */
 export async function writeDrugsCache(data, version) {
   if (!Array.isArray(data) || data.length === 0) return
+  // 2026-08-31 (storage-connections-fix): every save/read used to open a
+  // fresh connection and never close it. Harmless day-to-day, but any
+  // leftover open connection can silently block a future storage-version
+  // bump (see openCapsulaDB's onblocked handler above) — closed here now
+  // that this function's work is done, success or failure either way.
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(DRUGS_STORE, 'readwrite')
       tx.objectStore(DRUGS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION }, DRUGS_KEY)
@@ -309,6 +325,8 @@ export async function writeDrugsCache(data, version) {
     // still fails silently from the caller's point of view, but now also
     // recorded so a repeating failure on a real device can be found.
     logCrash(err, 'utils/cache.js: writeDrugsCache')
+  } finally {
+    db?.close()
   }
 }
 
@@ -326,8 +344,9 @@ export async function writeDrugsCache(data, version) {
  * falling back to null, same as writeDrugsCache above.
  */
 export async function readDrugsCache() {
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     const record = await new Promise((resolve, reject) => {
       const tx = db.transaction(DRUGS_STORE, 'readonly')
       const req = tx.objectStore(DRUGS_STORE).get(DRUGS_KEY)
@@ -340,6 +359,8 @@ export async function readDrugsCache() {
   } catch (err) {
     logCrash(err, 'utils/cache.js: readDrugsCache')
     return null
+  } finally {
+    db?.close()
   }
 }
 
@@ -347,8 +368,9 @@ export async function readDrugsCache() {
  * Clear the drugs IndexedDB cache.
  */
 export async function clearDrugsCache() {
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(DRUGS_STORE, 'readwrite')
       tx.objectStore(DRUGS_STORE).delete(DRUGS_KEY)
@@ -357,6 +379,8 @@ export async function clearDrugsCache() {
     })
   } catch {
     // fail silently
+  } finally {
+    db?.close()
   }
 }
 
@@ -370,8 +394,9 @@ export async function clearDrugsCache() {
  */
 export async function writeConditionsCache(data, version) {
   if (!Array.isArray(data) || data.length === 0) return
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
       tx.objectStore(CONDITIONS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: CONDITIONS_CACHE_SCHEMA_VERSION }, CONDITIONS_KEY)
@@ -380,6 +405,8 @@ export async function writeConditionsCache(data, version) {
     })
   } catch (err) {
     logCrash(err, 'utils/cache.js: writeConditionsCache')
+  } finally {
+    db?.close()
   }
 }
 
@@ -391,8 +418,9 @@ export async function writeConditionsCache(data, version) {
  * crash-log reporting on a genuine failure (2026-08-31, see file header).
  */
 export async function readConditionsCache() {
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     const record = await new Promise((resolve, reject) => {
       const tx = db.transaction(CONDITIONS_STORE, 'readonly')
       const req = tx.objectStore(CONDITIONS_STORE).get(CONDITIONS_KEY)
@@ -405,6 +433,8 @@ export async function readConditionsCache() {
   } catch (err) {
     logCrash(err, 'utils/cache.js: readConditionsCache')
     return null
+  } finally {
+    db?.close()
   }
 }
 
@@ -413,8 +443,9 @@ export async function readConditionsCache() {
  * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1).
  */
 export async function clearConditionsCache() {
+  let db
   try {
-    const db = await openCapsulaDB()
+    db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
       tx.objectStore(CONDITIONS_STORE).delete(CONDITIONS_KEY)
@@ -423,5 +454,7 @@ export async function clearConditionsCache() {
     })
   } catch {
     // fail silently
+  } finally {
+    db?.close()
   }
 }
