@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchConditions, fetchMetadataTimestamps } from '../lib/queries'
+import { fetchConditions, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchConditionById } from '../lib/queries'
 import { readConditionsCache, writeConditionsCache } from '../utils/cache'
 import { CACHE_TTL_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
 
 const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
+
+// Phase F14 Stage 3 (delta sync): mirrors useDrugs.js's matching constant —
+// see that file's comment for the full reasoning.
+const DELTA_FALLBACK_CHANGE_COUNT = 200
 
 /**
  * useConditions — cache-first conditions data hook.
@@ -72,13 +76,18 @@ export function useConditions() {
     const myAttempt = ++attemptIdRef.current
     setError(null)
     try {
-      const [fresh, { conditionsUpdatedAt }] = await Promise.all([
+      // Phase F14 Stage 3: also captures a fresh audit_log cursor
+      // alongside the fetch — mirrors useDrugs.js's fetchAndCache. Leaves
+      // this device with a working baseline for the next background delta
+      // check regardless of why this particular fetch was a full one.
+      const [auditCursor, fresh, { conditionsUpdatedAt }] = await Promise.all([
+        fetchAuditCursorNow(supabase).catch(() => null),
         fetchConditions(supabase),
         fetchMetadataTimestamps(supabase),
       ])
       if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
       setConditions(fresh)
-      await writeConditionsCache(fresh, conditionsUpdatedAt)
+      await writeConditionsCache(fresh, conditionsUpdatedAt, auditCursor)
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
       setError(err.message ?? 'Failed to load conditions')
@@ -94,6 +103,60 @@ export function useConditions() {
       if (attemptIdRef.current === myAttempt) {
         setLoading(false)
       }
+    }
+  }
+
+  // Phase F14 Stage 3 (delta sync): mirrors useDrugs.js's applyDrugsDelta —
+  // see that function's comment for the full reasoning on the fallback
+  // rules (missing cursor, failed audit_log query, oversized change set).
+  // conditions/condition_blocks changes are id-scoped directly (record_id
+  // IS the condition id for both — confirmed from saveConditionBlocks/
+  // updateCondition/insertCondition/deleteCondition), so unlike drugs'
+  // generic/formulation ids, no scope lookup is needed here. A specialties
+  // change is uncommon enough that it falls back to a normal full
+  // fetchAndCache rather than adding separate per-specialty handling
+  // (deliberate simplification, not an oversight) — that full refetch also
+  // naturally covers any condition-level changes in the same batch, so no
+  // extra per-id work happens once this path is taken.
+  async function applyConditionsDelta(cachedRecord, conditionsUpdatedAt) {
+    if (!cachedRecord.auditCursor) {
+      await fetchAndCache()
+      return
+    }
+
+    try {
+      const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
+
+      if (changes.length === 0) {
+        await writeConditionsCache(cachedRecord.data, conditionsUpdatedAt, cachedRecord.auditCursor)
+        return
+      }
+
+      if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
+        await fetchAndCache()
+        return
+      }
+
+      if (changes.some(c => c.table_name === 'specialties')) {
+        await fetchAndCache()
+        return
+      }
+
+      const conditionIds = new Set(changes.map(c => c.record_id))
+
+      let nextConditions = [...cachedRecord.data]
+      for (const id of conditionIds) {
+        nextConditions = nextConditions.filter(c => c.id !== id)
+        const fresh = await fetchConditionById(supabase, id)
+        if (fresh) nextConditions.push(fresh)
+      }
+
+      const newCursor = changes[changes.length - 1].created_at
+      setConditions(nextConditions)
+      await writeConditionsCache(nextConditions, conditionsUpdatedAt, newCursor)
+    } catch (err) {
+      logCrash(err, 'useConditions.applyConditionsDelta')
+      await fetchAndCache()
     }
   }
 
@@ -153,11 +216,14 @@ export function useConditions() {
         return
       }
 
-      // Silently check server version against cached version
+      // Silently check server version against cached version. Phase F14
+      // Stage 3: routes through applyConditionsDelta instead of a full
+      // fetchAndCache — see that function for the delta-merge logic and
+      // its fallback rules.
       try {
         const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (conditionsUpdatedAt !== cached.version) {
-          await fetchAndCache()
+          await applyConditionsDelta(cached, conditionsUpdatedAt)
         }
       } catch {
         // Network error — keep cached data, don't crash
@@ -206,3 +272,4 @@ export function useConditions() {
 
   return { conditions: conditionsDisplay, specialties, loading, error, refresh: fetchAndCache, start, retry }
 }
+

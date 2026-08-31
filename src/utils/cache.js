@@ -257,6 +257,17 @@ export function writeIconCache(url, svg) {
 // above (categories, icons) aren't part of the bug this was chasing, and
 // logging every localStorage quota hiccup app-wide would be a much noisier,
 // separate change.
+//
+// 2026-08-31 (Phase F14 Stage 3, delta sync): writeDrugsCache/
+// writeConditionsCache now also stamp an auditCursor field (the ISO
+// created_at of the newest audit_log row applied so far, or null) on the
+// saved record, alongside the existing data/version/fetchedAt/
+// schemaVersion fields — and readDrugsCache/readConditionsCache return it
+// as part of the record like everything else already stored there. A
+// record saved before this change simply has no auditCursor key, which
+// reads back as undefined — the delta-merge logic in useDrugs.js/
+// useConditions.js already treats a missing cursor as 'no cursor yet' and
+// falls back to a full fetch, so this needs no separate migration step.
 
 const IDB_NAME    = 'capsula-cache'
 const IDB_VERSION = 2
@@ -301,10 +312,12 @@ function openCapsulaDB() {
  * when the underlying database rows themselves haven't changed. Reports a
  * failure to the crash log (2026-08-31, see file header) before falling
  * back to its previous silent no-op.
- * @param {Array}  data     — the full fetched drug list
- * @param {string} version  — ISO timestamp from app_metadata
+ * @param {Array}  data        — the full fetched drug list
+ * @param {string} version     — ISO timestamp from app_metadata
+ * @param {string|null} [auditCursor] — ISO created_at of the newest applied
+ *   audit_log row (Phase F14 Stage 3, delta sync), or null if not yet known
  */
-export async function writeDrugsCache(data, version) {
+export async function writeDrugsCache(data, version, auditCursor = null) {
   if (!Array.isArray(data) || data.length === 0) return
   // 2026-08-31 (storage-connections-fix): every save/read used to open a
   // fresh connection and never close it. Harmless day-to-day, but any
@@ -316,7 +329,7 @@ export async function writeDrugsCache(data, version) {
     db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(DRUGS_STORE, 'readwrite')
-      tx.objectStore(DRUGS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION }, DRUGS_KEY)
+      tx.objectStore(DRUGS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: DRUGS_CACHE_SCHEMA_VERSION, auditCursor }, DRUGS_KEY)
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
@@ -331,8 +344,10 @@ export async function writeDrugsCache(data, version) {
 }
 
 /**
- * Read the full stored drugs record — { data, version, fetchedAt } — or
- * null if nothing valid is saved yet.
+ * Read the full stored drugs record — { data, version, fetchedAt,
+ * auditCursor } — or null if nothing valid is saved yet. auditCursor is
+ * undefined on a record saved before Phase F14 Stage 3 — callers already
+ * treat that the same as "no cursor yet."
  *
  * Also returns null (forcing callers down their cold-start path) if the
  * saved record predates DRUGS_CACHE_SCHEMA_VERSION or was written by an
@@ -389,17 +404,19 @@ export async function clearDrugsCache() {
  * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
  * step 1.1) — same record shape, same schema-version stamping, same
  * crash-log reporting on failure (2026-08-31, see file header).
- * @param {Array}  data     — the full fetched conditions list
- * @param {string} version  — ISO timestamp from app_metadata
+ * @param {Array}  data        — the full fetched conditions list
+ * @param {string} version     — ISO timestamp from app_metadata
+ * @param {string|null} [auditCursor] — ISO created_at of the newest applied
+ *   audit_log row (Phase F14 Stage 3, delta sync), or null if not yet known
  */
-export async function writeConditionsCache(data, version) {
+export async function writeConditionsCache(data, version, auditCursor = null) {
   if (!Array.isArray(data) || data.length === 0) return
   let db
   try {
     db = await openCapsulaDB()
     await new Promise((resolve, reject) => {
       const tx = db.transaction(CONDITIONS_STORE, 'readwrite')
-      tx.objectStore(CONDITIONS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: CONDITIONS_CACHE_SCHEMA_VERSION }, CONDITIONS_KEY)
+      tx.objectStore(CONDITIONS_STORE).put({ data, version, fetchedAt: new Date().toISOString(), schemaVersion: CONDITIONS_CACHE_SCHEMA_VERSION, auditCursor }, CONDITIONS_KEY)
       tx.oncomplete = () => resolve()
       tx.onerror    = () => reject(tx.error)
     })
@@ -411,11 +428,13 @@ export async function writeConditionsCache(data, version) {
 }
 
 /**
- * Read the full stored conditions record — { data, version, fetchedAt } —
- * or null if nothing valid is saved yet. Exact mirror of readDrugsCache
- * above, added 2026-08-30 (conditions durable storage, plan §4.1/Phase 1,
- * step 1.1) — including the same schema-version check and the same
- * crash-log reporting on a genuine failure (2026-08-31, see file header).
+ * Read the full stored conditions record — { data, version, fetchedAt,
+ * auditCursor } — or null if nothing valid is saved yet. Exact mirror of
+ * readDrugsCache above, added 2026-08-30 (conditions durable storage, plan
+ * §4.1/Phase 1, step 1.1) — including the same schema-version check and the
+ * same crash-log reporting on a genuine failure (2026-08-31, see file
+ * header). auditCursor is undefined on a record saved before Phase F14
+ * Stage 3 — callers already treat that the same as "no cursor yet."
  */
 export async function readConditionsCache() {
   let db

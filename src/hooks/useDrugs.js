@@ -1,9 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchFlatDrugs, fetchMetadataTimestamps } from '../lib/queries'
+import { fetchFlatDrugs, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId } from '../lib/queries'
 import { readDrugsCache, writeDrugsCache } from '../utils/cache'
 import { CACHE_TTL_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
+
+// Phase F14 Stage 3 (delta sync): if a background check finds more than
+// this many audit_log entries since the device's last cursor, delta-
+// merging them one id at a time isn't worth it any more — fall back to the
+// existing full fetchAndCache instead. Same safety-net spirit as a missing
+// cursor or a failed audit_log query below.
+const DELTA_FALLBACK_CHANGE_COUNT = 200
 
 export function useDrugs() {
   const [drugs,    setDrugs]    = useState([])
@@ -42,12 +49,22 @@ export function useDrugs() {
       // "is there anything new," adding one avoidable extra wait to every
       // background refresh. Conditions already ran these two in parallel;
       // drugs now matches that.
-      const [fresh, { drugsUpdatedAt }] = await Promise.all([
+      //
+      // Phase F14 Stage 3: also captures a fresh audit_log cursor
+      // alongside the fetch, so a full fetch (whether from a TTL expiry,
+      // a delta-merge fallback, or this being the first fetch ever) always
+      // leaves the device with a working baseline for the next background
+      // delta check. fetchAuditCursorNow failing on its own doesn't fail
+      // this full fetch — worst case the cursor stays null and the next
+      // background check falls back to a full fetch again too, which is a
+      // safe, if slightly redundant, default.
+      const [auditCursor, fresh, { drugsUpdatedAt }] = await Promise.all([
+        fetchAuditCursorNow(supabase).catch(() => null),
         fetchFlatDrugs(supabase),
         fetchMetadataTimestamps(supabase),
       ])
       setDrugs(fresh)
-      await writeDrugsCache(fresh, drugsUpdatedAt)
+      await writeDrugsCache(fresh, drugsUpdatedAt, auditCursor)
     } catch (err) {
       setError(err.message ?? 'Failed to load drugs')
       // Diagnostics-only addition (download-fail investigation, 2026-08-31):
@@ -93,14 +110,22 @@ export function useDrugs() {
     setProgress(null)
 
     try {
+      // Phase F14 Stage 3: capture the audit cursor up front, before paging
+      // starts — see fetchAndCache's matching comment above for why (a
+      // write landing mid-fetch just gets picked up again on the next
+      // background delta check, safe because that merge is idempotent).
+      const auditCursorPromise = fetchAuditCursorNow(supabase).catch(() => null)
       const fresh = await fetchFlatDrugs(supabase, (loaded, total) => {
         if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
         setProgress({ loaded, total })
       })
-      const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      const [{ drugsUpdatedAt }, auditCursor] = await Promise.all([
+        fetchMetadataTimestamps(supabase),
+        auditCursorPromise,
+      ])
       if (attemptIdRef.current !== myAttempt) return // stale — a newer attempt already resolved or is still running
       setDrugs(fresh)
-      await writeDrugsCache(fresh, drugsUpdatedAt)
+      await writeDrugsCache(fresh, drugsUpdatedAt, auditCursor)
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
       setError(err.message ?? 'Failed to load drugs')
@@ -115,6 +140,78 @@ export function useDrugs() {
         setLoading(false)
         setProgress(null)
       }
+    }
+  }
+
+  // Phase F14 Stage 3 (delta sync): called from the background "server
+  // version moved on" check instead of a full fetchAndCache. Asks
+  // audit_log what's changed since this device's last-applied cursor and
+  // only re-fetches the specific generics/formulations/brands affected,
+  // falling back to a full fetchAndCache whenever the audit-log path can't
+  // be trusted: no cursor saved yet, the audit_log query itself fails, or
+  // the change set is larger than DELTA_FALLBACK_CHANGE_COUNT. Working set
+  // is built from cachedRecord.data (the just-read cache) rather than the
+  // 'drugs' state variable, since this can run before that state has
+  // actually committed.
+  async function applyDrugsDelta(cachedRecord, drugsUpdatedAt) {
+    if (!cachedRecord.auditCursor) {
+      await fetchAndCache()
+      return
+    }
+
+    try {
+      const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
+
+      if (changes.length === 0) {
+        // Metadata timestamp moved but nothing in the watched tables did —
+        // shouldn't normally happen, but re-stamp version/cursor either way
+        // so this check doesn't keep re-firing every background poll.
+        await writeDrugsCache(cachedRecord.data, drugsUpdatedAt, cachedRecord.auditCursor)
+        return
+      }
+
+      if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
+        await fetchAndCache()
+        return
+      }
+
+      // One rule for every action (create/update/delete/publish/
+      // unpublish), no branching on action type: for each distinct
+      // changed id, drop every cached row tied to it, then re-fetch and
+      // re-insert whatever's currently published under it. A
+      // delete/unpublish naturally re-inserts nothing; a create/edit/
+      // publish naturally re-inserts the current state.
+      const genericIds     = new Set()
+      const formulationIds = new Set()
+      const brandIds       = new Set()
+
+      for (const change of changes) {
+        if (change.table_name === 'generics')     genericIds.add(change.record_id)
+        if (change.table_name === 'formulations') formulationIds.add(change.record_id)
+        if (change.table_name === 'brands')       brandIds.add(change.record_id)
+      }
+
+      let nextDrugs = [...cachedRecord.data]
+
+      for (const id of genericIds) {
+        nextDrugs = nextDrugs.filter(d => d.genericId !== id)
+        nextDrugs.push(...await fetchFlatDrugsByScope(supabase, 'generic', id))
+      }
+      for (const id of formulationIds) {
+        nextDrugs = nextDrugs.filter(d => d.formulationId !== id)
+        nextDrugs.push(...await fetchFlatDrugsByScope(supabase, 'formulation', id))
+      }
+      for (const id of brandIds) {
+        nextDrugs = nextDrugs.filter(d => d.id !== id)
+        nextDrugs.push(...await fetchFlatDrugsByBrandId(supabase, id))
+      }
+
+      const newCursor = changes[changes.length - 1].created_at
+      setDrugs(nextDrugs)
+      await writeDrugsCache(nextDrugs, drugsUpdatedAt, newCursor)
+    } catch (err) {
+      logCrash(err, 'useDrugs.applyDrugsDelta')
+      await fetchAndCache()
     }
   }
 
@@ -171,11 +268,14 @@ export function useDrugs() {
         return
       }
 
-      // Fresh — just check in the background if the server's version moved on
+      // Fresh — just check in the background if the server's version moved
+      // on. Phase F14 Stage 3: routes through applyDrugsDelta instead of a
+      // full fetchAndCache — see that function for the delta-merge logic
+      // and its fallback rules.
       try {
         const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (drugsUpdatedAt !== cached.version) {
-          await fetchAndCache()
+          await applyDrugsDelta(cached, drugsUpdatedAt)
         }
       } catch {
         // Network error on the background check — keep showing cached data
@@ -188,3 +288,4 @@ export function useDrugs() {
 
   return { drugs, loading, error, progress, refresh: fetchAndCache, start, retry }
 }
+

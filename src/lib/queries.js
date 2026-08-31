@@ -229,6 +229,19 @@ async function withPageRetry(requestPage) {
  *      timeout above — the sort removal is — but a separate safety margin
  *      against the catalog continuing to grow past today's ~20 pages.
  *
+ *   - 2026-08-31 (Phase F14 Stage 3, delta sync): fetchFlatDrugs' mapping
+ *     step was pulled out into its own mapFlatDrugRows() function so the
+ *     new scoped delta-fetch helpers (fetchFlatDrugsByScope,
+ *     fetchFlatDrugsByBrandId, further down) can reuse the exact same
+ *     field mapping on a small, filtered set of brand rows instead of the
+ *     full table. Also added: DELTA_SYNC_TABLES, fetchAuditLogSince,
+ *     fetchAuditCursorNow (shared by drugs and conditions), plus
+ *     SCOPED_BRAND_SELECT, fetchFlatDrugsByScope, fetchFlatDrugsByBrandId
+ *     (drugs) and fetchConditionById (conditions) — see each function's
+ *     own comment for what it does. No existing query, select string, or
+ *     mapping logic changed shape; this only adds new, narrower ways to
+ *     ask for a slice of the same data.
+ *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} selectString
  * @param {(loaded: number, total: number) => void} [onProgress] — called
@@ -300,17 +313,17 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
 }
 
 /**
- * Fetch all published drugs as a flat list ready for the drug library UI.
- * Primary key is brand (item) UUID (one row per item — brand + strength + form).
+ * Map raw brand rows (FULL_BRAND_SELECT or SCOPED_BRAND_SELECT shape) into
+ * FlatDrug objects. Pulled out of fetchFlatDrugs (2026-08-31, Phase F14
+ * Stage 3) so the scoped delta-fetch helpers below (fetchFlatDrugsByScope,
+ * fetchFlatDrugsByBrandId) can map a small, filtered set of rows with the
+ * exact same logic instead of duplicating it.
  *
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {(loaded: number, total: number) => void} [onProgress]
- * @returns {Promise<FlatDrug[]>}
+ * @param {Array} rows — raw rows from a brands select using FULL_BRAND_SELECT or SCOPED_BRAND_SELECT
+ * @returns {FlatDrug[]}
  */
-export async function fetchFlatDrugs(supabase, onProgress) {
-  const allRows = await fetchAllBrandRows(supabase, FULL_BRAND_SELECT, onProgress)
-
-  return allRows
+function mapFlatDrugRows(rows) {
+  return rows
     .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
     .map(b => {
       const f = b.formulations
@@ -369,6 +382,81 @@ export async function fetchFlatDrugs(supabase, onProgress) {
 }
 
 /**
+ * Fetch all published drugs as a flat list ready for the drug library UI.
+ * Primary key is brand (item) UUID (one row per item — brand + strength + form).
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {(loaded: number, total: number) => void} [onProgress]
+ * @returns {Promise<FlatDrug[]>}
+ */
+export async function fetchFlatDrugs(supabase, onProgress) {
+  const allRows = await fetchAllBrandRows(supabase, FULL_BRAND_SELECT, onProgress)
+  return mapFlatDrugRows(allRows)
+}
+
+// FULL_BRAND_SELECT with the formulations/generics embeds marked as inner
+// joins (PostgREST's !inner hint). Same exact field list — only the join
+// hints differ — so mapFlatDrugRows maps either shape identically. Needed
+// because a plain (non-inner) embed filter only trims what shows up
+// *inside* each brand's nested formulations/generics object; it doesn't
+// restrict which top-level brand rows come back at all. !inner is what
+// makes fetchFlatDrugsByScope below actually return only the brands under
+// the requested generic/formulation, instead of every brand with a
+// filtered-down (possibly empty) nested object.
+const SCOPED_BRAND_SELECT = FULL_BRAND_SELECT
+  .replace('formulations (', 'formulations!inner (')
+  .replace('generics (', 'generics!inner (')
+
+/**
+ * Re-fetch the current published FlatDrug rows under one changed generic or
+ * formulation id — the building block behind Phase F14 Stage 3's drugs
+ * delta-merge: for each distinct changed id, the caller drops every cached
+ * row tied to it, then calls this to re-fetch and re-insert whatever's
+ * currently published under it. A delete/unpublish naturally comes back
+ * empty here (nothing currently published under that id) and a
+ * create/edit/publish naturally comes back with the current state — no
+ * branching on the audit_log action type needed.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {'generic'|'formulation'} scope
+ * @param {string} id
+ * @returns {Promise<FlatDrug[]>}
+ */
+export async function fetchFlatDrugsByScope(supabase, scope, id) {
+  const filterColumn = scope === 'generic' ? 'formulations.generics.id' : 'formulations.id'
+  const { data, error } = await supabase
+    .from('brands')
+    .select(SCOPED_BRAND_SELECT)
+    .eq('is_published', true)
+    .eq(filterColumn, id)
+
+  if (error) throw error
+  return mapFlatDrugRows(data ?? [])
+}
+
+/**
+ * Re-fetch the current published FlatDrug row(s) for one changed brand id.
+ * Same "remove then re-insert whatever's current" pattern as
+ * fetchFlatDrugsByScope above, scoped directly by the brand's own id
+ * instead of a nested generic/formulation id — no !inner join needed since
+ * the filter is on the top-level table itself.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} brandId
+ * @returns {Promise<FlatDrug[]>}
+ */
+export async function fetchFlatDrugsByBrandId(supabase, brandId) {
+  const { data, error } = await supabase
+    .from('brands')
+    .select(FULL_BRAND_SELECT)
+    .eq('is_published', true)
+    .eq('id', brandId)
+
+  if (error) throw error
+  return mapFlatDrugRows(data ?? [])
+}
+
+/**
  * Fetch the app_metadata timestamps for cache invalidation.
  * Returns { drugsUpdatedAt: string, conditionsUpdatedAt: string }
  *
@@ -387,6 +475,74 @@ export async function fetchMetadataTimestamps(supabase) {
     drugsUpdatedAt:      data.drugs_updated_at,
     conditionsUpdatedAt: data.conditions_updated_at,
   }
+}
+
+// ─── Delta sync (audit_log-based, Phase F14 Stage 3) ───────────────────────────
+//
+// Reuses audit_log — already populated by every admin write via logAudit(),
+// see utils/auditLogger.js — as a change feed, so a background refresh can
+// pull just what changed since a device's last check instead of
+// redownloading the whole library. Read access to audit_log is scoped by
+// Stage 2's audit_log_select_public RLS policy to exactly the six tables
+// below; admin-only rows (e.g. profiles) are invisible to this query by
+// database-level design, not just by convention.
+//
+// Shared by both useDrugs.js and useConditions.js — categories is
+// deliberately not in this list (stays on the existing full-refetch
+// system, out of delta-sync scope per Phase F14's plan).
+
+const DELTA_SYNC_TABLES = ['generics', 'formulations', 'brands', 'conditions', 'condition_blocks', 'specialties']
+
+/**
+ * Fetch every audit_log row newer than `sinceTimestamp` for the tables the
+ * delta-sync system watches, oldest first — callers walk them in the order
+ * they happened and use the last row's created_at as their new cursor.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} sinceTimestamp — ISO timestamp; the device's last-applied audit_log cursor
+ * @returns {Promise<Array<{ id: number, action: string, table_name: string, record_id: string, created_at: string }>>}
+ */
+export async function fetchAuditLogSince(supabase, sinceTimestamp) {
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select('id, action, table_name, record_id, created_at')
+    .in('table_name', DELTA_SYNC_TABLES)
+    .gt('created_at', sinceTimestamp)
+    .order('created_at', { ascending: true })
+
+  if (error) throw error
+  return data ?? []
+}
+
+/**
+ * Fetch the current "high water mark" for the delta-sync audit trail — the
+ * created_at of the newest audit_log row for the watched tables, right now.
+ * Callers capture this right before starting a full-library fetch (not
+ * after it finishes) and store it as the new cursor alongside that fetch's
+ * result: if a write lands mid-fetch, it's simply picked up again on the
+ * next background delta check rather than silently missed. That's safe to
+ * do because the delta-merge itself is idempotent (drops then re-inserts
+ * whatever's currently published under a changed id) — reprocessing an
+ * already-applied change is harmless.
+ *
+ * Returns null if audit_log has no matching rows yet (e.g. a brand-new
+ * database) — callers treat that the same as "no cursor yet," which the
+ * existing missing-cursor safety net already falls back to a full fetch for.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @returns {Promise<string | null>}
+ */
+export async function fetchAuditCursorNow(supabase) {
+  const { data, error } = await supabase
+    .from('audit_log')
+    .select('created_at')
+    .in('table_name', DELTA_SYNC_TABLES)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.created_at ?? null
 }
 
 // ─── Conditions queries ───────────────────────────────────────────────────────
@@ -542,6 +698,36 @@ async function fetchAllConditionRows(supabase) {
 export async function fetchConditions(supabase) {
   const data = await fetchAllConditionRows(supabase)
   return mapConditions(data)
+}
+
+/**
+ * Re-fetch one condition by id, current published state — the building
+ * block behind Phase F14 Stage 3's conditions delta-merge. record_id on a
+ * conditions/condition_blocks audit_log row IS the condition's own id for
+ * both tables (confirmed from saveConditionBlocks/updateCondition/
+ * insertCondition/deleteCondition), so no scope lookup is needed the way
+ * drugs' generic/formulation ids need one.
+ *
+ * Returns null if the condition is no longer published or was deleted —
+ * the caller's "drop then re-insert whatever's current" rule handles that
+ * correctly by simply not re-adding it, no branching on audit_log action
+ * type needed.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {string} conditionId
+ * @returns {Promise<ConditionFull | null>}
+ */
+export async function fetchConditionById(supabase, conditionId) {
+  const { data, error } = await supabase
+    .from('conditions')
+    .select(CONDITIONS_SELECT)
+    .eq('id', conditionId)
+    .eq('is_published', true)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data) return null
+  return mapConditions([data])[0]
 }
 
 /**
@@ -757,3 +943,4 @@ export async function fetchActiveGates(supabase, platform) {
       minVersion:  g.min_version,
     }))
 }
+
