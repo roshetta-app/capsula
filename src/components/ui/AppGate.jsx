@@ -211,10 +211,20 @@ function AppGateBlock({ gate }) {
 // A free account, offline, with a library already cached. Deliberately NOT
 // styled like AppGateBlock's tinted, alarm-style band above — this isn't an
 // error or an admin-authored message, it's a normal, expected state, so it
-// stays quiet: a plain neutral icon, no colored band. The one spot of color
-// is a small Pro pill at the bottom, using the same accent-blue + Sparkles
-// combination ProComingSoonSheet.jsx already established elsewhere in the
-// app as "this represents Pro" — approved mockup, this session.
+// stays quiet: a plain neutral icon, no colored band.
+//
+// Two-layer structure (revised this session after the first pass read as
+// one dense, "bulky" paragraph): a short status line, then a visually
+// separate bordered card for the Pro benefit — the same "here's what
+// upgrading gets you" callout shape apps commonly use, rather than
+// cramming the upsell into the same sentence as the status message. The
+// card reuses the accent-blue + Sparkles combination ProComingSoonSheet.jsx
+// already established elsewhere in the app as "this represents Pro."
+//
+// Icon note: explicit display:'block' + margin:'0 auto' below, NOT relying
+// on the container's text-align — this project's Tailwind preflight resets
+// all <svg> to display:block, which silently breaks text-align centering
+// for icon-only elements like this one.
 function OfflineBlock() {
   return (
     <div style={{
@@ -229,49 +239,76 @@ function OfflineBlock() {
       padding:         'var(--space-6) var(--space-5)',
       textAlign:       'center',
     }}>
-      <div style={{ width: '100%', maxWidth: 340 }}>
+      <div style={{ width: '100%', maxWidth: 320 }}>
         <WifiOff
-          size={56}
+          size={48}
           color="var(--color-text-secondary)"
           strokeWidth={1.5}
           aria-hidden="true"
-          style={{ marginBottom: 'var(--space-5)' }}
+          style={{ display: 'block', margin: '0 auto var(--space-4)' }}
         />
 
         <div style={{
-          fontSize:     20,
+          fontSize:     18,
           fontWeight:   700,
           color:        'var(--color-text-primary)',
           fontFamily:   'var(--font-body)',
-          marginBottom: 'var(--space-3)',
+          marginBottom: 'var(--space-2)',
         }}>
           You&apos;re offline
         </div>
 
         <div style={{
-          fontSize:     14,
-          lineHeight:   1.55,
+          fontSize:     13,
           color:        'var(--color-text-secondary)',
           fontFamily:   'var(--font-body)',
           marginBottom: 'var(--space-5)',
         }}>
-          Reconnect to keep browsing, or go Pro to keep using what you&apos;ve already saved — even offline.
+          Reconnect to keep browsing your saved data.
         </div>
 
         <div style={{
-          display:         'inline-flex',
-          alignItems:      'center',
-          gap:             6,
-          backgroundColor: 'var(--color-accent-light)',
-          color:           '#0C4A6E',
-          fontSize:        12,
-          fontWeight:      500,
-          fontFamily:      'var(--font-body)',
-          padding:         '5px 12px',
-          borderRadius:    'var(--radius-full)',
+          display:         'flex',
+          alignItems:      'flex-start',
+          gap:             10,
+          textAlign:       'left',
+          backgroundColor: 'var(--color-surface)',
+          border:          '1px solid var(--color-border)',
+          borderRadius:    'var(--radius-lg)',
+          padding:         'var(--space-3) var(--space-4)',
         }}>
-          <Sparkles size={13} aria-hidden="true" />
-          Pro keeps working offline
+          <div style={{
+            width:           28,
+            height:          28,
+            flexShrink:      0,
+            marginTop:       1,
+            borderRadius:    'var(--radius-md)',
+            backgroundColor: 'var(--color-accent-light)',
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+          }}>
+            <Sparkles size={14} color="var(--color-accent)" aria-hidden="true" />
+          </div>
+          <div>
+            <div style={{
+              fontSize:     13,
+              fontWeight:   600,
+              color:        'var(--color-text-primary)',
+              fontFamily:   'var(--font-body)',
+              marginBottom: 2,
+            }}>
+              Works offline with Pro
+            </div>
+            <div style={{
+              fontSize:   12,
+              lineHeight: 1.45,
+              color:      'var(--color-text-secondary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              Keep browsing everything you&apos;ve saved, connection or not.
+            </div>
+          </div>
         </div>
       </div>
     </div>
