@@ -1,10 +1,20 @@
 /**
  * src/components/ui/OfflineBanner.jsx
  * Phase 2K — PWA & Offline Infrastructure
+ * Phase 5 update (plan: CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md, §Phase 5)
  *
- * Slim yellow banner shown at top of screen when isOnline === false.
- * Dismissible via X button.
- * Remounts (re-shows) each time the user goes offline again.
+ * Slim yellow banner shown at top of screen when isOnline === false AND the
+ * person is Pro (§5.1). A free user going offline sees Phase 4's full-screen
+ * offline block instead (AppGate.jsx) — this banner and that block are never
+ * both visible at once, since Phase 4's block already covers the full screen
+ * (zIndex 2000) whenever it's showing.
+ *
+ * Reworded from a neutral notice to a reassurance for the Pro audience it
+ * now serves exclusively (§5.2): they're not being warned about a
+ * limitation, they're being told their saved data still works.
+ *
+ * Dismissible via X button. Remounts (re-shows) each time the user goes
+ * offline again. Unchanged from before (§5.3).
  *
  * Usage — already mounted once in layout.jsx:
  *   import OfflineBanner from './ui/OfflineBanner'
@@ -14,9 +24,11 @@
 
 import { useState, useEffect } from 'react'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useIsPro } from '../../hooks/useIsPro'
 
 export default function OfflineBanner() {
   const { isOnline }      = useOnlineStatus()
+  const isPro              = useIsPro()
   const [dismissed, setDismissed] = useState(false)
 
   // Re-show banner whenever the user goes offline again
@@ -24,8 +36,9 @@ export default function OfflineBanner() {
     if (!isOnline) setDismissed(false)
   }, [isOnline])
 
-  // Nothing to render when online or dismissed
-  if (isOnline || dismissed) return null
+  // Nothing to render when online, dismissed, or not Pro (§5.1) — a free
+  // user offline is handled entirely by AppGate.jsx's full-screen block.
+  if (isOnline || dismissed || !isPro) return null
 
   return (
     <div
@@ -64,7 +77,7 @@ export default function OfflineBanner() {
           color:      '#92400E',
           lineHeight: 1.3,
         }}>
-          You are offline. Showing cached data.
+          You&apos;re offline — showing what you&apos;ve already saved.
         </span>
       </div>
 
