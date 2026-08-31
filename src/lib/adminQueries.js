@@ -61,8 +61,9 @@ export async function deleteFormulation(id) {
     .from('formulations')
     .delete()
     .eq('id', id)
-  if (!error) await logAudit('delete', 'formulations', id)
-  return { error }
+  if (error) return { error }
+  await logAudit('delete', 'formulations', id)
+  return touchAppMetadata('drugs_updated_at')
 }
 
 // ─── Generics (5.3) ──────────────────────────────────────────────────────────
@@ -73,8 +74,10 @@ export async function insertGeneric(data) {
     .insert(data)
     .select('id, slug')
     .single()
-  if (!error && row) await logAudit('create', 'generics', row.id, data.name_en, data)
-  return { data: row, error }
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'generics', row.id, data.name_en, data)
+  await touchAppMetadata('drugs_updated_at')
+  return { data: row, error: null }
 }
 
 export async function updateGeneric(id, data) {
@@ -82,8 +85,9 @@ export async function updateGeneric(id, data) {
     .from('generics')
     .update(data)
     .eq('id', id)
-  if (!error) await logAudit('update', 'generics', id, data.name_en ?? null, data)
-  return { error }
+  if (error) return { error }
+  await logAudit('update', 'generics', id, data.name_en ?? null, data)
+  return touchAppMetadata('drugs_updated_at')
 }
 
 export async function fetchFormulationWithGeneric(formulationId) {
@@ -117,8 +121,10 @@ export async function insertFormulation(data) {
     .insert(data)
     .select('id')
     .single()
-  if (!error && row) await logAudit('create', 'formulations', row.id, null, data)
-  return { data: row, error }
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'formulations', row.id, null, data)
+  await touchAppMetadata('drugs_updated_at')
+  return { data: row, error: null }
 }
 
 export async function updateFormulation(id, data) {
@@ -139,8 +145,10 @@ export async function insertBrand(data) {
     .insert(data)
     .select('id')
     .single()
-  if (!error && row) await logAudit('create', 'brands', row.id, data.name ?? null, data)
-  return { data: row, error }
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'brands', row.id, data.name ?? null, data)
+  await touchAppMetadata('drugs_updated_at')
+  return { data: row, error: null }
 }
 
 export async function updateBrand(id, data) {
@@ -148,8 +156,9 @@ export async function updateBrand(id, data) {
     .from('brands')
     .update(data)
     .eq('id', id)
-  if (!error) await logAudit('update', 'brands', id, data.name ?? null, data)
-  return { error }
+  if (error) return { error }
+  await logAudit('update', 'brands', id, data.name ?? null, data)
+  return touchAppMetadata('drugs_updated_at')
 }
 
 export async function deleteBrand(id) {
@@ -526,8 +535,10 @@ export async function insertCondition(data) {
     .insert(data)
     .select('id, slug')
     .single()
-  if (!error && row) await logAudit('create', 'conditions', row.id, data.name ?? null, data)
-  return { data: row, error }
+  if (error || !row) return { data: row, error }
+  await logAudit('create', 'conditions', row.id, data.name ?? null, data)
+  await touchAppMetadata('conditions_updated_at')
+  return { data: row, error: null }
 }
 
 export async function updateCondition(id, data) {
@@ -535,8 +546,9 @@ export async function updateCondition(id, data) {
     .from('conditions')
     .update(data)
     .eq('id', id)
-  if (!error) await logAudit('update', 'conditions', id, data.name ?? null, data)
-  return { error }
+  if (error) return { error }
+  await logAudit('update', 'conditions', id, data.name ?? null, data)
+  return touchAppMetadata('conditions_updated_at')
 }
 
 export async function deleteCondition(id, name = null) {
@@ -544,8 +556,9 @@ export async function deleteCondition(id, name = null) {
     .from('conditions')
     .delete()
     .eq('id', id)
-  if (!error) await logAudit('delete', 'conditions', id, name)
-  return { error }
+  if (error) return { error }
+  await logAudit('delete', 'conditions', id, name)
+  return touchAppMetadata('conditions_updated_at')
 }
 
 export async function fetchConditionForEdit(id) {
