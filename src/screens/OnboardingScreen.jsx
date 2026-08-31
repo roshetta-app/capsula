@@ -1,3 +1,4 @@
+/**
  * src/screens/OnboardingScreen.jsx
  * Onboarding redesign (2026-08-30) — see CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md,
  * Phase 1, steps 1.6–1.9 for the full decision trail.
