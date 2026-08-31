@@ -1,4 +1,3 @@
-/**
  * src/screens/OnboardingScreen.jsx
  * Onboarding redesign (2026-08-30) — see CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md,
  * Phase 1, steps 1.6–1.9 for the full decision trail.
@@ -547,9 +546,9 @@ export default function OnboardingScreen({ onDone }) {
           src={slide.image}
           alt=""
           style={{
-            width:     heroOnBlue ? '78%' : '100%',
+            width:     heroOnBlue ? '56%' : '100%',
             height:    heroOnBlue ? 'auto' : '100%',
-            maxHeight: heroOnBlue ? '80%' : undefined,
+            maxHeight: heroOnBlue ? '58%' : undefined,
             objectFit: heroOnBlue ? 'contain' : 'cover',
             flex:      heroOnBlue ? undefined : 1,
             // 'auto 0' (top/bottom auto, left/right 0) centers the image
@@ -716,4 +715,3 @@ export default function OnboardingScreen({ onDone }) {
     </div>
   )
 }
-
