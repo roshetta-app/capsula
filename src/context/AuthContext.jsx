@@ -196,6 +196,23 @@ export function AuthProvider({ children }) {
     // gap is what let AccountScreen render signed-in for a beat before the
     // redirect to the wizard kicked in. Reading it straight off `profile`
     // like everything else here closes that gap.
+
+    // Pro-offline bug fix — a connectivity failure (device genuinely
+    // offline, or a background session re-validation on tab refocus /
+    // app resume — see the SIGNED_IN branch below — firing mid-flaky-
+    // connection) is not the same thing as "this profile doesn't exist."
+    // Before this check, ANY error here — including a plain fetch
+    // failure — fell through to setProfile(null) below, which wiped an
+    // already-known tier: 'paid' the instant a background refresh
+    // couldn't reach the server while offline. That's what could
+    // silently downgrade a Pro user into the offline block mid-session.
+    // A genuine "no profile row" error (e.g. right after first sign-up,
+    // before one exists yet) is a different, legitimate case and should
+    // still clear it below — only a connectivity failure bails out here,
+    // deliberately leaving the last known-good profile in place until a
+    // real check can actually succeed.
+    if (error && isNetworkTimingError(error)) return
+
     setProfile(error ? null : {
       role:                  data.role,
       tier:                  data.tier,
@@ -422,3 +439,4 @@ export function useAuth() {
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>')
   return ctx
 }
+
