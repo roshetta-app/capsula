@@ -51,21 +51,36 @@ export function useConditions() {
   // firing the fetch twice if start() somehow gets called more than once.
   const startedRef = useRef(false)
 
+  // Retry-stacking guard (2026-08-31) — mirrors useDrugs.js's matching
+  // fix. Tapping Retry used to start a brand new fetchAndCache() without
+  // stopping whatever attempt was already running, and whichever one
+  // finished last would silently overwrite the other's result. This
+  // counter tags every fetchAndCache() call with its own attempt number;
+  // a call only applies its results if it's still the *latest* attempt by
+  // the time it resolves. Also protects the silent background-refresh
+  // path this same function serves (init()'s TTL/version checks below) —
+  // if a background refresh and a user-triggered retry ever overlap, only
+  // the most recent one wins.
+  const attemptIdRef = useRef(0)
+
   // Fetch fresh data from DB, update state, write cache.
   // Fetches metadata FIRST so the version we store matches what triggered the fetch.
   // Clears any stuck error from an earlier failed attempt at the top of
   // every call, so a retry doesn't leave a stale error message behind
   // once a new attempt is under way.
   async function fetchAndCache() {
+    const myAttempt = ++attemptIdRef.current
     setError(null)
     try {
       const [fresh, { conditionsUpdatedAt }] = await Promise.all([
         fetchConditions(supabase),
         fetchMetadataTimestamps(supabase),
       ])
+      if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
       setConditions(fresh)
       await writeConditionsCache(fresh, conditionsUpdatedAt)
     } catch (err) {
+      if (attemptIdRef.current !== myAttempt) return
       setError(err.message ?? 'Failed to load conditions')
       // Diagnostics-only addition (download-fail investigation, 2026-08-31)
       // — matches the same addition in useDrugs.js's fetchAndCache/
@@ -76,7 +91,9 @@ export function useConditions() {
       // somewhere instead of only ever being retried blind.
       logCrash(err, 'useConditions.fetchAndCache')
     } finally {
-      setLoading(false)
+      if (attemptIdRef.current === myAttempt) {
+        setLoading(false)
+      }
     }
   }
 

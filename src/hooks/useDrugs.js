@@ -22,6 +22,19 @@ export function useDrugs() {
   // second time if start() somehow gets called more than once.
   const startedRef = useRef(false)
 
+  // Retry-stacking guard (2026-08-31): tapping Retry used to start a brand
+  // new fetchColdStart() without stopping whatever attempt was already
+  // running (e.g. one still in flight when onboarding's 25-30s timeout
+  // fired and showed Failed). Both attempts kept writing to drugs/
+  // loading/progress/error, and whichever finished last "won" — visible as
+  // the progress bar jumping around, and as two full downloads' worth of
+  // cache writes happening back to back. This counter tags every
+  // fetchColdStart() call with its own attempt number; a call only applies
+  // its results if it's still the *latest* attempt by the time it resolves,
+  // so a stale attempt's late-arriving progress/data/error is silently
+  // ignored instead of overwriting a newer one.
+  const attemptIdRef = useRef(0)
+
   async function fetchAndCache() {
     try {
       const fresh = await fetchFlatDrugs(supabase)
@@ -63,15 +76,26 @@ export function useDrugs() {
   // truth: onboarding does not finish until the complete download has
   // actually succeeded and been saved.
   async function fetchColdStart() {
+    // This call's own attempt number. If a newer call starts (another
+    // Retry tap) before this one finishes, attemptIdRef.current moves past
+    // myAttempt — every check below then knows this attempt is stale.
+    const myAttempt = ++attemptIdRef.current
+
     setLoading(true)
     setError(null)
+    setProgress(null)
 
     try {
-      const fresh = await fetchFlatDrugs(supabase, (loaded, total) => setProgress({ loaded, total }))
+      const fresh = await fetchFlatDrugs(supabase, (loaded, total) => {
+        if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
+        setProgress({ loaded, total })
+      })
       const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
+      if (attemptIdRef.current !== myAttempt) return // stale — a newer attempt already resolved or is still running
       setDrugs(fresh)
       await writeDrugsCache(fresh, drugsUpdatedAt)
     } catch (err) {
+      if (attemptIdRef.current !== myAttempt) return
       setError(err.message ?? 'Failed to load drugs')
       // Diagnostics-only addition (download-fail investigation, 2026-08-31)
       // — see matching note in fetchAndCache above. This is the path
@@ -80,8 +104,10 @@ export function useDrugs() {
       // "Something went wrong" / Retry loop.
       logCrash(err, 'useDrugs.fetchColdStart')
     } finally {
-      setLoading(false)
-      setProgress(null)
+      if (attemptIdRef.current === myAttempt) {
+        setLoading(false)
+        setProgress(null)
+      }
     }
   }
 

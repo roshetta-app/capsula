@@ -400,20 +400,81 @@ function mapConditions(data) {
   }))
 }
 
+// How many condition pages fetchAllConditionRows lets run at the same time.
+// Same batch size as BRAND_PAGE_BATCH_SIZE above, kept as its own constant
+// since the two tables' page counts aren't related.
+const CONDITION_PAGE_BATCH_SIZE = 4
+
+/**
+ * Page through the full `conditions` table for a given select shape,
+ * published rows only. Same shape as fetchAllBrandRows above.
+ *
+ * 2026-08-31 (conditions-size-protection): conditions was still being
+ * fetched in a single request with no paging — the exact same 1,000-row
+ * cap that once silently truncated the drugs library before pagination
+ * was added there. It only worked by luck (fewer than 1,000 published
+ * conditions today); this closes that gap the same way it was already
+ * closed for drugs, before the count has a chance to cross it.
+ *
+ * `.order('name')` is intentionally dropped here too, matching
+ * fetchAllBrandRows' reasoning above — the app sorts and searches
+ * conditions on-device once loaded, so the raw fetch order is never used
+ * for anything, and skipping it avoids the same kind of deep-page cost a
+ * database-side sort adds as the table grows.
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+async function fetchAllConditionRows(supabase) {
+  const { count, error: countError } = await supabase
+    .from('conditions')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_published', true)
+
+  if (countError) throw countError
+
+  const totalPages = Math.max(1, Math.ceil((count ?? 0) / SUPABASE_MAX_ROWS))
+  const allRows = []
+
+  for (let batchStart = 0; batchStart < totalPages; batchStart += CONDITION_PAGE_BATCH_SIZE) {
+    const pageIndexes = Array.from(
+      { length: Math.min(CONDITION_PAGE_BATCH_SIZE, totalPages - batchStart) },
+      (_, i) => batchStart + i
+    )
+
+    const batchResults = await Promise.all(
+      pageIndexes.map(i => {
+        const from = i * SUPABASE_MAX_ROWS
+        const to   = from + SUPABASE_MAX_ROWS - 1
+        return supabase
+          .from('conditions')
+          .select(CONDITIONS_SELECT)
+          .eq('is_published', true)
+          .range(from, to)
+          .then(({ data, error }) => {
+            if (error) throw error
+            return data
+          })
+      })
+    )
+
+    allRows.push(...batchResults.flat())
+  }
+
+  return allRows
+}
+
 /**
  * Fetch all PUBLISHED conditions — used by public app via useConditions hook.
+ *
+ * 2026-08-31: now pages through the table (see fetchAllConditionRows above)
+ * instead of a single request, so it can't silently drop rows once the
+ * library passes 1,000 published conditions.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @returns {Promise<ConditionFull[]>}
  */
 export async function fetchConditions(supabase) {
-  const { data, error } = await supabase
-    .from('conditions')
-    .select(CONDITIONS_SELECT)
-    .eq('is_published', true)
-    .order('name')
-
-  if (error) throw error
+  const data = await fetchAllConditionRows(supabase)
   return mapConditions(data)
 }
 
