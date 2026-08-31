@@ -55,10 +55,20 @@
  * Provider order (outermost → innermost):
  *   ErrorBoundary → BrowserRouter → ToastProvider → AuthProvider →
  *   ThemeProvider → ConditionProvider → DrugProvider → FavouritesProvider →
- *   NotesActivityProvider → PushSubscriptionProvider → AppGateProvider →
+ *   NotesActivityProvider → PushSubscriptionProvider → OnlineStatusProvider →
+ *   AppGateProvider →
  *   [AppGateResumeListener, AppGate, OnboardingGate → AppRoutes,
  *   ProfileSetupRedirect, SignInNudge] (all five as siblings inside
  *   AppGateProvider — AppGate does not wrap OnboardingGate, see note above)
+ *   (OnlineStatusProvider added 2026-08-31, Pro-offline-lift bugfix — was a
+ *   plain hook (useOnlineStatus.js) called independently by both
+ *   OfflineBanner.jsx and AppGate.jsx, so each ran its own separate
+ *   reachability check with no coordination, which is what made the
+ *   offline block's own lift-back-online timing look inconsistent against
+ *   the banner's. Sits just inside PushSubscriptionProvider and outside
+ *   AppGateProvider — no dependency on anything else in the tree, and
+ *   needs to cover both AppGate below and OfflineBanner, mounted much
+ *   deeper inside AppRoutes → Layout.)
  *   (ThemeProvider added 2026-08-22, account-theme-sync bugfix — sits
  *   inside AuthProvider since it reads useAuth() internally, and outside
  *   everything that might read the theme.)
@@ -92,6 +102,7 @@ import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { NotesActivityProvider } from './context/NotesActivityContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
+import { OnlineStatusProvider } from './context/OnlineStatusContext'
 import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
 import { ToastProvider } from './context/ToastContext'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -176,15 +187,17 @@ export default function App() {
                   <FavouritesProvider>
                     <NotesActivityProvider>
                       <PushSubscriptionProvider>
-                        <AppGateProvider>
-                          <AppGateResumeListener />
-                          <AppGate />
-                          <OnboardingGate>
-                            <AppRoutes />
-                          </OnboardingGate>
-                          <ProfileSetupRedirect />
-                          <SignInNudge />
-                        </AppGateProvider>
+                        <OnlineStatusProvider>
+                          <AppGateProvider>
+                            <AppGateResumeListener />
+                            <AppGate />
+                            <OnboardingGate>
+                              <AppRoutes />
+                            </OnboardingGate>
+                            <ProfileSetupRedirect />
+                            <SignInNudge />
+                          </AppGateProvider>
+                        </OnlineStatusProvider>
                       </PushSubscriptionProvider>
                     </NotesActivityProvider>
                   </FavouritesProvider>
