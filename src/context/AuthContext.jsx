@@ -567,7 +567,28 @@ export function AuthProvider({ children }) {
   // of what page is currently open. Favourites doesn't need the same
   // treatment — it's mirrored by an always-mounted context, so its own
   // sign-out effect already covers every case.
+  //
+  // Offline-sign-out bug fix (2026-09-01) — this used to wipe the local
+  // notes/recently-viewed storage AND the remembered Pro-status snapshot
+  // (authSnapshot.js) unconditionally, before even attempting the real
+  // supabase.auth.signOut() call below. That snapshot is the one thing a
+  // cold app restart has to go on for "is this person Pro" while offline
+  // (see authSnapshot.js's header) — wiping it the instant Sign Out is
+  // tapped, regardless of whether the account was actually signed out,
+  // meant an offline Pro user who tried to sign out with no connection
+  // lost their offline-Pro fallback immediately, then got shown the
+  // free-tier offline block on the next cold start even though nothing
+  // had actually been confirmed server-side. Now the real sign-out is
+  // attempted FIRST, and local data is only cleared once that's confirmed
+  // to have actually gone through. A connectivity failure here (same
+  // isNetworkTimingError check used elsewhere in this file, e.g.
+  // loadProfile above) leaves everything untouched and reports back via
+  // the returned `error` instead of failing silently, so AccountSheet.jsx
+  // and AccountScreen.jsx can tell the person what happened.
   async function signOut() {
+    const { error } = await supabase.auth.signOut()
+    if (error && isNetworkTimingError(error)) return { error }
+
     clearAllNotesStorage()
     clearAllRecentlyViewedStorage()
     // account-instant-load: wipe the remembered name/photo/email right
@@ -576,7 +597,7 @@ export function AuthProvider({ children }) {
     // catch this, so there's no window where a signed-out AccountScreen
     // could still show the last signed-in person's info.
     clearCachedAuthSnapshot()
-    await supabase.auth.signOut()
+    return { error: error ?? null }
   }
 
   // account-screen-redesign — lets a screen that just changed the name

@@ -41,6 +41,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { User } from 'lucide-react'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useToast } from '../../context/ToastContext'
 
 export default function AccountSheet({
   isOpen,
@@ -52,6 +54,8 @@ export default function AccountSheet({
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState(null)
   const [googlePressed, setGooglePressed] = useState(false)
+  const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual position — same
@@ -104,11 +108,25 @@ export default function AccountSheet({
     setBusy(false)
   }
 
+  // Offline-sign-out bug fix (2026-09-01) — signOut() needs a network
+  // round-trip to actually complete (see AuthContext.jsx). Checking
+  // isOnline first means an offline tap gets an immediate, clear message
+  // instead of silently doing nothing while nothing visibly changes. The
+  // error check after calling it is a safety net for the rarer case where
+  // the connection drops between the tap and the call finishing.
   async function handleSignOut() {
     if (busy) return
+    if (!isOnline) {
+      toast.error("You'll need an internet connection to sign out.")
+      return
+    }
     setBusy(true)
-    await signOut()
+    const { error } = await signOut()
     setBusy(false)
+    if (error) {
+      toast.error("Couldn't sign out — please check your connection and try again.")
+      return
+    }
     onClose()
   }
 

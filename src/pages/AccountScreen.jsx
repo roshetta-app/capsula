@@ -194,6 +194,8 @@ import {
 import { useAuth } from '../hooks/useAuth'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
+import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useToast } from '../context/ToastContext'
 import NotificationSheet from '../components/ui/NotificationSheet'
 import InfoSheet from '../components/ui/InfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -485,6 +487,8 @@ export default function AccountScreen() {
   const { user, profile, loading, signInWithGoogle, signOut } = useAuth()
   const { theme, setTheme } = useDarkMode()
   const { subscribed: notificationsOn } = usePushSubscriptionContext()
+  const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
   const navigate = useNavigate()
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState(null)
@@ -521,11 +525,24 @@ export default function AccountScreen() {
     setBusy(false)
   }
 
+  // Offline-sign-out bug fix (2026-09-01) — same fix as AccountSheet.jsx's
+  // handleSignOut: signOut() needs a network round-trip to complete, so
+  // check isOnline first and give a clear message instead of the
+  // confirm-dialog silently closing with nothing actually having
+  // happened. The error check after calling it covers the connection
+  // dropping mid-attempt.
   async function handleSignOut() {
     if (busy) return
+    if (!isOnline) {
+      toast.error("You'll need an internet connection to sign out.")
+      return
+    }
     setBusy(true)
-    await signOut()
+    const { error } = await signOut()
     setBusy(false)
+    if (error) {
+      toast.error("Couldn't sign out — please check your connection and try again.")
+    }
   }
 
   // Contact Us, Report a Problem, Terms of Use, Privacy Policy — all stubs
