@@ -39,20 +39,30 @@
  *
  * On completion: sets capsula_onboarded = true, calls onDone() to unmount.
  *
- * 2026-08-31 (onboarding-download-flow hardening, plan Phase 1 addendum):
- * useDrugs.js/useConditions.js no longer auto-download on a brand-new
- * install — they wait for start(), called from here. This file now
- * provides that trigger:
- *   - Tapping Next on slide 4 (favourites) checks isOnline first. Offline
- *     -> the tap is blocked and an inline message asks the person to
- *     connect, instead of advancing into slide 5 just to fail immediately.
- *     Online -> start() fires for both libraries and slide 5 begins.
- *   - Slide 5 now reflects three real states instead of assuming success:
- *     Downloading (the existing progress bar), Success (a brief
- *     confirmation before completing), and Failed (an error message with
- *     a Retry button wired to whichever library actually failed).
- * Back-arrow navigation, a download timeout, and slide-transition polish
- * are deliberately left for a follow-on piece — not part of this change.
+ * 2026-08-31 (onboarding-download-flow hardening, plan Phase 1, steps
+ * 1.10-1.16 — see CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md for the full
+ * decision trail). useDrugs.js/useConditions.js no longer auto-download
+ * on a brand-new install (1.10) — they wait for start(), called from
+ * here. This file provides that trigger and everything downstream of it:
+ *   - 1.11: tapping Next on slide 4 (favourites) is what sends the
+ *     "start now" signal — not app open.
+ *   - 1.12: that Next tap checks isOnline first. Offline -> advances to
+ *     slide 5 anyway, but skips straight to the Failed state below
+ *     instead of ever attempting the fetch (no slow timeout to sit
+ *     through for a connection that plainly isn't there).
+ *   - 1.13: slide 5 has three real states instead of assuming success —
+ *     Downloading (progress bar), Success (a brief confirmation, then it
+ *     continues into the app on its own), and Failed (message + Retry).
+ *   - 1.14: a hard ~28s time limit on an actual in-flight attempt — if
+ *     nothing has finished by then, it drops into the Failed state too,
+ *     same as a real error would.
+ *   - 1.15: a back arrow on slides 2-4 only (not slide 1, not slide 5 —
+ *     nothing to go back to once loading starts), plus a subtle fade
+ *     between every slide and a fade from slide 5 into the real app on
+ *     completion, instead of the previous instant cuts.
+ * Retry (whatever the failure reason — offline, a real error, or a
+ * timeout) always re-attempts both libraries, since there's no reliable
+ * way to know from a stall alone which one actually stuck.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -147,6 +157,21 @@ const LOADING_FLOOR_MS = 1200
 // confirmation at all. (2026-08-31, onboarding-download-flow hardening.)
 const SUCCESS_HOLD_MS = 900
 
+// How long an actual in-flight attempt is allowed to run before it's
+// treated as stuck and dropped into the Failed state (plan step 1.14 —
+// "roughly 25-30 seconds"; picked the middle of that range). Only ever
+// started once a real fetch attempt begins (see attemptId below) — never
+// runs for the offline pre-check case in 1.12, since no attempt is made
+// there at all.
+const DOWNLOAD_TIMEOUT_MS = 28000
+
+// How long the whole screen takes to fade out once onboarding completes,
+// instead of cutting straight to the real app (plan step 1.15).
+const COMPLETE_FADE_MS = 400
+
+// How long each slide takes to fade in on arrival (plan step 1.15).
+const SLIDE_FADE_MS = 220
+
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
 // without duplicating the same style object twice.
@@ -232,12 +257,15 @@ function useCombinedLibraryProgress() {
     startConditions()
   }
 
-  // Only retries whichever library actually failed — calling retry() on
-  // one that already succeeded would incorrectly re-trigger its loading
-  // state over data that's already in place.
+  // 2026-08-31: always retries both, regardless of which (if either) has
+  // a real `error` set — a stalled attempt (1.14's timeout) or an
+  // offline-skipped attempt (1.12) has no per-library error to key off
+  // of, so there's no reliable way to know from the failure alone which
+  // one actually stuck. Re-fetching a library that already succeeded is
+  // a harmless extra request, not a destructive one.
   function retry() {
-    if (drugsError) retryDrugs()
-    if (conditionsError) retryConditions()
+    retryDrugs()
+    retryConditions()
   }
 
   return { fraction, done, failed, start, retry }
@@ -248,16 +276,30 @@ function useCombinedLibraryProgress() {
 export default function OnboardingScreen({ onDone }) {
   const [current, setCurrent] = useState(0)
 
-  const { fraction, done, failed, start, retry } = useCombinedLibraryProgress()
+  const { fraction, done, failed: hookFailed, start: startBoth, retry: retryBoth } = useCombinedLibraryProgress()
   const { isOnline } = useOnlineStatus()
 
-  // 2026-08-31: true only right after an offline Next tap on slide 4 gets
-  // blocked — see next() below. Clears itself once the device is back
-  // online, so the message doesn't linger after the person reconnects.
-  const [offlineBlocked, setOfflineBlocked] = useState(false)
-  useEffect(() => {
-    if (isOnline) setOfflineBlocked(false)
-  }, [isOnline])
+  // 2026-08-31 (plan step 1.12): true when slide 4's Next tap found no
+  // connection — no fetch is ever attempted in that case, so this is
+  // tracked separately from hookFailed (a real error from an attempt
+  // that actually ran). Cleared the moment a real attempt is kicked off.
+  const [offlinePreCheck, setOfflinePreCheck] = useState(false)
+  // 2026-08-31 (plan step 1.14): true once DOWNLOAD_TIMEOUT_MS has passed
+  // on an actual in-flight attempt with nothing done. See the timeout
+  // effect below.
+  const [timedOut, setTimedOut] = useState(false)
+  // Bumped every time a real fetch attempt begins (initial start or a
+  // Retry) — the timeout effect only ever runs once this is > 0, so the
+  // offline pre-check case (no attempt made) never starts a stray timer.
+  const [attemptId, setAttemptId] = useState(0)
+
+  const failed = offlinePreCheck || timedOut || hookFailed
+
+  const failedMessage = offlinePreCheck
+    ? 'Please connect to the internet and try again.'
+    : timedOut
+      ? 'This is taking longer than expected. Check your connection and try again.'
+      : 'Something went wrong loading your library. Check your connection and try again.'
 
   // Always holds the latest `done` value for use inside effects/timers
   // without those effects needing `done` itself in their dependency array.
@@ -266,12 +308,36 @@ export default function OnboardingScreen({ onDone }) {
 
   const isLoadingSlide = SLIDES[current].isLoading
   const isLast = current === LAST_INDEX
+  const isFirst = current === 0
   const isFavouritesSlide = current === 3 // slide 4 — see file header
+  // Back arrow only on slides 2-4 (plan step 1.15) — never slide 1
+  // (nothing before it) or slide 5 (nothing to go back to once loading
+  // starts, and going back mid-download isn't a supported flow here).
+  const showBackArrow = !isFirst && !isLoadingSlide
+
+  // 2026-08-31 (plan step 1.15): fades the whole screen out before
+  // actually completing, instead of cutting straight to the real app.
+  const [completing, setCompleting] = useState(false)
 
   function complete() {
-    localStorage.setItem('capsula_onboarded', 'true')
-    onDone()
+    setCompleting(true)
+    setTimeout(() => {
+      localStorage.setItem('capsula_onboarded', 'true')
+      onDone()
+    }, COMPLETE_FADE_MS)
   }
+
+  // 2026-08-31 (plan step 1.14): once a real attempt is under way,
+  // give it DOWNLOAD_TIMEOUT_MS to actually finish before treating it as
+  // stuck. Re-runs (and so restarts cleanly) whenever a new attempt
+  // begins, or stops immediately once the attempt actually finishes
+  // (done) or fails for a real reason (hookFailed) — no point letting a
+  // stale timer fire after the outcome is already known.
+  useEffect(() => {
+    if (!isLoadingSlide || attemptId === 0 || done || hookFailed) return
+    const timer = setTimeout(() => setTimedOut(true), DOWNLOAD_TIMEOUT_MS)
+    return () => clearTimeout(timer)
+  }, [isLoadingSlide, attemptId, done, hookFailed])
 
   // ── Preload every slide image on mount ─────────────────────────────────
   // A statically-imported image is only actually fetched by the browser
@@ -307,6 +373,7 @@ export default function OnboardingScreen({ onDone }) {
       setFloorElapsed(false)
       setEntryFillStarted(false)
       setShowSuccess(false)
+      setTimedOut(false)
       return
     }
     alreadyDoneAtEntryRef.current = doneRef.current
@@ -339,21 +406,44 @@ export default function OnboardingScreen({ onDone }) {
     if (isLast) return
 
     // Slide 4 (favourites) is where the first-ever library download
-    // begins — see useDrugs.js/useConditions.js's start(). Checked here,
-    // before calling start(), so a genuinely offline device gets an
-    // inline message on this slide instead of advancing into slide 5 and
-    // watching it fail immediately (2026-08-31 decision: offline -> block
-    // Next, ask the person to connect).
+    // begins — see useDrugs.js/useConditions.js's start(). Plan step
+    // 1.12: offline still advances to slide 5, it just skips straight to
+    // the Failed state there instead of ever attempting the fetch — no
+    // slow timeout to sit through for a connection that plainly isn't
+    // there.
     if (isFavouritesSlide) {
+      setCurrent(c => c + 1)
       if (!isOnline) {
-        setOfflineBlocked(true)
+        setOfflinePreCheck(true)
         return
       }
-      setOfflineBlocked(false)
-      start()
+      setOfflinePreCheck(false)
+      setTimedOut(false)
+      setAttemptId(id => id + 1)
+      startBoth()
+      return
     }
 
     setCurrent(c => c + 1)
+  }
+
+  // Plan step 1.15 — back arrow, slides 2-4 only (see showBackArrow above).
+  function prev() {
+    if (current > 0 && !isLoadingSlide) setCurrent(c => c - 1)
+  }
+
+  // Failed-state Retry button (plan steps 1.12-1.14) — covers all three
+  // failure reasons (offline pre-check, a real error, or a timeout) the
+  // same way, since retry() always re-attempts both libraries regardless
+  // of which one actually stuck. If still offline, there's genuinely
+  // nothing to retry yet, so this just no-ops rather than kicking off a
+  // fetch that will only stall again.
+  function handleRetry() {
+    if (!isOnline) return
+    setOfflinePreCheck(false)
+    setTimedOut(false)
+    setAttemptId(id => id + 1)
+    retryBoth()
   }
 
   // Real progress while genuinely still loading — unchanged from before.
@@ -368,19 +458,39 @@ export default function OnboardingScreen({ onDone }) {
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
 
+  // 2026-08-31 (plan step 1.15): fades the slide content in on arrival —
+  // starts hidden, flips visible next frame so the opacity change is
+  // picked up as a transition rather than an instant jump (same
+  // next-frame trick as entryFillStarted above).
+  const [slideVisible, setSlideVisible] = useState(false)
+  useEffect(() => {
+    setSlideVisible(false)
+    const frame = requestAnimationFrame(() => setSlideVisible(true))
+    return () => cancelAnimationFrame(frame)
+  }, [current])
+
   return (
     <div
       style={{
         position:   'fixed',
         inset:      0,
-        display:    'flex',
-        flexDirection: 'column',
         backgroundColor: COLORS.surface,
         fontFamily: FONT_BODY,
         userSelect: 'none',
         zIndex:     9999,
+        opacity:    completing ? 0 : 1,
+        transition: `opacity ${COMPLETE_FADE_MS}ms ease`,
       }}
     >
+      <div
+        style={{
+          display:       'flex',
+          flexDirection: 'column',
+          height:        '100%',
+          opacity:       slideVisible ? 1 : 0,
+          transition:    `opacity ${SLIDE_FADE_MS}ms ease`,
+        }}
+      >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ── */}
       <div
         style={{
@@ -395,6 +505,32 @@ export default function OnboardingScreen({ onDone }) {
           overflow:        'hidden',
         }}
       >
+        {showBackArrow && (
+          <button
+            onClick={prev}
+            aria-label="Back"
+            style={{
+              position: 'absolute',
+              top:      36,
+              left:     20,
+              zIndex:   2,
+              background: 'none',
+              border:     'none',
+              padding:    8,
+              cursor:     'pointer',
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path
+                d="M15 5L8 12L15 19"
+                stroke={heroOnBlue ? COLORS.surface : COLORS.textPrimary}
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
         {heroOnBlue && (
           <div style={{ paddingTop: 40, paddingBottom: 8 }}>
             <CapsulaLogo light height={26} />
@@ -487,22 +623,6 @@ export default function OnboardingScreen({ onDone }) {
             </p>
           )}
 
-          {/* 2026-08-31: inline offline message on the favourites slide —
-              see next() above. Only ever shown here, never on slide 5,
-              since the check happens before start() is called. */}
-          {isFavouritesSlide && offlineBlocked && (
-            <p
-              style={{
-                fontSize:   14,
-                fontWeight: 600,
-                color:      COLORS.warning,
-                lineHeight: 1.5,
-                margin:     '12px 0 0',
-              }}
-            >
-              Please connect to the internet to continue.
-            </p>
-          )}
         </div>
 
         {/* ── Bottom action: Next/Get Started button on slides 1–4, or
@@ -512,10 +632,10 @@ export default function OnboardingScreen({ onDone }) {
           failed ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', marginTop: 12 }}>
               <p style={{ fontSize: 14, color: COLORS.warning, margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
-                Something went wrong loading your library. Check your connection and try again.
+                {failedMessage}
               </p>
               <button
-                onClick={retry}
+                onClick={handleRetry}
                 style={PRIMARY_BUTTON_STYLE}
                 onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
                 onMouseUp={e => { e.currentTarget.style.backgroundColor = COLORS.accent }}
@@ -577,6 +697,7 @@ export default function OnboardingScreen({ onDone }) {
             {current === 0 ? "Let's Get Started" : 'Next'}
           </button>
         )}
+      </div>
       </div>
     </div>
   )
