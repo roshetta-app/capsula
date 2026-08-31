@@ -227,24 +227,34 @@ function useCombinedLibraryProgress() {
     retry:    retryDrugs,
   } = useDrugContext()
 
-  // Drugs is only truly finished (light list + full detail) once loading
-  // is false AND progress has been reset to null — loading alone flips
-  // false as soon as the fast list arrives, while the fuller detail fetch
-  // keeps reporting progress in the background after that. Onboarding
-  // should wait for the whole thing, not just the fast list. A failed
-  // attempt also leaves loading false and progress null (see
-  // useDrugs.js's fetchLightThenFull catch block), so drugsError is
-  // checked explicitly rather than letting that combination read as done.
-  const drugsDone = !drugsLoading && drugsProgress === null && !drugsError
+  // 2026-08-31 bugfix: this used to also wait for `drugsProgress` to reset
+  // to null, meaning it waited for BOTH the fast list AND the much bigger
+  // background detail fetch (same ~19,700-row catalog again, just with
+  // every clinical field this time) before ever letting onboarding move
+  // on. That's why the bar visibly filled once for the list, snapped back
+  // to the start, and filled a second time for the full data — and why
+  // the whole screen sat there roughly twice as long as it needed to.
+  // Original decision (plan §7/1.7) was always to wait for the fast list
+  // only — `loading` flips false the moment that's ready — and let the
+  // fuller detail fetch keep loading quietly in the background exactly
+  // like it already does on every later app open. Restoring that here.
+  const drugsDone = !drugsLoading && !drugsError
 
   const failed = !!drugsError || !!conditionsError
 
   const conditionsFraction = (conditionsLoading || conditionsError) ? 0 : 1
+  // Once drugsDone is true, pin the bar at full — the background detail
+  // fetch keeps calling onProgress after this point (it's a separate,
+  // later stage we're no longer waiting on), and reading it live here is
+  // exactly what caused the bar to jump back down mid-"All set". Checking
+  // drugsDone first means those later updates are simply ignored.
   const drugsFraction = drugsError
     ? 0
-    : (drugsProgress && drugsProgress.total > 0
-        ? Math.min(1, drugsProgress.loaded / drugsProgress.total)
-        : (drugsDone ? 1 : 0))
+    : drugsDone
+      ? 1
+      : (drugsProgress && drugsProgress.total > 0
+          ? Math.min(1, drugsProgress.loaded / drugsProgress.total)
+          : 0)
 
   const fraction =
     conditionsFraction * CONDITIONS_WEIGHT +
@@ -652,35 +662,43 @@ export default function OnboardingScreen({ onDone }) {
               <span style={{ fontSize: 15, fontWeight: 600, color: COLORS.success }}>All set!</span>
             </div>
           ) : (
-            <div
-              role="progressbar"
-              aria-valuenow={Math.round(displayFraction * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              style={{
-                width:           '100%',
-                height:          14,
-                borderRadius:    999,
-                border:          `2px solid ${COLORS.accent}`,
-                backgroundColor: COLORS.surface,
-                overflow:        'hidden',
-                marginTop:       12,
-              }}
-            >
+          ) : (
+            <div style={{ width: '100%', marginTop: 12 }}>
               <div
+                role="progressbar"
+                aria-valuenow={Math.round(displayFraction * 100)}
+                aria-valuemin={0}
+                aria-valuemax={100}
                 style={{
-                  width:           `${Math.max(6, displayFraction * 100)}%`,
-                  height:          '100%',
+                  width:           '100%',
+                  height:          14,
                   borderRadius:    999,
-                  backgroundColor: COLORS.accent,
-                  // Slower, deliberate fill when the data was already done
-                  // on arrival (matches LOADING_FLOOR_MS); the normal quick
-                  // transition otherwise, same as before.
-                  transition:      alreadyDoneAtEntryRef.current
-                    ? `width ${LOADING_FLOOR_MS}ms ease`
-                    : 'width 0.3s ease',
+                  border:          `2px solid ${COLORS.accent}`,
+                  backgroundColor: COLORS.surface,
+                  overflow:        'hidden',
                 }}
-              />
+              >
+                <div
+                  style={{
+                    width:           `${Math.max(6, displayFraction * 100)}%`,
+                    height:          '100%',
+                    borderRadius:    999,
+                    backgroundColor: COLORS.accent,
+                    // Slower, deliberate fill when the data was already done
+                    // on arrival (matches LOADING_FLOOR_MS); the normal quick
+                    // transition otherwise, same as before.
+                    transition:      alreadyDoneAtEntryRef.current
+                      ? `width ${LOADING_FLOOR_MS}ms ease`
+                      : 'width 0.3s ease',
+                  }}
+                />
+              </div>
+              {/* 2026-08-31 bugfix: the bar previously had no readable
+                  number anywhere near it — just a plain shape with no way
+                  to tell how far along it actually was. */}
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 8 }}>
+                {Math.round(displayFraction * 100)}%
+              </div>
             </div>
           )
         ) : (
