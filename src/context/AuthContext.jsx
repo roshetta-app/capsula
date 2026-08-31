@@ -102,6 +102,31 @@ function isNetworkTimingError(error) {
   return message.includes('Failed to fetch') || message.includes('NetworkError')
 }
 
+// Pro-offline cold-start fix, round 2 (2026-09-01) — maps the durable
+// snapshot (authSnapshot.js) onto the same shape `profile` normally holds.
+// The snapshot now carries the whole profile, not just tier (round 1 of
+// this fix only cached tier, which fixed the offline block but left every
+// other field reading as blank — an already-set-up person's occupation/
+// country/specialty/etc. looked wiped on a cold offline start, and
+// profileSetupDismissed reading as missing could even bounce them back
+// into the setup wizard). Fields the snapshot doesn't carry (currently
+// none — every profile field it needs now rides along, see
+// writeCachedAuthSnapshot below) would fall back to null here, same as a
+// real "field not filled in yet" state.
+function cachedSnapshotToProfile(cached) {
+  return {
+    role:                  cached.role ?? null,
+    tier:                  cached.tier ?? null,
+    fullName:              cached.fullName ?? null,
+    themePreference:       cached.themePreference ?? null,
+    phoneNumber:           cached.phoneNumber ?? null,
+    occupation:            cached.occupation ?? null,
+    country:               cached.country ?? null,
+    specialty:             cached.specialty ?? null,
+    profileSetupDismissed: cached.profileSetupDismissed ?? null,
+  }
+}
+
 async function exchangeCodeWithRetry(code) {
   const first = await supabase.auth.exchangeCodeForSession(code)
   if (!first.error || !isNetworkTimingError(first.error)) return first
@@ -174,6 +199,28 @@ export function AuthProvider({ children }) {
       clearCachedAuthSnapshot()
       return
     }
+
+    // Pro-offline cold-start fix, round 2 (2026-09-01) — seed `profile`
+    // from the durable snapshot BEFORE the network call below, not after
+    // it fails. The previous version of this fix only fell back to the
+    // snapshot once the fetch below had already failed — which, with no
+    // network interface at all, isn't instant; the request can sit
+    // failing/timing out for several seconds first. That's what produced
+    // the reported "offline block shows, then disappears a few seconds
+    // later" behavior: correct end state, wrong timing. Seeding here
+    // instead means a cold start reads correctly right away, and the
+    // fetch below just quietly confirms/refreshes it in the background —
+    // same instant-then-confirm pattern account-instant-load already
+    // established for name/photo, just triggered earlier in the
+    // function. `prev ?? ...` still protects an already-known-good
+    // in-memory profile from ever being downgraded by a stale cached
+    // snapshot (e.g. a background token-refresh call arriving after the
+    // real profile already loaded this session).
+    const cachedForSeed = getCachedAuthSnapshot()
+    if (cachedForSeed?.id === currentUser.id) {
+      setProfile(prev => prev ?? cachedSnapshotToProfile(cachedForSeed))
+    }
+
     const { data, error } = await supabase
       .from('profiles')
       .select('role, tier, full_name, theme_preference, phone_number, occupation, country, specialty, profile_setup_dismissed')
@@ -227,20 +274,24 @@ export function AuthProvider({ children }) {
     // session (the functional setProfile below leaves an existing
     // known-good profile untouched, so this never overrides the case the
     // check above already handles).
+    //
+    // Round 2 (2026-09-01, same day) — this branch only ever ran AFTER
+    // the fetch above had already failed, which isn't instant with no
+    // network at all, so the offline block would show correctly then
+    // disappear several seconds later once this finally caught up. The
+    // real fix is now further up this function, before the fetch even
+    // starts — this branch stays as a second layer of protection for the
+    // mid-session case (see its own comment below).
     if (error && isNetworkTimingError(error)) {
+      // Belt-and-suspenders alongside the upfront seed above: covers the
+      // case where `profile` already held a real, known-good value from
+      // earlier in this session (so the upfront seed's `prev ?? ...`
+      // correctly left it alone) and now needs protecting from being
+      // wiped by this failed request, same reasoning as the original
+      // Pro-offline bug fix above.
       const cached = getCachedAuthSnapshot()
-      if (cached?.id === currentUser.id && cached.tier) {
-        setProfile(prev => prev ?? {
-          role:                  null,
-          tier:                  cached.tier,
-          fullName:              cached.fullName ?? null,
-          themePreference:       null,
-          phoneNumber:           null,
-          occupation:            null,
-          country:               null,
-          specialty:             null,
-          profileSetupDismissed: null,
-        })
+      if (cached?.id === currentUser.id) {
+        setProfile(prev => prev ?? cachedSnapshotToProfile(cached))
       }
       return
     }
@@ -264,14 +315,26 @@ export function AuthProvider({ children }) {
     // right after first sign-up) since the name/email/avatar shown on
     // AccountScreen comes from the auth user object either way, not from
     // the missing profile row.
-    // tier now included (Pro-offline-cold-start fix, 2026-09-01) — see
-    // this snapshot's own read-side fallback above.
+    // Full profile now included, not just tier (Pro-offline cold-start
+    // fix round 2, 2026-09-01) — round 1 only cached tier, which fixed the
+    // offline block itself but left every other field (occupation,
+    // country, specialty, profileSetupDismissed...) reading as blank on a
+    // cold offline start, making an already-set-up profile look wiped and
+    // (via profileSetupDismissed) risking an unwanted bounce back into the
+    // setup wizard. See cachedSnapshotToProfile above for the read side.
     writeCachedAuthSnapshot({
-      id:        currentUser.id,
-      email:     currentUser.email ?? null,
-      fullName:  error ? null : data.full_name,
-      avatarUrl: currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || null,
-      tier:      error ? null : data.tier,
+      id:                    currentUser.id,
+      email:                 currentUser.email ?? null,
+      avatarUrl:             currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture || null,
+      role:                  error ? null : data.role,
+      tier:                  error ? null : data.tier,
+      fullName:              error ? null : data.full_name,
+      themePreference:       error ? null : data.theme_preference,
+      phoneNumber:           error ? null : data.phone_number,
+      occupation:            error ? null : data.occupation,
+      country:               error ? null : data.country,
+      specialty:             error ? null : data.specialty,
+      profileSetupDismissed: error ? null : data.profile_setup_dismissed,
     })
   }, [])
 

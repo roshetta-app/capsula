@@ -1,6 +1,6 @@
 /**
  * authSnapshot.js — remembers just enough of the signed-in person's info
- * (name, email, avatar) so AccountScreen.jsx can render instantly on
+ * (name, email, avatar, tier) so AccountScreen.jsx can render instantly on
  * reopen, instead of showing a blank screen while AuthContext re-checks
  * the real session.
  *
@@ -16,13 +16,42 @@
  * needed, though today's version trusts whatever is stored since only
  * one signed-in identity is expected on a given device in the common
  * case.
+ *
+ * `tier` added (Pro-offline-cold-start fix round 1, 2026-09-01) — this
+ * snapshot was already exactly the right mechanism for a second problem:
+ * AuthContext's existing "Pro-offline bug fix" only protects a profile
+ * that's already loaded in memory during the current session from being
+ * wiped out by a mid-session connectivity blip. It does nothing for a
+ * genuine cold start while offline (app process killed, then relaunched
+ * with no connection) — there, `profile` starts at null again, the
+ * re-fetch to confirm tier fails because the device is offline, and
+ * there's no in-memory "last known good" to fall back on, so a Pro
+ * account gets treated as free until connectivity returns.
+ *
+ * Full profile (role/themePreference/phoneNumber/occupation/country/
+ * specialty/profileSetupDismissed) added (round 2, same day) — round 1
+ * fixed the offline gate itself but only cached tier, so every other
+ * profile field still read as blank on a cold offline start: an
+ * already-set-up person's occupation/country/specialty looked wiped, and
+ * `profileSetupDismissed` reading as missing risked bouncing them back
+ * into the setup wizard as if they'd never finished it. AuthContext now
+ * also reads this snapshot BEFORE attempting the network re-fetch (not
+ * only after it fails), since with no network at all that failure isn't
+ * instant — waiting for it produced a correct-but-late fallback (the
+ * offline block would show, then disappear several seconds later).
+ *
+ * Shape: { id, email, avatarUrl, role, tier, fullName, themePreference,
+ * phoneNumber, occupation, country, specialty, profileSetupDismissed }.
+ * Every field is whatever AuthContext's last successful profile load saw
+ * — a snapshot, not a source of truth, always superseded the moment a
+ * real check succeeds again.
  */
 
 import { CACHE_KEYS } from '../constants/cache'
 
 /**
  * Read the remembered snapshot, or null if there isn't one / it's
- * corrupted. Shape: { id, email, fullName, avatarUrl }.
+ * corrupted. See file header for the full shape.
  */
 export function getCachedAuthSnapshot() {
   try {
@@ -37,9 +66,9 @@ export function getCachedAuthSnapshot() {
 }
 
 /**
- * Save a snapshot of the signed-in person's display info. Called from
- * AuthContext.jsx right after a real profile load succeeds.
- * @param {{ id: string, email: string, fullName: string|null, avatarUrl: string|null }} snapshot
+ * Save a snapshot of the signed-in person's info. Called from
+ * AuthContext.jsx right after a real profile load succeeds. See file
+ * header for the full shape.
  */
 export function writeCachedAuthSnapshot(snapshot) {
   if (!snapshot?.id) return
