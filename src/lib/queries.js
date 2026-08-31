@@ -85,6 +85,22 @@
  *     later open. This closes a blind spot where the light list could land
  *     successfully while the fuller background fetch silently failed,
  *     leaving onboarding reporting success with nothing actually saved.
+ *   - 2026-08-31 (download-timeout-fix): fetchAllBrandRows no longer sorts
+ *     the deep, two-tables-away 'formulations.generics.name_en' column
+ *     while paging, and no longer fires all ~20 pages at once. Root cause,
+ *     confirmed from a real device's crash log and live network trace: a
+ *     "canceling statement due to statement timeout" error, hitting only
+ *     the later pages (offset 15000+). Sorting by a joined-table column
+ *     forces the database to build and order the entire result before it
+ *     can slice out a deep page, so later pages did dramatically more work
+ *     than early ones — combined with firing all pages simultaneously, the
+ *     deepest ones timed out. The raw fetch order was never actually used
+ *     for anything: the app already sorts and searches everything on-device
+ *     once downloaded (plan §4.2), so dropping the pre-sort changes nothing
+ *     visible and removes the expensive part of the query outright. Paging
+ *     in small batches instead of all-at-once is a second, independent
+ *     safety margin against the catalog's continued growth, not itself the
+ *     fix for this specific error.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -93,6 +109,13 @@
 // this size until a page comes back short, which is how it knows it has
 // reached the end of the table.
 const SUPABASE_MAX_ROWS = 1000
+
+// How many brand pages fetchAllBrandRows lets run at the same time
+// (2026-08-31, download-timeout-fix). Previously every page (roughly 20 for
+// the current catalog size) fired in one single Promise.all — see that
+// function's comment for why this was changed to run in small batches
+// instead of either all-at-once or fully one-at-a-time.
+const BRAND_PAGE_BATCH_SIZE = 4
 
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
@@ -147,11 +170,27 @@ export const FLAT_DRUG_SCHEMA_VERSION = hashString(FULL_BRAND_SELECT.replace(/\s
 
 /**
  * Page through the full `brands` table for a given select shape. Looks up
- * the total row count first, then fires every page request at once instead
- * of waiting for each one before starting the next — since range-based
- * pages don't depend on each other, this cuts the real wait time down to
- * roughly one round trip instead of twenty stacked back-to-back. Used by
- * fetchFlatDrugs, below.
+ * the total row count first, then runs the page requests in small batches
+ * (BRAND_PAGE_BATCH_SIZE at a time) rather than either one at a time or all
+ * at once.
+ *
+ * 2026-08-31 (download-timeout-fix): two changes from the original
+ * all-at-once version, both aimed at the same confirmed root cause (a real
+ * device's crash log showed "canceling statement due to statement timeout",
+ * and the live network trace showed it hitting only the deepest pages):
+ *   1. Dropped the `.order(...)` on the joined generics name. Sorting by a
+ *      column two tables away forces the database to build and order the
+ *      *entire* result before it can slice out a given page — so a deep
+ *      page (e.g. offset 19000) did far more work than an early one (offset
+ *      0), which is exactly the pattern the failed requests showed. The raw
+ *      order returned here was never used for anything: the app sorts and
+ *      searches everything itself once the data is on-device (plan §4.2),
+ *      so this removes real, unnecessary cost without changing any visible
+ *      behavior.
+ *   2. Batched the page requests (BRAND_PAGE_BATCH_SIZE at a time) instead
+ *      of firing all ~20 in one Promise.all. Not itself the fix for the
+ *      timeout above — the sort removal is — but a separate safety margin
+ *      against the catalog continuing to grow past today's ~20 pages.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} selectString
@@ -170,25 +209,36 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
   let loaded = 0
   onProgress?.(0, totalPages)
 
-  const pagePromises = Array.from({ length: totalPages }, (_, i) => {
-    const from = i * SUPABASE_MAX_ROWS
-    const to   = from + SUPABASE_MAX_ROWS - 1
-    return supabase
-      .from('brands')
-      .select(selectString)
-      .eq('is_published', true)
-      .order('name_en', { referencedTable: 'formulations.generics' })
-      .range(from, to)
-      .then(({ data, error }) => {
-        if (error) throw error
-        loaded += 1
-        onProgress?.(loaded, totalPages)
-        return data
-      })
-  })
+  const allRows = []
 
-  const pages = await Promise.all(pagePromises)
-  return pages.flat()
+  for (let batchStart = 0; batchStart < totalPages; batchStart += BRAND_PAGE_BATCH_SIZE) {
+    const pageIndexes = Array.from(
+      { length: Math.min(BRAND_PAGE_BATCH_SIZE, totalPages - batchStart) },
+      (_, i) => batchStart + i
+    )
+
+    const batchResults = await Promise.all(
+      pageIndexes.map(i => {
+        const from = i * SUPABASE_MAX_ROWS
+        const to   = from + SUPABASE_MAX_ROWS - 1
+        return supabase
+          .from('brands')
+          .select(selectString)
+          .eq('is_published', true)
+          .range(from, to)
+          .then(({ data, error }) => {
+            if (error) throw error
+            loaded += 1
+            onProgress?.(loaded, totalPages)
+            return data
+          })
+      })
+    )
+
+    allRows.push(...batchResults.flat())
+  }
+
+  return allRows
 }
 
 /**
