@@ -78,6 +78,13 @@
  *     approach (src/constants/cache.js / vite.config.js's VITE_BUILD_STAMP),
  *     which invalidated every device's local drugs cache on every single
  *     deploy, regardless of whether FULL_BRAND_SELECT actually changed.
+ *   - 2026-08-31 (second pass, plan Phase 1 addendum 1.18): fetchFlatDrugsLight
+ *     and LIGHT_BRAND_SELECT (added 2026-07-16, described above) are retired
+ *     and removed outright, not left as dead code — a device's first-ever
+ *     download now always uses fetchFlatDrugs directly, the same as every
+ *     later open. This closes a blind spot where the light list could land
+ *     successfully while the fuller background fetch silently failed,
+ *     leaving onboarding reporting success with nothing actually saved.
  */
 
 // ─── Drug queries ─────────────────────────────────────────────────────────────
@@ -102,30 +109,6 @@ const FULL_BRAND_SELECT = `
       contraindications, drug_interactions, dose_adjustments,
       pharmacokinetics, clinical_relevance, sources, textbook_doses, textbook_dose_notes,
       mechanism_of_action, is_published, ingredients
-    )
-  )
-`
-
-// Light select — only what the list, search, and filter screens read.
-// Leaves out the per-drug clinical write-up fields (uses, side effects,
-// interactions, dosing table, etc.), which only the detail page needs.
-// pregnancy_category / breastfeeding_safety ARE included here even though
-// they're clinical fields, because the pregnancy/breastfeeding filter
-// checks every drug in the list at once — deferring those two would make
-// that filter briefly wrong right after a cold start. tradename_clean /
-// strength_value / strength_unit / strength_basis are included for the same
-// reason (plan §7 step 0a) — the drug card's title is built from these on
-// every screen that uses this light list, including the very first load.
-// fill_volume is included for the same reason again (drug_card_title_suffix
-// plan, step A.1) — the title suffix needs it on the very first load too.
-const LIGHT_BRAND_SELECT = `
-  id, slug, name, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
-  formulations (
-    id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, is_published,
-    generics (
-      id, slug, name_en, category, class,
-      pregnancy_category, breastfeeding_safety,
-      is_published, ingredients
     )
   )
 `
@@ -167,9 +150,8 @@ export const FLAT_DRUG_SCHEMA_VERSION = hashString(FULL_BRAND_SELECT.replace(/\s
  * the total row count first, then fires every page request at once instead
  * of waiting for each one before starting the next — since range-based
  * pages don't depend on each other, this cuts the real wait time down to
- * roughly one round trip instead of twenty stacked back-to-back. Shared by
- * fetchFlatDrugs and fetchFlatDrugsLight so both stay correct against the
- * same 1,000-row per-request cap.
+ * roughly one round trip instead of twenty stacked back-to-back. Used by
+ * fetchFlatDrugs, below.
  *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
  * @param {string} selectString
@@ -274,61 +256,6 @@ export async function fetchFlatDrugs(supabase, onProgress) {
         sources:              g.sources               ?? [],
         textbookDoses:        g.textbook_doses        ?? [],
         textbookDoseNotes:    g.textbook_dose_notes,
-      }
-    })
-}
-
-/**
- * Fetch a trimmed, list-ready version of the drug catalog — used only for
- * a device's very first load, before anything is cached, so the list can
- * appear without waiting on the full per-drug clinical write-up. Every
- * field the list, search, and filter screens actually read is included;
- * fields only the detail page needs (uses, side effects, interactions,
- * dosing table, etc.) are left out and filled in afterward by a normal
- * fetchFlatDrugs call. Shape matches fetchFlatDrugs's output — callers
- * don't need to know which one they got, except that detail-only fields
- * will be undefined until the full fetch completes.
- *
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @param {(loaded: number, total: number) => void} [onProgress]
- * @returns {Promise<FlatDrug[]>}
- */
-export async function fetchFlatDrugsLight(supabase, onProgress) {
-  const allRows = await fetchAllBrandRows(supabase, LIGHT_BRAND_SELECT, onProgress)
-
-  return allRows
-    .filter(b => b.formulations?.is_published === true && b.formulations?.generics?.is_published === true)
-    .map(b => {
-      const f = b.formulations
-      const g = f.generics
-
-      return {
-        id:                   b.id,
-        slug:                 b.slug,
-        name:                 b.name,
-        tradenameClean:       b.tradename_clean,
-        manufacturer:         b.manufacturer,
-        price:                b.price,
-        packSize:             b.pack_size,
-        fillVolume:           b.fill_volume,
-        formulationId:        f.id,
-        formulationSlug:      f.slug,
-        concentration:        f.concentration,
-        strengthValue:        f.strength_value,
-        strengthUnit:         f.strength_unit,
-        strengthBasis:        f.strength_basis,
-        form:                 f.form,
-        formModifier:         f.form_modifier ?? [],
-        route:                f.route,
-        routeDetails:         f.route_details ?? [],
-        genericId:            g.id,
-        genericSlug:          g.slug,
-        genericName:          g.name_en,
-        ingredients:          g.ingredients ?? null,
-        category:             g.category,
-        class:                g.class,
-        pregnancyCategory:    g.pregnancy_category,
-        breastfeedingSafety:  g.breastfeeding_safety,
       }
     })
 }
@@ -653,4 +580,3 @@ export async function fetchActiveGates(supabase, platform) {
       minVersion:  g.min_version,
     }))
 }
-

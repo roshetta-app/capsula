@@ -227,27 +227,24 @@ function useCombinedLibraryProgress() {
     retry:    retryDrugs,
   } = useDrugContext()
 
-  // 2026-08-31 bugfix: this used to also wait for `drugsProgress` to reset
-  // to null, meaning it waited for BOTH the fast list AND the much bigger
-  // background detail fetch (same ~19,700-row catalog again, just with
-  // every clinical field this time) before ever letting onboarding move
-  // on. That's why the bar visibly filled once for the list, snapped back
-  // to the start, and filled a second time for the full data — and why
-  // the whole screen sat there roughly twice as long as it needed to.
-  // Original decision (plan §7/1.7) was always to wait for the fast list
-  // only — `loading` flips false the moment that's ready — and let the
-  // fuller detail fetch keep loading quietly in the background exactly
-  // like it already does on every later app open. Restoring that here.
+  // 2026-08-31 (second pass, plan Phase 1 addendum 1.18): useDrugs.js's
+  // cold-start fetch is now a single, complete download rather than a fast
+  // list followed by a bigger background detail fetch — 'loading' and
+  // 'progress' both belong to that one download now, so 'drugsDone' simply
+  // reflects whether it has finished. (An earlier version of this comment
+  // described a two-stage bugfix specific to the old fast-list/full-detail
+  // split; that split no longer exists, so there's nothing left here for
+  // this hook to reconcile between two stages.)
   const drugsDone = !drugsLoading && !drugsError
 
   const failed = !!drugsError || !!conditionsError
 
   const conditionsFraction = (conditionsLoading || conditionsError) ? 0 : 1
-  // Once drugsDone is true, pin the bar at full — the background detail
-  // fetch keeps calling onProgress after this point (it's a separate,
-  // later stage we're no longer waiting on), and reading it live here is
-  // exactly what caused the bar to jump back down mid-"All set". Checking
-  // drugsDone first means those later updates are simply ignored.
+  // Once drugsDone is true, pin the bar at full. 'loading' and 'progress'
+  // now resolve together at the end of the single cold-start download (see
+  // useDrugs.js's fetchColdStart), so this is a plain safety net rather
+  // than a fix for a live bug — nothing sets 'progress' again after
+  // 'loading' flips false for this to guard against anymore.
   const drugsFraction = drugsError
     ? 0
     : drugsDone
@@ -719,3 +716,4 @@ export default function OnboardingScreen({ onDone }) {
     </div>
   )
 }
+

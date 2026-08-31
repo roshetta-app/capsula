@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { fetchFlatDrugs, fetchFlatDrugsLight, fetchMetadataTimestamps } from '../lib/queries'
+import { fetchFlatDrugs, fetchMetadataTimestamps } from '../lib/queries'
 import { readDrugsCache, writeDrugsCache } from '../utils/cache'
 import { CACHE_TTL_MS } from '../constants/cache'
 
@@ -34,41 +34,29 @@ export function useDrugs() {
     }
   }
 
-  // Cold-start only: show the fast, list-only data as soon as it arrives,
-  // then keep loading the complete data (full clinical write-ups) behind
-  // the scenes and swap it in once ready. Reports real page-by-page
-  // progress via `progress` while each stage is in flight.
+  // Cold-start only — called from OnboardingScreen's slide 4 Next tap
+  // (start(), below) or its Retry button (retry()), and from the
+  // "already onboarded but cache somehow missing" branch inside init()
+  // further down. Runs the same single, complete download as a normal
+  // cache-expired refresh (fetchAndCache above), but also reports real
+  // page-by-page progress via 'progress' for onboarding's progress bar.
   //
   // Resets loading/error at the top of every call, not just the first —
   // this is what lets it double as a retry after a failed attempt (see
   // retry() below) without a stale error message sitting around once a
   // new attempt is under way.
-  async function fetchLightThenFull() {
+  //
+  // 2026-08-31 (second pass): replaces the previous fetchLightThenFull,
+  // which showed a fast partial list first and kept loading the full
+  // data invisibly behind it — the exact blind spot that let a
+  // background failure go unnoticed (a device could reach "All set!"
+  // with nothing actually saved). This is now the single source of
+  // truth: onboarding does not finish until the complete download has
+  // actually succeeded and been saved.
+  async function fetchColdStart() {
     setLoading(true)
     setError(null)
 
-    try {
-      const light = await fetchFlatDrugsLight(supabase, (loaded, total) => setProgress({ loaded, total }))
-      setDrugs(light)
-      setLoading(false)
-    } catch (err) {
-      setError(err.message ?? 'Failed to load drugs')
-      setLoading(false)
-      setProgress(null)
-      return
-    }
-
-    // Full fetch continues in the background. The light list stays in
-    // place and usable if this fails — but the failure itself now gets
-    // reported (2026-08-31 bugfix), instead of failing silently as
-    // before. Silently swallowing it meant nothing ever got saved to the
-    // device on a failure here, yet nothing downstream could tell —
-    // onboarding would show "All set!" and finish anyway, and every
-    // later app open would quietly restart this same download from
-    // scratch, since there was no cached copy and no record that the
-    // first attempt had failed. Reporting it the same way every other
-    // failure here does lets onboarding's Failed state and Retry button
-    // (plan step 1.13) actually catch this case instead.
     try {
       const fresh = await fetchFlatDrugs(supabase, (loaded, total) => setProgress({ loaded, total }))
       const { drugsUpdatedAt } = await fetchMetadataTimestamps(supabase)
@@ -77,6 +65,7 @@ export function useDrugs() {
     } catch (err) {
       setError(err.message ?? 'Failed to load drugs')
     } finally {
+      setLoading(false)
       setProgress(null)
     }
   }
@@ -87,7 +76,7 @@ export function useDrugs() {
   const start = useCallback(() => {
     if (startedRef.current) return
     startedRef.current = true
-    fetchLightThenFull()
+    fetchColdStart()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -97,7 +86,7 @@ export function useDrugs() {
   // also fire a second attempt on top of it.
   const retry = useCallback(() => {
     startedRef.current = true
-    fetchLightThenFull()
+    fetchColdStart()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -118,7 +107,7 @@ export function useDrugs() {
         const alreadyOnboarded = localStorage.getItem('capsula_onboarded') === 'true'
         if (alreadyOnboarded) {
           startedRef.current = true
-          await fetchLightThenFull()
+          await fetchColdStart()
         }
         return
       }
