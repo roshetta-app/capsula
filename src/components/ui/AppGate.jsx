@@ -502,6 +502,39 @@ export default function AppGate() {
     return () => { document.body.style.overflow = previousOverflow }
   }, [gate, offlineBlockActive, onAdminRoute])
 
+  // Same "must focus on this" surfaces as the scroll-lock above — the
+  // offline block, or any non-dismissible gate — also need to swallow
+  // back navigation, not just taps. Without this, the hardware/gesture
+  // back button (Android) or a browser back gesture could still change
+  // the route underneath an opaque, "inert" overlay — invisibly swapping
+  // which screen (and which highlighted BottomNav tab) is waiting once
+  // the block eventually clears, which is exactly the kind of surprise
+  // this surface is supposed to prevent.
+  //
+  // History trap, not a backButton listener: pushing one extra history
+  // entry pointing at the CURRENT url, then re-pushing the current url
+  // again on every popstate, means a back press always has something to
+  // "consume" without the URL — or the route under it — ever actually
+  // changing. This covers a real browser back button, a trackpad/edge
+  // swipe on the website build, AND Android's hardware back gesture,
+  // since Capacitor's default (unhandled) back-button behavior is just
+  // "call the WebView's own history back if it can," which is the exact
+  // same history.back() this traps — so there's no need to also touch
+  // @capacitor/app's separate, version-flaky backButton listener here.
+  const isFullyBlocked = offlineBlockActive || (gate && !gate.dismissible)
+
+  useEffect(() => {
+    if (!isFullyBlocked || onAdminRoute) return
+
+    function trapBack() {
+      window.history.pushState(null, '', window.location.href)
+    }
+
+    window.history.pushState(null, '', window.location.href)
+    window.addEventListener('popstate', trapBack)
+    return () => window.removeEventListener('popstate', trapBack)
+  }, [isFullyBlocked, onAdminRoute])
+
   if (onAdminRoute) return null
 
   // Phase 4: takes priority over a database-driven gate (confirmed this
