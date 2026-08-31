@@ -227,15 +227,21 @@ async function fetchAllBrandRows(supabase, selectString, onProgress) {
           .eq('is_published', true)
           .range(from, to)
           .then(({ data, error }) => {
-            if (error) throw error
-            loaded += 1
-            onProgress?.(loaded, totalPages)
-            return data
-          })
-      })
-    )
-
     allRows.push(...batchResults.flat())
+  }
+
+  // 2026-08-31 (empty-result-guard fix): the cache-write guard elsewhere
+  // (writeDrugsCache/writeConditionsCache) skips saving when fetched data
+  // is empty, to avoid a broken fetch silently overwriting a good saved
+  // copy with nothing — but it couldn't tell "something broke and returned
+  // nothing" apart from "the catalog genuinely, legitimately became empty."
+  // Caught here instead, where the expected count from the server is
+  // already known: if the server said there should be rows but paging came
+  // back with none, that's a real failure — thrown so it surfaces as a
+  // normal fetch error (caught upstream, shown to the user, logged)
+  // instead of silently discarded.
+  if (count > 0 && allRows.length === 0) {
+    throw new Error('Expected drug rows but received none — treating as a failed fetch')
   }
 
   return allRows
@@ -458,6 +464,12 @@ async function fetchAllConditionRows(supabase) {
     )
 
     allRows.push(...batchResults.flat())
+  }
+
+  // 2026-08-31 (empty-result-guard fix): mirrors fetchAllBrandRows' matching
+  // fix above — see that function's comment for the full reasoning.
+  if (count > 0 && allRows.length === 0) {
+    throw new Error('Expected condition rows but received none — treating as a failed fetch')
   }
 
   return allRows
