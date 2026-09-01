@@ -12,6 +12,19 @@
  *   Swipe (at 1x)   — prev / next image
  *   Tap backdrop    — close (only at 1x)
  *
+ * Offline caching (Image System Refinement Plan, Part A):
+ *   - The active photo is loaded via useCachedImage, same device-first
+ *     → network → cache-on-view logic used by ImageCarousel.jsx.
+ *   - 'ready'   → photo renders with the existing zoom/pan transform.
+ *   - 'error'   → ImageLoadError placeholder with a working Retry
+ *     button. Its own touch handlers stop propagation so a Retry tap
+ *     isn't also read as a pan/swipe/backdrop-tap by the image-area
+ *     handlers, and doesn't accidentally trigger the double-tap-zoom
+ *     gesture.
+ *   - 'loading' → nothing rendered in the image area yet; just the
+ *     backdrop. Zoom/pan state still resets correctly on activeIndex
+ *     change since that doesn't depend on the image having loaded.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -22,6 +35,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useCachedImage } from '../../hooks/useCachedImage'
+import ImageLoadError from './ImageLoadError'
 
 export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   const [scale,      setScale]      = useState(1)
@@ -51,6 +66,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   }, [])
 
   const active = images[activeIndex]
+  const { src, status, retry } = useCachedImage(active?.url)
 
   function getTouchDist(touches) {
     const dx = touches[0].clientX - touches[1].clientX
@@ -198,21 +214,35 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           overflow: 'hidden', touchAction: 'none', position: 'relative',
         }}
       >
-        <img
-          key={active.url}
-          src={active.url}
-          alt={active.caption || ''}
-          draggable={false}
-          style={{
-            maxWidth: '100%', maxHeight: '100%',
-            objectFit: 'contain', display: 'block',
-            transform: `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`,
-            transformOrigin: 'center center',
-            transition: scale === 1 ? 'transform 0.22s ease' : 'none',
-            userSelect: 'none', WebkitUserSelect: 'none',
-            pointerEvents: 'none',
-          }}
-        />
+        {status === 'ready' && src && (
+          <img
+            key={active.url}
+            src={src}
+            alt={active.caption || ''}
+            draggable={false}
+            style={{
+              maxWidth: '100%', maxHeight: '100%',
+              objectFit: 'contain', display: 'block',
+              transform: `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`,
+              transformOrigin: 'center center',
+              transition: scale === 1 ? 'transform 0.22s ease' : 'none',
+              userSelect: 'none', WebkitUserSelect: 'none',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {status === 'error' && (
+          <div
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <ImageLoadError onRetry={retry} />
+          </div>
+        )}
+
         {images.length > 1 && activeIndex > 0 && scale === 1 && (
           <button
             onClick={(e) => { e.stopPropagation(); onGo(activeIndex - 1) }}

@@ -34,12 +34,28 @@
  *     from being misread as a tap and accidentally opening the lightbox.
  *   - e.stopPropagation() on touchstart blocks parent tab-switcher
  *
+ * Offline caching (Image System Refinement Plan, Part A):
+ *   - The current photo is loaded via useCachedImage, which checks the
+ *     on-device photo store first, falls back to the network, and
+ *     quietly saves a copy for next time (cache-on-view).
+ *   - 'ready'   → photo renders as before.
+ *   - 'error'   → ImageLoadError placeholder with a working Retry
+ *     button, replacing the browser's default broken-image icon. The
+ *     placeholder's own touch handlers stop propagation so tapping
+ *     Retry doesn't also register as a stationary tap on the outer
+ *     container (which would open the lightbox on top of the error
+ *     state).
+ *   - 'loading' → nothing rendered yet; the container's
+ *     backgroundColor (var(--color-bg)) shows in the meantime.
+ *
  * Props:
  *   images  { id, url, caption }[]
  */
 import { useState, useRef, useCallback } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
+import ImageLoadError from '../ui/ImageLoadError'
+import { useCachedImage } from '../../hooks/useCachedImage'
 
 export default function ImageCarousel({ images = [] }) {
   const [index,        setIndex]    = useState(0)
@@ -50,9 +66,14 @@ export default function ImageCarousel({ images = [] }) {
   const goTo   = useCallback((i) => setIndex(Math.max(0, Math.min(images.length - 1, i))), [images.length])
   const openAt = useCallback((i) => { setIndex(i); setLightbox(true) }, [])
 
-  if (!images.length) return null
-
+  // Hooks must run unconditionally — the `images.length` guard below
+  // happens after this, so `current` may be undefined on an empty
+  // array; useCachedImage(undefined) safely resolves to 'error' and
+  // renders nothing in that case.
   const current = images[index]
+  const { src, status, retry } = useCachedImage(current?.url)
+
+  if (!images.length) return null
 
   function onTouchStart(e) {
     e.stopPropagation()
@@ -103,20 +124,32 @@ export default function ImageCarousel({ images = [] }) {
             backgroundColor: 'var(--color-bg)',
           }}
         >
-          <img
-            src={current.url}
-            alt={current.caption || ''}
-            style={{
-              position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center',
-              display: 'block',
-              pointerEvents: 'none',
-            }}
-          />
+          {status === 'ready' && src && (
+            <img
+              src={src}
+              alt={current.caption || ''}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                objectPosition: 'center',
+                display: 'block',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {status === 'error' && (
+            <div
+              onTouchStart={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+              style={{ position: 'absolute', inset: 0, cursor: 'default' }}
+            >
+              <ImageLoadError onRetry={retry} />
+            </div>
+          )}
         </div>
 
         {/* Dot indicators — stay within the normal content width */}
