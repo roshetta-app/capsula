@@ -118,8 +118,14 @@ export function useConditions() {
     setPhotosProgress({ loaded: 0, total: urls.length })
 
     if (urls.length === 0) {
-      await pruneOrphanedPhotos(urls)
-      if (attemptIdRef.current === myAttempt) setPhotosLoading(false)
+      // 2026-09-02 fix: only this (still-current) attempt is allowed to
+      // prune — see the matching fix on the final prune call below for
+      // the full reasoning (a stale attempt finishing late could
+      // otherwise delete photos a newer attempt just saved).
+      if (attemptIdRef.current === myAttempt) {
+        await pruneOrphanedPhotos(urls)
+        setPhotosLoading(false)
+      }
       return
     }
 
@@ -160,8 +166,17 @@ export function useConditions() {
       Array.from({ length: Math.min(PHOTO_DOWNLOAD_CONCURRENCY, urls.length) }, worker)
     )
 
-    await pruneOrphanedPhotos(urls)
-    if (attemptIdRef.current === myAttempt) setPhotosLoading(false)
+    // 2026-09-02 fix (image-system review, Issue 1): pruning used to run
+    // unconditionally here even if a newer attempt had already taken
+    // over — so a slow-finishing stale attempt could delete a photo the
+    // newer attempt just downloaded a moment earlier, since the stale
+    // attempt's `urls` snapshot wouldn't include it. Now only the
+    // still-current attempt is allowed to prune, matching the guard used
+    // everywhere else in this function.
+    if (attemptIdRef.current === myAttempt) {
+      await pruneOrphanedPhotos(urls)
+      setPhotosLoading(false)
+    }
   }
 
   // Fetch fresh data from DB, update state, write cache.
@@ -331,6 +346,20 @@ export function useConditions() {
         const { conditionsUpdatedAt } = await fetchMetadataTimestamps(supabase)
         if (conditionsUpdatedAt !== cached.version) {
           await applyConditionsDelta(cached, conditionsUpdatedAt)
+        } else {
+          // 2026-09-02 fix (image-system review, Issue 2): previously,
+          // when nothing about the conditions data itself had changed,
+          // syncGalleryPhotos never ran at all this session — leaving
+          // photosLoading stuck at its initial `true` forever (nothing
+          // else ever resolves it), and — more importantly — meaning a
+          // device with an already-valid conditions cache (e.g. one that
+          // onboarded before offline photo caching existed) would never
+          // actually get its gallery photos downloaded until something
+          // unrelated forced a refresh. Running it here too is cheap: any
+          // photo already saved is just a device-only check, no network
+          // involved, so this reliably completes on every normal app
+          // open instead of only on a real data refresh.
+          syncGalleryPhotos(cached.data, attemptIdRef.current)
         }
       } catch {
         // Network error — keep cached data, don't crash
