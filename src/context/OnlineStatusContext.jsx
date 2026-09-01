@@ -224,18 +224,37 @@ export function OnlineStatusProvider({ children }) {
     }
 
     function handleOffline() {
-      // No network interface at all — trust this signal outright, and
-      // stop the continuous recheck too: with no connection at any level,
-      // there's nothing to usefully re-check until the browser reports
-      // 'online' again (handleOnline above restarts it). No confirmation
+      // No network interface at all — trust this signal outright for
+      // both isOnline and hasNetworkInterface immediately. No confirmation
       // threshold here — an interface-level "offline" event is a hard
-      // signal, not a slow/weak-signal guess, so it's still acted on
-      // immediately, for both isOnline and hasNetworkInterface.
+      // signal, not a slow/weak-signal guess.
+      //
+      // Fix (offline-gate-stuck, 2026-09-01): this used to also call
+      // stopPolling(), betting entirely on the browser's own 'online'
+      // event to ever check again — but that event isn't always reliable
+      // in practice (a real wifi/data toggle can come back without the
+      // event firing, or firing later than the connection actually
+      // recovers), which left isOnline stuck false indefinitely with
+      // nothing left to notice the recovery. Per plan §Phase 2.3 ("re-run
+      // the real check periodically while it's reporting offline, so
+      // access resumes promptly"), the recheck loop now keeps running
+      // through a hard offline too — checkReachable()'s own guard below
+      // starts it if it isn't already running, so recovery is caught
+      // within one RECHECK_INTERVAL_MS regardless of whether 'online'
+      // ever fires. A pending confirm-retry is still cleared, since
+      // there's nothing ambiguous left to confirm once a hard offline
+      // signal has already arrived.
       attemptIdRef.current++ // invalidate any reachability check still in flight
       consecutiveFailuresRef.current = 0
-      stopPolling()
+      if (confirmRetryTimerRef.current) {
+        clearTimeout(confirmRetryTimerRef.current)
+        confirmRetryTimerRef.current = null
+      }
       setHasNetworkInterface(false)
       setIsOnline(false)
+      if (!pollTimerRef.current) {
+        pollTimerRef.current = setInterval(checkReachable, RECHECK_INTERVAL_MS)
+      }
     }
 
     window.addEventListener('online', handleOnline)
