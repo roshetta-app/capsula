@@ -1,26 +1,48 @@
 /**
  * src/components/ui/NotificationsBanner.jsx
  *
- * Proactive "turn on notifications" prompt. Shown at most 3 times across
- * separate visits (24h cooldown between attempts), then retires
- * permanently — see MAX_ATTEMPTS/COOLDOWN_MS below.
+ * Proactive "turn on notifications" prompt.
+ *
+ * Redesign (2026-09-01, notif-banner-standardized-timing) — this session:
+ *   - Timing: previously fired 2.5s after every single app open, with no
+ *     regard for whether the person had done anything yet. The "when/
+ *     whether to ask" decision now lives in a new dedicated hook,
+ *     useNotificationsPrompt.js, mirroring the same dedicated-hook pattern
+ *     useSignInPrompt.js already established for the sign-in popup. The
+ *     banner is now only eligible starting on someone's 2nd visit (never
+ *     their very first), on top of the existing per-session one-shot and a
+ *     24h cooldown between genuine asks.
+ *   - Counting: replaced the old attempts-cap + separate permanent
+ *     "dismissed forever" flag with a single lifetime impression counter,
+ *     the same model useSignInPrompt.js uses — including its
+ *     accidental-tap protection (a close doesn't spend the lifetime
+ *     budget unless the banner was genuinely visible for at least half a
+ *     second). A successful subscribe no longer needs its own separate
+ *     permanent flag: once `subscribed` is true, the eligibility check
+ *     passed into the hook is false, so it simply never runs again — the
+ *     same way useSignInPrompt relies on `isSignedIn` rather than a
+ *     stored "done" flag.
+ *   - This component itself is otherwise unchanged: same visuals, same
+ *     animation, same auto-dismiss-after-8s behavior, same Allow/Ask
+ *     Later actions, same "don't lock anyone out if subscribeToPush()
+ *     fails" protection.
  *
  * Auto-dismiss (2026-08-11): if left untouched for AUTO_DISMISS_MS after
  * the banner becoming visible, it closes itself the same way "Ask
  * Later" does — soft decline, no permanent flag, still governed by the
- * existing attempt cap/cooldown. Keeps this a single soft-decline path
+ * timing/frequency rules above. Keeps this a single soft-decline path
  * instead of adding a second one.
  *
  * Stage 2 follow-up fix (2026-08-11) — flaw #1 from the F4 banner audit:
- * handleAllow() previously set the permanent DISMISSED_KEY flag before
+ * handleAllow() previously set a permanent "dismissed forever" flag before
  * knowing whether subscribeToPush() actually succeeded, so a failed
  * subscribe silently locked the banner out forever with no way back in
- * through this UI. Now the permanent flag is only set once subscribeToPush
- * resolves true. On failure, the banner still closes (soft, not
- * permanent) and the existing attempt/cooldown logic decides if/when it
- * asks again — same as any other soft decline. Regardless of this fix,
- * NotificationSheet.jsx (opened via the bell in ConditionsScreen) is now
- * always available as a non-attempt-limited fallback.
+ * through this UI. A failed subscribe now just closes the banner softly
+ * (not permanently) and the normal timing/frequency rules above decide
+ * if/when it asks again — same as any other soft decline. Regardless of
+ * this fix, NotificationSheet.jsx (opened via the bell in
+ * ConditionsScreen) is now always available as a non-attempt-limited
+ * fallback.
  *
  * Fix (2026-08-11, notif-sync-and-race-fix) — now reads
  * usePushSubscriptionContext() instead of mounting its own
@@ -36,7 +58,7 @@
  * stayed `null` forever, and the banner's own show-condition
  * (`permission === null` blocks display) meant it could never appear on
  * native at all — not at first install, not on any later visit, regardless
- * of the attempt/cooldown timers below. Fixed by reading `permission` from
+ * of the timing/frequency rules. Fixed by reading `permission` from
  * usePushSubscriptionContext() instead, the same shared, native-aware
  * source `supported` and `subscribed` already come from. The banner's own
  * local permission state and its Notification-reading effect are removed
@@ -60,57 +82,29 @@
 import { useState, useEffect } from 'react'
 import { usePushSubscriptionContext } from '../../context/PushSubscriptionContext'
 import { useToast } from '../../context/ToastContext'
+import { useNotificationsPrompt } from '../../hooks/useNotificationsPrompt'
 
-const DISMISSED_KEY    = 'capsula_notif_dismissed'
-const ATTEMPTS_KEY     = 'capsula_notif_attempts'
-const LAST_SHOWN_KEY   = 'capsula_notif_last_shown'
-const SESSION_SHOWN_KEY = 'capsula_notif_shown_session'
-
-const MAX_ATTEMPTS      = 3
-const COOLDOWN_MS       = 24 * 60 * 60 * 1000 // 24h between un-actioned attempts
-const APPEAR_DELAY_MS   = 2500
 const EXIT_DURATION_MS  = 220
 const AUTO_DISMISS_MS   = 8000 // auto-close as a soft decline if untouched
 
 export default function NotificationsBanner() {
   const { supported, permission, subscribed, subscribeToPush } = usePushSubscriptionContext()
   const { toast } = useToast()
-  const [permanentlyDismissed, setPermanentlyDismissed] = useState(
-    () => localStorage.getItem(DISMISSED_KEY) === 'true'
-  )
+
+  // Same eligibility conditions the old inline effect used: supported,
+  // not already subscribed, and permission neither unknown-on-native nor
+  // denied. Once true, the timing/frequency decision itself lives in
+  // useNotificationsPrompt — see that file's header for the full model.
+  const eligible = supported && !subscribed && permission !== null && permission !== 'denied'
+  const { shouldShow, dismiss } = useNotificationsPrompt({ eligible })
+
   // 'hidden' (not shown yet / gone) → 'visible' (shown, animates in)
   // → 'leaving' (animates out, then finalizes to 'hidden')
   const [phase, setPhase] = useState('hidden')
 
   useEffect(() => {
-    if (!supported) return
-    if (permanentlyDismissed) return
-    if (subscribed) return
-    if (permission === null || permission === 'denied') return
-    if (sessionStorage.getItem(SESSION_SHOWN_KEY) === 'true') return
-
-    const attempts = parseInt(localStorage.getItem(ATTEMPTS_KEY) || '0', 10)
-
-    if (attempts >= MAX_ATTEMPTS) {
-      localStorage.setItem(DISMISSED_KEY, 'true')
-      setPermanentlyDismissed(true)
-      return
-    }
-
-    const lastShown = parseInt(localStorage.getItem(LAST_SHOWN_KEY) || '0', 10)
-    if (attempts > 0 && Date.now() - lastShown < COOLDOWN_MS) {
-      return
-    }
-
-    const timer = setTimeout(() => {
-      sessionStorage.setItem(SESSION_SHOWN_KEY, 'true')
-      localStorage.setItem(ATTEMPTS_KEY, String(attempts + 1))
-      localStorage.setItem(LAST_SHOWN_KEY, String(Date.now()))
-      setPhase('visible')
-    }, APPEAR_DELAY_MS)
-
-    return () => clearTimeout(timer)
-  }, [supported, permanentlyDismissed, subscribed, permission])
+    if (shouldShow) setPhase('visible')
+  }, [shouldShow])
 
   // Auto-dismiss: once visible, close on its own like "Ask Later" if the
   // user hasn't interacted within AUTO_DISMISS_MS. Cancelled if the user
@@ -130,37 +124,35 @@ export default function NotificationsBanner() {
     setTimeout(after, EXIT_DURATION_MS)
   }
 
-  // Primary action — requests permission and subscribes. The permanent
-  // "never ask again" flag is only set once subscribeToPush() actually
-  // resolves true (fix, 2026-08-11) — a failed subscribe closes the
-  // banner softly instead, leaving the normal attempt/cooldown logic in
-  // charge of whether it asks again, same as "Ask Later".
+  // Primary action — requests permission and subscribes. `dismiss()` is
+  // called regardless of outcome (same as any other close), spending the
+  // lifetime impression budget if the banner was genuinely seen. There's
+  // no separate permanent flag on success any more — once `subscribed`
+  // becomes true, `eligible` above goes false and the hook simply never
+  // fires again. On failure, the banner still closes (soft, not
+  // permanent) and the normal timing/frequency rules decide if/when it
+  // asks again — same as "Ask Later".
   function handleAllow() {
     closeWithAnimation(() => {
       setPhase('hidden')
+      dismiss()
       subscribeToPush().then((ok) => {
-        if (ok) {
-          localStorage.setItem(DISMISSED_KEY, 'true')
-          setPermanentlyDismissed(true)
-        } else {
-          toast.error('Could not enable notifications. Please try again.')
-        }
+        if (!ok) toast.error('Could not enable notifications. Please try again.')
       })
     })
   }
 
-  // Secondary action — soft decline. Does NOT set the permanent flag;
-  // the existing attempt cap/cooldown decides if/when to ask again.
-  // Also used by the auto-dismiss timer above.
+  // Secondary action — soft decline. Also used by the auto-dismiss timer
+  // above.
   function handleAskLater() {
     closeWithAnimation(() => {
       setPhase('hidden')
+      dismiss()
     })
   }
 
   if (!supported) return null
   if (permission === 'denied') return null
-  if (permanentlyDismissed && phase !== 'leaving') return null
   if (subscribed && phase !== 'leaving') return null
   if (phase === 'hidden') return null
 
