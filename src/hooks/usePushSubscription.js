@@ -200,6 +200,29 @@
  * exposed on the hook's return value so callers (NotificationSheet.jsx)
  * can show the right message up front instead of waiting for a failed
  * attempt.
+ *
+ * Bug fix, 2026-09-01 (alarms-redirect-fix) — root cause found for the
+ * MIUI "Alarms & reminders" redirect the three fixes above
+ * (miui-alarms-redirect-mitigation, miui-alarms-redirect-removed) were
+ * chasing. It was never the notification-permission checks those two
+ * fixes correctly tightened — it was @capacitor/local-notifications
+ * itself: displaying a notification through that plugin goes through
+ * Android's exact-alarm scheduling system, which is what triggers the
+ * permission redirect, regardless of anything checked/requested
+ * beforehand. There's no supported way around that from inside the
+ * plugin, so this removes it from the foreground path entirely: a push
+ * arriving while the app is open is now shown as an in-app toast (this
+ * app's existing ToastContext, extended with an optional onAction so
+ * tapping it still reports the click and follows the deep link, same as
+ * the old native notification did) instead of a native notification.
+ * This matches how most apps handle a push arriving while already open
+ * (an in-app banner rather than a system notification), and is also
+ * Firebase's own documented approach — foreground display is left
+ * entirely up to the app. Background/closed delivery is unaffected: those
+ * are still shown natively by Android straight from the FCM payload, same
+ * as before. One known trade-off: the toast shows title/body only, not
+ * the notification's image — background/closed notifications still show
+ * the image as before.
  */
 
 import { useState, useEffect } from 'react'
@@ -207,9 +230,9 @@ import { useNavigate } from 'react-router-dom'
 import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
-import { LocalNotifications } from '@capacitor/local-notifications'
 import { supabase } from '../lib/supabase'
 import { useOnlineStatus } from './useOnlineStatus'
+import { useToast } from '../context/ToastContext'
 import { getDeviceId } from '../analytics/deviceSession'
 
 const firebaseConfig = {
@@ -235,15 +258,17 @@ const FCM_VAPID_KEY = import.meta.env.VITE_FCM_VAPID_KEY
 // CHANNEL_BY_TYPE exactly. These ids only work if a matching Android
 // notification channel has already been registered on-device (the Stage 2
 // native one-time setup step) — otherwise Android silently falls back to
-// its own default channel behavior for the foreground-scheduled local
-// notification.
+// its own default channel behavior. Still needed for the one-time channel
+// registration below (background/closed notifications, shown natively by
+// Android from deliver-notification's own FCM payload, still use these
+// channels) — only the per-notification channel lookup that used to
+// happen here for the foreground path (channelForType()) was removed
+// alongside the local-notification code it belonged to; see 2026-09-01
+// (alarms-redirect-fix) in the file header.
 const CHANNEL_BY_TYPE = {
   info:      'capsula_info',
   update:    'capsula_update',
   important: 'capsula_important',
-}
-function channelForType(type) {
-  return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
 }
 
 // Wraps a promise so it fails with a clear error instead of hanging forever
@@ -262,6 +287,11 @@ function withTimeout(promise, ms, label) {
 
 export function usePushSubscription() {
   const navigate = useNavigate()
+  // Bug fix, 2026-09-01 (alarms-redirect-fix) — see file header. This hook
+  // is only ever mounted via PushSubscriptionProvider, which App.jsx
+  // renders inside <ToastProvider>, so useToast() is always safe to call
+  // here.
+  const { toast } = useToast()
   // 2026-09-01 offline fix — see file header. Same shared check used
   // elsewhere in the app (AppGate.jsx, OfflineStatusToast.jsx), not a new
   // independent one.
@@ -348,30 +378,39 @@ export function usePushSubscription() {
   //     the raw FCM payload, so its tap is reported by FCM's own
   //     'notificationActionPerformed' event, reading log_id back out of
   //     the same data payload send-notification/index.ts already sends.
-  //   - Foreground: shown by our own LocalNotifications.schedule() call
-  //     below, so its tap is reported by LocalNotifications' own
-  //     'localNotificationActionPerformed' event instead — which needs
-  //     log_id threaded through via `extra` at schedule-time (added
-  //     below), since a locally-scheduled notification has no FCM data
-  //     payload of its own to read it back from.
+  //   - Foreground: shown as an in-app toast (see 2026-09-01,
+  //     alarms-redirect-fix, below), so its "tap" is just the toast's own
+  //     onAction callback — no separate native listener needed for this
+  //     path anymore.
   // Both call the same increment_notification_click RPC the service
   // worker uses (log_id param name matches), fire-and-forget — a failed
   // report shouldn't block anything the person is doing.
   //
-  // Bug fix, 2026-08-17 (banner-eager-permission-fix, same-day follow-up)
-  // — see file header note above. LocalNotifications.requestPermissions()
-  // used to be called here unconditionally, firing the OS permission
-  // popup on every app mount regardless of the banner. It's now called
-  // lazily inside the 'notificationReceived' handler below, right before
-  // a local notification actually needs to be scheduled — by which point
-  // FCM permission is already granted through the normal banner/bell
-  // flow, so this silently confirms rather than prompting again.
-  //
-  // Phase F9 Stage 2 (D28) — see file header note above. The scheduled
-  // local notification now carries the same image and channelId
-  // deliver-notification's FCM payload sends for the background/closed
-  // path, and extra now also threads the deep-link url through (log_id
-  // was already there) — see file header for what's still open.
+  // Bug fix, 2026-09-01 (alarms-redirect-fix) — replaces the
+  // LocalNotifications-based foreground display this section used to
+  // describe (banner-eager-permission-fix, miui-alarms-redirect-
+  // mitigation, miui-alarms-redirect-removed — see file header for all
+  // three). Those fixes correctly targeted the notification-permission
+  // checks, but the actual redirect trigger turned out to be a different,
+  // unrelated Android permission: LocalNotifications.schedule() displays
+  // by way of the same OS mechanism used for exact-time alarms, and
+  // requesting that permission is what MIUI shows as a full "Alarms &
+  // reminders" settings redirect rather than a normal popup — regardless
+  // of anything checked or requested beforehand. There is no supported way
+  // to display a notification through that plugin without touching this
+  // mechanism, so the fix removes it from this path entirely: a
+  // foreground push is now shown as an in-app toast (this app's existing
+  // toast system, ToastContext.jsx) instead of a native notification.
+  // This is also the standard approach — most apps (e.g. WhatsApp,
+  // Instagram) show an in-app banner rather than a system notification
+  // while already open, and Firebase's own guidance leaves foreground
+  // display entirely up to the app for this reason. Background/closed
+  // delivery (the other bullet above) is untouched by this change.
+  // Known trade-off: unlike the old LocalNotifications-based version, the
+  // toast does not show the notification's image (deliver-notification's
+  // image_url) — text (title/body) only. Background/closed notifications,
+  // which Android displays natively from FCM's own payload, still show
+  // the image as before; this only affects the foreground-only case.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -397,57 +436,28 @@ export function usePushSubscription() {
 
     const handles = []
 
-    FirebaseMessaging.addListener('notificationReceived', async event => {
-      // Requested here, not eagerly on mount — see bug fix note above.
-      // Separate OS permission from the notification-permission FCM
-      // already requested — LocalNotifications tracks/asks for it
-      // independently even though on Android it's backed by the same
-      // underlying permission, so this is a silent confirm in practice,
-      // not a second real prompt.
-      //
-      // Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) / 2026-09-01
-      // (miui-alarms-redirect-removed) — see file header for both. No
-      // request() call here at all anymore — only a read-only check.
-      // Permission was already asked for once, for real, through the FCM
-      // banner/bell flow; if this somehow still isn't granted, skip this
-      // one local notification rather than prompting again.
-      const { display } = await LocalNotifications.checkPermissions()
-      if (display !== 'granted') {
-        return
-      }
-
+    FirebaseMessaging.addListener('notificationReceived', event => {
+      // Bug fix, 2026-09-01 (alarms-redirect-fix) — see comment above this
+      // effect. No LocalNotifications permission check or schedule() call
+      // here anymore; this is shown as an in-app toast instead, which
+      // needs no OS-level permission of any kind.
       const notification = event?.notification ?? event
-      const imageUrl = notification?.image ?? null
       const deepLinkUrl = notification?.data?.url ?? '/capsula/'
-      const channelId = channelForType(notification?.data?.type ?? 'info')
+      const logId = notification?.data?.log_id ?? null
 
-      LocalNotifications.schedule({
-        notifications: [{
-          id: Date.now() % 2147483647, // fits a 32-bit int; uniqueness is enough here, no need to track/reuse ids
-          title: notification?.title ?? '',
-          body: notification?.body ?? '',
-          // Without this, LocalNotifications falls back to Android's
-          // generic default icon (a plain "!") instead of the app's mark.
-          // Reuses the same drawable the manifest already points FCM's own
-          // background/closed notifications at, so foreground and
-          // background notifications look identical.
-          smallIcon: 'ic_stat_notify',
-          // Matches the channel deliver-notification's FCM payload set for
-          // the background/closed path — requires the same on-device
-          // channel registration (Stage 2 native setup step).
-          channelId,
-          // LocalNotifications' documented way to attach an image; only
-          // included when the send actually had one, same as sw.js's push
-          // handler only setting options.image when imageUrl is present.
-          ...(imageUrl ? { attachments: [{ id: 'image', url: imageUrl }] } : {}),
-          // Threads log_id and the deep-link url through so a tap on this
-          // foreground-shown notification can still be reported (and,
-          // once the navigation piece is built, routed) — see click-
-          // count-fix note above and the file header's open item. Read
-          // back out via event.notification.extra in the
-          // localNotificationActionPerformed listener below.
-          extra: { log_id: notification?.data?.log_id ?? null, url: deepLinkUrl },
-        }],
+      const title = notification?.title ?? ''
+      const body = notification?.body ?? ''
+      const message = title && body ? `${title}: ${body}` : (title || body)
+      if (!message) return
+
+      // onAction stands in for the old localNotificationActionPerformed
+      // listener: tapping the toast reports the click and routes to the
+      // deep link, same as tapping the old native notification did.
+      toast.info(message, {
+        onAction: () => {
+          reportClick(logId)
+          navigateToDeepLink(deepLinkUrl)
+        },
       })
     }).then(handle => handles.push(handle))
 
@@ -456,12 +466,8 @@ export function usePushSubscription() {
       navigateToDeepLink(event?.notification?.data?.url)
     }).then(handle => handles.push(handle))
 
-    LocalNotifications.addListener('localNotificationActionPerformed', event => {
-      reportClick(event?.notification?.extra?.log_id)
-      navigateToDeepLink(event?.notification?.extra?.url)
-    }).then(handle => handles.push(handle))
-
     return () => { handles.forEach(handle => handle.remove()) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Reads or re-fetches the device's current FCM token without prompting —
