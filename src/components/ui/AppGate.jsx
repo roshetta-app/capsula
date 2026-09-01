@@ -5,6 +5,10 @@
  * mockup this implements.
  * Phase 4 addition (plan: CAPSULA_DATA_TIERS_AND_ACCESS_PLAN.md, §Phase 4)
  * — added the offline block, see its own comment below.
+ * Phase 4 follow-up — the offline block now fades in/out instead of
+ * snapping instantly, matching AppGateSheet's existing fade pattern
+ * below rather than inventing a new one. See OfflineBlock and the
+ * mount/unmount effect in AppGate() for details.
  *
  * Reads the current gate from AppGateContext and renders one of two
  * surfaces, chosen by gate.dismissible:
@@ -226,7 +230,14 @@ function AppGateBlock({ gate }) {
 // on the container's text-align — this project's Tailwind preflight resets
 // all <svg> to display:block, which silently breaks text-align centering
 // for icon-only elements like this one.
-function OfflineBlock() {
+//
+// `visible` prop drives the fade — see AppGate()'s mount/unmount effect
+// below. This component stays a stateless full-bleed panel; the parent
+// keeps it mounted a little past offlineBlockActive turning false so the
+// opacity transition has time to finish before it's actually removed.
+// pointer-events is tied to the same flag so a mid-fade-out block can't
+// still swallow taps meant for the real app becoming visible underneath it.
+function OfflineBlock({ visible }) {
   return (
     <div style={{
       position:        'fixed',
@@ -239,6 +250,9 @@ function OfflineBlock() {
       justifyContent:  'center',
       padding:         'var(--space-6) var(--space-5)',
       textAlign:       'center',
+      opacity:         visible ? 1 : 0,
+      pointerEvents:   visible ? 'auto' : 'none',
+      transition:      'opacity var(--motion-screen) var(--ease-reveal)',
     }}>
       <div style={{ width: '100%', maxWidth: 320 }}>
         {/* Neutral circle behind the icon, var(--color-surface-muted) —
@@ -505,6 +519,38 @@ export default function AppGate() {
   const hasCachedLibrary = !drugsLoading && drugs.length > 0 && !conditionsLoading && conditions.length > 0
   const offlineBlockActive = hasCachedLibrary && !isOnline && !isPro
 
+  // Fade mount/unmount for the offline block, mirroring AppGateSheet's
+  // shouldRender/animateIn pattern above rather than a plain conditional
+  // render — see the header comment and OfflineBlock's own comment.
+  // Kept as two flags because they turn on/off at different moments:
+  // showOfflineBlock controls whether the component is in the tree at
+  // all (stays true a little past offlineBlockActive going false, so the
+  // fade-out has something to animate), offlineBlockVisible controls the
+  // opacity itself (flips immediately with offlineBlockActive).
+  const [showOfflineBlock,    setShowOfflineBlock]    = useState(offlineBlockActive)
+  const [offlineBlockVisible, setOfflineBlockVisible] = useState(offlineBlockActive)
+
+  useEffect(() => {
+    if (offlineBlockActive) {
+      // Reconnected-then-disconnected-again case: mount immediately and
+      // let the very next frame trigger the opacity transition, same
+      // requestAnimationFrame timing AppGateSheet uses for its own
+      // fade-in, so the block doesn't just pop straight to opacity 1.
+      setShowOfflineBlock(true)
+      const raf = requestAnimationFrame(() => setOfflineBlockVisible(true))
+      return () => cancelAnimationFrame(raf)
+    }
+
+    // Connection came back: start the fade immediately, then remove the
+    // block from the tree once the opacity transition has had time to
+    // finish. 220ms matches AppGateSheet's own closeThen() timeout
+    // elsewhere in this file, so every gate-style surface in the app
+    // exits on the same beat.
+    setOfflineBlockVisible(false)
+    const timeout = setTimeout(() => setShowOfflineBlock(false), 220)
+    return () => clearTimeout(timeout)
+  }, [offlineBlockActive])
+
   // Admins must always be able to reach the CMS to turn a gate off, even a
   // non-dismissible one — the App Gate system is for the app's regular
   // users, not the admin panel itself. Also exempts the offline block
@@ -516,7 +562,12 @@ export default function AppGate() {
   // someone could still scroll the real app underneath the message even
   // though tapping it does nothing, which defeats the point of a "must
   // focus on this" surface. Never engages on /admin, matching the
-  // exemption above.
+  // exemption above. Keyed off offlineBlockActive (not showOfflineBlock)
+  // so the real app becomes scrollable again the instant connectivity
+  // returns, rather than waiting out the fade — the block's own
+  // pointer-events:none during the fade already stops it from
+  // intercepting taps, so there's nothing gained by keeping scroll
+  // locked any longer than that.
   useEffect(() => {
     if ((!gate && !offlineBlockActive) || onAdminRoute) return
     const previousOverflow = document.body.style.overflow
@@ -563,7 +614,9 @@ export default function AppGate() {
   // session) — if the device is genuinely unreachable, a possibly-stale
   // maintenance/promo message fetched before going offline matters less
   // than telling the person plainly that they're offline right now.
-  if (offlineBlockActive) return <OfflineBlock />
+  // Uses showOfflineBlock (not offlineBlockActive) so the block stays
+  // mounted through its own fade-out — see the effect above.
+  if (showOfflineBlock) return <OfflineBlock visible={offlineBlockVisible} />
 
   if (!gate) return null
 
