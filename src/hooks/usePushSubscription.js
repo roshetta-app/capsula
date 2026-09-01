@@ -157,19 +157,22 @@
  * to cut this down to at most once per app session — see the 2026-09-01
  * follow-up below for why that didn't actually hold.
  *
- * Bug fix, 2026-09-01 (miui-alarms-redirect-followup) — the check-then-
+ * Bug fix, 2026-09-01 (miui-alarms-redirect-removed) — the check-then-
  * request pattern above still re-requested on every single foreground
  * notification for as long as permission stayed ungranted on a given
- * phone, since nothing remembered a previous attempt across pushes (or
- * across app restarts). Confirmed on-device: a phone that never grants
- * this permission kept hitting the redirect on every foreground push,
- * indefinitely. Fixed by recording a durable "already asked, don't ask
- * again" flag via @capacitor/preferences (the same durable native storage
- * src/lib/supabase.js already uses for auth) the first time a request
- * comes back still not granted — so this now fires at most once ever per
- * install, not once per notification. A fresh install naturally gets to
- * ask again, which is correct: the OS permission itself resets on
- * reinstall too.
+ * phone. Rather than just capping how often that request fires, this
+ * removes the request entirely: permission was already asked for once,
+ * for real, through the FCM banner/bell flow
+ * (FirebaseMessaging.requestPermissions(), elsewhere in this file) — and
+ * on Android that's the same underlying OS permission LocalNotifications
+ * needs, so a second, separate request from this plugin was never
+ * actually necessary. It was also the direct trigger for the MIUI
+ * redirect: only an actual request() call (not the read-only
+ * checkPermissions() below) can surface that OS settings screen. Now
+ * this only reads the current permission state; if it somehow isn't
+ * granted, that one foreground notification is simply skipped, with no
+ * prompt — the same end result a denied request would have produced,
+ * just without ever asking again from this code path.
  *
  * Bug fix, 2026-09-01 (ghost-token-on-reinstall) — claim_push_token was
  * only ever keyed on the FCM token itself, and a reinstall (or a cleared-
@@ -205,7 +208,6 @@ import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { LocalNotifications } from '@capacitor/local-notifications'
-import { Preferences } from '@capacitor/preferences'
 import { supabase } from '../lib/supabase'
 import { useOnlineStatus } from './useOnlineStatus'
 import { getDeviceId } from '../analytics/deviceSession'
@@ -242,31 +244,6 @@ const CHANNEL_BY_TYPE = {
 }
 function channelForType(type) {
   return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
-}
-
-// Bug fix, 2026-09-01 (miui-alarms-redirect-followup) — see file header.
-// Durable per-install flag: once a LocalNotifications permission request
-// comes back not granted, never request it again on this install.
-const ALARM_PERMISSION_DECLINED_KEY = 'capsula_alarm_permission_declined'
-
-async function hasDeclinedAlarmPermission() {
-  try {
-    const { value } = await Preferences.get({ key: ALARM_PERMISSION_DECLINED_KEY })
-    return value === 'true'
-  } catch {
-    // Preferences unavailable for some reason — fail open (allow asking),
-    // same as any other best-effort read in this file.
-    return false
-  }
-}
-
-async function markAlarmPermissionDeclined() {
-  try {
-    await Preferences.set({ key: ALARM_PERMISSION_DECLINED_KEY, value: 'true' })
-  } catch {
-    // Best-effort — worst case this asks again next launch, no worse than
-    // the previous behavior.
-  }
 }
 
 // Wraps a promise so it fails with a clear error instead of hanging forever
@@ -429,16 +406,14 @@ export function usePushSubscription() {
       // not a second real prompt.
       //
       // Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) / 2026-09-01
-      // (miui-alarms-redirect-followup) — see file header for both. Only
-      // requests when not already granted AND this install hasn't
-      // already been told no once before — so a phone that keeps coming
-      // back not-granted gets asked at most once ever, not once per push.
+      // (miui-alarms-redirect-removed) — see file header for both. No
+      // request() call here at all anymore — only a read-only check.
+      // Permission was already asked for once, for real, through the FCM
+      // banner/bell flow; if this somehow still isn't granted, skip this
+      // one local notification rather than prompting again.
       const { display } = await LocalNotifications.checkPermissions()
-      if (display !== 'granted' && !(await hasDeclinedAlarmPermission())) {
-        const result = await LocalNotifications.requestPermissions()
-        if (result.display !== 'granted') {
-          await markAlarmPermissionDeclined()
-        }
+      if (display !== 'granted') {
+        return
       }
 
       const notification = event?.notification ?? event
