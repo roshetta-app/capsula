@@ -21,6 +21,15 @@
  * than that, even across multiple real drops. The very first drop in a
  * session always shows, since lastShownRef starts empty.
  *
+ * "Back online" confirmation (this session): fires once reconnected, but
+ * ONLY if the matching offline toast actually showed — paired 1:1 via
+ * offlineToastShownRef, not an independent watcher. If a drop was
+ * suppressed by the cooldown above, its recovery is silent too, so
+ * "back online" never appears without a preceding "offline" message the
+ * person actually saw. Not subject to its own cooldown — it fires the
+ * instant reconnection happens, since it can only ever fire once per
+ * shown offline toast anyway.
+ *
  * Free users never see this at all — they are already covered by
  * AppGate.jsx's full-screen offline block, which is mutually exclusive
  * with normal browsing.
@@ -58,17 +67,30 @@ export default function OfflineStatusToast() {
 
   const wasOnlineRef = useRef(isOnline)
   const lastShownRef = useRef(0)
+  const offlineToastShownRef = useRef(false)
 
   useEffect(() => {
-    // Only Pro users get this reassurance — a free user going offline is
-    // handled entirely by AppGate.jsx's full-screen block instead.
-    if (isPro && wasOnlineRef.current && !isOnline) {
-      const now = Date.now()
-      if (now - lastShownRef.current >= COOLDOWN_MS) {
-        toast.info('Offline — everything still works')
-        lastShownRef.current = now
+    const wasOnline = wasOnlineRef.current
+
+    if (isPro) {
+      if (wasOnline && !isOnline) {
+        // Going offline — only Pro users get this reassurance; a free
+        // user going offline is handled entirely by AppGate.jsx's
+        // full-screen block instead.
+        const now = Date.now()
+        if (now - lastShownRef.current >= COOLDOWN_MS) {
+          toast.info('Offline — everything still works')
+          lastShownRef.current = now
+          offlineToastShownRef.current = true
+        }
+      } else if (!wasOnline && isOnline && offlineToastShownRef.current) {
+        // Coming back online — only confirm if the drop that caused this
+        // was actually announced (not cooldown-suppressed).
+        toast.success('Back online')
+        offlineToastShownRef.current = false
       }
     }
+
     wasOnlineRef.current = isOnline
   }, [isOnline, isPro, toast])
 
