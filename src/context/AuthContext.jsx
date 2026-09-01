@@ -60,6 +60,22 @@
  * fetch resolved, letting AccountEditScreen's once-per-user-id
  * auto-open-wizard check run against a still-null profile and lock in a
  * blank first-time wizard for what was actually a returning account.
+ *
+ * profile-avatar-offline-fix (2026-09-01) — loadProfile(null) no longer
+ * wipes the remembered auth snapshot (name/avatar/tier/everything).
+ * Same root-cause class as the recently-viewed-offline-fix: `loadProfile`
+ * gets called with `currentUser` null any time the sign-in library can't
+ * currently confirm a session — which includes a real sign-out, but also
+ * a background session recheck failing purely from being offline. This
+ * function had no way to tell those apart, so an offline hiccup wiped the
+ * exact same snapshot this file otherwise goes out of its way to protect
+ * for instant/offline loading — explaining why the Account screen's
+ * photo/name sometimes rendered correctly and sometimes fell back to
+ * initials or the email fallback with no real cause. The snapshot is now
+ * only ever cleared from signOut() below, the one place a sign-out is
+ * guaranteed to be real (and which already protects itself against a
+ * network-timing false positive via isNetworkTimingError) — not
+ * reactively here on every merely-unconfirmed session.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -225,11 +241,19 @@ export function AuthProvider({ children }) {
   const loadProfile = useCallback(async (currentUser) => {
     if (!currentUser) {
       setProfile(null)
-      // account-instant-load: no one is signed in, so any remembered
-      // snapshot from a previous session is stale — wipe it. Otherwise
-      // AccountScreen could show a signed-out visitor the last signed-in
-      // person's name/photo for an instant on next load.
-      clearCachedAuthSnapshot()
+      // profile-avatar-offline-fix (2026-09-01) — this used to also call
+      // clearCachedAuthSnapshot() here unconditionally. That treated
+      // "we don't currently have a confirmed user in this one call" the
+      // same as "this person is genuinely signed out" — but this branch
+      // runs any time a session simply can't be confirmed right now,
+      // including a background recheck failing purely from being
+      // offline (same library quirk documented in the
+      // recently-viewed-offline-fix). Wiping the snapshot on that false
+      // signal is exactly what made the Account screen's photo/name
+      // sometimes vanish for no real reason. The snapshot is durable,
+      // offline-safe data by design (see authSnapshot.js) — it should
+      // only ever be cleared by a real, confirmed sign-out, which
+      // signOut() below already handles on its own, safely.
       return
     }
 
@@ -348,19 +372,12 @@ export function AuthProvider({ children }) {
       studentType:           data.student_type,
     })
 
-    // account-instant-load: remember just enough to render AccountScreen's
-    // header instantly on the next open — written every time a real
-    // profile load succeeds, so it's always as fresh as the last real
-    // check. Written even if `error` was truthy (no profile row yet, e.g.
-    // right after first sign-up) since the name/email/avatar shown on
-    // AccountScreen comes from the auth user object either way, not from
-    // the missing profile row.
-    // Full profile now included, not just tier (Pro-offline cold-start
-    // fix round 2, 2026-09-01) — round 1 only cached tier, which fixed the
-    // offline block itself but left every other field (occupation,
-    // country, specialty, profileSetupDismissed...) reading as blank on a
-    // cold offline start, making an already-set-up profile look wiped and
-    // (via profileSetupDismissed) risking an unwanted bounce back into the
+    // account-instant-load: durable snapshot written after a real,
+    // successful (or legitimately-empty, e.g. no profile row yet) load —
+    // never after a connectivity failure, which bails out above before
+    // reaching here. avatarUrl comes straight off the auth user, not the
+    // profiles table — Google's photo URL, not something this app stores
+    // (via profile_setup_dismissed) risking an unwanted bounce back into the
     // setup wizard. See cachedSnapshotToProfile above for the read side.
     writeCachedAuthSnapshot({
       id:                    currentUser.id,
@@ -626,6 +643,10 @@ export function AuthProvider({ children }) {
   // loadProfile above) leaves everything untouched and reports back via
   // the returned `error` instead of failing silently, so AccountSheet.jsx
   // and AccountScreen.jsx can tell the person what happened.
+  //
+  // profile-avatar-offline-fix (2026-09-01) — this is now also the ONLY
+  // place clearCachedAuthSnapshot() is called from — see loadProfile's
+  // header comment above for why it was removed from there.
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error && isNetworkTimingError(error)) return { error }
