@@ -52,6 +52,29 @@
  * timeout elsewhere. Fixed by making the recheck run continuously, every
  * RECHECK_INTERVAL_MS, regardless of whether the last check reported
  * online or offline.
+ *
+ * 2026-09-01 (weak-connection false-positive fix): a single failed
+ * reachability check used to be enough to declare the whole app offline —
+ * one slow response past REACHABILITY_TIMEOUT_MS (e.g. a weak hospital
+ * Wi-Fi signal, or the burst of requests right after signing in
+ * momentarily crowding out this lightweight check) flipped isOnline to
+ * false immediately, which then flowed straight into AppGate's offline
+ * block and the Pro "offline" toast with no confirmation step. That's
+ * what produced the reported spam: the check would fail, recover on the
+ * very next poll, fail again a few seconds of bad signal later, and so
+ * on — each flip toggling the block/toast on and off.
+ *
+ * Fixed with a standard, asymmetric confirm pattern: it now takes
+ * OFFLINE_CONFIRM_THRESHOLD (2) failed checks IN A ROW before isOnline is
+ * ever set to false — a single blip is no longer trusted on its own.
+ * After a first failure, instead of waiting the full RECHECK_INTERVAL_MS
+ * to find out if it was real, one quick follow-up check runs sooner
+ * (CONFIRM_RETRY_DELAY_MS) to confirm or clear it — so a genuine drop is
+ * still caught quickly, it just isn't acted on off a single sample.
+ * Recovery stays intentionally asymmetric: the very first successful
+ * check clears the failure count and reports online immediately, so a
+ * Pro user's access (and the "back online" toast) resumes the moment the
+ * connection is actually usable again, matching plan §2.3's intent.
  */
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
@@ -69,6 +92,16 @@ const REACHABILITY_TIMEOUT_MS = 5000
 // access, and onboarding's auto-retry, resume promptly once the connection
 // is actually usable again.
 const RECHECK_INTERVAL_MS = 10000
+
+// How many failed checks in a row are required before isOnline actually
+// flips to false (2026-09-01 weak-connection fix — see file header). One
+// slow/weak-signal blip is no longer enough on its own.
+const OFFLINE_CONFIRM_THRESHOLD = 2
+
+// After an unconfirmed failure, how soon the follow-up check runs — sooner
+// than RECHECK_INTERVAL_MS, so a genuine drop is still confirmed quickly
+// instead of leaving isOnline stale (and possibly wrong) for up to 10s.
+const CONFIRM_RETRY_DELAY_MS = 3000
 
 // Resolves true/false, never rejects — a network error and a timeout both
 // just mean "not reachable right now."
@@ -95,10 +128,21 @@ export function OnlineStatusProvider({ children }) {
   const attemptIdRef = useRef(0)
   const pollTimerRef = useRef(null)
 
+  // How many reachability checks have failed in a row since the last
+  // success (2026-09-01 weak-connection fix). Reset to 0 on any success.
+  const consecutiveFailuresRef = useRef(0)
+  // Holds the quick follow-up check scheduled after an unconfirmed
+  // failure, so it can be cleared if a newer check supersedes it.
+  const confirmRetryTimerRef = useRef(null)
+
   const stopPolling = useCallback(() => {
     if (pollTimerRef.current) {
       clearInterval(pollTimerRef.current)
       pollTimerRef.current = null
+    }
+    if (confirmRetryTimerRef.current) {
+      clearTimeout(confirmRetryTimerRef.current)
+      confirmRetryTimerRef.current = null
     }
   }, [])
 
@@ -108,12 +152,36 @@ export function OnlineStatusProvider({ children }) {
   // recovering, is always caught within one interval instead of only ever
   // being noticed via the device's own online/offline events (2026-09-01
   // fix, see file header).
+  //
+  // A failure only ever flips isOnline to false once it's been confirmed
+  // OFFLINE_CONFIRM_THRESHOLD times in a row (2026-09-01 weak-connection
+  // fix, see file header) — a single failed check instead schedules one
+  // quick follow-up via CONFIRM_RETRY_DELAY_MS rather than acting
+  // immediately or waiting out the full recheck interval.
   const checkReachable = useCallback(async () => {
     const myAttempt = ++attemptIdRef.current
     const reachable = await withTimeout(fetchMetadataTimestamps(supabase), REACHABILITY_TIMEOUT_MS)
     if (attemptIdRef.current !== myAttempt) return // a newer check has taken over
 
-    setIsOnline(reachable)
+    if (confirmRetryTimerRef.current) {
+      clearTimeout(confirmRetryTimerRef.current)
+      confirmRetryTimerRef.current = null
+    }
+
+    if (reachable) {
+      consecutiveFailuresRef.current = 0
+      setIsOnline(true)
+    } else {
+      consecutiveFailuresRef.current += 1
+      if (consecutiveFailuresRef.current >= OFFLINE_CONFIRM_THRESHOLD) {
+        setIsOnline(false)
+      } else {
+        // Not confirmed yet — don't touch isOnline off a single sample.
+        // Check again sooner than the normal poll cadence would, so a
+        // real drop still gets caught quickly.
+        confirmRetryTimerRef.current = setTimeout(checkReachable, CONFIRM_RETRY_DELAY_MS)
+      }
+    }
 
     if (!pollTimerRef.current) {
       pollTimerRef.current = setInterval(checkReachable, RECHECK_INTERVAL_MS)
@@ -134,8 +202,12 @@ export function OnlineStatusProvider({ children }) {
       // No network interface at all — trust this signal outright, and
       // stop the continuous recheck too: with no connection at any level,
       // there's nothing to usefully re-check until the browser reports
-      // 'online' again (handleOnline above restarts it).
+      // 'online' again (handleOnline above restarts it). No confirmation
+      // threshold here — an interface-level "offline" event is a hard
+      // signal, not a slow/weak-signal guess, so it's still acted on
+      // immediately.
       attemptIdRef.current++ // invalidate any reachability check still in flight
+      consecutiveFailuresRef.current = 0
       stopPolling()
       setIsOnline(false)
     }
