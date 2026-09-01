@@ -13,8 +13,16 @@
  *      if present, use it immediately, no network request.
  *   2. Otherwise fetch it from the network and quietly save a copy for
  *      next time (cache-on-view, plan §4).
- *   3. If neither works (offline with nothing saved, or a real fetch
- *      failure), report 'error' so the caller can show ImageLoadError.
+ *   3. If the fetch itself fails (2026-09-02 fix — commonly a CORS block
+ *      on externally-hosted photos, or something else preventing fetch()
+ *      specifically), fall back to the photo's plain address so it still
+ *      renders via the browser's normal <img> loading, which isn't
+ *      subject to that restriction. Reports 'ready' with no cached copy
+ *      saved — this photo just won't be available offline.
+ *   4. Offline with nothing saved, or an address that's genuinely dead
+ *      (fails even plain <img> loading — the caller's onError handler
+ *      catches this), is the only case that still reports 'error' so the
+ *      caller can show ImageLoadError.
  *
  * @param {string} url — the gallery photo's web address
  * @returns {{ src: string|null, status: 'loading'|'ready'|'error', retry: () => void }}
@@ -84,8 +92,16 @@ export function useCachedImage(url) {
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
       logCrash(err, 'useCachedImage: network fetch')
-      setSrc(null)
-      setStatus('error')
+      // Fallback: fetch() failed (commonly CORS — the hosting site allows
+      // normal <img> display but not letting other apps read/copy the
+      // bytes) or something else blocked the request (e.g. a browser
+      // extension). Rendering the plain address directly isn't subject to
+      // fetch()'s CORS restriction, so this still shows online — it just
+      // won't be available offline, since there's nothing to save. If the
+      // address is genuinely dead, the caller's <img onError> handler is
+      // what catches that and shows the real error state.
+      setSrc(url)
+      setStatus('ready')
     }
   }, [url])
 
@@ -102,3 +118,5 @@ export function useCachedImage(url) {
 
   return { src, status, retry: load }
 }
+
+

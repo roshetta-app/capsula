@@ -51,7 +51,7 @@
  * Props:
  *   images  { id, url, caption }[]
  */
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Image as ImageIcon } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
 import ImageLoadError from '../ui/ImageLoadError'
@@ -72,6 +72,18 @@ export default function ImageCarousel({ images = [] }) {
   // renders nothing in that case.
   const current = images[index]
   const { src, status, retry } = useCachedImage(current?.url)
+
+  // 2026-09-02 fix: useCachedImage now falls back to the photo's plain
+  // address (status 'ready') when it can't fetch()/cache a copy — that
+  // covers CORS-blocked external photos, which still display fine via a
+  // normal <img>. This local flag catches the rarer case where the
+  // address is genuinely dead and even that fails, via the <img>'s own
+  // onError below. Reset whenever the photo changes so a stale failure
+  // from a previous image doesn't linger.
+  const [displayFailed, setDisplayFailed] = useState(false)
+  useEffect(() => { setDisplayFailed(false) }, [current?.url])
+
+  const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
 
   if (!images.length) return null
 
@@ -124,10 +136,11 @@ export default function ImageCarousel({ images = [] }) {
             backgroundColor: 'var(--color-bg)',
           }}
         >
-          {status === 'ready' && src && (
+          {status === 'ready' && src && !displayFailed && (
             <img
               src={src}
               alt={current.caption || ''}
+              onError={() => setDisplayFailed(true)}
               style={{
                 position: 'absolute',
                 inset: 0,
@@ -141,13 +154,13 @@ export default function ImageCarousel({ images = [] }) {
             />
           )}
 
-          {status === 'error' && (
+          {(status === 'error' || displayFailed) && (
             <div
               onTouchStart={(e) => e.stopPropagation()}
               onTouchEnd={(e) => e.stopPropagation()}
               style={{ position: 'absolute', inset: 0, cursor: 'default' }}
             >
-              <ImageLoadError onRetry={retry} />
+              <ImageLoadError onRetry={handleRetry} />
             </div>
           )}
         </div>
@@ -234,3 +247,5 @@ export default function ImageCarousel({ images = [] }) {
     </>
   )
 }
+
+

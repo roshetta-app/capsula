@@ -32,7 +32,7 @@
  *   onGo         (index: number) => void
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCachedImage } from '../../hooks/useCachedImage'
@@ -67,6 +67,13 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
   const active = images[activeIndex]
   const { src, status, retry } = useCachedImage(active?.url)
+
+  // 2026-09-02 fix — see ImageCarousel.jsx's matching comment. Catches an
+  // address that's genuinely dead even after useCachedImage's plain-<img>
+  // fallback, via the <img>'s own onError below.
+  const [displayFailed, setDisplayFailed] = useState(false)
+  useEffect(() => { setDisplayFailed(false) }, [active?.url])
+  const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
 
   function getTouchDist(touches) {
     const dx = touches[0].clientX - touches[1].clientX
@@ -214,12 +221,13 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           overflow: 'hidden', touchAction: 'none', position: 'relative',
         }}
       >
-        {status === 'ready' && src && (
+        {status === 'ready' && src && !displayFailed && (
           <img
             key={active.url}
             src={src}
             alt={active.caption || ''}
             draggable={false}
+            onError={() => setDisplayFailed(true)}
             style={{
               maxWidth: '100%', maxHeight: '100%',
               objectFit: 'contain', display: 'block',
@@ -232,14 +240,14 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           />
         )}
 
-        {status === 'error' && (
+        {(status === 'error' || displayFailed) && (
           <div
             onTouchStart={(e) => e.stopPropagation()}
             onTouchMove={(e) => e.stopPropagation()}
             onTouchEnd={(e) => e.stopPropagation()}
             style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
-            <ImageLoadError onRetry={retry} />
+            <ImageLoadError onRetry={handleRetry} />
           </div>
         )}
 
@@ -307,3 +315,5 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     document.body
   )
 }
+
+
