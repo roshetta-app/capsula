@@ -30,6 +30,19 @@
  * instant reconnection happens, since it can only ever fire once per
  * shown offline toast anyway.
  *
+ * 2026-09-01 (cooldown-survives-reload fix): the cooldown timestamp and
+ * the "did the offline message actually show" pairing used to live only
+ * in refs, reset to empty on every mount. That meant a reload or app
+ * relaunch during a rough patch of signal forgot both — the 60s cooldown
+ * above and the offline/back-online pairing — so someone reloading a few
+ * times while signal was bad could see more "Offline" messages than the
+ * cooldown was ever meant to allow, and could in rare cases see a stray
+ * "Back online" with no matching message shown that session (or the
+ * reverse: an owed "Back online" never arriving because the pairing flag
+ * was lost). Both values now persist to localStorage (same fail-silently
+ * pattern already used in utils/cache.js) and are read back on mount, so
+ * they survive a reload/relaunch exactly as if the app had stayed open.
+ *
  * Free users never see this at all — they are already covered by
  * AppGate.jsx's full-screen offline block, which is mutually exclusive
  * with normal browsing.
@@ -60,14 +73,64 @@ import { useToast } from '../../context/ToastContext'
 // by product, 60s chosen as a reasonable "don't be spammy" default.
 const COOLDOWN_MS = 60000
 
+// localStorage keys for the two small values that need to survive a
+// reload/relaunch (2026-09-01 fix, see file header). Same naming
+// convention and fail-silently-on-unavailable pattern as utils/cache.js.
+const LAST_SHOWN_KEY = 'capsula_offline_toast_last_shown_at'
+const PENDING_KEY    = 'capsula_offline_toast_pending'
+
+function readPersistedLastShown() {
+  try {
+    const raw = localStorage.getItem(LAST_SHOWN_KEY)
+    const parsed = raw ? Number(raw) : 0
+    return Number.isFinite(parsed) ? parsed : 0
+  } catch {
+    // localStorage unavailable — behave as if nothing was ever shown
+    return 0
+  }
+}
+
+function writePersistedLastShown(timestamp) {
+  try {
+    localStorage.setItem(LAST_SHOWN_KEY, String(timestamp))
+  } catch {
+    // localStorage full or unavailable — fail silently, same as
+    // utils/cache.js does for its own writes
+  }
+}
+
+function readPersistedPending() {
+  try {
+    return localStorage.getItem(PENDING_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function writePersistedPending(pending) {
+  try {
+    localStorage.setItem(PENDING_KEY, pending ? 'true' : 'false')
+  } catch {
+    // fail silently
+  }
+}
+
 export default function OfflineStatusToast() {
   const { isOnline } = useOnlineStatus()
   const isPro = useIsPro()
   const { toast } = useToast()
 
   const wasOnlineRef = useRef(isOnline)
-  const lastShownRef = useRef(0)
-  const offlineToastShownRef = useRef(false)
+
+  // Lazily seeded from localStorage on first render only (2026-09-01
+  // fix) — `undefined` is the "not yet read" sentinel, since 0/false are
+  // both valid persisted values and can't be used as the sentinel
+  // themselves.
+  const lastShownRef = useRef(undefined)
+  if (lastShownRef.current === undefined) lastShownRef.current = readPersistedLastShown()
+
+  const offlineToastShownRef = useRef(undefined)
+  if (offlineToastShownRef.current === undefined) offlineToastShownRef.current = readPersistedPending()
 
   useEffect(() => {
     const wasOnline = wasOnlineRef.current
@@ -82,12 +145,17 @@ export default function OfflineStatusToast() {
           toast.info('Offline — everything still works')
           lastShownRef.current = now
           offlineToastShownRef.current = true
+          writePersistedLastShown(now)
+          writePersistedPending(true)
         }
       } else if (!wasOnline && isOnline && offlineToastShownRef.current) {
         // Coming back online — only confirm if the drop that caused this
-        // was actually announced (not cooldown-suppressed).
+        // was actually announced (not cooldown-suppressed), whether that
+        // announcement happened this session or a prior one before a
+        // reload (2026-09-01 fix).
         toast.success('Back online')
         offlineToastShownRef.current = false
+        writePersistedPending(false)
       }
     }
 
