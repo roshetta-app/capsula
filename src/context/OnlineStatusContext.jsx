@@ -75,6 +75,18 @@
  * check clears the failure count and reports online immediately, so a
  * Pro user's access (and the "back online" toast) resumes the moment the
  * connection is actually usable again, matching plan §2.3's intent.
+ *
+ * 2026-09-01 (hard-vs-ambiguous offline signal): isOnline alone can't
+ * tell a consumer WHY it's false — a device with no network interface at
+ * all (wifi/data fully off) and a device that's technically connected but
+ * failing the reachability check both collapse into the same isOnline:
+ * false. AppGate.jsx's offline-block grace period needs to tell these
+ * apart (a hard "no interface at all" signal should never wait — there's
+ * nothing ambiguous to give the benefit of the doubt to), so this now
+ * also exposes hasNetworkInterface: a live mirror of the device's own
+ * online/offline events, independent of the reachability check above.
+ * isOnline's own behavior (and every existing consumer of it) is
+ * completely unchanged — this is an additional field, not a replacement.
  */
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
@@ -118,6 +130,16 @@ const OnlineStatusCtx = createContext(null)
 
 export function OnlineStatusProvider({ children }) {
   const [isOnline, setIsOnline] = useState(
+    () => typeof navigator !== 'undefined' ? navigator.onLine : true
+  )
+
+  // Live mirror of the device's own online/offline events (2026-09-01
+  // fix, see file header) — independent of the reachability check below.
+  // true whenever the device reports a network interface at all, false
+  // only on a hard 'offline' event (no interface). This is a genuinely
+  // different question from isOnline: isOnline also requires that
+  // interface to actually reach the server.
+  const [hasNetworkInterface, setHasNetworkInterface] = useState(
     () => typeof navigator !== 'undefined' ? navigator.onLine : true
   )
 
@@ -194,7 +216,10 @@ export function OnlineStatusProvider({ children }) {
       // Device says it's connected again — confirm it before trusting it
       // (§4.4), rather than flipping isOnline true on the device's word
       // alone. Also restarts the continuous recheck if it isn't already
-      // running (it's stopped by handleOffline below).
+      // running (it's stopped by handleOffline below). hasNetworkInterface
+      // itself is trusted immediately, unlike isOnline — it's just
+      // reporting the interface exists, not that it can reach anything.
+      setHasNetworkInterface(true)
       checkReachable()
     }
 
@@ -205,10 +230,11 @@ export function OnlineStatusProvider({ children }) {
       // 'online' again (handleOnline above restarts it). No confirmation
       // threshold here — an interface-level "offline" event is a hard
       // signal, not a slow/weak-signal guess, so it's still acted on
-      // immediately.
+      // immediately, for both isOnline and hasNetworkInterface.
       attemptIdRef.current++ // invalidate any reachability check still in flight
       consecutiveFailuresRef.current = 0
       stopPolling()
+      setHasNetworkInterface(false)
       setIsOnline(false)
     }
 
@@ -233,7 +259,7 @@ export function OnlineStatusProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const value = { isOnline }
+  const value = { isOnline, hasNetworkInterface }
   return <OnlineStatusCtx.Provider value={value}>{children}</OnlineStatusCtx.Provider>
 }
 

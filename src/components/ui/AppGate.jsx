@@ -22,6 +22,17 @@
  * so the Pro toast and everything else keep reacting exactly as fast as
  * before.
  *
+ * 2026-09-01 (hard-vs-ambiguous fix, same day) — the grace period above
+ * was initially applied any time isOnline was false, which wrongly
+ * treated a device with no network interface at all the same as a
+ * technically-connected-but-unreachable one — a true "wifi is off"
+ * offline was made to wait BLOCK_GRACE_MS too, for no reason, since
+ * there's nothing ambiguous to wait out. Fixed by also reading
+ * hasNetworkInterface (OnlineStatusContext.jsx, same date): a hard "no
+ * interface" offline shows the block immediately, same as before the
+ * grace period ever existed; only the ambiguous "device says connected
+ * but can't reach the server" case gets the wait.
+ *
  * Reads the current gate from AppGateContext and renders one of two
  * surfaces, chosen by gate.dismissible:
  *
@@ -532,7 +543,7 @@ export default function AppGate() {
   // already loaded into Drug/ConditionContext — no explicit refresh()
   // needed for this to clear itself the instant a real connection
   // returns (§4.4), since it's just recalculated on the next render.
-  const { isOnline } = useOnlineStatus()
+  const { isOnline, hasNetworkInterface } = useOnlineStatus()
   const isPro = useIsPro()
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { conditions, loading: conditionsLoading } = useConditionContext()
@@ -556,18 +567,36 @@ export default function AppGate() {
   // the toast and everything else keep reading the same signal exactly
   // as responsively as before; only the block's own decision to show
   // gets this extra patience.
+  //
+  // 2026-09-01 (hard-vs-ambiguous fix): that grace period is ONLY for the
+  // ambiguous case — device claims connected but the reachability check
+  // can't get through, which could be a real drop or could just be a
+  // slow moment. A device with no network interface at all
+  // (hasNetworkInterface false — wifi/data actually off) is not
+  // ambiguous at all, so it gets none of that grace: the block shows
+  // immediately, same as it always did before the grace period existed.
   const [offlineBlockActive, setOfflineBlockActive] = useState(false)
 
   useEffect(() => {
-    if (rawOfflineCandidate) {
-      const timer = setTimeout(() => setOfflineBlockActive(true), BLOCK_GRACE_MS)
-      return () => clearTimeout(timer)
+    if (!rawOfflineCandidate) {
+      // Not eligible (back online, went Pro, or lost cached library) —
+      // clear instantly, same "recovery is never delayed" rule the
+      // shared signal itself already follows.
+      setOfflineBlockActive(false)
+      return
     }
-    // Not eligible (back online, went Pro, or lost cached library) —
-    // clear instantly, same "recovery is never delayed" rule the shared
-    // signal itself already follows.
-    setOfflineBlockActive(false)
-  }, [rawOfflineCandidate])
+
+    if (!hasNetworkInterface) {
+      // Hard offline — nothing ambiguous to wait out.
+      setOfflineBlockActive(true)
+      return
+    }
+
+    // Device claims connected but can't actually reach the server —
+    // give it a chance to recover before locking the person out.
+    const timer = setTimeout(() => setOfflineBlockActive(true), BLOCK_GRACE_MS)
+    return () => clearTimeout(timer)
+  }, [rawOfflineCandidate, hasNetworkInterface])
 
   // Fade mount/unmount for the offline block, mirroring AppGateSheet's
   // shouldRender/animateIn pattern above rather than a plain conditional
