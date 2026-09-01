@@ -177,6 +177,15 @@ const LAST_INDEX = SLIDES.length - 1
 // split was chosen over a two-phase bar.
 const CONDITIONS_WEIGHT = 0.15
 
+// 2026-09-01 (Image System Refinement Plan, Part A): the combined bar's
+// third weighted component, alongside conditions and drugs — gallery-photo
+// download progress, reported by useConditions.js's photosLoading/
+// photosProgress. Real loaded/total fraction, same treatment as drugs'
+// weight below. No plan-specified split for three components yet, so this
+// is a starting judgment call (drugs keeps the remainder,
+// 1 - CONDITIONS_WEIGHT - PHOTOS_WEIGHT); easy to retune later.
+const PHOTOS_WEIGHT = 0.15
+
 // Minimum time slide 5 stays visible before it's allowed to auto-complete,
 // regardless of how far along loading already is. Without this, if both
 // libraries finished loading before the user ever reached slide 5 (common,
@@ -252,6 +261,11 @@ function useCombinedLibraryProgress() {
     error:   conditionsError,
     start:   startConditions,
     retry:   retryConditions,
+    // 2026-09-01 (Image System Refinement Plan, Part A): gallery-photo
+    // download progress, folded into this hook's combined fraction below
+    // as a third weighted component.
+    photosLoading,
+    photosProgress,
   } = useConditionContext()
   const {
     loading:  drugsLoading,
@@ -271,6 +285,13 @@ function useCombinedLibraryProgress() {
   // this hook to reconcile between two stages.)
   const drugsDone = !drugsLoading && !drugsError
 
+  // 2026-09-01 (Image System Refinement Plan, Part A): a failed individual
+  // photo download is non-fatal (plan §4) and never surfaces as an error
+  // here — useConditions.js already logs it and still counts it toward
+  // photosProgress, so this only tracks whether the sync step itself has
+  // finished running, not whether every photo in it succeeded.
+  const photosDone = !photosLoading
+
   const failed = !!drugsError || !!conditionsError
 
   const conditionsFraction = (conditionsLoading || conditionsError) ? 0 : 1
@@ -286,12 +307,21 @@ function useCombinedLibraryProgress() {
       : (drugsProgress && drugsProgress.total > 0
           ? Math.min(1, drugsProgress.loaded / drugsProgress.total)
           : 0)
+  // Same real loaded/total treatment as drugs above — see photosDone's
+  // comment for why a per-photo failure never zeroes this out the way a
+  // real drugsError does.
+  const photosFraction = photosDone
+    ? 1
+    : (photosProgress && photosProgress.total > 0
+        ? Math.min(1, photosProgress.loaded / photosProgress.total)
+        : 0)
 
   const fraction =
     conditionsFraction * CONDITIONS_WEIGHT +
-    drugsFraction * (1 - CONDITIONS_WEIGHT)
+    photosFraction * PHOTOS_WEIGHT +
+    drugsFraction * (1 - CONDITIONS_WEIGHT - PHOTOS_WEIGHT)
 
-  const done = !failed && !conditionsLoading && drugsDone
+  const done = !failed && !conditionsLoading && drugsDone && photosDone
 
   function start() {
     startDrugs()

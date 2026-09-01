@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { fetchConditions, fetchMetadataTimestamps, fetchAuditLogSince, fetchAuditCursorNow, fetchConditionById } from '../lib/queries'
-import { readConditionsCache, writeConditionsCache } from '../utils/cache'
+import { readConditionsCache, writeConditionsCache, getCachedPhoto, savePhotoToCache, pruneOrphanedPhotos } from '../utils/cache'
+import { getAllGalleryUrls } from '../utils/galleryImageUrls'
 import { CACHE_TTL_MS } from '../constants/cache'
 import { logCrash } from '../utils/crashLogger'
 
@@ -10,6 +11,15 @@ const UNCATEGORIZED_ID = '00000000-0000-0000-0000-000000000001'
 // Phase F14 Stage 3 (delta sync): mirrors useDrugs.js's matching constant —
 // see that file's comment for the full reasoning.
 const DELTA_FALLBACK_CHANGE_COUNT = 200
+
+// Image System Refinement Plan, Part A (2026-09-01): how many gallery
+// photos sync in parallel during syncGalleryPhotos below. Bounded so a
+// large batch of new/changed photos doesn't open dozens of simultaneous
+// connections on a mobile network — 4 is a conservative middle ground:
+// plenty of overlap for the common case (mostly cache-hit checks, no
+// network at all), gentle on the uncommon case (many real downloads at
+// once, e.g. a brand-new install).
+const PHOTO_DOWNLOAD_CONCURRENCY = 4
 
 /**
  * useConditions — cache-first conditions data hook.
@@ -28,6 +38,19 @@ const DELTA_FALLBACK_CHANGE_COUNT = 200
  * single-stage fetchAndCache (no light-then-full split), so start()/retry()
  * call that directly instead of a separate staged function.
  *
+ * 2026-09-01 (Image System Refinement Plan, Part A): after every full
+ * condition fetch — the initial onboarding download, a manual retry, a
+ * TTL-expiry refresh, or a delta-merge with real changes — this hook now
+ * also syncs every referenced gallery photo (device-first, network
+ * fallback, quietly save a copy) and prunes any saved photo no longer
+ * referenced by any condition. Exposed as photosLoading/photosProgress so
+ * OnboardingScreen.jsx can fold this into the combined setup progress bar
+ * as a third weighted component alongside drugs and conditions. A failed
+ * individual photo download is non-fatal (plan §4) — it's logged, still
+ * counted toward progress, and simply stays uncached; it self-heals the
+ * next time it's actually viewed online via useCachedImage.js's
+ * cache-on-view.
+ *
  * On mount:
  *   1. Read the saved copy from IndexedDB → show it immediately once ready
  *   2. Fetch app_metadata.conditions_updated_at from Supabase
@@ -37,18 +60,28 @@ const DELTA_FALLBACK_CHANGE_COUNT = 200
  *      cache somehow)
  *
  * Exposes:
- *   conditions  — ConditionFull[] (Uncategorized specialty label stripped)
- *   specialties — Specialty[]  (unique, sorted by admin sort_order, Uncategorized excluded)
- *   loading     — true only on cold start
- *   error       — string | null
- *   refresh     — () => void  (force re-fetch, e.g. after CMS save)
- *   start       — () => void  (called from OnboardingScreen's slide 4 Next tap)
- *   retry       — () => void  (called from OnboardingScreen's Failed-state Retry button)
+ *   conditions      — ConditionFull[] (Uncategorized specialty label stripped)
+ *   specialties     — Specialty[]  (unique, sorted by admin sort_order, Uncategorized excluded)
+ *   loading         — true only on cold start
+ *   error           — string | null
+ *   photosLoading   — true while the gallery-photo sync step is running
+ *   photosProgress  — { loaded, total } for the gallery-photo sync step
+ *   refresh         — () => void  (force re-fetch, e.g. after CMS save)
+ *   start           — () => void  (called from OnboardingScreen's slide 4 Next tap)
+ *   retry           — () => void  (called from OnboardingScreen's Failed-state Retry button)
  */
 export function useConditions() {
   const [conditions, setConditions] = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
+
+  // Image System Refinement Plan, Part A — separate from `loading` on
+  // purpose: conditions themselves should show the instant they're cached,
+  // without waiting on every gallery photo to finish syncing. Defaults to
+  // true, same convention as `loading` above — it only ever resolves once
+  // syncGalleryPhotos actually runs (see that function).
+  const [photosLoading,  setPhotosLoading]  = useState(true)
+  const [photosProgress, setPhotosProgress] = useState({ loaded: 0, total: 0 })
 
   // Onboarding-download-flow hardening (plan Sec Phase 1, 1.11) — see
   // useDrugs.js's matching comment for the full reasoning. Guards against
@@ -64,8 +97,72 @@ export function useConditions() {
   // the time it resolves. Also protects the silent background-refresh
   // path this same function serves (init()'s TTL/version checks below) —
   // if a background refresh and a user-triggered retry ever overlap, only
-  // the most recent one wins.
+  // the most recent one wins. Reused below to guard syncGalleryPhotos'
+  // longer-running loop the same way.
   const attemptIdRef = useRef(0)
+
+  // Image System Refinement Plan, Part A: downloads every gallery photo
+  // referenced across `conditionsList` (device-first — skips the network
+  // entirely for anything already saved, so re-running this after every
+  // background refresh stays cheap), then prunes any saved photo no
+  // longer referenced by any condition. `myAttempt` is whatever
+  // attemptIdRef held at the moment this was kicked off — if a newer
+  // fetchAndCache attempt starts before this finishes, this one stops
+  // touching state (and stops making further network requests) rather
+  // than racing it.
+  async function syncGalleryPhotos(conditionsList, myAttempt) {
+    const urls = getAllGalleryUrls(conditionsList)
+    if (attemptIdRef.current !== myAttempt) return
+
+    setPhotosLoading(true)
+    setPhotosProgress({ loaded: 0, total: urls.length })
+
+    if (urls.length === 0) {
+      await pruneOrphanedPhotos(urls)
+      if (attemptIdRef.current === myAttempt) setPhotosLoading(false)
+      return
+    }
+
+    let loaded = 0
+    let cursor = 0
+
+    async function worker() {
+      while (cursor < urls.length) {
+        if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
+        const url = urls[cursor++]
+        try {
+          // Device first, same order as useCachedImage.js — a photo
+          // already saved from a previous fetch or cache-on-view never
+          // hits the network again here.
+          const alreadyCached = await getCachedPhoto(url)
+          if (!alreadyCached) {
+            const res = await fetch(url)
+            if (!res.ok) throw new Error(`Photo fetch failed: ${res.status}`)
+            const blob = await res.blob()
+            await savePhotoToCache(url, blob)
+          }
+        } catch (err) {
+          // Non-fatal (plan §4 — "a failed photo download during
+          // onboarding is non-fatal"): this one photo simply stays
+          // uncached and self-heals the next time it's actually viewed
+          // online (useCachedImage.js's cache-on-view).
+          logCrash(err, 'useConditions.syncGalleryPhotos')
+        } finally {
+          loaded += 1
+          if (attemptIdRef.current === myAttempt) {
+            setPhotosProgress({ loaded, total: urls.length })
+          }
+        }
+      }
+    }
+
+    await Promise.all(
+      Array.from({ length: Math.min(PHOTO_DOWNLOAD_CONCURRENCY, urls.length) }, worker)
+    )
+
+    await pruneOrphanedPhotos(urls)
+    if (attemptIdRef.current === myAttempt) setPhotosLoading(false)
+  }
 
   // Fetch fresh data from DB, update state, write cache.
   // Fetches metadata FIRST so the version we store matches what triggered the fetch.
@@ -88,6 +185,12 @@ export function useConditions() {
       if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
       setConditions(fresh)
       await writeConditionsCache(fresh, conditionsUpdatedAt, auditCursor)
+      // Fire-and-forget: conditions themselves are already cached and
+      // shown above; gallery photos sync in the background so `loading`
+      // (below) can resolve without waiting on every photo to finish.
+      // OnboardingScreen.jsx tracks photosLoading/photosProgress
+      // separately for its combined progress bar.
+      syncGalleryPhotos(fresh, myAttempt)
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
       setError(err.message ?? 'Failed to load conditions')
@@ -154,6 +257,10 @@ export function useConditions() {
       const newCursor = changes[changes.length - 1].created_at
       setConditions(nextConditions)
       await writeConditionsCache(nextConditions, conditionsUpdatedAt, newCursor)
+      // Image System Refinement Plan, Part A: a delta merge can add,
+      // change, or remove gallery photos just like a full fetch — sync
+      // and prune here too, fire-and-forget, same as fetchAndCache above.
+      syncGalleryPhotos(nextConditions, attemptIdRef.current)
     } catch (err) {
       logCrash(err, 'useConditions.applyConditionsDelta')
       await fetchAndCache()
@@ -270,6 +377,15 @@ export function useConditions() {
     ),
   [conditions])
 
-  return { conditions: conditionsDisplay, specialties, loading, error, refresh: fetchAndCache, start, retry }
+  return {
+    conditions: conditionsDisplay,
+    specialties,
+    loading,
+    error,
+    photosLoading,
+    photosProgress,
+    refresh: fetchAndCache,
+    start,
+    retry,
+  }
 }
-
