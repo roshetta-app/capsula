@@ -10,6 +10,18 @@
  * below rather than inventing a new one. See OfflineBlock and the
  * mount/unmount effect in AppGate() for details.
  *
+ * 2026-09-01 (offline-block-forgiveness fix, plan §4.4 addendum) — the
+ * block used to engage the instant the shared isOnline signal went
+ * false, which meant a slow-but-working connection (weak signal, brief
+ * hiccup) that the shared check had confirmed "down" still locked a free
+ * user out immediately, with no chance to recover first. The block now
+ * waits BLOCK_GRACE_MS after becoming eligible before it's allowed to
+ * appear at all, and cancels instantly if the connection recovers before
+ * then — see rawOfflineCandidate / BLOCK_GRACE_MS in AppGate(). This is
+ * deliberately scoped to the block only: isOnline itself is untouched,
+ * so the Pro toast and everything else keep reacting exactly as fast as
+ * before.
+ *
  * Reads the current gate from AppGateContext and renders one of two
  * surfaces, chosen by gate.dismissible:
  *
@@ -65,6 +77,14 @@ import { useIsPro } from '../../hooks/useIsPro'
 import { useDrugContext } from '../../context/DrugContext'
 import { useConditionContext } from '../../context/ConditionContext'
 import { logUsageEvent } from '../../analytics/usageEvents'
+
+// How long the offline block waits, once eligible, before it's actually
+// allowed to appear (2026-09-01 offline-block-forgiveness fix, plan §4.4
+// addendum) — gives a slow-but-recovering connection a further window to
+// come back before a free user is locked out, on top of (not instead of)
+// the shared reachability check's own confirmation in OnlineStatusContext.
+// Cancels immediately, no grace, the moment the connection recovers.
+const BLOCK_GRACE_MS = 6000
 
 // Type-based color + icon, plan §10.6. Force Update and (hard) Maintenance
 // lean into the serious tones since they're the two that can block
@@ -517,7 +537,37 @@ export default function AppGate() {
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { conditions, loading: conditionsLoading } = useConditionContext()
   const hasCachedLibrary = !drugsLoading && drugs.length > 0 && !conditionsLoading && conditions.length > 0
-  const offlineBlockActive = hasCachedLibrary && !isOnline && !isPro
+
+  // Everything that would make the block eligible to show, before the
+  // grace period below is applied.
+  const rawOfflineCandidate = hasCachedLibrary && !isOnline && !isPro
+
+  // 2026-09-01 (offline-block-forgiveness fix, plan §4.4 addendum): the
+  // shared isOnline signal (OnlineStatusContext) already requires two
+  // failed reachability checks before it flips false, which protects
+  // every consumer — this block, the Pro toast, everything — from a
+  // single blip. But the block specifically has real consequences (it
+  // stops a free user from using the app at all), while the toast is
+  // just a message, so the block alone gets one further layer of
+  // forgiveness on top of that shared signal: it waits BLOCK_GRACE_MS
+  // after becoming eligible before it's actually allowed to appear,
+  // and cancels immediately (no grace) if the connection recovers
+  // before that window is up. This does NOT touch isOnline itself —
+  // the toast and everything else keep reading the same signal exactly
+  // as responsively as before; only the block's own decision to show
+  // gets this extra patience.
+  const [offlineBlockActive, setOfflineBlockActive] = useState(false)
+
+  useEffect(() => {
+    if (rawOfflineCandidate) {
+      const timer = setTimeout(() => setOfflineBlockActive(true), BLOCK_GRACE_MS)
+      return () => clearTimeout(timer)
+    }
+    // Not eligible (back online, went Pro, or lost cached library) —
+    // clear instantly, same "recovery is never delayed" rule the shared
+    // signal itself already follows.
+    setOfflineBlockActive(false)
+  }, [rawOfflineCandidate])
 
   // Fade mount/unmount for the offline block, mirroring AppGateSheet's
   // shouldRender/animateIn pattern above rather than a plain conditional
