@@ -559,7 +559,6 @@ const CONDITIONS_SELECT = `
   clinical_picture, history_questions, examination, investigations,
   patient_instructions, clinical_blocks, is_published,
   specialties!conditions_specialty_id_fkey ( id, name_en, slug, icon_name, icon_type, icon_url, color_hex, color_token, sort_order ),
-  condition_images ( id, url, caption, sort_order ),
   condition_blocks ( id, block_type, order_index, data, created_at, updated_at ),
   condition_tags ( tags ( name ) )
 `
@@ -600,9 +599,6 @@ function mapConditions(data) {
     examination:          c.examination              ?? [],
     investigations:       c.investigations           ?? [],
     patientInstructions:  c.patient_instructions,
-    images: (c.condition_images ?? [])
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map(img => ({ id: img.id, url: img.url, caption: img.caption })),
     // New unified block-based content (Phase 2.1) — sorted by order_index
     blocks: (c.condition_blocks ?? [])
       .sort((a, b) => a.order_index - b.order_index)
@@ -943,4 +939,3 @@ export async function fetchActiveGates(supabase, platform) {
       minVersion:  g.min_version,
     }))
 }
-
