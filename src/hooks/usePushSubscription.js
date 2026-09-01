@@ -144,15 +144,47 @@
  *   - Tap navigation is now wired up: this hook is only ever mounted via
  *     PushSubscriptionProvider (context/PushSubscriptionContext.jsx),
  *     which App.jsx renders inside <BrowserRouter>, so useNavigate() is
- *     safe to call directly here, same as any other component. Both
- *     'notificationActionPerformed' (background/closed FCM-displayed
- *     notifications) and 'localNotificationActionPerformed' (foreground,
- *     scheduled via LocalNotifications above) now call navigate() with
- *     the deep link's url after reporting the click.
+ *     safe to call here.
  *
- * Bug fix, 2026-09-01 (notif-offline-and-pwa-copy-fix) — subscribeToPush()
- * and unsubscribeFromPush() both do more than ask the OS for local
- * permission: they also fetch a device token and save/remove it via
+ * Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) — this used to
+ * call requestPermissions() unconditionally on every single foreground
+ * push. Confirmed on a Xiaomi/MIUI device: this can surface the OS's own
+ * "Alarms & reminders" settings screen instead of a normal notification
+ * prompt — a manufacturer-level Android customization outside this app's
+ * control, not documented behavior of the LocalNotifications plugin
+ * itself, so there's no way to suppress the redirect itself from here.
+ * Checking first and only requesting when not already granted was meant
+ * to cut this down to at most once per app session — see the 2026-09-01
+ * follow-up below for why that didn't actually hold.
+ *
+ * Bug fix, 2026-09-01 (miui-alarms-redirect-followup) — the check-then-
+ * request pattern above still re-requested on every single foreground
+ * notification for as long as permission stayed ungranted on a given
+ * phone, since nothing remembered a previous attempt across pushes (or
+ * across app restarts). Confirmed on-device: a phone that never grants
+ * this permission kept hitting the redirect on every foreground push,
+ * indefinitely. Fixed by recording a durable "already asked, don't ask
+ * again" flag via @capacitor/preferences (the same durable native storage
+ * src/lib/supabase.js already uses for auth) the first time a request
+ * comes back still not granted — so this now fires at most once ever per
+ * install, not once per notification. A fresh install naturally gets to
+ * ask again, which is correct: the OS permission itself resets on
+ * reinstall too.
+ *
+ * Bug fix, 2026-09-01 (ghost-token-on-reinstall) — claim_push_token was
+ * only ever keyed on the FCM token itself, and a reinstall (or a cleared-
+ * data reset) always produces a brand-new token — so every reinstall
+ * inserted a fresh row instead of updating the existing one for that
+ * physical device, leaving the old row behind as a permanently dead
+ * entry until FCM eventually confirmed it dead (which can take over a
+ * day). Fixed by also sending this device's permanent id (getDeviceId(),
+ * from analytics/deviceSession.js — the same id already used for usage
+ * analytics) to claim_push_token, which now updates the existing row for
+ * a known device_id instead of always inserting a new one. See the
+ * matching database migration for the other half of this fix.
+ *
+ * Bug fix, 2026-09-01 (offline-push-toggle-fix) — subscribeToPush() and
+ * unsubscribeFromPush() both end with a save/delete against push_tokens in
  * Supabase, which needs a real connection. While offline, that step used
  * to fail silently partway through, surfacing only as a generic "Could
  * not enable/turn off notifications. Please try again." error — accurate,
@@ -173,8 +205,10 @@ import { initializeApp, getApps } from 'firebase/app'
 import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { LocalNotifications } from '@capacitor/local-notifications'
+import { Preferences } from '@capacitor/preferences'
 import { supabase } from '../lib/supabase'
 import { useOnlineStatus } from './useOnlineStatus'
+import { getDeviceId } from '../analytics/deviceSession'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -208,6 +242,31 @@ const CHANNEL_BY_TYPE = {
 }
 function channelForType(type) {
   return CHANNEL_BY_TYPE[type] ?? CHANNEL_BY_TYPE.info
+}
+
+// Bug fix, 2026-09-01 (miui-alarms-redirect-followup) — see file header.
+// Durable per-install flag: once a LocalNotifications permission request
+// comes back not granted, never request it again on this install.
+const ALARM_PERMISSION_DECLINED_KEY = 'capsula_alarm_permission_declined'
+
+async function hasDeclinedAlarmPermission() {
+  try {
+    const { value } = await Preferences.get({ key: ALARM_PERMISSION_DECLINED_KEY })
+    return value === 'true'
+  } catch {
+    // Preferences unavailable for some reason — fail open (allow asking),
+    // same as any other best-effort read in this file.
+    return false
+  }
+}
+
+async function markAlarmPermissionDeclined() {
+  try {
+    await Preferences.set({ key: ALARM_PERMISSION_DECLINED_KEY, value: 'true' })
+  } catch {
+    // Best-effort — worst case this asks again next launch, no worse than
+    // the previous behavior.
+  }
 }
 
 // Wraps a promise so it fails with a clear error instead of hanging forever
@@ -369,19 +428,17 @@ export function usePushSubscription() {
       // underlying permission, so this is a silent confirm in practice,
       // not a second real prompt.
       //
-      // Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) — this used
-      // to call requestPermissions() unconditionally on every single
-      // foreground push. Confirmed on a Xiaomi/MIUI device: this can
-      // surface the OS's own "Alarms & reminders" settings screen instead
-      // of a normal notification prompt — a manufacturer-level Android
-      // customization outside this app's control, not documented behavior
-      // of the LocalNotifications plugin itself, so there's no way to
-      // suppress the redirect itself from here. Checking first and only
-      // requesting when not already granted at least cuts this from firing
-      // on every notification down to, at worst, once per app session.
+      // Bug fix, 2026-08-20 (miui-alarms-redirect-mitigation) / 2026-09-01
+      // (miui-alarms-redirect-followup) — see file header for both. Only
+      // requests when not already granted AND this install hasn't
+      // already been told no once before — so a phone that keeps coming
+      // back not-granted gets asked at most once ever, not once per push.
       const { display } = await LocalNotifications.checkPermissions()
-      if (display !== 'granted') {
-        await LocalNotifications.requestPermissions()
+      if (display !== 'granted' && !(await hasDeclinedAlarmPermission())) {
+        const result = await LocalNotifications.requestPermissions()
+        if (result.display !== 'granted') {
+          await markAlarmPermissionDeclined()
+        }
       }
 
       const notification = event?.notification ?? event
@@ -457,12 +514,18 @@ export function usePushSubscription() {
   // Saves a fetched token via the same atomic claim_push_token step
   // subscribeToPush() uses. Shared so the mount-time re-verify effect can
   // self-heal a rotated/reinstalled token without duplicating this logic.
+  //
+  // Bug fix, 2026-09-01 (ghost-token-on-reinstall) — see file header.
+  // Now also sends this device's permanent id so the database function
+  // can update the existing row for a known device instead of always
+  // inserting a new one keyed only on the (reinstall-rotated) token.
   async function saveToken(fetchedToken) {
     const { data: { user } } = await supabase.auth.getUser()
     const { error: dbErr } = await supabase.rpc('claim_push_token', {
       p_token: fetchedToken,
       p_platform: Capacitor.getPlatform(), // 'android' | 'ios' | 'web'
       p_user_id: user?.id ?? null,
+      p_device_id: getDeviceId(),
     })
     if (dbErr) throw dbErr
   }
