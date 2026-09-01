@@ -11,11 +11,6 @@
  *     the bottom where the app's other toasts appear.
  *   - Laid out like a real notification (small bell icon, bold title,
  *     body text underneath) instead of a single colored message line.
- *   - Stays on screen until it's tapped or closed with the X — no
- *     auto-dismiss timer. The first version of this reused the general
- *     toast, which auto-dismissed after a few seconds; that turned out to
- *     also be why taps weren't reliably being counted in the admin stats
- *     — the toast was often gone before there was time to tap it.
  *
  * Used only by usePushSubscription.js, for the case where a push arrives
  * while the app is already open (in place of a native OS notification,
@@ -23,6 +18,32 @@
  * MIUI — see usePushSubscription.js's file header for the full story).
  * Notifications received while the app is closed or backgrounded are
  * unaffected by this file — those are still shown natively by Android.
+ *
+ * UI refinement, 2026-09-01 (round 2) — matched to real notification
+ * conventions (iOS/Android system notification style, e.g. an app-icon
+ * square + bold title + "now"/"Yesterday" timestamp on one line, body
+ * capped at a couple lines): title now caps at one line and body at two,
+ * both with "…" instead of letting the banner grow to fit a long
+ * message; the icon container is a rounded square (an app icon) rather
+ * than a circle (a generic status icon); and dismissing — by tap or by
+ * the X — now fades/slides the banner out first, with a tap's
+ * navigation (onAction) only firing once that's finished, instead of the
+ * destination page appearing abruptly underneath it.
+ *
+ * UI refinement, 2026-09-01 (round 3) — auto-dismiss after
+ * DEFAULT_DURATION_MS, rather than staying up indefinitely (round 1's
+ * choice, made specifically to fix taps not being counted — see
+ * usePushSubscription.js's header for that story). Reconsidered: real
+ * apps that do this (WhatsApp, Instagram, Slack) do auto-dismiss a
+ * foreground banner like this, typically after 5-6s — closer to how a
+ * real heads-up notification briefly appears then retracts — so
+ * "disappears on its own" was never actually the wrong call, only 3s
+ * (the general toast's default, inherited by round 1's predecessor) was
+ * too short to be usable. 6s keeps that standard behavior while giving
+ * comfortable time to read and tap; unlike round 1's toast, an
+ * auto-dismiss here still doesn't count as a "click" — same as closing it
+ * with the X — since reportClick only ever runs from onAction (a real
+ * tap), never from the timeout.
  *
  * Usage:
  *   const { showBanner } = usePushBanner()
@@ -33,12 +54,13 @@
  *   })
  */
 
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import Icon from '../components/ui/Icon'
 
 const PushBannerContext = createContext(null)
 
 let _nextId = 1
+const DEFAULT_DURATION_MS = 6000
 
 export function PushBannerProvider({ children }) {
   const [banners, setBanners] = useState([])
@@ -99,15 +121,46 @@ function PushBannerStack({ banners, onDismiss }) {
 }
 
 function PushBannerItem({ banner, onDismiss }) {
-  function handleTap() {
-    banner.onAction?.()
-    onDismiss(banner.id)
+  // UI refinement, 2026-09-01 (alarms-redirect-fix, round 2) — enter/exit
+  // animation. animateIn drives the entrance (slide down + fade in on
+  // mount); exiting drives the exit (slide up + fade out) — used for the
+  // X (plain dismiss), a tap (dismiss, then run onAction only once the
+  // exit animation has actually finished, so tapping never just swaps to
+  // the destination page with no transition at all), and now (round 3)
+  // the auto-dismiss timer below.
+  const [animateIn, setAnimateIn] = useState(false)
+  const [exiting, setExiting] = useState(false)
+  const closeTimer = useRef(null)
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setAnimateIn(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  function close(then) {
+    setExiting(true)
+    clearTimeout(closeTimer.current)
+    closeTimer.current = setTimeout(() => {
+      onDismiss(banner.id)
+      then?.()
+    }, 200) // matches the transition duration below
   }
+
+  // UI refinement, 2026-09-01 (round 3) — see file header. Auto-dismiss
+  // after DEFAULT_DURATION_MS, same as closing with the X: no onAction,
+  // so this never counts as a click. Cleared on unmount, so a tap or the
+  // X firing first (both of which unmount this component via onDismiss)
+  // can't also fire this timer afterwards.
+  useEffect(() => {
+    const autoTimer = setTimeout(() => close(), DEFAULT_DURATION_MS)
+    return () => clearTimeout(autoTimer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div
       role="alert"
-      onClick={handleTap}
+      onClick={() => close(() => banner.onAction?.())}
       style={{
         pointerEvents:   'auto',
         display:         'flex',
@@ -119,18 +172,21 @@ function PushBannerItem({ banner, onDismiss }) {
         boxShadow:       '0 8px 28px rgba(0,0,0,0.18)',
         fontFamily:      'var(--font-body)',
         cursor:          'pointer',
-        animation:       'toast-in 200ms ease',
+        opacity:         exiting ? 0 : (animateIn ? 1 : 0),
+        transform:       exiting ? 'translateY(-16px)' : (animateIn ? 'translateY(0)' : 'translateY(-16px)'),
+        transition:      'opacity 200ms ease, transform 200ms ease',
       }}
     >
-      {/* Small bell icon, same treatment as NotificationSheet.jsx's bell,
-          so this reads as "a Capsula notification" rather than a generic
-          alert. */}
+      {/* Small bell icon in a rounded square, matching how a real
+          notification shows its app icon (see file header reference
+          images) — was a circle before, which read more like a generic
+          status icon than "this came from an app". */}
       <div style={{
         width:           28,
         height:          28,
         flexShrink:      0,
         marginTop:       1,
-        borderRadius:    'var(--radius-full)',
+        borderRadius:    'var(--radius-md)',
         backgroundColor: 'var(--color-hero-bg)',
         display:         'flex',
         alignItems:      'center',
@@ -140,23 +196,51 @@ function PushBannerItem({ banner, onDismiss }) {
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        {banner.title && (
-          <p style={{
-            margin:     0,
-            fontSize:   14,
-            fontWeight: 600,
-            lineHeight: 1.4,
-            color:      'var(--color-text-primary)',
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+          {banner.title && (
+            <p style={{
+              margin:       0,
+              flex:         1,
+              minWidth:     0,
+              fontSize:     14,
+              fontWeight:   600,
+              lineHeight:   1.4,
+              color:        'var(--color-text-primary)',
+              // UI refinement — a long title used to stretch the banner
+              // taller/wider instead of a real notification's fixed-size
+              // card; now cuts off with "…" after one line instead.
+              overflow:     'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace:   'nowrap',
+            }}>
+              {banner.title}
+            </p>
+          )}
+          {/* Matches the "Yesterday" / "now" timestamp both reference
+              screenshots show next to the title. Always "now" here since
+              this only ever fires for a push arriving while the app is
+              open — there's no delay to reflect. */}
+          <span style={{
+            flexShrink: 0,
+            fontSize:   12,
+            color:      'var(--color-text-secondary)',
           }}>
-            {banner.title}
-          </p>
-        )}
+            now
+          </span>
+        </div>
         {banner.body && (
           <p style={{
-            margin:     banner.title ? '2px 0 0' : 0,
-            fontSize:   13,
-            lineHeight: 1.4,
-            color:      'var(--color-text-secondary)',
+            margin:            banner.title ? '2px 0 0' : 0,
+            fontSize:          13,
+            lineHeight:        1.4,
+            color:             'var(--color-text-secondary)',
+            // UI refinement — same reasoning as the title above: caps a
+            // long message at two lines with "…" instead of letting the
+            // banner grow to fit it.
+            display:           '-webkit-box',
+            WebkitLineClamp:   2,
+            WebkitBoxOrient:   'vertical',
+            overflow:          'hidden',
           }}>
             {banner.body}
           </p>
@@ -166,7 +250,7 @@ function PushBannerItem({ banner, onDismiss }) {
       {/* Dismiss without triggering the tap action — mirrors swiping away
           a real notification (no click credited) rather than tapping it. */}
       <button
-        onClick={e => { e.stopPropagation(); onDismiss(banner.id) }}
+        onClick={e => { e.stopPropagation(); close() }}
         aria-label="Dismiss"
         style={{
           flexShrink:              0,
