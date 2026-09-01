@@ -83,6 +83,20 @@
  *     matching change. This file needed no change for that part: a
  *     retried-and-recovered page never surfaces as a failure up here at
  *     all.
+ *
+ * 2026-09-01 (onboarding-offline-retry fix): the 28s stall timeout above
+ * was the ONLY thing that ever noticed a connection dying mid-download —
+ * so a genuinely dropped connection could take up to 28s to show Failed,
+ * even though the real cause (no connection) was knowable almost
+ * immediately. useOnlineStatus now re-verifies the real connection
+ * continuously, every ~10s, instead of only after the device's own
+ * on/off signal fires (see OnlineStatusContext.jsx's header). This file
+ * now reacts the instant that check reports the connection is genuinely
+ * gone while a download is actually in progress, dropping straight into
+ * the Failed state instead of waiting out the stall timer — see the new
+ * effect below, the mirror image of the existing reconnect effect. The
+ * 28s stall timer stays in place as a backstop for the different case of
+ * a connection that reports fine but is just very slow.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -495,6 +509,24 @@ export default function OnboardingScreen({ onDone }) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOnline])
+
+  // 2026-09-01 (onboarding-offline-retry fix): mirror image of the
+  // reconnect effect above — the moment a real, in-flight attempt's
+  // connection is confirmed genuinely gone (not just slow), drop straight
+  // into the Failed state instead of waiting out the full stall timeout.
+  // isOnline now gets re-verified continuously (every ~10s, not just on
+  // the device's own on/off signal — see OnlineStatusContext.jsx), so this
+  // fires within one of those cycles instead of only after a long stall.
+  // Guarded to a real in-flight attempt (attemptId > 0, not yet done or
+  // hookFailed) so it never fires for the separate pre-check case in
+  // next()/1.12, which already handles offline before an attempt even
+  // starts.
+  useEffect(() => {
+    if (!isOnline && isLoadingSlide && attemptId > 0 && !done && !hookFailed) {
+      setOfflinePreCheck(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline, isLoadingSlide, attemptId, done, hookFailed])
 
   // Real progress while genuinely still loading — unchanged from before.
   // If the data was already done the instant this slide was reached, show
