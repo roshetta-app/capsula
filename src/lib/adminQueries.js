@@ -629,23 +629,6 @@ export async function saveConditionBlocks(conditionId, blocks) {
 
 // ─── Condition image upload (used by ImageGalleryEditor) ─────────────────────
 
-export async function insertConditionImage(data) {
-  const { data: row, error } = await supabase
-    .from('condition_images')
-    .insert(data)
-    .select('id, url, caption, sort_order')
-    .single()
-  return { data: row, error }
-}
-
-export async function deleteConditionImage(id) {
-  const { error } = await supabase
-    .from('condition_images')
-    .delete()
-    .eq('id', id)
-  return { error }
-}
-
 export async function uploadConditionImage(file) {
   const ext      = file.name.split('.').pop()
   const filename = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
@@ -1576,3 +1559,4 @@ export async function toggleGateActive(id, isActive, title = null) {
   if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
 }
+
