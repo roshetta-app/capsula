@@ -44,6 +44,28 @@
  * delay at all — the only case where a delay is possible is tapping the
  * bell in the first moment after the app loads.
  *
+ * Bug fix (2026-09-01, notif-offline-and-pwa-copy-fix) — two issues
+ * reported together, same root: the copy and the actions here assumed a
+ * regular browser tab and an always-on connection.
+ *   1. The "blocked" message used to say "enable them in your browser's
+ *      site settings" — meaningless once the app is installed as a PWA,
+ *      where there's no visible browser chrome to go find that in.
+ *      Reworded to point at "device or browser notification settings"
+ *      instead, which reads correctly either way.
+ *   2. Turning notifications on/off also has to reach our server (to
+ *      save/remove the device's token), not just ask the OS for local
+ *      permission — so it silently failed when offline, surfacing only
+ *      as the generic "Could not enable notifications. Please try
+ *      again." toast, which reads like a permission problem rather than
+ *      a connectivity one. Now reads `isOnline` from
+ *      usePushSubscriptionContext() and, while offline, shows a dedicated
+ *      message with only a Close button — matching the existing
+ *      "unsupported"/"blocked" pattern — instead of letting a tap on
+ *      Allow/Turn Off run the network call and fail. The underlying
+ *      subscribeToPush()/unsubscribeFromPush() calls are also gated the
+ *      same way in usePushSubscription.js, so any other caller (e.g.
+ *      NotificationsBanner.jsx) gets the same protection.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
@@ -58,7 +80,7 @@ import { useToast } from '../../context/ToastContext'
 export default function NotificationSheet({ isOpen, onClose }) {
   const overlayRef = useRef(null)
   const {
-    supported, subscribed, permission, checking,
+    supported, subscribed, permission, checking, isOnline,
     subscribeToPush, unsubscribeFromPush,
   } = usePushSubscriptionContext()
   const { toast } = useToast()
@@ -94,6 +116,12 @@ export default function NotificationSheet({ isOpen, onClose }) {
   if (!shouldRender) return null
 
   const blocked = permission === 'denied'
+  // 2026-09-01 offline fix — see file header. Checked after `blocked` on
+  // purpose: a permanently-blocked permission is worth surfacing even
+  // while offline (fixing it doesn't need a connection), but if it's not
+  // blocked, connectivity is the next thing standing between the person
+  // and a working toggle.
+  const offline = !blocked && !isOnline
 
   // Primary action when notifications are currently OFF — same shape as
   // NotificationsBanner's handleAllow(): close immediately, subscribe in
@@ -190,9 +218,19 @@ export default function NotificationSheet({ isOpen, onClose }) {
             lineHeight: 1.55,
             color:      'var(--color-text-secondary)',
           }}>
-            Notifications are blocked for this site at the browser level.
-            Enable them in your browser's site settings, then reopen this
+            Notifications are blocked for Capsula. Enable them in your
+            device or browser's notification settings, then reopen this
             to turn them on here.
+          </p>
+        ) : offline ? (
+          <p style={{
+            margin:     '0 0 var(--space-5)',
+            fontSize:   14,
+            lineHeight: 1.55,
+            color:      'var(--color-text-secondary)',
+          }}>
+            You're offline. Turning notifications on or off needs an
+            internet connection — reconnect and try again.
           </p>
         ) : subscribed ? (
           <>
@@ -239,7 +277,7 @@ export default function NotificationSheet({ isOpen, onClose }) {
         {/* Actions — same colors/shape as NotificationsBanner's Allow /
             Ask Later pair, stacked instead of side-by-side. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {!supported || blocked ? (
+          {!supported || blocked || offline ? (
             <button
               onClick={onClose}
               style={{

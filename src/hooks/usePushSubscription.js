@@ -149,6 +149,22 @@
  *     notifications) and 'localNotificationActionPerformed' (foreground,
  *     scheduled via LocalNotifications above) now call navigate() with
  *     the deep link's url after reporting the click.
+ *
+ * Bug fix, 2026-09-01 (notif-offline-and-pwa-copy-fix) — subscribeToPush()
+ * and unsubscribeFromPush() both do more than ask the OS for local
+ * permission: they also fetch a device token and save/remove it via
+ * Supabase, which needs a real connection. While offline, that step used
+ * to fail silently partway through, surfacing only as a generic "Could
+ * not enable/turn off notifications. Please try again." error — accurate,
+ * but easy to mistake for a permission problem rather than a connectivity
+ * one. Now reads the app's existing shared connectivity check
+ * (useOnlineStatus, same one AppGate.jsx and OfflineStatusToast.jsx
+ * already use) and exits immediately with a clear "No internet
+ * connection" error — before touching the OS permission prompt or making
+ * any network call — whenever isOnline is false. `isOnline` is also
+ * exposed on the hook's return value so callers (NotificationSheet.jsx)
+ * can show the right message up front instead of waiting for a failed
+ * attempt.
  */
 
 import { useState, useEffect } from 'react'
@@ -158,6 +174,7 @@ import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { LocalNotifications } from '@capacitor/local-notifications'
 import { supabase } from '../lib/supabase'
+import { useOnlineStatus } from './useOnlineStatus'
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
@@ -209,6 +226,10 @@ function withTimeout(promise, ms, label) {
 
 export function usePushSubscription() {
   const navigate = useNavigate()
+  // 2026-09-01 offline fix — see file header. Same shared check used
+  // elsewhere in the app (AppGate.jsx, OfflineStatusToast.jsx), not a new
+  // independent one.
+  const { isOnline } = useOnlineStatus()
   const [supported,  setSupported]  = useState(false)
   const [permission, setPermission] = useState(null)
   const [subscribed, setSubscribed] = useState(false)
@@ -448,6 +469,14 @@ export function usePushSubscription() {
 
   async function subscribeToPush() {
     if (!supported) return false
+    // 2026-09-01 offline fix — see file header. Bail out before ever
+    // touching the OS permission prompt or a network call: fetching a
+    // token and saving it both need a real connection, so there's nothing
+    // useful this can do offline anyway.
+    if (!isOnline) {
+      setError('No internet connection')
+      return false
+    }
     setLoading(true)
     setError(null)
     try {
@@ -495,6 +524,13 @@ export function usePushSubscription() {
 
   async function unsubscribeFromPush() {
     if (!supported) return false
+    // 2026-09-01 offline fix — see file header. Same reasoning as
+    // subscribeToPush(): removing the token is a server-side delete, so
+    // there's nothing to do here without a connection.
+    if (!isOnline) {
+      setError('No internet connection')
+      return false
+    }
     setLoading(true)
     setError(null)
     try {
@@ -588,7 +624,7 @@ export function usePushSubscription() {
   }, [supported, permission])
 
   return {
-    supported, permission, subscribed, loading, error, checking,
+    supported, permission, subscribed, loading, error, checking, isOnline,
     subscribeToPush, unsubscribeFromPush,
   }
 }
