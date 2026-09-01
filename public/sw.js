@@ -2,8 +2,10 @@
  * Capsula Service Worker
  *
  * Strategy:
- *   - HTML (navigation requests) → network-first, NO cache write
- *     (index.html must always be fresh — caching it caused stale-bundle 404s)
+ *   - HTML (navigation requests) → network-first, cached copy kept ONLY as
+ *     an offline fallback, never served when the network is reachable
+ *     (index.html must always be fresh online — caching it for online use
+ *     caused stale-bundle 404s; see offline-app-shell fix below)
  *   - JS/CSS/fonts/images        → cache-first (Vite content-hashes guarantee freshness)
  *
  * Auto-update flow:
@@ -63,6 +65,24 @@
  *     broken every real deep link the moment the app was already open in a
  *     tab. Now calls client.navigate(target) first, then focuses.
  *
+ * Fix (offline-app-shell, 2026-09-01):
+ *   - Previously index.html was never cached at all (URLS_TO_PRECACHE was
+ *     empty), so the offline fallback below (caches.match('/capsula/index.html'))
+ *     could never find anything — a cold offline open or an offline refresh
+ *     fell straight through to the browser's own "no internet" page instead
+ *     of Capsula's own shell.
+ *   - Fixed at install time: once the SW installs, it also fetches a fresh
+ *     copy of index.html (bypassing the HTTP cache, same no-store approach
+ *     used elsewhere in this file) and stores it in STATIC_CACHE — the same
+ *     cache that already gets wiped and rebuilt on every deploy, so this
+ *     copy is always either current or absent, never stale.
+ *   - Online behavior is unchanged: navigation still tries the network
+ *     first every time below; the cached copy is only ever read in the
+ *     .catch() branch, which only runs when the network genuinely can't be
+ *     reached. A device that has never opened Capsula successfully before
+ *     still has nothing to fall back on the very first time it's offline —
+ *     this only helps a device that's used the app before.
+ *
  * Bug fix, 2026-08-19 (deep-link-web-prefix-fix) — deep_link_path is stored
  * unprefixed (e.g. '/drugs/panadol-migraine'), which is correct for the
  * native app's basename-less router but not for the website, which is
@@ -113,7 +133,23 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 self.addEventListener('install', event => {
   self.skipWaiting()
   event.waitUntil(
-    caches.open(STATIC_CACHE).then(cache => cache.addAll(URLS_TO_PRECACHE))
+    caches.open(STATIC_CACHE).then(cache =>
+      cache.addAll(URLS_TO_PRECACHE).then(() =>
+        // Offline-app-shell fix (see file header): fetch a genuinely fresh
+        // copy of the shell (no-store, same as the navigate fetch below)
+        // and store it under the exact URL the fetch handler's offline
+        // fallback looks up. This is the ONLY writer of this cache entry —
+        // online navigation never touches it.
+        fetch('/capsula/index.html', { cache: 'no-store' })
+          .then(response => cache.put('/capsula/index.html', response))
+          .catch(() => {
+            // Install ran while offline itself, or the fetch otherwise
+            // failed — nothing to cache yet. Not fatal: the next successful
+            // install (next deploy, or next time this device is online)
+            // will populate it.
+          })
+      )
+    )
   )
 })
 

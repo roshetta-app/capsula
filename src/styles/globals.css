@@ -289,6 +289,12 @@ html {
      width never changes on tab switch. No-op on platforms/browsers using
      overlay scrollbars that don't consume layout width. */
   scrollbar-gutter: stable;
+  /* Pull-to-refresh fix (2026-09-01): body already had this rule, but an
+     installed PWA's swipe-down-to-reload gesture wasn't reliably blocked
+     by that alone — it needs to also sit on html to fully suppress the
+     gesture. Purely a "don't trigger a native reload" rule; doesn't change
+     how anything scrolls or looks. */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -802,4 +808,3 @@ body {
    token for consistency between the two header variants. ───────────── */
 .fav-sticky-header {
   background: var(--color-accent-light);
-}
