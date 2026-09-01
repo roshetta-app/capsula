@@ -49,6 +49,17 @@
  * that let AccountScreen render signed-in for a beat before
  * ProfileSetupRedirect.jsx could redirect a first-time signup to the
  * wizard — see that file's own note for the full picture.
+ *
+ * pwa-first-signin-blank-wizard fix (2026-09-01) — the initial mount
+ * effect's `loading` handling (added by the offline-profile-account fix
+ * below) is now conditioned on a real cache seed actually being found,
+ * not just on a session existing. See that effect's own comment for the
+ * full race this closes: a first-ever sign-in on a given browser/device
+ * (no local snapshot yet) landing on the website via a full-page OAuth
+ * redirect could previously clear `loading` before the real profile
+ * fetch resolved, letting AccountEditScreen's once-per-user-id
+ * auto-open-wizard check run against a still-null profile and lock in a
+ * blank first-time wizard for what was actually a returning account.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -397,6 +408,27 @@ export function AuthProvider({ children }) {
     // the real network confirm/refresh keeps running in the background
     // exactly as it already does for every later profile reload, it just
     // no longer blocks the very first paint.
+    //
+    // pwa-first-signin-blank-wizard fix (2026-09-01) — the above is only
+    // safe when a seed was actually found. It wasn't safe for a session
+    // that exists but has NOTHING cached locally yet — the exact shape of
+    // a first-ever sign-in on a given browser/device. That case is
+    // genuinely still "nothing paintable yet," same as a first-time
+    // sign-up, and used to incorrectly clear `loading` anyway just
+    // because a session object existed. On the website, sign-in
+    // completes via a full-page reload back from Google — this effect
+    // runs fresh at that exact moment — so a screen gated on `loading`
+    // (AccountEditScreen's once-per-user-id auto-open-wizard check) could
+    // run against a still-null `profile`, decide "no saved data, this
+    // must be a first-time signup," and open the wizard blank — a
+    // decision that check never revisits once made, so it stuck even
+    // after the real profile arrived moments later. Native doesn't hit
+    // this: its sign-in completes while the app is already running (no
+    // fresh mount of this effect at that moment), so it always goes
+    // through the onAuthStateChange SIGNED_IN branch below instead, which
+    // already correctly holds `loading` until the real fetch finishes —
+    // this fix just brings this mount-time path in line with that
+    // already-correct behavior.
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return
       userIdRef.current = session?.user?.id ?? null
@@ -407,18 +439,27 @@ export function AuthProvider({ children }) {
       setCurrentUserId(userIdRef.current)
       setUser(session?.user ?? null)
 
+      let seed = null
       if (session?.user) {
-        const seed = seedProfileFromCache(session.user)
+        seed = seedProfileFromCache(session.user)
         if (seed) setProfile(seed)
       }
-      if (!cancelled) setLoading(false)
+      // Only a real seed (or no one signed in at all) counts as a first
+      // paintable state — see comment above. A session with no seed
+      // leaves `loading` true, closed out below once the real fetch
+      // resolves, same as the onAuthStateChange SIGNED_IN branch already
+      // does for this exact case.
+      if (!session?.user || seed) {
+        if (!cancelled) setLoading(false)
+      }
 
       await loadProfile(session?.user ?? null)
+      if (!cancelled) setLoading(false)
     })
 
     // Subscribe to auth state changes (sign in / sign out / token refresh).
     // account-header-tweaks (2026-08-23): a real SIGNED_IN event now
-    // re-enters `loading` for the duration of the profile fetch, the same
+    // re-enters `loading` for the duration of that fetch, the same
     // way the initial getSession() check above already does. Previously
     // this handler set `user` immediately but left `loading` false the
     // whole time profile loaded, so anything gated on `loading` (e.g.
