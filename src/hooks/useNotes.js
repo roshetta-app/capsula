@@ -11,15 +11,26 @@
  *
  * Signed in: loads from the 'notes' table on sign-in (or when conditionId
  * changes), then writes through on save. Condition-only for now — no
- * item_type column, matching today's feature exactly. The local copy is
- * cleared the moment the user signs out.
+ * item_type column, matching today's feature exactly.
+ *
+ * recently-viewed-offline-fix (2026-09-01) — removed the reactive
+ * "clear the local copy when `user` goes from signed-in to signed-out"
+ * effect that used to live here (same pattern useRecentlyViewed.js just
+ * had removed — see that file's header for the full explanation). The
+ * sign-in library can genuinely report "signed out" for a moment purely
+ * from a background session check failing while offline, which this
+ * effect couldn't tell apart from someone actually tapping Sign Out.
+ * AuthContext.jsx's signOut() already sweeps every `capsula_notes_*` key
+ * directly, from the one place a real sign-out is guaranteed to run
+ * through — see clearAllNotesStorage() there. This hook no longer needs
+ * its own copy of that logic.
  *
  * Returns:
  *   savedValue  string   — the current saved note ('' if none)
  *   save        (value: string) => void
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 
@@ -35,14 +46,9 @@ function writeStorage(conditionId, value) {
   try { localStorage.setItem(storageKeyFor(conditionId), value) } catch { /* ignore */ }
 }
 
-function clearStorage(conditionId) {
-  try { localStorage.removeItem(storageKeyFor(conditionId)) } catch { /* ignore */ }
-}
-
 export function useNotes(conditionId) {
   const { user } = useAuth()
   const [savedValue, setSavedValue] = useState(() => readStorage(conditionId))
-  const prevUserRef = useRef(user)
 
   // Load from the database once signed in, and whenever the signed-in
   // user or the condition being viewed changes.
@@ -64,15 +70,6 @@ export function useNotes(conditionId) {
       })
 
     return () => { cancelled = true }
-  }, [user, conditionId])
-
-  // Sign-out transition: clear the local mirror immediately.
-  useEffect(() => {
-    if (prevUserRef.current && !user) {
-      clearStorage(conditionId)
-      setSavedValue('')
-    }
-    prevUserRef.current = user
   }, [user, conditionId])
 
   const save = useCallback((value) => {

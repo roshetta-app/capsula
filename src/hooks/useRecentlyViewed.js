@@ -12,9 +12,20 @@
  * Also made account-aware (D1): signed out (guest) behaves exactly as
  * before, localStorage only. Signed in, it loads from the 'recently_viewed'
  * table on sign-in and writes through on every view (optimistic — local
- * state updates immediately alongside the database call). The local copy
- * becomes a fast mirror, not the source of truth, once a user is present.
- * The mirror is cleared the moment the user signs out.
+ * state updates immediately alongside the database call). The local copy is
+ * a fast mirror, not the source of truth, once a user is present.
+ *
+ * recently-viewed-offline-fix (2026-09-01) — removed the reactive
+ * "clear the mirror when `user` goes from signed-in to signed-out" effect
+ * that used to live here. It was wiping this list on things that were
+ * never a real sign-out: the sign-in library can genuinely report
+ * "signed out" for a moment purely from a background session check
+ * failing while offline (a confirmed quirk of the library itself, not
+ * this app), and this effect couldn't tell that apart from someone
+ * actually tapping Sign Out. AuthContext.jsx's signOut() already sweeps
+ * this exact storage key directly, from the one place a real sign-out is
+ * guaranteed to run through — see clearAllRecentlyViewedStorage() there.
+ * This hook no longer needs its own copy of that logic.
  *
  * Storage keys (unchanged, so existing local history isn't lost):
  *   condition: capsula_recent_conditions
@@ -51,7 +62,7 @@
  *   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from './useAuth'
 import { supabase } from '../lib/supabase'
 
@@ -79,19 +90,10 @@ function writeToStorage(storageKey, items) {
   }
 }
 
-function clearStorage(storageKey) {
-  try {
-    localStorage.removeItem(storageKey)
-  } catch {
-    // Storage unavailable — fail silently
-  }
-}
-
 export function useRecentlyViewed(itemType = 'condition') {
   const { storageKey, maxHistory } = CONFIG[itemType]
   const { user } = useAuth()
   const [history, setHistory] = useState(() => readFromStorage(storageKey))
-  const prevUserRef = useRef(user)
 
   // Load from the database once signed in, and whenever the signed-in
   // user changes.
@@ -114,15 +116,6 @@ export function useRecentlyViewed(itemType = 'condition') {
 
     return () => { cancelled = true }
   }, [user, itemType, storageKey, maxHistory])
-
-  // Sign-out transition: clear the local mirror immediately.
-  useEffect(() => {
-    if (prevUserRef.current && !user) {
-      clearStorage(storageKey)
-      setHistory([])
-    }
-    prevUserRef.current = user
-  }, [user, storageKey])
 
   /**
    * Record an item as viewed.
