@@ -3,6 +3,7 @@
   "short_name": "Capsula",
   "description": "Drug reference for Egyptian GPs",
   "start_url": "/capsula/",
+  "scope": "/capsula/",
   "display": "standalone",
   "background_color": "#FAFAF9",
   "theme_color": "#FAFAF9",
