@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav'
-import OfflineBanner from './ui/OfflineBanner'
+import OfflineStatusToast from './ui/OfflineStatusToast'
 import NotificationsBanner from './ui/NotificationsBanner'
 
 /**
@@ -67,7 +67,7 @@ export default function Layout({ children }) {
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
     }}>
-      <OfflineBanner />
+      <OfflineStatusToast />
 
       {!suppressHeader && (
         <header style={{
