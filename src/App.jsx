@@ -38,6 +38,13 @@
  * pick up something just switched on in the CMS), with a cooldown so a
  * quick app-switcher flick can't trigger a refetch on every single resume.
  *
+ * Bug fix, 2026-09-01 (alarms-redirect-fix) — added PushBannerProvider,
+ * scoped to the public branch only (same reasoning as
+ * PushSubscriptionProvider just inside it: admin has no use for it).
+ * Renders the in-app banner usePushSubscription.js now shows instead of a
+ * native notification when a push arrives while the app is open — see
+ * that file's header for why.
+ *
  * App Gate System Step 4e — AppGateProvider and AppGate are now mounted.
  * AppGate is rendered as a SIBLING of OnboardingGate, not a wrapper around
  * it — unlike OnboardingGate, AppGate takes no children prop; it draws its
@@ -141,6 +148,7 @@ import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { OnlineStatusProvider } from './context/OnlineStatusContext'
 import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
 import { ToastProvider } from './context/ToastContext'
+import { PushBannerProvider } from './context/PushBannerContext'
 import ErrorBoundary from './components/ErrorBoundary'
 import { useVisualViewport } from './hooks/useVisualViewport'
 import { initDeviceSessionTracking } from './analytics/deviceSession'
@@ -241,17 +249,24 @@ export default function App() {
                     <ThemeProvider>
                       <FavouritesProvider>
                         <NotesActivityProvider>
-                          <PushSubscriptionProvider>
-                            <AppGateProvider>
-                              <AppGateResumeListener />
-                              <AppGate />
-                              <OnboardingGate>
-                                <PublicRoutes />
-                              </OnboardingGate>
-                              <ProfileSetupRedirect />
-                              <SignInNudge />
-                            </AppGateProvider>
-                          </PushSubscriptionProvider>
+                          {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
+                              scoped here rather than at the top of the
+                              tree, same reasoning as PushSubscriptionProvider
+                              just below: this is public-branch-only, the
+                              admin branch has no use for it. */}
+                          <PushBannerProvider>
+                            <PushSubscriptionProvider>
+                              <AppGateProvider>
+                                <AppGateResumeListener />
+                                <AppGate />
+                                <OnboardingGate>
+                                  <PublicRoutes />
+                                </OnboardingGate>
+                                <ProfileSetupRedirect />
+                                <SignInNudge />
+                              </AppGateProvider>
+                            </PushSubscriptionProvider>
+                          </PushBannerProvider>
                         </NotesActivityProvider>
                       </FavouritesProvider>
                     </ThemeProvider>
@@ -266,3 +281,5 @@ export default function App() {
     </ErrorBoundary>
   )
 }
+
+

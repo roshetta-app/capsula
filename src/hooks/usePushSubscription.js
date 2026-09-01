@@ -211,18 +211,32 @@
  * permission redirect, regardless of anything checked/requested
  * beforehand. There's no supported way around that from inside the
  * plugin, so this removes it from the foreground path entirely: a push
- * arriving while the app is open is now shown as an in-app toast (this
- * app's existing ToastContext, extended with an optional onAction so
- * tapping it still reports the click and follows the deep link, same as
- * the old native notification did) instead of a native notification.
- * This matches how most apps handle a push arriving while already open
- * (an in-app banner rather than a system notification), and is also
- * Firebase's own documented approach — foreground display is left
- * entirely up to the app. Background/closed delivery is unaffected: those
- * are still shown natively by Android straight from the FCM payload, same
- * as before. One known trade-off: the toast shows title/body only, not
- * the notification's image — background/closed notifications still show
- * the image as before.
+ * arriving while the app is open is now shown via PushBannerContext.jsx,
+ * a dedicated in-app banner built specifically to look and behave like a
+ * real notification (top of screen, bell icon + title + body, stays until
+ * tapped or closed), rather than pushing this into the app's plain
+ * "Saved"/"Something went wrong" toast system. This matches how most apps
+ * handle a push arriving while already open (an in-app banner rather than
+ * a system notification), and is also Firebase's own documented approach
+ * — foreground display is left entirely up to the app. Background/closed
+ * delivery is unaffected: those are still shown natively by Android
+ * straight from the FCM payload, same as before. Confirmed on-device:
+ * the redirect no longer happens at all, foreground or otherwise. One
+ * known trade-off: the banner shows title/body only, not the
+ * notification's image — background/closed notifications still show the
+ * image as before.
+ *
+ * UI refinement, 2026-09-01 (same day) — the first version of this fix
+ * reused the app's general ToastContext rather than a dedicated
+ * component. Two things came out of testing it on the actual MIUI phone:
+ * it read as a generic message rather than a notification (bottom of
+ * screen, single colored line, no icon/title split), and it auto-
+ * dismissed after 3 seconds — often before there was time to tap it,
+ * which is also why taps weren't showing up in the admin click stats.
+ * Replaced with PushBannerContext.jsx (see its own header for the full
+ * reasoning), which fixes both: it looks like an actual notification, and
+ * it now stays up until tapped or closed, giving click-tracking a real
+ * chance to fire.
  */
 
 import { useState, useEffect } from 'react'
@@ -232,7 +246,7 @@ import { Capacitor } from '@capacitor/core'
 import { FirebaseMessaging } from '@capacitor-firebase/messaging'
 import { supabase } from '../lib/supabase'
 import { useOnlineStatus } from './useOnlineStatus'
-import { useToast } from '../context/ToastContext'
+import { usePushBanner } from '../context/PushBannerContext'
 import { getDeviceId } from '../analytics/deviceSession'
 
 const firebaseConfig = {
@@ -287,11 +301,10 @@ function withTimeout(promise, ms, label) {
 
 export function usePushSubscription() {
   const navigate = useNavigate()
-  // Bug fix, 2026-09-01 (alarms-redirect-fix) — see file header. This hook
-  // is only ever mounted via PushSubscriptionProvider, which App.jsx
-  // renders inside <ToastProvider>, so useToast() is always safe to call
-  // here.
-  const { toast } = useToast()
+  // Bug fix, 2026-09-01 (alarms-redirect-fix) — this hook is only ever
+  // mounted via PushSubscriptionProvider, which App.jsx now renders inside
+  // <PushBannerProvider>, so usePushBanner() is always safe to call here.
+  const { showBanner } = usePushBanner()
   // 2026-09-01 offline fix — see file header. Same shared check used
   // elsewhere in the app (AppGate.jsx, OfflineStatusToast.jsx), not a new
   // independent one.
@@ -399,18 +412,33 @@ export function usePushSubscription() {
   // of anything checked or requested beforehand. There is no supported way
   // to display a notification through that plugin without touching this
   // mechanism, so the fix removes it from this path entirely: a
-  // foreground push is now shown as an in-app toast (this app's existing
-  // toast system, ToastContext.jsx) instead of a native notification.
-  // This is also the standard approach — most apps (e.g. WhatsApp,
+  // foreground push is now shown via PushBannerContext.jsx, a dedicated
+  // in-app banner built to actually look and behave like a notification
+  // (top of screen, bell icon + title + body, stays until tapped or
+  // closed) rather than the app's plain "Saved"/"Something went wrong"
+  // toast. This is also the standard approach — most apps (e.g. WhatsApp,
   // Instagram) show an in-app banner rather than a system notification
   // while already open, and Firebase's own guidance leaves foreground
   // display entirely up to the app for this reason. Background/closed
   // delivery (the other bullet above) is untouched by this change.
   // Known trade-off: unlike the old LocalNotifications-based version, the
-  // toast does not show the notification's image (deliver-notification's
+  // banner does not show the notification's image (deliver-notification's
   // image_url) — text (title/body) only. Background/closed notifications,
   // which Android displays natively from FCM's own payload, still show
   // the image as before; this only affects the foreground-only case.
+  //
+  // UI refinement (2026-09-01, same day) — the first version of this
+  // reused the app's general ToastContext (bottom of screen, single
+  // colored line, auto-dismissed after 3s). Confirmed on-device that the
+  // redirect itself was gone, but it didn't read as a real notification
+  // and often disappeared before there was time to tap it — which also
+  // explains why taps weren't showing up in the admin click stats: with
+  // nothing to tap in time, reportClick() below was never actually
+  // running. Replaced with the dedicated PushBannerContext described
+  // above, which stays up until it's tapped or closed with the X, fixing
+  // both the look and the missing click counts in the same change — the
+  // click-reporting call itself (reportClick, same RPC the service worker
+  // and the old native notification both used) was already correct.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
 
@@ -439,21 +467,20 @@ export function usePushSubscription() {
     FirebaseMessaging.addListener('notificationReceived', event => {
       // Bug fix, 2026-09-01 (alarms-redirect-fix) — see comment above this
       // effect. No LocalNotifications permission check or schedule() call
-      // here anymore; this is shown as an in-app toast instead, which
+      // here anymore; this is shown as an in-app banner instead, which
       // needs no OS-level permission of any kind.
       const notification = event?.notification ?? event
       const deepLinkUrl = notification?.data?.url ?? '/capsula/'
       const logId = notification?.data?.log_id ?? null
 
-      const title = notification?.title ?? ''
-      const body = notification?.body ?? ''
-      const message = title && body ? `${title}: ${body}` : (title || body)
-      if (!message) return
-
       // onAction stands in for the old localNotificationActionPerformed
-      // listener: tapping the toast reports the click and routes to the
+      // listener: tapping the banner reports the click and routes to the
       // deep link, same as tapping the old native notification did.
-      toast.info(message, {
+      // Closing it with the X instead skips onAction entirely — no click
+      // reported — matching how swiping away a real notification works.
+      showBanner({
+        title: notification?.title ?? '',
+        body: notification?.body ?? '',
         onAction: () => {
           reportClick(logId)
           navigateToDeepLink(deepLinkUrl)

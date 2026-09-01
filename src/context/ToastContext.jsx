@@ -14,17 +14,6 @@
  * which broke Icon.jsx's own app-wide rule ('always use <Icon>, never a
  * raw glyph/svg'). Swapped to <Icon> with a Lucide name per type, same
  * fix already applied to the old offline banner.
- *
- * Bug fix, 2026-09-01 (alarms-redirect-fix) — a toast can now optionally
- * be tapped to do something, not just dismiss. Pass an options object as
- * the second argument instead of a plain duration number:
- *   toast.info('New message', { onAction: () => navigate('/inbox') })
- *   toast.info('New message', { duration: 5000, onAction: () => {...} })
- * Every existing call site (a plain number or nothing as the second
- * argument) is unaffected and keeps behaving exactly as before — this
- * was added for usePushSubscription.js, which uses a toast to show a
- * push notification while the app is open, in place of a native
- * notification (see that file's header for why).
  */
 
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
@@ -44,25 +33,18 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  // Bug fix, 2026-09-01 (alarms-redirect-fix) — third argument can now be
-  // either a plain duration number (existing behavior, unchanged) or an
-  // options object of { duration, onAction }. onAction, if given, fires
-  // when the toast itself is tapped, before it's dismissed.
-  const add = useCallback((type, message, durationOrOptions) => {
-    const isOptions = durationOrOptions !== null && typeof durationOrOptions === 'object'
-    const duration = isOptions ? (durationOrOptions.duration ?? 3000) : (durationOrOptions ?? 3000)
-    const onAction = isOptions ? durationOrOptions.onAction : undefined
+  const add = useCallback((type, message, duration = 3000) => {
     const id = _nextId++
-    setToasts(prev => [...prev, { id, type, message, onAction }])
+    setToasts(prev => [...prev, { id, type, message }])
     timers.current[id] = setTimeout(() => dismiss(id), duration)
     return id
   }, [dismiss])
 
   const toast = {
-    success: (msg, durationOrOptions) => add('success', msg, durationOrOptions),
-    error:   (msg, durationOrOptions) => add('error',   msg, durationOrOptions),
-    warning: (msg, durationOrOptions) => add('warning', msg, durationOrOptions),
-    info:    (msg, durationOrOptions) => add('info',    msg, durationOrOptions),
+    success: (msg, dur) => add('success', msg, dur),
+    error:   (msg, dur) => add('error',   msg, dur),
+    warning: (msg, dur) => add('warning', msg, dur),
+    info:    (msg, dur) => add('info',    msg, dur),
   }
 
   return (
@@ -139,13 +121,7 @@ function ToastItem({ toast, onDismiss }) {
         width: '100%',
         cursor: 'pointer',
       }}
-      onClick={() => {
-        // Bug fix, 2026-09-01 (alarms-redirect-fix) — fire the toast's
-        // optional onAction (e.g. deep-link navigation) before dismissing,
-        // so a tap on a toast can do something, not just close it.
-        toast.onAction?.()
-        onDismiss(toast.id)
-      }}
+      onClick={() => onDismiss(toast.id)}
     >
       <Icon name={iconName} size={16} color="#fff" />
       <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
