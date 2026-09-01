@@ -8,9 +8,16 @@
  *   toast.error('Something went wrong')
  *   toast.warning('Check your input')
  *   toast.info('Refreshed')
+ *
+ * Icon update (offline-banner-pro-refine session) — toast icons were
+ * plain unicode characters (checkmark, cross, triangle, info glyph),
+ * which broke Icon.jsx's own app-wide rule ('always use <Icon>, never a
+ * raw glyph/svg'). Swapped to <Icon> with a Lucide name per type, same
+ * fix already applied to the old offline banner.
  */
 
 import { createContext, useCallback, useContext, useRef, useState } from 'react'
+import Icon from '../components/ui/Icon'
 
 const ToastContext = createContext(null)
 
@@ -54,13 +61,13 @@ export function useToast() {
   return ctx
 }
 
-// ── Visual stack ──────────────────────────────────────────────────────────────
+// -- Visual stack -----------------------------------------------------------
 
 const TYPE_STYLES = {
-  success: { bg: '#16a34a', icon: '✓' },
-  error:   { bg: '#dc2626', icon: '✕' },
-  warning: { bg: '#d97706', icon: '⚠' },
-  info:    { bg: '#2563eb', icon: 'ℹ' },
+  success: { bg: '#16a34a', iconName: 'CheckCircle2' },
+  error:   { bg: '#dc2626', iconName: 'XCircle' },
+  warning: { bg: '#d97706', iconName: 'AlertTriangle' },
+  info:    { bg: '#2563eb', iconName: 'Info' },
 }
 
 function ToastStack({ toasts, onDismiss }) {
@@ -92,7 +99,7 @@ function ToastStack({ toasts, onDismiss }) {
 }
 
 function ToastItem({ toast, onDismiss }) {
-  const { bg, icon } = TYPE_STYLES[toast.type] ?? TYPE_STYLES.info
+  const { bg, iconName } = TYPE_STYLES[toast.type] ?? TYPE_STYLES.info
 
   return (
     <div
@@ -116,7 +123,7 @@ function ToastItem({ toast, onDismiss }) {
       }}
       onClick={() => onDismiss(toast.id)}
     >
-      <span style={{ fontSize: 16, flexShrink: 0 }}>{icon}</span>
+      <Icon name={iconName} size={16} color="#fff" />
       <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
     </div>
   )

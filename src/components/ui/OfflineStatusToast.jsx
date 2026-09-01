@@ -13,6 +13,14 @@
  * toast fires — decided this session: a Pro user in that case just
  * browses normally from cache, no message needed.
  *
+ * Cooldown (this session): a flaky connection can drop and reconnect
+ * several times within a couple of minutes. Without a cooldown, every
+ * single drop would fire its own toast — recreating the same spammy,
+ * intrusive feeling this component was built to replace. COOLDOWN_MS
+ * below suppresses a repeat toast if the last one fired more recently
+ * than that, even across multiple real drops. The very first drop in a
+ * session always shows, since lastShownRef starts empty.
+ *
  * Free users never see this at all — they are already covered by
  * AppGate.jsx's full-screen offline block, which is mutually exclusive
  * with normal browsing.
@@ -38,18 +46,28 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useToast } from '../../context/ToastContext'
 
+// Minimum time between repeat toasts on a flaky connection that drops and
+// reconnects several times in a row. Tunable — no exact number specified
+// by product, 60s chosen as a reasonable "don't be spammy" default.
+const COOLDOWN_MS = 60000
+
 export default function OfflineStatusToast() {
   const { isOnline } = useOnlineStatus()
   const isPro = useIsPro()
   const { toast } = useToast()
 
   const wasOnlineRef = useRef(isOnline)
+  const lastShownRef = useRef(0)
 
   useEffect(() => {
     // Only Pro users get this reassurance — a free user going offline is
     // handled entirely by AppGate.jsx's full-screen block instead.
     if (isPro && wasOnlineRef.current && !isOnline) {
-      toast.info('Offline — everything still works')
+      const now = Date.now()
+      if (now - lastShownRef.current >= COOLDOWN_MS) {
+        toast.info('Offline — everything still works')
+        lastShownRef.current = now
+      }
     }
     wasOnlineRef.current = isOnline
   }, [isOnline, isPro, toast])
