@@ -45,6 +45,14 @@
  * with the X — since reportClick only ever runs from onAction (a real
  * tap), never from the timeout.
  *
+ * UI refinement, 2026-09-01 (round 4) — removed the X dismiss button
+ * round 2 added. Sitting right next to the tap target, it was pulling
+ * clicks away from the deep link — a person reaching to close the
+ * banner is an easy mis-tap away from just dismissing it instead of
+ * opening it. The whole banner is tap-to-open now; with no separate way
+ * to dismiss early, the only way it goes away untapped is the
+ * DEFAULT_DURATION_MS auto-dismiss above.
+ *
  * Usage:
  *   const { showBanner } = usePushBanner()
  *   showBanner({
@@ -123,11 +131,12 @@ function PushBannerStack({ banners, onDismiss }) {
 function PushBannerItem({ banner, onDismiss }) {
   // UI refinement, 2026-09-01 (alarms-redirect-fix, round 2) — enter/exit
   // animation. animateIn drives the entrance (slide down + fade in on
-  // mount); exiting drives the exit (slide up + fade out) — used for the
-  // X (plain dismiss), a tap (dismiss, then run onAction only once the
-  // exit animation has actually finished, so tapping never just swaps to
-  // the destination page with no transition at all), and now (round 3)
-  // the auto-dismiss timer below.
+  // mount); exiting drives the exit (slide up + fade out) — used for a
+  // tap (dismiss, then run onAction only once the exit animation has
+  // actually finished, so tapping never just swaps to the destination
+  // page with no transition at all) and (round 3) the auto-dismiss timer
+  // below. Round 4 removed the X button this was also handling — see
+  // file header.
   const [animateIn, setAnimateIn] = useState(false)
   const [exiting, setExiting] = useState(false)
   const closeTimer = useRef(null)
@@ -147,10 +156,10 @@ function PushBannerItem({ banner, onDismiss }) {
   }
 
   // UI refinement, 2026-09-01 (round 3) — see file header. Auto-dismiss
-  // after DEFAULT_DURATION_MS, same as closing with the X: no onAction,
-  // so this never counts as a click. Cleared on unmount, so a tap or the
-  // X firing first (both of which unmount this component via onDismiss)
-  // can't also fire this timer afterwards.
+  // after DEFAULT_DURATION_MS, same as a manual dismiss: no onAction, so
+  // this never counts as a click. Cleared on unmount, so a tap firing
+  // first (which unmounts this component via onDismiss) can't also fire
+  // this timer afterwards.
   useEffect(() => {
     const autoTimer = setTimeout(() => close(), DEFAULT_DURATION_MS)
     return () => clearTimeout(autoTimer)
@@ -246,26 +255,6 @@ function PushBannerItem({ banner, onDismiss }) {
           </p>
         )}
       </div>
-
-      {/* Dismiss without triggering the tap action — mirrors swiping away
-          a real notification (no click credited) rather than tapping it. */}
-      <button
-        onClick={e => { e.stopPropagation(); close() }}
-        aria-label="Dismiss"
-        style={{
-          flexShrink:              0,
-          border:                  'none',
-          background:              'none',
-          padding:                 4,
-          marginTop:               -2,
-          marginRight:             -4,
-          cursor:                  'pointer',
-          color:                   'var(--color-text-secondary)',
-          WebkitTapHighlightColor: 'transparent',
-        }}
-      >
-        <Icon name="X" size={16} />
-      </button>
     </div>
   )
 }
