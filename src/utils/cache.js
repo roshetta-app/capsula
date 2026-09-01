@@ -226,7 +226,7 @@ export function writeIconCache(url, svg) {
   }
 }
 
-// ─── IndexedDB (drugs + conditions) ────────────────────────────────────────
+// ─── IndexedDB (drugs + conditions + photos) ──────────────────────────────
 //
 // 2026-07-16: localStorage caps out around 5 MB per site — far below the
 // real size of the full drug catalog (tens of MB as JSON) — so
@@ -268,15 +268,25 @@ export function writeIconCache(url, svg) {
 // reads back as undefined — the delta-merge logic in useDrugs.js/
 // useConditions.js already treats a missing cursor as 'no cursor yet' and
 // falls back to a full fetch, so this needs no separate migration step.
+//
+// 2026-09-01 (Image System Refinement Plan, Part A): added a third store,
+// 'photos', for offline gallery-photo caching. Unlike 'drugs'/'conditions'
+// above, this store isn't a single record under a fixed key — it holds one
+// Blob per photo, keyed by the photo's own Storage URL, since there can be
+// many of them and each is looked up independently by useCachedImage.js.
+// IDB_VERSION bumped 2 → 3 so existing devices get this new store created
+// automatically the next time they open the app; the existing 'drugs' and
+// 'conditions' stores and their data are untouched by this bump.
 
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 2
-const IDB_STORES  = ['drugs', 'conditions']
+const IDB_VERSION = 3
+const IDB_STORES  = ['drugs', 'conditions', 'photos']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
 const CONDITIONS_STORE = 'conditions'
 const CONDITIONS_KEY   = 'conditions'
+const PHOTOS_STORE     = 'photos'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -473,6 +483,107 @@ export async function clearConditionsCache() {
     })
   } catch {
     // fail silently
+  } finally {
+    db?.close()
+  }
+}
+
+// ─── Photos (gallery images) ──────────────────────────────────────────────
+//
+// Added 2026-09-01 (Image System Refinement Plan, Part A). Each entry is a
+// raw Blob keyed by the photo's own Storage URL — not a single record like
+// the drugs/conditions stores above, since there can be many photos and
+// each one is looked up independently by useCachedImage.js.
+
+/**
+ * Save one gallery photo to the on-device store, keyed by its own URL.
+ * Called both from the one-time onboarding download (useConditions.js) and
+ * from cache-on-view (useCachedImage.js) the first time a photo not yet
+ * saved is viewed online. A failed save is non-fatal by design (plan §4 —
+ * "a failed photo download during onboarding is non-fatal"); this fails
+ * silently from the caller's point of view but reports to the crash log,
+ * same pattern as writeDrugsCache/writeConditionsCache above.
+ * @param {string} url  — the gallery photo's Storage URL
+ * @param {Blob}   blob — the fetched image data
+ */
+export async function savePhotoToCache(url, blob) {
+  if (!url || !blob) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTOS_STORE, 'readwrite')
+      tx.objectStore(PHOTOS_STORE).put(blob, url)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: savePhotoToCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Read one cached gallery photo's Blob, or null if nothing's saved for
+ * that URL yet. A miss here is the normal, expected case for a photo never
+ * viewed online and not covered by the onboarding download — callers
+ * (useCachedImage.js) fall back to the network for it, not an error.
+ * @param {string} url — the gallery photo's Storage URL
+ * @returns {Promise<Blob|null>}
+ */
+export async function getCachedPhoto(url) {
+  if (!url) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    const blob = await new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTOS_STORE, 'readonly')
+      const req = tx.objectStore(PHOTOS_STORE).get(url)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+    return blob
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: getCachedPhoto')
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Delete every saved photo whose URL is no longer referenced by any
+ * condition. Called from useConditions.js after each fresh condition fetch
+ * (plan §4 — "prunes photos no longer referenced by any condition"), so a
+ * photo an editor removes doesn't sit on-device forever. No cap on total
+ * saved photo count (plan §4 decision, since this is a bounded, curated
+ * library rather than user-generated content) — this orphan cleanup is the
+ * only pruning this store gets.
+ * @param {string[]} validUrls — every gallery photo URL currently referenced
+ *   across all conditions (see utils/galleryImageUrls.js)
+ */
+export async function pruneOrphanedPhotos(validUrls) {
+  const validSet = new Set(validUrls ?? [])
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PHOTOS_STORE, 'readwrite')
+      const store = tx.objectStore(PHOTOS_STORE)
+      const req = store.openKeyCursor()
+      req.onsuccess = () => {
+        const cursor = req.result
+        if (!cursor) return // reached the end of the store
+        if (!validSet.has(cursor.key)) store.delete(cursor.key)
+        cursor.continue()
+      }
+      req.onerror = () => reject(req.error)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: pruneOrphanedPhotos')
   } finally {
     db?.close()
   }
