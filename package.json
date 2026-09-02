@@ -30,6 +30,7 @@
     "@tailwindcss/vite": "^4.3.0",
     "@tanstack/react-virtual": "^3.14.6",
     "dotenv": "^17.4.2",
+    "embla-carousel-react": "^8.6.0",
     "firebase": "^12.17.1",
     "fuse.js": "^7.0.0",
     "html2canvas": "^1.4.1",
