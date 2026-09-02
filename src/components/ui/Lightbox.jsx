@@ -320,7 +320,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   useEffect(() => {
     if (!emblaApi) return
     const speedUpSettle = () => {
-      emblaApi.internalEngine().scrollBody.useDuration(4).useFriction(0.36)
+      emblaApi.internalEngine().scrollBody.useDuration(7).useFriction(0.4)
     }
     emblaApi.on('pointerUp', speedUpSettle)
     return () => emblaApi.off('pointerUp', speedUpSettle)
