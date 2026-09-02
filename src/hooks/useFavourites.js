@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
+import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
 
@@ -11,6 +11,18 @@ const CAPS = {
   drugs:      FAVOURITES_CAP_DRUGS,
   conditions: FAVOURITES_CAP_CONDITIONS,
 }
+
+// favourites-pending-fix — a signed-out heart-tap is now persisted here, not
+// just held in React state. Opening the system browser for Google sign-in
+// backgrounds the app, and Android can reclaim that backgrounded process
+// under memory pressure, wiping any in-memory-only state before the app
+// ever gets a chance to fold the pending tap in. Storing it means it
+// survives that, and gets picked back up the moment this hook next mounts
+// (see the lazy useState init below). The timestamp guards against a
+// days-old abandoned tap resurfacing unexpectedly — anything older than
+// PENDING_FAVOURITE_MAX_AGE_MS is treated as if it were never recorded.
+const PENDING_FAVOURITE_STORAGE_KEY = 'capsula_pending_favourite'
+const PENDING_FAVOURITE_MAX_AGE_MS = 10 * 60 * 1000 // 10 minutes
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
@@ -39,6 +51,40 @@ function writeStorage(favourites) {
 function clearStorage() {
   try {
     localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // localStorage unavailable — silently ignore
+  }
+}
+
+// ─── Pending favourite storage helpers (favourites-pending-fix) ───────────────
+
+function readPendingFavouriteStorage() {
+  try {
+    const raw = localStorage.getItem(PENDING_FAVOURITE_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || !parsed.type || typeof parsed.id === 'undefined' || !parsed.savedAt) return null
+    if (Date.now() - parsed.savedAt > PENDING_FAVOURITE_MAX_AGE_MS) {
+      localStorage.removeItem(PENDING_FAVOURITE_STORAGE_KEY)
+      return null
+    }
+    return { type: parsed.type, id: parsed.id }
+  } catch {
+    return null
+  }
+}
+
+function writePendingFavouriteStorage(pending) {
+  try {
+    localStorage.setItem(PENDING_FAVOURITE_STORAGE_KEY, JSON.stringify({ ...pending, savedAt: Date.now() }))
+  } catch {
+    // localStorage unavailable — silently ignore; falls back to in-memory-only, same as before this fix
+  }
+}
+
+function clearPendingFavouriteStorage() {
+  try {
+    localStorage.removeItem(PENDING_FAVOURITE_STORAGE_KEY)
   } catch {
     // localStorage unavailable — silently ignore
   }
@@ -83,9 +129,13 @@ function clearStorage() {
 export function useFavourites() {
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
+  const { toast } = useToast()
 
   const [favourites, setFavourites]           = useState(() => readStorage())
-  const [pendingFavourite, setPendingFavourite] = useState(null)
+  // favourites-pending-fix — seeded from storage, not just null, so a tap
+  // recorded before the app got reloaded (e.g. by the OS during the native
+  // sign-in round trip) is still here the moment this hook next mounts.
+  const [pendingFavourite, setPendingFavourite] = useState(() => readPendingFavouriteStorage())
   const [capBlocked, setCapBlocked]             = useState(null)
 
   const prevUserRef      = useRef(user)
@@ -100,6 +150,19 @@ export function useFavourites() {
   useEffect(() => { pendingFavouriteRef.current = pendingFavourite }, [pendingFavourite])
   const isProRef = useRef(isPro)
   useEffect(() => { isProRef.current = isPro }, [isPro])
+
+  // favourites-pending-fix — every place that used to call
+  // setPendingFavourite(...) directly now goes through one of these two, so
+  // the storage copy never drifts out of sync with the in-memory one.
+  const recordPendingFavourite = useCallback((pending) => {
+    setPendingFavourite(pending)
+    writePendingFavouriteStorage(pending)
+  }, [])
+
+  const clearPendingFavourite = useCallback(() => {
+    setPendingFavourite(null)
+    clearPendingFavouriteStorage()
+  }, [])
 
   // Fire-and-forget write-through to the database. No-ops for guests.
   // Upsert (not plain insert) on add, since the table has a unique
@@ -134,6 +197,7 @@ export function useFavourites() {
         const next = { ...prev, [type]: list.filter(x => x !== id) }
         writeStorage(next)
         writeThrough(itemType, id, false)
+        toast.info('Removed from Favourites')
         return next
       }
 
@@ -145,15 +209,26 @@ export function useFavourites() {
       const next = { ...prev, [type]: [...list, id] }
       writeStorage(next)
       writeThrough(itemType, id, true)
+      toast.success('Added to Favourites')
       return next
     })
-  }, [isPro, writeThrough])
+  }, [isPro, writeThrough, toast])
 
   // Load from the database once signed in, and whenever the signed-in
   // user changes (e.g. one account signs out and a different one signs
   // into the same session).
   useEffect(() => {
     if (!user) return
+    // favourites-pending-fix — wait for AuthContext's own loading flag to
+    // clear before doing anything. `user` becomes available synchronously
+    // on sign-in, but `profile` (what isPro/isProRef actually reads) only
+    // resolves a beat later over the network — `loading` stays true for
+    // that whole gap. Without this check, a pending favourite could be
+    // folded in before the app has any real idea whether the account is
+    // Pro or free, capping a genuine Pro account by pure timing luck. This
+    // effect re-runs once `authLoading` flips to false (it's in the
+    // dependency array below), so nothing here is lost by waiting.
+    if (authLoading) return
     let cancelled = false
 
     supabase
@@ -180,9 +255,10 @@ export function useFavourites() {
             } else {
               next[pending.type] = [...next[pending.type], pending.id]
               writeThrough(pending.type === 'drugs' ? 'drug' : 'condition', pending.id, true)
+              toast.success('Added to Favourites')
             }
           }
-          setPendingFavourite(null)
+          clearPendingFavourite()
         }
 
         writeStorage(next)
@@ -190,7 +266,7 @@ export function useFavourites() {
       })
 
     return () => { cancelled = true }
-  }, [user])
+  }, [user, authLoading])
 
   // Sign-out transition: clear the local mirror immediately. Guarded so
   // this only fires when an actual signed-in user goes to null, not on
@@ -219,19 +295,19 @@ export function useFavourites() {
 
   const toggleDrug = useCallback((id) => {
     if (!user) {
-      setPendingFavourite({ type: 'drugs', id })
+      recordPendingFavourite({ type: 'drugs', id })
       return
     }
     applyToggle('drugs', id)
-  }, [user, applyToggle])
+  }, [user, applyToggle, recordPendingFavourite])
 
   const toggleCondition = useCallback((id) => {
     if (!user) {
-      setPendingFavourite({ type: 'conditions', id })
+      recordPendingFavourite({ type: 'conditions', id })
       return
     }
     applyToggle('conditions', id)
-  }, [user, applyToggle])
+  }, [user, applyToggle, recordPendingFavourite])
 
   // restoreConditionAt — reinserts a condition id at a specific index instead
   // of appending it to the end. Used by Undo after a remove: toggleCondition
@@ -287,7 +363,7 @@ export function useFavourites() {
     [favourites.conditions]
   )
 
-  const dismissPendingFavourite = useCallback(() => setPendingFavourite(null), [])
+  const dismissPendingFavourite = clearPendingFavourite
   const dismissCapBlocked       = useCallback(() => setCapBlocked(null), [])
 
   return {
