@@ -58,12 +58,29 @@
  *   - Unchanged — small magnifying-glass badge, top-right of the photo,
  *     shown whenever the current photo is 'ready'.
  *
+ * Caption crossfade (2026-09-02, fifth pass — same root cause/fix as
+ * Lightbox.jsx's own caption fix, applied here too):
+ *   The caption row's text used to just snap to the new value the
+ *   instant Embla's `select` fired, with no transition at all — the
+ *   same "disconnected from the photo change" flicker already fixed in
+ *   Lightbox.jsx. Wrapped in an AnimatePresence (mode="wait", so the
+ *   outgoing caption fully fades out before the incoming one fades in —
+ *   fading both at once briefly superimposes two different captions,
+ *   which reads as garbled/flickery rather than smooth) keyed by photo
+ *   id/url. Unlike Lightbox.jsx, this row already has a fixed height
+ *   (single line, ellipsis-truncated, no wrap) via the pre-existing
+ *   `height: 19`, so there's no risk of the row resizing mid-fade the
+ *   way Lightbox.jsx's multi-line, unbounded-height caption did — no
+ *   CSS-grid overlap trick is needed here, a plain sequential fade is
+ *   enough.
+ *
  * Props:
  *   images  { id, url, caption }[]
  *   title   string (optional) — bold heading rendered above the card;
  *           omitted entirely when empty/absent
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { MessageSquare, ZoomIn } from 'lucide-react'
 import useEmblaCarousel from 'embla-carousel-react'
 import Lightbox from '../ui/Lightbox'
@@ -94,6 +111,10 @@ const LOAD_WINDOW = 1
 // swipe commit/threshold/settle entirely on its own — this only has to
 // catch "finger never really moved."
 const TAP_SLOP_PX = 8
+
+// Caption crossfade timing — matches Lightbox.jsx's own caption fade so
+// the two feel consistent wherever a caption changes in the app.
+const CAPTION_TRANSITION = { duration: 0.22, ease: 'easeInOut' }
 
 function Slide({ img, index, selectedIndex, onCurrentInfo, onCurrentFailed, currentDisplayFailed }) {
   const isCurrent = index === selectedIndex
@@ -387,19 +408,34 @@ export default function ImageCarousel({ images = [], title = '' }) {
                     lineHeight: 1.5,
                   }}
                 >
-                  {active?.caption && (
-                    <>
-                      <MessageSquare size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-                      <span style={{
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        minWidth: 0,
-                      }}>
-                        {active.caption}
-                      </span>
-                    </>
-                  )}
+                  <AnimatePresence initial={false} mode="wait">
+                    {active?.caption && (
+                      <motion.div
+                        key={active.id ?? active.url}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={CAPTION_TRANSITION}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          minWidth: 0,
+                          width: '100%',
+                        }}
+                      >
+                        <MessageSquare size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+                        <span style={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          minWidth: 0,
+                        }}>
+                          {active.caption}
+                        </span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </div>
