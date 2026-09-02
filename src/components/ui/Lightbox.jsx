@@ -81,6 +81,21 @@
  *   sit on one shared black gradient (transparent -> solid) for
  *   legibility against any photo.
  *
+ * Back-gesture guard (2026-09-02, third pass same day):
+ *   Nothing anywhere in this app previously trapped the back button/
+ *   gesture for a modal-style overlay, so with no listener registered,
+ *   "back" fell straight through to whatever navigated the page
+ *   underneath — closing the Lightbox was never actually possible via
+ *   back, it just left the current screen entirely. Two separate
+ *   mechanisms now cover the two build targets: on native Android, a
+ *   Capacitor `backButton` listener is registered for as long as the
+ *   Lightbox is mounted and simply closes it instead of falling
+ *   through. On the website/PWA (no Capacitor bridge to hook into),
+ *   opening the Lightbox pushes a placeholder browser-history entry;
+ *   popping it (back gesture/button) closes the Lightbox the same way,
+ *   and closing normally instead (X, swipe-down) removes that
+ *   placeholder itself so it doesn't leave a dead history entry behind.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -192,6 +207,11 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   const dirRef = useRef(1)
   const isFirstPhotoRef = useRef(true)
   useEffect(() => { isFirstPhotoRef.current = false }, [])
+  // True once a browser back gesture/button has already popped the
+  // placeholder history entry pushed below — tells that effect's
+  // cleanup not to also call history.back() itself for a close that
+  // already consumed it.
+  const poppedViaBrowserBackRef = useRef(false)
 
   const active = images[activeIndex]
   const { src, status, retry } = useCachedImage(active?.url)
@@ -216,9 +236,8 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   // Lightbox instead. Removed on unmount, so normal back behavior for
   // the underlying page resumes immediately once closed. No-ops on the
   // website build via the same Capacitor.isNativePlatform() guard
-  // already used in App.jsx for the status bar — a browser back
-  // gesture on the installed website/PWA isn't covered by this and
-  // would need separate handling if that's ever needed.
+  // already used in App.jsx for the status bar — the website/PWA's own
+  // browser back-gesture is covered separately, by the next effect below.
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const listenerPromise = CapacitorApp.addListener('backButton', () => {
@@ -226,6 +245,36 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     })
     return () => {
       listenerPromise.then(handle => handle.remove())
+    }
+  }, [requestClose])
+
+  // Browser back-gesture/button guard (website/PWA only — the effect
+  // above already covers the native Android app via Capacitor). A plain
+  // browser has no equivalent of Capacitor's backButton event; back is
+  // just "pop the browser's history," which would otherwise navigate
+  // the underlying route away exactly like the native case did before
+  // its own fix. Pushing a placeholder entry here gives the Lightbox its
+  // own spot in that history, so back pops the placeholder (caught
+  // below and turned into a close) instead of the real route entry
+  // underneath it.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return
+    window.history.pushState({ capsulaLightbox: true }, '')
+    function handlePopState() {
+      poppedViaBrowserBackRef.current = true
+      requestClose()
+    }
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      // Closed via a UI control (X, swipe-down) rather than the browser
+      // back gesture — the placeholder entry pushed above is still
+      // sitting there unconsumed. Remove it so the back stack doesn't
+      // end up with a dead entry someone would have to press back
+      // through twice.
+      if (!poppedViaBrowserBackRef.current) {
+        window.history.back()
+      }
     }
   }, [requestClose])
 
