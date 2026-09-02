@@ -72,11 +72,21 @@
  * Back-gesture guard, body-scroll lock — unchanged, since neither depends
  * on how photo-switching itself is implemented.
  *
+ * Top title band (added 2026-09-02): shows the gallery block's own
+ *   title (same string ImageCarousel shows above the card) on the same
+ *   banded-gradient treatment as the bottom caption/dots band below,
+ *   rather than the close button floating alone over the photo. Only
+ *   the title itself is conditional — the band and close button always
+ *   show together, matching how the bottom band always shows even when
+ *   a photo has no caption.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
  *   onClose      () => void
  *   onGo         (index: number) => void
+ *   title        string (optional) — gallery block title, shown in the
+ *                top band next to the close button
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -102,14 +112,44 @@ const LOAD_WINDOW = 1
 // "finger never really moved," same as ImageCarousel.jsx's own tap check.
 const TAP_SLOP_PX = 8
 
-// Close button — the one remaining top control (dots already show
-// position, swipe already handles navigation). Floats directly over the
-// photo instead of sitting in a tinted band.
-const CLOSE_BUTTON_WRAP_STYLE = {
+// Top overlay — same treatment as BOTTOM_OVERLAY_STYLE below (one black
+// gradient for legibility against any photo, anchored to its own edge so
+// it grows toward the middle of the screen as content wraps), just
+// flipped to anchor at the top and hold the block's title next to the
+// close button instead of the caption/dots.
+const TOP_OVERLAY_STYLE = {
   position: 'absolute',
-  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-  right: 14,
+  left: 0,
+  right: 0,
+  top: 0,
   zIndex: 2,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 12,
+  paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+  paddingLeft: 20,
+  paddingRight: 14,
+  paddingBottom: 44,
+  background: 'linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.88) 18%, rgba(0,0,0,0.68) 38%, rgba(0,0,0,0.42) 58%, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0) 100%)',
+}
+
+// One title for the whole gallery block (unlike the caption below, which
+// is per-photo and changes on swipe) — left-aligned since it shares a
+// row with the close button, and allowed to wrap across lines like the
+// caption rather than truncating, with the button held to flex-start on
+// TOP_OVERLAY_STYLE so it stays put at the top of that row either way.
+const TITLE_STYLE = {
+  margin: 0,
+  paddingTop: 4,
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 700,
+  lineHeight: 1.35,
+  textAlign: 'left',
+  whiteSpace: 'normal',
+  overflowWrap: 'break-word',
+  flex: 1,
+  minWidth: 0,
 }
 
 const CONTROL_BUTTON_STYLE = {
@@ -279,7 +319,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   )
 }
 
-export default function Lightbox({ images, activeIndex, onClose, onGo }) {
+export default function Lightbox({ images, activeIndex, onClose, onGo, title = '' }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     loop: false,
@@ -537,15 +577,19 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
         </div>
       </motion.div>
 
-      {/* Close — the one remaining top control, floating over the photo */}
+      {/* Title + close — same banded-gradient treatment as the bottom
+          caption/dots band: title (when the gallery block has one) sits
+          next to the close button on one shared gradient instead of the
+          button floating alone over the photo. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
         style={{
-          ...CLOSE_BUTTON_WRAP_STYLE,
+          ...TOP_OVERLAY_STYLE,
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
+        {title && <h2 style={TITLE_STYLE}>{title}</h2>}
         <button
           onClick={(e) => { e.stopPropagation(); requestClose() }}
           aria-label="Close"

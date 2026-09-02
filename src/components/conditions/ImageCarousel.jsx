@@ -464,8 +464,10 @@ export default function ImageCarousel({ images = [], title = '' }) {
           activeIndex={selectedIndex}
           onClose={() => setLightboxOpen(false)}
           onGo={goTo}
+          title={title}
         />
       )}
     </>
   )
 }
+
