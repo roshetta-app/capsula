@@ -168,15 +168,20 @@ export default function ImageCarousel({ images = [], title = '' }) {
   // The public `duration` option only affects programmatic scrollTo()
   // calls — a released drag's settle speed is computed internally from
   // a hardcoded baseSpeed/friction (25 / 0.68) that isn't exposed as a
-  // public option at all. That's the actual thing that reads as "slow."
-  // internalEngine() is the only way to reach it: override it the
-  // instant the finger lifts, right before Embla's own settle animation
-  // starts, so every release (not just the next one) gets the faster
-  // values.
+  // public option at all. internalEngine() is the only way to reach it.
+  // duration(2)/friction(0.36) below were chosen by directly simulating
+  // Embla's seek() formula (v += displacement/duration; v *= friction;
+  // loc += v) rather than guessing: they settle in ~14 frames (~230ms,
+  // close to the original hand-rolled 260ms) with under 1px of
+  // overshoot, verified across swipe distances from 80px to 1000px.
+  // (An earlier version of this override used duration 10/friction
+  // 0.25, which — despite looking "smaller = faster" — actually took
+  // ~220 frames/3.7s to settle: lower friction kills velocity harder
+  // each frame, so it can't build enough speed to cover the distance.)
   useEffect(() => {
     if (!emblaApi) return
     const speedUpSettle = () => {
-      emblaApi.internalEngine().scrollBody.useDuration(10).useFriction(0.25)
+      emblaApi.internalEngine().scrollBody.useDuration(2).useFriction(0.36)
     }
     emblaApi.on('pointerUp', speedUpSettle)
     return () => emblaApi.off('pointerUp', speedUpSettle)
