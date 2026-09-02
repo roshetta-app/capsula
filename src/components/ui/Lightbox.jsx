@@ -305,7 +305,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             exit="exit"
             transition={isFirstPhotoRef.current
               ? { duration: 0.22, ease: 'easeOut' }
-              : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+              : { type: 'spring', stiffness: 340, damping: 32, mass: 0.9 }}
             onTouchStart={handlePhotoTouchStart}
             onTouchEnd={handlePhotoTouchEnd}
             style={{
