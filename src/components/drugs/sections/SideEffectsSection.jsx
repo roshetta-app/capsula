@@ -30,11 +30,16 @@
  * and side_effects_serious merged into one DB column, side_effects, mapped
  * app-side as sideEffects — this component now reads it directly and no
  * longer performs its own merge.
+ *
+ * Phase 6 (re-scoped, 2026-09-03, plan §4.9): empty-state changed from the
+ * EmptySection "Not yet added" placeholder to rendering nothing at all —
+ * now matches every other section's hide-when-empty rule. See DoseSection.jsx
+ * for the fuller note on why the three-status loading model is no longer
+ * needed (Phase 1's 1.18 single-unified-download change).
  */
 
 import { useState } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
-import { EmptySection } from './sectionPrimitives.jsx'
 
 const TRUNCATE_AT = 3
 
@@ -44,7 +49,7 @@ export default function SideEffectsSection({ drug }) {
   const { sideEffects = [] } = drug
 
   if (sideEffects.length === 0) {
-    return <EmptySection title="Side Effects" />
+    return null
   }
 
   const hasMore = sideEffects.length > TRUNCATE_AT

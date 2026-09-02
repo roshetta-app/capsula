@@ -56,6 +56,7 @@
 
 import { useEffect, useRef, useState }   from 'react'
 import { useParams, useNavigate }        from 'react-router-dom'
+import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
 import BottomNav                         from '../components/BottomNav'
@@ -80,7 +81,7 @@ export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
 
-  const { drugs, loading }          = useDrugContext()
+  const { drugs, loading, error, retry } = useDrugContext()
   const { isDrugFavourited, toggleDrug } = useFavouritesContext()
 
   // Match by formulation slug first, fall back to id
@@ -145,6 +146,60 @@ export default function DrugDetailScreen() {
         fontSize:       14,
       }}>
         Loading…
+      </div>
+    )
+  }
+
+  // ── Load failed ────────────────────────────────────────────────────────────
+  // Phase 6 (re-scoped, 2026-09-03, plan §4.9): rare case — device is past
+  // onboarding but its cache is missing (e.g. OS cleared storage under low-
+  // space pressure while leaving the "already onboarded" flag intact), and
+  // the resulting re-download fails. Previously fell through to "Drug not
+  // found," which misdescribes a failed download as a bad link. error/retry
+  // already exist on DrugContext (same ones the drug list screen's own
+  // LibraryErrorState uses) — this just reads them here too. Wording/colors
+  // match that same screen's failed-load state.
+  if (!drug && !loading && error) {
+    return (
+      <div style={{
+        display:        'flex',
+        flexDirection:  'column',
+        alignItems:     'center',
+        justifyContent: 'center',
+        minHeight:      '60dvh',
+        gap:            'var(--space-3)',
+        color:          'var(--color-text-tertiary)',
+        padding:        'var(--space-6)',
+        textAlign:      'center',
+      }}>
+        <WifiOff size={28} color="var(--color-text-tertiary)" />
+        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+          Couldn't load your library
+        </div>
+        <div style={{ fontSize: 13 }}>
+          Check your connection and try again
+        </div>
+        <button
+          onClick={retry}
+          style={{
+            marginTop:       'var(--space-2)',
+            display:         'inline-flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            padding:         '6px 20px',
+            borderRadius:    'var(--radius-md)',
+            border:          '1.5px solid var(--color-accent)',
+            backgroundColor: 'var(--color-accent)',
+            color:           '#fff',
+            fontSize:        13,
+            fontWeight:      600,
+            cursor:          'pointer',
+            fontFamily:      'var(--font-body)',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Try again
+        </button>
       </div>
     )
   }

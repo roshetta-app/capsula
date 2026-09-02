@@ -60,12 +60,19 @@
  * Props:
  *   drug — flat drug object from DrugContext (textbookDoses, doseAdjustments,
  *          textbookDoseNotes)
+ *
+ * Phase 6 (re-scoped, 2026-09-03, plan §4.9): empty-state changed from the
+ * EmptySection "Not yet added" placeholder to rendering nothing at all —
+ * now matches every other section's hide-when-empty rule. The three-status
+ * loading model §4.9 originally called for is no longer needed: Phase 1's
+ * 1.18 single-unified-download change means a drug's data always arrives
+ * complete in one shot, so there's no point where a section is "still
+ * loading" versus genuinely empty.
  */
 
 import { useState } from 'react'
 import { ChevronRight } from 'lucide-react'
 import DoseAdjustmentsBottomSheet from './DoseAdjustmentsBottomSheet.jsx'
-import { EmptySection } from './sectionPrimitives.jsx'
 
 export default function DoseSection({ drug }) {
   const {
@@ -78,7 +85,7 @@ export default function DoseSection({ drug }) {
   const [adjustmentsOpen, setAdjustmentsOpen] = useState(false)
 
   if (textbookDoses.length === 0) {
-    return <EmptySection title="Dosage" />
+    return null
   }
 
   // Tab order = array order — population is now the top-level grouping

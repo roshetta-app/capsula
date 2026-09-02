@@ -40,12 +40,17 @@
  *                   generic, same shape BrandsList.jsx already receives
  *   onSelectBrand — (item) => void — passed through to BrandsBottomSheet,
  *                   called after the sheet closes
+ *
+ * Phase 6 (re-scoped, 2026-09-03, plan §4.9): the Mechanism of Action
+ * sub-block's empty state changed from an inline NotYetAdded fallback to
+ * rendering nothing at all — matches every other section's hide-when-empty
+ * rule. The rest of this section (name, ingredients, tags) is unaffected.
  */
 
 import { useState } from 'react'
 import { Atom, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { NotYetAdded, InlineTruncatedList } from './sectionPrimitives.jsx'
+import { InlineTruncatedList } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 const pillStyle = {
@@ -142,51 +147,46 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
             App-side truncation at 30 words (decision 5) — button omitted
             entirely (not just inert) when already under the limit, same
             convention UsesSection.jsx uses. -- */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>
-        {mechanismOfAction
-          ? (
-            <>
-              <p style={{
-                fontSize:   14,
-                color:      'var(--color-text-primary)',
-                lineHeight: 1.6,
-                margin:     0,
-              }}>
-                {moaText}
-              </p>
-              {moaHasMore && (
-                <button
-                  onClick={() => setMoaOpen(o => !o)}
-                  style={{
-                    display:        'flex',
-                    alignItems:     'center',
-                    justifyContent: 'center',
-                    gap:            4,
-                    width:          '100%',
-                    marginTop:      'var(--space-2)',
-                    background:     'none',
-                    border:         'none',
-                    cursor:         'pointer',
-                    padding:        0,
-                    fontFamily:     'var(--font-body)',
-                    fontSize:       13,
-                    fontWeight:     600,
-                    color:          'var(--color-text-secondary)',
-                    WebkitTapHighlightColor: 'transparent',
-                  }}
-                >
-                  {moaOpen ? 'See less' : 'See more'}
-                  {moaOpen
-                    ? <ChevronUp size={14} />
-                    : <ChevronDown size={14} />
-                  }
-                </button>
-              )}
-            </>
-          )
-          : <NotYetAdded />
-        }
-      </div>
+      {mechanismOfAction && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <p style={{
+            fontSize:   14,
+            color:      'var(--color-text-primary)',
+            lineHeight: 1.6,
+            margin:     0,
+          }}>
+            {moaText}
+          </p>
+          {moaHasMore && (
+            <button
+              onClick={() => setMoaOpen(o => !o)}
+              style={{
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                gap:            4,
+                width:          '100%',
+                marginTop:      'var(--space-2)',
+                background:     'none',
+                border:         'none',
+                cursor:         'pointer',
+                padding:        0,
+                fontFamily:     'var(--font-body)',
+                fontSize:       13,
+                fontWeight:     600,
+                color:          'var(--color-text-secondary)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {moaOpen ? 'See less' : 'See more'}
+              {moaOpen
+                ? <ChevronUp size={14} />
+                : <ChevronDown size={14} />
+              }
+            </button>
+          )}
+        </div>
+      )}
 
       {/* -- Placeholder Class/Subclass tags (4.8) — static labels, not
             real data yet; subclass column deferred, plan §11.5 -- */}
