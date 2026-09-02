@@ -186,6 +186,14 @@ export default function ImageCarousel({ images = [], title = '' }) {
   const goTo   = useCallback((i) => setIndex(Math.max(0, Math.min(images.length - 1, i))), [images.length])
   const openAt = useCallback((i) => { setIndex(i); setLightbox(true) }, [])
 
+  // The dot indicator should switch the instant a swipe is committed —
+  // the same moment the photo starts sliding — not 300ms later when the
+  // settle timer actually flips `index`. That timer has a deliberate
+  // 40ms safety buffer past the end of the photo's own 260ms slide (so
+  // it can never hang waiting on a transition event), which otherwise
+  // left the dot visibly lagging behind an already-finished photo slide.
+  const displayIndex = settling === 'next' ? index + 1 : settling === 'prev' ? index - 1 : index
+
   // Each slot is permanently wired to useCachedImage — same three call
   // sites every render, only the url fed into each one changes, and
   // only when the photo it's tracking actually leaves the ±1 window.
@@ -412,13 +420,13 @@ export default function ImageCarousel({ images = [], title = '' }) {
                       onClick={() => goTo(i)}
                       aria-label={`Image ${i + 1}`}
                       style={{
-                        width:  i === index ? 8 : 6,
-                        height: i === index ? 8 : 6,
+                        width:  i === displayIndex ? 8 : 6,
+                        height: i === displayIndex ? 8 : 6,
                         borderRadius: '50%',
                         border: 'none',
                         padding: 0,
                         cursor: 'pointer',
-                        backgroundColor: i === index
+                        backgroundColor: i === displayIndex
                           ? 'var(--color-accent)'
                           : 'var(--color-border)',
                         transition: 'width 0.2s ease, height 0.2s ease, background-color 0.2s ease',
