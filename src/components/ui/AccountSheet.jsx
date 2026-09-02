@@ -24,6 +24,13 @@
  *     opt-out button. This supersedes D16's original "explicit permanent
  *     dismiss button" model — see useSignInPrompt.js for the new mechanic.
  *
+ * favourites-pending-fix follow-up (copy) — signed-out headline/subtext now
+ * swap to favourite-specific wording when this sheet was opened because of
+ * a pending favourite tap (favouriteContext, passed by SignInNudge.jsx),
+ * instead of always showing the generic "Sync your favourites across
+ * devices" copy that made sense for the notes-based nudge but not for
+ * "you just tried to save something."
+ *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
@@ -36,6 +43,11 @@
  *   user               SupabaseUser | null
  *   signInWithGoogle    () => Promise<{ error }>
  *   signOut             () => Promise<void>
+ *   favouriteContext    boolean — true when a pending favourite (not the
+ *                                 notes-based nudge) is why this sheet is
+ *                                 open. Swaps the signed-out copy only;
+ *                                 everything else about the sheet is
+ *                                 unchanged. Defaults to false.
  */
 
 import { useEffect, useState } from 'react'
@@ -50,6 +62,7 @@ export default function AccountSheet({
   user,
   signInWithGoogle,
   signOut,
+  favouriteContext = false,
 }) {
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState(null)
@@ -233,7 +246,7 @@ export default function AccountSheet({
               color:        'var(--color-text-primary)',
               marginBottom: 'var(--space-2)',
             }}>
-              Sign in or create account
+              {favouriteContext ? 'Save this to your Favourites' : 'Sign in or create account'}
             </div>
             <p style={{
               margin:     '0 0 var(--space-4)',
@@ -241,7 +254,9 @@ export default function AccountSheet({
               lineHeight: 1.55,
               color:      'var(--color-text-secondary)',
             }}>
-              Sync your favourites across devices with your Google account.
+              {favouriteContext
+                ? "Sign in with Google — it's free — to save it and find it anytime, on any device."
+                : 'Sync your favourites across devices with your Google account.'}
             </p>
 
             {error && (

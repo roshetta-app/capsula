@@ -1,4 +1,3 @@
-
 /**
  * src/components/SignInNudge.jsx
  *
@@ -67,6 +66,7 @@ export default function SignInNudge() {
         user={user}
         signInWithGoogle={signInWithGoogle}
         signOut={signOut}
+        favouriteContext={!!pendingFavourite}
       />
       <FavouriteLimitSheet
         isOpen={!!capBlocked}
