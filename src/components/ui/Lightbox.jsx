@@ -194,6 +194,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             style={{
               width: '100%', height: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              touchAction: 'none',
             }}
           >
             {status === 'ready' && src && !displayFailed && (
@@ -202,7 +203,13 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
                 minScale={1}
                 maxScale={4}
                 doubleClick={{ mode: 'toggle', step: 1.5 }}
-                panning={{ velocityDisabled: true }}
+                // Panning is only meaningful once actually zoomed in — left
+                // enabled at 1x, it still captures part of a single-finger
+                // drag, which corrupts the swipe/dismiss gesture below into
+                // misreading a sideways swipe as a downward one. Pinch
+                // itself stays active regardless (separate from panning),
+                // so zooming in still works from any scale.
+                panning={{ disabled: zoomScale <= 1, velocityDisabled: true }}
                 onTransformed={(_ref, state) => setZoomScale(state.scale)}
               >
                 <TransformComponent
