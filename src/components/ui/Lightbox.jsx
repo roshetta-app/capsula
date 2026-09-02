@@ -96,6 +96,25 @@
  *   and closing normally instead (X, swipe-down) removes that
  *   placeholder itself so it doesn't leave a dead history entry behind.
  *
+ * Caption/photo sync fix (2026-09-02, fourth pass same day):
+ *   The caption text was previously a plain, un-animated node — when
+ *   the active photo changed, it just snapped to the new value in place,
+ *   completely disconnected from the photo's own slide/settle animation
+ *   (a regression from the original decision that caption and photo
+ *   should "read as one carousel unit"). That mismatch is what showed up
+ *   as a flicker: the text swapped instantly while the photo was still
+ *   mid-slide. The caption is now its own AnimatePresence, keyed by
+ *   photo URL and driven by the same `slideCustom` (direction + "is this
+ *   the very first photo") and the same transition timing as the photo,
+ *   so it slides/fades in step with it instead of jump-cutting. It uses
+ *   `mode="popLayout"` so the outgoing caption is pulled out of normal
+ *   layout the instant it starts exiting — otherwise, for the brief
+ *   overlap where both the old and new caption are mounted at once,
+ *   they'd stack on top of each other in the flex column and puff up the
+ *   bottom band's height for that instant, nudging the dots below it.
+ *   `mode="popLayout"` keeps that overlap from ever affecting layout, so
+ *   the dots stay put exactly as the fixed-slot decision intended.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -352,6 +371,27 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   }
   const slideCustom = { isFirstPhoto: isFirstPhotoRef.current, dir: dirRef.current }
 
+  // Caption's own enter/exit, read the same {isFirstPhoto, dir} custom
+  // prop as the photo (see slideVariants above) so it moves with the
+  // exact same direction and "is this the opening photo" logic — a
+  // smaller slide-and-fade rather than the photo's full-width slide,
+  // since it's a line or two of text, not the whole screen. The photo's
+  // own transition object (right below, keyed off isFirstPhotoRef) is
+  // reused as-is for the caption too, so both finish moving at the same
+  // moment instead of drifting out of step.
+  const captionVariants = {
+    enter: ({ isFirstPhoto, dir }) => isFirstPhoto
+      ? { opacity: 0 }
+      : { opacity: 0, x: dir > 0 ? 24 : -24 },
+    center: { opacity: 1, x: 0 },
+    exit: ({ isFirstPhoto, dir }) => isFirstPhoto
+      ? { opacity: 0 }
+      : { opacity: 0, x: dir > 0 ? -24 : 24 },
+  }
+  const photoTransition = isFirstPhotoRef.current
+    ? { duration: 0.22, ease: 'easeOut' }
+    : { type: 'spring', stiffness: 340, damping: 32, mass: 0.9 }
+
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
@@ -381,9 +421,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             initial="enter"
             animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.94 : 1, x: 0 }}
             exit="exit"
-            transition={isFirstPhotoRef.current
-              ? { duration: 0.22, ease: 'easeOut' }
-              : { type: 'spring', stiffness: 340, damping: 32, mass: 0.9 }}
+            transition={photoTransition}
             onTouchStart={handlePhotoTouchStart}
             onTouchEnd={handlePhotoTouchEnd}
             style={{
@@ -460,7 +498,12 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           given a fixed height — a taller caption grows the box upward,
           not downward, so the dots as the last child never move. Both
           float over the photo on a shared bottom gradient that grows
-          with the box instead of a flat tinted band. */}
+          with the box instead of a flat tinted band.
+
+          The caption itself is wrapped in its own AnimatePresence
+          (mode="popLayout") keyed by photo URL, driven by the same
+          slideCustom/photoTransition as the photo above — see the
+          "Caption/photo sync fix" note in the file header for why. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
@@ -469,11 +512,23 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        {active.caption && (
-          <p dir="auto" style={CAPTION_STYLE}>
-            {active.caption}
-          </p>
-        )}
+        <AnimatePresence initial={false} custom={slideCustom} mode="popLayout">
+          {active.caption && (
+            <motion.p
+              key={active.url}
+              dir="auto"
+              custom={slideCustom}
+              variants={captionVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={photoTransition}
+              style={CAPTION_STYLE}
+            >
+              {active.caption}
+            </motion.p>
+          )}
+        </AnimatePresence>
 
         {images.length > 1 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
