@@ -48,11 +48,22 @@
  *   - 'loading' → nothing rendered yet; the container's
  *     backgroundColor (var(--color-bg)) shows in the meantime.
  *
+ * Zoom-hint (Image System Refinement Plan, Part C, Step 2):
+ *   - A small magnifying-glass badge in the top-right corner of the
+ *     photo, shown whenever a photo is actually displayed ('ready').
+ *     Purely a discoverability cue — tap-to-zoom already worked before
+ *     this, nothing about the interaction itself changed, there was
+ *     just no visual sign it existed on a touchscreen (the old
+ *     cursor: zoom-in hint has no equivalent for touch). Purely
+ *     decorative, so it's marked aria-hidden and sits behind
+ *     pointer-events: none — the existing tap/swipe handlers on the
+ *     container still own all touch interaction.
+ *
  * Props:
  *   images  { id, url, caption }[]
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Image as ImageIcon } from 'lucide-react'
+import { Image as ImageIcon, ZoomIn } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
 import ImageLoadError from '../ui/ImageLoadError'
 import { useCachedImage } from '../../hooks/useCachedImage'
@@ -154,6 +165,27 @@ export default function ImageCarousel({ images = [] }) {
             />
           )}
 
+          {status === 'ready' && src && !displayFailed && (
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                top: 10,
+                right: 10,
+                width: 26,
+                height: 26,
+                borderRadius: '50%',
+                backgroundColor: 'rgba(0,0,0,0.35)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'none',
+              }}
+            >
+              <ZoomIn size={14} color="#fff" />
+            </div>
+          )}
+
           {(status === 'error' || displayFailed) && (
             <div
               onTouchStart={(e) => e.stopPropagation()}
@@ -247,5 +279,3 @@ export default function ImageCarousel({ images = [] }) {
     </>
   )
 }
-
-
