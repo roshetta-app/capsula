@@ -96,24 +96,32 @@
  *   and closing normally instead (X, swipe-down) removes that
  *   placeholder itself so it doesn't leave a dead history entry behind.
  *
- * Caption/photo sync fix (2026-09-02, fourth pass same day):
+ * Caption/photo sync fix (2026-09-02, fourth + fifth pass same day):
  *   The caption text was previously a plain, un-animated node — when
  *   the active photo changed, it just snapped to the new value in place,
  *   completely disconnected from the photo's own slide/settle animation.
  *   That mismatch is what showed up as a flicker: the text swapped
- *   instantly while the photo was still mid-slide. The caption is now
- *   its own AnimatePresence, keyed by photo URL, doing a plain crossfade
- *   (deliberately NOT mirroring the photo's directional slide — a first
- *   pass tried that and it read as the text flying around, which felt
- *   worse than the original flicker) timed to the photo's own transition
- *   duration so the two settle together. It uses `mode="popLayout"` so
- *   the outgoing caption is pulled out of normal layout the instant it
- *   starts exiting — otherwise, for the brief overlap where both the old
- *   and new caption are mounted at once, they'd stack on top of each
- *   other in the flex column and puff up the bottom band's height for
- *   that instant, nudging the dots below it. `mode="popLayout"` keeps
- *   that overlap from ever affecting layout, so the dots stay put
- *   exactly as the fixed-slot decision intended.
+ *   instantly while the photo was still mid-slide.
+ *   First attempt: an AnimatePresence with mode="popLayout" that mirrored
+ *   the photo's directional slide. Both parts of that were wrong for a
+ *   caption living in a plain flex column (not the photo's own
+ *   absolutely-positioned stage): the directional slide read as the
+ *   text flying across the screen, and popLayout — which yanks the
+ *   outgoing element out of document flow the instant it starts exiting
+ *   — made the bottom band's height (and so the caption's own position,
+ *   since the band grows/shrinks upward from a bottom anchor) jump
+ *   around for the duration of the crossfade, which read as the caption
+ *   flying up and down instead.
+ *   Fixed version: no slide, no popLayout. The caption now renders
+ *   inside an always-present CSS grid wrapper (`hasAnyCaption`, same
+ *   pattern as ImageCarousel.jsx) with every caption sharing one grid
+ *   cell (`gridArea: '1 / 1'`), so the outgoing and incoming caption
+ *   overlap directly on top of each other for the whole crossfade
+ *   instead of one leaving flow before the other arrives. The wrapper's
+ *   size is simply "as tall as the taller of the two," so nothing above
+ *   or below it (namely the dots) ever moves. Both captions just fade
+ *   opacity in place, timed to the photo's own transition duration so
+ *   they settle together.
  *
  * Props:
  *   images       { id, url, caption }[]
@@ -237,6 +245,14 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
   const active = images[activeIndex]
   const { src, status, retry } = useCachedImage(active?.url)
+  // Whether ANY photo in this gallery has a caption at all — mirrors
+  // ImageCarousel.jsx's own hasAnyCaption. Used to decide whether the
+  // caption's grid wrapper renders at all: keeping that wrapper mounted
+  // for the lifetime of the gallery (rather than only when the current
+  // photo happens to have a caption) is what lets AnimatePresence below
+  // play an outgoing caption's fade even on the photo where it's
+  // disappearing, without the wrapper itself popping in and out.
+  const hasAnyCaption = images.some((img) => img.caption)
 
   const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
 
@@ -371,16 +387,19 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   }
   const slideCustom = { isFirstPhoto: isFirstPhotoRef.current, dir: dirRef.current }
 
-  // Caption's own enter/exit — a plain crossfade, deliberately not a
-  // directional slide like the photo. Direction/first-photo don't
-  // affect it at all; it just fades out and the new one fades in, timed
-  // to the photo's own transition duration so they still finish
-  // together, without the caption visually flying across the screen.
-  const captionVariants = {
-    enter: { opacity: 0 },
-    center: { opacity: 1 },
-    exit: { opacity: 0 },
-  }
+  // Caption's own transition — a plain crossfade, timed to the photo's
+  // own transition duration so the two finish together. No slide, no
+  // direction: the earlier attempt reused the photo's slide distance for
+  // the caption too, but with the caption sitting in a plain flex column
+  // (not the photo's absolutely-positioned stage), popping the outgoing
+  // caption out of flow mid-fade made the box's height (and so the
+  // caption's own position, since the box grows/shrinks upward from a
+  // bottom anchor) jump around — read as the caption "flying" up and
+  // down rather than just fading. Fixed below by overlapping the
+  // outgoing and incoming caption in the same CSS grid cell instead of
+  // letting one leave the document flow before the other arrives, so the
+  // wrapper's size is simply "however tall the taller of the two is" for
+  // the entire crossfade, with no reflow at any point.
   const captionTransition = { duration: 0.22, ease: 'easeInOut' }
   const photoTransition = isFirstPhotoRef.current
     ? { duration: 0.22, ease: 'easeOut' }
@@ -494,9 +513,10 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           float over the photo on a shared bottom gradient that grows
           with the box instead of a flat tinted band.
 
-          The caption itself is wrapped in its own AnimatePresence
-          (mode="popLayout") keyed by photo URL, doing a plain crossfade
-          timed to the photo's own transition — see the "Caption/photo
+          The caption itself sits in its own always-present grid wrapper
+          (rendered whenever any photo in the gallery has a caption) so
+          AnimatePresence can crossfade the outgoing/incoming caption
+          overlapping in the same grid cell — see the "Caption/photo
           sync fix" note in the file header for why. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
@@ -506,22 +526,25 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        <AnimatePresence initial={false} mode="popLayout">
-          {active.caption && (
-            <motion.p
-              key={active.url}
-              dir="auto"
-              variants={captionVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={captionTransition}
-              style={CAPTION_STYLE}
-            >
-              {active.caption}
-            </motion.p>
-          )}
-        </AnimatePresence>
+        {hasAnyCaption && (
+          <div style={{ display: 'grid', width: '100%' }}>
+            <AnimatePresence initial={false}>
+              {active.caption && (
+                <motion.p
+                  key={active.url}
+                  dir="auto"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={captionTransition}
+                  style={{ ...CAPTION_STYLE, gridArea: '1 / 1' }}
+                >
+                  {active.caption}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {images.length > 1 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
