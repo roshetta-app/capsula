@@ -188,7 +188,12 @@ export function useFavourites() {
   // Removing always goes through, no check. Adding checks the free-tier
   // cap first: if already at the limit, blocks the add (capBlocked) and
   // leaves favourites untouched instead of silently exceeding it.
-  const applyToggle = useCallback((type, id) => {
+  // favourites-pending-fix follow-up — accepts an optional { silent: true }
+  // so a screen that already shows its own feedback for a remove (e.g.
+  // FavouritesScreen's own Undo snackbar) can skip this generic toast
+  // instead of showing both at once. Defaults to false everywhere else,
+  // so every other call site's behavior is unchanged.
+  const applyToggle = useCallback((type, id, { silent = false } = {}) => {
     setFavourites(prev => {
       const list = prev[type]
       const itemType = type === 'drugs' ? 'drug' : 'condition'
@@ -197,7 +202,7 @@ export function useFavourites() {
         const next = { ...prev, [type]: list.filter(x => x !== id) }
         writeStorage(next)
         writeThrough(itemType, id, false)
-        toast.info('Removed from Favourites')
+        if (!silent) toast.info('Removed from Favourites')
         return next
       }
 
@@ -209,7 +214,7 @@ export function useFavourites() {
       const next = { ...prev, [type]: [...list, id] }
       writeStorage(next)
       writeThrough(itemType, id, true)
-      toast.success('Added to Favourites')
+      if (!silent) toast.success('Added to Favourites')
       return next
     })
   }, [isPro, writeThrough, toast])
@@ -293,20 +298,20 @@ export function useFavourites() {
     setFavourites({ drugs: [], conditions: [] })
   }, [authLoading, user])
 
-  const toggleDrug = useCallback((id) => {
+  const toggleDrug = useCallback((id, options) => {
     if (!user) {
       recordPendingFavourite({ type: 'drugs', id })
       return
     }
-    applyToggle('drugs', id)
+    applyToggle('drugs', id, options)
   }, [user, applyToggle, recordPendingFavourite])
 
-  const toggleCondition = useCallback((id) => {
+  const toggleCondition = useCallback((id, options) => {
     if (!user) {
       recordPendingFavourite({ type: 'conditions', id })
       return
     }
-    applyToggle('conditions', id)
+    applyToggle('conditions', id, options)
   }, [user, applyToggle, recordPendingFavourite])
 
   // restoreConditionAt — reinserts a condition id at a specific index instead

@@ -1,4 +1,3 @@
-
 /**
  * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
@@ -1586,7 +1585,7 @@ export default function FavouritesScreen() {
     const restoreEntries = ids
       .map(id => ({ id, index: favourites.conditions.indexOf(id) }))
       .sort((a, b) => a.index - b.index)
-    ids.forEach(id => toggleCondition(id))
+    ids.forEach(id => toggleCondition(id, { silent: true }))
     showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`, {
       label: 'Undo',
       onAction: () => {
@@ -1782,7 +1781,7 @@ export default function FavouritesScreen() {
     const index = favourites.conditions.indexOf(id)
     beginRowExit(id)
     setTimeout(() => {
-      toggleCondition(id)
+      toggleCondition(id, { silent: true })
       endRowExit(id)
     }, ROW_EXIT_MS)
     showSnack('Removed from favourites', {
@@ -1806,7 +1805,7 @@ export default function FavouritesScreen() {
     if (!confirmingDrug) return
     const id = confirmingDrug.id
     const index = favourites.drugs.indexOf(id)
-    toggleDrug(id)
+    toggleDrug(id, { silent: true })
     showSnack('Removed from favourites', {
       label: 'Undo',
       onAction: () => restoreDrugAt(id, index),
