@@ -92,6 +92,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
+import { Capacitor } from '@capacitor/core'
+import { App as CapacitorApp } from '@capacitor/app'
 import { X } from 'lucide-react'
 import { useCachedImage } from '../../hooks/useCachedImage'
 import ImageLoadError from './ImageLoadError'
@@ -202,6 +204,30 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = prev }
   }, [])
+
+  // Android back button/gesture guard. With no listener registered here,
+  // Capacitor's default behavior sends "back" straight to the WebView's
+  // own browser history — which pops the actual route underneath (e.g.
+  // back to the previous screen) instead of just closing this overlay,
+  // since the Lightbox never occupies its own spot in that history.
+  // Registering a listener here takes over that behavior entirely for as
+  // long as the Lightbox is mounted (which is only ever while it's
+  // open — the parent renders it conditionally): back closes the
+  // Lightbox instead. Removed on unmount, so normal back behavior for
+  // the underlying page resumes immediately once closed. No-ops on the
+  // website build via the same Capacitor.isNativePlatform() guard
+  // already used in App.jsx for the status bar — a browser back
+  // gesture on the installed website/PWA isn't covered by this and
+  // would need separate handling if that's ever needed.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      requestClose()
+    })
+    return () => {
+      listenerPromise.then(handle => handle.remove())
+    }
+  }, [requestClose])
 
   // Reset failure/zoom state when the photo itself changes — otherwise a
   // failed load or a leftover zoom level from the previous photo would
