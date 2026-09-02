@@ -188,40 +188,25 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   // onCurrentZoom, but only while this is the current slide, since only
   // the current slide's zoom should affect Embla's own drag gating.
   const [localScale, setLocalScale] = useState(1)
-  // Scale immediately before the most recent double-click (or wheel)
-  // zoom action — see the onZoomStart/onZoomStop pair below.
+  // Scale immediately before the most recent onZoomStart/onZoomStop
+  // pair — see below. Whether that pair was a pinch, not a double-tap.
+  //
+  // Correction: an earlier version of this fix wrongly assumed (from
+  // checking react-zoom-pan-pinch's *latest* npm version) that pinch
+  // never fires onZoomStart/onZoomStop — but the version actually
+  // installed in this project is older (confirmed 2026-09-02 by finding
+  // `onTransformed` only exists pre-v4; v4 renamed it to `onTransform`,
+  // and this file already used `onTransformed` before any of tonight's
+  // changes). In that installed version, onPinchStart/onPinchStop *do*
+  // fire onZoomStart/onZoomStop, so the double-tap correction below was
+  // firing on every pinch too, forcing pinch-zoom-out back to 1x.
+  //
+  // The library passes the underlying event through as the callbacks'
+  // 2nd argument — a pinch's touchstart always carries 2+ touches, a
+  // double-tap's never does — so that's what actually distinguishes
+  // them, rather than a flag or timing guess.
   const scaleBeforeZoomRef = useRef(1)
-  // Timestamp until which a "double-click" should be ignored by our
-  // correction below. Lifting two fingers off a pinch close together can
-  // make the WebView synthesize a native double-click from the two
-  // touchend events, which the zoom library can't tell apart from a real
-  // double-tap — without this guard, ending a pinch could trigger our
-  // own full-reset correction, which is a step further than even the
-  // library's own (already slightly odd, pre-existing) reaction to that
-  // same phantom event. Confirmed from source that pinch itself never
-  // calls onZoomStart/onZoomStop, so this only needs to catch the
-  // moment fingers lift, not gate anything during the pinch itself.
-  const pinchGuardUntilRef = useRef(0)
-
-  useEffect(() => {
-    const activePointers = new Set()
-    function onDown(e) {
-      activePointers.add(e.pointerId)
-    }
-    function onUpOrCancel(e) {
-      if (activePointers.size >= 2) pinchGuardUntilRef.current = Date.now() + 400
-      activePointers.delete(e.pointerId)
-    }
-    window.addEventListener('pointerdown', onDown, true)
-    window.addEventListener('pointerup', onUpOrCancel, true)
-    window.addEventListener('pointercancel', onUpOrCancel, true)
-    return () => {
-      window.removeEventListener('pointerdown', onDown, true)
-      window.removeEventListener('pointerup', onUpOrCancel, true)
-      window.removeEventListener('pointercancel', onUpOrCancel, true)
-    }
-  }, [])
-
+  const zoomStartWasPinchRef = useRef(false)
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
   }, [isCurrent, cached.status, cached.retry, onCurrentInfo])
@@ -252,20 +237,12 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
           minScale={1}
           maxScale={4}
           doubleClick={{ mode: 'toggle', step: 0.6 }}
-          // The library's own "toggle" mode always steps the scale by a
-          // fixed `step` off wherever it currently sits (confirmed from
-          // its source: targetScale = scale - step whenever scale != 1),
-          // so double-tapping while pinched in further than the
-          // double-tap's own target only partially zoomed back out
-          // instead of landing on the original size. onZoomStart/
-          // onZoomStop only fire for double-click and wheel zooms (never
-          // for a live pinch — confirmed from source), so this pair
-          // corrects that one case without touching pinch or pan at all.
-          onZoomStart={(ref) => {
+          onZoomStart={(ref, event) => {
+            zoomStartWasPinchRef.current = !!(event?.touches && event.touches.length >= 2)
             scaleBeforeZoomRef.current = ref.state.scale
           }}
           onZoomStop={(ref) => {
-            if (Date.now() < pinchGuardUntilRef.current) return // a pinch just ended, not a real double-tap
+            if (zoomStartWasPinchRef.current) return // this was a pinch, not a double-tap
             const wasZoomedIn = scaleBeforeZoomRef.current > 1.01
             const stillZoomedIn = ref.state.scale > 1.01
             if (wasZoomedIn && stillZoomedIn) {
@@ -365,20 +342,19 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
   // Embla's own untouched defaults (duration 25, friction 0.68 — the
   // 0.68 isn't even a public option, it's a hardcoded internal constant,
-  // confirmed 2026-09-02 from Embla's source) still read as too fast
-  // once actually tested on a full-screen photo swipe, not just the
-  // carousel's more aggressive duration(2)/friction(0.36) tuning that
-  // was here before. Both numbers push the settle in the same direction
-  // — higher duration and friction closer to 1 both mean a slower,
-  // gentler glide to the next photo — so this deliberately goes past
-  // Embla's defaults in that direction. These two exact numbers are a
-  // starting point, not a measured target: worth nudging further on a
-  // real device if it's still not slow enough, or overshoots into
-  // sluggish.
+  // confirmed 2026-09-02 from Embla's source) read as too fast for a
+  // full-screen photo swipe, and so did a first attempt at slowing it
+  // (duration 40 / friction 0.78) — still reported too fast on-device.
+  // Both numbers push the settle in the same direction — higher
+  // duration and friction closer to 1 both mean a slower, gentler glide
+  // — so this takes a considerably bigger step in that direction than
+  // last time, rather than a small nudge, since the small nudge wasn't
+  // enough to be felt. Still a starting point to react to on-device,
+  // not a measured final value.
   useEffect(() => {
     if (!emblaApi) return
     const slowSettle = () => {
-      emblaApi.internalEngine().scrollBody.useDuration(40).useFriction(0.78)
+      emblaApi.internalEngine().scrollBody.useDuration(65).useFriction(0.85)
     }
     emblaApi.on('pointerUp', slowSettle)
     return () => emblaApi.off('pointerUp', slowSettle)
