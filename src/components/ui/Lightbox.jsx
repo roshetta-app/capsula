@@ -67,6 +67,20 @@
  *   cache-on-view). 'error' shows the ImageLoadError placeholder with a
  *   working Retry button.
  *
+ * Chrome layering pass (2026-09-02, second pass same day):
+ *   Counter and prev/next arrow buttons removed entirely — the dots
+ *   already show position, swipe already handles navigation. The photo
+ *   is now the true fullscreen base layer (solid opaque black
+ *   background, no translucency) rather than being squeezed into a
+ *   middle flex section between two tinted bands. The close button and
+ *   the caption+dots block are now separate, absolutely-positioned
+ *   overlays that float over the photo instead of consuming layout
+ *   space. Caption and dots are independent of each other: the caption
+ *   keeps a fixed-height slot regardless of whether the current photo
+ *   has one, so the dots never shift position between photos, and both
+ *   sit on one shared black gradient (transparent -> solid) for
+ *   legibility against any photo.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -78,23 +92,20 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
-import { X, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X } from 'lucide-react'
 import { useCachedImage } from '../../hooks/useCachedImage'
 import ImageLoadError from './ImageLoadError'
 
-const BAND_STYLE = {
-  position: 'relative',
+// Close button — the one remaining top control now that the counter is
+// gone (dots already show position, swipe already handles navigation).
+// Floats directly over the photo instead of sitting in a tinted band.
+const CLOSE_BUTTON_WRAP_STYLE = {
+  position: 'absolute',
+  top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+  right: 14,
   zIndex: 2,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '10px 14px',
-  backgroundColor: 'rgba(255,255,255,0.10)',
 }
 
-// Close and nav buttons now share one style — previously the close
-// button (28px/15px icon) was visibly smaller than the nav arrows
-// (32px/17px icon) for no real reason.
 const CONTROL_BUTTON_STYLE = {
   width: 32,
   height: 32,
@@ -111,7 +122,43 @@ const CONTROL_BUTTON_STYLE = {
   flexShrink: 0,
 }
 
-const CONTROL_PLACEHOLDER_STYLE = { width: 32, height: 32, flexShrink: 0 }
+// Bottom overlay — floats over the fullscreen photo rather than
+// compressing it. Holds the caption directly above the dots, both
+// covered by one black gradient (transparent -> solid) for legibility
+// against any photo, however light.
+const BOTTOM_OVERLAY_STYLE = {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  bottom: 0,
+  zIndex: 2,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  paddingTop: 44,
+  paddingLeft: 20,
+  paddingRight: 20,
+  paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+  background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 45%, rgba(0,0,0,0) 100%)',
+}
+
+// Fixed-height slot regardless of whether the current photo has a
+// caption, so switching photos never shifts the dots below it. Bigger
+// and bolder than the old 13px/400-weight caption.
+const CAPTION_STYLE = {
+  height: 24,
+  margin: 0,
+  marginBottom: 10,
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: 700,
+  lineHeight: '24px',
+  textAlign: 'center',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  maxWidth: '100%',
+}
 
 // Swallows a touch event at the portal boundary — see "Portal event
 // leak" note above. Applied to touchstart/touchmove/touchend on the
@@ -238,38 +285,16 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       onTouchEnd={stopTouchLeak}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        backgroundColor: 'rgba(0,0,0,0.94)',
-        display: 'flex', flexDirection: 'column',
+        backgroundColor: '#000',
         touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}
     >
-      {/* Top band — counter + close */}
-      <motion.div
-        animate={{ opacity: chromeVisible ? 1 : 0 }}
-        transition={{ duration: 0.18 }}
-        style={{
-          ...BAND_STYLE,
-          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
-          pointerEvents: chromeVisible ? 'auto' : 'none',
-        }}
-      >
-        {images.length > 1 ? (
-          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
-            {activeIndex + 1} / {images.length}
-          </span>
-        ) : <span />}
-        <button
-          onClick={(e) => { e.stopPropagation(); requestClose() }}
-          aria-label="Close"
-          style={CONTROL_BUTTON_STYLE}
-        >
-          <X size={17} strokeWidth={2.5} />
-        </button>
-      </motion.div>
-
-      {/* Image area */}
-      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+      {/* Image area — fullscreen base layer, true edge-to-edge, solid
+          black background with no other layout siblings taking up
+          space around it. Top/bottom controls float over this as
+          separate absolutely-positioned overlays below. */}
+      <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
         <AnimatePresence initial={false} custom={slideCustom}>
           <motion.div
             key={active.url}
@@ -331,59 +356,54 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
         </AnimatePresence>
       </div>
 
-      {/* Bottom band — prev / caption + dots / next */}
+      {/* Close — the one remaining top control, floating over the photo */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
         style={{
-          ...BAND_STYLE,
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)',
+          ...CLOSE_BUTTON_WRAP_STYLE,
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        {images.length > 1 && activeIndex > 0 ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); goTo(activeIndex - 1) }}
-            aria-label="Previous image"
-            style={CONTROL_BUTTON_STYLE}
-          >
-            <ChevronLeft size={17} strokeWidth={2} />
-          </button>
-        ) : <span style={CONTROL_PLACEHOLDER_STYLE} />}
+        <button
+          onClick={(e) => { e.stopPropagation(); requestClose() }}
+          aria-label="Close"
+          style={CONTROL_BUTTON_STYLE}
+        >
+          <X size={17} strokeWidth={2.5} />
+        </button>
+      </motion.div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-          {active.caption && (
-            <p dir="auto" style={{
-              margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13,
-              lineHeight: 1.5, textAlign: 'center', padding: '0 8px',
-            }}>
-              {active.caption}
-            </p>
-          )}
-          {images.length > 1 && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-              {images.map((_, i) => (
-                <div key={i} style={{
-                  width: i === activeIndex ? 8 : 5,
-                  height: i === activeIndex ? 8 : 5,
-                  borderRadius: '50%',
-                  backgroundColor: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.35)',
-                  transition: 'all 0.2s ease', flexShrink: 0,
-                }} />
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Caption + dots — independent of each other: caption keeps a
+          fixed-height slot so a caption-less photo never shifts the
+          dots below it, and the dots sit at one fixed position on
+          every photo. Both float over the photo on a shared bottom
+          gradient rather than a flat tinted band. */}
+      <motion.div
+        animate={{ opacity: chromeVisible ? 1 : 0 }}
+        transition={{ duration: 0.18 }}
+        style={{
+          ...BOTTOM_OVERLAY_STYLE,
+          pointerEvents: chromeVisible ? 'auto' : 'none',
+        }}
+      >
+        <p dir="auto" style={CAPTION_STYLE}>
+          {active.caption || ''}
+        </p>
 
-        {images.length > 1 && activeIndex < images.length - 1 ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); goTo(activeIndex + 1) }}
-            aria-label="Next image"
-            style={CONTROL_BUTTON_STYLE}
-          >
-            <ChevronRight size={17} strokeWidth={2} />
-          </button>
-        ) : <span style={CONTROL_PLACEHOLDER_STYLE} />}
+        {images.length > 1 && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            {images.map((_, i) => (
+              <div key={i} style={{
+                width: i === activeIndex ? 8 : 5,
+                height: i === activeIndex ? 8 : 5,
+                borderRadius: '50%',
+                backgroundColor: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.35)',
+                transition: 'all 0.2s ease', flexShrink: 0,
+              }} />
+            ))}
+          </div>
+        )}
       </motion.div>
     </motion.div>,
     document.body
