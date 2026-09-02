@@ -593,7 +593,12 @@ export default function Lightbox({ images, activeIndex, onClose, onGo, title = '
         <button
           onClick={(e) => { e.stopPropagation(); requestClose() }}
           aria-label="Close"
-          style={CONTROL_BUTTON_STYLE}
+          // marginLeft: 'auto' anchors this to the right edge of the row
+          // on its own, rather than relying on the title's flex:1 to push
+          // it there — otherwise, with no title, the button was the only
+          // flex child left and fell back to the row's default left
+          // alignment instead of staying put on the right.
+          style={{ ...CONTROL_BUTTON_STYLE, marginLeft: 'auto' }}
         >
           <X size={17} strokeWidth={2.5} />
         </button>
