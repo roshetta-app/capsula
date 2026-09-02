@@ -142,7 +142,11 @@ const CONTROL_BUTTON_STYLE = {
 // Bottom overlay — floats over the fullscreen photo rather than
 // compressing it. Holds the caption directly above the dots, both
 // covered by one black gradient (transparent -> solid) for legibility
-// against any photo, however light.
+// against any photo, however light. Anchored via `bottom: 0` rather
+// than a fixed height, so the whole box (gradient included) grows
+// upward as the caption wraps to more lines — the dots, as the last
+// child, always sit the same fixed distance above the screen's bottom
+// edge regardless of how tall the caption above them gets.
 const BOTTOM_OVERLAY_STYLE = {
   position: 'absolute',
   left: 0,
@@ -152,6 +156,7 @@ const BOTTOM_OVERLAY_STYLE = {
   display: 'flex',
   flexDirection: 'column',
   alignItems: 'center',
+  gap: 10,
   paddingTop: 44,
   paddingLeft: 20,
   paddingRight: 20,
@@ -159,21 +164,19 @@ const BOTTOM_OVERLAY_STYLE = {
   background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.88) 18%, rgba(0,0,0,0.68) 38%, rgba(0,0,0,0.42) 58%, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0) 100%)',
 }
 
-// Fixed-height slot regardless of whether the current photo has a
-// caption, so switching photos never shifts the dots below it. Bigger
-// and bolder than the old 13px/400-weight caption.
+// No truncation — the caption shows in full, wrapping to as many lines
+// as it needs. Only rendered at all when the current photo actually
+// has one (see JSX below); the gap above handles the caption/dots
+// spacing instead of a margin, so no caption means no gap either.
 const CAPTION_STYLE = {
-  height: 24,
   margin: 0,
-  marginBottom: 10,
   color: '#fff',
   fontSize: 16,
   fontWeight: 700,
-  lineHeight: '24px',
+  lineHeight: 1.35,
   textAlign: 'center',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
+  whiteSpace: 'normal',
+  overflowWrap: 'break-word',
   maxWidth: '100%',
 }
 
@@ -449,11 +452,15 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
         </button>
       </motion.div>
 
-      {/* Caption + dots — independent of each other: caption keeps a
-          fixed-height slot so a caption-less photo never shifts the
-          dots below it, and the dots sit at one fixed position on
-          every photo. Both float over the photo on a shared bottom
-          gradient rather than a flat tinted band. */}
+      {/* Caption + dots — independent of each other: the caption shows
+          in full with no truncation and is only rendered when the
+          current photo has one; the dots still sit at one fixed
+          position on every photo regardless, because this whole box is
+          anchored to the screen's bottom edge (bottom: 0) rather than
+          given a fixed height — a taller caption grows the box upward,
+          not downward, so the dots as the last child never move. Both
+          float over the photo on a shared bottom gradient that grows
+          with the box instead of a flat tinted band. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
@@ -462,9 +469,11 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        <p dir="auto" style={CAPTION_STYLE}>
-          {active.caption || ''}
-        </p>
+        {active.caption && (
+          <p dir="auto" style={CAPTION_STYLE}>
+            {active.caption}
+          </p>
+        )}
 
         {images.length > 1 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
