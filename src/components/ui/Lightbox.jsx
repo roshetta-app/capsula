@@ -102,6 +102,18 @@ const LOAD_WINDOW = 1
 // "finger never really moved," same as ImageCarousel.jsx's own tap check.
 const TAP_SLOP_PX = 8
 
+// Double-tap-to-zoom target scale — matches the felt zoom level of the
+// library's old built-in toggle (which stepped by 0.6 from 1x), kept
+// the same here so this fix doesn't change how far a double-tap zooms.
+const DOUBLE_TAP_ZOOM_SCALE = 1.6
+
+// Max gap between two taps to count as a double-tap (matches the
+// library's own internal double-tap window, since this replaces that
+// mechanism), and how far the second tap may drift from the first and
+// still count as the same double-tap rather than two separate taps.
+const DOUBLE_TAP_WINDOW_MS = 300
+const DOUBLE_TAP_DRIFT_PX = 24
+
 // Close button — the one remaining top control (dots already show
 // position, swipe already handles navigation). Floats directly over the
 // photo instead of sitting in a tinted band.
@@ -188,6 +200,12 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   // onCurrentZoom, but only while this is the current slide, since only
   // the current slide's zoom should affect Embla's own drag gating.
   const [localScale, setLocalScale] = useState(1)
+  // Tracks the previous tap's time/position for double-tap detection,
+  // and the current touch's start position so a pan/drag release isn't
+  // mistaken for a tap. See handleImgPointerUp below for why this
+  // replaces the library's own built-in double-tap-to-zoom.
+  const lastTapRef = useRef({ time: 0, x: 0, y: 0 })
+  const tapStartRef = useRef(null)
 
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
@@ -207,6 +225,44 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
 
   const hidden = isCurrent && currentDisplayFailed
 
+  // Double-tap-to-zoom, hand-rolled instead of the library's own
+  // `doubleClick` toggle: that built-in toggle only steps the scale by
+  // a fixed amount off wherever it currently sits (scale - step), so
+  // pinch-zooming past the double-tap's own target and then
+  // double-tapping again only stepped it back down partway instead of
+  // all the way to 1x. This always lands exactly on 1x when zoomed in
+  // by any amount, and always zooms in to the same fixed target when at
+  // 1x, regardless of how the current zoom was reached.
+  function handleImgPointerDown(e) {
+    tapStartRef.current = { x: e.clientX, y: e.clientY }
+  }
+  function handleImgPointerUp(e) {
+    const start = tapStartRef.current
+    tapStartRef.current = null
+    if (!start) return
+    const moved = Math.abs(e.clientX - start.x) > TAP_SLOP_PX || Math.abs(e.clientY - start.y) > TAP_SLOP_PX
+    if (moved) return // a pan/drag release, not a tap
+
+    const now = Date.now()
+    const last = lastTapRef.current
+    const isDoubleTap = now - last.time < DOUBLE_TAP_WINDOW_MS &&
+      Math.abs(e.clientX - last.x) < DOUBLE_TAP_DRIFT_PX &&
+      Math.abs(e.clientY - last.y) < DOUBLE_TAP_DRIFT_PX
+
+    if (!isDoubleTap) {
+      lastTapRef.current = { time: now, x: e.clientX, y: e.clientY }
+      return
+    }
+    lastTapRef.current = { time: 0, x: 0, y: 0 } // consume the pair
+    const api = transformRef.current
+    if (!api) return
+    if (localScale > 1.01) {
+      api.resetTransform(200)
+    } else {
+      api.centerView(DOUBLE_TAP_ZOOM_SCALE, 200)
+    }
+  }
+
   return (
     <div style={{
       position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
@@ -218,7 +274,10 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
           initialScale={1}
           minScale={1}
           maxScale={4}
-          doubleClick={{ mode: 'toggle', step: 0.6 }}
+          limitToBounds
+          // Handled by handleImgPointerUp above instead — see its
+          // comment for why the library's own toggle isn't used here.
+          doubleClick={{ disabled: true }}
           // Panning only matters for this slide once it's actually
           // zoomed in — left enabled at 1x, it still captures part of a
           // single-finger drag, which would corrupt the Embla-driven
@@ -231,16 +290,29 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
             if (isCurrent) onCurrentZoom(state.scale)
           }}
         >
+          {/* wrapperStyle centers the content box in the frame; contentStyle
+              is left un-sized (no width/height) so it shrink-wraps to the
+              actual rendered <img>, rather than stretching to the full
+              frame. The library measures *this* box to work out how far a
+              zoomed photo can be panned — sized to the full frame, it
+              treated the empty letterboxed margins around a
+              non-frame-shaped photo as draggable image content, so a
+              zoomed photo's real top/bottom edge could be dragged past the
+              screen edge before panning was stopped. Shrink-wrapped to the
+              real image, the pan boundary now matches the photo's actual
+              edges. */}
           <TransformComponent
-            wrapperStyle={{ width: '100%', height: '100%' }}
-            contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            wrapperStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            contentStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <img
               src={cached.src}
               alt={img.caption || ''}
               draggable={false}
               onError={isCurrent ? onCurrentFailed : undefined}
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+              onPointerDown={handleImgPointerDown}
+              onPointerUp={handleImgPointerUp}
+              style={{ maxWidth: '100vw', maxHeight: '100dvh', objectFit: 'contain', display: 'block' }}
             />
           </TransformComponent>
         </TransformWrapper>
@@ -310,21 +382,15 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     }
   }, [emblaApi, onGo])
 
-  // Same settle mechanism as ImageCarousel.jsx's own override, but tuned
-  // slower here: the carousel's duration(2)/friction(0.36) settles a
-  // ~230ms-long swipe over the width of its card, but the lightbox's
-  // photo is the full screen — the same 230ms covering a much longer
-  // distance reads as a noticeably higher-velocity, snappier settle even
-  // though the timing is identical. Slowing the duration down brings the
-  // felt speed back in line with the carousel's.
-  useEffect(() => {
-    if (!emblaApi) return
-    const speedUpSettle = () => {
-      emblaApi.internalEngine().scrollBody.useDuration(7).useFriction(0.4)
-    }
-    emblaApi.on('pointerUp', speedUpSettle)
-    return () => emblaApi.off('pointerUp', speedUpSettle)
-  }, [emblaApi])
+  // No custom settle override here (2026-09-02): the carousel's
+  // duration(2)/friction(0.36) tuning was built for a compact card and
+  // read as too fast once copied onto a full-screen swipe — even the
+  // slowed-down duration(7)/friction(0.4) version still felt fast,
+  // because the aggressive tuning itself (not just its numbers) is wrong
+  // for this much larger swipe distance. Leaving Embla's own untouched
+  // defaults (duration 25, friction 0.68, scaled to flick speed) in
+  // place gives the natural, smooth settle most full-screen swipe UIs
+  // ship with.
 
   const active = images[selectedIndex]
   const hasAnyCaption = images.some((img) => img.caption)
