@@ -1,30 +1,30 @@
 /**
  * ImageCarousel — swipeable image carousel (Phase 4.2).
  *
- * Layout:
- *   - Image itself is full-bleed: breaks out of the parent's lateral
- *     padding (var(--space-6), the panel padding set in
- *     ConditionDetailScreen.jsx) via negative inline margins + matching
- *     width increase, so it runs edge-to-edge on the screen. Dots and
- *     caption stay inside the normal content width, unaffected.
- *   - 4:3 aspect ratio via `aspect-ratio` (not the old padding-top %
- *     trick — percentage padding resolves against the *containing
- *     block's* width, which stays narrower than this element once it's
- *     broken out with negative margins, so the padding-top hack would
- *     flatten the image; aspect-ratio is self-referential and immune
- *     to that).
+ * Layout (bordered-card redesign, 2026-09-02):
+ *   - Optional bold title renders above the card when `title` is a
+ *     non-empty string. Belongs to the whole gallery, not to any one
+ *     photo — it doesn't change as you swipe between images.
+ *   - Everything else — photo, dots, caption — sits inside one bordered,
+ *     rounded card (var(--color-border) / var(--radius-md), same
+ *     convention already used by ImageGalleryEditor.jsx's image rows in
+ *     the CMS). This replaces the previous full-bleed layout, which
+ *     broke out of the panel's lateral padding via negative margins.
+ *   - 4:3 aspect ratio via `aspect-ratio` on the photo area.
  *   - object-fit: cover, object-position: center
- *   - No border-radius — full-bleed edges are flush with the screen,
- *     rounding would look wrong there.
- *   - Order: image → dots → caption
+ *   - The card's own border-radius + overflow: hidden clips the photo's
+ *     top corners; the photo itself carries no radius of its own.
+ *   - Order: title (outside card) → image → dots → caption (last two
+ *     inside the card, in a padded footer below the photo)
  *   - Caption slot always reserves its own height (fixed height, fixed
- *     margin-top) whether or not a caption is present, so content below
- *     the carousel doesn't shift up/down depending on caption presence.
- *   - Caption row is a flex row with a leading image icon. dir="auto"
- *     on the row lets the browser resolve RTL/LTR from the caption
- *     text; flex's default row order then visually flips with it, so
- *     the icon sits left of LTR captions and right of RTL captions
- *     with no manual direction branching.
+ *     margin-top) whether or not a caption is present, so the card
+ *     doesn't grow or shrink as you swipe between a captioned and an
+ *     uncaptioned photo.
+ *   - Caption row is a flex row with a leading caption/comment icon.
+ *     dir="auto" on the row lets the browser resolve RTL/LTR from the
+ *     caption text; flex's default row order then visually flips with
+ *     it, so the icon sits left of LTR captions and right of RTL
+ *     captions with no manual direction branching.
  *
  * Interaction:
  *   - Swipe threshold: 50px
@@ -61,14 +61,17 @@
  *
  * Props:
  *   images  { id, url, caption }[]
+ *   title   string (optional) — bold heading rendered above the card;
+ *           omitted entirely when empty/absent (e.g. galleries saved
+ *           before this field existed)
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Image as ImageIcon, ZoomIn } from 'lucide-react'
+import { MessageSquare, ZoomIn } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
 import ImageLoadError from '../ui/ImageLoadError'
 import { useCachedImage } from '../../hooks/useCachedImage'
 
-export default function ImageCarousel({ images = [] }) {
+export default function ImageCarousel({ images = [], title = '' }) {
   const [index,        setIndex]    = useState(0)
   const [lightboxOpen, setLightbox] = useState(false)
   const touchStartX = useRef(null)
@@ -132,138 +135,161 @@ export default function ImageCarousel({ images = [] }) {
           marginBottom: 'var(--space-3)',
         }}
       >
-        {/* Full-bleed 4:3 image container — breaks out of the panel's
-            lateral padding (var(--space-6)) on both sides. */}
-        <div
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-          style={{
-            position: 'relative',
-            width: 'calc(100% + var(--space-6) * 2)',
-            marginInline: 'calc(var(--space-6) * -1)',
-            aspectRatio: '4 / 3',
-            overflow: 'hidden',
-            cursor: 'zoom-in',
-            backgroundColor: 'var(--color-bg)',
-          }}
-        >
-          {status === 'ready' && src && !displayFailed && (
-            <img
-              src={src}
-              alt={current.caption || ''}
-              onError={() => setDisplayFailed(true)}
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                objectPosition: 'center',
-                display: 'block',
-                pointerEvents: 'none',
-              }}
-            />
-          )}
-
-          {status === 'ready' && src && !displayFailed && (
-            <div
-              aria-hidden="true"
-              style={{
-                position: 'absolute',
-                top: 10,
-                right: 10,
-                width: 26,
-                height: 26,
-                borderRadius: '50%',
-                backgroundColor: 'rgba(0,0,0,0.35)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                pointerEvents: 'none',
-              }}
-            >
-              <ZoomIn size={14} color="#fff" />
-            </div>
-          )}
-
-          {(status === 'error' || displayFailed) && (
-            <div
-              onTouchStart={(e) => e.stopPropagation()}
-              onTouchEnd={(e) => e.stopPropagation()}
-              style={{ position: 'absolute', inset: 0, cursor: 'default' }}
-            >
-              <ImageLoadError onRetry={handleRetry} />
-            </div>
-          )}
-        </div>
-
-        {/* Dot indicators — stay within the normal content width */}
-        {images.length > 1 && (
+        {/* Gallery title — belongs to the whole carousel, not any one
+            photo, so it lives outside the bordered card and never
+            changes as you swipe. */}
+        {title && (
           <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 6,
-            marginTop: 10,
+            fontSize: 18,
+            fontWeight: 700,
+            fontFamily: 'var(--font-body)',
+            color: 'var(--color-text-primary)',
+            marginBottom: 'var(--space-2)',
           }}>
-            {images.map((_, i) => (
-              <button
-                key={i}
-                onClick={() => goTo(i)}
-                aria-label={`Image ${i + 1}`}
-                style={{
-                  width:  i === index ? 8 : 6,
-                  height: i === index ? 8 : 6,
-                  borderRadius: '50%',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  backgroundColor: i === index
-                    ? 'var(--color-accent)'
-                    : 'var(--color-border)',
-                  transition: 'width 0.2s ease, height 0.2s ease, background-color 0.2s ease',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline: 'none',
-                }}
-              />
-            ))}
+            {title}
           </div>
         )}
 
-        {/* Caption slot — always rendered (empty when this image has no
-            caption) so the space below the carousel never shifts between
-            captioned/uncaptioned images. dir="auto" lets the browser
-            resolve RTL/LTR from the caption text; as a flex row, item
-            order then visually follows that resolved direction, so the
-            leading icon ends up on the correct side without any manual
-            direction logic. Text span keeps the single-line ellipsis
-            truncation from before. */}
-        <div
-          dir="auto"
-          style={{
-            marginTop: 6,
-            height: 19, // one line at fontSize 13 / lineHeight 1.5
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 13,
-            color: 'var(--color-text-secondary)',
-            fontWeight: 400,
-            lineHeight: 1.5,
-          }}
-        >
-          {current.caption && (
-            <>
-              <ImageIcon size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
-              <span style={{
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                minWidth: 0,
+        {/* Bordered card — photo, dots, and caption all live inside this
+            one border. overflow: hidden clips the photo's top corners to
+            match the card's radius; the photo itself carries no radius. */}
+        <div style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-md)',
+          overflow: 'hidden',
+          backgroundColor: 'var(--color-surface)',
+        }}>
+          {/* 4:3 photo area */}
+          <div
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            style={{
+              position: 'relative',
+              aspectRatio: '4 / 3',
+              overflow: 'hidden',
+              cursor: 'zoom-in',
+              backgroundColor: 'var(--color-bg)',
+            }}
+          >
+            {status === 'ready' && src && !displayFailed && (
+              <img
+                src={src}
+                alt={current.caption || ''}
+                onError={() => setDisplayFailed(true)}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center',
+                  display: 'block',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+
+            {status === 'ready' && src && !displayFailed && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  right: 10,
+                  width: 26,
+                  height: 26,
+                  borderRadius: '50%',
+                  backgroundColor: 'rgba(0,0,0,0.35)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  pointerEvents: 'none',
+                }}
+              >
+                <ZoomIn size={14} color="#fff" />
+              </div>
+            )}
+
+            {(status === 'error' || displayFailed) && (
+              <div
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                style={{ position: 'absolute', inset: 0, cursor: 'default' }}
+              >
+                <ImageLoadError onRetry={handleRetry} />
+              </div>
+            )}
+          </div>
+
+          {/* Footer — dots + caption, inside the card, below the photo */}
+          <div style={{ padding: '10px var(--space-4) var(--space-3)' }}>
+            {images.length > 1 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: 6,
+                marginBottom: 8,
               }}>
-                {current.caption}
-              </span>
-            </>
-          )}
+                {images.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => goTo(i)}
+                    aria-label={`Image ${i + 1}`}
+                    style={{
+                      width:  i === index ? 8 : 6,
+                      height: i === index ? 8 : 6,
+                      borderRadius: '50%',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      backgroundColor: i === index
+                        ? 'var(--color-accent)'
+                        : 'var(--color-border)',
+                      transition: 'width 0.2s ease, height 0.2s ease, background-color 0.2s ease',
+                      WebkitTapHighlightColor: 'transparent',
+                      outline: 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Caption slot — always rendered (empty when this image has no
+                caption) so the card never resizes between captioned/
+                uncaptioned images. dir="auto" lets the browser resolve
+                RTL/LTR from the caption text; as a flex row, item order
+                then visually follows that resolved direction, so the
+                leading icon ends up on the correct side without any
+                manual direction logic. Text span keeps the single-line
+                ellipsis truncation from before. */}
+            <div
+              dir="auto"
+              style={{
+                height: 19, // one line at fontSize 13 / lineHeight 1.5
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 13,
+                color: 'var(--color-text-secondary)',
+                fontWeight: 400,
+                lineHeight: 1.5,
+              }}
+            >
+              {current.caption && (
+                <>
+                  <MessageSquare size={13} strokeWidth={2} style={{ flexShrink: 0 }} />
+                  <span style={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    minWidth: 0,
+                  }}>
+                    {current.caption}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

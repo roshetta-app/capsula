@@ -4,19 +4,24 @@
  * Phase 3.3: CMS editor for image_gallery blocks.
  *
  * Props:
- *   data     { images: { url, caption }[] }  — block.data (read-only; patch via onChange)
- *   onChange (dataPatch) => void             — call with { images: nextImages }
- *   disabled Boolean                         — freeze all controls during parent save
+ *   data     { title?, images: { url, caption }[] }  — block.data (read-only; patch via onChange)
+ *   onChange (dataPatch) => void                      — call with { title } or { images: nextImages };
+ *                                                        the parent merges each patch into the full
+ *                                                        block.data, so a title patch and an images
+ *                                                        patch never need to be sent together
+ *   disabled Boolean                                  — freeze all controls during parent save
  *
  * Features:
+ *   - Gallery title field — optional; shown above the whole carousel in the app,
+ *     left blank the carousel simply renders without a heading (2026-09-02)
  *   - Thumbnail strip of existing images with caption field below each
  *   - ↑ ↓ 🗑 per image
  *   - Upload button (calls uploadConditionImage from adminQueries) — single or multiple files
  *   - Shows upload progress / error inline
  *   - Empty state when images: []
  *
- * Data shape (Section 3.1 of masterplan):
- *   { images: [{ url: "https://...", caption: "" }] }
+ * Data shape (Section 3.1 of masterplan, title added 2026-09-02):
+ *   { title: "", images: [{ url: "https://...", caption: "" }] }
  *   (No id field at the block level — id is only on condition_images rows, which are legacy)
  *
  * Image System Refinement Plan, Part C, Step 1 (2026-09-02):
@@ -298,8 +303,8 @@ function EmptyState() {
 /**
  * ImageGalleryEditor
  *
- * @param {{ images: { url: string, caption: string }[] }} data
- * @param {Function} onChange   — (dataPatch) => void; receives { images: nextImages }
+ * @param {{ title?: string, images: { url: string, caption: string }[] }} data
+ * @param {Function} onChange   — (dataPatch) => void; receives { title } or { images: nextImages }
  * @param {Boolean}  disabled   — freeze controls during parent save
  */
 export default function ImageGalleryEditor({ data, onChange, disabled = false }) {
@@ -312,6 +317,10 @@ export default function ImageGalleryEditor({ data, onChange, disabled = false })
 
   function patch(nextImages) {
     onChange({ images: nextImages })
+  }
+
+  function handleTitleChange(title) {
+    onChange({ title })
   }
 
   function handleCaptionChange(index, caption) {
@@ -374,6 +383,43 @@ export default function ImageGalleryEditor({ data, onChange, disabled = false })
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      {/* Gallery title — optional; shown as a bold heading above the whole
+          carousel in the app. Left blank, the carousel renders without one. */}
+      <div>
+        <label style={{
+          display: 'block',
+          fontSize: 11,
+          fontWeight: 600,
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: 4,
+        }}>
+          Gallery title
+        </label>
+        <input
+          type="text"
+          value={data?.title ?? ''}
+          onChange={e => handleTitleChange(e.target.value)}
+          disabled={disabled}
+          placeholder="e.g. Rash progression"
+          style={{
+            width: '100%',
+            fontSize: 13,
+            fontFamily: 'var(--font-body)',
+            color: 'var(--color-text-primary)',
+            backgroundColor: 'var(--color-surface)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: '6px 10px',
+            outline: 'none',
+            boxSizing: 'border-box',
+            opacity: disabled ? 0.6 : 1,
+          }}
+        />
+      </div>
+
       {/* Upload row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <UploadButton onUpload={handleUpload} disabled={disabled} uploading={uploading} />
