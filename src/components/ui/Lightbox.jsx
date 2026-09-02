@@ -24,14 +24,14 @@
  *     from ~94% rather than just appearing.
  *   - Chrome show/hide: a plain opacity fade on each band.
  *   - Swipe left/right (at 1x zoom) navigates; swipe down (at 1x)
- *     dismisses. Both are handled by the same draggable element —
- *     dragSnapToOrigin springs the photo back to centre on a drag that
- *     doesn't clear either threshold, so no manual reset code is needed.
- *     A photo that does clear a threshold simply unmounts (new index /
- *     onClose), which is what discards its drag offset.
- *   - Backdrop stays a fixed, solid opacity throughout — it does not
- *     fade lighter during the swipe-down drag. The photo's own downward
- *     movement under the finger is the dismiss feedback.
+ *     dismisses. The photo itself does NOT visually follow the finger
+ *     during the swipe (changed 2026-09-02, on request) — it stays put
+ *     in place, and only reads the gesture once it ends: touchstart
+ *     records the starting point, touchend measures the distance and
+ *     direction and fires onGo/requestClose if it cleared the
+ *     threshold, otherwise nothing happens at all. There is no
+ *     mid-gesture drag-follow or snap-back animation to reconcile.
+ *   - Backdrop stays a fixed, solid opacity throughout.
  *
  * Zoom/pan (react-zoom-pan-pinch):
  *   Replaces the previous hand-rolled pinch/pan/double-tap finger-
@@ -66,7 +66,7 @@
  *   onGo         (index: number) => void
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
@@ -125,6 +125,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   // once that fade finishes.
   const [isClosing, setIsClosing] = useState(false)
   const requestClose = useCallback(() => setIsClosing(true), [])
+  const swipeStart = useRef(null)
 
   const active = images[activeIndex]
   const { src, status, retry } = useCachedImage(active?.url)
@@ -146,17 +147,28 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
   if (!active) return null
 
-  const canDrag = status === 'ready' && !displayFailed && zoomScale <= 1
+  // Swipe is only meaningful at 1x — once zoomed in, a single-finger
+  // drag belongs to react-zoom-pan-pinch's own panning instead.
+  const canSwipe = status === 'ready' && !displayFailed && zoomScale <= 1
 
-  function handleDragEnd(_event, info) {
-    const { offset } = info
-    if (Math.abs(offset.y) > Math.abs(offset.x) && offset.y > 100) {
+  function handlePhotoTouchStart(e) {
+    if (!canSwipe) return
+    swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+
+  function handlePhotoTouchEnd(e) {
+    if (!canSwipe || !swipeStart.current) return
+    const dx = e.changedTouches[0].clientX - swipeStart.current.x
+    const dy = e.changedTouches[0].clientY - swipeStart.current.y
+    swipeStart.current = null
+
+    if (Math.abs(dy) > Math.abs(dx) && dy > 100) {
       requestClose()
       return
     }
-    if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > 60) {
-      if (offset.x < 0 && activeIndex < images.length - 1) onGo(activeIndex + 1)
-      if (offset.x > 0 && activeIndex > 0) onGo(activeIndex - 1)
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
+      if (dx < 0 && activeIndex < images.length - 1) onGo(activeIndex + 1)
+      if (dx > 0 && activeIndex > 0) onGo(activeIndex - 1)
     }
   }
 
@@ -210,11 +222,9 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.94 : 1 }}
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.22, ease: 'easeOut' }}
-            drag={canDrag}
-            dragElastic={0.15}
-            dragSnapToOrigin
-            onDragEnd={handleDragEnd}
             onTap={() => setChromeVisible((v) => !v)}
+            onTouchStart={handlePhotoTouchStart}
+            onTouchEnd={handlePhotoTouchEnd}
             style={{
               width: '100%', height: '100%',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
