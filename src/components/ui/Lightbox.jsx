@@ -1,50 +1,50 @@
 /**
  * Lightbox — full-screen portal image viewer.
  *
- * Extracted from ImageCarousel.jsx and ImageGallery.jsx (Phase 2.13 cleanup).
- * Previously duplicated identically in both files.
+ * Rebuild (Image System Refinement Plan, Part C — chrome/motion/gesture
+ * pass, 2026-09-02). Replaces the earlier "chrome softening" pass (pill
+ * counter + translucent circles scattered over the photo) with a proper
+ * rebuild addressing three separate complaints about that earlier pass:
+ * the controls read as disconnected floating pieces, open/close had no
+ * animation, and the hand-rolled pinch/pan math felt janky.
  *
- * Touch interactions:
- *   Single tap      — no-op (lets double-tap register)
- *   Double tap      — toggle 1x ↔ 2.5x zoom, centred on tap point
- *   Pinch           — free scale 1x–4x with midpoint pan
- *   Drag (>1x)      — pan the zoomed image
- *   Swipe (at 1x)   — prev / next image
- *   Swipe down (at 1x) — dismiss lightbox
- *   Tap backdrop    — close (only at 1x)
+ * Chrome (Direction A — unified bands):
+ *   Controls are grouped into two connected translucent bands (top:
+ *   counter + close; bottom: prev/next + caption + dots) instead of
+ *   floating separately over the photo — the same "group related things
+ *   into one container" logic already used in ImageCarousel.jsx's
+ *   bordered-card redesign. Close and nav buttons now share identical
+ *   sizing/treatment (previously the close button was visibly smaller
+ *   than the nav arrows for no real reason).
+ *   Tapping the photo toggles both bands' visibility, for distraction-
+ *   free viewing — a single re-tap brings them back.
  *
- * Offline caching (Image System Refinement Plan, Part A):
- *   - The active photo is loaded via useCachedImage, same device-first
- *     → network → cache-on-view logic used by ImageCarousel.jsx.
- *   - 'ready'   → photo renders with the existing zoom/pan transform.
- *   - 'error'   → ImageLoadError placeholder with a working Retry
- *     button. Its own touch handlers stop propagation so a Retry tap
- *     isn't also read as a pan/swipe/backdrop-tap by the image-area
- *     handlers, and doesn't accidentally trigger the double-tap-zoom
- *     gesture.
- *   - 'loading' → nothing rendered in the image area yet; just the
- *     backdrop. Zoom/pan state still resets correctly on activeIndex
- *     change since that doesn't depend on the image having loaded.
+ * Motion (framer-motion):
+ *   - Open/close: backdrop fades in/out; the photo fades and scales up
+ *     from ~94% rather than just appearing.
+ *   - Chrome show/hide: a plain opacity fade on each band.
+ *   - Swipe left/right (at 1x zoom) navigates; swipe down (at 1x)
+ *     dismisses. Both are handled by the same draggable element —
+ *     dragSnapToOrigin springs the photo back to centre on a drag that
+ *     doesn't clear either threshold, so no manual reset code is needed.
+ *     A photo that does clear a threshold simply unmounts (new index /
+ *     onClose), which is what discards its drag offset.
+ *   - Backdrop stays a fixed, solid opacity throughout — it does not
+ *     fade lighter during the swipe-down drag. The photo's own downward
+ *     movement under the finger is the dismiss feedback.
  *
- * Chrome styling (Image System Refinement Plan, Part C, Step 3):
- *   - Page counter is now a soft rounded pill instead of plain
- *     monospace text.
- *   - Close button and prev/next nav buttons all share the same
- *     lighter, more translucent circular treatment (white-tinted,
- *     no border) instead of the previous darker/bordered circles —
- *     quieter chrome, more photo. Purely visual; none of the touch
- *     handling below changed.
+ * Zoom/pan (react-zoom-pan-pinch):
+ *   Replaces the previous hand-rolled pinch/pan/double-tap finger-
+ *   tracking math entirely — same category of fix as the Embla swap in
+ *   ImageCarousel.jsx (a maintained library owns the actual gesture
+ *   physics instead of custom touch-event math). Swipe-navigate and
+ *   swipe-down-dismiss are disabled while zoomed past 1x, so panning a
+ *   zoomed photo doesn't fight with them.
  *
- * Swipe-down-to-dismiss (Image System Refinement Plan, Part C, Step 5):
- *   - At 1x zoom, a single-finger drag that's more vertical than
- *     horizontal moves the photo down with the finger and fades the
- *     backdrop as feedback. The transform transition is suppressed
- *     while any touch is active so the photo tracks the finger 1:1 —
- *     the same treatment already used for panning a zoomed-in photo.
- *   - Releasing past ~100px of downward drag closes the lightbox;
- *     releasing short of that snaps the photo back to centre.
- *   - Layered on the existing single-finger branch — swipe left/right
- *     to navigate and pinch/double-tap zoom are unchanged.
+ * Offline caching (Image System Refinement Plan, Part A) — unchanged:
+ *   The active photo loads via useCachedImage (device-first → network →
+ *   cache-on-view). 'error' shows the ImageLoadError placeholder with a
+ *   working Retry button.
  *
  * Props:
  *   images       { id, url, caption }[]
@@ -53,32 +53,62 @@
  *   onGo         (index: number) => void
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useCachedImage } from '../../hooks/useCachedImage'
 import ImageLoadError from './ImageLoadError'
 
+const BAND_STYLE = {
+  position: 'relative',
+  zIndex: 2,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  padding: '10px 14px',
+  backgroundColor: 'rgba(255,255,255,0.10)',
+}
+
+// Close and nav buttons now share one style — previously the close
+// button (28px/15px icon) was visibly smaller than the nav arrows
+// (32px/17px icon) for no real reason.
+const CONTROL_BUTTON_STYLE = {
+  width: 32,
+  height: 32,
+  borderRadius: '50%',
+  backgroundColor: 'rgba(255,255,255,0.12)',
+  border: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+  color: 'rgba(255,255,255,0.85)',
+  WebkitTapHighlightColor: 'transparent',
+  outline: 'none',
+  flexShrink: 0,
+}
+
+const CONTROL_PLACEHOLDER_STYLE = { width: 32, height: 32, flexShrink: 0 }
+
 export default function Lightbox({ images, activeIndex, onClose, onGo }) {
-  const [scale,      setScale]      = useState(1)
-  const [translateX, setTranslateX] = useState(0)
-  const [translateY, setTranslateY] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
+  const [chromeVisible, setChromeVisible] = useState(true)
+  const [displayFailed, setDisplayFailed] = useState(false)
+  const [zoomScale, setZoomScale] = useState(1)
+  // The parent renders this component with a plain `{open && <Lightbox />}`
+  // — there's no AnimatePresence wrapping that conditional, so a normal
+  // framer-motion `exit` animation would never get the chance to play; the
+  // component would just vanish the instant `onClose` unmounts it. Instead,
+  // closing is staged locally: fade out first, then call the real `onClose`
+  // once that fade finishes.
+  const [isClosing, setIsClosing] = useState(false)
+  const requestClose = useCallback(() => setIsClosing(true), [])
 
-  const touch = useRef({
-    startX: 0, startY: 0, startTime: 0,
-    lastTapTime: 0, lastTapX: 0, lastTapY: 0,
-    panStartX: 0, panStartY: 0,
-    lastTranslateX: 0, lastTranslateY: 0,
-    pinchStartDist: null, pinchStartScale: 1,
-    pinchMidX: 0, pinchMidY: 0,
-    scaleAtStart: 1,
-  })
+  const active = images[activeIndex]
+  const { src, status, retry } = useCachedImage(active?.url)
 
-  // Reset zoom when image changes
-  useEffect(() => {
-    setScale(1); setTranslateX(0); setTranslateY(0)
-  }, [activeIndex])
+  const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
 
   // Lock body scroll while open
   useEffect(() => {
@@ -87,289 +117,176 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     return () => { document.body.style.overflow = prev }
   }, [])
 
-  const active = images[activeIndex]
-  const { src, status, retry } = useCachedImage(active?.url)
-
-  // 2026-09-02 fix — see ImageCarousel.jsx's matching comment. Catches an
-  // address that's genuinely dead even after useCachedImage's plain-<img>
-  // fallback, via the <img>'s own onError below.
-  const [displayFailed, setDisplayFailed] = useState(false)
+  // Reset failure/zoom state when the photo itself changes — otherwise a
+  // failed load or a leftover zoom level from the previous photo would
+  // bleed into the next one.
   useEffect(() => { setDisplayFailed(false) }, [active?.url])
-  const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
+  useEffect(() => { setZoomScale(1) }, [active?.url])
 
-  // Swipe-down-to-dismiss feedback: fade the backdrop as the photo is
-  // dragged down at 1x. Purely visual — the actual dismiss decision is
-  // made in handleTouchEnd once the finger lifts.
-  const dismissProgress = scale === 1 ? Math.min(1, Math.max(0, translateY) / 250) : 0
+  if (!active) return null
 
-  function getTouchDist(touches) {
-    const dx = touches[0].clientX - touches[1].clientX
-    const dy = touches[0].clientY - touches[1].clientY
-    return Math.sqrt(dx * dx + dy * dy)
-  }
+  const canDrag = status === 'ready' && !displayFailed && zoomScale <= 1
 
-  function resetZoom() { setScale(1); setTranslateX(0); setTranslateY(0) }
-
-  function handleTouchStart(e) {
-    e.stopPropagation()
-    setIsDragging(true)
-    const t = touch.current
-    if (e.touches.length === 1) {
-      const cx = e.touches[0].clientX
-      const cy = e.touches[0].clientY
-      t.startX = cx; t.startY = cy
-      t.startTime = Date.now()
-      t.panStartX = cx; t.panStartY = cy
-      t.lastTranslateX = translateX
-      t.lastTranslateY = translateY
-      t.scaleAtStart = scale
-      t.pinchStartDist = null
-    }
-    if (e.touches.length === 2) {
-      t.pinchStartDist  = getTouchDist(e.touches)
-      t.pinchStartScale = scale
-      t.pinchMidX = (e.touches[0].clientX + e.touches[1].clientX) / 2
-      t.pinchMidY = (e.touches[0].clientY + e.touches[1].clientY) / 2
-      t.panStartX = t.pinchMidX; t.panStartY = t.pinchMidY
-      t.lastTranslateX = translateX
-      t.lastTranslateY = translateY
-    }
-  }
-
-  function handleTouchMove(e) {
-    e.preventDefault()
-    e.stopPropagation()
-    const t = touch.current
-    if (e.touches.length === 2 && t.pinchStartDist !== null) {
-      const dist     = getTouchDist(e.touches)
-      const newScale = Math.min(4, Math.max(1, t.pinchStartScale * (dist / t.pinchStartDist)))
-      const midX     = (e.touches[0].clientX + e.touches[1].clientX) / 2
-      const midY     = (e.touches[0].clientY + e.touches[1].clientY) / 2
-      setScale(newScale)
-      setTranslateX(t.lastTranslateX + (midX - t.panStartX))
-      setTranslateY(t.lastTranslateY + (midY - t.panStartY))
-    } else if (e.touches.length === 1 && t.scaleAtStart > 1) {
-      setTranslateX(t.lastTranslateX + (e.touches[0].clientX - t.panStartX))
-      setTranslateY(t.lastTranslateY + (e.touches[0].clientY - t.panStartY))
-    } else if (e.touches.length === 1 && t.scaleAtStart === 1) {
-      // Swipe-down-to-dismiss drag. Only tracks downward, mostly-vertical
-      // movement — a mostly-horizontal drag is left alone here so the
-      // existing swipe-left/right navigation (decided in handleTouchEnd)
-      // isn't fought over.
-      const dy = e.touches[0].clientY - t.panStartY
-      const dx = e.touches[0].clientX - t.panStartX
-      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
-        setTranslateY(dy)
-      }
-    }
-  }
-
-  function handleTouchEnd(e) {
-    e.stopPropagation()
-    setIsDragging(false)
-    const t = touch.current
-    if (e.touches.length > 0) return
-    const endX  = e.changedTouches[0].clientX
-    const endY  = e.changedTouches[0].clientY
-    const dx    = endX - t.startX
-    const dy    = endY - t.startY
-    const dt    = Date.now() - t.startTime
-    const moved = Math.sqrt(dx * dx + dy * dy)
-    t.pinchStartDist = null
-
-    if (dt < 300 && moved < 12) {
-      const now       = Date.now()
-      const sinceLast = now - t.lastTapTime
-      const tapDx     = endX - t.lastTapX
-      const tapDy     = endY - t.lastTapY
-      const doubleTap = sinceLast < 320 && Math.sqrt(tapDx * tapDx + tapDy * tapDy) < 40
-      if (doubleTap) {
-        t.lastTapTime = 0
-        if (scale > 1) {
-          resetZoom()
-        } else {
-          const rect = e.target.getBoundingClientRect()
-          const ox = endX - rect.left - rect.width  / 2
-          const oy = endY - rect.top  - rect.height / 2
-          setScale(2.5)
-          setTranslateX(-ox * 1.5)
-          setTranslateY(-oy * 1.5)
-        }
-      } else {
-        t.lastTapTime = now
-        t.lastTapX = endX
-        t.lastTapY = endY
-      }
+  function handleDragEnd(_event, info) {
+    const { offset } = info
+    if (Math.abs(offset.y) > Math.abs(offset.x) && offset.y > 100) {
+      requestClose()
       return
     }
-
-    if (t.scaleAtStart === 1 && dy > 100 && Math.abs(dy) > Math.abs(dx)) {
-      onClose()
-      return
-    }
-
-    if (t.scaleAtStart === 1 && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 48) {
-      if (dx < 0) onGo(activeIndex + 1)
-      else        onGo(activeIndex - 1)
-      return
-    }
-
-    if (t.scaleAtStart === 1 && translateY !== 0) {
-      resetZoom()
+    if (Math.abs(offset.x) > Math.abs(offset.y) && Math.abs(offset.x) > 60) {
+      if (offset.x < 0 && activeIndex < images.length - 1) onGo(activeIndex + 1)
+      if (offset.x > 0 && activeIndex > 0) onGo(activeIndex - 1)
     }
   }
 
   return createPortal(
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: isClosing ? 0 : 1 }}
+      transition={{ duration: 0.2 }}
+      onAnimationComplete={() => { if (isClosing) onClose() }}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        backgroundColor: `rgba(0,0,0,${(0.95 - dismissProgress * 0.55).toFixed(2)})`,
+        backgroundColor: 'rgba(0,0,0,0.94)',
         display: 'flex', flexDirection: 'column',
-        touchAction: 'none',
-        userSelect: 'none', WebkitUserSelect: 'none',
+        touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget && scale === 1) onClose() }}
+      onClick={(e) => { if (e.target === e.currentTarget) requestClose() }}
     >
-      {/* Top bar */}
-      <div style={{
-        position: 'absolute', top: 0, left: 0, right: 0,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px',
-        paddingTop: 'calc(env(safe-area-inset-top, 0px) + 12px)',
-        zIndex: 10,
-        background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)',
-        pointerEvents: 'none',
-      }}>
+      {/* Top band — counter + close */}
+      <motion.div
+        animate={{ opacity: chromeVisible ? 1 : 0 }}
+        transition={{ duration: 0.18 }}
+        style={{
+          ...BAND_STYLE,
+          paddingTop: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+          pointerEvents: chromeVisible ? 'auto' : 'none',
+        }}
+      >
         {images.length > 1 ? (
-          <span style={{
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            color: 'rgba(255,255,255,0.85)',
-            fontSize: 12,
-            padding: '4px 10px',
-            borderRadius: 20,
-            pointerEvents: 'none',
-          }}>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.85)' }}>
             {activeIndex + 1} / {images.length}
           </span>
         ) : <span />}
         <button
-          onClick={(e) => { e.stopPropagation(); onClose() }}
+          onClick={(e) => { e.stopPropagation(); requestClose() }}
           aria-label="Close"
-          style={{
-            width: 28, height: 28, borderRadius: '50%',
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            border: 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
-            WebkitTapHighlightColor: 'transparent', outline: 'none',
-            pointerEvents: 'auto',
-          }}
+          style={CONTROL_BUTTON_STYLE}
         >
-          <X size={15} strokeWidth={2.5} />
+          <X size={17} strokeWidth={2.5} />
         </button>
-      </div>
+      </motion.div>
 
       {/* Image area */}
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={active.url}
+            initial={{ opacity: 0, scale: 0.94 }}
+            animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.94 : 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+            drag={canDrag}
+            dragElastic={0.15}
+            dragSnapToOrigin
+            onDragEnd={handleDragEnd}
+            onTap={() => setChromeVisible((v) => !v)}
+            style={{
+              width: '100%', height: '100%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+          >
+            {status === 'ready' && src && !displayFailed && (
+              <TransformWrapper
+                initialScale={1}
+                minScale={1}
+                maxScale={4}
+                doubleClick={{ mode: 'toggle', step: 1.5 }}
+                panning={{ velocityDisabled: true }}
+                onTransformed={(_ref, state) => setZoomScale(state.scale)}
+              >
+                <TransformComponent
+                  wrapperStyle={{ width: '100%', height: '100%' }}
+                  contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <img
+                    src={src}
+                    alt={active.caption || ''}
+                    draggable={false}
+                    onError={() => setDisplayFailed(true)}
+                    style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
+                  />
+                </TransformComponent>
+              </TransformWrapper>
+            )}
+
+            {(status === 'error' || displayFailed) && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <ImageLoadError onRetry={handleRetry} />
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom band — prev / caption + dots / next */}
+      <motion.div
+        animate={{ opacity: chromeVisible ? 1 : 0 }}
+        transition={{ duration: 0.18 }}
         style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          overflow: 'hidden', touchAction: 'none', position: 'relative',
+          ...BAND_STYLE,
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)',
+          pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        {status === 'ready' && src && !displayFailed && (
-          <img
-            key={active.url}
-            src={src}
-            alt={active.caption || ''}
-            draggable={false}
-            onError={() => setDisplayFailed(true)}
-            style={{
-              maxWidth: '100%', maxHeight: '100%',
-              objectFit: 'contain', display: 'block',
-              transform: `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`,
-              transformOrigin: 'center center',
-              transition: (scale === 1 && !isDragging) ? 'transform 0.22s ease' : 'none',
-              userSelect: 'none', WebkitUserSelect: 'none',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
-
-        {(status === 'error' || displayFailed) && (
-          <div
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
-            style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <ImageLoadError onRetry={handleRetry} />
-          </div>
-        )}
-
-        {images.length > 1 && activeIndex > 0 && scale === 1 && (
+        {images.length > 1 && activeIndex > 0 ? (
           <button
             onClick={(e) => { e.stopPropagation(); onGo(activeIndex - 1) }}
             aria-label="Previous image"
-            style={{
-              position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 32, height: 32, borderRadius: '50%',
-              backgroundColor: 'rgba(255,255,255,0.1)', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          ><ChevronLeft size={17} strokeWidth={2} /></button>
-        )}
-        {images.length > 1 && activeIndex < images.length - 1 && scale === 1 && (
+            style={CONTROL_BUTTON_STYLE}
+          >
+            <ChevronLeft size={17} strokeWidth={2} />
+          </button>
+        ) : <span style={CONTROL_PLACEHOLDER_STYLE} />}
+
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+          {active.caption && (
+            <p dir="auto" style={{
+              margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13,
+              lineHeight: 1.5, textAlign: 'center', padding: '0 8px',
+            }}>
+              {active.caption}
+            </p>
+          )}
+          {images.length > 1 && (
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+              {images.map((_, i) => (
+                <div key={i} style={{
+                  width: i === activeIndex ? 8 : 5,
+                  height: i === activeIndex ? 8 : 5,
+                  borderRadius: '50%',
+                  backgroundColor: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.35)',
+                  transition: 'all 0.2s ease', flexShrink: 0,
+                }} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {images.length > 1 && activeIndex < images.length - 1 ? (
           <button
             onClick={(e) => { e.stopPropagation(); onGo(activeIndex + 1) }}
             aria-label="Next image"
-            style={{
-              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 32, height: 32, borderRadius: '50%',
-              backgroundColor: 'rgba(255,255,255,0.1)', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          ><ChevronRight size={17} strokeWidth={2} /></button>
-        )}
-      </div>
-
-      {/* Caption + dots */}
-      <div style={{
-        paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-        paddingTop: 12,
-        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 100%)',
-        minHeight: 56,
-      }}>
-        {active.caption && (
-          <p dir="auto" style={{
-            margin: 0, color: 'rgba(255,255,255,0.85)', fontSize: 13,
-            lineHeight: 1.5, textAlign: 'center', padding: '0 24px', maxWidth: 500,
-          }}>
-            {active.caption}
-          </p>
-        )}
-        {images.length > 1 && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {images.map((_, i) => (
-              <div key={i} style={{
-                width:  i === activeIndex ? 8 : 5,
-                height: i === activeIndex ? 8 : 5,
-                borderRadius: '50%',
-                backgroundColor: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.2s ease', flexShrink: 0,
-              }} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>,
+            style={CONTROL_BUTTON_STYLE}
+          >
+            <ChevronRight size={17} strokeWidth={2} />
+          </button>
+        ) : <span style={CONTROL_PLACEHOLDER_STYLE} />}
+      </motion.div>
+    </motion.div>,
     document.body
   )
 }
