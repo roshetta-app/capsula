@@ -207,6 +207,52 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   const lastTapRef = useRef({ time: 0, x: 0, y: 0 })
   const tapStartRef = useRef(null)
 
+  // Measures the slide's own frame (the space the photo has to fit in)
+  // and the photo's real pixel dimensions, so the actual on-screen size
+  // of an `objectFit: contain` photo can be computed in JS — see
+  // renderedSize below. This replaces an earlier attempt that tried to
+  // cap the image with a `100dvh` CSS unit: that unit isn't supported by
+  // every WebView, and when unsupported the browser drops the max-height
+  // entirely, letting the photo render at full resolution and overflow
+  // the screen (confirmed 2026-09-02 from a device screenshot). Measuring
+  // in JS instead doesn't depend on any one CSS unit being supported.
+  const frameRef = useRef(null)
+  const [frameSize, setFrameSize] = useState(null)
+  const [naturalSize, setNaturalSize] = useState(null)
+
+  useEffect(() => {
+    const el = frameRef.current
+    if (!el) return
+    function measure() {
+      const rect = el.getBoundingClientRect()
+      setFrameSize({ width: rect.width, height: rect.height })
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    window.addEventListener('orientationchange', measure)
+    return () => {
+      window.removeEventListener('resize', measure)
+      window.removeEventListener('orientationchange', measure)
+    }
+  }, [])
+
+  function handleImgLoad(e) {
+    setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight })
+  }
+
+  // The exact on-screen box a `contain`-fitted photo would occupy in its
+  // frame — null until both measurements are in, in which case the
+  // slide falls back to the old CSS-only sizing (safe, matches what
+  // shipped before this fix, just without the corrected pan bounds).
+  let renderedSize = null
+  if (frameSize?.width && frameSize?.height && naturalSize?.width && naturalSize?.height) {
+    const frameRatio = frameSize.width / frameSize.height
+    const imgRatio = naturalSize.width / naturalSize.height
+    renderedSize = imgRatio > frameRatio
+      ? { width: frameSize.width, height: frameSize.width / imgRatio }
+      : { width: frameSize.height * imgRatio, height: frameSize.height }
+  }
+
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
   }, [isCurrent, cached.status, cached.retry, onCurrentInfo])
@@ -264,10 +310,13 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   }
 
   return (
-    <div style={{
-      position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
+    <div
+      ref={frameRef}
+      style={{
+        position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
       {!hidden && cached.status === 'ready' && cached.src && (
         <TransformWrapper
           ref={transformRef}
@@ -290,29 +339,31 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
             if (isCurrent) onCurrentZoom(state.scale)
           }}
         >
-          {/* wrapperStyle centers the content box in the frame; contentStyle
-              is left un-sized (no width/height) so it shrink-wraps to the
-              actual rendered <img>, rather than stretching to the full
-              frame. The library measures *this* box to work out how far a
-              zoomed photo can be panned — sized to the full frame, it
-              treated the empty letterboxed margins around a
-              non-frame-shaped photo as draggable image content, so a
-              zoomed photo's real top/bottom edge could be dragged past the
-              screen edge before panning was stopped. Shrink-wrapped to the
-              real image, the pan boundary now matches the photo's actual
-              edges. */}
+          {/* wrapperStyle centers the content box in the frame. Once
+              renderedSize is known, contentStyle is left un-sized so it
+              shrink-wraps to the img's own explicit pixel size below —
+              that's what lets the library's pan-bounds math match the
+              photo's real edges instead of the full letterboxed frame
+              around it. Until then (briefly, before the photo's first
+              onLoad fires), it falls back to the original full-frame
+              sizing so nothing looks different from before this fix. */}
           <TransformComponent
             wrapperStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            contentStyle={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            contentStyle={renderedSize
+              ? { display: 'flex', alignItems: 'center', justifyContent: 'center' }
+              : { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <img
               src={cached.src}
               alt={img.caption || ''}
               draggable={false}
+              onLoad={handleImgLoad}
               onError={isCurrent ? onCurrentFailed : undefined}
               onPointerDown={handleImgPointerDown}
               onPointerUp={handleImgPointerUp}
-              style={{ maxWidth: '100vw', maxHeight: '100dvh', objectFit: 'contain', display: 'block' }}
+              style={renderedSize
+                ? { width: renderedSize.width, height: renderedSize.height, display: 'block', pointerEvents: 'auto' }
+                : { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'auto' }}
             />
           </TransformComponent>
         </TransformWrapper>
