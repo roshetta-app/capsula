@@ -20,17 +20,20 @@
  *   free viewing — a single re-tap brings them back.
  *
  * Motion (framer-motion):
- *   - Open/close: backdrop fades in/out; the photo fades and scales up
- *     from ~94% rather than just appearing.
+ *   - Open/close: backdrop fades in/out; the very first photo shown
+ *     fades and scales up from ~94% rather than just appearing.
  *   - Chrome show/hide: a plain opacity fade on each band.
  *   - Swipe left/right (at 1x zoom) navigates; swipe down (at 1x)
- *     dismisses. The photo itself does NOT visually follow the finger
- *     during the swipe (changed 2026-09-02, on request) — it stays put
- *     in place, and only reads the gesture once it ends: touchstart
- *     records the starting point, touchend measures the distance and
- *     direction and fires onGo/requestClose if it cleared the
- *     threshold, otherwise nothing happens at all. There is no
- *     mid-gesture drag-follow or snap-back animation to reconcile.
+ *     dismisses. The photo does NOT visually follow the finger during
+ *     the swipe itself (changed 2026-09-02) — it stays put until the
+ *     finger lifts, and only then, if the swipe cleared the distance
+ *     threshold, does the transition play: a directional slide, like a
+ *     carousel (changed 2026-09-02, on request) — the new photo slides
+ *     in from the side you swiped toward while the old one slides out
+ *     the opposite way, at the same time. This only replaces the
+ *     open/close fade-and-scale for the very first photo shown; every
+ *     later index change (swipe or the prev/next arrows) always uses
+ *     the slide instead.
  *   - Backdrop stays a fixed, solid opacity throughout.
  *
  * Zoom/pan (react-zoom-pan-pinch):
@@ -126,6 +129,15 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   const [isClosing, setIsClosing] = useState(false)
   const requestClose = useCallback(() => setIsClosing(true), [])
   const swipeStart = useRef(null)
+  // dirRef: which way the last swipe/nav-tap moved (1 = to the next
+  // photo, -1 = to the previous one). isFirstPhotoRef: true only for
+  // the very first photo shown when the viewer opens — that one keeps
+  // the fade+scale open animation instead of sliding in, since there's
+  // no "previous" photo for it to slide in relative to. Flips to false
+  // once, right after the first paint, and never flips back.
+  const dirRef = useRef(1)
+  const isFirstPhotoRef = useRef(true)
+  useEffect(() => { isFirstPhotoRef.current = false }, [])
 
   const active = images[activeIndex]
   const { src, status, retry } = useCachedImage(active?.url)
@@ -151,6 +163,14 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   // drag belongs to react-zoom-pan-pinch's own panning instead.
   const canSwipe = status === 'ready' && !displayFailed && zoomScale <= 1
 
+  // Records which way we're moving before telling the parent to change
+  // the index — the slide variants below read dirRef at animation time,
+  // including for the photo that's already on its way out.
+  function goTo(newIndex) {
+    dirRef.current = newIndex > activeIndex ? 1 : -1
+    onGo(newIndex)
+  }
+
   function handlePhotoTouchStart(e) {
     if (!canSwipe) return
     swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
@@ -167,10 +187,28 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       return
     }
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 60) {
-      if (dx < 0 && activeIndex < images.length - 1) onGo(activeIndex + 1)
-      if (dx > 0 && activeIndex > 0) onGo(activeIndex - 1)
+      if (dx < 0 && activeIndex < images.length - 1) goTo(activeIndex + 1)
+      if (dx > 0 && activeIndex > 0) goTo(activeIndex - 1)
     }
   }
+
+  // enter/exit read {isFirstPhoto, dir} via the `custom` prop rather
+  // than closing over component state directly — framer-motion freezes
+  // a departing element's own props at the moment it's removed, so
+  // without this it would slide out using whatever direction was true
+  // the last time IT was the entering photo, not the direction of the
+  // swipe that's currently pushing it out. AnimatePresence's `custom`
+  // prop is the one channel that still reaches an already-exiting
+  // element.
+  const slideVariants = {
+    enter: ({ isFirstPhoto, dir }) => isFirstPhoto
+      ? { opacity: 0, scale: 0.94, x: 0 }
+      : { opacity: 1, scale: 1, x: dir > 0 ? '100%' : '-100%' },
+    exit: ({ isFirstPhoto, dir }) => isFirstPhoto
+      ? { opacity: 0, scale: 0.96, x: 0 }
+      : { opacity: 1, scale: 1, x: dir > 0 ? '-100%' : '100%' },
+  }
+  const slideCustom = { isFirstPhoto: isFirstPhotoRef.current, dir: dirRef.current }
 
   return createPortal(
     <motion.div
@@ -215,13 +253,17 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
       {/* Image area */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence initial={false} custom={slideCustom}>
           <motion.div
             key={active.url}
-            initial={{ opacity: 0, scale: 0.94 }}
-            animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.94 : 1 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{ duration: 0.22, ease: 'easeOut' }}
+            custom={slideCustom}
+            variants={slideVariants}
+            initial="enter"
+            animate={{ opacity: isClosing ? 0 : 1, scale: isClosing ? 0.94 : 1, x: 0 }}
+            exit="exit"
+            transition={isFirstPhotoRef.current
+              ? { duration: 0.22, ease: 'easeOut' }
+              : { duration: 0.28, ease: 'easeOut' }}
             onTap={() => setChromeVisible((v) => !v)}
             onTouchStart={handlePhotoTouchStart}
             onTouchEnd={handlePhotoTouchEnd}
@@ -285,7 +327,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       >
         {images.length > 1 && activeIndex > 0 ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onGo(activeIndex - 1) }}
+            onClick={(e) => { e.stopPropagation(); goTo(activeIndex - 1) }}
             aria-label="Previous image"
             style={CONTROL_BUTTON_STYLE}
           >
@@ -319,7 +361,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
         {images.length > 1 && activeIndex < images.length - 1 ? (
           <button
-            onClick={(e) => { e.stopPropagation(); onGo(activeIndex + 1) }}
+            onClick={(e) => { e.stopPropagation(); goTo(activeIndex + 1) }}
             aria-label="Next image"
             style={CONTROL_BUTTON_STYLE}
           >
