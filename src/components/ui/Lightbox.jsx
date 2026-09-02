@@ -139,7 +139,7 @@ const BOTTOM_OVERLAY_STYLE = {
   paddingLeft: 20,
   paddingRight: 20,
   paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
-  background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.75) 45%, rgba(0,0,0,0) 100%)',
+  background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.88) 18%, rgba(0,0,0,0.68) 38%, rgba(0,0,0,0.42) 58%, rgba(0,0,0,0.18) 78%, rgba(0,0,0,0) 100%)',
 }
 
 // Fixed-height slot regardless of whether the current photo has a
@@ -305,7 +305,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             exit="exit"
             transition={isFirstPhotoRef.current
               ? { duration: 0.22, ease: 'easeOut' }
-              : { duration: 0.28, ease: 'easeOut' }}
+              : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             onTouchStart={handlePhotoTouchStart}
             onTouchEnd={handlePhotoTouchEnd}
             style={{
