@@ -102,18 +102,6 @@ const LOAD_WINDOW = 1
 // "finger never really moved," same as ImageCarousel.jsx's own tap check.
 const TAP_SLOP_PX = 8
 
-// Double-tap-to-zoom target scale — matches the felt zoom level of the
-// library's old built-in toggle (which stepped by 0.6 from 1x), kept
-// the same here so this fix doesn't change how far a double-tap zooms.
-const DOUBLE_TAP_ZOOM_SCALE = 1.6
-
-// Max gap between two taps to count as a double-tap (matches the
-// library's own internal double-tap window, since this replaces that
-// mechanism), and how far the second tap may drift from the first and
-// still count as the same double-tap rather than two separate taps.
-const DOUBLE_TAP_WINDOW_MS = 300
-const DOUBLE_TAP_DRIFT_PX = 24
-
 // Close button — the one remaining top control (dots already show
 // position, swipe already handles navigation). Floats directly over the
 // photo instead of sitting in a tinted band.
@@ -200,58 +188,6 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   // onCurrentZoom, but only while this is the current slide, since only
   // the current slide's zoom should affect Embla's own drag gating.
   const [localScale, setLocalScale] = useState(1)
-  // Tracks the previous tap's time/position for double-tap detection,
-  // and the current touch's start position so a pan/drag release isn't
-  // mistaken for a tap. See handleImgPointerUp below for why this
-  // replaces the library's own built-in double-tap-to-zoom.
-  const lastTapRef = useRef({ time: 0, x: 0, y: 0 })
-  const tapStartRef = useRef(null)
-
-  // Measures the slide's own frame (the space the photo has to fit in)
-  // and the photo's real pixel dimensions, so the actual on-screen size
-  // of an `objectFit: contain` photo can be computed in JS — see
-  // renderedSize below. This replaces an earlier attempt that tried to
-  // cap the image with a `100dvh` CSS unit: that unit isn't supported by
-  // every WebView, and when unsupported the browser drops the max-height
-  // entirely, letting the photo render at full resolution and overflow
-  // the screen (confirmed 2026-09-02 from a device screenshot). Measuring
-  // in JS instead doesn't depend on any one CSS unit being supported.
-  const frameRef = useRef(null)
-  const [frameSize, setFrameSize] = useState(null)
-  const [naturalSize, setNaturalSize] = useState(null)
-
-  useEffect(() => {
-    const el = frameRef.current
-    if (!el) return
-    function measure() {
-      const rect = el.getBoundingClientRect()
-      setFrameSize({ width: rect.width, height: rect.height })
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    window.addEventListener('orientationchange', measure)
-    return () => {
-      window.removeEventListener('resize', measure)
-      window.removeEventListener('orientationchange', measure)
-    }
-  }, [])
-
-  function handleImgLoad(e) {
-    setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight })
-  }
-
-  // The exact on-screen box a `contain`-fitted photo would occupy in its
-  // frame — null until both measurements are in, in which case the
-  // slide falls back to the old CSS-only sizing (safe, matches what
-  // shipped before this fix, just without the corrected pan bounds).
-  let renderedSize = null
-  if (frameSize?.width && frameSize?.height && naturalSize?.width && naturalSize?.height) {
-    const frameRatio = frameSize.width / frameSize.height
-    const imgRatio = naturalSize.width / naturalSize.height
-    renderedSize = imgRatio > frameRatio
-      ? { width: frameSize.width, height: frameSize.width / imgRatio }
-      : { width: frameSize.height * imgRatio, height: frameSize.height }
-  }
 
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
@@ -271,62 +207,18 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
 
   const hidden = isCurrent && currentDisplayFailed
 
-  // Double-tap-to-zoom, hand-rolled instead of the library's own
-  // `doubleClick` toggle: that built-in toggle only steps the scale by
-  // a fixed amount off wherever it currently sits (scale - step), so
-  // pinch-zooming past the double-tap's own target and then
-  // double-tapping again only stepped it back down partway instead of
-  // all the way to 1x. This always lands exactly on 1x when zoomed in
-  // by any amount, and always zooms in to the same fixed target when at
-  // 1x, regardless of how the current zoom was reached.
-  function handleImgPointerDown(e) {
-    tapStartRef.current = { x: e.clientX, y: e.clientY }
-  }
-  function handleImgPointerUp(e) {
-    const start = tapStartRef.current
-    tapStartRef.current = null
-    if (!start) return
-    const moved = Math.abs(e.clientX - start.x) > TAP_SLOP_PX || Math.abs(e.clientY - start.y) > TAP_SLOP_PX
-    if (moved) return // a pan/drag release, not a tap
-
-    const now = Date.now()
-    const last = lastTapRef.current
-    const isDoubleTap = now - last.time < DOUBLE_TAP_WINDOW_MS &&
-      Math.abs(e.clientX - last.x) < DOUBLE_TAP_DRIFT_PX &&
-      Math.abs(e.clientY - last.y) < DOUBLE_TAP_DRIFT_PX
-
-    if (!isDoubleTap) {
-      lastTapRef.current = { time: now, x: e.clientX, y: e.clientY }
-      return
-    }
-    lastTapRef.current = { time: 0, x: 0, y: 0 } // consume the pair
-    const api = transformRef.current
-    if (!api) return
-    if (localScale > 1.01) {
-      api.resetTransform(200)
-    } else {
-      api.centerView(DOUBLE_TAP_ZOOM_SCALE, 200)
-    }
-  }
-
   return (
-    <div
-      ref={frameRef}
-      style={{
-        position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
+    <div style={{
+      position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+    }}>
       {!hidden && cached.status === 'ready' && cached.src && (
         <TransformWrapper
           ref={transformRef}
           initialScale={1}
           minScale={1}
           maxScale={4}
-          limitToBounds
-          // Handled by handleImgPointerUp above instead — see its
-          // comment for why the library's own toggle isn't used here.
-          doubleClick={{ disabled: true }}
+          doubleClick={{ mode: 'toggle', step: 0.6 }}
           // Panning only matters for this slide once it's actually
           // zoomed in — left enabled at 1x, it still captures part of a
           // single-finger drag, which would corrupt the Embla-driven
@@ -339,31 +231,16 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
             if (isCurrent) onCurrentZoom(state.scale)
           }}
         >
-          {/* wrapperStyle centers the content box in the frame. Once
-              renderedSize is known, contentStyle is left un-sized so it
-              shrink-wraps to the img's own explicit pixel size below —
-              that's what lets the library's pan-bounds math match the
-              photo's real edges instead of the full letterboxed frame
-              around it. Until then (briefly, before the photo's first
-              onLoad fires), it falls back to the original full-frame
-              sizing so nothing looks different from before this fix. */}
           <TransformComponent
-            wrapperStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            contentStyle={renderedSize
-              ? { display: 'flex', alignItems: 'center', justifyContent: 'center' }
-              : { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            wrapperStyle={{ width: '100%', height: '100%' }}
+            contentStyle={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           >
             <img
               src={cached.src}
               alt={img.caption || ''}
               draggable={false}
-              onLoad={handleImgLoad}
               onError={isCurrent ? onCurrentFailed : undefined}
-              onPointerDown={handleImgPointerDown}
-              onPointerUp={handleImgPointerUp}
-              style={renderedSize
-                ? { width: renderedSize.width, height: renderedSize.height, display: 'block', pointerEvents: 'auto' }
-                : { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block', pointerEvents: 'auto' }}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }}
             />
           </TransformComponent>
         </TransformWrapper>
