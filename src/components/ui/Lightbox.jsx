@@ -191,6 +191,36 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   // Scale immediately before the most recent double-click (or wheel)
   // zoom action — see the onZoomStart/onZoomStop pair below.
   const scaleBeforeZoomRef = useRef(1)
+  // Timestamp until which a "double-click" should be ignored by our
+  // correction below. Lifting two fingers off a pinch close together can
+  // make the WebView synthesize a native double-click from the two
+  // touchend events, which the zoom library can't tell apart from a real
+  // double-tap — without this guard, ending a pinch could trigger our
+  // own full-reset correction, which is a step further than even the
+  // library's own (already slightly odd, pre-existing) reaction to that
+  // same phantom event. Confirmed from source that pinch itself never
+  // calls onZoomStart/onZoomStop, so this only needs to catch the
+  // moment fingers lift, not gate anything during the pinch itself.
+  const pinchGuardUntilRef = useRef(0)
+
+  useEffect(() => {
+    const activePointers = new Set()
+    function onDown(e) {
+      activePointers.add(e.pointerId)
+    }
+    function onUpOrCancel(e) {
+      if (activePointers.size >= 2) pinchGuardUntilRef.current = Date.now() + 400
+      activePointers.delete(e.pointerId)
+    }
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('pointerup', onUpOrCancel, true)
+    window.addEventListener('pointercancel', onUpOrCancel, true)
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('pointerup', onUpOrCancel, true)
+      window.removeEventListener('pointercancel', onUpOrCancel, true)
+    }
+  }, [])
 
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
@@ -235,6 +265,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
             scaleBeforeZoomRef.current = ref.state.scale
           }}
           onZoomStop={(ref) => {
+            if (Date.now() < pinchGuardUntilRef.current) return // a pinch just ended, not a real double-tap
             const wasZoomedIn = scaleBeforeZoomRef.current > 1.01
             const stillZoomedIn = ref.state.scale > 1.01
             if (wasZoomedIn && stillZoomedIn) {
@@ -332,15 +363,26 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     }
   }, [emblaApi, onGo])
 
-  // No custom settle override here (2026-09-02): the carousel's
-  // duration(2)/friction(0.36) tuning was built for a compact card and
-  // read as too fast once copied onto a full-screen swipe — even the
-  // slowed-down duration(7)/friction(0.4) version still felt fast,
-  // because the aggressive tuning itself (not just its numbers) is wrong
-  // for this much larger swipe distance. Leaving Embla's own untouched
-  // defaults (duration 25, friction 0.68, scaled to flick speed) in
-  // place gives the natural, smooth settle most full-screen swipe UIs
-  // ship with.
+  // Embla's own untouched defaults (duration 25, friction 0.68 — the
+  // 0.68 isn't even a public option, it's a hardcoded internal constant,
+  // confirmed 2026-09-02 from Embla's source) still read as too fast
+  // once actually tested on a full-screen photo swipe, not just the
+  // carousel's more aggressive duration(2)/friction(0.36) tuning that
+  // was here before. Both numbers push the settle in the same direction
+  // — higher duration and friction closer to 1 both mean a slower,
+  // gentler glide to the next photo — so this deliberately goes past
+  // Embla's defaults in that direction. These two exact numbers are a
+  // starting point, not a measured target: worth nudging further on a
+  // real device if it's still not slow enough, or overshoots into
+  // sluggish.
+  useEffect(() => {
+    if (!emblaApi) return
+    const slowSettle = () => {
+      emblaApi.internalEngine().scrollBody.useDuration(40).useFriction(0.78)
+    }
+    emblaApi.on('pointerUp', slowSettle)
+    return () => emblaApi.off('pointerUp', slowSettle)
+  }, [emblaApi])
 
   const active = images[selectedIndex]
   const hasAnyCaption = images.some((img) => img.caption)
