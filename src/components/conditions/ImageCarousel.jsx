@@ -140,6 +140,10 @@ export default function ImageCarousel({ images = [], title = '' }) {
     align: 'start',
     loop: false,
     watchDrag: images.length > 1,
+    // Embla's default (25 frames, ~420ms) reads as noticeably slower
+    // than the original hand-rolled settle (260ms). 16 frames ≈ 260ms
+    // at 60fps — matches the old feel.
+    duration: 16,
   })
 
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -236,65 +240,75 @@ export default function ImageCarousel({ images = [], title = '' }) {
           overflow: 'hidden',
           backgroundColor: 'var(--color-surface)',
         }}>
-          {/* 4:3 photo area — Embla viewport */}
-          <div
-            ref={emblaRef}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onTouchStart={onTouchStart}
-            onTouchMove={onTouchMove}
-            onTouchEnd={onTouchEnd}
-            style={{
-              position: 'relative',
-              aspectRatio: '4 / 3',
-              overflow: 'hidden',
-              cursor: 'zoom-in',
-              backgroundColor: 'var(--color-bg)',
-              // Lets the browser handle vertical page scroll natively;
-              // Embla owns horizontal drag via JS. Replaces the old
-              // manual horizontal/vertical phase-detection entirely.
-              touchAction: 'pan-y',
-            }}
-          >
-            <div style={{ display: 'flex', height: '100%' }}>
-              {images.map((img, i) => (
-                <Slide
-                  key={img.id ?? i}
-                  img={img}
-                  index={i}
-                  selectedIndex={selectedIndex}
-                  onCurrentInfo={handleCurrentInfo}
-                  onCurrentFailed={() => setDisplayFailed(true)}
-                  currentDisplayFailed={displayFailed}
-                />
-              ))}
+          {/* 4:3 photo area. Uses the classic padding-top ratio hack
+              instead of CSS `aspect-ratio` — some Android WebView
+              Chromium builds have a layout-jitter bug where an
+              aspect-ratio box recalculates on every frame of a
+              descendant's transform animation (exactly what Embla's
+              drag/settle does), which is the likely real cause of the
+              card's bottom-border flicker survived the Embla swap.
+              paddingTop: 75% == height 3/4 of width == the same 4:3
+              box, just computed a way that doesn't re-trigger that
+              bug. */}
+          <div style={{ position: 'relative', width: '100%', paddingTop: '75%' }}>
+            <div
+              ref={emblaRef}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+              style={{
+                position: 'absolute', inset: 0,
+                overflow: 'hidden',
+                cursor: 'zoom-in',
+                backgroundColor: 'var(--color-bg)',
+                // Lets the browser handle vertical page scroll natively;
+                // Embla owns horizontal drag via JS. Replaces the old
+                // manual horizontal/vertical phase-detection entirely.
+                touchAction: 'pan-y',
+              }}
+            >
+              <div style={{ display: 'flex', height: '100%' }}>
+                {images.map((img, i) => (
+                  <Slide
+                    key={img.id ?? i}
+                    img={img}
+                    index={i}
+                    selectedIndex={selectedIndex}
+                    onCurrentInfo={handleCurrentInfo}
+                    onCurrentFailed={() => setDisplayFailed(true)}
+                    currentDisplayFailed={displayFailed}
+                  />
+                ))}
+              </div>
+
+              {currentCache.status === 'ready' && !displayFailed && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', top: 10, right: 10,
+                    width: 26, height: 26, borderRadius: '50%',
+                    backgroundColor: 'rgba(0,0,0,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <ZoomIn size={14} color="#fff" />
+                </div>
+              )}
+
+              {(currentCache.status === 'error' || displayFailed) && (
+                <div
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onPointerUp={(e) => e.stopPropagation()}
+                  style={{ position: 'absolute', inset: 0, cursor: 'default' }}
+                >
+                  <ImageLoadError onRetry={handleRetry} />
+                </div>
+              )}
             </div>
-
-            {currentCache.status === 'ready' && !displayFailed && (
-              <div
-                aria-hidden="true"
-                style={{
-                  position: 'absolute', top: 10, right: 10,
-                  width: 26, height: 26, borderRadius: '50%',
-                  backgroundColor: 'rgba(0,0,0,0.35)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  pointerEvents: 'none',
-                }}
-              >
-                <ZoomIn size={14} color="#fff" />
-              </div>
-            )}
-
-            {(currentCache.status === 'error' || displayFailed) && (
-              <div
-                onPointerDown={(e) => e.stopPropagation()}
-                onPointerUp={(e) => e.stopPropagation()}
-                style={{ position: 'absolute', inset: 0, cursor: 'default' }}
-              >
-                <ImageLoadError onRetry={handleRetry} />
-              </div>
-            )}
           </div>
 
           {/* Footer — dots and/or caption; only rendered when there's
