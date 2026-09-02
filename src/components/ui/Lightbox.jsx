@@ -10,6 +10,7 @@
  *   Pinch           — free scale 1x–4x with midpoint pan
  *   Drag (>1x)      — pan the zoomed image
  *   Swipe (at 1x)   — prev / next image
+ *   Swipe down (at 1x) — dismiss lightbox
  *   Tap backdrop    — close (only at 1x)
  *
  * Offline caching (Image System Refinement Plan, Part A):
@@ -34,6 +35,17 @@
  *     quieter chrome, more photo. Purely visual; none of the touch
  *     handling below changed.
  *
+ * Swipe-down-to-dismiss (Image System Refinement Plan, Part C, Step 5):
+ *   - At 1x zoom, a single-finger drag that's more vertical than
+ *     horizontal moves the photo down with the finger and fades the
+ *     backdrop as feedback. The transform transition is suppressed
+ *     while any touch is active so the photo tracks the finger 1:1 —
+ *     the same treatment already used for panning a zoomed-in photo.
+ *   - Releasing past ~100px of downward drag closes the lightbox;
+ *     releasing short of that snaps the photo back to centre.
+ *   - Layered on the existing single-finger branch — swipe left/right
+ *     to navigate and pinch/double-tap zoom are unchanged.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -51,6 +63,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   const [scale,      setScale]      = useState(1)
   const [translateX, setTranslateX] = useState(0)
   const [translateY, setTranslateY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
 
   const touch = useRef({
     startX: 0, startY: 0, startTime: 0,
@@ -84,6 +97,11 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   useEffect(() => { setDisplayFailed(false) }, [active?.url])
   const handleRetry = useCallback(() => { setDisplayFailed(false); retry() }, [retry])
 
+  // Swipe-down-to-dismiss feedback: fade the backdrop as the photo is
+  // dragged down at 1x. Purely visual — the actual dismiss decision is
+  // made in handleTouchEnd once the finger lifts.
+  const dismissProgress = scale === 1 ? Math.min(1, Math.max(0, translateY) / 250) : 0
+
   function getTouchDist(touches) {
     const dx = touches[0].clientX - touches[1].clientX
     const dy = touches[0].clientY - touches[1].clientY
@@ -94,6 +112,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
   function handleTouchStart(e) {
     e.stopPropagation()
+    setIsDragging(true)
     const t = touch.current
     if (e.touches.length === 1) {
       const cx = e.touches[0].clientX
@@ -132,11 +151,22 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     } else if (e.touches.length === 1 && t.scaleAtStart > 1) {
       setTranslateX(t.lastTranslateX + (e.touches[0].clientX - t.panStartX))
       setTranslateY(t.lastTranslateY + (e.touches[0].clientY - t.panStartY))
+    } else if (e.touches.length === 1 && t.scaleAtStart === 1) {
+      // Swipe-down-to-dismiss drag. Only tracks downward, mostly-vertical
+      // movement — a mostly-horizontal drag is left alone here so the
+      // existing swipe-left/right navigation (decided in handleTouchEnd)
+      // isn't fought over.
+      const dy = e.touches[0].clientY - t.panStartY
+      const dx = e.touches[0].clientX - t.panStartX
+      if (dy > 0 && Math.abs(dy) > Math.abs(dx)) {
+        setTranslateY(dy)
+      }
     }
   }
 
   function handleTouchEnd(e) {
     e.stopPropagation()
+    setIsDragging(false)
     const t = touch.current
     if (e.touches.length > 0) return
     const endX  = e.changedTouches[0].clientX
@@ -173,9 +203,19 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       return
     }
 
+    if (t.scaleAtStart === 1 && dy > 100 && Math.abs(dy) > Math.abs(dx)) {
+      onClose()
+      return
+    }
+
     if (t.scaleAtStart === 1 && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 48) {
       if (dx < 0) onGo(activeIndex + 1)
       else        onGo(activeIndex - 1)
+      return
+    }
+
+    if (t.scaleAtStart === 1 && translateY !== 0) {
+      resetZoom()
     }
   }
 
@@ -183,7 +223,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
-        backgroundColor: 'rgba(0,0,0,0.95)',
+        backgroundColor: `rgba(0,0,0,${(0.95 - dismissProgress * 0.55).toFixed(2)})`,
         display: 'flex', flexDirection: 'column',
         touchAction: 'none',
         userSelect: 'none', WebkitUserSelect: 'none',
@@ -251,7 +291,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
               objectFit: 'contain', display: 'block',
               transform: `scale(${scale}) translate(${translateX / scale}px, ${translateY / scale}px)`,
               transformOrigin: 'center center',
-              transition: scale === 1 ? 'transform 0.22s ease' : 'none',
+              transition: (scale === 1 && !isDragging) ? 'transform 0.22s ease' : 'none',
               userSelect: 'none', WebkitUserSelect: 'none',
               pointerEvents: 'none',
             }}
