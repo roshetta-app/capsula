@@ -41,6 +41,19 @@
  *   swipe-down-dismiss are disabled while zoomed past 1x, so panning a
  *   zoomed photo doesn't fight with them.
  *
+ * Portal event leak (fixed 2026-09-02):
+ *   This component teleports its DOM into document.body via
+ *   createPortal, but React still delivers touch events along the
+ *   *component* tree, not the DOM tree — so a swipe inside the lightbox
+ *   was still reaching touch handlers on whatever screen actually
+ *   rendered <Lightbox />, one of which reads horizontal swipes as a
+ *   request to switch tabs. Stopping propagation on the outermost
+ *   portaled element (below) keeps every touch that starts inside the
+ *   lightbox from bubbling out to that ancestor, without touching how
+ *   framer-motion or react-zoom-pan-pinch read gestures on the elements
+ *   *inside* this component — they see the event first, before it ever
+ *   reaches this boundary.
+ *
  * Offline caching (Image System Refinement Plan, Part A) — unchanged:
  *   The active photo loads via useCachedImage (device-first → network →
  *   cache-on-view). 'error' shows the ImageLoadError placeholder with a
@@ -91,6 +104,14 @@ const CONTROL_BUTTON_STYLE = {
 }
 
 const CONTROL_PLACEHOLDER_STYLE = { width: 32, height: 32, flexShrink: 0 }
+
+// Swallows a touch event at the portal boundary — see "Portal event
+// leak" note above. Applied to touchstart/touchmove/touchend on the
+// outermost portaled element only; it never runs on the elements that
+// actually need to see the gesture (the draggable photo, the zoom/pan
+// wrapper), since those sit further down the tree and get the event
+// first, before it bubbles out to here.
+function stopTouchLeak(e) { e.stopPropagation() }
 
 export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   const [chromeVisible, setChromeVisible] = useState(true)
@@ -145,6 +166,9 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       animate={{ opacity: isClosing ? 0 : 1 }}
       transition={{ duration: 0.2 }}
       onAnimationComplete={() => { if (isClosing) onClose() }}
+      onTouchStart={stopTouchLeak}
+      onTouchMove={stopTouchLeak}
+      onTouchEnd={stopTouchLeak}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         backgroundColor: 'rgba(0,0,0,0.94)',
