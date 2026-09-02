@@ -119,9 +119,15 @@
  *   overlap directly on top of each other for the whole crossfade
  *   instead of one leaving flow before the other arrives. The wrapper's
  *   size is simply "as tall as the taller of the two," so nothing above
- *   or below it (namely the dots) ever moves. Both captions just fade
- *   opacity in place, timed to the photo's own transition duration so
- *   they settle together.
+ *   or below it (namely the dots) ever moves.
+ *   Sixth pass, same day: with two DIFFERENT captions genuinely fading
+ *   simultaneously (mode="sync", the AnimatePresence default), there's
+ *   a real stretch of time where both are visibly superimposed at
+ *   partial opacity — two overlapping lines of text reads as messy/
+ *   flickery, distinct from the layout-jump problem the fifth pass
+ *   fixed. Switched to `mode="wait"`: the outgoing caption fades out
+ *   completely before the incoming one starts fading in, so only one
+ *   caption is ever partially visible at a time.
  *
  * Props:
  *   images       { id, url, caption }[]
@@ -528,7 +534,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
       >
         {hasAnyCaption && (
           <div style={{ display: 'grid', width: '100%' }}>
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} mode="wait">
               {active.caption && (
                 <motion.p
                   key={active.url}
