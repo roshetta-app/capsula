@@ -310,15 +310,17 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     }
   }, [emblaApi, onGo])
 
-  // Same settle-speed override as ImageCarousel.jsx, for the same reason
-  // — a released drag's default settle is noticeably slower than the old
-  // hand-rolled animation. Keeping the two in sync makes the lightbox
-  // swipe feel identical to the carousel's, which is the whole point of
-  // this swap.
+  // Same settle mechanism as ImageCarousel.jsx's own override, but tuned
+  // slower here: the carousel's duration(2)/friction(0.36) settles a
+  // ~230ms-long swipe over the width of its card, but the lightbox's
+  // photo is the full screen — the same 230ms covering a much longer
+  // distance reads as a noticeably higher-velocity, snappier settle even
+  // though the timing is identical. Slowing the duration down brings the
+  // felt speed back in line with the carousel's.
   useEffect(() => {
     if (!emblaApi) return
     const speedUpSettle = () => {
-      emblaApi.internalEngine().scrollBody.useDuration(2).useFriction(0.36)
+      emblaApi.internalEngine().scrollBody.useDuration(4).useFriction(0.36)
     }
     emblaApi.on('pointerUp', speedUpSettle)
     return () => emblaApi.off('pointerUp', speedUpSettle)
