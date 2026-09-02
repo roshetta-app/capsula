@@ -370,27 +370,42 @@ export default function ImageCarousel({ images = [], title = '' }) {
                   display: 'flex', justifyContent: 'center', gap: 6,
                   marginBottom: hasAnyCaption ? 8 : 0,
                 }}>
-                  {images.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => goTo(i)}
-                      aria-label={`Image ${i + 1}`}
-                      style={{
-                        width:  i === selectedIndex ? 8 : 6,
-                        height: i === selectedIndex ? 8 : 6,
-                        borderRadius: '50%',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        backgroundColor: i === selectedIndex
-                          ? 'var(--color-accent)'
-                          : 'var(--color-border)',
-                        transition: 'width 0.2s ease, height 0.2s ease, background-color 0.2s ease',
-                        WebkitTapHighlightColor: 'transparent',
-                        outline: 'none',
-                      }}
-                    />
-                  ))}
+                  {/* Fixed 8x8 footprint per button regardless of active
+                      state — the button's actual width/height used to
+                      change (6px ↔ 8px), which changes this row's total
+                      content width every time the selection changes,
+                      shifting the centered row (and, since marginBottom
+                      is measured off this row, nudging the caption
+                      below it too) — same root cause as the Lightbox
+                      dots fix, just here instead of there. Scaling the
+                      painted circle via `transform` instead keeps the
+                      button's box (and the row's width) constant. */}
+                  {images.map((_, i) => {
+                    const isActive = i === selectedIndex
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => goTo(i)}
+                        aria-label={`Image ${i + 1}`}
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          border: 'none',
+                          padding: 0,
+                          cursor: 'pointer',
+                          backgroundColor: isActive
+                            ? 'var(--color-accent)'
+                            : 'var(--color-border)',
+                          transform: isActive ? 'scale(1)' : 'scale(0.75)',
+                          transition: 'transform 0.2s ease, background-color 0.2s ease',
+                          WebkitTapHighlightColor: 'transparent',
+                          outline: 'none',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )
+                  })}
                 </div>
               )}
 

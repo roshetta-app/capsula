@@ -554,15 +554,36 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
 
         {images.length > 1 && (
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {images.map((_, i) => (
-              <div key={i} style={{
-                width: i === activeIndex ? 8 : 5,
-                height: i === activeIndex ? 8 : 5,
-                borderRadius: '50%',
-                backgroundColor: i === activeIndex ? '#fff' : 'rgba(255,255,255,0.35)',
-                transition: 'all 0.2s ease', flexShrink: 0,
-              }} />
-            ))}
+            {/* Fixed 8x8 slot per dot regardless of active state — only
+                the visible circle inside scales via `transform`. The
+                old version changed each dot's actual width/height
+                (5px ↔ 8px), which changes the flex row's total content
+                width every time the active index changes; since this
+                row (and the caption above it, sharing the same
+                centered column) sits inside a fixed-width overlay, that
+                width change had nowhere to go but a visible shift of
+                the whole row — the same "a sibling's box size changing
+                mid-transition moves things around it" root cause as the
+                caption fix above, just showing up in the dots instead
+                of the caption. `transform: scale()` changes only the
+                painted size, never the box's layout size, so the row's
+                width — and everything anchored relative to it — never
+                moves. */}
+            {images.map((_, i) => {
+              const isActive = i === activeIndex
+              return (
+                <div key={i} style={{ width: 8, height: 8, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: isActive ? '#fff' : 'rgba(255,255,255,0.35)',
+                    transform: isActive ? 'scale(1)' : 'scale(0.625)',
+                    transition: 'transform 0.2s ease, background-color 0.2s ease',
+                  }} />
+                </div>
+              )
+            })}
           </div>
         )}
       </motion.div>
