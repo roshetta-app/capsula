@@ -38,6 +38,30 @@
  *   by a plain timer instead of waiting on a transition event, so it is
  *   no longer possible for it to hang indefinitely.
  *
+ * Tap-vs-swipe fix (2026-09-02, third pass):
+ *   Root cause (confirmed from code, not a guess): the old logic treated
+ *   "the finger never crossed the drag threshold" as the ONLY signal for
+ *   "this was a tap" — but a vertical scroll gesture over the carousel
+ *   also never crosses that threshold (it's explicitly left alone so the
+ *   page can scroll), so on release it was indistinguishable from a tap
+ *   and wrongly opened the lightbox. Separately, touchstart skipped
+ *   resetting its tracking state whenever a touch began mid-settle,
+ *   which could leave a stale drag/tap state from a previous gesture to
+ *   be read by the *next* gesture's touchend — sometimes swallowing a
+ *   real tap, sometimes firing the lightbox from what was actually a
+ *   swipe.
+ *   Fix: touch tracking now always resets on every touchstart (a
+ *   separate `ignore` flag — not skipping the reset — is what disables
+ *   a touch that starts during settle or on a single-photo gallery).
+ *   The gesture is classified into exactly one of three outcomes –
+ *   'undetermined' (never moved past the threshold — a genuine tap),
+ *   'horizontal' (a committed carousel drag), or 'vertical' (a scroll,
+ *   explicitly never a tap and never a drag) — so only a real stationary
+ *   tap can open the lightbox.
+ *   NOTE: this pass fixes tap/lightbox reliability only. The reported
+ *   flashing-on-swipe and card-bottom-border jump are still open and are
+ *   deliberately not touched here — see NEXT_SESSION notes.
+ *
  * Offline caching (Image System Refinement Plan, Part A):
  *   - Each of the three tracked photos loads via useCachedImage
  *     (device-first → network → cache-on-view).
@@ -62,6 +86,17 @@ import { MessageSquare, ZoomIn } from 'lucide-react'
 import Lightbox from '../ui/Lightbox'
 import ImageLoadError from '../ui/ImageLoadError'
 import { useCachedImage } from '../../hooks/useCachedImage'
+
+// ─── TEMP DIAGNOSTIC LOGGING (2026-09-02) ───────────────────────────
+// Added to capture real touch/settle behaviour on-device while
+// tracking down the flashing, border-jump, and stuck-swipe bugs.
+// Remove this whole block, and every dlog(...) call below, once we
+// have what we need — none of it is meant to ship.
+function dlog(...args) {
+  // eslint-disable-next-line no-console
+  console.log('[Carousel]', ...args)
+}
+// ──────────────────────────────────────────────────────────────────
 
 // How long the "commit" / "snap back" glide takes once a finger lifts.
 // Settling is cleared by a plain timer set to this plus a small buffer —
@@ -127,12 +162,26 @@ export default function ImageCarousel({ images = [], title = '' }) {
   const [settling,     setSettling] = useState(null) // null | 'next' | 'prev' | 'back'
 
   const areaRef = useRef(null)
-  const touch = useRef({ startX: 0, startY: 0, dragging: false, containerWidth: 0 })
+  // phase: 'idle' | 'undetermined' | 'horizontal' | 'vertical'
+  //   'idle'        — no touch in progress.
+  //   'undetermined'— finger down, hasn't moved past the threshold yet.
+  //                   If touchend fires while still here, it's a tap.
+  //   'horizontal'  — committed carousel drag.
+  //   'vertical'    — committed page scroll; never a tap, never a drag.
+  // ignore: true for a touch that started during settle or on a
+  //   single-photo gallery — decided once, at touchstart, so a change in
+  //   `settling` partway through the same touch can't retroactively
+  //   change how it's read.
+  const touch = useRef({ startX: 0, startY: 0, phase: 'idle', containerWidth: 0, ignore: false })
   const settleTimer = useRef(null)
 
   useEffect(() => () => {
     if (settleTimer.current) clearTimeout(settleTimer.current)
   }, [])
+
+  // TEMP DIAGNOSTIC LOGGING — see block near the top of this file.
+  useEffect(() => { dlog('index ->', index) }, [index])
+  useEffect(() => { dlog('settling ->', settling) }, [settling])
 
   const goTo   = useCallback((i) => setIndex(Math.max(0, Math.min(images.length - 1, i))), [images.length])
   const openAt = useCallback((i) => { setIndex(i); setLightbox(true) }, [])
@@ -187,25 +236,31 @@ export default function ImageCarousel({ images = [], title = '' }) {
 
   function onTouchStart(e) {
     e.stopPropagation()
-    if (images.length <= 1 || settling) return
     const t = touch.current
     t.startX = e.touches[0].clientX
     t.startY = e.touches[0].clientY
-    t.dragging = false
+    t.phase = 'undetermined'
     t.containerWidth = areaRef.current ? areaRef.current.getBoundingClientRect().width : 0
+    // Decided once, here — not re-checked later against a `settling`
+    // value that could itself change while this same finger is still down.
+    t.ignore = images.length <= 1 || !!settling
+    dlog('touchstart', { index, settling, ignore: t.ignore, startX: t.startX, startY: t.startY })
   }
 
   function onTouchMove(e) {
-    if (images.length <= 1 || settling) return
     const t = touch.current
+    if (t.ignore) return
     const dx = e.touches[0].clientX - t.startX
     const dy = e.touches[0].clientY - t.startY
 
-    if (!t.dragging) {
+    if (t.phase === 'undetermined') {
       if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
-      if (Math.abs(dy) > Math.abs(dx)) return // vertical scroll wins — leave it alone
-      t.dragging = true
+      t.phase = Math.abs(dy) > Math.abs(dx) ? 'vertical' : 'horizontal'
+      dlog('touchmove phase ->', t.phase, { dx, dy })
+      if (t.phase === 'vertical') return // page scroll wins — leave it alone, and never treat this as a tap
     }
+
+    if (t.phase !== 'horizontal') return
 
     e.stopPropagation()
     e.preventDefault()
@@ -218,11 +273,18 @@ export default function ImageCarousel({ images = [], title = '' }) {
 
   function onTouchEnd(e) {
     e.stopPropagation()
-    if (images.length <= 1 || settling) return
     const t = touch.current
+    dlog('touchend', { phase: t.phase, ignore: t.ignore, dragPx })
 
-    if (!t.dragging) {
-      openAt(index) // stationary tap — open lightbox
+    if (t.ignore) { t.phase = 'idle'; return }
+
+    if (t.phase !== 'horizontal') {
+      // 'undetermined' = finger never moved past the threshold = a real
+      // stationary tap. 'vertical' = a scroll, and must never open the
+      // lightbox no matter how the gesture ends.
+      if (t.phase === 'undetermined') { dlog('outcome: tap -> openAt', index); openAt(index) }
+      else { dlog('outcome: vertical scroll, ignored') }
+      t.phase = 'idle'
       return
     }
 
@@ -230,10 +292,13 @@ export default function ImageCarousel({ images = [], title = '' }) {
     let direction = 'back'
     if (dragPx <= -threshold && index < images.length - 1) direction = 'next'
     else if (dragPx >= threshold && index > 0)             direction = 'prev'
+    dlog('outcome: swipe ->', direction, { threshold, dragPx })
 
+    t.phase = 'idle'
     setSettling(direction)
     if (settleTimer.current) clearTimeout(settleTimer.current)
     settleTimer.current = setTimeout(() => {
+      dlog('settle timer fired ->', direction)
       if (direction === 'next') setIndex(i => Math.min(images.length - 1, i + 1))
       if (direction === 'prev') setIndex(i => Math.max(0, i - 1))
       setSettling(null)
