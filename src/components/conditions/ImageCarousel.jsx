@@ -140,10 +140,6 @@ export default function ImageCarousel({ images = [], title = '' }) {
     align: 'start',
     loop: false,
     watchDrag: images.length > 1,
-    // Embla's default (25 frames, ~420ms) reads as noticeably slower
-    // than the original hand-rolled settle (260ms). 16 frames ≈ 260ms
-    // at 60fps — matches the old feel.
-    duration: 16,
   })
 
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -167,6 +163,23 @@ export default function ImageCarousel({ images = [], title = '' }) {
       emblaApi.off('select', onSelect)
       emblaApi.off('reInit', onSelect)
     }
+  }, [emblaApi])
+
+  // The public `duration` option only affects programmatic scrollTo()
+  // calls — a released drag's settle speed is computed internally from
+  // a hardcoded baseSpeed/friction (25 / 0.68) that isn't exposed as a
+  // public option at all. That's the actual thing that reads as "slow."
+  // internalEngine() is the only way to reach it: override it the
+  // instant the finger lifts, right before Embla's own settle animation
+  // starts, so every release (not just the next one) gets the faster
+  // values.
+  useEffect(() => {
+    if (!emblaApi) return
+    const speedUpSettle = () => {
+      emblaApi.internalEngine().scrollBody.useDuration(10).useFriction(0.25)
+    }
+    emblaApi.on('pointerUp', speedUpSettle)
+    return () => emblaApi.off('pointerUp', speedUpSettle)
   }, [emblaApi])
 
   // Instant jump (no slide animation) — matches the old dot-tap /
@@ -270,7 +283,18 @@ export default function ImageCarousel({ images = [], title = '' }) {
                 touchAction: 'pan-y',
               }}
             >
-              <div style={{ display: 'flex', height: '100%' }}>
+              <div style={{
+                display: 'flex', height: '100%',
+                // Promotes this element (the one Embla actually
+                // transforms) to its own compositing layer, isolating
+                // its repaint from the static bordered card around it.
+                // Some Android WebView builds visibly bleed a moving
+                // element's repaint into an adjacent border without
+                // this — the likely real cause of the border flicker.
+                willChange: 'transform',
+                backfaceVisibility: 'hidden',
+                WebkitBackfaceVisibility: 'hidden',
+              }}>
                 {images.map((img, i) => (
                   <Slide
                     key={img.id ?? i}
