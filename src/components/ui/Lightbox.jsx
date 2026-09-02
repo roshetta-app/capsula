@@ -25,6 +25,15 @@
  *     backdrop. Zoom/pan state still resets correctly on activeIndex
  *     change since that doesn't depend on the image having loaded.
  *
+ * Chrome styling (Image System Refinement Plan, Part C, Step 3):
+ *   - Page counter is now a soft rounded pill instead of plain
+ *     monospace text.
+ *   - Close button and prev/next nav buttons all share the same
+ *     lighter, more translucent circular treatment (white-tinted,
+ *     no border) instead of the previous darker/bordered circles —
+ *     quieter chrome, more photo. Purely visual; none of the touch
+ *     handling below changed.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -191,23 +200,32 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
         background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, transparent 100%)',
         pointerEvents: 'none',
       }}>
-        <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'var(--font-mono)', pointerEvents: 'none' }}>
-          {images.length > 1 ? `${activeIndex + 1} / ${images.length}` : ''}
-        </span>
+        {images.length > 1 ? (
+          <span style={{
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            color: 'rgba(255,255,255,0.85)',
+            fontSize: 12,
+            padding: '4px 10px',
+            borderRadius: 20,
+            pointerEvents: 'none',
+          }}>
+            {activeIndex + 1} / {images.length}
+          </span>
+        ) : <span />}
         <button
           onClick={(e) => { e.stopPropagation(); onClose() }}
           aria-label="Close"
           style={{
-            width: 36, height: 36, borderRadius: '50%',
-            backgroundColor: 'rgba(0,0,0,0.55)',
-            border: '1px solid rgba(255,255,255,0.15)',
+            width: 28, height: 28, borderRadius: '50%',
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            border: 'none',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#fff',
+            cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
             WebkitTapHighlightColor: 'transparent', outline: 'none',
             pointerEvents: 'auto',
           }}
         >
-          <X size={18} strokeWidth={2.5} />
+          <X size={15} strokeWidth={2.5} />
         </button>
       </div>
 
@@ -257,13 +275,13 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             aria-label="Previous image"
             style={{
               position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 40, height: 40, borderRadius: '50%',
-              backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)',
+              width: 32, height: 32, borderRadius: '50%',
+              backgroundColor: 'rgba(255,255,255,0.1)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#fff',
+              cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
               WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
-          ><ChevronLeft size={20} strokeWidth={2} /></button>
+          ><ChevronLeft size={17} strokeWidth={2} /></button>
         )}
         {images.length > 1 && activeIndex < images.length - 1 && scale === 1 && (
           <button
@@ -271,13 +289,13 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             aria-label="Next image"
             style={{
               position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              width: 40, height: 40, borderRadius: '50%',
-              backgroundColor: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)',
+              width: 32, height: 32, borderRadius: '50%',
+              backgroundColor: 'rgba(255,255,255,0.1)', border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#fff',
+              cursor: 'pointer', color: 'rgba(255,255,255,0.85)',
               WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
-          ><ChevronRight size={20} strokeWidth={2} /></button>
+          ><ChevronRight size={17} strokeWidth={2} /></button>
         )}
       </div>
 
@@ -315,5 +333,3 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
     document.body
   )
 }
-
-
