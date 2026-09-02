@@ -203,6 +203,18 @@ export default function ImageCarousel({ images = [], title = '' }) {
     if (!tap.current.moved) openAt(selectedIndex)
   }
 
+  // Embla drives the drag via pointer events, which don't stop the raw
+  // touchstart/touchmove/touchend events from also bubbling up to
+  // whatever's listening for a horizontal swipe higher in the tree (e.g.
+  // the Rx/Clinical tab switcher). The old hand-rolled touch handlers
+  // stopped that propagation as a side effect; these three do the same
+  // job on their own, with no drag logic attached. Doesn't affect
+  // vertical scrolling — that's handled by the `touchAction: 'pan-y'`
+  // CSS below, not by JS event propagation.
+  function onTouchStart(e) { e.stopPropagation() }
+  function onTouchMove(e) { e.stopPropagation() }
+  function onTouchEnd(e) { e.stopPropagation() }
+
   return (
     <>
       <div style={{ userSelect: 'none', marginBottom: 'var(--space-3)' }}>
@@ -230,6 +242,9 @@ export default function ImageCarousel({ images = [], title = '' }) {
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
+            onTouchStart={onTouchStart}
+            onTouchMove={onTouchMove}
+            onTouchEnd={onTouchEnd}
             style={{
               position: 'relative',
               aspectRatio: '4 / 3',
