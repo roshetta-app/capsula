@@ -99,21 +99,21 @@
  * Caption/photo sync fix (2026-09-02, fourth pass same day):
  *   The caption text was previously a plain, un-animated node — when
  *   the active photo changed, it just snapped to the new value in place,
- *   completely disconnected from the photo's own slide/settle animation
- *   (a regression from the original decision that caption and photo
- *   should "read as one carousel unit"). That mismatch is what showed up
- *   as a flicker: the text swapped instantly while the photo was still
- *   mid-slide. The caption is now its own AnimatePresence, keyed by
- *   photo URL and driven by the same `slideCustom` (direction + "is this
- *   the very first photo") and the same transition timing as the photo,
- *   so it slides/fades in step with it instead of jump-cutting. It uses
- *   `mode="popLayout"` so the outgoing caption is pulled out of normal
- *   layout the instant it starts exiting — otherwise, for the brief
- *   overlap where both the old and new caption are mounted at once,
- *   they'd stack on top of each other in the flex column and puff up the
- *   bottom band's height for that instant, nudging the dots below it.
- *   `mode="popLayout"` keeps that overlap from ever affecting layout, so
- *   the dots stay put exactly as the fixed-slot decision intended.
+ *   completely disconnected from the photo's own slide/settle animation.
+ *   That mismatch is what showed up as a flicker: the text swapped
+ *   instantly while the photo was still mid-slide. The caption is now
+ *   its own AnimatePresence, keyed by photo URL, doing a plain crossfade
+ *   (deliberately NOT mirroring the photo's directional slide — a first
+ *   pass tried that and it read as the text flying around, which felt
+ *   worse than the original flicker) timed to the photo's own transition
+ *   duration so the two settle together. It uses `mode="popLayout"` so
+ *   the outgoing caption is pulled out of normal layout the instant it
+ *   starts exiting — otherwise, for the brief overlap where both the old
+ *   and new caption are mounted at once, they'd stack on top of each
+ *   other in the flex column and puff up the bottom band's height for
+ *   that instant, nudging the dots below it. `mode="popLayout"` keeps
+ *   that overlap from ever affecting layout, so the dots stay put
+ *   exactly as the fixed-slot decision intended.
  *
  * Props:
  *   images       { id, url, caption }[]
@@ -371,23 +371,17 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   }
   const slideCustom = { isFirstPhoto: isFirstPhotoRef.current, dir: dirRef.current }
 
-  // Caption's own enter/exit, read the same {isFirstPhoto, dir} custom
-  // prop as the photo (see slideVariants above) so it moves with the
-  // exact same direction and "is this the opening photo" logic — a
-  // smaller slide-and-fade rather than the photo's full-width slide,
-  // since it's a line or two of text, not the whole screen. The photo's
-  // own transition object (right below, keyed off isFirstPhotoRef) is
-  // reused as-is for the caption too, so both finish moving at the same
-  // moment instead of drifting out of step.
+  // Caption's own enter/exit — a plain crossfade, deliberately not a
+  // directional slide like the photo. Direction/first-photo don't
+  // affect it at all; it just fades out and the new one fades in, timed
+  // to the photo's own transition duration so they still finish
+  // together, without the caption visually flying across the screen.
   const captionVariants = {
-    enter: ({ isFirstPhoto, dir }) => isFirstPhoto
-      ? { opacity: 0 }
-      : { opacity: 0, x: dir > 0 ? 24 : -24 },
-    center: { opacity: 1, x: 0 },
-    exit: ({ isFirstPhoto, dir }) => isFirstPhoto
-      ? { opacity: 0 }
-      : { opacity: 0, x: dir > 0 ? -24 : 24 },
+    enter: { opacity: 0 },
+    center: { opacity: 1 },
+    exit: { opacity: 0 },
   }
+  const captionTransition = { duration: 0.22, ease: 'easeInOut' }
   const photoTransition = isFirstPhotoRef.current
     ? { duration: 0.22, ease: 'easeOut' }
     : { type: 'spring', stiffness: 340, damping: 32, mass: 0.9 }
@@ -501,9 +495,9 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           with the box instead of a flat tinted band.
 
           The caption itself is wrapped in its own AnimatePresence
-          (mode="popLayout") keyed by photo URL, driven by the same
-          slideCustom/photoTransition as the photo above — see the
-          "Caption/photo sync fix" note in the file header for why. */}
+          (mode="popLayout") keyed by photo URL, doing a plain crossfade
+          timed to the photo's own transition — see the "Caption/photo
+          sync fix" note in the file header for why. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
@@ -512,17 +506,16 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
           pointerEvents: chromeVisible ? 'auto' : 'none',
         }}
       >
-        <AnimatePresence initial={false} custom={slideCustom} mode="popLayout">
+        <AnimatePresence initial={false} mode="popLayout">
           {active.caption && (
             <motion.p
               key={active.url}
               dir="auto"
-              custom={slideCustom}
               variants={captionVariants}
               initial="enter"
               animate="center"
               exit="exit"
-              transition={photoTransition}
+              transition={captionTransition}
               style={CAPTION_STYLE}
             >
               {active.caption}
