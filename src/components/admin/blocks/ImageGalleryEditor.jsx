@@ -18,6 +18,13 @@
  * Data shape (Section 3.1 of masterplan):
  *   { images: [{ url: "https://...", caption: "" }] }
  *   (No id field at the block level — id is only on condition_images rows, which are legacy)
+ *
+ * Image System Refinement Plan, Part C, Step 1 (2026-09-02):
+ *   Every selected photo is resized and re-compressed client-side, before
+ *   it ever reaches uploadConditionImage/Storage — see
+ *   resizeAndCompressImage below. Nothing downstream (adminQueries.js,
+ *   the app's display components) needed to change; they already just
+ *   handle whatever URL/file they're given.
  */
 
 import { useRef, useState } from 'react'
@@ -31,6 +38,75 @@ function swap(arr, i, j) {
   const next = [...arr]
   ;[next[i], next[j]] = [next[j], next[i]]
   return next
+}
+
+// ─── Image resize + compress (Part C, Step 1) ─────────────────────────────────
+//
+// Runs entirely in the browser before a photo reaches uploadConditionImage.
+// Shrinks anything larger than maxDimension on its longer edge and
+// re-encodes as a standard-quality JPEG — this keeps stored/downloaded
+// file sizes reasonable (directly benefits the Part A offline cache,
+// which downloads every gallery photo to every device) and standardizes
+// format, which also fixes photos uploaded in a format some browsers
+// can't display (e.g. an iPhone's default HEIC).
+//
+// maxDimension of 1800px and quality of 0.8 were chosen to hold up under
+// the lightbox's up to 4x pinch/double-tap zoom (Image System
+// Refinement Plan §12.3) while cutting a typical modern phone photo
+// (often 3000-4000px+) down substantially.
+
+const MAX_DIMENSION = 1800
+const JPEG_QUALITY = 0.8
+
+function resizeAndCompressImage(file, { maxDimension = MAX_DIMENSION, quality = JPEG_QUALITY } = {}) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file)
+    const img = new Image()
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl)
+
+      let { width, height } = img
+      if (width > maxDimension || height > maxDimension) {
+        if (width >= height) {
+          height = Math.round((height * maxDimension) / width)
+          width = maxDimension
+        } else {
+          width = Math.round((width * maxDimension) / height)
+          height = maxDimension
+        }
+      }
+
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, width, height)
+
+      canvas.toBlob(
+        blob => {
+          if (!blob) {
+            reject(new Error('Image compression produced no output'))
+            return
+          }
+          // Standardize to .jpg regardless of the original extension —
+          // this is what resolves the HEIC-display risk, since every
+          // upload now leaves the browser as a plain JPEG.
+          const baseName = file.name.replace(/\.[^./\\]+$/, '') || 'photo'
+          resolve(new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' }))
+        },
+        'image/jpeg',
+        quality
+      )
+    }
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      reject(new Error('Could not read selected image'))
+    }
+
+    img.src = objectUrl
+  })
 }
 
 // ─── Single image row ─────────────────────────────────────────────────────────
@@ -258,7 +334,21 @@ export default function ImageGalleryEditor({ data, onChange, disabled = false })
     setUploading(true)
     setUploadError(null)
 
-    const results = await Promise.all(files.map(f => uploadConditionImage(f)))
+    // Part C, Step 1: resize + compress every selected photo before it
+    // ever reaches uploadConditionImage. A failure here (e.g. a
+    // corrupted file that can't be decoded) is reported the same way an
+    // upload failure already is, rather than falling back to uploading
+    // the original untouched.
+    let processedFiles
+    try {
+      processedFiles = await Promise.all(files.map(f => resizeAndCompressImage(f)))
+    } catch {
+      setUploadError('Could not process one or more images. Please try again.')
+      setUploading(false)
+      return
+    }
+
+    const results = await Promise.all(processedFiles.map(f => uploadConditionImage(f)))
 
     const errors = results.filter(r => r.error)
     if (errors.length) {
