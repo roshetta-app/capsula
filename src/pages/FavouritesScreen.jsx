@@ -1,3 +1,4 @@
+
 /**
  * src/pages/FavouritesScreen.jsx
  * Phase 2H — Favourites Screen rebuild
@@ -476,6 +477,10 @@ import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
+import { useAuth } from '../hooks/useAuth'
+import { useIsPro } from '../hooks/useIsPro'
+import ProUpsellBanner from '../components/ui/ProUpsellBanner'
+import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
 
 // Favourites' own identity color for the heart badge/star icon. Previously
 // aliased var(--color-danger) so "favourited = red heart" shared the exact
@@ -1031,7 +1036,7 @@ function renderTabs(activeTab, onSelect, counts) {
               <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500, color: fg }}>
                 {tab.label}
               </span>
-              {typeof count === 'number' && (
+              {count !== undefined && count !== null && count !== '' && (
                 <span style={{
                   fontSize:   11,
                   fontWeight: 600,
@@ -1594,6 +1599,8 @@ export default function FavouritesScreen() {
   const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt } = useFavouritesContext()
   const { conditions, specialties } = useConditionContext()
   const { drugs }      = useDrugContext()
+  const { user } = useAuth()
+  const isPro = useIsPro()
 
   // Look up full objects from context. Memoized — without this, a new array
   // reference was created every render, which re-triggered
@@ -1608,6 +1615,19 @@ export default function FavouritesScreen() {
     () => favourites.drugs.map(id => drugs.find(d => d.id === id)).filter(Boolean),
     [favourites.drugs, drugs]
   )
+
+  // Phase 7 — tab counts show "8/20" style text only for a signed-in free
+  // account; Pro and guests keep the bare number unchanged, since the cap
+  // is a free-tier-only concept and showing it to Pro or guests would be
+  // misleading. Same object feeds both the sticky header and the in-page
+  // tab bar below, so the two never drift out of sync.
+  const isFreeAccount = !!user && !isPro
+  const conditionsAtCap = isFreeAccount && savedConditions.length >= FAVOURITES_CAP_CONDITIONS
+  const drugsAtCap      = isFreeAccount && savedDrugs.length >= FAVOURITES_CAP_DRUGS
+  const tabCounts = {
+    conditions: isFreeAccount ? `${savedConditions.length}/${FAVOURITES_CAP_CONDITIONS}` : savedConditions.length,
+    drugs:      isFreeAccount ? `${savedDrugs.length}/${FAVOURITES_CAP_DRUGS}`           : savedDrugs.length,
+  }
 
   // Sort (Phase 14) — own storage key ('capsula_favourites_sort'), separate
   // from ConditionsScreen's 'capsula_conditions_sort' key, since 'recent'
@@ -1886,7 +1906,7 @@ export default function FavouritesScreen() {
         showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
         hasActiveFilters={hasActiveFilters}
         onOpenManager={() => setShowManagerSheet(true)}
-        counts={{ conditions: savedConditions.length, drugs: savedDrugs.length }}
+        counts={tabCounts}
         isSearching={isSearching}
         onToggleSearch={toggleSearch}
         searchValue={heroSearchValue}
@@ -1971,7 +1991,7 @@ export default function FavouritesScreen() {
             FavouritesHero/StickyFavouritesHeader) and now swaps in-place
             with the header title itself — no overlay panel here anymore. */}
         <div style={{ marginBottom: 8 }}>
-          {renderTabs(activeTab, switchTab, { conditions: savedConditions.length, drugs: savedDrugs.length })}
+          {renderTabs(activeTab, switchTab, tabCounts)}
         </div>
 
         {/* Tab content area — swipeable again (see handleTabTouch* above),
@@ -1993,6 +2013,11 @@ export default function FavouritesScreen() {
             {/* ── Conditions tab ── */}
             {activeTab === 'conditions' && (
               <>
+                {conditionsAtCap && (
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    <ProUpsellBanner subtitle="Unlock unlimited favourites" />
+                  </div>
+                )}
                 {activeSpecialty !== 'all' && savedConditions.length > 0 && (
                   <SpecialtyFilterBanner
                     specialty={activeSpecialtyObj}
@@ -2096,7 +2121,13 @@ export default function FavouritesScreen() {
                 before regardless of isManaging — no checkboxes, no
                 selection. Revisit if manage mode is ever extended to Drugs. */}
             {activeTab === 'drugs' && (
-              savedDrugs.length === 0
+              <>
+                {drugsAtCap && (
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    <ProUpsellBanner subtitle="Unlock unlimited favourites" />
+                  </div>
+                )}
+                {savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
                 : savedDrugs.map((drug, i) => (
                     <SharedDrugCard
@@ -2113,7 +2144,8 @@ export default function FavouritesScreen() {
                         />
                       }
                     />
-                  ))
+                  ))}
+              </>
             )}
           </div>
         </div>

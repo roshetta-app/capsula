@@ -1,8 +1,16 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
+import { useIsPro } from './useIsPro'
 import { supabase } from '../lib/supabase'
+import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
 
 const STORAGE_KEY = 'capsula_favourites'
+
+const CAPS = {
+  drugs:      FAVOURITES_CAP_DRUGS,
+  conditions: FAVOURITES_CAP_CONDITIONS,
+}
 
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
@@ -41,15 +49,20 @@ function clearStorage() {
 /**
  * useFavourites — manages bookmarked drugs and conditions.
  *
- * Signed out (guest): unchanged from before — localStorage only, key
- * 'capsula_favourites', no account required (D12).
- *
- * Signed in: loads from the 'favourites' table on sign-in, then writes
- * through to the table on every toggle/restore (optimistic — local state
- * updates immediately, the database call fires alongside it). The local
- * copy becomes a fast mirror, not the source of truth, once a user is
- * present (D1). The mirror is cleared the moment the user signs out —
- * nothing is lost, it stays safely in the account.
+ * Phase 7 (this session) — favouriting now requires an account:
+ *   - A signed-out tap never touches favourites at all. It's recorded as
+ *     `pendingFavourite` ({ type, id }) instead, so SignInNudge can open the
+ *     sign-in sheet. The moment sign-in completes, the pending item is
+ *     folded into the freshly-loaded database list (see the sign-in effect
+ *     below) — this supersedes the old "guest favourites via localStorage"
+ *     behaviour (D12) entirely.
+ *   - A confirmed guest (useAuth().loading is false, no user) gets any
+ *     leftover local favourites from before this change wiped once, with
+ *     no migration.
+ *   - Free accounts are capped per-list (see constants/features.js). Adding
+ *     past the cap is blocked and surfaces via `capBlocked` instead of
+ *     silently exceeding it; removing always goes through, uncapped, at any
+ *     tier. Pro accounts are never capped (see useIsPro.js).
  *
  * Storage shape (both local and as read from the database): { drugs:
  * string[], conditions: string[] }
@@ -62,45 +75,31 @@ function clearStorage() {
  *   restoreDrugAt         (id: string, index: number) => void
  *   isDrugFavourited      (id: string) => boolean
  *   isConditionFavourited (id: string) => boolean
+ *   pendingFavourite      { type: 'drugs' | 'conditions', id } | null
+ *   capBlocked            'drugs' | 'conditions' | null
+ *   dismissPendingFavourite () => void
+ *   dismissCapBlocked       () => void
  */
 export function useFavourites() {
-  const { user } = useAuth()
-  const [favourites, setFavourites] = useState(() => readStorage())
-  const prevUserRef = useRef(user)
+  const { user, loading: authLoading } = useAuth()
+  const isPro = useIsPro()
 
-  // Load from the database once signed in, and whenever the signed-in
-  // user changes (e.g. one account signs out and a different one signs
-  // into the same session).
-  useEffect(() => {
-    if (!user) return
-    let cancelled = false
+  const [favourites, setFavourites]           = useState(() => readStorage())
+  const [pendingFavourite, setPendingFavourite] = useState(null)
+  const [capBlocked, setCapBlocked]             = useState(null)
 
-    supabase
-      .from('favourites')
-      .select('item_type, item_id')
-      .then(({ data, error }) => {
-        if (cancelled || error || !data) return
-        const next = {
-          drugs:      data.filter(r => r.item_type === 'drug').map(r => r.item_id),
-          conditions: data.filter(r => r.item_type === 'condition').map(r => r.item_id),
-        }
-        writeStorage(next)
-        setFavourites(next)
-      })
+  const prevUserRef      = useRef(user)
+  const wipedGuestRef     = useRef(false)
 
-    return () => { cancelled = true }
-  }, [user])
-
-  // Sign-out transition: clear the local mirror immediately. Guarded so
-  // this only fires when an actual signed-in user goes to null, not on
-  // the initial guest render.
-  useEffect(() => {
-    if (prevUserRef.current && !user) {
-      clearStorage()
-      setFavourites({ drugs: [], conditions: [] })
-    }
-    prevUserRef.current = user
-  }, [user])
+  // Refs so the sign-in DB-fetch effect below can read the latest
+  // pendingFavourite/isPro without depending on them — same pattern as
+  // prevUserRef above. That effect must only re-run when `user` changes;
+  // depending on pendingFavourite/isPro too would re-run it on every
+  // unrelated favourite/tier change.
+  const pendingFavouriteRef = useRef(pendingFavourite)
+  useEffect(() => { pendingFavouriteRef.current = pendingFavourite }, [pendingFavourite])
+  const isProRef = useRef(isPro)
+  useEffect(() => { isProRef.current = isPro }, [isPro])
 
   // Fire-and-forget write-through to the database. No-ops for guests.
   // Upsert (not plain insert) on add, since the table has a unique
@@ -121,29 +120,118 @@ export function useFavourites() {
     })
   }, [user])
 
-  const toggleDrug = useCallback((id) => {
+  // Shared add/remove step (Phase 7) — the only place toggleDrug/
+  // toggleCondition actually mutate favourites once a user is present.
+  // Removing always goes through, no check. Adding checks the free-tier
+  // cap first: if already at the limit, blocks the add (capBlocked) and
+  // leaves favourites untouched instead of silently exceeding it.
+  const applyToggle = useCallback((type, id) => {
     setFavourites(prev => {
-      const nowFavourited = !prev.drugs.includes(id)
-      const next = nowFavourited
-        ? { ...prev, drugs: [...prev.drugs, id] }
-        : { ...prev, drugs: prev.drugs.filter(d => d !== id) }
+      const list = prev[type]
+      const itemType = type === 'drugs' ? 'drug' : 'condition'
+
+      if (list.includes(id)) {
+        const next = { ...prev, [type]: list.filter(x => x !== id) }
+        writeStorage(next)
+        writeThrough(itemType, id, false)
+        return next
+      }
+
+      if (!isPro && list.length >= CAPS[type]) {
+        setCapBlocked(type)
+        return prev
+      }
+
+      const next = { ...prev, [type]: [...list, id] }
       writeStorage(next)
-      writeThrough('drug', id, nowFavourited)
+      writeThrough(itemType, id, true)
       return next
     })
-  }, [writeThrough])
+  }, [isPro, writeThrough])
+
+  // Load from the database once signed in, and whenever the signed-in
+  // user changes (e.g. one account signs out and a different one signs
+  // into the same session).
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+
+    supabase
+      .from('favourites')
+      .select('item_type, item_id')
+      .then(({ data, error }) => {
+        if (cancelled || error || !data) return
+        const next = {
+          drugs:      data.filter(r => r.item_type === 'drug').map(r => r.item_id),
+          conditions: data.filter(r => r.item_type === 'condition').map(r => r.item_id),
+        }
+
+        // Fold in a pending favourite from a guest tap that triggered this
+        // sign-in. Must happen here, before setFavourites(next) below, and
+        // nowhere else — this fetch replaces the whole favourites object,
+        // so a separate effect adding the pending item first would get
+        // silently wiped out the moment this resolves.
+        const pending = pendingFavouriteRef.current
+        if (pending) {
+          if (!next[pending.type].includes(pending.id)) {
+            const atCap = !isProRef.current && next[pending.type].length >= CAPS[pending.type]
+            if (atCap) {
+              setCapBlocked(pending.type)
+            } else {
+              next[pending.type] = [...next[pending.type], pending.id]
+              writeThrough(pending.type === 'drugs' ? 'drug' : 'condition', pending.id, true)
+            }
+          }
+          setPendingFavourite(null)
+        }
+
+        writeStorage(next)
+        setFavourites(next)
+      })
+
+    return () => { cancelled = true }
+  }, [user])
+
+  // Sign-out transition: clear the local mirror immediately. Guarded so
+  // this only fires when an actual signed-in user goes to null, not on
+  // the initial guest render.
+  useEffect(() => {
+    if (prevUserRef.current && !user) {
+      clearStorage()
+      setFavourites({ drugs: [], conditions: [] })
+    }
+    prevUserRef.current = user
+  }, [user])
+
+  // Guest clean-slate (Phase 7) — favouriting now requires an account, so
+  // a guest never keeps local favourites going forward (see file header).
+  // Waits for useAuth()'s own loading flag so this only fires for a
+  // *confirmed* guest, not on the render before the session check has
+  // resolved. One-time wipe of anything left over from before this
+  // change — no migration.
+  useEffect(() => {
+    if (authLoading || user) return
+    if (wipedGuestRef.current) return
+    wipedGuestRef.current = true
+    clearStorage()
+    setFavourites({ drugs: [], conditions: [] })
+  }, [authLoading, user])
+
+  const toggleDrug = useCallback((id) => {
+    if (!user) {
+      setPendingFavourite({ type: 'drugs', id })
+      return
+    }
+    applyToggle('drugs', id)
+  }, [user, applyToggle])
 
   const toggleCondition = useCallback((id) => {
-    setFavourites(prev => {
-      const nowFavourited = !prev.conditions.includes(id)
-      const next = nowFavourited
-        ? { ...prev, conditions: [...prev.conditions, id] }
-        : { ...prev, conditions: prev.conditions.filter(c => c !== id) }
-      writeStorage(next)
-      writeThrough('condition', id, nowFavourited)
-      return next
-    })
-  }, [writeThrough])
+    if (!user) {
+      setPendingFavourite({ type: 'conditions', id })
+      return
+    }
+    applyToggle('conditions', id)
+  }, [user, applyToggle])
 
   // restoreConditionAt — reinserts a condition id at a specific index instead
   // of appending it to the end. Used by Undo after a remove: toggleCondition
@@ -199,6 +287,9 @@ export function useFavourites() {
     [favourites.conditions]
   )
 
+  const dismissPendingFavourite = useCallback(() => setPendingFavourite(null), [])
+  const dismissCapBlocked       = useCallback(() => setCapBlocked(null), [])
+
   return {
     favourites,
     toggleDrug,
@@ -207,5 +298,9 @@ export function useFavourites() {
     restoreDrugAt,
     isDrugFavourited,
     isConditionFavourited,
+    pendingFavourite,
+    capBlocked,
+    dismissPendingFavourite,
+    dismissCapBlocked,
   }
 }

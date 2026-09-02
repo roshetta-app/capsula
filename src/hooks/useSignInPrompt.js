@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 
 // sessionStorage — resets each new visit/tab. Shared across both triggers:
@@ -32,36 +33,35 @@ const MIN_VISIBLE_MS = 500
  *   - A dismissal only counts against that lifetime budget if the sheet
  *     was visibly open for at least MIN_VISIBLE_MS — an instant close
  *     (backdrop mis-tap, reflex swipe) doesn't burn down the budget.
- *   - Favourites and notes are still tracked as two fully independent
- *     0-to-1+ transitions (unchanged from before this session) — either
- *     can trigger the prompt on its own. It still only actually opens
- *     once per visit total (SESSION_KEY, shared) — whichever trigger fires
- *     first "wins" that visit; the other trigger stays eligible again on
- *     the next visit.
  *   - Signing in stops future prompts automatically, same as before — no
  *     separate flag needed, since the isSignedIn guard below already
  *     blocks the effect once true.
  *
+ * Phase 7 (this session) — the favourites-based "went from zero" trigger
+ * and its favouritesCount parameter are removed entirely. Favouriting now
+ * requires an account (see useFavourites.js), so a signed-out favourite
+ * count can never go above zero any more — the trigger had nothing left
+ * to fire on. The pending-favourite tap itself opens AccountSheet directly
+ * (see SignInNudge.jsx), so this hook only needs to watch the notes
+ * trigger now.
+ *
  * Usage:
  *   const { shouldAutoOpen, dismiss } =
- *     useSignInPrompt({ isSignedIn: !!user, favouritesCount, notesActivityCount })
+ *     useSignInPrompt({ isSignedIn: !!user, notesActivityCount })
  *
  *   // Pass `dismiss` as AccountSheet's onClose — it closes the sheet AND
  *   // records the impression (subject to the MIN_VISIBLE_MS debounce).
  */
-export function useSignInPrompt({ isSignedIn, favouritesCount, notesActivityCount = 0 }) {
+export function useSignInPrompt({ isSignedIn, notesActivityCount = 0 }) {
   const [shouldAutoOpen, setShouldAutoOpen] = useState(false)
-  const prevFavouritesCount = useRef(favouritesCount)
   const prevNotesActivityCount = useRef(notesActivityCount)
   const openedAtRef = useRef(null)
 
   useEffect(() => {
-    const favouritesWentFromZero = prevFavouritesCount.current === 0 && favouritesCount > 0
     const notesWentFromZero = prevNotesActivityCount.current === 0 && notesActivityCount > 0
-    prevFavouritesCount.current = favouritesCount
     prevNotesActivityCount.current = notesActivityCount
 
-    if (!favouritesWentFromZero && !notesWentFromZero) return
+    if (!notesWentFromZero) return
     if (isSignedIn) return
 
     let impressions = 0
@@ -82,7 +82,7 @@ export function useSignInPrompt({ isSignedIn, favouritesCount, notesActivityCoun
     openedAtRef.current = Date.now()
     setShouldAutoOpen(true)
     try { sessionStorage.setItem(SESSION_KEY, 'true') } catch { /* ignore */ }
-  }, [favouritesCount, notesActivityCount, isSignedIn])
+  }, [notesActivityCount, isSignedIn])
 
   // Call on any dismissal — backdrop tap, Escape, or the "Not now" link.
   // Closes the sheet immediately; only counts toward the lifetime cap if

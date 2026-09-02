@@ -1,3 +1,4 @@
+
 /**
  * src/constants/features.js
  * Phase 2K — Feature flags
@@ -18,3 +19,18 @@ export const FEATURES = {
    */
   OFFLINE_MODE: false,
 }
+
+/**
+ * Phase 7 — Favouriting caps (free tier)
+ *
+ * Free accounts are capped separately per list (drugs and conditions each
+ * get their own ceiling, not one shared number). Pro accounts are never
+ * checked against these (see useIsPro.js).
+ */
+export const FAVOURITES_CAP_DRUGS = 10
+export const FAVOURITES_CAP_CONDITIONS = 10
+
+export const FAVOURITES_LIMIT_MESSAGE_DRUGS =
+  "You've reached your free limit of 10 saved drugs — go Pro for unlimited favourites."
+export const FAVOURITES_LIMIT_MESSAGE_CONDITIONS =
+  "You've reached your free limit of 10 saved conditions — go Pro for unlimited favourites."
