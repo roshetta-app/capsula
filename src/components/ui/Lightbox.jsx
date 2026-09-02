@@ -188,6 +188,9 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   // onCurrentZoom, but only while this is the current slide, since only
   // the current slide's zoom should affect Embla's own drag gating.
   const [localScale, setLocalScale] = useState(1)
+  // Scale immediately before the most recent double-click (or wheel)
+  // zoom action — see the onZoomStart/onZoomStop pair below.
+  const scaleBeforeZoomRef = useRef(1)
 
   useEffect(() => {
     if (isCurrent) onCurrentInfo({ status: cached.status, retry: cached.retry })
@@ -219,6 +222,25 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
           minScale={1}
           maxScale={4}
           doubleClick={{ mode: 'toggle', step: 0.6 }}
+          // The library's own "toggle" mode always steps the scale by a
+          // fixed `step` off wherever it currently sits (confirmed from
+          // its source: targetScale = scale - step whenever scale != 1),
+          // so double-tapping while pinched in further than the
+          // double-tap's own target only partially zoomed back out
+          // instead of landing on the original size. onZoomStart/
+          // onZoomStop only fire for double-click and wheel zooms (never
+          // for a live pinch — confirmed from source), so this pair
+          // corrects that one case without touching pinch or pan at all.
+          onZoomStart={(ref) => {
+            scaleBeforeZoomRef.current = ref.state.scale
+          }}
+          onZoomStop={(ref) => {
+            const wasZoomedIn = scaleBeforeZoomRef.current > 1.01
+            const stillZoomedIn = ref.state.scale > 1.01
+            if (wasZoomedIn && stillZoomedIn) {
+              transformRef.current?.resetTransform(200)
+            }
+          }}
           // Panning only matters for this slide once it's actually
           // zoomed in — left enabled at 1x, it still captures part of a
           // single-finger drag, which would corrupt the Embla-driven
