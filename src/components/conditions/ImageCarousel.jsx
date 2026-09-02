@@ -12,61 +12,50 @@
  *   - Photo display: uncropped. Each photo renders in full via
  *     object-fit: contain, centred inside the 4:3 area; any leftover
  *     space is filled with a softly blurred, darkened copy of the same
- *     photo (object-fit: cover) rather than empty background colour.
- *     This replaces the earlier crop-to-fill approach — these are
- *     clinical reference photos, so nothing an editor uploads should
- *     ever get cropped off in-page. Full detail is still only reachable
- *     via pinch/double-tap zoom in the lightbox, same as before.
+ *     photo (object-fit: cover). Full detail is still only reachable via
+ *     pinch/double-tap zoom in the lightbox, same as before.
  *   - Caption row only renders — and only reserves its fixed height —
  *     when at least one photo in the gallery actually has a caption.
- *     A gallery where nothing has a caption (including any single-photo
- *     gallery with no caption) now shows no reserved space at all.
- *     When some photos have captions and others don't, the row still
- *     stays reserved at a fixed height across every photo in that
- *     gallery, so the card doesn't resize while swiping between them.
- *   - Caption row is a flex row with a leading caption/comment icon.
- *     dir="auto" on the row lets the browser resolve RTL/LTR from the
- *     caption text.
  *
- * Interaction (refined 2026-09-02):
- *   - The photo now tracks your finger while dragging — a real sliding
- *     motion, not an instant swap once a threshold is crossed. Three
- *     photos (previous / current / next) sit side by side in a strip;
- *     dragging moves the strip by the same distance as the finger, and
- *     lifting either finishes the slide onto the neighbouring photo
- *     (past ~20% of the card's width) or glides back to the current one.
- *     This also removes the old hard-cut flicker when the current photo
- *     changes, since the neighbouring photo is already on-screen and
- *     already loaded before the slide finishes, rather than a same-
- *     element image swap.
- *   - Tap (< 8px movement on both axes, no drag started) → opens
- *     Lightbox.
- *   - A vertical finger movement bigger than the horizontal one is left
- *     alone (lets the page's own vertical scroll win), same as before.
- *   - e.stopPropagation() on touch start blocks the parent tab-switcher.
+ * Interaction / continuity fix (2026-09-02, second pass):
+ *   Earlier this session the swipe was rebuilt as three fixed "prev /
+ *   current / next" photo slots whose ROLE shifted by one every swipe.
+ *   That caused two real bugs, both root-caused and fixed here:
+ *     1. Flicker on every swipe — each slot's cache tracking was keyed
+ *        to its role, not to a specific photo, so the photo that had
+ *        just become "current" briefly looked like a brand new,
+ *        unloaded photo and re-resolved from scratch, causing a visible
+ *        flash.
+ *     2. Occasional permanent lockup — swiping past the first or last
+ *        photo (edge of the gallery) could leave the settle animation
+ *        waiting on a browser transition-end event that, in that one
+ *        case, never fires, permanently freezing all further swipes
+ *        AND taps (since both were gated on that wait completing).
+ *   Fix: the three DOM slots now stay assigned to whichever photo index
+ *   they've always tracked (index % 3), and only change photo when a
+ *   photo genuinely leaves the nearby window — so the photo you just
+ *   swiped onto never gets relabelled as "new." Settling is now driven
+ *   by a plain timer instead of waiting on a transition event, so it is
+ *   no longer possible for it to hang indefinitely.
  *
  * Offline caching (Image System Refinement Plan, Part A):
- *   - The previous, current, and next photo are each loaded via
- *     useCachedImage (device-first → network → cache-on-view), so the
- *     neighbouring photos revealed by a drag are already resolved from
- *     the on-device store the same way the current one is.
- *   - 'ready'   → photo renders as before.
+ *   - Each of the three tracked photos loads via useCachedImage
+ *     (device-first → network → cache-on-view).
+ *   - 'ready'   → photo renders.
  *   - 'error'   → ImageLoadError placeholder with a working Retry
- *     button, shown for the current photo only. The placeholder's own
- *     touch handlers stop propagation so tapping Retry doesn't also
- *     register as a drag or a stationary tap.
- *   - 'loading' → nothing rendered yet for that slide.
+ *     button, shown for the current photo only. Its own touch handlers
+ *     stop propagation so a Retry tap isn't read as a drag or a
+ *     stationary tap.
+ *   - 'loading' → nothing rendered yet for that slot.
  *
  * Zoom-hint (Image System Refinement Plan, Part C, Step 2):
  *   - Unchanged — small magnifying-glass badge, top-right of the photo,
- *     shown whenever the current photo is 'ready'. Purely decorative
- *     (aria-hidden, pointer-events: none).
+ *     shown whenever the current photo is 'ready'.
  *
  * Props:
  *   images  { id, url, caption }[]
  *   title   string (optional) — bold heading rendered above the card;
- *           omitted entirely when empty/absent (e.g. galleries saved
- *           before this field existed)
+ *           omitted entirely when empty/absent
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { MessageSquare, ZoomIn } from 'lucide-react'
@@ -75,19 +64,29 @@ import ImageLoadError from '../ui/ImageLoadError'
 import { useCachedImage } from '../../hooks/useCachedImage'
 
 // How long the "commit" / "snap back" glide takes once a finger lifts.
-const SETTLE_MS = 280
+// Settling is cleared by a plain timer set to this plus a small buffer —
+// not by waiting on a CSS transition-end event — so it can never hang.
+const SETTLE_MS = 260
+const SETTLE_TIMEOUT_MS = SETTLE_MS + 40
+
 // A drag has to cross this fraction of the card's width before it
 // counts as a committed swipe rather than a snap-back. Floored at 40px
 // so narrow cards still need a deliberate drag, not a stray touch.
 const COMMIT_RATIO = 0.2
 const COMMIT_MIN_PX = 40
 
-// One slide's photo: the real photo shown in full (object-fit: contain)
-// over a blurred, darkened copy of itself filling the rest of the 4:3
-// area, so nothing is ever cropped off but there's no dead background
-// space either. Renders nothing (leaves the slide blank) until its
-// cached copy is ready — used for the previous/next slides that may
-// still be resolving while a drag reveals them.
+// Which of the three fixed DOM slots a given photo index belongs to.
+// Three consecutive indices (index-1, index, index+1) always land on
+// three different slots, so a photo keeps the same slot — and the same
+// useCachedImage instance behind it — for as long as it stays within
+// one step of the current photo, however many swipes that takes.
+function slotFor(i) {
+  return ((i % 3) + 3) % 3
+}
+
+// One slide's photo: shown in full (object-fit: contain) over a
+// blurred, darkened copy of itself filling the rest of the 4:3 area.
+// Renders nothing until its cached copy is ready.
 function SlidePhoto({ cached, caption, onFailed }) {
   const { src, status } = cached
   if (status !== 'ready' || !src) return null
@@ -129,30 +128,58 @@ export default function ImageCarousel({ images = [], title = '' }) {
 
   const areaRef = useRef(null)
   const touch = useRef({ startX: 0, startY: 0, dragging: false, containerWidth: 0 })
+  const settleTimer = useRef(null)
+
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current)
+  }, [])
 
   const goTo   = useCallback((i) => setIndex(Math.max(0, Math.min(images.length - 1, i))), [images.length])
   const openAt = useCallback((i) => { setIndex(i); setLightbox(true) }, [])
 
-  // Hooks must run unconditionally — the `images.length` guard below
-  // happens after this, so any of these may be undefined on a short or
-  // empty array; useCachedImage(undefined) safely resolves to 'error'
-  // and SlidePhoto renders nothing in that case.
-  const prevImg = images[index - 1]
-  const current = images[index]
-  const nextImg = images[index + 1]
+  // Each slot is permanently wired to useCachedImage — same three call
+  // sites every render, only the url fed into each one changes, and
+  // only when the photo it's tracking actually leaves the ±1 window.
+  const roleForSlot = useCallback((s) => {
+    if (s === slotFor(index - 1)) return 'prev'
+    if (s === slotFor(index))     return 'current'
+    return 'next'
+  }, [index])
 
-  const prevCached = useCachedImage(prevImg?.url)
-  const currCached = useCachedImage(current?.url)
-  const nextCached = useCachedImage(nextImg?.url)
+  const imageForRole = (role) => {
+    const i = role === 'prev' ? index - 1 : role === 'current' ? index : index + 1
+    return (i >= 0 && i < images.length) ? images[i] : undefined
+  }
+
+  const role0 = roleForSlot(0)
+  const role1 = roleForSlot(1)
+  const role2 = roleForSlot(2)
+  const img0 = imageForRole(role0)
+  const img1 = imageForRole(role1)
+  const img2 = imageForRole(role2)
+
+  const cached0 = useCachedImage(img0?.url)
+  const cached1 = useCachedImage(img1?.url)
+  const cached2 = useCachedImage(img2?.url)
+
+  const slots = [
+    { role: role0, img: img0, cached: cached0 },
+    { role: role1, img: img1, cached: cached1 },
+    { role: role2, img: img2, cached: cached2 },
+  ]
+  const currentSlot = slots.find(s => s.role === 'current')
+  const current = images[index]
 
   // 2026-09-02 fix: useCachedImage falls back to the photo's plain
-  // address when it can't fetch()/cache a copy (e.g. CORS-blocked
-  // external photos), which still displays fine via a normal <img>.
-  // This local flag catches the rarer case where the address is
-  // genuinely dead and even that fails, via the <img>'s own onError.
+  // address when it can't fetch()/cache a copy, which still displays
+  // fine via a normal <img>. This local flag catches the rarer case
+  // where the address is genuinely dead and even that fails.
   const [displayFailed, setDisplayFailed] = useState(false)
   useEffect(() => { setDisplayFailed(false) }, [current?.url])
-  const handleRetry = useCallback(() => { setDisplayFailed(false); currCached.retry() }, [currCached])
+  const handleRetry = useCallback(() => {
+    setDisplayFailed(false)
+    currentSlot?.cached.retry()
+  }, [currentSlot])
 
   const hasAnyCaption = images.some(img => img.caption)
 
@@ -195,46 +222,36 @@ export default function ImageCarousel({ images = [], title = '' }) {
     const t = touch.current
 
     if (!t.dragging) {
-      // Stationary tap — open lightbox
-      openAt(index)
+      openAt(index) // stationary tap — open lightbox
       return
     }
 
     const threshold = Math.max(COMMIT_MIN_PX, t.containerWidth * COMMIT_RATIO)
-    if (dragPx <= -threshold && index < images.length - 1) {
-      setSettling('next')
-    } else if (dragPx >= threshold && index > 0) {
-      setSettling('prev')
-    } else {
-      setSettling('back')
-    }
+    let direction = 'back'
+    if (dragPx <= -threshold && index < images.length - 1) direction = 'next'
+    else if (dragPx >= threshold && index > 0)             direction = 'prev'
+
+    setSettling(direction)
+    if (settleTimer.current) clearTimeout(settleTimer.current)
+    settleTimer.current = setTimeout(() => {
+      if (direction === 'next') setIndex(i => Math.min(images.length - 1, i + 1))
+      if (direction === 'prev') setIndex(i => Math.max(0, i - 1))
+      setSettling(null)
+      setDragPx(0)
+      settleTimer.current = null
+    }, SETTLE_TIMEOUT_MS)
   }
 
-  function handleTransitionEnd() {
-    if (!settling) return
-    if (settling === 'next') setIndex(i => i + 1)
-    if (settling === 'prev') setIndex(i => i - 1)
-    setSettling(null)
-    setDragPx(0)
-  }
-
-  // Track position: three slides (previous | current | next), each a
-  // third of the strip's own width, strip itself 3x the card's width.
-  // -33.3334% centres the "current" slide in the visible card — that's
-  // the resting position and where a cancelled drag glides back to.
-  // Committing all the way to a neighbour animates to -66.6667% (next)
-  // or 0% (previous); once that finishes, the index updates and the
-  // strip snaps back to -33.3334% with no transition, which is
-  // imperceptible since the new current slide is now the one sitting
-  // in the centre.
-  let percent = -33.3334
-  if (settling === 'next') percent = -66.6667
-  if (settling === 'prev') percent = 0
+  // Per-slot horizontal position: -100% (prev), 0% (current), +100%
+  // (next), then shifted by one whole slot while settling so the target
+  // role ends up centred, plus the live drag offset while dragging.
+  const roleBase = { prev: -100, current: 0, next: 100 }
+  const settleShift = settling === 'next' ? -100 : settling === 'prev' ? 100 : 0
+  const dragTerm = settling ? 0 : dragPx
 
   return (
     <>
       <div style={{ userSelect: 'none', marginBottom: 'var(--space-3)' }}>
-        {/* Gallery title — outside the card, doesn't change as you swipe */}
         {title && (
           <div style={{
             fontSize: 18,
@@ -267,31 +284,29 @@ export default function ImageCarousel({ images = [], title = '' }) {
               backgroundColor: 'var(--color-bg)',
             }}
           >
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', width: '300%',
-              transform: `translateX(calc(${percent}% + ${settling ? 0 : dragPx}px))`,
-              transition: settling ? `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)` : 'none',
-            }}
-              onTransitionEnd={handleTransitionEnd}
-            >
-              <div style={{ position: 'relative', flex: '0 0 33.3334%', height: '100%' }}>
-                <SlidePhoto cached={prevCached} caption={prevImg?.caption} />
-              </div>
-              <div style={{ position: 'relative', flex: '0 0 33.3334%', height: '100%' }}>
-                {!displayFailed && (
-                  <SlidePhoto
-                    cached={currCached}
-                    caption={current?.caption}
-                    onFailed={() => setDisplayFailed(true)}
-                  />
-                )}
-              </div>
-              <div style={{ position: 'relative', flex: '0 0 33.3334%', height: '100%' }}>
-                <SlidePhoto cached={nextCached} caption={nextImg?.caption} />
-              </div>
-            </div>
+            {slots.map((slot, s) => {
+              const percent = roleBase[slot.role] + settleShift
+              return (
+                <div
+                  key={s}
+                  style={{
+                    position: 'absolute', inset: 0,
+                    transform: `translateX(calc(${percent}% + ${dragTerm}px))`,
+                    transition: settling ? `transform ${SETTLE_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1)` : 'none',
+                  }}
+                >
+                  {slot.role === 'current' && displayFailed ? null : (
+                    <SlidePhoto
+                      cached={slot.cached}
+                      caption={slot.img?.caption}
+                      onFailed={slot.role === 'current' ? () => setDisplayFailed(true) : undefined}
+                    />
+                  )}
+                </div>
+              )
+            })}
 
-            {currCached.status === 'ready' && currCached.src && !displayFailed && (
+            {currentSlot?.cached.status === 'ready' && currentSlot.cached.src && !displayFailed && (
               <div
                 aria-hidden="true"
                 style={{
@@ -306,7 +321,7 @@ export default function ImageCarousel({ images = [], title = '' }) {
               </div>
             )}
 
-            {(currCached.status === 'error' || displayFailed) && (
+            {(currentSlot?.cached.status === 'error' || displayFailed) && (
               <div
                 onTouchStart={(e) => e.stopPropagation()}
                 onTouchEnd={(e) => e.stopPropagation()}
@@ -317,10 +332,8 @@ export default function ImageCarousel({ images = [], title = '' }) {
             )}
           </div>
 
-          {/* Footer — dots and/or caption; only rendered at all when
-              there's something to show, so a single uncaptioned photo
-              (or a gallery where nothing has a caption) leaves no dead
-              space below the card at all. */}
+          {/* Footer — dots and/or caption; only rendered when there's
+              something to show. */}
           {(images.length > 1 || hasAnyCaption) && (
             <div style={{ padding: '10px var(--space-4) var(--space-3)' }}>
               {images.length > 1 && (
@@ -352,15 +365,11 @@ export default function ImageCarousel({ images = [], title = '' }) {
                 </div>
               )}
 
-              {/* Caption slot — reserves a fixed height only while this
-                  gallery actually has at least one caption somewhere in
-                  it, so the card never resizes between a captioned and
-                  an uncaptioned photo within the same gallery. */}
               {hasAnyCaption && (
                 <div
                   dir="auto"
                   style={{
-                    height: 19, // one line at fontSize 13 / lineHeight 1.5
+                    height: 19,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
@@ -390,7 +399,6 @@ export default function ImageCarousel({ images = [], title = '' }) {
         </div>
       </div>
 
-      {/* Lightbox portal */}
       {lightboxOpen && (
         <Lightbox
           images={images}
