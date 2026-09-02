@@ -17,7 +17,12 @@
  *   sizing/treatment (previously the close button was visibly smaller
  *   than the nav arrows for no real reason).
  *   Tapping the photo toggles both bands' visibility, for distraction-
- *   free viewing — a single re-tap brings them back.
+ *   free viewing — a single re-tap brings them back. This is decided by
+ *   the same touch handler that reads swipes (see below), not
+ *   framer-motion's own onTap gesture — using both at once was the
+ *   cause of a 2026-09-02 bug where swipes randomly got misread as taps
+ *   and flickered the chrome, once the drag-follow (which used to
+ *   "claim" real movement before onTap could) was removed.
  *
  * Motion (framer-motion):
  *   - Open/close: backdrop fades in/out; the very first photo shown
@@ -172,15 +177,27 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
   }
 
   function handlePhotoTouchStart(e) {
-    if (!canSwipe) return
     swipeStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
   }
 
   function handlePhotoTouchEnd(e) {
-    if (!canSwipe || !swipeStart.current) return
+    if (!swipeStart.current) return
     const dx = e.changedTouches[0].clientX - swipeStart.current.x
     const dy = e.changedTouches[0].clientY - swipeStart.current.y
     swipeStart.current = null
+
+    // A touch that barely moved is a tap, not a swipe — toggle the
+    // chrome. Checked first and unconditionally (even while zoomed),
+    // since tapping to show/hide the controls has always worked
+    // regardless of zoom level.
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 10) {
+      setChromeVisible((v) => !v)
+      return
+    }
+
+    // Anything past that is real movement — while zoomed in, that
+    // movement belongs to react-zoom-pan-pinch's own panning, not us.
+    if (!canSwipe) return
 
     if (Math.abs(dy) > Math.abs(dx) && dy > 100) {
       requestClose()
@@ -264,7 +281,6 @@ export default function Lightbox({ images, activeIndex, onClose, onGo }) {
             transition={isFirstPhotoRef.current
               ? { duration: 0.22, ease: 'easeOut' }
               : { duration: 0.28, ease: 'easeOut' }}
-            onTap={() => setChromeVisible((v) => !v)}
             onTouchStart={handlePhotoTouchStart}
             onTouchEnd={handlePhotoTouchEnd}
             style={{
