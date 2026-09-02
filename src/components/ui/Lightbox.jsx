@@ -218,7 +218,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
           initialScale={1}
           minScale={1}
           maxScale={4}
-          doubleClick={{ mode: 'toggle', step: 1 }}
+          doubleClick={{ mode: 'toggle', step: 0.6 }}
           // Panning only matters for this slide once it's actually
           // zoomed in — left enabled at 1x, it still captures part of a
           // single-finger drag, which would corrupt the Embla-driven
