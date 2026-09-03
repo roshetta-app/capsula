@@ -87,9 +87,22 @@
  * online/offline events, independent of the reachability check above.
  * isOnline's own behavior (and every existing consumer of it) is
  * completely unchanged — this is an additional field, not a replacement.
+ *
+ * 2026-09-03 (resume-reachability-check fix): a normal background/
+ * foreground cycle — not a relaunch — never remounts this provider, so its
+ * mount-time check, window online/offline listeners, and poll timer were
+ * the only things that could ever notice a reconnect, and none of those
+ * are guaranteed to keep running while the app is backgrounded on Android.
+ * A device that reconnects while backgrounded could go on reporting
+ * isOnline: false indefinitely, even once foregrounded again, until the
+ * next scheduled poll happened to land. Now also listens for Capacitor's
+ * 'resume' event (same pattern as AppGateResumeListener in App.jsx) and
+ * forces one fresh reachability check the instant the app returns to the
+ * foreground.
  */
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import { App as CapacitorApp } from '@capacitor/app'
 import { supabase } from '../lib/supabase'
 import { fetchMetadataTimestamps } from '../lib/queries'
 
@@ -260,6 +273,21 @@ export function OnlineStatusProvider({ children }) {
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
+    // resume-reachability-check fix — a normal background/foreground cycle
+    // (home button, app switcher) never remounts this provider and never
+    // reliably fires window 'online'/'offline' events or keeps
+    // pollTimerRef's setInterval running on Android — the OS can throttle
+    // or suspend both while backgrounded. Without this, a real reconnect
+    // that happens while the app is backgrounded can go unnoticed
+    // indefinitely, since nothing left running would ever catch it. Same
+    // App.addListener('resume', ...) pattern already used by
+    // AppGateResumeListener in App.jsx — forces one fresh check the
+    // instant the app is foregrounded again, rather than waiting on
+    // background timers/events that aren't reliable here.
+    const resumeListenerPromise = CapacitorApp.addListener('resume', () => {
+      checkReachable()
+    })
+
     // Initial check on mount — don't trust navigator.onLine's word alone
     // even at startup; confirm reachability before ever reporting online.
     // Runs exactly once for the whole app now (Provider mounts once in
@@ -273,6 +301,7 @@ export function OnlineStatusProvider({ children }) {
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      resumeListenerPromise.then(handle => handle.remove())
       stopPolling()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

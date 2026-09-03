@@ -188,6 +188,25 @@ function buildFavouriteQuery(userId, itemType, id, nowFavourited) {
  * the app entirely while offline — but the fix itself doesn't need to know
  * that; it's correct for anyone regardless of tier.
  *
+ * offline-favourite-sync refinement (this session) — two follow-up gaps
+ * found in testing, both fixed together:
+ *   - The sign-in fetch had no explicit order, so it could silently
+ *     scramble "recently added" ordering (which is just this array's own
+ *     order, reversed — see FavouritesScreen.jsx's Phase 14 note) whenever
+ *     it ran after a queued write flushed. Now explicitly ordered by
+ *     created_at.
+ *   - A successful flush only cleared the queue; it didn't touch local
+ *     state. If the sign-in fetch happened to run before the flush
+ *     finished, the flushed item could end up missing from view entirely,
+ *     with nothing left to pull it back in. The flush now merges its own
+ *     result into favourites directly, so the outcome is correct no
+ *     matter which of the two finishes first.
+ *   - Also depends on OnlineStatusContext.jsx now force-checking
+ *     reachability on app resume (see that file) — a normal background/
+ *     foreground cycle (not a relaunch) never re-runs this hook's effects
+ *     at all, so without that, a reconnect that happens while backgrounded
+ *     could go unnoticed indefinitely.
+ *
  * Storage shape (both local and as read from the database): { drugs:
  * string[], conditions: string[] }
  *
@@ -298,6 +317,33 @@ export function useFavourites() {
           const current = readPendingWrites()
           delete current[key]
           writePendingWrites(current)
+
+          // offline-favourite-sync refinement — a successful flush can
+          // land either before or after the sign-in fetch effect's own
+          // DB-replace runs (they're independent effects with no fixed
+          // order). If the fetch already ran, it wouldn't have included
+          // this item (the write hadn't reached the database yet), so it
+          // needs to be folded in here too — same append-to-end/filter-out
+          // shape as everywhere else in this file. If the fetch hasn't
+          // run yet, this is a safe no-op once it does, since the fetch
+          // will already include this item (its created_at is now set).
+          // Only applies to the currently signed-in account, so a queued
+          // write left over from a previously signed-out account can't
+          // bleed into someone else's local list.
+          if (entry.userId === user?.id) {
+            const listKey = entry.itemType === 'drug' ? 'drugs' : 'conditions'
+            setFavourites(prev => {
+              const list = prev[listKey]
+              const already = list.includes(entry.id)
+              if (entry.nowFavourited === already) return prev
+              const nextList = entry.nowFavourited
+                ? [...list, entry.id]
+                : list.filter(x => x !== entry.id)
+              const next = { ...prev, [listKey]: nextList }
+              writeStorage(next)
+              return next
+            })
+          }
         }
         // On error, leave it queued — the next flush (reconnect or next
         // app open) will retry it.
@@ -306,7 +352,7 @@ export function useFavourites() {
 
     flushPendingWrites()
     return () => { cancelled = true }
-  }, [isOnline])
+  }, [isOnline, user])
 
   // Shared add/remove step (Phase 7) — the only place toggleDrug/
   // toggleCondition actually mutate favourites once a user is present.
@@ -364,6 +410,14 @@ export function useFavourites() {
     supabase
       .from('favourites')
       .select('item_type, item_id')
+      // offline-favourite-sync refinement — explicit order, ascending, so
+      // this array's order (index 0 oldest → last index newest) is always
+      // deterministic. Without this, Postgres returns rows in whatever
+      // scan order it happens to use, which is NOT guaranteed to match
+      // insertion/upsert recency — and FavouritesScreen's "recently added"
+      // tab is just this array's own order, reversed (see that file's
+      // Phase 14 note), so an unordered fetch could silently scramble it.
+      .order('created_at', { ascending: true })
       .then(({ data, error }) => {
         if (cancelled || error || !data) return
         const next = {
