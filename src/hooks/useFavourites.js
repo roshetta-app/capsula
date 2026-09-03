@@ -206,6 +206,11 @@ function buildFavouriteQuery(userId, itemType, id, nowFavourited) {
  *     foreground cycle (not a relaunch) never re-runs this hook's effects
  *     at all, so without that, a reconnect that happens while backgrounded
  *     could go unnoticed indefinitely.
+ *   - Cold-start race (found via on-device testing, same session): the
+ *     flush could fire before `user` had actually resolved — isOnline's
+ *     initial value can already be true on the very first render, ahead
+ *     of auth settling. Now also waits for authLoading, same as the
+ *     sign-in fetch effect already does and for the same reason.
  *
  * Storage shape (both local and as read from the database): { drugs:
  * string[], conditions: string[] }
@@ -303,8 +308,22 @@ export function useFavourites() {
   // chance to flush. Each entry is retried and only removed from the queue
   // on success, so a still-offline (or otherwise still-failing) entry is
   // simply left for the next flush rather than lost.
+  //
+  // offline-favourite-sync refinement (cold-start race fix) — also waits
+  // for authLoading, same reasoning as the sign-in fetch effect above:
+  // isOnline's initial value can already be true on the very first render
+  // (read straight from navigator.onLine), before `user` has actually
+  // resolved. Without this, a flush could fire in that gap — the database
+  // write itself might still succeed (Supabase's own session can be ready
+  // slightly before this component's `user` state is), but the `entry.
+  // userId === user?.id` check below would wrongly fail since `user` was
+  // still null, skipping the local-state merge and leaving the result
+  // dependent on pure timing luck: sometimes the later sign-in fetch
+  // effect happens to already reflect the write and self-heals (visible
+  // as a brief flash), sometimes it doesn't. Waiting here removes the gap
+  // entirely instead of racing it.
   useEffect(() => {
-    if (!isOnline) return
+    if (!isOnline || authLoading) return
     let cancelled = false
 
     async function flushPendingWrites() {
@@ -352,7 +371,7 @@ export function useFavourites() {
 
     flushPendingWrites()
     return () => { cancelled = true }
-  }, [isOnline, user])
+  }, [isOnline, authLoading, user])
 
   // Shared add/remove step (Phase 7) — the only place toggleDrug/
   // toggleCondition actually mutate favourites once a user is present.
