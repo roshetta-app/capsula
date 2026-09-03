@@ -1,12 +1,11 @@
 /**
  * src/components/ui/AccountSheet.jsx
  *
- * The sign-in nudge — opened automatically after a signed-out user's first
- * favourite or first personal note of a visit (D12, extended per this
- * session's redesign). Never gates content on its own; it's just a
- * dismissible surface.
+ * The sign-in sheet — opened automatically whenever a signed-out user
+ * tries to save a favourite or add a personal note. Never gates content
+ * on its own; it's just a dismissible surface.
  *
- * Redesign (this session):
+ * Redesign (Phase 7):
  *   - Rebuilt as a true bottom sheet, on the same pattern
  *     SpecialtiesBottomSheet.jsx already uses elsewhere in the app (fixed
  *     backdrop, slide-up sheet, drag handle, rounded top corners, safe-area
@@ -18,36 +17,42 @@
  *     multi-color Google mark, copied from AccountScreen.jsx's local
  *     GoogleIcon) — instead of separate wording/styling living in two
  *     places.
- *   - Dismissal simplified to a single "Not now" action. The old separate
- *     "Don't ask again" button is gone — permanent silence is now handled
- *     by useSignInPrompt's lifetime impression cap instead of an explicit
- *     opt-out button. This supersedes D16's original "explicit permanent
- *     dismiss button" model — see useSignInPrompt.js for the new mechanic.
+ *   - Dismissal simplified to a single "Not now" action.
  *
  * favourites-pending-fix follow-up (copy) — signed-out headline/subtext now
  * swap to favourite-specific wording when this sheet was opened because of
  * a pending favourite tap (favouriteContext, passed by SignInNudge.jsx),
- * instead of always showing the generic "Sync your favourites across
- * devices" copy that made sense for the notes-based nudge but not for
- * "you just tried to save something."
+ * instead of always showing the generic copy.
+ *
+ * notes-signin-required (this session) — added noteContext, same shape as
+ * favouriteContext but its own copy branch. Deliberately not reusing
+ * favouriteContext's "save this" framing: a favourite tap has already
+ * happened by the time this sheet opens (something's mid-action), but a
+ * note prompt opens before anything's been typed — there's no content yet
+ * to "save this" implies. Copy here is forward-looking instead ("Sign in
+ * to add a note…"). favouriteContext and noteContext are mutually
+ * exclusive in practice (SignInNudge.jsx only ever sets one at a time),
+ * so favouriteContext is checked first, then noteContext, then the
+ * generic default.
  *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
  *                                     Escape, or the "Not now" link).
- *                                     useSignInPrompt's dismiss() already
- *                                     handles the accidental-tap debounce
- *                                     and impression counting — this
- *                                     component doesn't need to know about
- *                                     either.
  *   user               SupabaseUser | null
  *   signInWithGoogle    () => Promise<{ error }>
  *   signOut             () => Promise<void>
- *   favouriteContext    boolean — true when a pending favourite (not the
- *                                 notes-based nudge) is why this sheet is
- *                                 open. Swaps the signed-out copy only;
- *                                 everything else about the sheet is
- *                                 unchanged. Defaults to false.
+ *   favouriteContext    boolean — true when a pending favourite is why
+ *                                 this sheet is open. Swaps the
+ *                                 signed-out copy only; everything else
+ *                                 about the sheet is unchanged. Defaults
+ *                                 to false.
+ *   noteContext         boolean — true when a pending note sign-in
+ *                                 request (see NotesSignInContext.jsx) is
+ *                                 why this sheet is open. Swaps the
+ *                                 signed-out copy only, same as
+ *                                 favouriteContext above. Defaults to
+ *                                 false.
  */
 
 import { useEffect, useState } from 'react'
@@ -63,6 +68,7 @@ export default function AccountSheet({
   signInWithGoogle,
   signOut,
   favouriteContext = false,
+  noteContext = false,
 }) {
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState(null)
@@ -246,7 +252,11 @@ export default function AccountSheet({
               color:        'var(--color-text-primary)',
               marginBottom: 'var(--space-2)',
             }}>
-              {favouriteContext ? 'Save this to your Favourites' : 'Sign in or create account'}
+              {favouriteContext
+                ? 'Save this to your Favourites'
+                : noteContext
+                  ? 'Sign in to add a note'
+                  : 'Sign in or create account'}
             </div>
             <p style={{
               margin:     '0 0 var(--space-4)',
@@ -256,7 +266,9 @@ export default function AccountSheet({
             }}>
               {favouriteContext
                 ? "Sign in with Google — it's free — to save it and find it anytime, on any device."
-                : 'Sync your favourites across devices with your Google account.'}
+                : noteContext
+                  ? 'Sign in with Google to write personal notes, saved to your account and available on any device.'
+                  : 'Sync your favourites across devices with your Google account.'}
             </p>
 
             {error && (
@@ -315,11 +327,7 @@ export default function AccountSheet({
               {busy ? 'Opening Google…' : 'Continue with Google'}
             </button>
 
-            {/* Single dismiss action — replaces the old two-button row
-                ("Not now" / "Don't ask again"). Permanent silence is now
-                handled by useSignInPrompt's lifetime impression cap
-                instead of an explicit opt-out button (D16 supersession —
-                see useSignInPrompt.js). */}
+            {/* Single dismiss action. */}
             <button onClick={onClose} style={linkButtonStyle}>
               Not now
             </button>

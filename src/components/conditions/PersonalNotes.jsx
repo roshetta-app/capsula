@@ -2,8 +2,9 @@ import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react
 import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import { useDirtyState } from '../../hooks/useDirtyState'
+import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
-import { useNotesActivityContext } from '../../context/NotesActivityContext'
+import { useNotesSignInContext } from '../../context/NotesSignInContext'
 
 /**
  * PersonalNotes — personal note for a condition (Phase 3.5).
@@ -84,20 +85,30 @@ import { useNotesActivityContext } from '../../context/NotesActivityContext'
  *     user's account and clears the local copy on sign-out. Nothing
  *     about the UI, layout, or copy in this file changed.
  *
- * Sign-in nudge extension (this session):
- *   - A signed-out user's first-ever note save for a condition now also
- *     reports to NotesActivityContext, so the same D12/D16 sign-in prompt
- *     that already fires after a first favourite can fire after a first
- *     note too. Reuses the existing empty->populated detection this
- *     component already computes for its own save-flash animation —
- *     no new state, just one extra call at that same moment.
+ * notes-signin-required (this session):
+ *   - Notes now require an account, matching favourites' Phase 7
+ *     treatment. Replaces the old "sign in nudge fires after your first
+ *     guest note" flow entirely — signing in is now required up front,
+ *     at the point of saving, not suggested afterward.
+ *   - The empty state's editable textarea is gone for a signed-out user.
+ *     In its place: a static "Sign in to add a note" prompt that opens
+ *     the sign-in sheet directly (via requestNoteSignIn). There is
+ *     nothing to type and therefore nothing that can be lost to the
+ *     Google sign-in round trip — once sign-in completes, this renders
+ *     exactly like any other signed-in user's first, empty, editable
+ *     note.
+ *   - markNoteSaved()/NotesActivityContext usage removed — that
+ *     mechanism only existed to power the old after-the-fact nudge,
+ *     which no longer applies now that sign-in is required up front. See
+ *     NotesSignInContext.jsx.
  *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
+  const { user } = useAuth()
   const { savedValue, save } = useNotes(conditionId)
-  const { markNoteSaved } = useNotesActivityContext()
+  const { requestNoteSignIn } = useNotesSignInContext()
 
   const [draft, setDraft] = useState(savedValue)
   const [isEditing, setIsEditing] = useState(false)
@@ -161,10 +172,6 @@ export default function PersonalNotes({ conditionId }) {
     const isFirstSaveForThisCondition = !savedValue && draft
     if (isFirstSaveForThisCondition) {
       setJustPopulated(true)
-      // Sign-in nudge (D12/D16 extension) — tell the app-wide notes
-      // signal about this first save, the same way favourites' own count
-      // already triggers the nudge. See NotesActivityContext.jsx.
-      markNoteSaved()
     }
     save(draft)
     setIsEditing(false)
@@ -263,7 +270,7 @@ export default function PersonalNotes({ conditionId }) {
           }}>
             ✓ Saved
           </span>
-        ) : savedValue ? (
+        ) : user && savedValue ? (
           <button
             type="button"
             onClick={startEditing}
@@ -289,7 +296,40 @@ export default function PersonalNotes({ conditionId }) {
         ) : null}
       </div>
 
-      {isEditing ? (
+      {!user ? (
+        /* notes-signin-required — signed-out state. No textarea, nothing
+           to type or lose: a static prompt that opens the sign-in sheet
+           directly. Same tinted/bordered card the guest empty state used
+           to use, so this still reads as a single, familiar tappable
+           area. */
+        <div
+          onClick={() => requestNoteSignIn(conditionId)}
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
+            border: '1px solid var(--color-border)',
+            borderRadius: 'var(--radius-md)',
+            padding: '12px 14px',
+            minHeight: 56,
+            boxSizing: 'border-box',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            gap: 2,
+            cursor: 'pointer',
+          }}
+        >
+          <span style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--color-accent)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            Sign in to add a note
+          </span>
+        </div>
+      ) : isEditing ? (
         <>
           {/* Card-style textarea — auto-grows to fit content, soft border
               that only accents on focus (no thick always-on outline). */}
@@ -396,9 +436,10 @@ export default function PersonalNotes({ conditionId }) {
           </p>
         </div>
       ) : (
-        /* Empty state — tinted, bordered card (subtle blue tint over
-           surface) so it reads as a distinct tappable area instead of
-           bare text, while staying compact — no icons, no illustrations. */
+        /* Empty state (signed in, no note yet) — tinted, bordered card
+           (subtle blue tint over surface) so it reads as a distinct
+           tappable area instead of bare text, while staying compact — no
+           icons, no illustrations. */
         <div
           onClick={startEditing}
           style={{

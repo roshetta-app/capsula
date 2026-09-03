@@ -32,6 +32,14 @@
  * signed-out user's first personal note, not just their first favourite
  * (see NotesActivityContext.jsx).
  *
+ * notes-signin-required (this session) — NotesActivityProvider replaced
+ * with NotesSignInProvider (same mount position, no dependency change).
+ * Notes now require an account to save at all, the same as favourites'
+ * toggle actions, so the old "nudge after your first guest note" mechanism
+ * this provider used to power no longer applies — see
+ * NotesSignInContext.jsx for what replaced it, and SignInNudge.jsx /
+ * useSignInPrompt.js (deleted) for the other half of this change.
+ *
  * App Gate System Phase 1 Step 4c — added AppGateResumeListener below,
  * which re-checks for a Force Update / message every time the app resumes
  * from the background (so a device doesn't have to be fully relaunched to
@@ -92,7 +100,7 @@
  *   ConditionProvider → DrugProvider →
  *     ┌─ ErrorBoundary → AdminRoutes                     (admin branch)
  *     └─ ErrorBoundary → OnlineStatusProvider → ThemeProvider →
- *          FavouritesProvider → NotesActivityProvider →
+ *          FavouritesProvider → NotesSignInProvider →
  *          PushSubscriptionProvider → AppGateProvider →
  *          [AppGateResumeListener, AppGate, OnboardingGate → PublicRoutes,
  *          ProfileSetupRedirect, SignInNudge]              (public branch)
@@ -143,7 +151,7 @@ import { ThemeProvider } from './context/ThemeContext'
 import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
-import { NotesActivityProvider } from './context/NotesActivityContext'
+import { NotesSignInProvider } from './context/NotesSignInContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { OnlineStatusProvider } from './context/OnlineStatusContext'
 import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
@@ -248,7 +256,7 @@ export default function App() {
                   <OnlineStatusProvider>
                     <ThemeProvider>
                       <FavouritesProvider>
-                        <NotesActivityProvider>
+                        <NotesSignInProvider>
                           {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
                               scoped here rather than at the top of the
                               tree, same reasoning as PushSubscriptionProvider
@@ -267,7 +275,7 @@ export default function App() {
                               </AppGateProvider>
                             </PushSubscriptionProvider>
                           </PushBannerProvider>
-                        </NotesActivityProvider>
+                        </NotesSignInProvider>
                       </FavouritesProvider>
                     </ThemeProvider>
                   </OnlineStatusProvider>
@@ -281,5 +289,3 @@ export default function App() {
     </ErrorBoundary>
   )
 }
-
-
