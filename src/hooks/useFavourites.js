@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
+import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
@@ -11,6 +12,26 @@ const CAPS = {
   drugs:      FAVOURITES_CAP_DRUGS,
   conditions: FAVOURITES_CAP_CONDITIONS,
 }
+
+// offline-favourite-sync fix — a database write that fails (or is skipped
+// because we're offline) used to just be logged and dropped: local state
+// and localStorage already looked correct, so nothing ever told the user
+// their favourite never actually reached their account. In practice this
+// only ever hits Pro accounts — free accounts are already blocked from the
+// app entirely while offline by AppGate.jsx — but nothing below needs to
+// special-case that; it just works correctly for whoever hits it.
+//
+// Every write that fails or is skipped gets queued here instead, keyed by
+// user+item so repeated toggles on the same item while offline collapse to
+// just the final desired state rather than queuing every intermediate
+// flip. Flushed (see the effect below) the moment the app's own confirmed
+// isOnline (not the browser's raw, less trustworthy navigator.onLine) goes
+// true, and also once on mount in case the app was closed before a prior
+// session's queue ever got the chance to flush. No expiry, unlike
+// PENDING_FAVOURITE above — this represents something the user actually
+// did, not a speculative intent, so it keeps retrying until it succeeds
+// rather than silently giving up on a real action.
+const PENDING_WRITES_KEY = 'capsula_favourites_pending_writes'
 
 // favourites-pending-fix — a signed-out heart-tap is now persisted here, not
 // just held in React state. Opening the system browser for Google sign-in
@@ -90,6 +111,53 @@ function clearPendingFavouriteStorage() {
   }
 }
 
+// ─── Pending-write queue helpers (offline-favourite-sync fix) ─────────────────
+
+function readPendingWrites() {
+  try {
+    const raw = localStorage.getItem(PENDING_WRITES_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return (parsed && typeof parsed === 'object') ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writePendingWrites(pending) {
+  try {
+    localStorage.setItem(PENDING_WRITES_KEY, JSON.stringify(pending))
+  } catch {
+    // localStorage unavailable — silently ignore. A write that fails here
+    // simply won't be retried automatically, same risk as before this fix.
+  }
+}
+
+function queueWrite(userId, itemType, id, nowFavourited) {
+  const pending = readPendingWrites()
+  pending[`${userId}:${itemType}:${id}`] = { userId, itemType, id, nowFavourited }
+  writePendingWrites(pending)
+}
+
+function unqueueWrite(userId, itemType, id) {
+  const key = `${userId}:${itemType}:${id}`
+  const pending = readPendingWrites()
+  if (key in pending) {
+    delete pending[key]
+    writePendingWrites(pending)
+  }
+}
+
+function buildFavouriteQuery(userId, itemType, id, nowFavourited) {
+  return nowFavourited
+    ? supabase.from('favourites').upsert(
+        { user_id: userId, item_type: itemType, item_id: id },
+        { onConflict: 'user_id,item_type,item_id' }
+      )
+    : supabase.from('favourites').delete()
+        .eq('user_id', userId).eq('item_type', itemType).eq('item_id', id)
+}
+
 // ─── useFavourites ────────────────────────────────────────────────────────────
 
 /**
@@ -110,6 +178,16 @@ function clearPendingFavouriteStorage() {
  *     silently exceeding it; removing always goes through, uncapped, at any
  *     tier. Pro accounts are never capped (see useIsPro.js).
  *
+ * offline-favourite-sync fix (this session) — a database write that failed,
+ * or was skipped entirely because the app was offline, used to just be
+ * logged and dropped; the account's actual saved list could silently never
+ * receive it. Every such write is now queued to localStorage and retried
+ * automatically once the app's own confirmed isOnline goes true (see
+ * writeThrough and the flush effect below). In practice this only ever
+ * affects Pro accounts, since AppGate.jsx already blocks free accounts from
+ * the app entirely while offline — but the fix itself doesn't need to know
+ * that; it's correct for anyone regardless of tier.
+ *
  * Storage shape (both local and as read from the database): { drugs:
  * string[], conditions: string[] }
  *
@@ -129,6 +207,7 @@ function clearPendingFavouriteStorage() {
 export function useFavourites() {
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
+  const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
 
   const [favourites, setFavourites]           = useState(() => readStorage())
@@ -150,6 +229,8 @@ export function useFavourites() {
   useEffect(() => { pendingFavouriteRef.current = pendingFavourite }, [pendingFavourite])
   const isProRef = useRef(isPro)
   useEffect(() => { isProRef.current = isPro }, [isPro])
+  const isOnlineRef = useRef(isOnline)
+  useEffect(() => { isOnlineRef.current = isOnline }, [isOnline])
 
   // favourites-pending-fix — every place that used to call
   // setPendingFavourite(...) directly now goes through one of these two, so
@@ -168,20 +249,64 @@ export function useFavourites() {
   // Upsert (not plain insert) on add, since the table has a unique
   // constraint on (user_id, item_type, item_id) — this keeps a fast
   // double-tap from erroring out or creating a duplicate row.
+  //
+  // offline-favourite-sync fix — previously, a failed (or offline) write
+  // was only logged, never retried, so it could silently never reach the
+  // account at all. Now: if we're not online, skip attempting the request
+  // altogether and queue it straight away; if the request is attempted and
+  // fails for any other reason, queue it too. Either way it retries via
+  // the flush effect below.
   const writeThrough = useCallback((itemType, id, nowFavourited) => {
     if (!user) return
-    const query = nowFavourited
-      ? supabase.from('favourites').upsert(
-          { user_id: user.id, item_type: itemType, item_id: id },
-          { onConflict: 'user_id,item_type,item_id' }
-        )
-      : supabase.from('favourites').delete()
-          .eq('user_id', user.id).eq('item_type', itemType).eq('item_id', id)
+    const userId = user.id
 
-    query.then(({ error }) => {
-      if (error) console.error('Failed to sync favourite:', error)
+    if (!isOnlineRef.current) {
+      queueWrite(userId, itemType, id, nowFavourited)
+      return
+    }
+
+    buildFavouriteQuery(userId, itemType, id, nowFavourited).then(({ error }) => {
+      if (error) {
+        console.error('Failed to sync favourite:', error)
+        queueWrite(userId, itemType, id, nowFavourited)
+      } else {
+        // Succeeded directly — clear any older queued entry for this same
+        // item so a stale queued write can't overwrite this newer result
+        // on a later flush.
+        unqueueWrite(userId, itemType, id)
+      }
     })
   }, [user])
+
+  // offline-favourite-sync fix — flushes anything left in the queue above.
+  // Runs whenever isOnline is true: on a genuine reconnect, and also on
+  // mount if the app was closed before a previous session's queue got the
+  // chance to flush. Each entry is retried and only removed from the queue
+  // on success, so a still-offline (or otherwise still-failing) entry is
+  // simply left for the next flush rather than lost.
+  useEffect(() => {
+    if (!isOnline) return
+    let cancelled = false
+
+    async function flushPendingWrites() {
+      const pending = readPendingWrites()
+      for (const [key, entry] of Object.entries(pending)) {
+        if (cancelled) return
+        const { error } = await buildFavouriteQuery(entry.userId, entry.itemType, entry.id, entry.nowFavourited)
+        if (cancelled) return
+        if (!error) {
+          const current = readPendingWrites()
+          delete current[key]
+          writePendingWrites(current)
+        }
+        // On error, leave it queued — the next flush (reconnect or next
+        // app open) will retry it.
+      }
+    }
+
+    flushPendingWrites()
+    return () => { cancelled = true }
+  }, [isOnline])
 
   // Shared add/remove step (Phase 7) — the only place toggleDrug/
   // toggleCondition actually mutate favourites once a user is present.
