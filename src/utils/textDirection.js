@@ -36,3 +36,71 @@ export function getTextDirection(text) {
 
   return 'ltr'
 }
+
+/**
+ * Same first-strong-character scan as getTextDirection, but returns null
+ * for a word with no strong character of its own (pure numbers,
+ * punctuation, emoji, or whitespace) instead of defaulting to 'ltr'.
+ * splitIntoDirectionalRuns needs that null case to know when a word
+ * should just tag along with whichever chunk it's sitting next to,
+ * rather than force-starting a new left-to-right chunk.
+ */
+function detectStrongDirection(word) {
+  for (const char of word) {
+    if (RTL_CHAR_RANGE.test(char)) return 'rtl'
+    if (LTR_CHAR_RANGE.test(char)) return 'ltr'
+  }
+  return null
+}
+
+/**
+ * Splits mixed-language text into isolated chunks, one per uninterrupted
+ * run of same-direction words, so each chunk can be wrapped in its own
+ * <bdi> for display. This is what lets a saved note like
+ * "Tonsiltis بيكون في حالات شديدة" render as two isolated blocks instead
+ * of one direction fighting the other.
+ *
+ * Splitting happens strictly on whitespace boundaries — never inside a
+ * word — so a single word (e.g. "antibiotics") can never be broken into
+ * two chunks no matter which language starts the note or where a
+ * language switch happens later. Words with no strong character of their
+ * own (numbers, punctuation, emoji) attach to whichever chunk comes
+ * right before them, so they don't force an unnecessary extra chunk.
+ *
+ * Returns an array of { text, dir } objects in reading order. An empty
+ * or falsy input returns a single empty 'ltr' run so callers can map
+ * over the result unconditionally.
+ */
+export function splitIntoDirectionalRuns(text) {
+  if (!text) return [{ text: '', dir: 'ltr' }]
+
+  // Each token is one word plus any whitespace immediately after it, so
+  // re-joining every token's text in order reproduces the original
+  // string exactly (including spacing and line breaks).
+  const tokens = text.match(/\S+\s*/g) || [text]
+  const runs = []
+
+  for (const token of tokens) {
+    const dir = detectStrongDirection(token)
+
+    if (dir === null) {
+      // No strong character in this token — attach it to the previous
+      // chunk if there is one, otherwise start a neutral chunk that the
+      // next strong token's direction will effectively take over.
+      if (runs.length > 0) {
+        runs[runs.length - 1].text += token
+      } else {
+        runs.push({ text: token, dir: 'ltr' })
+      }
+      continue
+    }
+
+    if (runs.length > 0 && runs[runs.length - 1].dir === dir) {
+      runs[runs.length - 1].text += token
+    } else {
+      runs.push({ text: token, dir })
+    }
+  }
+
+  return runs
+}
