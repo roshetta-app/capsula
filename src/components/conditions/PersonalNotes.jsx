@@ -110,6 +110,14 @@ function formatRelativeTime(isoString) {
  *     row and down to the bottom-right corner under the pill, next to
  *     the Edit link — so the avatar and pill align to the top instead of
  *     the pill being pushed down by a caption row above it.
+ *   - Signed-out placeholder avatar circle now uses --color-accent-light
+ *     (the app's existing tinted-blue token, also used for
+ *     fav-sticky-header) instead of the plain page --color-bg, so it
+ *     reads as an avatar rather than an empty grey circle; its User icon
+ *     switched from tertiary grey to --color-accent to stay legible on
+ *     the tint. Every pill (loading / editing / populated / prompt) now
+ *     sits on --color-surface (white) instead of the transparent
+ *     page background, so the pill reads as its own surface.
  *
  * Props:
  *   conditionId  string
@@ -310,6 +318,7 @@ export default function PersonalNotes({ conditionId }) {
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
               boxSizing: 'border-box',
+              backgroundColor: 'var(--color-surface)',
             }}>
               <div style={{
                 width: '55%',
@@ -340,6 +349,7 @@ export default function PersonalNotes({ conditionId }) {
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
               boxSizing: 'border-box',
+              backgroundColor: 'var(--color-surface)',
               transition: 'border-color 0.15s ease',
             }}>
               <textarea
@@ -472,6 +482,7 @@ export default function PersonalNotes({ conditionId }) {
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
               boxSizing: 'border-box',
+              backgroundColor: 'var(--color-surface)',
             }}>
               <span style={{
                 fontSize: 14,
@@ -545,13 +556,13 @@ export default function PersonalNotes({ conditionId }) {
               width: AVATAR_SIZE,
               height: AVATAR_SIZE,
               borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--color-bg)',
+              backgroundColor: 'var(--color-accent-light)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
             }}>
-              <User size={16} color="var(--color-text-tertiary)" strokeWidth={1.8} />
+              <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -560,6 +571,7 @@ export default function PersonalNotes({ conditionId }) {
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
               boxSizing: 'border-box',
+              backgroundColor: 'var(--color-surface)',
             }}>
               <span style={{
                 fontSize: 14,
