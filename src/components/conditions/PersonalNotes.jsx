@@ -54,7 +54,7 @@ function formatRelativeTime(isoString) {
  *     static prompt instead of a textarea, so there's nothing that can be
  *     lost to the Google sign-in round trip.
  *
- * notes-comment-redesign (this session):
+ * notes-comment-redesign:
  *   - Saved note now renders as a social-style comment: avatar, "You",
  *     a relative "Edited …" timestamp, note text, and an inline Edit
  *     link underneath — replacing the old plain white text card with a
@@ -75,11 +75,19 @@ function formatRelativeTime(isoString) {
  *     generic-person icon fills the same circle for the signed-out
  *     prompt, since ProfileAvatar has nothing to render without a user.
  *
+ * avatar-instant-load (2026-09-04):
+ *   - While useAuth()'s sign-in check is still settling, this card used
+ *     to briefly show the signed-out prompt ("Add a note or a thought")
+ *     before flipping to the real note, even for an already-signed-in
+ *     person on a cold open. Now shows a small skeleton block instead,
+ *     gated on `loading`, in the same sized container as the prompt/
+ *     comment states so nothing jumps in height when it resolves.
+ *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
-  const { user, profile } = useAuth()
+  const { user, profile, loading } = useAuth()
   const { savedValue, updatedAt, save } = useNotes(conditionId)
   const { requestNoteSignIn } = useNotesSignInContext()
 
@@ -252,7 +260,48 @@ export default function PersonalNotes({ conditionId }) {
         ) : null}
       </div>
 
-      {isEditing ? (
+      {loading ? (
+        /* Loading skeleton — shown only while useAuth()'s sign-in check
+           is still settling, so this card doesn't flash the signed-out
+           prompt for a person who turns out to already be signed in.
+           Same container sizing as the prompt/comment states below
+           (padding, minHeight) so nothing jumps in height once it
+           resolves. */
+        <div style={{
+          backgroundColor: 'var(--color-surface)',
+          border: '1px solid var(--color-border-subtle)',
+          borderRadius: 'var(--radius-md)',
+          padding: '10px 14px',
+          minHeight: 56,
+          boxSizing: 'border-box',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+        }}>
+          <div style={{
+            width: AVATAR_SIZE,
+            height: AVATAR_SIZE,
+            borderRadius: 'var(--radius-full)',
+            backgroundColor: 'var(--color-border-subtle)',
+            flexShrink: 0,
+          }} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              width: '55%',
+              height: 12,
+              borderRadius: 'var(--radius-sm, 4px)',
+              backgroundColor: 'var(--color-border-subtle)',
+              marginBottom: 6,
+            }} />
+            <div style={{
+              width: '35%',
+              height: 10,
+              borderRadius: 'var(--radius-sm, 4px)',
+              backgroundColor: 'var(--color-border-subtle)',
+            }} />
+          </div>
+        </div>
+      ) : isEditing ? (
         <>
           {/* Card-style textarea — auto-grows to fit content, soft border
               that only accents on focus (no thick always-on outline). */}

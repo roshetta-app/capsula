@@ -13,9 +13,25 @@
  *
  * Fixed at 72px, matching what Account screen and Profile Wizard already
  * used (Edit Profile's old 64px was the outlier and now matches too).
+ *
+ * avatar-instant-load (2026-09-04) — while the real `user` prop is still
+ * resolving (AuthContext's initial check on cold open), this used to have
+ * nothing to show and rendered a blank gap that then popped in once the
+ * real prop landed. It now reads authSnapshot.js's cached snapshot
+ * synchronously as its own instant-paint fallback for that gap only —
+ * scoped to this component rather than seeding AuthContext's shared
+ * user/loading state, since that state's history (pwa-first-signin-blank-
+ * wizard, Pro-offline-cold-start rounds 1 & 2) showed it's fragile enough
+ * that a wider change there risks reintroducing race conditions already
+ * fixed once. hasSeenRealUserRef makes sure the fallback can never
+ * resurface after a genuine sign-out while this component stays mounted
+ * (e.g. tapping Sign Out on AccountScreen) — once a real user has been
+ * seen this mount, the cached photo/initials are never shown again, even
+ * if `user` goes null again afterward.
  */
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
+import { getCachedAuthSnapshot } from '../../utils/authSnapshot'
 
 // Two-letter initials from the person's full name if set ("Jelil Ajao" ->
 // "JA"), otherwise the first two letters of their email. Adopted from
@@ -49,8 +65,31 @@ export default function ProfileAvatar({ user, fullName, style }) {
   // unchanged from all three prior implementations.
   const [avatarError, setAvatarError] = useState(false)
 
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-  const initials  = getInitials(fullName, user?.email)
+  // Lazy-read once per mount — this is a snapshot for the instant-paint
+  // gap only, never re-read after mount.
+  const [cachedFallback] = useState(() => getCachedAuthSnapshot())
+
+  // Flips true the first time a real user prop is seen this mount, and
+  // never flips back. Updated during render (not an effect) — same
+  // "have we ever seen X" ref pattern already used elsewhere in this
+  // codebase (prevUserRef, pendingFavouriteRef).
+  const hasSeenRealUserRef = useRef(false)
+  if (user) {
+    hasSeenRealUserRef.current = true
+  }
+
+  // Only allowed to use the cached fallback while there's no real user
+  // yet AND a real user has never been seen this mount — this is what
+  // stops a stale cached photo from reappearing after a genuine
+  // sign-out while the component stays mounted.
+  const canUseFallback = !user && !hasSeenRealUserRef.current
+
+  const realAvatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+  const avatarUrl = realAvatarUrl || (canUseFallback ? cachedFallback?.avatarUrl : null) || null
+
+  const fallbackFullName = canUseFallback ? cachedFallback?.fullName : undefined
+  const fallbackEmail    = canUseFallback ? cachedFallback?.email    : undefined
+  const initials = getInitials(fullName ?? fallbackFullName, user?.email ?? fallbackEmail)
 
   if (avatarUrl && !avatarError) {
     return (
