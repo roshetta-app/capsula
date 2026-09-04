@@ -72,30 +72,44 @@ function formatRelativeTime(isoString) {
  *     `loading`, so an already-signed-in person doesn't see a flash of
  *     the wrong state on a cold open.
  *
- * notes-pill-redesign (this session):
- *   - Every state (loading / empty prompt / editing / saved) now shares
- *     one plain pill shape for the actual text content — a single
- *     hairline border, 18px corners, no elevated card surface behind
- *     it. The avatar and the caption/meta line (privacy note, "You" +
- *     timestamp, Cancel/Save) all sit OUTSIDE the pill now, not nested
+ * notes-pill-redesign:
+ *   - Every state (loading / empty prompt / editing / saved) shares one
+ *     plain pill shape for the actual text content — a single hairline
+ *     border, 18px corners, no elevated card surface behind it. The
+ *     avatar and the caption/meta line sit OUTSIDE the pill, not nested
  *     inside a bordered wrapper with them — the pill is just the text
  *     box, matching a plain comment-input look rather than a card.
- *   - Placeholder/prompt copy changed from "Add a note or a thought" to
- *     "Add a note or a thought…" (trailing ellipsis) per direct request
- *     — used consistently as both the empty-state pill text and the
- *     textarea's real placeholder attribute, replacing the old
- *     "Write a note..." placeholder so the two don't diverge again.
- *   - Header row no longer duplicates Cancel/Save — those live in the
- *     footer row under the pill now (with the privacy caption and
- *     Clear), so there's only one place to find them while editing. The
- *     header keeps just the static "Personal Notes" title and the
- *     "✓ Saved" flash.
+ *   - Placeholder/prompt copy is "Add a note or a thought…" (trailing
+ *     ellipsis), used consistently as both the empty-state pill text and
+ *     the textarea's real placeholder attribute.
  *
- * clear-note-saves-immediately (this session):
- *   - Confirming Clear (via ConfirmSheet) now calls save('') right away
+ * clear-note-saves-immediately:
+ *   - Confirming Clear (via ConfirmSheet) calls save('') right away
  *     instead of only clearing the in-memory draft — the confirm dialog
  *     tap IS the save intent, so a second Save tap afterward would have
  *     been redundant and confusing.
+ *
+ * notes-comment-polish (this session):
+ *   - Empty/editing/populated rows all top-align the avatar with the
+ *     pill directly (no header content pushing the pill down inside the
+ *     column), so avatar and pill line up cleanly instead of drifting
+ *     apart — the empty-state prompt row centers the avatar against the
+ *     pill instead, since that pill is the column's only content.
+ *   - Placeholder copy (both the textarea's real placeholder and the
+ *     empty-state pill text) is now a muted tertiary grey instead of
+ *     bold near-black, so it reads as a placeholder rather than content.
+ *   - Save is now a "Send" icon button living inside the pill itself,
+ *     pinned to the bottom-right corner as the textarea grows — Cancel
+ *     and Clear are the only controls left in the footer row below.
+ *   - "Visible only to you" no longer appears in the editing footer
+ *     (Clear/Cancel felt crowded with it); the privacy note now lives
+ *     once, inline next to the "Personal Notes" title, and only shows
+ *     in the empty-prompt state.
+ *   - Populated state drops the redundant "You" label (the avatar
+ *     already signals authorship) and moves "Edited …" out of the header
+ *     row and down to the bottom-right corner under the pill, next to
+ *     the Edit link — so the avatar and pill align to the top instead of
+ *     the pill being pushed down by a caption row above it.
  *
  * Props:
  *   conditionId  string
@@ -174,6 +188,7 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   function handleSave() {
+    if (!isDirty) return
     const isFirstSaveForThisCondition = !savedValue && draft
     if (isFirstSaveForThisCondition) {
       setJustPopulated(true)
@@ -203,15 +218,30 @@ export default function PersonalNotes({ conditionId }) {
     setShowConfirm(true)
   }
 
+  // Drives both the header's inline privacy caption and the row layout
+  // below — true only for the unified empty/prompt state (not while
+  // loading, editing, or showing a populated note).
+  const isPromptState = !loading && !isEditing && !(user && savedValue)
+
   return (
     <div style={{
       marginTop: 'var(--space-4)',
       borderTop: '1px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row — static title, plus the "✓ Saved" flash when not
-          editing. Cancel/Save live in the footer row under the pill now
-          (see below), not duplicated here. */}
+      {/* Scoped placeholder color — inline style attributes can't target
+          ::placeholder, so this is the one bit of real CSS in an
+          otherwise inline-styled file. */}
+      <style>{`
+        .personal-notes-textarea::placeholder {
+          color: var(--color-text-tertiary);
+          opacity: 1;
+        }
+      `}</style>
+
+      {/* Label row — static title, the privacy caption inline next to it
+          (empty-prompt state only), plus the "✓ Saved" flash when not
+          editing. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -229,6 +259,20 @@ export default function PersonalNotes({ conditionId }) {
         }}>
           Personal Notes
         </span>
+
+        {isPromptState && (
+          <span style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            fontSize: 11,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
+            Only you can see this
+          </span>
+        )}
 
         {!isEditing && savedVisible ? (
           <span style={{
@@ -252,7 +296,7 @@ export default function PersonalNotes({ conditionId }) {
            prompt for a person who turns out to already be signed in.
            Same pill shape as the other states, avatar outside, so
            nothing jumps in shape once it resolves. */
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <div style={{
             width: AVATAR_SIZE,
             height: AVATAR_SIZE,
@@ -274,14 +318,6 @@ export default function PersonalNotes({ conditionId }) {
                 backgroundColor: 'var(--color-border-subtle)',
               }} />
             </div>
-            <div style={{
-              width: '30%',
-              height: 9,
-              borderRadius: 4,
-              backgroundColor: 'var(--color-border-subtle)',
-              marginTop: 6,
-              marginLeft: 14,
-            }} />
           </div>
         </div>
       ) : isEditing ? (
@@ -292,10 +328,14 @@ export default function PersonalNotes({ conditionId }) {
             style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Pill — just the text box, auto-grows to fit content, soft
-                border that only accents on focus (no thick always-on
-                outline). */}
+            {/* Pill — text box plus an inline Send button pinned to the
+                bottom-right corner, so this reads as one comment-style
+                input rather than a text box with a separate Save
+                control living elsewhere. */}
             <div style={{
+              display: 'flex',
+              alignItems: 'flex-end',
+              gap: 8,
               border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
@@ -304,6 +344,7 @@ export default function PersonalNotes({ conditionId }) {
             }}>
               <textarea
                 ref={textareaRef}
+                className="personal-notes-textarea"
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 onFocus={() => setIsFocused(true)}
@@ -312,7 +353,8 @@ export default function PersonalNotes({ conditionId }) {
                 rows={2}
                 autoFocus
                 style={{
-                  width: '100%',
+                  flex: 1,
+                  minWidth: 0,
                   boxSizing: 'border-box',
                   fontSize: 14,
                   color: 'var(--color-text-primary)',
@@ -327,93 +369,88 @@ export default function PersonalNotes({ conditionId }) {
                   overflow: 'hidden',
                 }}
               />
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!isDirty}
+                aria-label="Send note"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  marginBottom: 2,
+                  cursor: isDirty ? 'pointer' : 'default',
+                }}
+              >
+                <Icon
+                  name="Send"
+                  size={17}
+                  color={isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
+                />
+              </button>
             </div>
 
-            {/* Footer row — privacy note on the left, Clear (only when a
-                note exists to clear) then Cancel then Save on the
-                right. All outside the pill. */}
+            {/* Footer row — Clear (only when a note exists to clear) and
+                Cancel, right-aligned. No privacy caption here anymore —
+                it lives once, inline with the title above. */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
+              justifyContent: 'flex-end',
+              gap: 14,
               marginTop: 6,
               paddingLeft: 14,
             }}>
-              <span style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-                fontSize: 11,
-                color: 'var(--color-text-tertiary)',
-                fontFamily: 'var(--font-body)',
-              }}>
-                <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-                Visible only to you
-              </span>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                {draft && (
-                  <button
-                    type="button"
-                    onClick={handleClearClick}
-                    aria-label="Clear note"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 4,
-                      fontSize: 12,
-                      fontFamily: 'var(--font-body)',
-                      color: 'var(--color-danger)',
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <Icon name="X" size={12} color="var(--color-danger)" />
-                    Clear
-                  </button>
-                )}
+              {draft && (
                 <button
                   type="button"
-                  onClick={handleCancel}
+                  onClick={handleClearClick}
+                  aria-label="Clear note"
                   style={{
-                    fontSize: 13,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 12,
                     fontFamily: 'var(--font-body)',
-                    color: 'var(--color-text-secondary)',
+                    color: 'var(--color-danger)',
                     background: 'none',
                     border: 'none',
                     padding: 0,
                     cursor: 'pointer',
                   }}
                 >
-                  Cancel
+                  <Icon name="X" size={12} color="var(--color-danger)" />
+                  Clear
                 </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={!isDirty}
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    fontFamily: 'var(--font-body)',
-                    color: isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: isDirty ? 'pointer' : 'default',
-                  }}
-                >
-                  Save
-                </button>
-              </div>
+              )}
+              <button
+                type="button"
+                onClick={handleCancel}
+                style={{
+                  fontSize: 13,
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--color-text-secondary)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       ) : user && savedValue ? (
-        /* Populated, signed in — comment-style: avatar outside, "You" +
-           relative timestamp above the pill, note text inside the pill,
-           inline Edit link below. On the very first save (empty ->
+        /* Populated, signed in — comment-style: avatar top-aligned with
+           the pill (no "You"/timestamp caption pushing it down anymore),
+           note text inside the pill, Edit link and the relative
+           timestamp sharing a footer row underneath — timestamp sits in
+           the bottom-right corner. On the very first save (empty ->
            populated) this fades/scales in; subsequent edits render at
            steady-state with no re-animation. */
         <div style={{
@@ -431,31 +468,6 @@ export default function PersonalNotes({ conditionId }) {
           />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'baseline',
-              gap: 6,
-              marginBottom: 4,
-              paddingLeft: 14,
-            }}>
-              <span style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
-                fontFamily: 'var(--font-body)',
-              }}>
-                You
-              </span>
-              {updatedAt && (
-                <span style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  {formatRelativeTime(updatedAt)}
-                </span>
-              )}
-            </div>
-            <div style={{
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
@@ -471,36 +483,54 @@ export default function PersonalNotes({ conditionId }) {
                 {savedValue}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={startEditing}
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-accent)',
-                background: 'none',
-                border: 'none',
-                padding: '6px 0 0 14px',
-                cursor: 'pointer',
-              }}
-            >
-              Edit
-            </button>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 6,
+              paddingLeft: 14,
+            }}>
+              <button
+                type="button"
+                onClick={startEditing}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 500,
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--color-accent)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                Edit
+              </button>
+              {updatedAt && (
+                <span style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  {formatRelativeTime(updatedAt)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ) : (
         /* Unified prompt state — identical whether signed out or signed
            in with no note yet. Tap routes to the sign-in sheet or
-           straight into edit mode via handlePromptTap. The sign-in ask
-           itself lives only in the bottom sheet's own copy now, not
-           duplicated here. */
+           straight into edit mode via handlePromptTap. The pill is the
+           column's only content now (the privacy caption moved up to
+           the title row), so avatar and pill are centered against each
+           other rather than top-aligned. */
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
             gap: 10,
-            alignItems: 'flex-start',
+            alignItems: 'center',
             cursor: 'pointer',
           }}
         >
@@ -533,21 +563,13 @@ export default function PersonalNotes({ conditionId }) {
             }}>
               <span style={{
                 fontSize: 14,
-                fontWeight: 600,
-                color: 'var(--color-text-primary)',
+                fontWeight: 400,
+                color: 'var(--color-text-tertiary)',
                 fontFamily: 'var(--font-body)',
               }}>
                 Add a note or a thought…
               </span>
             </div>
-            <p style={{
-              margin: '6px 0 0 14px',
-              fontSize: 12,
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
-            }}>
-              Only you can see this
-            </p>
           </div>
         </div>
       )}
