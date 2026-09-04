@@ -377,7 +377,7 @@ export default function PersonalNotes({ conditionId }) {
               minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '5px 16px',
+              padding: '8px 16px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
@@ -543,7 +543,7 @@ export default function PersonalNotes({ conditionId }) {
               minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '5px 16px',
+              padding: '8px 16px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
@@ -612,7 +612,7 @@ export default function PersonalNotes({ conditionId }) {
             minHeight: AVATAR_SIZE,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '5px 16px',
+            padding: '8px 16px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
           }}>
