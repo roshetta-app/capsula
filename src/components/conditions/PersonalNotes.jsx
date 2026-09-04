@@ -7,7 +7,7 @@ import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
-import { getTextDirection, splitIntoDirectionalRuns } from '../../utils/textDirection'
+import { getTextDirection } from '../../utils/textDirection'
 
 const AVATAR_SIZE = 32
 const PILL_RADIUS = 18
@@ -549,19 +549,27 @@ export default function PersonalNotes({ conditionId }) {
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
+              {/* Mixed-language display: rather than manually splitting the
+                  text into per-language chunks in code (fragile — proved
+                  itself buggy twice), this hands the raw saved text to the
+                  browser's own built-in bidi text engine via dir="auto" +
+                  unicode-bidi: plaintext. That's the same standard engine
+                  every browser and phone uses for this already (WhatsApp,
+                  Twitter, Gmail, etc. rely on it rather than writing their
+                  own splitter), so English/Arabic runs get positioned and
+                  wrapped correctly without any custom logic to maintain. */}
               <span
-                dir={getTextDirection(savedValue)}
+                dir="auto"
                 style={{
                   fontSize: 14,
                   lineHeight: '20px',
                   fontFamily: 'var(--font-body)',
                   whiteSpace: 'pre-wrap',
                   color: 'var(--color-text-primary)',
+                  unicodeBidi: 'plaintext',
                 }}
               >
-                {splitIntoDirectionalRuns(savedValue).map((run, i) => (
-                  <bdi key={i} dir={run.dir}>{run.text}</bdi>
-                ))}
+                {savedValue}
               </span>
             </div>
           </div>
