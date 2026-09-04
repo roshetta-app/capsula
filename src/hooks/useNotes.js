@@ -158,11 +158,21 @@ export function useNotes(conditionId) {
   const isOnlineRef = useRef(isOnline)
   useEffect(() => { isOnlineRef.current = isOnline }, [isOnline])
 
+  // notes-timestamp-race-fix: guards against a slow initial load
+  // overwriting a note that was saved WHILE that load was still in
+  // flight. Reset to false each time a fresh load starts, flipped to
+  // true by save() below — if a save lands before the load's response
+  // arrives, the load's now-stale result is discarded instead of
+  // clobbering the just-saved value/timestamp (this is what produced
+  // the "edited just now" flashing back to an old "3w ago").
+  const editedSinceLoadRef = useRef(false)
+
   // Load from the database once signed in, and whenever the signed-in
   // user or the condition being viewed changes.
   useEffect(() => {
     if (!user) return
     let cancelled = false
+    editedSinceLoadRef.current = false
 
     supabase
       .from('notes')
@@ -171,7 +181,7 @@ export function useNotes(conditionId) {
       .eq('condition_id', conditionId)
       .maybeSingle()
       .then(({ data, error }) => {
-        if (cancelled || error) return
+        if (cancelled || error || editedSinceLoadRef.current) return
         const value = data?.body ?? ''
         const ts    = data?.updated_at ?? null
         writeStorage(conditionId, value)
@@ -234,6 +244,11 @@ export function useNotes(conditionId) {
     // local write and (eventually) the database write, whether that
     // happens immediately or after sitting in the offline queue.
     const now = new Date().toISOString()
+
+    // See notes-timestamp-race-fix above: tells any still-in-flight
+    // initial load for this condition not to overwrite what we're about
+    // to write below.
+    editedSinceLoadRef.current = true
 
     writeStorage(conditionId, value)
     writeUpdatedAtStorage(conditionId, now)

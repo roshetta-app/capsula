@@ -374,7 +374,7 @@ export default function PersonalNotes({ conditionId }) {
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              minHeight: AVATAR_SIZE,
+              minHeight: AVATAR_SIZE + 2,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
               padding: '8px 16px',
@@ -540,7 +540,7 @@ export default function PersonalNotes({ conditionId }) {
               minWidth: 0,
               display: 'flex',
               alignItems: 'center',
-              minHeight: AVATAR_SIZE,
+              minHeight: AVATAR_SIZE + 2,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
               padding: '8px 16px',
@@ -560,12 +560,16 @@ export default function PersonalNotes({ conditionId }) {
           </div>
           {updatedAt && (
             <p style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              gap: 4,
               fontSize: 12,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
-              textAlign: 'right',
               margin: '6px 0 0 0',
             }}>
+              <Icon name="Clock" size={11} color="var(--color-text-tertiary)" />
               {formatRelativeTime(updatedAt)}
             </p>
           )}
@@ -609,7 +613,7 @@ export default function PersonalNotes({ conditionId }) {
             minWidth: 0,
             display: 'flex',
             alignItems: 'center',
-            minHeight: AVATAR_SIZE,
+            minHeight: AVATAR_SIZE + 2,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
             padding: '8px 16px',
