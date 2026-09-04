@@ -115,14 +115,15 @@ function formatRelativeTime(isoString) {
  *     renders at a time (Saved flash takes priority right after a
  *     save/clear, then the state's normal content returns), so they
  *     never compete for the same spot.
- *   - Empty-state and populated-state pills use 8px vertical padding with
- *     a 1x line-height on their text (14px), so a single line of content
- *     totals exactly 32px (16px padding + 2px border + 14px line-height)
- *     — the same as AVATAR_SIZE — instead of the avatar and pill looking
- *     mismatched in height. This is single-line-only math: a note that
- *     wraps to multiple lines will naturally grow taller than the
- *     avatar, which is expected and fine since the avatar is top-aligned
- *     rather than centered.
+ *   - Loading, empty-state, and populated-state pills are flex rows with
+ *     alignItems: 'center' and minHeight: AVATAR_SIZE (rather than tuned
+ *     padding + line-height numbers, which turned out unreliable since
+ *     the pill's line-box height is also influenced by the container's
+ *     own inherited font metrics, not just the text span's). minHeight
+ *     pins a single line of content to exactly the avatar's height with
+ *     the text vertically centered inside; a note that wraps to multiple
+ *     lines still grows past that floor naturally, which is expected
+ *     since the avatar is top-aligned rather than centered against it.
  *   - Signed-out placeholder avatar circle now uses --color-accent-light
  *     (the app's existing tinted-blue token, also used for
  *     fav-sticky-header) instead of the plain page --color-bg, so it
@@ -183,6 +184,19 @@ export default function PersonalNotes({ conditionId }) {
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [isEditing, draft])
+
+  // Put the cursor at the end of the existing text when entering edit
+  // mode, rather than the browser's default (start of text / select-all
+  // on some platforms). Only keyed on isEditing — not draft — so this
+  // fires once on entry and never yanks the cursor back to the end
+  // while someone is actively typing or editing mid-text.
+  useLayoutEffect(() => {
+    if (!isEditing || !textareaRef.current) return
+    const el = textareaRef.current
+    const end = el.value.length
+    el.focus()
+    el.setSelectionRange(end, end)
+  }, [isEditing])
 
   // Flip the fade-in flag off shortly after it turns on, so the
   // transition plays exactly once per first-save.
@@ -275,12 +289,12 @@ export default function PersonalNotes({ conditionId }) {
         display: 'flex',
         alignItems: 'center',
         gap: 6,
-        height: 20,
-        marginBottom: 8,
+        height: 24,
+        marginBottom: 16,
       }}>
-        <Icon name="StickyNote" size={14} color="var(--color-text-primary)" />
+        <Icon name="StickyNote" size={16} color="var(--color-text-primary)" />
         <span style={{
-          fontSize: 13,
+          fontSize: 16,
           fontWeight: 700,
           letterSpacing: '0.01em',
           color: 'var(--color-text-primary)',
@@ -343,8 +357,9 @@ export default function PersonalNotes({ conditionId }) {
         /* Loading skeleton — shown only while useAuth()'s sign-in check
            is still settling, so this card doesn't flash the signed-out
            prompt for a person who turns out to already be signed in.
-           Same pill shape as the other states, avatar outside, so
-           nothing jumps in shape once it resolves. */
+           Same pill shape/height as the real empty-state pill (same
+           minHeight + centered content), so nothing resizes once it
+           resolves into that state. */
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <div style={{
             width: AVATAR_SIZE,
@@ -355,9 +370,12 @@ export default function PersonalNotes({ conditionId }) {
           }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '9px 14px',
+              padding: '4px 14px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
@@ -518,15 +536,18 @@ export default function PersonalNotes({ conditionId }) {
             <div style={{
               flex: 1,
               minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '8px 14px',
+              padding: '4px 14px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
               <span style={{
                 fontSize: 14,
-                lineHeight: 1,
+                lineHeight: 1.5,
                 fontFamily: 'var(--font-body)',
                 whiteSpace: 'pre-wrap',
                 color: 'var(--color-text-primary)',
@@ -584,15 +605,17 @@ export default function PersonalNotes({ conditionId }) {
           <div style={{
             flex: 1,
             minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            minHeight: AVATAR_SIZE,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '8px 14px',
+            padding: '4px 14px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
           }}>
             <span style={{
               fontSize: 14,
-              lineHeight: 1,
               fontWeight: 400,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
