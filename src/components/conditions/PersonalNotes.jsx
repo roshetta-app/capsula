@@ -7,6 +7,7 @@ import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
+import { getTextDirection } from '../../utils/textDirection'
 
 const AVATAR_SIZE = 32
 const PILL_RADIUS = 18
@@ -421,6 +422,7 @@ export default function PersonalNotes({ conditionId }) {
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
                 placeholder="Add a note or a thought…"
+                dir={getTextDirection(draft)}
                 rows={2}
                 autoFocus
                 style={{
@@ -547,13 +549,16 @@ export default function PersonalNotes({ conditionId }) {
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
-              <span style={{
-                fontSize: 14,
-                lineHeight: '20px',
-                fontFamily: 'var(--font-body)',
-                whiteSpace: 'pre-wrap',
-                color: 'var(--color-text-primary)',
-              }}>
+              <span
+                dir={getTextDirection(savedValue)}
+                style={{
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  fontFamily: 'var(--font-body)',
+                  whiteSpace: 'pre-wrap',
+                  color: 'var(--color-text-primary)',
+                }}
+              >
                 {savedValue}
               </span>
             </div>
