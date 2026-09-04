@@ -6,31 +6,34 @@
  * shape as useFavourites.js / useRecentlyViewed.js instead of duplicating
  * the account-aware sync logic a third time inside a component.
  *
- * notes-signin-required (this session) — notes now require an account,
- * matching favourites' Phase 7 treatment:
+ * notes-signin-required — notes require an account:
  *   - save() no-ops for a signed-out call. This is a defensive backstop,
- *     not the primary gate — PersonalNotes.jsx no longer renders an
- *     editable textarea at all while signed out (see that file), so in
- *     practice save() should never be reachable without a user. Kept here
- *     anyway so this hook can't silently write a local-only note if it's
- *     ever called from somewhere that skips that UI gate.
- *   - No pending-item/localStorage-draft mechanism was added (unlike
- *     favourites' pendingFavourite) — see NotesSignInContext.jsx's header
- *     for why: nothing can be typed while signed out, so there's no draft
- *     that needs to survive the Google sign-in round trip.
- *   - Added a single-slot-per-condition offline write queue, mirroring
- *     useFavourites.js's offline-favourite-sync fix. Confirmed before this
- *     change: a failed/offline supabase.upsert here was only
- *     console.error'd, never retried — a signed-in edit made while
- *     offline could silently never reach the account. Unlike favourites'
- *     array-of-queued-writes (a list can gain two different offline
- *     additions from two devices), a note is one value per condition, so
- *     only the latest edit for a given condition ever matters — queuing a
- *     single { conditionId, body } slot per condition (keyed by
- *     userId:conditionId) is enough. Last-write-wins on reconnect: no
- *     merge logic, whichever device's queued write flushes last simply
- *     overwrites the row, an accepted trade-off for something this
- *     low-stakes.
+ *     not the primary gate — PersonalNotes.jsx doesn't render an editable
+ *     textarea at all while signed out (see that file), so in practice
+ *     save() should never be reachable without a user. Kept here anyway
+ *     so this hook can't silently write a local-only note if it's ever
+ *     called from somewhere that skips that UI gate.
+ *   - Single-slot-per-condition offline write queue, mirroring
+ *     useFavourites.js's offline-favourite-sync fix. A note is one value
+ *     per condition, so only the latest edit for a given condition ever
+ *     matters — a single { conditionId, body, updatedAt } slot per
+ *     condition (keyed by userId:conditionId) is enough. Last-write-wins
+ *     on reconnect, no merge logic.
+ *
+ * notes-comment-redesign (this session) — added updatedAt tracking, for
+ * the new "Edited 2h ago"-style relative timestamp PersonalNotes.jsx now
+ * shows under a saved note. Three parts, not just a new return value:
+ *   - Loaded alongside `body` from the 'notes' table (same select) and
+ *     returned as `updatedAt`.
+ *   - Persisted locally too (`capsula_notes_updated_${conditionId}`), same
+ *     reasoning as the note body itself — a note edited while offline
+ *     needs a timestamp to show immediately, not just once it's finished
+ *     syncing.
+ *   - Threaded through the offline write queue. A queued write now
+ *     carries the timestamp of the actual edit (captured in save() at the
+ *     moment the user saved), not the moment the queue later flushes —
+ *     otherwise a write that sits queued for an hour would show "Edited
+ *     just now" a full hour after it actually happened.
  *
  * Signed out (guest): still localStorage only, key
  * `capsula_notes_${conditionId}` — this hook itself doesn't change what a
@@ -55,7 +58,9 @@
  * its own copy of that logic.
  *
  * Returns:
- *   savedValue  string   — the current saved note ('' if none)
+ *   savedValue  string          — the current saved note ('' if none)
+ *   updatedAt   string | null   — ISO timestamp of the last save, null if
+ *                                 the note has never been saved
  *   save        (value: string) => void
  */
 
@@ -68,6 +73,10 @@ function storageKeyFor(conditionId) {
   return `capsula_notes_${conditionId}`
 }
 
+function updatedAtKeyFor(conditionId) {
+  return `capsula_notes_updated_${conditionId}`
+}
+
 function readStorage(conditionId) {
   try { return localStorage.getItem(storageKeyFor(conditionId)) ?? '' } catch { return '' }
 }
@@ -76,7 +85,21 @@ function writeStorage(conditionId, value) {
   try { localStorage.setItem(storageKeyFor(conditionId), value) } catch { /* ignore */ }
 }
 
-// ─── Pending-write queue helpers (notes-signin-required offline fix) ──────────
+function readUpdatedAtStorage(conditionId) {
+  try { return localStorage.getItem(updatedAtKeyFor(conditionId)) ?? null } catch { return null }
+}
+
+function writeUpdatedAtStorage(conditionId, isoString) {
+  try {
+    if (isoString) {
+      localStorage.setItem(updatedAtKeyFor(conditionId), isoString)
+    } else {
+      localStorage.removeItem(updatedAtKeyFor(conditionId))
+    }
+  } catch { /* ignore */ }
+}
+
+// ─── Pending-write queue helpers (offline fix) ─────────────────────────────
 // Single slot per userId:conditionId — a note is one value per condition,
 // so a later queued write for the same condition simply replaces an
 // earlier one rather than needing an array like favourites' queue.
@@ -102,9 +125,9 @@ function writePendingWrites(pending) {
   }
 }
 
-function queueWrite(userId, conditionId, body) {
+function queueWrite(userId, conditionId, body, updatedAt) {
   const pending = readPendingWrites()
-  pending[`${userId}:${conditionId}`] = { userId, conditionId, body }
+  pending[`${userId}:${conditionId}`] = { userId, conditionId, body, updatedAt }
   writePendingWrites(pending)
 }
 
@@ -117,11 +140,11 @@ function unqueueWrite(userId, conditionId) {
   }
 }
 
-function buildNoteUpsert(userId, conditionId, body) {
+function buildNoteUpsert(userId, conditionId, body, updatedAt) {
   return supabase
     .from('notes')
     .upsert(
-      { user_id: userId, condition_id: conditionId, body, updated_at: new Date().toISOString() },
+      { user_id: userId, condition_id: conditionId, body, updated_at: updatedAt },
       { onConflict: 'user_id,condition_id' }
     )
 }
@@ -130,6 +153,7 @@ export function useNotes(conditionId) {
   const { user, loading: authLoading } = useAuth()
   const { isOnline } = useOnlineStatus()
   const [savedValue, setSavedValue] = useState(() => readStorage(conditionId))
+  const [updatedAt, setUpdatedAt]   = useState(() => readUpdatedAtStorage(conditionId))
 
   const isOnlineRef = useRef(isOnline)
   useEffect(() => { isOnlineRef.current = isOnline }, [isOnline])
@@ -142,27 +166,29 @@ export function useNotes(conditionId) {
 
     supabase
       .from('notes')
-      .select('body')
+      .select('body, updated_at')
       .eq('user_id', user.id)
       .eq('condition_id', conditionId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled || error) return
         const value = data?.body ?? ''
+        const ts    = data?.updated_at ?? null
         writeStorage(conditionId, value)
+        writeUpdatedAtStorage(conditionId, ts)
         setSavedValue(value)
+        setUpdatedAt(ts)
       })
 
     return () => { cancelled = true }
   }, [user, conditionId])
 
-  // notes-signin-required offline fix — flushes anything left in the
-  // queue above. Runs whenever isOnline is true: on a genuine reconnect,
-  // and also on mount in case the app was closed before a previous
-  // session's queue got the chance to flush. Waits for authLoading too,
-  // same cold-start race reasoning as useFavourites.js's own flush effect
-  // — isOnline can already read true on the very first render, before
-  // `user` has resolved.
+  // Flushes anything left in the offline queue above. Runs whenever
+  // isOnline is true: on a genuine reconnect, and also on mount in case
+  // the app was closed before a previous session's queue got the chance
+  // to flush. Waits for authLoading too, same cold-start race reasoning
+  // as useFavourites.js's own flush effect — isOnline can already read
+  // true on the very first render, before `user` has resolved.
   useEffect(() => {
     if (!isOnline || authLoading) return
     let cancelled = false
@@ -171,7 +197,7 @@ export function useNotes(conditionId) {
       const pending = readPendingWrites()
       for (const [key, entry] of Object.entries(pending)) {
         if (cancelled) return
-        const { error } = await buildNoteUpsert(entry.userId, entry.conditionId, entry.body)
+        const { error } = await buildNoteUpsert(entry.userId, entry.conditionId, entry.body, entry.updatedAt)
         if (cancelled) return
         if (!error) {
           const current = readPendingWrites()
@@ -185,7 +211,9 @@ export function useNotes(conditionId) {
           // so self-heal here in case this flush wins the race.
           if (entry.userId === user?.id && entry.conditionId === conditionId) {
             writeStorage(conditionId, entry.body)
+            writeUpdatedAtStorage(conditionId, entry.updatedAt)
             setSavedValue(entry.body)
+            setUpdatedAt(entry.updatedAt)
           }
         }
         // On error, leave it queued — the next flush (reconnect or next
@@ -202,25 +230,32 @@ export function useNotes(conditionId) {
     // offers a way to reach this without a signed-in user.
     if (!user) return
 
+    // Captured once, at the moment of the actual edit — used for both the
+    // local write and (eventually) the database write, whether that
+    // happens immediately or after sitting in the offline queue.
+    const now = new Date().toISOString()
+
     writeStorage(conditionId, value)
+    writeUpdatedAtStorage(conditionId, now)
     setSavedValue(value)
+    setUpdatedAt(now)
 
     const userId = user.id
 
     if (!isOnlineRef.current) {
-      queueWrite(userId, conditionId, value)
+      queueWrite(userId, conditionId, value, now)
       return
     }
 
-    buildNoteUpsert(userId, conditionId, value).then(({ error }) => {
+    buildNoteUpsert(userId, conditionId, value, now).then(({ error }) => {
       if (error) {
         console.error('Failed to sync note:', error)
-        queueWrite(userId, conditionId, value)
+        queueWrite(userId, conditionId, value, now)
       } else {
         unqueueWrite(userId, conditionId)
       }
     })
   }, [user, conditionId])
 
-  return { savedValue, save }
+  return { savedValue, updatedAt, save }
 }

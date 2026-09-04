@@ -1,10 +1,35 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { User } from 'lucide-react'
 import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
+import ProfileAvatar from '../ui/ProfileAvatar'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
+
+const AVATAR_SIZE = 32
+
+// Small, single-purpose relative-time formatter for the "Edited …" line
+// below a saved note. Kept local to this file rather than a new shared
+// utils/ helper — checked project_tree.md's utils/ folder first and
+// nothing else in the app currently needs relative-time formatting, so a
+// new shared utility would be introducing a pattern nothing else asked
+// for. If a second consumer shows up later, this is the one to promote.
+function formatRelativeTime(isoString) {
+  if (!isoString) return null
+  const diffMs = Date.now() - new Date(isoString).getTime()
+  const minutes = Math.floor(diffMs / 60000)
+  if (minutes < 1)  return 'Edited just now'
+  if (minutes < 60) return `Edited ${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Edited ${hours}h ago`
+  const days = Math.floor(hours / 24)
+  if (days < 7) return `Edited ${days}d ago`
+  const weeks = Math.floor(days / 7)
+  if (weeks < 4) return `Edited ${weeks}w ago`
+  return `Edited on ${new Date(isoString).toLocaleDateString()}`
+}
 
 /**
  * PersonalNotes — personal note for a condition (Phase 3.5).
@@ -14,100 +39,48 @@ import { useNotesSignInContext } from '../../context/NotesSignInContext'
  * sticky-note widget. Read-mode card (white surface + 1px border +
  * radius-md) reuses the edit textarea's own border/radius scheme.
  *
- * Refinement pass: further decluttered to feel quieter and lighter
- * (closer to Apple Notes than a web form) —
- *   - Empty state collapsed to a single compact line ('No notes yet ·
- *     Add note'), no icons or explanatory copy — the section title
- *     already communicates this is a notes area.
- *   - Privacy note moved to an edit-mode-only footer line; no longer
- *     shown permanently in the empty state.
- *   - Saved indicator fully unmounts (not just fades to opacity 0) once
- *     its transition completes, so afterwards only Edit occupies that
- *     row. Fade timer shortened to 1.5s per spec.
- *   - Textarea shrunk to a 3-4 line default (rows=3, minHeight 80).
- *   - Focused textarea border uses a muted color-mix instead of the full
- *     accent color, avoiding a "thick blue outline" feel.
- *   - Clear is now fully hidden (not just disabled) until a draft exists,
- *     and stays confirm()-gated.
- *   - Read-mode card padding trimmed so it hugs short notes instead of
- *     leaving empty space.
- *
- * Final polish pass:
- *   - Clear confirmation now uses an in-app ConfirmSheet instead of the
- *     native window.confirm() dialog, matching the app's own visual
- *     language and destructive-action styling (real --color-danger
- *     token, not a placeholder fallback).
- *   - Empty state now sits inside a subtly tinted, bordered card instead
- *     of bare text, giving it a visible boundary while staying compact
- *     (no icons/illustrations added).
- *   - Saving the very first note (empty -> populated) triggers a brief
- *     CSS opacity/transform fade-in on the card. Subsequent edits to an
- *     already-populated note do not re-trigger it.
- *
- * Minor fixes pass:
- *   - Privacy icon added before the "Saved to this device only" label.
- *   - Clear button restyled red (--color-danger) to read as destructive.
- *   - Saved flash moved out of the card's own footer (where its
- *     mount/unmount was shifting the card's height) into the label row's
- *     right-hand slot — the same slot Edit normally occupies, so Saved
- *     swaps in over Edit and swaps back to Edit on fade-out, with no
- *     layout shift.
- *   - Display-mode card now shares the edit textarea's minHeight (88)
- *     and padding, so a one-line note no longer collapses to a tiny box
- *     and toggling between display/edit doesn't visibly resize.
- *
- * Icon collision fix:
- *   - Privacy-line icon swapped Shield → Lock. The page's clinical
- *     disclaimer footer also uses a Shield icon, so the two were reading
- *     as the same visual element in two unrelated places on the same
- *     screen. Lock better matches "saved to this device only" (local
- *     storage / privacy) and is now visually distinct from the footer.
- *
- * Final polish pass (v2):
- *   - Empty state redesigned: compact (minHeight 56 vs prior open-ended
- *     height), vertically centered, CTA-first hierarchy ("+ Add your
- *     first note" primary / "Saved only on this device" secondary —
- *     echoes the edit-mode privacy line instead of introducing new copy).
- *   - Saved-state card border switched to --color-border-subtle (softer,
- *     matches the app's general card border weight) and bottom padding
- *     increased for more breathing room under the note text.
- *   - Label row items given lineHeight: 1 so title and Edit sit on the
- *     same baseline.
- *   - Edit-mode helper text pulled closer to the textarea (marginTop
- *     6 -> 4) so it reads as part of the editor, not a floating line.
- *   - Delete-confirmation copy simplified to "This action can't be
- *     undone."
+ * [...earlier redesign/polish pass notes retained from prior versions of
+ * this file — see git history for the full sequence of visual-only
+ * refinements that predate the account-gating and comment-style work
+ * below.]
  *
  * Phase F3 — Personal Data Migration:
  *   - Storage moved out of this component into useNotes.js, which adds
- *     account-aware syncing (D1) — signed out still behaves exactly as
- *     before (localStorage only), signed in now also backs up to the
- *     user's account and clears the local copy on sign-out. Nothing
- *     about the UI, layout, or copy in this file changed.
+ *     account-aware syncing (D1).
  *
- * notes-signin-required (this session):
- *   - Notes now require an account, matching favourites' Phase 7
- *     treatment. Replaces the old "sign in nudge fires after your first
- *     guest note" flow entirely — signing in is now required up front,
- *     at the point of saving, not suggested afterward.
- *   - The empty state's editable textarea is gone for a signed-out user.
- *     In its place: a static "Sign in to add a note" prompt that opens
- *     the sign-in sheet directly (via requestNoteSignIn). There is
- *     nothing to type and therefore nothing that can be lost to the
- *     Google sign-in round trip — once sign-in completes, this renders
- *     exactly like any other signed-in user's first, empty, editable
- *     note.
- *   - markNoteSaved()/NotesActivityContext usage removed — that
- *     mechanism only existed to power the old after-the-fact nudge,
- *     which no longer applies now that sign-in is required up front. See
- *     NotesSignInContext.jsx.
+ * notes-signin-required:
+ *   - Notes require an account, matching favourites' Phase 7 treatment.
+ *     A signed-out user can't type a draft at all — the empty state is a
+ *     static prompt instead of a textarea, so there's nothing that can be
+ *     lost to the Google sign-in round trip.
+ *
+ * notes-comment-redesign (this session):
+ *   - Saved note now renders as a social-style comment: avatar, "You",
+ *     a relative "Edited …" timestamp, note text, and an inline Edit
+ *     link underneath — replacing the old plain white text card with a
+ *     separate header-row Edit button.
+ *   - The header-row Edit button is gone — Edit now lives inline under
+ *     the note text, so there is only ever one Edit affordance on screen
+ *     at a time. The "✓ Saved" flash keeps its old spot in the header
+ *     row, which no longer collides with anything there.
+ *   - Signed-out and signed-in-empty states are now visually identical
+ *     (avatar + "Add a note or a thought" / "Only you can see this"),
+ *     rather than two differently-worded prompts. Tapping either opens
+ *     the sign-in sheet if signed out, or drops straight into edit mode
+ *     if already signed in — the sign-in ask itself now lives only in
+ *     the bottom sheet's own copy (see AccountSheet.jsx's noteContext),
+ *     not duplicated here in the card.
+ *   - Avatar reuses the shared ProfileAvatar component (sized down to
+ *     32px via its style-override prop) for a signed-in user; a plain
+ *     generic-person icon fills the same circle for the signed-out
+ *     prompt, since ProfileAvatar has nothing to render without a user.
  *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
-  const { user } = useAuth()
-  const { savedValue, save } = useNotes(conditionId)
+  const { user, profile } = useAuth()
+  const { savedValue, updatedAt, save } = useNotes(conditionId)
   const { requestNoteSignIn } = useNotesSignInContext()
 
   const [draft, setDraft] = useState(savedValue)
@@ -140,8 +113,7 @@ export default function PersonalNotes({ conditionId }) {
     fadeOutRef.current = setTimeout(() => {
       setSavedVisible('out')
       // Unmount after the opacity transition finishes, so the indicator
-      // doesn't linger as an invisible-but-present flex item — afterwards
-      // only the Edit action should occupy this row.
+      // doesn't linger as an invisible-but-present flex item.
       fadeOutRef.current = setTimeout(() => setSavedVisible(null), 400)
     }, 1500)
   }, [])
@@ -166,6 +138,17 @@ export default function PersonalNotes({ conditionId }) {
   function startEditing() {
     setDraft(savedValue)
     setIsEditing(true)
+  }
+
+  // Unified empty/prompt-state tap handler — signed in drops straight
+  // into edit mode; signed out opens the sign-in sheet instead. The
+  // sign-in ask itself lives only in that sheet's copy now, not here.
+  function handlePromptTap() {
+    if (user) {
+      startEditing()
+    } else {
+      requestNoteSignIn(conditionId)
+    }
   }
 
   function handleSave() {
@@ -199,8 +182,7 @@ export default function PersonalNotes({ conditionId }) {
     }}>
       {/* Label row — section-title styled to match SectionHeader's label
           elsewhere on this page; right slot holds Cancel/Save while
-          editing, nothing extra while displaying (Edit lives on the card
-          itself, Saved lives on the card's own footer). */}
+          editing, the "✓ Saved" flash otherwise, nothing else. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -255,9 +237,6 @@ export default function PersonalNotes({ conditionId }) {
             </button>
           </div>
         ) : savedVisible ? (
-          /* Saved flash occupies the exact slot Edit lives in, so it
-             swaps in/out in place instead of appearing on a separate
-             line that changes the card's height. */
           <span style={{
             marginLeft: 'auto',
             fontSize: 12,
@@ -270,66 +249,10 @@ export default function PersonalNotes({ conditionId }) {
           }}>
             ✓ Saved
           </span>
-        ) : user && savedValue ? (
-          <button
-            type="button"
-            onClick={startEditing}
-            style={{
-              marginLeft: 'auto',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 12,
-              fontWeight: 500,
-              fontFamily: 'var(--font-body)',
-              lineHeight: 1,
-              color: 'var(--color-accent)',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              cursor: 'pointer',
-            }}
-          >
-            <Icon name="Pencil" size={12} color="var(--color-accent)" />
-            Edit
-          </button>
         ) : null}
       </div>
 
-      {!user ? (
-        /* notes-signin-required — signed-out state. No textarea, nothing
-           to type or lose: a static prompt that opens the sign-in sheet
-           directly. Same tinted/bordered card the guest empty state used
-           to use, so this still reads as a single, familiar tappable
-           area. */
-        <div
-          onClick={() => requestNoteSignIn(conditionId)}
-          style={{
-            backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            padding: '12px 14px',
-            minHeight: 56,
-            boxSizing: 'border-box',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            gap: 2,
-            cursor: 'pointer',
-          }}
-        >
-          <span style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--color-accent)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            Sign in to add a note
-          </span>
-        </div>
-      ) : isEditing ? (
+      {isEditing ? (
         <>
           {/* Card-style textarea — auto-grows to fit content, soft border
               that only accents on focus (no thick always-on outline). */}
@@ -362,9 +285,9 @@ export default function PersonalNotes({ conditionId }) {
             }}
           />
 
-          {/* Footer row — privacy note (edit-mode only, never shown in
-              read/empty state) on the left, Clear on the right, only when
-              a note actually exists to clear. */}
+          {/* Footer row — privacy note (edit-mode only) on the left,
+              Clear on the right, only when a note actually exists to
+              clear. */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -380,7 +303,7 @@ export default function PersonalNotes({ conditionId }) {
               fontFamily: 'var(--font-body)',
             }}>
               <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-              Saved to this device only
+              Visible only to you
             </span>
 
             {draft && (
@@ -407,72 +330,141 @@ export default function PersonalNotes({ conditionId }) {
             )}
           </div>
         </>
-      ) : savedValue ? (
-        /* Display state — white surface, subtle border, radius-md — same
-           border/radius language as the edit textarea, so this reads as
-           one continuous surface rather than a separate widget. On the
-           very first save (empty -> populated) this fades/scales in;
+      ) : user && savedValue ? (
+        /* Populated, signed in — comment-style card: avatar, "You" +
+           relative timestamp, note text, inline Edit link. On the very
+           first save (empty -> populated) this fades/scales in;
            subsequent edits render at steady-state with no re-animation. */
         <div style={{
           backgroundColor: 'var(--color-surface)',
           border: '1px solid var(--color-border-subtle)',
           borderRadius: 'var(--radius-md)',
-          padding: '10px 12px 16px',
-          minHeight: 88,
+          padding: '12px 14px',
           boxSizing: 'border-box',
           opacity: justPopulated ? 0 : 1,
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
+          display: 'flex',
+          gap: 10,
         }}>
-          <p style={{
-            margin: 0,
-            fontSize: 14,
-            lineHeight: 1.65,
-            fontFamily: 'var(--font-body)',
-            whiteSpace: 'pre-wrap',
-            color: 'var(--color-text-primary)',
-          }}>
-            {savedValue}
-          </p>
+          <ProfileAvatar
+            user={user}
+            fullName={profile?.fullName}
+            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
+          />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: 6,
+              marginBottom: 2,
+            }}>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-body)',
+              }}>
+                You
+              </span>
+              {updatedAt && (
+                <span style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  {formatRelativeTime(updatedAt)}
+                </span>
+              )}
+            </div>
+            <p style={{
+              margin: '0 0 6px',
+              fontSize: 14,
+              lineHeight: 1.65,
+              fontFamily: 'var(--font-body)',
+              whiteSpace: 'pre-wrap',
+              color: 'var(--color-text-primary)',
+            }}>
+              {savedValue}
+            </p>
+            <button
+              type="button"
+              onClick={startEditing}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                color: 'var(--color-accent)',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+          </div>
         </div>
       ) : (
-        /* Empty state (signed in, no note yet) — tinted, bordered card
-           (subtle blue tint over surface) so it reads as a distinct
-           tappable area instead of bare text, while staying compact — no
-           icons, no illustrations. */
+        /* Unified prompt state — identical whether signed out or signed
+           in with no note yet. Tap routes to the sign-in sheet or
+           straight into edit mode via handlePromptTap. The sign-in ask
+           itself lives only in the bottom sheet's own copy now, not
+           duplicated here. */
         <div
-          onClick={startEditing}
+          onClick={handlePromptTap}
           style={{
             backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
             border: '1px solid var(--color-border)',
             borderRadius: 'var(--radius-md)',
-            padding: '12px 14px',
+            padding: '10px 14px',
             minHeight: 56,
             boxSizing: 'border-box',
             display: 'flex',
-            flexDirection: 'column',
             alignItems: 'center',
-            justifyContent: 'center',
-            textAlign: 'center',
-            gap: 2,
+            gap: 10,
             cursor: 'pointer',
           }}
         >
-          <span style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--color-accent)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            + Add your first note
-          </span>
-          <span style={{
-            fontSize: 11,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            Saved only on this device
-          </span>
+          {user ? (
+            <ProfileAvatar
+              user={user}
+              fullName={profile?.fullName}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
+            />
+          ) : (
+            <div style={{
+              width: AVATAR_SIZE,
+              height: AVATAR_SIZE,
+              borderRadius: 'var(--radius-full)',
+              backgroundColor: 'var(--color-bg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <User size={16} color="var(--color-text-tertiary)" strokeWidth={1.8} />
+            </div>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <p style={{
+              margin: 0,
+              fontSize: 14,
+              fontWeight: 600,
+              color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              Add a note or a thought
+            </p>
+            <p style={{
+              margin: 0,
+              fontSize: 12,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              Only you can see this
+            </p>
+          </div>
         </div>
       )}
 
