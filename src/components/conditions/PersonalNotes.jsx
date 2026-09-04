@@ -103,19 +103,20 @@ function formatRelativeTime(isoString) {
  *     and Clear are the only controls left in the footer row below.
  *   - "Visible only to you" no longer appears in the editing footer
  *     (Clear/Cancel felt crowded with it); the privacy note now lives
- *     in a corner slot beside the pill (see below), and only shows in
- *     the empty-prompt state.
+ *     inline in the header row next to the title (see below).
  *   - Populated state drops the redundant "You" label (the avatar
  *     already signals authorship) and moves "Edited …" out of the header
  *     row and down to a plain line under the pill, so the avatar and
  *     pill align to the top instead of the pill being pushed down by a
  *     caption row above it.
- *   - notes-corner-slot: "Only you can see this" (empty state), "Edit"
- *     (populated state), and the "✓ Saved" flash all share ONE slot —
- *     top-right, directly above the pill, never in the header. Only one
- *     of them ever renders at a time (Saved flash takes priority right
- *     after a save/clear, then the state's normal content returns), so
- *     they never compete for the same spot.
+ *   - notes-header-inline: "Only you can see this" (empty state),
+ *     "Edit" (populated state), and the "✓ Saved" flash all share ONE
+ *     slot — inline on the same row as the "Personal Notes" title,
+ *     right-aligned, matching the app's other top corner elements
+ *     rather than sitting in a row of their own. Only one of them ever
+ *     renders at a time (Saved flash takes priority right after a
+ *     save/clear, then the state's normal content returns), so they
+ *     never compete for the same spot.
  *   - Signed-out placeholder avatar circle now uses --color-accent-light
  *     (the app's existing tinted-blue token, also used for
  *     fav-sticky-header) instead of the plain page --color-bg, so it
@@ -232,6 +233,14 @@ export default function PersonalNotes({ conditionId }) {
     setShowConfirm(true)
   }
 
+  // Drives the header row's right-hand slot — true for every state
+  // except loading and editing (neither has anything to show up there).
+  // What actually renders inside the slot depends on which state it is:
+  // the "✓ Saved" flash takes priority right after a save/clear, then
+  // falls back to "Edit" (populated state) or the privacy caption
+  // (empty/prompt state) — see the header row JSX below.
+  const showHeaderCorner = !loading && !isEditing
+
   return (
     <div style={{
       marginTop: 'var(--space-4)',
@@ -248,10 +257,11 @@ export default function PersonalNotes({ conditionId }) {
         }
       `}</style>
 
-      {/* Label row — just the static title now. The privacy caption,
-          "Edit" link, and "✓ Saved" flash all moved to a shared corner
-          slot beside the pill itself (see each state below) instead of
-          living here. */}
+      {/* Label row — title on the left; privacy caption (empty-prompt
+          state), "Edit" (populated state), or the "✓ Saved" flash sits
+          on the right of this same row — all three share one inline
+          slot here, same as every other top corner element, rather than
+          "Edit" living in a separate row of its own below. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -269,6 +279,54 @@ export default function PersonalNotes({ conditionId }) {
         }}>
           Personal Notes
         </span>
+
+        {showHeaderCorner && (
+          savedVisible ? (
+            <span style={{
+              marginLeft: 'auto',
+              fontSize: 11,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              opacity: savedVisible === 'in' ? 1 : 0,
+              transition: savedVisible === 'in'
+                ? 'opacity 0.2s ease'
+                : 'opacity 0.4s ease',
+            }}>
+              ✓ Saved
+            </span>
+          ) : user && savedValue ? (
+            <button
+              type="button"
+              onClick={startEditing}
+              style={{
+                marginLeft: 'auto',
+                fontSize: 12,
+                fontWeight: 500,
+                fontFamily: 'var(--font-body)',
+                color: 'var(--color-accent)',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+              }}
+            >
+              Edit
+            </button>
+          ) : (
+            <span style={{
+              marginLeft: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              fontSize: 11,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
+              Only you can see this
+            </span>
+          )
+        )}
       </div>
 
       {loading ? (
@@ -429,60 +487,29 @@ export default function PersonalNotes({ conditionId }) {
           </div>
         </div>
       ) : user && savedValue ? (
-        /* Populated, signed in — comment-style: avatar top-aligned with
-           the pill. The corner slot above the pill holds "Edit" in
-           steady state, or the "✓ Saved" flash right after a save —
-           never both, so they don't fight for the same spot. The
-           relative timestamp is a plain line under the pill. On the
-           very first save (empty -> populated) this fades/scales in;
-           subsequent edits render at steady-state with no re-animation. */
+        /* Populated, signed in — comment-style. Edit/Saved now live in
+           the header row above, so this row only ever contains the
+           avatar and the pill and can center them against each other —
+           a short, one-line note (pill ~41px) no longer looks
+           mismatched against the 32px avatar the way top-aligning them
+           did when a corner row used to sit inside this same flex row.
+           On the very first save (empty -> populated) the whole block
+           fades/scales in; subsequent edits render at steady-state with
+           no re-animation. */
         <div style={{
-          display: 'flex',
-          gap: 10,
-          alignItems: 'flex-start',
           opacity: justPopulated ? 0 : 1,
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
-          <ProfileAvatar
-            user={user}
-            fullName={profile?.fullName}
-            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-              {savedVisible ? (
-                <span style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                  opacity: savedVisible === 'in' ? 1 : 0,
-                  transition: savedVisible === 'in'
-                    ? 'opacity 0.2s ease'
-                    : 'opacity 0.4s ease',
-                }}>
-                  ✓ Saved
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={startEditing}
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 500,
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--color-accent)',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Edit
-                </button>
-              )}
-            </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <ProfileAvatar
+              user={user}
+              fullName={profile?.fullName}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
+            />
             <div style={{
+              flex: 1,
+              minWidth: 0,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
               padding: '9px 14px',
@@ -499,30 +526,31 @@ export default function PersonalNotes({ conditionId }) {
                 {savedValue}
               </span>
             </div>
-            {updatedAt && (
-              <p style={{
-                fontSize: 12,
-                color: 'var(--color-text-tertiary)',
-                fontFamily: 'var(--font-body)',
-                margin: '6px 0 0 14px',
-              }}>
-                {formatRelativeTime(updatedAt)}
-              </p>
-            )}
           </div>
+          {updatedAt && (
+            <p style={{
+              fontSize: 12,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
+              margin: `6px 0 0 ${AVATAR_SIZE + 10 + 14}px`,
+            }}>
+              {formatRelativeTime(updatedAt)}
+            </p>
+          )}
         </div>
       ) : (
         /* Unified prompt state — identical whether signed out or signed
            in with no note yet. Tap routes to the sign-in sheet or
-           straight into edit mode via handlePromptTap. Corner slot above
-           the pill holds "Only you can see this" in steady state, or the
-           "✓ Saved" flash right after clearing a note back to empty. */
+           straight into edit mode via handlePromptTap. The pill is the
+           column's only content (privacy caption lives in the header
+           row above), so avatar and pill are centered against each
+           other. */
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
             gap: 10,
-            alignItems: 'flex-start',
+            alignItems: 'center',
             cursor: 'pointer',
           }}
         >
@@ -546,50 +574,23 @@ export default function PersonalNotes({ conditionId }) {
               <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
-              {savedVisible ? (
-                <span style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                  opacity: savedVisible === 'in' ? 1 : 0,
-                  transition: savedVisible === 'in'
-                    ? 'opacity 0.2s ease'
-                    : 'opacity 0.4s ease',
-                }}>
-                  ✓ Saved
-                </span>
-              ) : (
-                <span style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 11,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-                  Only you can see this
-                </span>
-              )}
-            </div>
-            <div style={{
-              border: '1px solid var(--color-border)',
-              borderRadius: PILL_RADIUS,
-              padding: '9px 14px',
-              boxSizing: 'border-box',
-              backgroundColor: 'var(--color-surface)',
+          <div style={{
+            flex: 1,
+            minWidth: 0,
+            border: '1px solid var(--color-border)',
+            borderRadius: PILL_RADIUS,
+            padding: '9px 14px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-surface)',
+          }}>
+            <span style={{
+              fontSize: 14,
+              fontWeight: 400,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
             }}>
-              <span style={{
-                fontSize: 14,
-                fontWeight: 400,
-                color: 'var(--color-text-tertiary)',
-                fontFamily: 'var(--font-body)',
-              }}>
-                Add a note or a thought…
-              </span>
-            </div>
+              Add a note or a thought…
+            </span>
           </div>
         </div>
       )}
