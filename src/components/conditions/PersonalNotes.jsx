@@ -90,11 +90,9 @@ function formatRelativeTime(isoString) {
  *     been redundant and confusing.
  *
  * notes-comment-polish (this session):
- *   - Empty/editing/populated rows all top-align the avatar with the
- *     pill directly (no header content pushing the pill down inside the
- *     column), so avatar and pill line up cleanly instead of drifting
- *     apart — the empty-state prompt row centers the avatar against the
- *     pill instead, since that pill is the column's only content.
+ *   - Avatar is always top-aligned with the pill (loading / editing /
+ *     populated / prompt), never vertically centered against it, so a
+ *     short one-line pill doesn't look mismatched next to the avatar.
  *   - Placeholder copy (both the textarea's real placeholder and the
  *     empty-state pill text) is now a muted tertiary grey instead of
  *     bold near-black, so it reads as a placeholder rather than content.
@@ -261,11 +259,15 @@ export default function PersonalNotes({ conditionId }) {
           state), "Edit" (populated state), or the "✓ Saved" flash sits
           on the right of this same row — all three share one inline
           slot here, same as every other top corner element, rather than
-          "Edit" living in a separate row of its own below. */}
+          "Edit" living in a separate row of its own below. Fixed height
+          (rather than letting the row size itself to whichever text is
+          showing) keeps the row from growing or shrinking a few pixels
+          as the right-hand content swaps between states. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         gap: 6,
+        height: 20,
         marginBottom: 8,
       }}>
         <Icon name="StickyNote" size={14} color="var(--color-text-primary)" />
@@ -335,7 +337,7 @@ export default function PersonalNotes({ conditionId }) {
            prompt for a person who turns out to already be signed in.
            Same pill shape as the other states, avatar outside, so
            nothing jumps in shape once it resolves. */
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <div style={{
             width: AVATAR_SIZE,
             height: AVATAR_SIZE,
@@ -435,18 +437,19 @@ export default function PersonalNotes({ conditionId }) {
               </button>
             </div>
 
-            {/* Footer row — Clear (only when a note exists to clear) and
-                Cancel, right-aligned. No privacy caption here anymore —
-                it lives once, inline with the title above. */}
+            {/* Footer row — Clear (only when a note exists to clear) on
+                the left, right under the textbox; Cancel on the right.
+                paddingLeft matches the pill's own inner text padding so
+                Clear lines up under the textbox, not under the avatar
+                in the row above. */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 14,
+              justifyContent: 'space-between',
               marginTop: 6,
               paddingLeft: 14,
             }}>
-              {draft && (
+              {draft ? (
                 <button
                   type="button"
                   onClick={handleClearClick}
@@ -467,7 +470,7 @@ export default function PersonalNotes({ conditionId }) {
                   <Icon name="X" size={12} color="var(--color-danger)" />
                   Clear
                 </button>
-              )}
+              ) : <span />}
               <button
                 type="button"
                 onClick={handleCancel}
@@ -489,11 +492,8 @@ export default function PersonalNotes({ conditionId }) {
       ) : user && savedValue ? (
         /* Populated, signed in — comment-style. Edit/Saved now live in
            the header row above, so this row only ever contains the
-           avatar and the pill and can center them against each other —
-           a short, one-line note (pill ~41px) no longer looks
-           mismatched against the 32px avatar the way top-aligning them
-           did when a corner row used to sit inside this same flex row.
-           On the very first save (empty -> populated) the whole block
+           avatar and the pill, top-aligned against each other. On the
+           very first save (empty -> populated) the whole block
            fades/scales in; subsequent edits render at steady-state with
            no re-animation. */
         <div style={{
@@ -501,7 +501,7 @@ export default function PersonalNotes({ conditionId }) {
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             <ProfileAvatar
               user={user}
               fullName={profile?.fullName}
@@ -532,7 +532,8 @@ export default function PersonalNotes({ conditionId }) {
               fontSize: 12,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
-              margin: `6px 0 0 ${AVATAR_SIZE + 10 + 14}px`,
+              textAlign: 'right',
+              margin: '6px 0 0 0',
             }}>
               {formatRelativeTime(updatedAt)}
             </p>
@@ -541,16 +542,14 @@ export default function PersonalNotes({ conditionId }) {
       ) : (
         /* Unified prompt state — identical whether signed out or signed
            in with no note yet. Tap routes to the sign-in sheet or
-           straight into edit mode via handlePromptTap. The pill is the
-           column's only content (privacy caption lives in the header
-           row above), so avatar and pill are centered against each
-           other. */
+           straight into edit mode via handlePromptTap. Avatar and pill
+           are top-aligned, same as every other state. */
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
             gap: 10,
-            alignItems: 'center',
+            alignItems: 'flex-start',
             cursor: 'pointer',
           }}
         >
