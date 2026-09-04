@@ -116,14 +116,16 @@ function formatRelativeTime(isoString) {
  *     save/clear, then the state's normal content returns), so they
  *     never compete for the same spot.
  *   - Loading, empty-state, and populated-state pills are flex rows with
- *     alignItems: 'center' and minHeight: AVATAR_SIZE (rather than tuned
- *     padding + line-height numbers, which turned out unreliable since
- *     the pill's line-box height is also influenced by the container's
- *     own inherited font metrics, not just the text span's). minHeight
- *     pins a single line of content to exactly the avatar's height with
- *     the text vertically centered inside; a note that wraps to multiple
- *     lines still grows past that floor naturally, which is expected
- *     since the avatar is top-aligned rather than centered against it.
+ *     alignItems: 'center', minHeight: AVATAR_SIZE, and an explicit
+ *     pixel line-height (20px) on their text rather than a unitless
+ *     multiplier (e.g. 1.5) — a unitless value resolves against the
+ *     custom body font's own internal metrics, which didn't reliably
+ *     produce the same pixel height as the plain avatar circle. A fixed
+ *     pixel value plus the minHeight floor pins a single line of content
+ *     to exactly the avatar's height, text vertically centered inside;
+ *     a note that wraps to multiple lines still grows past that floor
+ *     naturally (20px per extra line), which is expected since the
+ *     avatar is top-aligned rather than centered against it.
  *   - Signed-out placeholder avatar circle now uses --color-accent-light
  *     (the app's existing tinted-blue token, also used for
  *     fav-sticky-header) instead of the plain page --color-bg, so it
@@ -292,7 +294,7 @@ export default function PersonalNotes({ conditionId }) {
         height: 24,
         marginBottom: 16,
       }}>
-        <Icon name="StickyNote" size={16} color="var(--color-text-primary)" />
+        <Icon name="NotebookPen" size={16} color="var(--color-text-primary)" />
         <span style={{
           fontSize: 16,
           fontWeight: 700,
@@ -375,7 +377,7 @@ export default function PersonalNotes({ conditionId }) {
               minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '4px 14px',
+              padding: '5px 16px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
@@ -406,7 +408,7 @@ export default function PersonalNotes({ conditionId }) {
               gap: 8,
               border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
               borderRadius: PILL_RADIUS,
-              padding: '9px 14px',
+              padding: '9px 16px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
               transition: 'border-color 0.15s ease',
@@ -473,7 +475,7 @@ export default function PersonalNotes({ conditionId }) {
               alignItems: 'center',
               justifyContent: 'space-between',
               marginTop: 6,
-              paddingLeft: 14,
+              paddingLeft: 16,
             }}>
               {draft ? (
                 <button
@@ -541,13 +543,13 @@ export default function PersonalNotes({ conditionId }) {
               minHeight: AVATAR_SIZE,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '4px 14px',
+              padding: '5px 16px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
               <span style={{
                 fontSize: 14,
-                lineHeight: 1.5,
+                lineHeight: '20px',
                 fontFamily: 'var(--font-body)',
                 whiteSpace: 'pre-wrap',
                 color: 'var(--color-text-primary)',
@@ -610,12 +612,13 @@ export default function PersonalNotes({ conditionId }) {
             minHeight: AVATAR_SIZE,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '4px 14px',
+            padding: '5px 16px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
           }}>
             <span style={{
               fontSize: 14,
+              lineHeight: '20px',
               fontWeight: 400,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
