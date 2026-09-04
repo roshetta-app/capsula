@@ -9,6 +9,7 @@ import { useNotes } from '../../hooks/useNotes'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
 
 const AVATAR_SIZE = 32
+const PILL_RADIUS = 18
 
 // Small, single-purpose relative-time formatter for the "Edited …" line
 // below a saved note. Kept local to this file rather than a new shared
@@ -55,33 +56,46 @@ function formatRelativeTime(isoString) {
  *     lost to the Google sign-in round trip.
  *
  * notes-comment-redesign:
- *   - Saved note now renders as a social-style comment: avatar, "You",
- *     a relative "Edited …" timestamp, note text, and an inline Edit
- *     link underneath — replacing the old plain white text card with a
- *     separate header-row Edit button.
- *   - The header-row Edit button is gone — Edit now lives inline under
- *     the note text, so there is only ever one Edit affordance on screen
- *     at a time. The "✓ Saved" flash keeps its old spot in the header
- *     row, which no longer collides with anything there.
- *   - Signed-out and signed-in-empty states are now visually identical
- *     (avatar + "Add a note or a thought" / "Only you can see this"),
+ *   - Saved note renders as a social-style comment: avatar, "You" + a
+ *     relative "Edited …" timestamp, note text, inline Edit link.
+ *   - Signed-out and signed-in-empty states are visually identical
+ *     (avatar + "Add a note or a thought…" / "Only you can see this"),
  *     rather than two differently-worded prompts. Tapping either opens
  *     the sign-in sheet if signed out, or drops straight into edit mode
- *     if already signed in — the sign-in ask itself now lives only in
- *     the bottom sheet's own copy (see AccountSheet.jsx's noteContext),
- *     not duplicated here in the card.
- *   - Avatar reuses the shared ProfileAvatar component (sized down to
- *     32px via its style-override prop) for a signed-in user; a plain
- *     generic-person icon fills the same circle for the signed-out
- *     prompt, since ProfileAvatar has nothing to render without a user.
+ *     if already signed in — the sign-in ask itself lives only in the
+ *     bottom sheet's own copy (see AccountSheet.jsx's noteContext), not
+ *     duplicated here in the card.
  *
- * avatar-instant-load (2026-09-04):
- *   - While useAuth()'s sign-in check is still settling, this card used
- *     to briefly show the signed-out prompt ("Add a note or a thought")
- *     before flipping to the real note, even for an already-signed-in
- *     person on a cold open. Now shows a small skeleton block instead,
- *     gated on `loading`, in the same sized container as the prompt/
- *     comment states so nothing jumps in height when it resolves.
+ * avatar-instant-load:
+ *   - While useAuth()'s sign-in check is still settling, shows a small
+ *     skeleton block instead of the signed-out prompt, gated on
+ *     `loading`, so an already-signed-in person doesn't see a flash of
+ *     the wrong state on a cold open.
+ *
+ * notes-pill-redesign (this session):
+ *   - Every state (loading / empty prompt / editing / saved) now shares
+ *     one plain pill shape for the actual text content — a single
+ *     hairline border, 18px corners, no elevated card surface behind
+ *     it. The avatar and the caption/meta line (privacy note, "You" +
+ *     timestamp, Cancel/Save) all sit OUTSIDE the pill now, not nested
+ *     inside a bordered wrapper with them — the pill is just the text
+ *     box, matching a plain comment-input look rather than a card.
+ *   - Placeholder/prompt copy changed from "Add a note or a thought" to
+ *     "Add a note or a thought…" (trailing ellipsis) per direct request
+ *     — used consistently as both the empty-state pill text and the
+ *     textarea's real placeholder attribute, replacing the old
+ *     "Write a note..." placeholder so the two don't diverge again.
+ *   - Header row no longer duplicates Cancel/Save — those live in the
+ *     footer row under the pill now (with the privacy caption and
+ *     Clear), so there's only one place to find them while editing. The
+ *     header keeps just the static "Personal Notes" title and the
+ *     "✓ Saved" flash.
+ *
+ * clear-note-saves-immediately (this session):
+ *   - Confirming Clear (via ConfirmSheet) now calls save('') right away
+ *     instead of only clearing the in-memory draft — the confirm dialog
+ *     tap IS the save intent, so a second Save tap afterward would have
+ *     been redundant and confusing.
  *
  * Props:
  *   conditionId  string
@@ -195,9 +209,9 @@ export default function PersonalNotes({ conditionId }) {
       borderTop: '1px solid var(--color-border)',
       paddingTop: 'var(--space-4)',
     }}>
-      {/* Label row — section-title styled to match SectionHeader's label
-          elsewhere on this page; right slot holds Cancel/Save while
-          editing, the "✓ Saved" flash otherwise, nothing else. */}
+      {/* Label row — static title, plus the "✓ Saved" flash when not
+          editing. Cancel/Save live in the footer row under the pill now
+          (see below), not duplicated here. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -216,42 +230,7 @@ export default function PersonalNotes({ conditionId }) {
           Personal Notes
         </span>
 
-        {isEditing ? (
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <button
-              type="button"
-              onClick={handleCancel}
-              style={{
-                fontSize: 13,
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-text-secondary)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={!isDirty}
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                fontFamily: 'var(--font-body)',
-                color: isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: isDirty ? 'pointer' : 'default',
-              }}
-            >
-              Save
-            </button>
-          </div>
-        ) : savedVisible ? (
+        {!isEditing && savedVisible ? (
           <span style={{
             marginLeft: 'auto',
             fontSize: 12,
@@ -271,20 +250,9 @@ export default function PersonalNotes({ conditionId }) {
         /* Loading skeleton — shown only while useAuth()'s sign-in check
            is still settling, so this card doesn't flash the signed-out
            prompt for a person who turns out to already be signed in.
-           Same container sizing as the prompt/comment states below
-           (padding, minHeight) so nothing jumps in height once it
-           resolves. */
-        <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '10px 14px',
-          minHeight: 56,
-          boxSizing: 'border-box',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}>
+           Same pill shape as the other states, avatar outside, so
+           nothing jumps in shape once it resolves. */
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <div style={{
             width: AVATAR_SIZE,
             height: AVATAR_SIZE,
@@ -294,114 +262,167 @@ export default function PersonalNotes({ conditionId }) {
           }} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
-              width: '55%',
-              height: 12,
-              borderRadius: 'var(--radius-sm, 4px)',
-              backgroundColor: 'var(--color-border-subtle)',
-              marginBottom: 6,
-            }} />
+              border: '1px solid var(--color-border)',
+              borderRadius: PILL_RADIUS,
+              padding: '9px 14px',
+              boxSizing: 'border-box',
+            }}>
+              <div style={{
+                width: '55%',
+                height: 11,
+                borderRadius: 4,
+                backgroundColor: 'var(--color-border-subtle)',
+              }} />
+            </div>
             <div style={{
-              width: '35%',
-              height: 10,
-              borderRadius: 'var(--radius-sm, 4px)',
+              width: '30%',
+              height: 9,
+              borderRadius: 4,
               backgroundColor: 'var(--color-border-subtle)',
+              marginTop: 6,
+              marginLeft: 14,
             }} />
           </div>
         </div>
       ) : isEditing ? (
-        <>
-          {/* Card-style textarea — auto-grows to fit content, soft border
-              that only accents on focus (no thick always-on outline). */}
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder="Write a note..."
-            rows={3}
-            autoFocus
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              fontSize: 14,
-              color: 'var(--color-text-primary)',
-              backgroundColor: 'var(--color-surface)',
-              border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
-              borderRadius: 'var(--radius-md)',
-              padding: '10px 12px',
-              fontFamily: 'var(--font-body)',
-              lineHeight: 1.65,
-              resize: 'none',
-              outline: 'none',
-              minHeight: 88,
-              display: 'block',
-              overflow: 'hidden',
-              transition: 'border-color 0.15s ease',
-            }}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <ProfileAvatar
+            user={user}
+            fullName={profile?.fullName}
+            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
           />
-
-          {/* Footer row — privacy note (edit-mode only) on the left,
-              Clear on the right, only when a note actually exists to
-              clear. */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: 4,
-          }}>
-            <span style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              fontSize: 11,
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Pill — just the text box, auto-grows to fit content, soft
+                border that only accents on focus (no thick always-on
+                outline). */}
+            <div style={{
+              border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
+              borderRadius: PILL_RADIUS,
+              padding: '9px 14px',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s ease',
             }}>
-              <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-              Visible only to you
-            </span>
-
-            {draft && (
-              <button
-                type="button"
-                onClick={handleClearClick}
-                aria-label="Clear note"
+              <textarea
+                ref={textareaRef}
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder="Add a note or a thought…"
+                rows={2}
+                autoFocus
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 12,
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-danger)',
-                  background: 'none',
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  fontSize: 14,
+                  color: 'var(--color-text-primary)',
+                  backgroundColor: 'transparent',
                   border: 'none',
                   padding: 0,
-                  cursor: 'pointer',
+                  fontFamily: 'var(--font-body)',
+                  lineHeight: 1.65,
+                  resize: 'none',
+                  outline: 'none',
+                  display: 'block',
+                  overflow: 'hidden',
                 }}
-              >
-                <Icon name="X" size={12} color="var(--color-danger)" />
-                Clear
-              </button>
-            )}
+              />
+            </div>
+
+            {/* Footer row — privacy note on the left, Clear (only when a
+                note exists to clear) then Cancel then Save on the
+                right. All outside the pill. */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginTop: 6,
+              paddingLeft: 14,
+            }}>
+              <span style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 11,
+                color: 'var(--color-text-tertiary)',
+                fontFamily: 'var(--font-body)',
+              }}>
+                <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
+                Visible only to you
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                {draft && (
+                  <button
+                    type="button"
+                    onClick={handleClearClick}
+                    aria-label="Clear note"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      fontSize: 12,
+                      fontFamily: 'var(--font-body)',
+                      color: 'var(--color-danger)',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Icon name="X" size={12} color="var(--color-danger)" />
+                    Clear
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  style={{
+                    fontSize: 13,
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--color-text-secondary)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={!isDirty}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    fontFamily: 'var(--font-body)',
+                    color: isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: isDirty ? 'pointer' : 'default',
+                  }}
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           </div>
-        </>
+        </div>
       ) : user && savedValue ? (
-        /* Populated, signed in — comment-style card: avatar, "You" +
-           relative timestamp, note text, inline Edit link. On the very
-           first save (empty -> populated) this fades/scales in;
-           subsequent edits render at steady-state with no re-animation. */
+        /* Populated, signed in — comment-style: avatar outside, "You" +
+           relative timestamp above the pill, note text inside the pill,
+           inline Edit link below. On the very first save (empty ->
+           populated) this fades/scales in; subsequent edits render at
+           steady-state with no re-animation. */
         <div style={{
-          backgroundColor: 'var(--color-surface)',
-          border: '1px solid var(--color-border-subtle)',
-          borderRadius: 'var(--radius-md)',
-          padding: '12px 14px',
-          boxSizing: 'border-box',
+          display: 'flex',
+          gap: 10,
+          alignItems: 'flex-start',
           opacity: justPopulated ? 0 : 1,
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
-          display: 'flex',
-          gap: 10,
         }}>
           <ProfileAvatar
             user={user}
@@ -413,7 +434,8 @@ export default function PersonalNotes({ conditionId }) {
               display: 'flex',
               alignItems: 'baseline',
               gap: 6,
-              marginBottom: 2,
+              marginBottom: 4,
+              paddingLeft: 14,
             }}>
               <span style={{
                 fontSize: 13,
@@ -433,16 +455,22 @@ export default function PersonalNotes({ conditionId }) {
                 </span>
               )}
             </div>
-            <p style={{
-              margin: '0 0 6px',
-              fontSize: 14,
-              lineHeight: 1.65,
-              fontFamily: 'var(--font-body)',
-              whiteSpace: 'pre-wrap',
-              color: 'var(--color-text-primary)',
+            <div style={{
+              border: '1px solid var(--color-border)',
+              borderRadius: PILL_RADIUS,
+              padding: '9px 14px',
+              boxSizing: 'border-box',
             }}>
-              {savedValue}
-            </p>
+              <span style={{
+                fontSize: 14,
+                lineHeight: 1.65,
+                fontFamily: 'var(--font-body)',
+                whiteSpace: 'pre-wrap',
+                color: 'var(--color-text-primary)',
+              }}>
+                {savedValue}
+              </span>
+            </div>
             <button
               type="button"
               onClick={startEditing}
@@ -453,7 +481,7 @@ export default function PersonalNotes({ conditionId }) {
                 color: 'var(--color-accent)',
                 background: 'none',
                 border: 'none',
-                padding: 0,
+                padding: '6px 0 0 14px',
                 cursor: 'pointer',
               }}
             >
@@ -470,15 +498,9 @@ export default function PersonalNotes({ conditionId }) {
         <div
           onClick={handlePromptTap}
           style={{
-            backgroundColor: 'color-mix(in srgb, var(--color-accent) 3%, var(--color-surface) 97%)',
-            border: '1px solid var(--color-border)',
-            borderRadius: 'var(--radius-md)',
-            padding: '10px 14px',
-            minHeight: 56,
-            boxSizing: 'border-box',
             display: 'flex',
-            alignItems: 'center',
             gap: 10,
+            alignItems: 'flex-start',
             cursor: 'pointer',
           }}
         >
@@ -502,18 +524,24 @@ export default function PersonalNotes({ conditionId }) {
               <User size={16} color="var(--color-text-tertiary)" strokeWidth={1.8} />
             </div>
           )}
-          <div style={{ minWidth: 0 }}>
-            <p style={{
-              margin: 0,
-              fontSize: 14,
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              fontFamily: 'var(--font-body)',
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              border: '1px solid var(--color-border)',
+              borderRadius: PILL_RADIUS,
+              padding: '9px 14px',
+              boxSizing: 'border-box',
             }}>
-              Add a note or a thought
-            </p>
+              <span style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: 'var(--color-text-primary)',
+                fontFamily: 'var(--font-body)',
+              }}>
+                Add a note or a thought…
+              </span>
+            </div>
             <p style={{
-              margin: 0,
+              margin: '6px 0 0 14px',
               fontSize: 12,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
