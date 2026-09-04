@@ -115,6 +115,14 @@ function formatRelativeTime(isoString) {
  *     renders at a time (Saved flash takes priority right after a
  *     save/clear, then the state's normal content returns), so they
  *     never compete for the same spot.
+ *   - Empty-state and populated-state pills use 8px vertical padding with
+ *     a 1x line-height on their text (14px), so a single line of content
+ *     totals exactly 32px (16px padding + 2px border + 14px line-height)
+ *     — the same as AVATAR_SIZE — instead of the avatar and pill looking
+ *     mismatched in height. This is single-line-only math: a note that
+ *     wraps to multiple lines will naturally grow taller than the
+ *     avatar, which is expected and fine since the avatar is top-aligned
+ *     rather than centered.
  *   - Signed-out placeholder avatar circle now uses --color-accent-light
  *     (the app's existing tinted-blue token, also used for
  *     fav-sticky-header) instead of the plain page --color-bg, so it
@@ -512,13 +520,13 @@ export default function PersonalNotes({ conditionId }) {
               minWidth: 0,
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
-              padding: '9px 14px',
+              padding: '8px 14px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
             }}>
               <span style={{
                 fontSize: 14,
-                lineHeight: 1.65,
+                lineHeight: 1,
                 fontFamily: 'var(--font-body)',
                 whiteSpace: 'pre-wrap',
                 color: 'var(--color-text-primary)',
@@ -578,12 +586,13 @@ export default function PersonalNotes({ conditionId }) {
             minWidth: 0,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '9px 14px',
+            padding: '8px 14px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
           }}>
             <span style={{
               fontSize: 14,
+              lineHeight: 1,
               fontWeight: 400,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
