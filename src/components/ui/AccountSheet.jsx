@@ -24,16 +24,27 @@
  * a pending favourite tap (favouriteContext, passed by SignInNudge.jsx),
  * instead of always showing the generic copy.
  *
- * notes-signin-required (this session) — added noteContext, same shape as
+ * notes-signin-required — added noteContext, same shape as
  * favouriteContext but its own copy branch. Deliberately not reusing
  * favouriteContext's "save this" framing: a favourite tap has already
  * happened by the time this sheet opens (something's mid-action), but a
  * note prompt opens before anything's been typed — there's no content yet
  * to "save this" implies. Copy here is forward-looking instead ("Sign in
- * to add a note…"). favouriteContext and noteContext are mutually
+ * to add your thoughts…"). favouriteContext and noteContext are mutually
  * exclusive in practice (SignInNudge.jsx only ever sets one at a time),
  * so favouriteContext is checked first, then noteContext, then the
  * generic default.
+ *
+ * notes-comment-redesign (this session) — both signed-out subtexts
+ * shortened to one consistent, concise line each. Dropped "with Google"
+ * and "it's free" from the favourite one — the button directly below
+ * already reads "Continue with Google", so naming it again in the
+ * sentence above was redundant. The note one lost its "saved to your
+ * account and available on any device" wording in favor of the same
+ * length/rhythm as the favourite line, so the two read as one consistent
+ * voice instead of two differently-worded asks. PersonalNotes.jsx's own
+ * card no longer asks the person to sign in at all (see that file) — this
+ * sheet's copy is now the only place that ask is made.
  *
  * Props:
  *   isOpen             boolean
@@ -53,6 +64,19 @@
  *                                 signed-out copy only, same as
  *                                 favouriteContext above. Defaults to
  *                                 false.
+ * account-sheet-close-flash fix (this session) — favouriteContext/
+ * noteContext/user are driven by state elsewhere (pendingFavourite,
+ * pendingNoteConditionId) that clears the instant the sheet is dismissed
+ * or sign-in completes — the same render that flips isOpen to false also
+ * flips these back to their defaults. But shouldRender keeps this
+ * component mounted for another 280ms after that so the close transition
+ * can play, and it kept re-rendering with those now-stale live props
+ * during that window — visible as a flash of the generic "Sign in or
+ * create account" copy behind whatever context-specific content had
+ * actually been showing, right as the sheet faded out. `display` below
+ * snapshots {user, favouriteContext, noteContext} only while isOpen is
+ * true, so the close animation always plays out on the last real state
+ * instead of whatever the props happen to become a moment later.
  */
 
 import { useEffect, useState } from 'react'
@@ -75,6 +99,19 @@ export default function AccountSheet({
   const [googlePressed, setGooglePressed] = useState(false)
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
+
+  // account-sheet-close-flash fix — see file header. Only updates while
+  // isOpen is true, so it stays live for anything that changes during a
+  // genuinely open sheet (e.g. signing in without closing first), but
+  // freezes at its last value for the entire close-transition window
+  // rather than snapping to whatever the live props become the moment
+  // dismissal starts.
+  const [display, setDisplay] = useState({ user, favouriteContext, noteContext })
+  useEffect(() => {
+    if (isOpen) {
+      setDisplay({ user, favouriteContext, noteContext })
+    }
+  }, [isOpen, user, favouriteContext, noteContext])
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual position — same
@@ -171,7 +208,7 @@ export default function AccountSheet({
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={user ? 'Account' : 'Sign in'}
+        aria-label={display.user ? 'Account' : 'Sign in'}
         style={{
           position:        'fixed',
           bottom:          0,
@@ -199,7 +236,7 @@ export default function AccountSheet({
           margin:          '0 auto var(--space-5)',
         }} />
 
-        {user ? (
+        {display.user ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{
               fontSize:     16,
@@ -216,7 +253,7 @@ export default function AccountSheet({
               color:      'var(--color-text-secondary)',
               wordBreak:  'break-word',
             }}>
-              {user.email}
+              {display.user.email}
             </p>
             <button
               onClick={handleSignOut}
@@ -252,10 +289,10 @@ export default function AccountSheet({
               color:        'var(--color-text-primary)',
               marginBottom: 'var(--space-2)',
             }}>
-              {favouriteContext
+              {display.favouriteContext
                 ? 'Save this to your Favourites'
-                : noteContext
-                  ? 'Sign in to add a note'
+                : display.noteContext
+                  ? 'Sign in to add your thoughts'
                   : 'Sign in or create account'}
             </div>
             <p style={{
@@ -264,10 +301,10 @@ export default function AccountSheet({
               lineHeight: 1.55,
               color:      'var(--color-text-secondary)',
             }}>
-              {favouriteContext
-                ? "Sign in with Google — it's free — to save it and find it anytime, on any device."
-                : noteContext
-                  ? 'Sign in with Google to write personal notes, saved to your account and available on any device.'
+              {display.favouriteContext
+                ? 'Sign in to save it and access it on any device.'
+                : display.noteContext
+                  ? 'Sign in to keep your notes private and available on every device.'
                   : 'Sync your favourites across devices with your Google account.'}
             </p>
 
