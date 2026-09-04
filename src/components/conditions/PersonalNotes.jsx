@@ -408,7 +408,7 @@ export default function PersonalNotes({ conditionId }) {
               gap: 8,
               border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
               borderRadius: PILL_RADIUS,
-              padding: '9px 16px',
+              padding: '12px 18px',
               boxSizing: 'border-box',
               backgroundColor: 'var(--color-surface)',
               transition: 'border-color 0.15s ease',
