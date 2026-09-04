@@ -175,7 +175,14 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   function handleClear() {
+    // Clearing is confirmed via ConfirmSheet before this runs — that
+    // confirmation IS the save intent, so this commits immediately
+    // instead of leaving an already-confirmed clear sitting as an
+    // unsaved draft the user would have to hit Save on again.
+    save('')
     setDraft('')
+    setIsEditing(false)
+    triggerSaved()
   }
 
   function handleClearClick() {
