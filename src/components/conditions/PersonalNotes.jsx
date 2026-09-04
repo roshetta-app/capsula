@@ -7,7 +7,7 @@ import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
-import { getTextDirection } from '../../utils/textDirection'
+import { getTextDirection, splitIntoDirectionalRuns } from '../../utils/textDirection'
 
 const AVATAR_SIZE = 32
 const PILL_RADIUS = 18
@@ -559,7 +559,9 @@ export default function PersonalNotes({ conditionId }) {
                   color: 'var(--color-text-primary)',
                 }}
               >
-                {savedValue}
+                {splitIntoDirectionalRuns(savedValue).map((run, i) => (
+                  <bdi key={i} dir={run.dir}>{run.text}</bdi>
+                ))}
               </span>
             </div>
           </div>
