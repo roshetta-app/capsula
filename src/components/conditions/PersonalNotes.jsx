@@ -103,13 +103,19 @@ function formatRelativeTime(isoString) {
  *     and Clear are the only controls left in the footer row below.
  *   - "Visible only to you" no longer appears in the editing footer
  *     (Clear/Cancel felt crowded with it); the privacy note now lives
- *     once, inline next to the "Personal Notes" title, and only shows
- *     in the empty-prompt state.
+ *     in a corner slot beside the pill (see below), and only shows in
+ *     the empty-prompt state.
  *   - Populated state drops the redundant "You" label (the avatar
  *     already signals authorship) and moves "Edited …" out of the header
- *     row and down to the bottom-right corner under the pill, next to
- *     the Edit link — so the avatar and pill align to the top instead of
- *     the pill being pushed down by a caption row above it.
+ *     row and down to a plain line under the pill, so the avatar and
+ *     pill align to the top instead of the pill being pushed down by a
+ *     caption row above it.
+ *   - notes-corner-slot: "Only you can see this" (empty state), "Edit"
+ *     (populated state), and the "✓ Saved" flash all share ONE slot —
+ *     top-right, directly above the pill, never in the header. Only one
+ *     of them ever renders at a time (Saved flash takes priority right
+ *     after a save/clear, then the state's normal content returns), so
+ *     they never compete for the same spot.
  *   - Signed-out placeholder avatar circle now uses --color-accent-light
  *     (the app's existing tinted-blue token, also used for
  *     fav-sticky-header) instead of the plain page --color-bg, so it
@@ -226,11 +232,6 @@ export default function PersonalNotes({ conditionId }) {
     setShowConfirm(true)
   }
 
-  // Drives both the header's inline privacy caption and the row layout
-  // below — true only for the unified empty/prompt state (not while
-  // loading, editing, or showing a populated note).
-  const isPromptState = !loading && !isEditing && !(user && savedValue)
-
   return (
     <div style={{
       marginTop: 'var(--space-4)',
@@ -247,9 +248,10 @@ export default function PersonalNotes({ conditionId }) {
         }
       `}</style>
 
-      {/* Label row — static title, the privacy caption inline next to it
-          (empty-prompt state only), plus the "✓ Saved" flash when not
-          editing. */}
+      {/* Label row — just the static title now. The privacy caption,
+          "Edit" link, and "✓ Saved" flash all moved to a shared corner
+          slot beside the pill itself (see each state below) instead of
+          living here. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -267,35 +269,6 @@ export default function PersonalNotes({ conditionId }) {
         }}>
           Personal Notes
         </span>
-
-        {isPromptState && (
-          <span style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            fontSize: 11,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-            Only you can see this
-          </span>
-        )}
-
-        {!isEditing && savedVisible ? (
-          <span style={{
-            marginLeft: 'auto',
-            fontSize: 12,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
-            opacity: savedVisible === 'in' ? 1 : 0,
-            transition: savedVisible === 'in'
-              ? 'opacity 0.2s ease'
-              : 'opacity 0.4s ease',
-          }}>
-            ✓ Saved
-          </span>
-        ) : null}
       </div>
 
       {loading ? (
@@ -457,12 +430,12 @@ export default function PersonalNotes({ conditionId }) {
         </div>
       ) : user && savedValue ? (
         /* Populated, signed in — comment-style: avatar top-aligned with
-           the pill (no "You"/timestamp caption pushing it down anymore),
-           note text inside the pill, Edit link and the relative
-           timestamp sharing a footer row underneath — timestamp sits in
-           the bottom-right corner. On the very first save (empty ->
-           populated) this fades/scales in; subsequent edits render at
-           steady-state with no re-animation. */
+           the pill. The corner slot above the pill holds "Edit" in
+           steady state, or the "✓ Saved" flash right after a save —
+           never both, so they don't fight for the same spot. The
+           relative timestamp is a plain line under the pill. On the
+           very first save (empty -> populated) this fades/scales in;
+           subsequent edits render at steady-state with no re-animation. */
         <div style={{
           display: 'flex',
           gap: 10,
@@ -477,6 +450,38 @@ export default function PersonalNotes({ conditionId }) {
             style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
           />
           <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+              {savedVisible ? (
+                <span style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                  opacity: savedVisible === 'in' ? 1 : 0,
+                  transition: savedVisible === 'in'
+                    ? 'opacity 0.2s ease'
+                    : 'opacity 0.4s ease',
+                }}>
+                  ✓ Saved
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={startEditing}
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--color-accent)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Edit
+                </button>
+              )}
+            </div>
             <div style={{
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
@@ -494,54 +499,30 @@ export default function PersonalNotes({ conditionId }) {
                 {savedValue}
               </span>
             </div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 6,
-              paddingLeft: 14,
-            }}>
-              <button
-                type="button"
-                onClick={startEditing}
-                style={{
-                  fontSize: 12,
-                  fontWeight: 500,
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-accent)',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                Edit
-              </button>
-              {updatedAt && (
-                <span style={{
-                  fontSize: 12,
-                  color: 'var(--color-text-tertiary)',
-                  fontFamily: 'var(--font-body)',
-                }}>
-                  {formatRelativeTime(updatedAt)}
-                </span>
-              )}
-            </div>
+            {updatedAt && (
+              <p style={{
+                fontSize: 12,
+                color: 'var(--color-text-tertiary)',
+                fontFamily: 'var(--font-body)',
+                margin: '6px 0 0 14px',
+              }}>
+                {formatRelativeTime(updatedAt)}
+              </p>
+            )}
           </div>
         </div>
       ) : (
         /* Unified prompt state — identical whether signed out or signed
            in with no note yet. Tap routes to the sign-in sheet or
-           straight into edit mode via handlePromptTap. The pill is the
-           column's only content now (the privacy caption moved up to
-           the title row), so avatar and pill are centered against each
-           other rather than top-aligned. */
+           straight into edit mode via handlePromptTap. Corner slot above
+           the pill holds "Only you can see this" in steady state, or the
+           "✓ Saved" flash right after clearing a note back to empty. */
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
             gap: 10,
-            alignItems: 'center',
+            alignItems: 'flex-start',
             cursor: 'pointer',
           }}
         >
@@ -566,6 +547,33 @@ export default function PersonalNotes({ conditionId }) {
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+              {savedVisible ? (
+                <span style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                  opacity: savedVisible === 'in' ? 1 : 0,
+                  transition: savedVisible === 'in'
+                    ? 'opacity 0.2s ease'
+                    : 'opacity 0.4s ease',
+                }}>
+                  ✓ Saved
+                </span>
+              ) : (
+                <span style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 11,
+                  color: 'var(--color-text-tertiary)',
+                  fontFamily: 'var(--font-body)',
+                }}>
+                  <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
+                  Only you can see this
+                </span>
+              )}
+            </div>
             <div style={{
               border: '1px solid var(--color-border)',
               borderRadius: PILL_RADIUS,
