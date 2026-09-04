@@ -310,16 +310,20 @@ export default function PersonalNotes({ conditionId }) {
         {showHeaderCorner && (
           savedVisible ? (
             <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
               marginLeft: 'auto',
               fontSize: 11,
-              color: 'var(--color-text-tertiary)',
+              color: 'var(--color-success)',
               fontFamily: 'var(--font-body)',
               opacity: savedVisible === 'in' ? 1 : 0,
               transition: savedVisible === 'in'
                 ? 'opacity 0.2s ease'
                 : 'opacity 0.4s ease',
             }}>
-              ✓ Saved
+              <Icon name="Check" size={12} color="var(--color-success)" />
+              Saved
             </span>
           ) : user && savedValue ? (
             <button

@@ -167,8 +167,23 @@ export function useNotes(conditionId) {
   // the "edited just now" flashing back to an old "3w ago").
   const editedSinceLoadRef = useRef(false)
 
-  // Load from the database once signed in, and whenever the signed-in
-  // user or the condition being viewed changes.
+  // notes-timestamp-flicker-fix: AuthContext.jsx intentionally gives
+  // `user` a fresh object reference on every SIGNED_IN re-validation for
+  // the SAME account — e.g. the app going to the background and back to
+  // the foreground while someone is mid-note, which is a very normal
+  // thing to do while typing on a phone. That's correct behavior over
+  // there (keeps the session token current), but this effect used to
+  // depend on the whole `user` object, so every one of those silent
+  // refreshes re-ran it: resetting editedSinceLoadRef above and
+  // re-fetching from the database. If that re-fetch's response reflected
+  // a moment slightly earlier than the most recent save, the "Edited …
+  // ago" line would jump to a stale value right after a real edit —
+  // exactly the "hallucinated" timestamp reported. Depending on the
+  // user's id instead of the user object itself means this effect only
+  // re-runs on an actual sign-in, sign-out, or account switch, not on a
+  // same-account background/foreground refresh. `user.id` inside the
+  // effect body still always reads the current value via closure, so
+  // nothing else here changes.
   useEffect(() => {
     if (!user) return
     let cancelled = false
@@ -191,7 +206,8 @@ export function useNotes(conditionId) {
       })
 
     return () => { cancelled = true }
-  }, [user, conditionId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: see notes-timestamp-flicker-fix above
+  }, [user?.id, conditionId])
 
   // Flushes anything left in the offline queue above. Runs whenever
   // isOnline is true: on a genuine reconnect, and also on mount in case
