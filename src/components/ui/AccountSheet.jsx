@@ -46,6 +46,11 @@
  * card no longer asks the person to sign in at all (see that file) — this
  * sheet's copy is now the only place that ask is made.
  *
+ * signin-sheet-copy-and-notes-emptystate (this session) — favouriteContext/
+ * noteContext headlines updated to "Sign in to save this to Favourites" /
+ * "Sign in to add notes." to match PaywallGateSheet.jsx's shorter voice.
+ * Subtext lines below each headline are unchanged.
+ *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
@@ -290,9 +295,9 @@ export default function AccountSheet({
               marginBottom: 'var(--space-2)',
             }}>
               {display.favouriteContext
-                ? 'Save this to your Favourites'
+                ? 'Sign in to save this to Favourites'
                 : display.noteContext
-                  ? 'Sign in to add your thoughts'
+                  ? 'Sign in to add notes.'
                   : 'Sign in or create account'}
             </div>
             <p style={{
@@ -414,3 +419,4 @@ const linkButtonStyle = {
   cursor:          'pointer',
   textDecoration:  'underline',
 }
+
