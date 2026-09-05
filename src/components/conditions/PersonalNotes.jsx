@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
-import { User } from 'lucide-react'
+import { User, Camera } from 'lucide-react'
 import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
+import PaywallGateSheet from '../ui/PaywallGateSheet'
 import ProfileAvatar from '../ui/ProfileAvatar'
 import Lightbox from '../ui/Lightbox'
-import ProUpsellBanner from '../ui/ProUpsellBanner'
 import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
@@ -106,130 +105,6 @@ function formatRelativeTime(isoString) {
   const weeks = Math.floor(days / 7)
   if (weeks < 4) return `Edited ${weeks}w ago`
   return `Edited on ${new Date(isoString).toLocaleDateString()}`
-}
-
-// notes-pro-image-and-char-cap: the "explain the perk" sheet shown when a
-// free account taps the greyed-out camera button. Built locally in this
-// file rather than as a new shared component, since the task's file list
-// only calls for editing PersonalNotes.jsx here — but visually it follows
-// FavouriteLimitSheet.jsx's own shell (bottom sheet, backdrop, drag
-// handle, message, ProUpsellBanner, single "Got it" dismiss) exactly, so
-// this reads as the same "you've hit a free-tier wall" pattern the app
-// already uses for favourites, rather than inventing a new one. Its own
-// message is written fresh (photo attachments, not favourite counts);
-// ProComingSoonSheet's copy was checked and not reused here since it
-// still describes a "no real paid tier yet" world that the favourites
-// cap (and this feature) have already moved past.
-//
-// notes-photo-uploader-redesign: still shown the same way, just triggered
-// from the new upload box's empty-state tap instead of the old header
-// camera button.
-function NotePhotoUpsellSheet({ isOpen, onClose }) {
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
-  return createPortal(
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          1000,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Photo attachments are a Pro feature"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          1001,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          padding:         'var(--space-5) var(--space-4)',
-          paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
-          fontFamily:      'var(--font-body)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        <div style={{
-          width:           40,
-          height:          4,
-          borderRadius:    2,
-          backgroundColor: 'var(--color-border)',
-          margin:          '0 auto var(--space-5)',
-        }} />
-
-        <p style={{
-          margin:     '0 0 var(--space-4)',
-          fontSize:   14,
-          lineHeight: 1.55,
-          color:      'var(--color-text-primary)',
-          textAlign:  'center',
-        }}>
-          Attaching a reference photo to a note — a lecture slide, a
-          diagram, a handwritten reminder — is a Pro feature.
-        </p>
-
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <ProUpsellBanner subtitle="Unlock photo attachments in your notes" />
-        </div>
-
-        <button
-          onClick={onClose}
-          style={{
-            width:           '100%',
-            padding:         'var(--space-2) var(--space-4)',
-            borderRadius:    'var(--radius-sm)',
-            border:          '1px solid var(--color-border)',
-            backgroundColor: 'transparent',
-            color:           'var(--color-text-secondary)',
-            fontSize:        14,
-            fontWeight:      500,
-            fontFamily:      'var(--font-body)',
-            cursor:          'pointer',
-          }}
-        >
-          Got it
-        </button>
-      </div>
-    </>,
-    document.body
-  )
 }
 
 // notes-photo-uploader-redesign: replaces the old NotePhotoStrip (a bare
@@ -1887,9 +1762,14 @@ export default function PersonalNotes({ conditionId }) {
         destructive
       />
 
-      <NotePhotoUpsellSheet
+      <PaywallGateSheet
         isOpen={showProUpsell}
         onClose={() => setShowProUpsell(false)}
+        icon={Camera}
+        headline="Enhance Your Notes"
+        message="Attach lecture slides, diagrams, and written reminders."
+        ctaSubtitle="Unlock photo attachments in your notes"
+        dismissLabel="Not now"
       />
 
       {lightboxOpen && savedImageUrl && (
