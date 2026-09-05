@@ -386,16 +386,50 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
 
   // 'empty' — same reachability the old camera button had: Pro opens the
   // picker, free opens the upsell sheet instead of silently doing nothing.
+  // notes-photo-box-copy-pass: swapped the old Camera icon (which reads
+  // as "take a photo", not "attach one") for ImagePlus everywhere. The
+  // Pro-locked look no longer leans on a single dimmed sentence — it's
+  // now a two-line label (bold title + a small "Pro" pill underneath),
+  // same pattern already used for Pro gating elsewhere in the app,
+  // rather than one long greyed-out line.
+  if (!isPro) {
+    return (
+      <button
+        type="button"
+        onClick={onTapEmpty}
+        aria-label="Add a photo note — Pro feature"
+        style={{ ...shell, cursor: 'pointer', gap: 4 }}
+      >
+        <span style={{ display: 'flex', opacity: 0.6, marginBottom: 2 }}>
+          <Icon name="ImagePlus" size={18} color="var(--color-text-tertiary)" />
+        </span>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+          Add a photo note
+        </span>
+        <span style={{
+          fontSize: 11,
+          padding: '2px 8px',
+          borderRadius: 'var(--radius-sm)',
+          backgroundColor: 'var(--color-accent-light)',
+          color: 'var(--color-accent)',
+          fontFamily: 'var(--font-body)',
+        }}>
+          Pro
+        </span>
+      </button>
+    )
+  }
+
   return (
     <button
       type="button"
       onClick={onTapEmpty}
-      aria-label={isPro ? 'Attach a photo to this note' : 'Attach a photo — Pro feature'}
-      style={{ ...shell, cursor: 'pointer', opacity: isPro ? 1 : 0.7 }}
+      aria-label="Add a photo note"
+      style={{ ...shell, cursor: 'pointer' }}
     >
-      <Icon name="Camera" size={18} color="var(--color-text-tertiary)" />
+      <Icon name="ImagePlus" size={18} color="var(--color-text-tertiary)" />
       <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-        {isPro ? 'Add a photo' : 'Add a photo — Pro feature'}
+        Add a photo
       </span>
     </button>
   )
