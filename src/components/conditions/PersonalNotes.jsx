@@ -49,8 +49,8 @@ const AVATAR_FIRST_LINE_OFFSET = {
 // maxHeight/overflowY below) sidesteps the problem entirely: every phone
 // and browser already keeps the caret visible inside a bounded,
 // internally-scrolling text box on its own, regardless of where in the
-// text someone is typing. 4 lines matches the "Compact" size chosen.
-const MAX_EDITING_LINES = 4
+// text someone is typing.
+const MAX_EDITING_LINES = 6
 const EDITING_MAX_HEIGHT = EDITING_LINE_HEIGHT * MAX_EDITING_LINES
 
 // notes-photo-uploader-redesign: fixed footprint for the upload box —
