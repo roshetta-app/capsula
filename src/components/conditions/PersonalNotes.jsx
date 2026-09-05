@@ -12,6 +12,7 @@ import { useNotes } from '../../hooks/useNotes'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useCachedImage } from '../../hooks/useCachedImage'
+import { useKeyboardOpen } from '../../hooks/useKeyboardOpen'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
 import { getTextDirection } from '../../utils/textDirection'
 import { resizeAndCompressImage } from '../../utils/imageResize'
@@ -920,6 +921,54 @@ export default function PersonalNotes({ conditionId }) {
     }
     el.addEventListener('transitionend', onTransitionEnd)
     return () => el.removeEventListener('transitionend', onTransitionEnd)
+  }, [isEditing])
+
+  // notes-typing-keyboard-scroll: keeps whatever you're actively typing —
+  // and, once the note's long enough, the footer buttons below the photo
+  // box — visible above the on-screen keyboard. Two different moments
+  // need this same nudge:
+  //
+  // 1. The instant the keyboard finishes opening. The very first "scroll
+  //    this into view" the browser does the moment you tap into the note
+  //    happens before the keyboard has actually finished sliding up, so
+  //    it's scrolling based on a taller, keyboard-not-open version of the
+  //    screen. useKeyboardOpen is the same signal already used elsewhere
+  //    in the app for "the keyboard is now actually open" — re-checking
+  //    at that point (not just at the initial tap) is what fixes the
+  //    "starts on the wrong part of the note" problem.
+  // 2. Every time the card grows taller — a new line wrapping as you
+  //    type, or a photo appearing mid-edit — since nothing else re-checks
+  //    what's still visible as that happens.
+  //
+  // Both just re-scroll the card only as far as needed to bring its
+  // bottom edge (wherever the cursor and the footer actually are) back on
+  // screen — never more than that, and never if it's already visible.
+  const keyboardOpen = useKeyboardOpen()
+
+  useEffect(() => {
+    if (!isEditing || !keyboardOpen) return
+    cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [isEditing, keyboardOpen])
+
+  useEffect(() => {
+    if (!isEditing || !cardRef.current) return
+    const el = cardRef.current
+    // Collapses a burst of resize events (e.g. the FLIP height animation
+    // above firing several in quick succession) into one scroll per
+    // animation frame, instead of stacking up several smooth-scrolls back
+    // to back.
+    let frame = null
+    const observer = new ResizeObserver(() => {
+      if (frame) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => {
+        el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      })
+    })
+    observer.observe(el)
+    return () => {
+      if (frame) cancelAnimationFrame(frame)
+      observer.disconnect()
+    }
   }, [isEditing])
 
   const triggerSaved = useCallback(() => {
