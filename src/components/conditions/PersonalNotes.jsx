@@ -1239,13 +1239,17 @@ export default function PersonalNotes({ conditionId }) {
           {/* personal-notes-ui-polish (name/edited restructure pass):
               name + "Edited … ago" live together as the two-line column
               next to the avatar — same two-line pattern the empty/prompt
-              state already uses for name + placeholder. The avatar keeps
-              its fixed marginTop (AVATAR_FIRST_LINE_OFFSET.saved) so it
-              centers on the name line specifically. The note text itself
-              is a separate block further down, still inside this same
-              bordered box — indented by AVATAR_SIZE + the row's own gap
-              so it lines up with the name column above it, not with the
-              avatar's left edge. */}
+              state already uses for name + placeholder. Unlike the
+              editing state's textarea (which can grow to many lines),
+              this column is always exactly these two short lines, so the
+              row uses plain alignItems: 'center' — the avatar centers on
+              the two lines as one unit, rather than the fixed
+              first-line-only offset the editing state still needs for
+              its own potentially-long, wrapping text. The note text
+              itself is a separate block further down, still inside this
+              same bordered box — indented by AVATAR_SIZE + the row's own
+              gap so it lines up with the name column above it, not with
+              the avatar's left edge. */}
           <div style={{
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
@@ -1256,14 +1260,14 @@ export default function PersonalNotes({ conditionId }) {
           }}>
             <div style={{
               display: 'flex',
-              alignItems: 'flex-start',
+              alignItems: 'center',
               gap: 10,
               minHeight: AVATAR_SIZE + 2,
             }}>
               <ProfileAvatar
                 user={user}
                 fullName={profile?.fullName}
-                style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0, marginTop: AVATAR_FIRST_LINE_OFFSET.saved }}
+                style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
