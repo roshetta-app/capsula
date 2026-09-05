@@ -1126,6 +1126,7 @@ export default function PersonalNotes({ conditionId }) {
         .personal-notes-textarea {
           scrollbar-width: thin;
           scrollbar-color: var(--color-accent) var(--color-border-subtle);
+          scrollbar-gutter: stable;
         }
         .personal-notes-textarea::-webkit-scrollbar {
           width: 8px;
@@ -1342,7 +1343,7 @@ export default function PersonalNotes({ conditionId }) {
                 color: 'var(--color-text-primary)',
                 backgroundColor: 'transparent',
                 border: 'none',
-                padding: 0,
+                padding: '0 8px 0 0',
                 fontFamily: 'var(--font-body)',
                 lineHeight: 1.65,
                 resize: 'none',
