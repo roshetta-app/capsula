@@ -372,7 +372,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
         type="button"
         onClick={onTapEmpty}
         aria-label="Add a photo — Pro feature"
-        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}
+        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-surface-muted)', cursor: 'pointer' }}
       >
         <span style={{
           display:         'flex',
@@ -415,7 +415,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       type="button"
       onClick={onTapEmpty}
       aria-label={PHOTO_BOX_TITLE}
-      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}
+      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-surface-muted)', cursor: 'pointer' }}
     >
       {iconSquare}
       <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
