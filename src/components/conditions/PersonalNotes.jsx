@@ -332,7 +332,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       height:          30,
       flexShrink:      0,
     }}>
-      <Icon name="ImagePlus" size={15} color="var(--color-text-tertiary)" />
+      <Icon name="ImagePlus" size={15} color="var(--color-accent)" />
     </span>
   )
   // notes-merged-card: no longer spreading boxBase — boxBase's fixed
