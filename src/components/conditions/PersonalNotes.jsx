@@ -1624,14 +1624,36 @@ export default function PersonalNotes({ conditionId }) {
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
-                  display: 'block',
-                  fontSize: 15,
-                  fontWeight: 500,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
                   lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-text-primary)',
                 }}>
-                  {profile?.fullName || 'You'}
+                  <span style={{
+                    fontSize: 15,
+                    fontWeight: 500,
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--color-text-primary)',
+                  }}>
+                    {profile?.fullName || 'You'}
+                  </span>
+                  {isPro && (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      letterSpacing: '0.03em',
+                      lineHeight: 1.4,
+                      padding: '1px 5px',
+                      borderRadius: 4,
+                      fontFamily: 'var(--font-body)',
+                      color: 'var(--color-accent)',
+                      backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--color-accent) 35%, transparent)',
+                      flexShrink: 0,
+                    }}>
+                      PRO
+                    </span>
+                  )}
                 </span>
                 {updatedAt && (
                   <span style={{
