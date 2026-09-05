@@ -1237,80 +1237,83 @@ export default function PersonalNotes({ conditionId }) {
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
           {/* personal-notes-ui-polish (name/edited restructure pass):
-              name + "Edited … ago" now live together as the two-line
-              column next to the avatar — same two-line pattern the
-              empty/prompt state already uses for name + placeholder.
-              The avatar keeps its fixed marginTop (AVATAR_FIRST_LINE_OFFSET.
-              saved) so it centers on the name line specifically, which
-              still works correctly now that this column is always exactly
-              two short lines (name, edited-time) regardless of how long
-              the note itself is — the note text moved out of this row
-              entirely (see below), so it can no longer push the column's
-              height around. */}
+              name + "Edited … ago" live together as the two-line column
+              next to the avatar — same two-line pattern the empty/prompt
+              state already uses for name + placeholder. The avatar keeps
+              its fixed marginTop (AVATAR_FIRST_LINE_OFFSET.saved) so it
+              centers on the name line specifically. The note text itself
+              is a separate block further down, still inside this same
+              bordered box — indented by AVATAR_SIZE + the row's own gap
+              so it lines up with the name column above it, not with the
+              avatar's left edge. */}
           <div style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: 10,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
             padding: '20px 16px 20px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
-            minHeight: AVATAR_SIZE + 2,
           }}>
-            <ProfileAvatar
-              user={user}
-              fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0, marginTop: AVATAR_FIRST_LINE_OFFSET.saved }}
-            />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <span style={{
-                display: 'block',
-                fontSize: 15,
-                fontWeight: 500,
-                lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-text-primary)',
-              }}>
-                {profile?.fullName || 'You'}
-              </span>
-              {updatedAt && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 10,
+              minHeight: AVATAR_SIZE + 2,
+            }}>
+              <ProfileAvatar
+                user={user}
+                fullName={profile?.fullName}
+                style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0, marginTop: AVATAR_FIRST_LINE_OFFSET.saved }}
+              />
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <span style={{
                   display: 'block',
-                  marginTop: 2,
-                  fontSize: 13,
-                  lineHeight: '19px',
-                  fontWeight: 400,
-                  color: 'var(--color-text-tertiary)',
+                  fontSize: 15,
+                  fontWeight: 500,
+                  lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
                   fontFamily: 'var(--font-body)',
+                  color: 'var(--color-text-primary)',
                 }}>
-                  {formatRelativeTime(updatedAt)}
+                  {profile?.fullName || 'You'}
                 </span>
-              )}
+                {updatedAt && (
+                  <span style={{
+                    display: 'block',
+                    marginTop: 2,
+                    fontSize: 13,
+                    lineHeight: '19px',
+                    fontWeight: 400,
+                    color: 'var(--color-text-tertiary)',
+                    fontFamily: 'var(--font-body)',
+                  }}>
+                    {formatRelativeTime(updatedAt)}
+                  </span>
+                )}
+              </div>
             </div>
-          </div>
 
-          {/* Note text — its own plain section below the avatar row now,
-              not indented to line up with the name/edited column above
-              it; the row above guarantees savedValue is non-empty here,
-              so no placeholder branch is needed the way the row's own
-              column above needed one. Mixed-language display still hands
-              the raw text to the browser's own bidi engine via dir="auto"
-              + unicode-bidi: plaintext, same reasoning as before. */}
-          <div
-            dir="auto"
-            style={{
-              marginTop: 10,
-              fontSize: 14,
-              lineHeight: '20px',
-              fontFamily: 'var(--font-body)',
-              whiteSpace: 'pre-wrap',
-              color: 'var(--color-text-primary)',
-              unicodeBidi: 'plaintext',
-            }}
-          >
-            {savedValue}
+            {/* Note text — its own body of text below the row, still
+                inside the box; the row above guarantees savedValue is
+                non-empty here, so no placeholder branch is needed the
+                way the row's own column above needed one. Mixed-language
+                display still hands the raw text to the browser's own
+                bidi engine via dir="auto" + unicode-bidi: plaintext,
+                same reasoning as before. */}
+            <div
+              dir="auto"
+              style={{
+                marginTop: 10,
+                marginLeft: AVATAR_SIZE + 10,
+                fontSize: 14,
+                lineHeight: '20px',
+                fontFamily: 'var(--font-body)',
+                whiteSpace: 'pre-wrap',
+                color: 'var(--color-text-primary)',
+                unicodeBidi: 'plaintext',
+              }}
+            >
+              {savedValue}
+            </div>
           </div>
 
           <NotePhotoBox
