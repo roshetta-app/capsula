@@ -18,12 +18,27 @@
  *   - useNotesPrefetchResume() — a hook, mounted once in AuthContext.jsx's
  *     AuthProvider (the one component in the app already guaranteed to
  *     mount exactly once — see this task's plan doc for why App.jsx was
- *     checked and ruled out). Watches useOnlineStatus() and resumes any
- *     photo downloads left unfinished by the last prefetchAllNotes pass,
+ *     checked and ruled out). Watches connectivity and resumes any photo
+ *     downloads left unfinished by the last prefetchAllNotes pass,
  *     mirroring the reconnect-flush shape useNotes.js's own
  *     flushPendingWrites/flushPendingPhoto effects already use elsewhere
  *     in this same feature area — same "if (!isOnline) return" gate, same
  *     "leave it queued on failure, the next flush retries it" behavior.
+ *
+ *     Bugfix (found via on-device testing, same day): this originally used
+ *     the shared useOnlineStatus() hook, same as useNotes.js's own flush
+ *     effects — but AuthProvider isn't guaranteed to sit inside
+ *     <OnlineStatusProvider> in the component tree (confirmed by a real
+ *     crash: "useOnlineStatus must be used inside <OnlineStatusProvider>").
+ *     Reordering the two providers in App.jsx was the more "correct" fix in
+ *     the abstract, but it's a change to the app's root structure well
+ *     outside this task's actual scope, and risks its own regressions
+ *     elsewhere. Reading navigator.onLine directly instead (see
+ *     useIsOnlineFallback below) sidesteps the ordering question entirely —
+ *     it's the same underlying browser signal OnlineStatusContext.jsx
+ *     itself is built on, just consulted directly rather than through that
+ *     shared context, so this mount point has no dependency on where
+ *     AuthProvider happens to sit relative to it.
  *
  * Writes each row straight into useNotes.js's own existing localStorage
  * keys (capsula_notes_${conditionId} / _image_ / _updated_) — deliberately
@@ -59,10 +74,9 @@
  * resuming a stalled photo download doesn't need fresher note text.
  */
 
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { saveNotePhotoToCache } from '../utils/cache'
-import { useOnlineStatus } from './useOnlineStatus'
 
 function storageKeyFor(conditionId) {
   return `capsula_notes_${conditionId}`
@@ -167,6 +181,30 @@ export async function prefetchAllNotes(userId) {
   writePendingPhotos(stillPending)
 }
 
+// Bugfix (see file header): a self-contained connectivity read, deliberately
+// not the shared useOnlineStatus() hook — this hook is mounted inside
+// AuthProvider, which isn't guaranteed to sit inside <OnlineStatusProvider>
+// in the component tree. navigator.onLine plus the browser's own
+// online/offline events is the same underlying signal that context is
+// built on, just read directly so this mount point has no dependency on
+// provider ordering elsewhere in the app.
+function useIsOnlineFallback() {
+  const [isOnline, setIsOnline] = useState(() => (typeof navigator === 'undefined' ? true : navigator.onLine))
+
+  useEffect(() => {
+    function goOnline()  { setIsOnline(true) }
+    function goOffline() { setIsOnline(false) }
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  return isOnline
+}
+
 /**
  * Mounted once in AuthContext.jsx's AuthProvider. Resumes only the photo
  * downloads left unfinished by the last prefetchAllNotes pass, whenever
@@ -176,7 +214,7 @@ export async function prefetchAllNotes(userId) {
  * list on success, leave it queued on failure for the next reconnect.
  */
 export function useNotesPrefetchResume() {
-  const { isOnline } = useOnlineStatus()
+  const isOnline = useIsOnlineFallback()
   // Guards against the same resume pass running twice in a row if
   // isOnline flips true, false, true in quick succession before the
   // first pass's fetches resolve — the second effect run would otherwise
