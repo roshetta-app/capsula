@@ -1228,7 +1228,7 @@ export default function PersonalNotes({ conditionId }) {
           scrollbar-color: var(--color-accent) var(--color-border-subtle);
         }
         .personal-notes-textarea::-webkit-scrollbar {
-          width: 6px;
+          width: 8px;
         }
         .personal-notes-textarea::-webkit-scrollbar-track {
           background: var(--color-border-subtle);
@@ -1236,6 +1236,8 @@ export default function PersonalNotes({ conditionId }) {
         }
         .personal-notes-textarea::-webkit-scrollbar-thumb {
           background-color: var(--color-accent);
+          background-clip: padding-box;
+          border: 2px solid transparent;
           border-radius: var(--radius-full);
         }
         @keyframes personal-notes-spin {
@@ -1344,7 +1346,7 @@ export default function PersonalNotes({ conditionId }) {
           gap: 10,
           border: '1px solid var(--color-border)',
           borderRadius: PILL_RADIUS,
-          padding: '20px 16px 20px 22px',
+          padding: '20px 16px 20px calc(var(--space-4) + 2px)',
           boxSizing: 'border-box',
           backgroundColor: 'var(--color-surface)',
           width: '100%',
@@ -1581,7 +1583,7 @@ export default function PersonalNotes({ conditionId }) {
             backgroundColor: 'var(--color-surface)',
             width: '100%',
           }}>
-          <div style={{ padding: '20px 16px 20px 22px' }}>
+          <div style={{ padding: '20px 16px 20px calc(var(--space-4) + 2px)' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1804,7 +1806,7 @@ export default function PersonalNotes({ conditionId }) {
               alignItems: 'center',
               gap: 10,
               cursor: 'pointer',
-              padding: '20px 16px 20px 22px',
+              padding: '20px 16px 20px calc(var(--space-4) + 2px)',
               minHeight: AVATAR_SIZE + 2,
             }}
           >
