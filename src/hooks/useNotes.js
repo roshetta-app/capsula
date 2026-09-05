@@ -58,6 +58,42 @@
  *   PersonalNotes.jsx — kept out of this hook so its job stays "save and
  *   load", matching its existing shape.
  *
+ * notes-photo-uploader-redesign (this task):
+ *   Added offline queueing for the upload step itself, one layer earlier
+ *   than the image_url queue described just above (that queue only ever
+ *   applies once a URL already exists; this one covers the gap before it
+ *   does).
+ *     - queuePendingImage(file) — called by PersonalNotes.jsx instead of
+ *       attempting uploadNoteImage at all when it already knows the device
+ *       is offline. Saves the resized File/Blob into its own IndexedDB
+ *       store (utils/cache.js's pending-note-photos, one slot per
+ *       userId:conditionId — same single-slot convention as every other
+ *       pending-write queue in this file) and returns immediately; no
+ *       optimistic local write happens here, since there's no URL yet to
+ *       write.
+ *     - A sibling reconnect effect (flushPendingPhoto, alongside the
+ *       existing flushPendingWrites below) checks this hook instance's own
+ *       pending photo slot whenever isOnline flips true, and — if one is
+ *       waiting — runs it through uploadNoteImage, then applies the same
+ *       local-write-plus-upsert steps saveImage() already does on success,
+ *       then clears the slot. On failure it's left queued for the next
+ *       flush, same as the existing queue's error handling.
+ *     - Deliberately scoped to only this hook instance's own condition,
+ *       not every pending photo across every condition the way the
+ *       existing body/image flush loop below iterates — a photo picked
+ *       offline uploads automatically the next time that note's own
+ *       screen is open while online, which covers the case this task
+ *       actually asked for without needing a new "list every pending key"
+ *       IndexedDB helper.
+ *     - This does cross the "hook only persists a URL it's given" line
+ *       from the paragraph just above — uploadNoteImage (an actual network
+ *       call) is now called from inside this hook for the reconnect-retry
+ *       path specifically, since the whole point of this queue is that no
+ *       component is necessarily on screen anymore to make that call
+ *       itself when the reconnect happens. The original, still-current
+ *       online happy path (PersonalNotes.jsx calling uploadNoteImage
+ *       directly, then this hook's own saveImage(url)) is unchanged.
+ *
  * Signed out (guest): still localStorage only, key
  * `capsula_notes_${conditionId}` — this hook itself doesn't change what a
  * signed-out call would do to local storage, PersonalNotes.jsx just no
@@ -88,12 +124,17 @@
  *                                    if nothing has ever been saved
  *   save           (value: string) => void
  *   saveImage      (url: string) => void
+ *   queuePendingImage  (file: File|Blob) => void — queues a resized photo
+ *                      for upload on reconnect; see notes-photo-uploader-
+ *                      redesign above
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useOnlineStatus } from './useOnlineStatus'
 import { supabase } from '../lib/supabase'
+import { uploadNoteImage } from '../lib/noteQueries'
+import { savePendingNotePhoto, getPendingNotePhoto, clearPendingNotePhoto } from '../utils/cache'
 
 function storageKeyFor(conditionId) {
   return `capsula_notes_${conditionId}`
@@ -343,6 +384,51 @@ export function useNotes(conditionId) {
     return () => { cancelled = true }
   }, [isOnline, authLoading, user, conditionId])
 
+  // notes-photo-uploader-redesign: flushes this hook instance's own queued
+  // photo upload (see file header) whenever isOnline flips true. Scoped to
+  // just this condition/user pair — unlike flushPendingWrites above, which
+  // iterates every pending entry across every condition, this only ever
+  // has one possible slot to check (the one keyed to the condition this
+  // hook instance is showing), so there's nothing to iterate.
+  useEffect(() => {
+    if (!isOnline || authLoading || !user) return
+    let cancelled = false
+
+    async function flushPendingPhoto() {
+      const pendingBlob = await getPendingNotePhoto(user.id, conditionId)
+      if (!pendingBlob || cancelled) return
+
+      const { url, error } = await uploadNoteImage(pendingBlob, user.id, conditionId)
+      if (cancelled) return
+
+      if (error || !url) {
+        // Leave it queued — the next flush (reconnect or next app open)
+        // retries it, same error handling as flushPendingWrites above.
+        return
+      }
+
+      const now = new Date().toISOString()
+      writeImageStorage(conditionId, url)
+      writeUpdatedAtStorage(conditionId, now)
+      setSavedImageUrl(url)
+      setUpdatedAt(now)
+
+      await buildNoteImageUpsert(user.id, conditionId, url, now)
+      await clearPendingNotePhoto(user.id, conditionId)
+    }
+
+    flushPendingPhoto()
+    return () => { cancelled = true }
+  }, [isOnline, authLoading, user, conditionId])
+
+  // notes-photo-uploader-redesign: called by PersonalNotes.jsx instead of
+  // attempting uploadNoteImage at all when it already knows the device is
+  // offline — see file header for the full flow.
+  const queuePendingImage = useCallback((file) => {
+    if (!user) return
+    savePendingNotePhoto(user.id, conditionId, file)
+  }, [user, conditionId])
+
   const save = useCallback((value) => {
     // Defensive gate — see file header. PersonalNotes.jsx no longer
     // offers a way to reach this without a signed-in user.
@@ -412,5 +498,5 @@ export function useNotes(conditionId) {
     })
   }, [user, conditionId])
 
-  return { savedValue, savedImageUrl, updatedAt, save, saveImage }
+  return { savedValue, savedImageUrl, updatedAt, save, saveImage, queuePendingImage }
 }
