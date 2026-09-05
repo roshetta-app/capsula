@@ -1236,15 +1236,17 @@ export default function PersonalNotes({ conditionId }) {
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
-          {/* personal-notes-ui-polish: name line added above the note
-              text — the account's profile name, or 'You' when none is
-              set (same fallback ProfileAvatar's own initials already use,
-              so nothing new is being read here). The avatar carries a
-              fixed marginTop (AVATAR_FIRST_LINE_OFFSET.saved) so it
-              centers on this name line specifically, rather than on the
-              vertical middle of the name + note text together — the note
-              text itself can still be any length below without pulling
-              the avatar's position around. */}
+          {/* personal-notes-ui-polish (name/edited restructure pass):
+              name + "Edited … ago" now live together as the two-line
+              column next to the avatar — same two-line pattern the
+              empty/prompt state already uses for name + placeholder.
+              The avatar keeps its fixed marginTop (AVATAR_FIRST_LINE_OFFSET.
+              saved) so it centers on the name line specifically, which
+              still works correctly now that this column is always exactly
+              two short lines (name, edited-time) regardless of how long
+              the note itself is — the note text moved out of this row
+              entirely (see below), so it can no longer push the column's
+              height around. */}
           <div style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -1273,41 +1275,42 @@ export default function PersonalNotes({ conditionId }) {
               }}>
                 {profile?.fullName || 'You'}
               </span>
-              {/* Mixed-language display: rather than manually splitting the
-                  text into per-language chunks in code (fragile — proved
-                  itself buggy twice), this hands the raw saved text to the
-                  browser's own built-in bidi text engine via dir="auto" +
-                  unicode-bidi: plaintext. */}
-              {savedValue ? (
-                <span
-                  dir="auto"
-                  style={{
-                    display: 'block',
-                    marginTop: 2,
-                    fontSize: 14,
-                    lineHeight: '20px',
-                    fontFamily: 'var(--font-body)',
-                    whiteSpace: 'pre-wrap',
-                    color: 'var(--color-text-primary)',
-                    unicodeBidi: 'plaintext',
-                  }}
-                >
-                  {savedValue}
-                </span>
-              ) : (
+              {updatedAt && (
                 <span style={{
                   display: 'block',
                   marginTop: 2,
-                  fontSize: 14,
-                  lineHeight: '20px',
+                  fontSize: 13,
+                  lineHeight: '19px',
                   fontWeight: 400,
                   color: 'var(--color-text-tertiary)',
                   fontFamily: 'var(--font-body)',
                 }}>
-                  Add a note or a thought…
+                  {formatRelativeTime(updatedAt)}
                 </span>
               )}
             </div>
+          </div>
+
+          {/* Note text — its own plain section below the avatar row now,
+              not indented to line up with the name/edited column above
+              it; the row above guarantees savedValue is non-empty here,
+              so no placeholder branch is needed the way the row's own
+              column above needed one. Mixed-language display still hands
+              the raw text to the browser's own bidi engine via dir="auto"
+              + unicode-bidi: plaintext, same reasoning as before. */}
+          <div
+            dir="auto"
+            style={{
+              marginTop: 10,
+              fontSize: 14,
+              lineHeight: '20px',
+              fontFamily: 'var(--font-body)',
+              whiteSpace: 'pre-wrap',
+              color: 'var(--color-text-primary)',
+              unicodeBidi: 'plaintext',
+            }}
+          >
+            {savedValue}
           </div>
 
           <NotePhotoBox
@@ -1318,22 +1321,6 @@ export default function PersonalNotes({ conditionId }) {
             onTapPhoto={() => setLightboxOpen(true)}
             onRetry={retryUpload}
           />
-
-          {updatedAt && (
-            <p style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
-              gap: 4,
-              fontSize: 12,
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
-              margin: '6px 0 0 0',
-            }}>
-              <Icon name="Clock" size={11} color="var(--color-text-tertiary)" />
-              {formatRelativeTime(updatedAt)}
-            </p>
-          )}
         </div>
       ) : (
         /* Unified prompt state — identical whether signed out or signed
@@ -1404,8 +1391,8 @@ export default function PersonalNotes({ conditionId }) {
             <span style={{
               display: 'block',
               marginTop: 2,
-              fontSize: 14,
-              lineHeight: '20px',
+              fontSize: 13,
+              lineHeight: '19px',
               fontWeight: 400,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
