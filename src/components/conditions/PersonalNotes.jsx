@@ -677,6 +677,58 @@ export default function PersonalNotes({ conditionId }) {
     clearTimeout(fadeOutRef.current)
   }, [])
 
+  // personal-notes-ui-polish (tap-to-edit height animation): the card
+  // swaps between completely different layouts on entering/leaving edit
+  // mode (prompt/saved <-> editing textarea + footer + send button), so
+  // React just mounts/unmounts different JSX — there's no single element
+  // whose height could transition on its own the way footerExpanded's
+  // grid-rows trick works above. This does a manual FLIP-style height
+  // animation on the whole card instead: measureCardHeight() is called
+  // right before the layout-changing state flips (see startEditing and
+  // closeEditing below), capturing the "before" height; this effect then
+  // reads the "after" height once the new layout has actually rendered,
+  // pins the card at the old height, forces a reflow so the browser
+  // registers that starting point, then animates to the new height and
+  // releases back to height: 'auto' once the transition finishes — auto
+  // is restored afterward so the textarea's own auto-grow (a separate,
+  // already-existing effect) can keep resizing the card normally while
+  // someone is actively typing, rather than fighting a leftover fixed
+  // height from this animation.
+  const cardRef = useRef(null)
+  const prevCardHeightRef = useRef(null)
+
+  function measureCardHeight() {
+    if (cardRef.current) {
+      prevCardHeightRef.current = cardRef.current.getBoundingClientRect().height
+    }
+  }
+
+  useLayoutEffect(() => {
+    const el = cardRef.current
+    const oldHeight = prevCardHeightRef.current
+    if (!el || oldHeight == null) return
+    prevCardHeightRef.current = null
+
+    const newHeight = el.getBoundingClientRect().height
+    if (Math.abs(newHeight - oldHeight) < 1) return
+
+    el.style.overflow = 'hidden'
+    el.style.height = `${oldHeight}px`
+    void el.offsetHeight // force reflow so the browser registers the start height
+    el.style.transition = 'height var(--motion-base) var(--ease-reveal)'
+    el.style.height = `${newHeight}px`
+
+    function onTransitionEnd(e) {
+      if (e.target !== el || e.propertyName !== 'height') return
+      el.style.height = 'auto'
+      el.style.overflow = ''
+      el.style.transition = ''
+      el.removeEventListener('transitionend', onTransitionEnd)
+    }
+    el.addEventListener('transitionend', onTransitionEnd)
+    return () => el.removeEventListener('transitionend', onTransitionEnd)
+  }, [isEditing])
+
   const triggerSaved = useCallback(() => {
     clearTimeout(fadeOutRef.current)
     setSavedVisible('in')
@@ -719,6 +771,7 @@ export default function PersonalNotes({ conditionId }) {
   }, [justPopulated])
 
   function startEditing() {
+    measureCardHeight()
     setDraft(savedValue)
     setIsEditing(true)
   }
@@ -731,7 +784,10 @@ export default function PersonalNotes({ conditionId }) {
   function closeEditing() {
     setFooterExpanded(false)
     clearTimeout(closeEditingRef.current)
-    closeEditingRef.current = setTimeout(() => setIsEditing(false), 220)
+    closeEditingRef.current = setTimeout(() => {
+      measureCardHeight()
+      setIsEditing(false)
+    }, 220)
   }
 
   // Unified empty/prompt-state tap handler — signed in drops straight
@@ -1017,6 +1073,7 @@ export default function PersonalNotes({ conditionId }) {
         </p>
       )}
 
+      <div ref={cardRef}>
       {loading ? (
         /* Loading skeleton — shown only while useAuth()'s sign-in check
            is still settling, so this card doesn't flash the signed-out
@@ -1419,6 +1476,7 @@ export default function PersonalNotes({ conditionId }) {
         />
         </>
       )}
+      </div>
 
       <ConfirmSheet
         isOpen={showConfirm}
