@@ -47,9 +47,15 @@
  * sheet's copy is now the only place that ask is made.
  *
  * signin-sheet-copy-and-notes-emptystate (this session) — favouriteContext/
- * noteContext headlines updated to "Sign in to save this to Favourites" /
- * "Sign in to add notes." to match PaywallGateSheet.jsx's shorter voice.
- * Subtext lines below each headline are unchanged.
+ * noteContext headlines and note subtext updated per feedback.
+ *
+ * paywall-sheet-copy-tweaks (this session, follow-up) — headlines dropped
+ * "Sign in to..." entirely (the ask reads as an action, not a login
+ * prompt): "Save this to Favourites" / "Add your notes". The "sign in"
+ * framing moved down into the subtext instead, which is why noteContext's
+ * subtext changed too ("Sign in to add notes and access them
+ * everywhere."). favouriteContext's subtext already carried that framing
+ * and is unchanged.
  *
  * Props:
  *   isOpen             boolean
@@ -295,9 +301,9 @@ export default function AccountSheet({
               marginBottom: 'var(--space-2)',
             }}>
               {display.favouriteContext
-                ? 'Sign in to save this to Favourites'
+                ? 'Save this to Favourites'
                 : display.noteContext
-                  ? 'Sign in to add notes.'
+                  ? 'Add your notes'
                   : 'Sign in or create account'}
             </div>
             <p style={{
@@ -309,7 +315,7 @@ export default function AccountSheet({
               {display.favouriteContext
                 ? 'Sign in to save it and access it on any device.'
                 : display.noteContext
-                  ? 'Sign in to keep your notes private and available on every device.'
+                  ? 'Sign in to add notes and access them everywhere.'
                   : 'Sync your favourites across devices with your Google account.'}
             </p>
 

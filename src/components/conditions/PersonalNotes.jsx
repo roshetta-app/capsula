@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { User, Camera } from 'lucide-react'
+import { User, ImagePlus } from 'lucide-react'
 import Icon from '../ui/Icon'
 import ConfirmSheet from '../ui/ConfirmSheet'
 import PaywallGateSheet from '../ui/PaywallGateSheet'
@@ -1765,10 +1765,9 @@ export default function PersonalNotes({ conditionId }) {
       <PaywallGateSheet
         isOpen={showProUpsell}
         onClose={() => setShowProUpsell(false)}
-        icon={Camera}
+        icon={ImagePlus}
         headline="Enhance Your Notes"
         message="Attach lecture slides, diagrams, and written reminders."
-        ctaSubtitle="Unlock photo attachments in your notes"
         dismissLabel="Not now"
       />
 

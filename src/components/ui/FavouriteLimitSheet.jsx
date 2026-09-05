@@ -12,6 +12,12 @@
  * old FAVOURITES_LIMIT_MESSAGE_DRUGS/CONDITIONS strings, which carried
  * the longer pre-redesign wording.
  *
+ * paywall-sheet-copy-tweaks (this session) — headline changed to
+ * "Favourites limit reached"; message rewritten to drop "saved" (not how
+ * favourites are described elsewhere in the app) and to bold "Pro".
+ * PaywallGateSheet's `message` prop takes a plain string or a node, so
+ * this passes a JSX fragment to get the bold word in.
+ *
  * Props:
  *   isOpen     boolean
  *   listType   'drugs' | 'conditions'
@@ -36,9 +42,8 @@ export default function FavouriteLimitSheet({ isOpen, listType, onClose }) {
       onClose={onClose}
       icon={Heart}
       countLabel={`${cap}/${cap}`}
-      headline="Saved Limit Reached"
-      message={`Limit of ${cap} saved ${listType} reached. Go Pro for unlimited access.`}
-      ctaSubtitle="Unlock unlimited favourites"
+      headline="Favourites limit reached"
+      message={<>You've reached your limit of favourite {listType}, go <strong>Pro</strong> for unlimited access.</>}
       dismissLabel="Maybe Later"
     />
   )

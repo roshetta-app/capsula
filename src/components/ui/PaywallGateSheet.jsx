@@ -14,30 +14,35 @@
  * already use — kept identical here rather than introducing a new
  * mechanic.
  *
- * Dismiss is a plain text link, not the old bordered button — matches the
- * mockup's "Clean Dismiss Action" note and its "Consolidated Primary CTA"
- * (ProUpsellBanner is the only real button in the sheet).
+ * Dismiss is a plain text link, not a bordered button — matches the
+ * mockup's "Clean Dismiss Action" note.
+ *
+ * paywall-sheet-copy-tweaks (this session) — CTA simplified from
+ * ProUpsellBanner (icon/subtitle/chevron card) down to one plain rounded
+ * button reading only "Upgrade to Capsula Pro" — per feedback, every
+ * sheet using this shell should show the same minimal button, nothing
+ * else. Non-interactive (no onClick/cursor) since no real Pro upsell page
+ * exists yet, same reasoning ProUpsellBanner's decorative mode already
+ * used. The `ctaSubtitle` prop this replaced is removed — no caller needs
+ * it now that the button has no subtitle.
  *
  * Props:
  *   isOpen       boolean
  *   onClose      () => void
  *   icon         lucide component — rendered inside the centered icon
- *                circle (e.g. Heart, Camera).
+ *                circle (e.g. Heart, ImagePlus).
  *   countLabel   string   — optional. A short pill under the icon circle
  *                (e.g. "10/10"). Omit to skip the pill entirely.
  *   headline     string   — bold centered title.
- *   message      string   — centered body copy under the headline.
- *   ctaSubtitle  string   — passed straight through to ProUpsellBanner's
- *                own `subtitle` prop. Non-interactive (no onClick) since
- *                no real Pro upsell page exists yet — same as every
- *                existing caller of ProUpsellBanner.
+ *   message      string | node — centered body copy under the headline.
+ *                Accepts a JSX fragment (not just a plain string) so a
+ *                caller can bold part of the message, e.g. the word "Pro".
  *   dismissLabel string   — text of the plain-link dismiss underneath.
  */
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Lock } from 'lucide-react'
-import ProUpsellBanner from './ProUpsellBanner'
 
 export default function PaywallGateSheet({
   isOpen,
@@ -46,7 +51,6 @@ export default function PaywallGateSheet({
   countLabel,
   headline,
   message,
-  ctaSubtitle,
   dismissLabel,
 }) {
   // shouldRender keeps the DOM present during the exit transition.
@@ -200,8 +204,8 @@ export default function PaywallGateSheet({
           </p>
         </div>
 
-        <div style={{ marginBottom: 'var(--space-4)' }}>
-          <ProUpsellBanner subtitle={ctaSubtitle} />
+        <div style={upgradeButtonStyle}>
+          Upgrade to Capsula Pro
         </div>
 
         <button onClick={onClose} style={dismissLinkStyle}>
@@ -211,6 +215,24 @@ export default function PaywallGateSheet({
     </>,
     document.body
   )
+}
+
+// paywall-sheet-copy-tweaks: plain div, not a <button> — this stays
+// decorative (no onClick, no cursor: pointer) since no real Pro upsell
+// page exists yet, same reasoning ProUpsellBanner's non-interactive mode
+// already used everywhere else in the app.
+const upgradeButtonStyle = {
+  width:           '100%',
+  padding:         'var(--space-3) var(--space-4)',
+  marginBottom:    'var(--space-4)',
+  borderRadius:    'var(--radius-full)',
+  backgroundColor: 'var(--color-accent)',
+  color:           '#fff',
+  fontSize:        14,
+  fontWeight:      700,
+  fontFamily:      'var(--font-body)',
+  textAlign:       'center',
+  boxSizing:       'border-box',
 }
 
 const dismissLinkStyle = {
