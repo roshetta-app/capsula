@@ -474,8 +474,13 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
  *   - Selected photo is resized/compressed (imageResize.js) before
  *     upload (noteQueries.js's uploadNoteImage), then handed straight to
  *     saveImage() — no separate Send tap needed for the photo itself.
- *   - The populated-state condition below fires on `savedImageUrl` alone
- *     too (a note can be photo-only, with no typed text).
+ *   - Originally the populated-state condition also fired on
+ *     `savedImageUrl` alone (a photo-only note, no typed text, still read
+ *     as "populated"). personal-notes-ui-polish below changed this: an
+ *     attached photo with no text now keeps the card in the prompt state
+ *     — the photo itself still shows (NotePhotoBox reads savedImageUrl
+ *     independently either way), just without the comment-style
+ *     name/"Edit" treatment until there's actual text.
  *   - Typing is clamped to the free/Pro character cap (280 / 2000, see
  *     constants/features.js) via both a live-clamping onChange and a
  *     native maxLength. The live "X / cap" counter only renders while
@@ -645,6 +650,29 @@ export default function PersonalNotes({ conditionId }) {
   const fadeOutRef  = useRef(null)
   const textareaRef = useRef(null)
 
+  // personal-notes-ui-polish: controls the editing footer row's own
+  // grow/shrink transition (see the footer row's JSX below for the
+  // grid-rows technique this drives). Kept separate from `isEditing`
+  // itself so the footer can visibly collapse — smoothly pulling the
+  // photo box back up with it — before the card switches away from the
+  // editing layout entirely, instead of the whole thing just vanishing.
+  const [footerExpanded, setFooterExpanded] = useState(false)
+  const closeEditingRef = useRef(null)
+
+  useEffect(() => {
+    if (!isEditing) {
+      setFooterExpanded(false)
+      return
+    }
+    // Starts collapsed on the same render the editing view mounts, then
+    // flips open one frame later so the transition actually plays instead
+    // of the row just appearing already-open.
+    const id = requestAnimationFrame(() => setFooterExpanded(true))
+    return () => cancelAnimationFrame(id)
+  }, [isEditing])
+
+  useEffect(() => () => clearTimeout(closeEditingRef.current), [])
+
   useEffect(() => () => {
     clearTimeout(fadeOutRef.current)
   }, [])
@@ -695,6 +723,17 @@ export default function PersonalNotes({ conditionId }) {
     setIsEditing(true)
   }
 
+  // personal-notes-ui-polish: shared exit path for Save/Cancel/Clear —
+  // collapses the footer row first (same duration as its own CSS
+  // transition, var(--motion-base)) so the photo box visibly slides back
+  // up, THEN switches isEditing off once that's finished, rather than the
+  // whole editing layout disappearing the instant a button is tapped.
+  function closeEditing() {
+    setFooterExpanded(false)
+    clearTimeout(closeEditingRef.current)
+    closeEditingRef.current = setTimeout(() => setIsEditing(false), 220)
+  }
+
   // Unified empty/prompt-state tap handler — signed in drops straight
   // into edit mode; signed out opens the sign-in sheet instead. The
   // sign-in ask itself lives only in that sheet's copy now, not here.
@@ -713,13 +752,13 @@ export default function PersonalNotes({ conditionId }) {
       setJustPopulated(true)
     }
     save(draft)
-    setIsEditing(false)
+    closeEditing()
     triggerSaved()
   }
 
   function handleCancel() {
     setDraft(savedValue)
-    setIsEditing(false)
+    closeEditing()
   }
 
   function handleClear() {
@@ -729,7 +768,7 @@ export default function PersonalNotes({ conditionId }) {
     // unsaved draft the user would have to hit Save on again.
     save('')
     setDraft('')
-    setIsEditing(false)
+    closeEditing()
     triggerSaved()
   }
 
@@ -932,7 +971,7 @@ export default function PersonalNotes({ conditionId }) {
               <Icon name="Check" size={12} color="var(--color-success)" />
               Saved
             </span>
-          ) : user && (savedValue || savedImageUrl) ? (
+          ) : user && savedValue ? (
             <button
               type="button"
               onClick={startEditing}
@@ -991,7 +1030,7 @@ export default function PersonalNotes({ conditionId }) {
           gap: 10,
           border: '1px solid var(--color-border)',
           borderRadius: PILL_RADIUS,
-          padding: '14px 16px 14px 22px',
+          padding: '20px 16px 20px 22px',
           boxSizing: 'border-box',
           backgroundColor: 'var(--color-surface)',
           width: '100%',
@@ -1036,7 +1075,7 @@ export default function PersonalNotes({ conditionId }) {
             gap: 10,
             border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
             borderRadius: PILL_RADIUS,
-            padding: '18px 18px 18px 24px',
+            padding: '24px 18px 24px 24px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             transition: 'border-color 0.15s ease',
@@ -1111,58 +1150,67 @@ export default function PersonalNotes({ conditionId }) {
               offset that no longer means anything.
               personal-notes-ui-polish: moved above the photo box —
               directly under the text box now, rather than below the
-              photo box — per the requested reorder. */}
+              photo box — per the requested reorder. Also now wrapped in
+              a grid-rows animated shell (0fr collapsed / 1fr expanded,
+              driven by footerExpanded) so it grows in when editing
+              starts and shrinks back out on Save/Cancel/Clear, instead
+              of snapping in and out — which is what actually makes the
+              photo box below look like it slides down/up smoothly,
+              since it's just the next thing in normal flow. */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            marginTop: 6,
+            display: 'grid',
+            gridTemplateRows: footerExpanded ? '1fr' : '0fr',
+            marginTop: footerExpanded ? 6 : 0,
+            opacity: footerExpanded ? 1 : 0,
+            transition: 'grid-template-rows var(--motion-base) var(--ease-reveal), margin-top var(--motion-base) var(--ease-reveal), opacity var(--motion-base) var(--ease-reveal)',
           }}>
-            {draft ? (
-              <button
-                type="button"
-                onClick={handleClearClick}
-                aria-label="Clear note"
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  fontSize: 12,
+            <div style={{ overflow: 'hidden', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {draft ? (
+                <button
+                  type="button"
+                  onClick={handleClearClick}
+                  aria-label="Clear note"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 12,
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--color-danger)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Icon name="X" size={12} color="var(--color-danger)" />
+                  Clear
+                </button>
+              ) : <span />}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={{
+                  fontSize: 11,
                   fontFamily: 'var(--font-body)',
-                  color: 'var(--color-danger)',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                <Icon name="X" size={12} color="var(--color-danger)" />
-                Clear
-              </button>
-            ) : <span />}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <span style={{
-                fontSize: 11,
-                fontFamily: 'var(--font-body)',
-                color: draft.length >= charCap ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
-              }}>
-                {draft.length}/{charCap}
-              </span>
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={{
-                  fontSize: 13,
-                  fontFamily: 'var(--font-body)',
-                  color: 'var(--color-text-secondary)',
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                }}
-              >
-                Cancel
-              </button>
+                  color: draft.length >= charCap ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
+                }}>
+                  {draft.length}/{charCap}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  style={{
+                    fontSize: 13,
+                    fontFamily: 'var(--font-body)',
+                    color: 'var(--color-text-secondary)',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1175,7 +1223,7 @@ export default function PersonalNotes({ conditionId }) {
             onRetry={retryUpload}
           />
         </div>
-      ) : user && (savedValue || savedImageUrl) ? (
+      ) : user && savedValue ? (
         /* Populated, signed in — comment-style. On the very first save
            (empty -> populated) the whole block fades/scales in;
            subsequent edits render at steady-state with no re-animation.
@@ -1203,7 +1251,7 @@ export default function PersonalNotes({ conditionId }) {
             gap: 10,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '14px 16px 14px 22px',
+            padding: '20px 16px 20px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
@@ -1297,12 +1345,14 @@ export default function PersonalNotes({ conditionId }) {
            personal-notes-ui-polish: the photo box (below) now also
            renders here, including signed-out — as the same locked
            "Pro feature" look a signed-in free account already sees,
-           rather than being hidden until someone starts editing. The
-           avatar here uses alignItems: 'center' rather than the fixed
-           first-line offset the other two states use, since this
-           placeholder is always exactly one line — centering against
-           the row and centering against "the first line" are the same
-           thing here. */
+           rather than being hidden until someone starts editing. Also
+           added the same name/"You" line the saved state has, above the
+           placeholder — since both lines here are always exactly one
+           line each (name never wraps, and the placeholder is a fixed
+           string), the avatar just uses alignItems: 'center' against the
+           two of them together, rather than the fixed first-line-only
+           offset the saved/editing states need for their own
+           potentially-long, wrapping text. */
         <>
         <div
           onClick={handlePromptTap}
@@ -1313,7 +1363,7 @@ export default function PersonalNotes({ conditionId }) {
             cursor: 'pointer',
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '14px 16px 14px 22px',
+            padding: '20px 16px 20px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
@@ -1340,8 +1390,20 @@ export default function PersonalNotes({ conditionId }) {
               <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{
+              display: 'block',
+              fontSize: 15,
+              fontWeight: 500,
+              lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
+              fontFamily: 'var(--font-body)',
+              color: 'var(--color-text-primary)',
+            }}>
+              {profile?.fullName || 'You'}
+            </span>
+            <span style={{
+              display: 'block',
+              marginTop: 2,
               fontSize: 14,
               lineHeight: '20px',
               fontWeight: 400,
