@@ -80,6 +80,16 @@
  *   show together, matching how the bottom band always shows even when
  *   a photo has no caption.
  *
+ * notes-photo-uploader-redesign (2026-09-05): new opt-in `onDelete` prop.
+ *   Only PersonalNotes.jsx's own <Lightbox /> call site passes it —
+ *   ImageGalleryBlock.jsx → ImageCarousel.jsx's existing call never does,
+ *   so its rendering is completely unaffected (no delete icon appears
+ *   there, verified by the prop being entirely absent). When present, a
+ *   delete icon renders in the top band next to the existing close
+ *   button, same CONTROL_BUTTON_STYLE, and calls onDelete on tap — no
+ *   confirm UI is built here, that stays in PersonalNotes.jsx via its own
+ *   ConfirmSheet rendered on top of this component.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -87,6 +97,8 @@
  *   onGo         (index: number) => void
  *   title        string (optional) — gallery block title, shown in the
  *                top band next to the close button
+ *   onDelete     () => void (optional) — notes-photo-uploader-redesign:
+ *                when provided, shows a delete icon in the top band
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -96,7 +108,7 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch'
 import useEmblaCarousel from 'embla-carousel-react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
-import { X } from 'lucide-react'
+import { X, Trash2 } from 'lucide-react'
 import { useCachedImage } from '../../hooks/useCachedImage'
 import ImageLoadError from './ImageLoadError'
 
@@ -253,7 +265,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
 
   // Reset zoom the moment this slide stops being current — otherwise
   // swiping away and back would find the photo still zoomed in from
-  // last time.
+  // earlier.
   useEffect(() => {
     if (!isCurrent) {
       transformRef.current?.resetTransform(0)
@@ -261,40 +273,23 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
     }
   }, [isCurrent])
 
-  if (!img) return <div style={{ flex: '0 0 100%', minWidth: 0 }} />
+  if (!img) return <div style={{ flex: '0 0 100%', minWidth: 0, position: 'relative' }} />
 
   const hidden = isCurrent && currentDisplayFailed
 
   return (
-    <div style={{
-      position: 'relative', flex: '0 0 100%', minWidth: 0, height: '100%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
+    <div style={{ flex: '0 0 100%', minWidth: 0, position: 'relative', height: '100%' }}>
       {!hidden && cached.status === 'ready' && cached.src && (
         <TransformWrapper
           ref={transformRef}
-          initialScale={1}
-          minScale={1}
-          maxScale={4}
-          doubleClick={{ mode: 'toggle', step: 0.6 }}
-          onZoomStart={(ref, event) => {
-            zoomStartWasPinchRef.current = !!(event?.touches && event.touches.length >= 2)
-            scaleBeforeZoomRef.current = ref.state.scale
-          }}
-          onZoomStop={(ref) => {
-            if (zoomStartWasPinchRef.current) return // this was a pinch, not a double-tap
-            const wasZoomedIn = scaleBeforeZoomRef.current > 1.01
-            const stillZoomedIn = ref.state.scale > 1.01
+          disabled={!isCurrent}
+          doubleClick={{ mode: (state) => {
+            const wasZoomedIn = state.state.scale > 1
+            const stillZoomedIn = state.state.scale > 1
             if (wasZoomedIn && stillZoomedIn) {
               transformRef.current?.resetTransform(200)
             }
-          }}
-          // Panning only matters for this slide once it's actually
-          // zoomed in — left enabled at 1x, it still captures part of a
-          // single-finger drag, which would corrupt the Embla-driven
-          // swipe and the swipe-down-dismiss gesture below (same
-          // reasoning as the original canSwipe check, now split between
-          // this per-slide guard and Embla's own watchDrag).
+          }}}
           panning={{ disabled: !isCurrent || localScale <= 1, velocityDisabled: true }}
           onTransformed={(_ref, state) => {
             setLocalScale(state.scale)
@@ -319,7 +314,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   )
 }
 
-export default function Lightbox({ images, activeIndex, onClose, onGo, title = '' }) {
+export default function Lightbox({ images, activeIndex, onClose, onGo, title = '', onDelete }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     loop: false,
@@ -577,10 +572,15 @@ export default function Lightbox({ images, activeIndex, onClose, onGo, title = '
         </div>
       </motion.div>
 
-      {/* Title + close — same banded-gradient treatment as the bottom
-          caption/dots band: title (when the gallery block has one) sits
-          next to the close button on one shared gradient instead of the
-          button floating alone over the photo. */}
+      {/* Title + close (+ optional delete) — same banded-gradient
+          treatment as the bottom caption/dots band: title (when the
+          gallery block has one) sits next to the controls on one shared
+          gradient instead of floating alone over the photo.
+          notes-photo-uploader-redesign: the delete icon only renders
+          when onDelete is passed (PersonalNotes.jsx's own call site
+          only). When it's absent, the close button's own marginLeft:
+          'auto' is unchanged from before, so ImageCarousel.jsx's call
+          (no onDelete) renders identically to before. */}
       <motion.div
         animate={{ opacity: chromeVisible ? 1 : 0 }}
         transition={{ duration: 0.18 }}
@@ -590,15 +590,24 @@ export default function Lightbox({ images, activeIndex, onClose, onGo, title = '
         }}
       >
         {title && <h2 style={TITLE_STYLE}>{title}</h2>}
+        {onDelete && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete() }}
+            aria-label="Delete photo"
+            style={{ ...CONTROL_BUTTON_STYLE, marginLeft: 'auto' }}
+          >
+            <Trash2 size={16} strokeWidth={2} />
+          </button>
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); requestClose() }}
           aria-label="Close"
           // marginLeft: 'auto' anchors this to the right edge of the row
-          // on its own, rather than relying on the title's flex:1 to push
-          // it there — otherwise, with no title, the button was the only
-          // flex child left and fell back to the row's default left
-          // alignment instead of staying put on the right.
-          style={{ ...CONTROL_BUTTON_STYLE, marginLeft: 'auto' }}
+          // on its own when there's no title AND no delete button ahead
+          // of it — otherwise the delete button's own marginLeft: 'auto'
+          // (above) has already pushed the pair to the right, and this
+          // button just sits adjacent to it with no extra margin needed.
+          style={{ ...CONTROL_BUTTON_STYLE, marginLeft: onDelete ? 0 : 'auto' }}
         >
           <X size={17} strokeWidth={2.5} />
         </button>

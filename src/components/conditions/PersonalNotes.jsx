@@ -10,14 +10,49 @@ import { useDirtyState } from '../../hooks/useDirtyState'
 import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useIsPro } from '../../hooks/useIsPro'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
 import { getTextDirection } from '../../utils/textDirection'
 import { resizeAndCompressImage } from '../../utils/imageResize'
-import { uploadNoteImage } from '../../lib/noteQueries'
+import { uploadNoteImage, deleteNoteImage } from '../../lib/noteQueries'
 import { NOTES_CHAR_CAP_FREE, NOTES_CHAR_CAP_PRO } from '../../constants/features'
 
 const AVATAR_SIZE = 32
 const PILL_RADIUS = 18
+
+// notes-photo-uploader-redesign: fixed footprint for the upload box —
+// matches the old NotePhotoStrip's footprint exactly (full width, 140px
+// tall) so this redesign doesn't change the space the photo area takes
+// up on the page, just what can render inside it.
+const PHOTO_BOX_HEIGHT = 140
+
+// notes-photo-uploader-redesign: a generous pre-resize sanity ceiling on
+// the raw picked file, checked before resizeAndCompressImage ever runs
+// (that function always ends up producing a low-hundreds-of-KB to ~1-2MB
+// .jpg regardless of input size — see imageResize.js — so this exists
+// only to reject something absurd, like a multi-hundred-MB video picked
+// by mistake via the image/* file picker, without a network round trip).
+const MAX_PHOTO_SOURCE_BYTES = 20 * 1024 * 1024
+
+// notes-photo-uploader-redesign: copied from ImageCarousel.jsx's own
+// BLUR_IMG_STYLE/MAIN_IMG_STYLE (see that file's header comment for the
+// full reasoning) — a two-layer blurred-background + contain-fit photo,
+// reused here so a note photo whose aspect ratio doesn't fill the box's
+// fixed 140px height still displays in full rather than being cropped.
+// A copy, not an import — ImageCarousel.jsx carries the full Embla
+// swipe/drag engine, which a single static note photo doesn't need.
+const NOTE_BLUR_IMG_STYLE = {
+  position: 'absolute', inset: 0, width: '100%', height: '100%',
+  objectFit: 'cover', objectPosition: 'center',
+  filter: 'blur(28px) brightness(0.65)',
+  transform: 'scale(1.15)',
+  pointerEvents: 'none',
+}
+const NOTE_MAIN_IMG_STYLE = {
+  position: 'absolute', inset: 0, width: '100%', height: '100%',
+  objectFit: 'contain', objectPosition: 'center',
+  pointerEvents: 'none',
+}
 
 // Small, single-purpose relative-time formatter for the "Edited …" line
 // below a saved note. Kept local to this file rather than a new shared
@@ -52,6 +87,10 @@ function formatRelativeTime(isoString) {
 // ProComingSoonSheet's copy was checked and not reused here since it
 // still describes a "no real paid tier yet" world that the favourites
 // cap (and this feature) have already moved past.
+//
+// notes-photo-uploader-redesign: still shown the same way, just triggered
+// from the new upload box's empty-state tap instead of the old header
+// camera button.
 function NotePhotoUpsellSheet({ isOpen, onClose }) {
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
@@ -160,34 +199,123 @@ function NotePhotoUpsellSheet({ isOpen, onClose }) {
   )
 }
 
-// notes-pro-image-and-char-cap: the attached photo, shown as a wide strip
-// spanning the note's own width (explicit call — not a small square
-// thumbnail like the CMS gallery rows use), tapping it opens the
-// full-screen Lightbox exactly as-is.
-function NotePhotoStrip({ url, onTap }) {
-  if (!url) return null
+// notes-photo-uploader-redesign: replaces the old NotePhotoStrip (a bare
+// <img>, only ever rendered when a photo already existed). This renders
+// the fixed-footprint box in all 5 states — empty / uploading / offline
+// queued / failed+retry / attached — instead of only the last one, so
+// there's always a visible next step regardless of where the attach flow
+// currently sits.
+//
+// `state` is computed by the parent (savedImageUrl / uploadingPhoto /
+// isOfflineQueued / photoError, in that priority order — see
+// PersonalNotes' photoState below) rather than derived in here, since the
+// parent already owns every piece of state that determines it.
+function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
+  const boxBase = {
+    display:      'block',
+    width:        '100%',
+    marginTop:    8,
+    height:       PHOTO_BOX_HEIGHT,
+    borderRadius: 'var(--radius-md)',
+    overflow:     'hidden',
+    position:     'relative',
+    boxSizing:    'border-box',
+  }
+
+  if (state === 'attached' && url) {
+    return (
+      <button
+        type="button"
+        onClick={onTapPhoto}
+        aria-label="View attached photo"
+        style={{ ...boxBase, padding: 0, border: 'none', cursor: 'pointer', background: 'none' }}
+      >
+        <img src={url} alt="" aria-hidden="true" draggable={false} style={NOTE_BLUR_IMG_STYLE} />
+        <img src={url} alt="Attached note photo" draggable={false} style={NOTE_MAIN_IMG_STYLE} />
+      </button>
+    )
+  }
+
+  // Every other state shares one plain dashed-border shell — only the
+  // content inside changes.
+  const shell = {
+    ...boxBase,
+    border:          '1px dashed var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
+    display:         'flex',
+    flexDirection:   'column',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             6,
+    padding:         '0 var(--space-4)',
+    textAlign:       'center',
+  }
+
+  if (state === 'uploading') {
+    return (
+      <div style={shell} aria-live="polite">
+        <div
+          aria-hidden="true"
+          style={{
+            width: 18, height: 18, borderRadius: '50%',
+            border: '2px solid var(--color-border)',
+            borderTopColor: 'var(--color-accent)',
+            animation: 'personal-notes-spin 0.7s linear infinite',
+          }}
+        />
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+          Uploading…
+        </span>
+      </div>
+    )
+  }
+
+  if (state === 'offline') {
+    return (
+      <div style={shell}>
+        <Icon name="CloudOff" size={16} color="var(--color-text-tertiary)" />
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+          Will upload once you're back online
+        </span>
+      </div>
+    )
+  }
+
+  if (state === 'error') {
+    return (
+      <div style={shell}>
+        <span style={{ fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)' }}>
+          Couldn't upload photo
+        </span>
+        <button
+          type="button"
+          onClick={onRetry}
+          style={{
+            fontSize: 12, fontWeight: 600,
+            color: 'var(--color-accent)',
+            background: 'none', border: 'none', padding: 0,
+            cursor: 'pointer', fontFamily: 'var(--font-body)',
+          }}
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  // 'empty' — same reachability the old camera button had: Pro opens the
+  // picker, free opens the upsell sheet instead of silently doing nothing.
   return (
     <button
       type="button"
-      onClick={onTap}
-      aria-label="View attached photo"
-      style={{
-        display:         'block',
-        width:           '100%',
-        marginTop:       8,
-        padding:         0,
-        border:          'none',
-        borderRadius:    'var(--radius-md)',
-        overflow:        'hidden',
-        cursor:          'pointer',
-        background:      'none',
-      }}
+      onClick={onTapEmpty}
+      aria-label={isPro ? 'Attach a photo to this note' : 'Attach a photo — Pro feature'}
+      style={{ ...shell, cursor: 'pointer', opacity: isPro ? 1 : 0.7 }}
     >
-      <img
-        src={url}
-        alt="Attached note photo"
-        style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-      />
+      <Icon name="Camera" size={18} color="var(--color-text-tertiary)" />
+      <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+        {isPro ? 'Add a photo' : 'Add a photo — Pro feature'}
+      </span>
     </button>
   )
 }
@@ -235,10 +363,7 @@ function NotePhotoStrip({ url, onTap }) {
  * notes-pill-redesign:
  *   - Every state (loading / empty prompt / editing / saved) shares one
  *     plain pill shape for the actual text content — a single hairline
- *     border, 18px corners, no elevated card surface behind it. The
- *     avatar and the caption/meta line sit OUTSIDE the pill, not nested
- *     inside a bordered wrapper with them — the pill is just the text
- *     box, matching a plain comment-input look rather than a card.
+ *     border, 18px corners, no elevated card surface behind it.
  *   - Placeholder/prompt copy is "Add a note or a thought…" (trailing
  *     ellipsis), used consistently as both the empty-state pill text and
  *     the textarea's real placeholder attribute.
@@ -259,78 +384,91 @@ function NotePhotoStrip({ url, onTap }) {
  *   - Save is now a "Send" icon button living inside the pill itself,
  *     pinned to the bottom-right corner as the textarea grows — Cancel
  *     and Clear are the only controls left in the footer row below.
- *   - "Visible only to you" no longer appears in the editing footer
- *     (Clear/Cancel felt crowded with it); the privacy note now lives
- *     inline in the header row next to the title (see below).
- *   - Populated state drops the redundant "You" label (the avatar
- *     already signals authorship) and moves "Edited …" out of the header
- *     row and down to a plain line under the pill, so the avatar and
- *     pill align to the top instead of the pill being pushed down by a
- *     caption row above it.
  *   - notes-header-inline: "Only you can see this" (empty state),
  *     "Edit" (populated state), and the "✓ Saved" flash all share ONE
  *     slot — inline on the same row as the "Personal Notes" title,
- *     right-aligned, matching the app's other top corner elements
- *     rather than sitting in a row of their own. Only one of them ever
- *     renders at a time (Saved flash takes priority right after a
- *     save/clear, then the state's normal content returns), so they
- *     never compete for the same spot.
- *   - Loading, empty-state, and populated-state pills are flex rows with
- *     alignItems: 'center', minHeight: AVATAR_SIZE, and an explicit
- *     pixel line-height (20px) on their text rather than a unitless
- *     multiplier (e.g. 1.5) — a unitless value resolves against the
- *     custom body font's own internal metrics, which didn't reliably
- *     produce the same pixel height as the plain avatar circle. A fixed
- *     pixel value plus the minHeight floor pins a single line of content
- *     to exactly the avatar's height, text vertically centered inside;
- *     a note that wraps to multiple lines still grows past that floor
- *     naturally (20px per extra line), which is expected since the
- *     avatar is top-aligned rather than centered against it.
- *   - Signed-out placeholder avatar circle now uses --color-accent-light
- *     (the app's existing tinted-blue token, also used for
- *     fav-sticky-header) instead of the plain page --color-bg, so it
- *     reads as an avatar rather than an empty grey circle; its User icon
- *     switched from tertiary grey to --color-accent to stay legible on
- *     the tint. Every pill (loading / editing / populated / prompt) now
- *     sits on --color-surface (white) instead of the transparent
- *     page background, so the pill reads as its own surface.
+ *     right-aligned. Only one of them ever renders at a time.
  *
  * notes-pro-image-and-char-cap (this task):
- *   - Camera icon button sits right after the "Personal Notes" title, so
- *     it's reachable from every state (prompt / editing / populated)
- *     without needing to enter edit mode first — attaching a photo is
- *     independent of the typed note (see useNotes.js's saveImage, kept
- *     separate from save()). Pro: opens the file picker directly. Free:
- *     greyed out (0.4 opacity) and taps open NotePhotoUpsellSheet instead
- *     of the picker, explaining the perk rather than silently doing
- *     nothing.
- *   - Selected photo is resized/compressed (imageResize.js, a fresh copy
- *     — not shared with the CMS's admin-only version) before upload
- *     (noteQueries.js's uploadNoteImage), then handed straight to
+ *   - Selected photo is resized/compressed (imageResize.js) before
+ *     upload (noteQueries.js's uploadNoteImage), then handed straight to
  *     saveImage() — no separate Send tap needed for the photo itself.
- *   - NotePhotoStrip (wide strip, not a small square — explicit call)
- *     renders under the pill in both the editing and populated states
- *     whenever a photo is attached; tapping it opens Lightbox.jsx exactly
- *     as it already works elsewhere, with a single-photo array.
- *   - The populated-state condition below now also fires on
- *     `savedImageUrl` alone (a note can be photo-only, with no typed
- *     text) — previously it required `savedValue` to be truthy.
+ *   - The populated-state condition below fires on `savedImageUrl` alone
+ *     too (a note can be photo-only, with no typed text).
  *   - Typing is clamped to the free/Pro character cap (280 / 2000, see
  *     constants/features.js) via both a live-clamping onChange and a
- *     native maxLength (defense in depth against IME/paste edge cases).
- *     The live "X / cap" counter shown just above Cancel only renders
- *     while isEditing — never on the saved/read view — matching the
- *     confirmed decision that the saved note should keep looking like a
- *     plain comment, not a form.
+ *     native maxLength. The live "X / cap" counter only renders while
+ *     isEditing.
+ *
+ * notes-photo-uploader-redesign (this task):
+ *   - The small camera-icon button that used to sit in the header row is
+ *     gone. In its place, a full-width, fixed-140px-tall upload box
+ *     (NotePhotoBox above) renders directly under the pill, in both the
+ *     editing and populated states — reusing exactly the same tap
+ *     behavior the camera button had (Pro opens the picker, free opens
+ *     NotePhotoUpsellSheet), just moved into the box's own empty state
+ *     instead of a header icon. The hidden file `<input>` that used to
+ *     sit next to the camera button now renders unconditionally whenever
+ *     a user is signed in, since nothing about the box's position in the
+ *     tree depends on the header row anymore.
+ *   - ProfileAvatar moves from a sibling flex item beside the pill into
+ *     the pill's own bordered container, and the pill is now full width
+ *     (previously flex: 1, leaving room for the avatar beside it) —
+ *     applied consistently across all four pill-bearing states (loading
+ *     skeleton, editing, populated, prompt) so none of them look
+ *     mismatched against the others. The avatar keeps its top-alignment
+ *     behavior (notes-comment-polish, above) via `alignItems: flex-start`
+ *     on each merged container, rather than being vertically centered
+ *     against a tall pill.
+ *   - Five visible box states (see NotePhotoBox above): no photo /
+ *     uploading / offline queued / upload failed+retry / attached.
+ *     `photoState` below computes which one applies, in priority order:
+ *     an attached photo always wins (it means the flow already
+ *     succeeded), then an in-flight upload, then an offline-queued pick,
+ *     then a genuine error, then the empty default.
+ *   - Client-side file-type/size validation (MAX_PHOTO_SOURCE_BYTES
+ *     above) runs before resizeAndCompressImage is ever called, so a
+ *     bad pick surfaces as photoError immediately with no network round
+ *     trip needed to discover it.
+ *   - Offline queueing for the upload step itself: if the device is
+ *     already known to be offline when a photo is picked, this calls
+ *     useNotes.js's queuePendingImage(resized) instead of ever attempting
+ *     uploadNoteImage, and flips isOfflineQueued — resolved automatically
+ *     once useNotes.js's own reconnect flush succeeds and savedImageUrl
+ *     updates (see the effect below that clears isOfflineQueued the
+ *     moment that happens).
+ *   - Upload failures (genuine errors, not "no connection at all") keep
+ *     the resized blob in lastFailedBlobRef so retryUpload() can re-run
+ *     the exact same attempt without asking the user to re-pick the file.
+ *   - Delete: Lightbox's new opt-in `onDelete` prop is only ever passed
+ *     from this file's own <Lightbox /> call (see that component's own
+ *     header for why ImageCarousel.jsx's call site is unaffected).
+ *     Tapping it opens a second ConfirmSheet (separate from the existing
+ *     "Delete note?" one), re-labelled "Delete image?". Confirming closes
+ *     the Lightbox, fires deleteNoteImage(user.id, conditionId) to remove
+ *     the file from Storage, and calls the existing saveImage(null) to
+ *     null out image_url — saveImage already handles a falsy URL
+ *     correctly end to end (local write, upsert, offline queue replay).
+ *     The storage delete isn't awaited before saveImage(null) runs —
+ *     saveImage's own optimistic-write/offline-queue behavior doesn't
+ *     depend on it, and there's no user-facing state that needs to wait
+ *     on a fire-and-forget Storage call.
+ *   - ConfirmSheet.jsx gained a small additive `zIndex` prop (default
+ *     1000, unchanged for every existing caller) specifically so this
+ *     delete-confirm sheet (zIndex 10000) can render above the open
+ *     Lightbox (zIndex 9999) — Lightbox's real z-index is otherwise
+ *     higher than ConfirmSheet's old hardcoded value, which would have
+ *     left the confirm dialog invisible behind the fullscreen photo.
  *
  * Props:
  *   conditionId  string
  */
 export default function PersonalNotes({ conditionId }) {
   const { user, profile, loading } = useAuth()
-  const { savedValue, savedImageUrl, updatedAt, save, saveImage } = useNotes(conditionId)
+  const { savedValue, savedImageUrl, updatedAt, save, saveImage, queuePendingImage } = useNotes(conditionId)
   const { requestNoteSignIn } = useNotesSignInContext()
   const isPro = useIsPro()
+  const { isOnline } = useOnlineStatus()
 
   const charCap = isPro ? NOTES_CHAR_CAP_PRO : NOTES_CHAR_CAP_FREE
 
@@ -343,8 +481,13 @@ export default function PersonalNotes({ conditionId }) {
   // savedVisible: null | 'in' | 'out'
   const [savedVisible, setSavedVisible] = useState(null)
 
-  // Clear confirmation sheet
+  // Clear confirmation sheet (note text)
   const [showConfirm, setShowConfirm] = useState(false)
+
+  // notes-photo-uploader-redesign: delete-photo confirmation sheet —
+  // kept separate from showConfirm above since it's a different action
+  // with different copy, and can be open while the Lightbox is also open.
+  const [showDeletePhotoConfirm, setShowDeletePhotoConfirm] = useState(false)
 
   // notes-pro-image-and-char-cap: photo attach/view state.
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -352,6 +495,21 @@ export default function PersonalNotes({ conditionId }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [showProUpsell, setShowProUpsell] = useState(false)
   const fileInputRef = useRef(null)
+
+  // notes-photo-uploader-redesign: true once handlePhotoSelected detects
+  // the device is offline and queues the pick instead of attempting an
+  // upload. Cleared automatically below the moment savedImageUrl actually
+  // updates (i.e. useNotes.js's own reconnect flush succeeded).
+  const [isOfflineQueued, setIsOfflineQueued] = useState(false)
+
+  // notes-photo-uploader-redesign: the last resized blob that failed to
+  // upload, kept so retryUpload() can re-run the exact same attempt
+  // without asking the user to re-pick the file. Cleared on success.
+  const lastFailedBlobRef = useRef(null)
+
+  useEffect(() => {
+    if (savedImageUrl) setIsOfflineQueued(false)
+  }, [savedImageUrl])
 
   // First-note fade-in — true only for the single render right after an
   // empty note becomes populated; flipped back to false shortly after
@@ -453,12 +611,12 @@ export default function PersonalNotes({ conditionId }) {
     setShowConfirm(true)
   }
 
-  // notes-pro-image-and-char-cap: camera tap — Pro opens the picker
-  // directly; free accounts see the upsell sheet instead. Requires a
-  // signed-in user the same way editing does (the button is only ever
+  // notes-photo-uploader-redesign: tap handler for the box's empty state —
+  // exact same reachability the old header camera button had. Requires a
+  // signed-in user the same way editing does (the box is only ever
   // rendered when `user` is truthy, see JSX below, but this stays
   // defensive in case that ever changes).
-  function handleCameraTap() {
+  function handleBoxTap() {
     if (!user) return
     if (!isPro) {
       setShowProUpsell(true)
@@ -467,27 +625,95 @@ export default function PersonalNotes({ conditionId }) {
     fileInputRef.current?.click()
   }
 
+  // notes-photo-uploader-redesign: shared by both the initial pick and
+  // retryUpload() below, so a retry re-runs the exact same upload logic
+  // rather than a second hand-written copy of it.
+  async function attemptUpload(resizedBlob) {
+    setPhotoError(null)
+    setUploadingPhoto(true)
+    try {
+      const { url, error } = await uploadNoteImage(resizedBlob, user.id, conditionId)
+      if (error || !url) {
+        lastFailedBlobRef.current = resizedBlob
+        setPhotoError('Could not upload photo. Please try again.')
+      } else {
+        lastFailedBlobRef.current = null
+        saveImage(url)
+      }
+    } catch {
+      lastFailedBlobRef.current = resizedBlob
+      setPhotoError('Could not upload photo. Please try again.')
+    } finally {
+      setUploadingPhoto(false)
+    }
+  }
+
+  function retryUpload() {
+    const blob = lastFailedBlobRef.current
+    if (!blob || !user) return
+    attemptUpload(blob)
+  }
+
   async function handlePhotoSelected(e) {
     const file = e.target.files?.[0]
     e.target.value = '' // allow re-selecting the same file next time
     if (!file || !user) return
 
     setPhotoError(null)
-    setUploadingPhoto(true)
+
+    // notes-photo-uploader-redesign: client-side validation before any
+    // resize/network work — surfaces immediately, no round trip needed.
+    if (!file.type.startsWith('image/')) {
+      setPhotoError("That file type isn't supported. Please choose an image.")
+      return
+    }
+    if (file.size > MAX_PHOTO_SOURCE_BYTES) {
+      setPhotoError('That photo is too large. Please choose a smaller one.')
+      return
+    }
+
+    let resized
     try {
-      const resized = await resizeAndCompressImage(file)
-      const { url, error } = await uploadNoteImage(resized, user.id, conditionId)
-      if (error || !url) {
-        setPhotoError('Could not upload photo. Please try again.')
-      } else {
-        saveImage(url)
-      }
+      resized = await resizeAndCompressImage(file)
     } catch {
       setPhotoError('Could not process photo. Please try again.')
-    } finally {
-      setUploadingPhoto(false)
+      return
     }
+
+    // notes-photo-uploader-redesign: offline queueing for the upload step
+    // itself — queue the resized blob and stop, rather than letting
+    // uploadNoteImage fail with no retry path.
+    if (!isOnline) {
+      queuePendingImage(resized)
+      setIsOfflineQueued(true)
+      return
+    }
+
+    await attemptUpload(resized)
   }
+
+  // notes-photo-uploader-redesign: closes the Lightbox, fires the storage
+  // delete, and reuses the existing saveImage(null) to null out
+  // image_url — see file header for why the storage delete isn't awaited.
+  function handleDeletePhotoConfirm() {
+    if (!user) return
+    setLightboxOpen(false)
+    deleteNoteImage(user.id, conditionId).catch(() => {})
+    saveImage(null)
+  }
+
+  // notes-photo-uploader-redesign: which of the 5 box states applies,
+  // in priority order — an attached photo always wins since it means an
+  // earlier step already succeeded.
+  const photoState = savedImageUrl
+    ? 'attached'
+    : uploadingPhoto
+      ? 'uploading'
+      : isOfflineQueued
+        ? 'offline'
+        : photoError
+          ? 'error'
+          : 'empty'
 
   // Drives the header row's right-hand slot — true for every state
   // except loading and editing (neither has anything to show up there).
@@ -505,24 +731,40 @@ export default function PersonalNotes({ conditionId }) {
     }}>
       {/* Scoped placeholder color — inline style attributes can't target
           ::placeholder, so this is the one bit of real CSS in an
-          otherwise inline-styled file. */}
+          otherwise inline-styled file. Also holds the upload box's
+          spinner keyframe (notes-photo-uploader-redesign). */}
       <style>{`
         .personal-notes-textarea::placeholder {
           color: var(--color-text-tertiary);
           opacity: 1;
         }
+        @keyframes personal-notes-spin {
+          to { transform: rotate(360deg); }
+        }
       `}</style>
 
-      {/* Label row — title on the left; camera button right after it
-          (notes-pro-image-and-char-cap, see file header); privacy
-          caption (empty-prompt state), "Edit" (populated state), or the
-          "✓ Saved" flash sits on the right of this same row — all three
-          share one inline slot here, same as every other top corner
-          element, rather than "Edit" living in a separate row of its
-          own below. Fixed height (rather than letting the row size
-          itself to whichever text is showing) keeps the row from
-          growing or shrinking a few pixels as the right-hand content
-          swaps between states. */}
+      {/* notes-photo-uploader-redesign: the hidden file input used to sit
+          next to the header camera button; it now renders unconditionally
+          whenever a user is signed in, since the box that triggers it can
+          appear in more than one place in the tree below. */}
+      {!loading && user && (
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={handlePhotoSelected}
+        />
+      )}
+
+      {/* Label row — title on the left; privacy caption (empty-prompt
+          state), "Edit" (populated state), or the "✓ Saved" flash sits on
+          the right of this same row — all three share one inline slot
+          here, same as every other top corner element. Fixed height
+          keeps the row from growing or shrinking a few pixels as the
+          right-hand content swaps between states.
+          notes-photo-uploader-redesign: the camera-icon button that used
+          to live in this row is gone — see NotePhotoBox below instead. */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
@@ -541,42 +783,6 @@ export default function PersonalNotes({ conditionId }) {
         }}>
           Personal Notes
         </span>
-
-        {!loading && user && (
-          <>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={handlePhotoSelected}
-            />
-            <button
-              type="button"
-              onClick={handleCameraTap}
-              disabled={uploadingPhoto}
-              aria-label={isPro ? 'Attach a photo to this note' : 'Attach a photo — Pro feature'}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 22,
-                height: 22,
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: uploadingPhoto ? 'default' : 'pointer',
-                opacity: isPro ? 1 : 0.4,
-              }}
-            >
-              <Icon
-                name="Camera"
-                size={15}
-                color={isPro ? 'var(--color-text-secondary)' : 'var(--color-text-tertiary)'}
-              />
-            </button>
-          </>
-        )}
 
         {showHeaderCorner && (
           savedVisible ? (
@@ -646,10 +852,21 @@ export default function PersonalNotes({ conditionId }) {
         /* Loading skeleton — shown only while useAuth()'s sign-in check
            is still settling, so this card doesn't flash the signed-out
            prompt for a person who turns out to already be signed in.
-           Same pill shape/height as the real empty-state pill (same
-           minHeight + centered content), so nothing resizes once it
-           resolves into that state. */
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+           notes-photo-uploader-redesign: avatar now sits inside the same
+           bordered container as the pill content, full width, matching
+           every other state below. */
+        <div style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          border: '1px solid var(--color-border)',
+          borderRadius: PILL_RADIUS,
+          padding: '8px 16px',
+          boxSizing: 'border-box',
+          backgroundColor: 'var(--color-surface)',
+          width: '100%',
+          minHeight: AVATAR_SIZE + 2,
+        }}>
           <div style={{
             width: AVATAR_SIZE,
             height: AVATAR_SIZE,
@@ -657,211 +874,203 @@ export default function PersonalNotes({ conditionId }) {
             backgroundColor: 'var(--color-border-subtle)',
             flexShrink: 0,
           }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
             <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: AVATAR_SIZE + 2,
-              border: '1px solid var(--color-border)',
-              borderRadius: PILL_RADIUS,
-              padding: '8px 16px',
-              boxSizing: 'border-box',
-              backgroundColor: 'var(--color-surface)',
-            }}>
-              <div style={{
-                width: '55%',
-                height: 11,
-                borderRadius: 4,
-                backgroundColor: 'var(--color-border-subtle)',
-              }} />
-            </div>
+              width: '55%',
+              height: 11,
+              borderRadius: 4,
+              backgroundColor: 'var(--color-border-subtle)',
+            }} />
           </div>
         </div>
       ) : isEditing ? (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-          <ProfileAvatar
-            user={user}
-            fullName={profile?.fullName}
-            style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
-          />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Pill — text box plus an inline Send button pinned to the
-                bottom-right corner, so this reads as one comment-style
-                input rather than a text box with a separate Save
-                control living elsewhere. */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-end',
-              gap: 8,
-              border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
-              borderRadius: PILL_RADIUS,
-              padding: '12px 18px',
-              boxSizing: 'border-box',
-              backgroundColor: 'var(--color-surface)',
-              transition: 'border-color 0.15s ease',
-            }}>
-              <textarea
-                ref={textareaRef}
-                className="personal-notes-textarea"
-                value={draft}
-                onChange={e => setDraft(e.target.value.slice(0, charCap))}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="Add a note or a thought…"
-                dir={getTextDirection(draft)}
-                rows={2}
-                autoFocus
-                maxLength={charCap}
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  boxSizing: 'border-box',
-                  fontSize: 14,
-                  color: 'var(--color-text-primary)',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  padding: 0,
-                  fontFamily: 'var(--font-body)',
-                  lineHeight: 1.65,
-                  resize: 'none',
-                  outline: 'none',
-                  display: 'block',
-                  overflow: 'hidden',
-                }}
+        <div>
+          {/* Pill — avatar, text box, and the inline Send button all
+              share one bordered container now (notes-photo-uploader-
+              redesign moved the avatar in from a sibling row), full
+              width to match the photo box below it. alignItems:
+              'flex-start' on the row keeps the avatar top-aligned even
+              as the textarea grows to multiple lines; the Send button
+              overrides back to alignSelf: 'flex-end' so it still pins to
+              the bottom-right corner as before. */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
+            borderRadius: PILL_RADIUS,
+            padding: '12px 18px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-surface)',
+            transition: 'border-color 0.15s ease',
+            width: '100%',
+          }}>
+            <ProfileAvatar
+              user={user}
+              fullName={profile?.fullName}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
+            />
+            <textarea
+              ref={textareaRef}
+              className="personal-notes-textarea"
+              value={draft}
+              onChange={e => setDraft(e.target.value.slice(0, charCap))}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="Add a note or a thought…"
+              dir={getTextDirection(draft)}
+              rows={2}
+              autoFocus
+              maxLength={charCap}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                boxSizing: 'border-box',
+                fontSize: 14,
+                color: 'var(--color-text-primary)',
+                backgroundColor: 'transparent',
+                border: 'none',
+                padding: 0,
+                fontFamily: 'var(--font-body)',
+                lineHeight: 1.65,
+                resize: 'none',
+                outline: 'none',
+                display: 'block',
+                overflow: 'hidden',
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={!isDirty}
+              aria-label="Send note"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                alignSelf: 'flex-end',
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                marginBottom: 2,
+                cursor: isDirty ? 'pointer' : 'default',
+              }}
+            >
+              <Icon
+                name="Send"
+                size={17}
+                color={isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
               />
+            </button>
+          </div>
+
+          <NotePhotoBox
+            state={photoState}
+            url={savedImageUrl}
+            isPro={isPro}
+            onTapEmpty={handleBoxTap}
+            onTapPhoto={() => setLightboxOpen(true)}
+            onRetry={retryUpload}
+          />
+
+          {/* Footer row — Clear (only when a note exists to clear) on
+              the left; the live character counter and Cancel share the
+              right side. notes-photo-uploader-redesign: paddingLeft
+              dropped to 0 — now that the pill and photo box are both
+              full width with no avatar offsetting them, aligning Clear
+              to the left edge matches the box below it instead of an
+              offset that no longer means anything. */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginTop: 6,
+          }}>
+            {draft ? (
               <button
                 type="button"
-                onClick={handleSave}
-                disabled={!isDirty}
-                aria-label="Send note"
+                onClick={handleClearClick}
+                aria-label="Clear note"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
+                  gap: 4,
+                  fontSize: 12,
+                  fontFamily: 'var(--font-body)',
+                  color: 'var(--color-danger)',
                   background: 'none',
                   border: 'none',
                   padding: 0,
-                  marginBottom: 2,
-                  cursor: isDirty ? 'pointer' : 'default',
+                  cursor: 'pointer',
                 }}
               >
-                <Icon
-                  name="Send"
-                  size={17}
-                  color={isDirty ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
-                />
+                <Icon name="X" size={12} color="var(--color-danger)" />
+                Clear
               </button>
-            </div>
-
-            <NotePhotoStrip url={savedImageUrl} onTap={() => setLightboxOpen(true)} />
-
-            {/* Footer row — Clear (only when a note exists to clear) on
-                the left, right under the textbox; the live character
-                counter (notes-pro-image-and-char-cap; editing-only, per
-                the confirmed decision that a saved note never shows it)
-                and Cancel share the right side. paddingLeft matches the
-                pill's own inner text padding so Clear lines up under the
-                textbox, not under the avatar in the row above. */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              marginTop: 6,
-              paddingLeft: 16,
-            }}>
-              {draft ? (
-                <button
-                  type="button"
-                  onClick={handleClearClick}
-                  aria-label="Clear note"
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    fontSize: 12,
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--color-danger)',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  <Icon name="X" size={12} color="var(--color-danger)" />
-                  Clear
-                </button>
-              ) : <span />}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{
-                  fontSize: 11,
+            ) : <span />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <span style={{
+                fontSize: 11,
+                fontFamily: 'var(--font-body)',
+                color: draft.length >= charCap ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
+              }}>
+                {draft.length}/{charCap}
+              </span>
+              <button
+                type="button"
+                onClick={handleCancel}
+                style={{
+                  fontSize: 13,
                   fontFamily: 'var(--font-body)',
-                  color: draft.length >= charCap ? 'var(--color-danger)' : 'var(--color-text-tertiary)',
-                }}>
-                  {draft.length}/{charCap}
-                </span>
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  style={{
-                    fontSize: 13,
-                    fontFamily: 'var(--font-body)',
-                    color: 'var(--color-text-secondary)',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+                  color: 'var(--color-text-secondary)',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
       ) : user && (savedValue || savedImageUrl) ? (
-        /* Populated, signed in — comment-style. Edit/Saved now live in
-           the header row above, so this row only ever contains the
-           avatar and the pill, top-aligned against each other. On the
-           very first save (empty -> populated) the whole block
-           fades/scales in; subsequent edits render at steady-state with
-           no re-animation.
-           notes-pro-image-and-char-cap: this branch now also fires when
-           only a photo has been saved (no text yet) — a note can be
-           photo-only, so the pill falls back to the same muted prompt
-           copy the empty state uses instead of rendering blank. */
+        /* Populated, signed in — comment-style. On the very first save
+           (empty -> populated) the whole block fades/scales in;
+           subsequent edits render at steady-state with no re-animation.
+           notes-photo-uploader-redesign: avatar moved inside the pill's
+           own bordered container, pill now full width; the photo box
+           renders under it in every populated note, not just ones with
+           a photo already attached. */
         <div style={{
           opacity: justPopulated ? 0 : 1,
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            border: '1px solid var(--color-border)',
+            borderRadius: PILL_RADIUS,
+            padding: '8px 16px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-surface)',
+            width: '100%',
+            minHeight: AVATAR_SIZE + 2,
+          }}>
             <ProfileAvatar
               user={user}
               fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
             />
-            <div style={{
-              flex: 1,
-              minWidth: 0,
-              display: 'flex',
-              alignItems: 'center',
-              minHeight: AVATAR_SIZE + 2,
-              border: '1px solid var(--color-border)',
-              borderRadius: PILL_RADIUS,
-              padding: '8px 16px',
-              boxSizing: 'border-box',
-              backgroundColor: 'var(--color-surface)',
-            }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
               {/* Mixed-language display: rather than manually splitting the
                   text into per-language chunks in code (fragile — proved
                   itself buggy twice), this hands the raw saved text to the
                   browser's own built-in bidi text engine via dir="auto" +
-                  unicode-bidi: plaintext. That's the same standard engine
-                  every browser and phone uses for this already (WhatsApp,
-                  Twitter, Gmail, etc. rely on it rather than writing their
-                  own splitter), so English/Arabic runs get positioned and
-                  wrapped correctly without any custom logic to maintain. */}
+                  unicode-bidi: plaintext. */}
               {savedValue ? (
                 <span
                   dir="auto"
@@ -890,7 +1099,14 @@ export default function PersonalNotes({ conditionId }) {
             </div>
           </div>
 
-          <NotePhotoStrip url={savedImageUrl} onTap={() => setLightboxOpen(true)} />
+          <NotePhotoBox
+            state={photoState}
+            url={savedImageUrl}
+            isPro={isPro}
+            onTapEmpty={handleBoxTap}
+            onTapPhoto={() => setLightboxOpen(true)}
+            onRetry={retryUpload}
+          />
 
           {updatedAt && (
             <p style={{
@@ -911,22 +1127,34 @@ export default function PersonalNotes({ conditionId }) {
       ) : (
         /* Unified prompt state — identical whether signed out or signed
            in with no note yet. Tap routes to the sign-in sheet or
-           straight into edit mode via handlePromptTap. Avatar and pill
-           are top-aligned, same as every other state. */
+           straight into edit mode via handlePromptTap.
+           notes-photo-uploader-redesign: avatar moved inside the pill's
+           own bordered container, pill now full width, matching every
+           other state — no photo box here per the execution plan (the
+           box only renders in editing/populated, so attaching a photo
+           from a totally fresh note starts by tapping into edit mode
+           first, same as it always required for typed text). */
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
-            gap: 10,
             alignItems: 'flex-start',
+            gap: 10,
             cursor: 'pointer',
+            border: '1px solid var(--color-border)',
+            borderRadius: PILL_RADIUS,
+            padding: '8px 16px',
+            boxSizing: 'border-box',
+            backgroundColor: 'var(--color-surface)',
+            width: '100%',
+            minHeight: AVATAR_SIZE + 2,
           }}
         >
           {user ? (
             <ProfileAvatar
               user={user}
               fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12 }}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
             />
           ) : (
             <div style={{
@@ -942,18 +1170,7 @@ export default function PersonalNotes({ conditionId }) {
               <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
             </div>
           )}
-          <div style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            minHeight: AVATAR_SIZE + 2,
-            border: '1px solid var(--color-border)',
-            borderRadius: PILL_RADIUS,
-            padding: '8px 16px',
-            boxSizing: 'border-box',
-            backgroundColor: 'var(--color-surface)',
-          }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
             <span style={{
               fontSize: 14,
               lineHeight: '20px',
@@ -988,8 +1205,22 @@ export default function PersonalNotes({ conditionId }) {
           activeIndex={0}
           onClose={() => setLightboxOpen(false)}
           onGo={() => {}}
+          onDelete={() => setShowDeletePhotoConfirm(true)}
         />
       )}
+
+      {/* notes-photo-uploader-redesign: rendered above the open Lightbox
+          via ConfirmSheet's additive zIndex prop — see file header. */}
+      <ConfirmSheet
+        isOpen={showDeletePhotoConfirm}
+        onClose={() => setShowDeletePhotoConfirm(false)}
+        onConfirm={handleDeletePhotoConfirm}
+        title="Delete image?"
+        message="This action can't be undone."
+        confirmLabel="Delete"
+        destructive
+        zIndex={10000}
+      />
     </div>
   )
 }

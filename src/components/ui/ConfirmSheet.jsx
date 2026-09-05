@@ -24,6 +24,16 @@
  *   message       string
  *   confirmLabel  string   (default 'Confirm')
  *   destructive   boolean  (default false)
+ *   zIndex        number   (default 1000) — notes-photo-uploader-redesign:
+ *                 lets a caller stack this dialog above another
+ *                 already-open fixed-position overlay (specifically,
+ *                 PersonalNotes.jsx's delete-photo confirm needs to sit
+ *                 above Lightbox.jsx, whose own z-index is 9999 — higher
+ *                 than this component's old hardcoded 1000, which would
+ *                 otherwise leave the confirm dialog rendered but
+ *                 invisible behind the fullscreen photo). Every existing
+ *                 caller keeps the original default of 1000, completely
+ *                 unchanged.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -37,6 +47,7 @@ export default function ConfirmSheet({
   message = '',
   confirmLabel = 'Confirm',
   destructive = false,
+  zIndex = 1000,
 }) {
   const overlayRef = useRef(null)
 
@@ -87,7 +98,7 @@ export default function ConfirmSheet({
       style={{
         position:        'fixed',
         inset:           0,
-        zIndex:          1000,
+        zIndex,
         backgroundColor: 'rgba(0,0,0,0.45)',
         display:         'flex',
         alignItems:      'center',
