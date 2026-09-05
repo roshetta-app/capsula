@@ -37,12 +37,14 @@ export const FAVOURITES_LIMIT_MESSAGE_CONDITIONS =
 /**
  * notes-pro-image-and-char-cap
  *
- * Personal Notes character caps — not shared between tiers. 280
- * (Twitter-style) makes a free note feel like a quick jot; 2000 feels
- * like a real upgrade next to it. The photo attachment (Pro-only, see
- * PersonalNotes.jsx) does most of the convincing to go Pro — this number
- * is a secondary nudge. Pro accounts are never checked against the free
- * cap (see useIsPro.js), same pattern as the favourites caps above.
+ * Personal Notes character caps — not shared between tiers. 400 still
+ * keeps a free note feeling like a quick jot, just with a bit more room
+ * than the original Twitter-style 280; 2000 feels like a real upgrade
+ * next to it. The photo attachment (Pro-only, see PersonalNotes.jsx)
+ * does most of the convincing to go Pro — this number is a secondary
+ * nudge. Pro accounts are never checked against the free cap (see
+ * useIsPro.js), same pattern as the favourites caps above.
  */
-export const NOTES_CHAR_CAP_FREE = 280
+export const NOTES_CHAR_CAP_FREE = 400
 export const NOTES_CHAR_CAP_PRO = 2000
+

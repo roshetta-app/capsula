@@ -483,7 +483,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
         type="button"
         onClick={onTapEmpty}
         aria-label={`${PHOTO_BOX_TITLE} — Pro feature`}
-        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', background: 'none', cursor: 'pointer' }}
+        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-accent-light)', cursor: 'pointer' }}
       >
         {iconSquare}
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -500,7 +500,11 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
           fontWeight:      700,
           padding:         '4px 10px',
           borderRadius:    'var(--radius-full)',
-          backgroundColor: 'var(--color-accent-light)',
+          // notes-photo-box-tint: row background is now accent-light (see
+          // rowShell style above) — this pill switches to a solid surface
+          // background instead of reusing accent-light so it still reads
+          // as a distinct chip rather than blending into the row behind it.
+          backgroundColor: 'var(--color-surface)',
           color:           'var(--color-accent)',
           fontFamily:      'var(--font-body)',
         }}>
@@ -515,7 +519,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       type="button"
       onClick={onTapEmpty}
       aria-label={PHOTO_BOX_TITLE}
-      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', background: 'none', cursor: 'pointer' }}
+      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-accent-light)', cursor: 'pointer' }}
     >
       {iconSquare}
       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
