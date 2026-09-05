@@ -24,16 +24,39 @@
  *      catches this), is the only case that still reports 'error' so the
  *      caller can show ImageLoadError.
  *
- * @param {string} url — the gallery photo's web address
+ * notes-offline-prefetch (2026-09-05): added an optional second argument,
+ * `{ store: 'gallery' | 'notes' }`, defaulting to `'gallery'` — picks which
+ * on-device store (and matching save function) step 1 and step 2's
+ * cache-on-view save target. Every existing call (ImageCarousel.jsx,
+ * Lightbox.jsx's gallery use) passes no second argument at all, so they
+ * keep resolving to 'gallery' and behave completely unchanged. Only
+ * Lightbox.jsx's note-photo call (PersonalNotes.jsx's own <Lightbox />)
+ * passes `{ store: 'notes' }`, so a note photo checks/saves
+ * utils/cache.js's separate 'note-photos' store instead of 'photos' — kept
+ * separate for the same pruneOrphanedPhotos reason documented on that
+ * store in utils/cache.js.
+ *
+ * @param {string} url — the photo's web address
+ * @param {{ store?: 'gallery'|'notes' }} [options]
  * @returns {{ src: string|null, status: 'loading'|'ready'|'error', retry: () => void }}
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getCachedPhoto, savePhotoToCache } from '../utils/cache'
+import { getCachedPhoto, savePhotoToCache, getCachedNotePhoto, saveNotePhotoToCache } from '../utils/cache'
 import { logCrash } from '../utils/crashLogger'
 
-export function useCachedImage(url) {
+// notes-offline-prefetch: maps the optional `store` option to its matching
+// get/save pair — 'gallery' (default) preserves every existing call's
+// behavior exactly; 'notes' is the only other value, used solely by
+// PersonalNotes.jsx's own Lightbox call.
+const STORE_FUNCS = {
+  gallery: { get: getCachedPhoto,     save: savePhotoToCache },
+  notes:   { get: getCachedNotePhoto, save: saveNotePhotoToCache },
+}
+
+export function useCachedImage(url, { store = 'gallery' } = {}) {
   const [src,    setSrc]    = useState(null)
   const [status, setStatus] = useState('loading')
+  const { get: getCached, save: saveCached } = STORE_FUNCS[store] ?? STORE_FUNCS.gallery
 
   // Race-guard for rapid url changes (e.g. swiping the carousel while a
   // previous load is still in flight) — same attempt-id pattern already
@@ -62,7 +85,7 @@ export function useCachedImage(url) {
 
     // 1. Device first
     try {
-      const cachedBlob = await getCachedPhoto(url)
+      const cachedBlob = await getCached(url)
       if (attemptIdRef.current !== myAttempt) return
       if (cachedBlob) {
         const objectUrl = URL.createObjectURL(cachedBlob)
@@ -88,7 +111,7 @@ export function useCachedImage(url) {
       objectUrlRef.current = objectUrl
       setSrc(objectUrl)
       setStatus('ready')
-      savePhotoToCache(url, blob) // fire-and-forget — self-heals the cache
+      saveCached(url, blob) // fire-and-forget — self-heals the cache
     } catch (err) {
       if (attemptIdRef.current !== myAttempt) return
       logCrash(err, 'useCachedImage: network fetch')
@@ -103,7 +126,7 @@ export function useCachedImage(url) {
       setSrc(url)
       setStatus('ready')
     }
-  }, [url])
+  }, [url, store])
 
   useEffect(() => {
     load()
@@ -118,5 +141,3 @@ export function useCachedImage(url) {
 
   return { src, status, retry: load }
 }
-
-

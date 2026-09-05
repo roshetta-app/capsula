@@ -290,10 +290,27 @@ export function writeIconCache(url, svg) {
 // existing devices get this new store created automatically the next time
 // they open the app; the 'drugs'/'conditions'/'photos' stores and their
 // data are untouched by this bump.
+//
+// 2026-09-05 (notes-offline-prefetch, Task 2): added a fifth store,
+// 'note-photos', for already-uploaded note photos an account's own notes
+// point to — cached so any note is viewable offline immediately after a
+// sign-in prefetch, without ever having been opened first. Deliberately
+// its own store rather than reusing 'photos' above: pruneOrphanedPhotos
+// (below) already runs after every fresh condition fetch and deletes
+// anything in 'photos' not in that fetch's own gallery-photo URL list —
+// note photos are never part of that list, so sharing the store would mean
+// every note photo gets silently deleted on the very next condition
+// refresh. 'note-photos' is a Blob-per-URL store like 'photos', just never
+// touched by pruneOrphanedPhotos or any other gallery-scoped cleanup — see
+// saveNotePhotoToCache/getCachedNotePhoto below, exact mirrors of
+// savePhotoToCache/getCachedPhoto targeting this store instead. IDB_VERSION
+// bumped 4 → 5 so existing devices get this new store created automatically
+// the next time they open the app; every other store and its data is
+// untouched by this bump.
 
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 4
-const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos']
+const IDB_VERSION = 5
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
@@ -301,6 +318,7 @@ const CONDITIONS_STORE = 'conditions'
 const CONDITIONS_KEY   = 'conditions'
 const PHOTOS_STORE     = 'photos'
 const PENDING_NOTE_PHOTOS_STORE = 'pending-note-photos'
+const NOTE_PHOTOS_STORE = 'note-photos'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -693,6 +711,72 @@ export async function clearPendingNotePhoto(userId, conditionId) {
     })
   } catch (err) {
     logCrash(err, 'utils/cache.js: clearPendingNotePhoto')
+  } finally {
+    db?.close()
+  }
+}
+
+// ─── Note photos (already-uploaded, cached for offline viewing) ──────────
+//
+// Added 2026-09-05 (notes-offline-prefetch, Task 2). Exact mirror of the
+// 'photos' (gallery) functions above, targeting NOTE_PHOTOS_STORE instead —
+// kept as its own store rather than sharing 'photos' so pruneOrphanedPhotos
+// (above) never sees these keys and can't delete them; see this file's
+// header comment on NOTE_PHOTOS_STORE for the full reasoning. Two callers:
+// useNotesPrefetch.js (the bulk background download after a genuine
+// sign-in) and useCachedImage.js (cache-on-view, the same fallback path the
+// gallery 'photos' store already gets, via its new optional store param).
+
+/**
+ * Save one note photo to the on-device store, keyed by its own URL. Same
+ * shape as savePhotoToCache above, just targeting NOTE_PHOTOS_STORE — see
+ * that function's own comment for the general reasoning (fire-and-forget,
+ * fails silently to the caller, reports to the crash log).
+ * @param {string} url  — the note photo's Storage URL
+ * @param {Blob}   blob — the fetched image data
+ */
+export async function saveNotePhotoToCache(url, blob) {
+  if (!url || !blob) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(NOTE_PHOTOS_STORE, 'readwrite')
+      tx.objectStore(NOTE_PHOTOS_STORE).put(blob, url)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: saveNotePhotoToCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Read one cached note photo's Blob, or null if nothing's saved for that
+ * URL yet — the normal, expected case for a photo the prefetch hasn't
+ * finished downloading yet, or a note attached before this task shipped.
+ * Callers (useCachedImage.js) fall back to the network for it, not an
+ * error, same as getCachedPhoto above.
+ * @param {string} url — the note photo's Storage URL
+ * @returns {Promise<Blob|null>}
+ */
+export async function getCachedNotePhoto(url) {
+  if (!url) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    const blob = await new Promise((resolve, reject) => {
+      const tx = db.transaction(NOTE_PHOTOS_STORE, 'readonly')
+      const req = tx.objectStore(NOTE_PHOTOS_STORE).get(url)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+    return blob
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: getCachedNotePhoto')
+    return null
   } finally {
     db?.close()
   }

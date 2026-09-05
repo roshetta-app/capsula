@@ -11,6 +11,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useNotes } from '../../hooks/useNotes'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useCachedImage } from '../../hooks/useCachedImage'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
 import { getTextDirection } from '../../utils/textDirection'
 import { resizeAndCompressImage } from '../../utils/imageResize'
@@ -210,6 +211,78 @@ function NotePhotoUpsellSheet({ isOpen, onClose }) {
 // isOfflineQueued / photoError, in that priority order — see
 // PersonalNotes' photoState below) rather than derived in here, since the
 // parent already owns every piece of state that determines it.
+// notes-offline-prefetch (2026-09-05): the attached-photo view used to be
+// a plain <img src={url}> pair (blur + main layers) inside NotePhotoBox
+// directly — fine for the upload flow itself (the browser already has the
+// just-uploaded photo warm in its own HTTP cache), but it meant this box
+// never actually benefited from useNotesPrefetch.js's background download
+// into utils/cache.js's 'note-photos' IndexedDB store: a plain <img> tag
+// only ever consults the browser's own HTTP cache, never IndexedDB. Pulled
+// out into its own small component so it can call
+// useCachedImage(url, { store: 'notes' }) — same device-first/network/
+// cache-on-view hook every gallery photo already uses via ImageCarousel.jsx
+// (mirrors that component's own Slide, just without the Embla swipe
+// scaffolding a single static photo doesn't need) — so this box is
+// actually instant offline once a note's photo has been prefetched, not
+// just theoretically cacheable.
+function NoteAttachedPhoto({ url, onTap, boxBase }) {
+  const { src, status, retry } = useCachedImage(url, { store: 'notes' })
+
+  if (status === 'error') {
+    return (
+      <div style={{
+        ...boxBase,
+        border: '1px dashed var(--color-border)',
+        backgroundColor: 'var(--color-surface)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+      }}>
+        <span style={{ fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)' }}>
+          Couldn't load photo
+        </span>
+        <button
+          type="button"
+          onClick={retry}
+          style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-accent)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label="View attached photo"
+      style={{ ...boxBase, padding: 0, border: 'none', cursor: 'pointer', background: 'none', backgroundColor: 'var(--color-surface)' }}
+    >
+      {status === 'ready' && src && (
+        <>
+          <img src={src} alt="" aria-hidden="true" draggable={false} style={NOTE_BLUR_IMG_STYLE} />
+          <img src={src} alt="Attached note photo" draggable={false} style={NOTE_MAIN_IMG_STYLE} />
+        </>
+      )}
+      {status === 'loading' && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            width: 18, height: 18, borderRadius: '50%',
+            border: '2px solid var(--color-border)',
+            borderTopColor: 'var(--color-accent)',
+            animation: 'personal-notes-spin 0.7s linear infinite',
+          }} />
+        </div>
+      )}
+    </button>
+  )
+}
+
 function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
   const boxBase = {
     display:      'block',
@@ -223,17 +296,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
   }
 
   if (state === 'attached' && url) {
-    return (
-      <button
-        type="button"
-        onClick={onTapPhoto}
-        aria-label="View attached photo"
-        style={{ ...boxBase, padding: 0, border: 'none', cursor: 'pointer', background: 'none' }}
-      >
-        <img src={url} alt="" aria-hidden="true" draggable={false} style={NOTE_BLUR_IMG_STYLE} />
-        <img src={url} alt="Attached note photo" draggable={false} style={NOTE_MAIN_IMG_STYLE} />
-      </button>
-    )
+    return <NoteAttachedPhoto url={url} onTap={onTapPhoto} boxBase={boxBase} />
   }
 
   // Every other state shares one plain dashed-border shell — only the
@@ -459,6 +522,26 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
  *     Lightbox (zIndex 9999) — Lightbox's real z-index is otherwise
  *     higher than ConfirmSheet's old hardcoded value, which would have
  *     left the confirm dialog invisible behind the fullscreen photo.
+ *
+ * notes-offline-prefetch (2026-09-05): added after discovering that
+ *   without it, Task 2's background prefetch (useNotesPrefetch.js) would
+ *   populate utils/cache.js's 'note-photos' store with nothing left to
+ *   ever read from it — neither of this file's own note-photo display
+ *   spots checked that store. Two small additive changes here (this file
+ *   wasn't in that task's own original file list, added once this gap
+ *   was found):
+ *   - NotePhotoBox's 'attached' state (the small photo box on the note
+ *     card itself) now renders via a new NoteAttachedPhoto sub-component
+ *     using useCachedImage(url, { store: 'notes' }) instead of a plain
+ *     <img src={url}> — mirrors ImageCarousel.jsx's own Slide, just
+ *     without the Embla swipe scaffolding a single static photo doesn't
+ *     need. This is the primary payoff of the whole prefetch task: it's
+ *     what makes opening a note screen show its photo instantly offline,
+ *     with no tap required, rather than only the fullscreen Lightbox view
+ *     benefiting.
+ *   - The <Lightbox /> call below now passes imageStore="notes", so
+ *     opening a note's photo fullscreen also reads from the same
+ *     prefetched store instead of always hitting the network.
  *
  * Props:
  *   conditionId  string
@@ -1206,6 +1289,7 @@ export default function PersonalNotes({ conditionId }) {
           onClose={() => setLightboxOpen(false)}
           onGo={() => {}}
           onDelete={() => setShowDeletePhotoConfirm(true)}
+          imageStore="notes"
         />
       )}
 

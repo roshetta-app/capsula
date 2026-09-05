@@ -76,6 +76,20 @@
  * guaranteed to be real (and which already protects itself against a
  * network-timing false positive via isNetworkTimingError) — not
  * reactively here on every merely-unconfirmed session.
+ *
+ * notes-offline-prefetch (2026-09-05): fires prefetchAllNotes(
+ * incomingUserId) — fire-and-forget, not awaited, not gating `loading` —
+ * from inside the onAuthStateChange subscription's genuine SIGNED_IN
+ * branch below (the `userIdRef.current = incomingUserId; setLoading(true)`
+ * one), never from the same-user tab-refocus revalidation branch just
+ * above it. App.jsx was checked in full for this task and confirmed to
+ * have no better/existing "run once per genuine sign-in" hook point — this
+ * is it. useNotesPrefetchResume() (see useNotesPrefetch.js) is also
+ * mounted once here, inside AuthProvider itself, since this component is
+ * already the one place in the app guaranteed to mount exactly once —
+ * same reasoning as the oauthCallbackListenerRegistered singleton flag
+ * above, just via a real single mount point instead of a module-level
+ * flag.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -86,6 +100,7 @@ import { supabase } from '../lib/supabase'
 import { useToast } from './ToastContext'
 import { writeCachedAuthSnapshot, clearCachedAuthSnapshot, getCachedAuthSnapshot } from '../utils/authSnapshot'
 import { setCurrentUserId } from '../analytics/deviceSession'
+import { prefetchAllNotes, useNotesPrefetchResume } from '../hooks/useNotesPrefetch'
 
 // Stage 3 (F6) — the custom scheme/host the native app registers in
 // AndroidManifest.xml to catch Google's redirect back from the system
@@ -224,6 +239,12 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+
+  // notes-offline-prefetch: mounted once here (AuthProvider is guaranteed
+  // to mount exactly once app-wide) — resumes any note-photo downloads
+  // left unfinished by the last prefetchAllNotes pass, on reconnect. See
+  // useNotesPrefetch.js's own header for the full reasoning.
+  useNotesPrefetchResume()
 
   // admin-cms-shell-flash fix (2026-08-24) — tracks whichever user id is
   // currently loaded so onAuthStateChange (below) can tell a genuine new
@@ -513,6 +534,10 @@ export function AuthProvider({ children }) {
         setLoading(true)
         setUser(session?.user ?? null)
         loadProfile(session?.user ?? null).finally(() => setLoading(false))
+        // notes-offline-prefetch: genuine sign-in only (this branch, not
+        // the same-user revalidation one above) — fire-and-forget, not
+        // awaited, doesn't touch `loading`. See useNotesPrefetch.js.
+        prefetchAllNotes(incomingUserId)
         return
       }
 

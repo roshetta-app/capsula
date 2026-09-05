@@ -90,6 +90,20 @@
  *   confirm UI is built here, that stays in PersonalNotes.jsx via its own
  *   ConfirmSheet rendered on top of this component.
  *
+ * notes-offline-prefetch (2026-09-05): new opt-in `imageStore` prop,
+ *   default `'gallery'` — forwarded straight through to every slide's own
+ *   useCachedImage(url, { store: imageStore }) call (see LightboxSlide
+ *   below). Every existing caller (ImageCarousel.jsx's gallery use) passes
+ *   no value at all, so it keeps resolving to `'gallery'` and behaves
+ *   completely unchanged. Only PersonalNotes.jsx's own call passes
+ *   `imageStore="notes"`, so its one note photo checks/saves
+ *   utils/cache.js's separate 'note-photos' store (populated by this
+ *   task's background prefetch, see useNotesPrefetch.js) instead of the
+ *   gallery 'photos' store — same store-selection option useCachedImage.js
+ *   itself gained this same task, just threaded one layer further out
+ *   since Lightbox.jsx, not PersonalNotes.jsx, is what actually calls that
+ *   hook.
+ *
  * Props:
  *   images       { id, url, caption }[]
  *   activeIndex  number
@@ -99,6 +113,9 @@
  *                top band next to the close button
  *   onDelete     () => void (optional) — notes-photo-uploader-redesign:
  *                when provided, shows a delete icon in the top band
+ *   imageStore   'gallery' | 'notes' (optional, default 'gallery') —
+ *                notes-offline-prefetch: which on-device cache each
+ *                slide's photo checks/saves via useCachedImage
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -230,10 +247,10 @@ function stopTouchLeak(e) { e.stopPropagation() }
 // the lightbox does). Only the current slide reports zoom back up and
 // keeps panning enabled; every other slide's zoom is reset the instant
 // it stops being current, so swiping back to it later always starts flat.
-function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom, onCurrentFailed, currentDisplayFailed }) {
+function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom, onCurrentFailed, currentDisplayFailed, imageStore }) {
   const isCurrent = index === selectedIndex
   const shouldLoad = !!img && Math.abs(index - selectedIndex) <= LOAD_WINDOW
-  const cached = useCachedImage(shouldLoad ? img?.url : undefined)
+  const cached = useCachedImage(shouldLoad ? img?.url : undefined, { store: imageStore })
   const transformRef = useRef(null)
   // Own local copy of this slide's zoom — needed to gate its own
   // panning (see below); also forwarded up to the parent via
@@ -314,7 +331,7 @@ function LightboxSlide({ img, index, selectedIndex, onCurrentInfo, onCurrentZoom
   )
 }
 
-export default function Lightbox({ images, activeIndex, onClose, onGo, title = '', onDelete }) {
+export default function Lightbox({ images, activeIndex, onClose, onGo, title = '', onDelete, imageStore = 'gallery' }) {
   const [emblaRef, emblaApi] = useEmblaCarousel({
     align: 'start',
     loop: false,
@@ -557,6 +574,7 @@ export default function Lightbox({ images, activeIndex, onClose, onGo, title = '
                 onCurrentZoom={handleCurrentZoom}
                 onCurrentFailed={() => setDisplayFailed(true)}
                 currentDisplayFailed={displayFailed}
+                imageStore={imageStore}
               />
             ))}
           </div>
