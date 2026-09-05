@@ -1339,7 +1339,9 @@ export default function PersonalNotes({ conditionId }) {
                 </span>
                 {updatedAt && (
                   <span style={{
-                    display: 'block',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
                     marginTop: 2,
                     fontSize: 13,
                     lineHeight: '19px',
@@ -1347,6 +1349,7 @@ export default function PersonalNotes({ conditionId }) {
                     color: 'var(--color-text-tertiary)',
                     fontFamily: 'var(--font-body)',
                   }}>
+                    <Icon name="Clock" size={11} color="var(--color-text-tertiary)" />
                     {formatRelativeTime(updatedAt)}
                   </span>
                 )}
