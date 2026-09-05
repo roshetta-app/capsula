@@ -301,17 +301,16 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
   )
 }
 
-// personal-notes-mock-restyle: `context` picks which copy the empty
-// photo-box states use — 'note' for the empty/writing pill (a note that
-// doesn't exist yet), 'saved' for a note that's already been saved. Only
-// affects the two text lines below; tap behavior and Pro-gating are the
-// same in both.
-const PHOTO_BOX_COPY = {
-  note:  { title: 'Add a photo to your note', subtitle: 'Photo notes are available with Pro.' },
-  saved: { title: 'Add a photo',              subtitle: 'Attach an image to this note' },
-}
+// personal-notes-mock-restyle: title is always the same regardless of
+// whether a note already exists — a context-varying title ("Add a photo"
+// once saved) read as inconsistent in testing. Subtitle only ever shows
+// for the Pro-locked look, and is the same "Unlock with Pro" wording
+// ProUpsellBanner/NotePhotoUpsellSheet already use elsewhere, kept short
+// so it doesn't wrap to two lines in the row layout below.
+const PHOTO_BOX_TITLE = 'Add a photo to your note'
+const PHOTO_BOX_PRO_SUBTITLE = 'Unlock with Pro'
 
-function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPhoto, onRetry }) {
+function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
   const boxBase = {
     display:      'block',
     width:        '100%',
@@ -340,6 +339,29 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
     gap:             6,
     padding:         '0 var(--space-4)',
     textAlign:       'center',
+  }
+
+  // personal-notes-mock-restyle: shown for the real duration of an
+  // in-flight image delete (see deletingPhoto above) — same shell/spinner
+  // pattern as 'uploading' below, so a delete gets the same visible
+  // "something is happening" feedback an upload already had.
+  if (state === 'deleting') {
+    return (
+      <div style={shell} aria-live="polite">
+        <div
+          aria-hidden="true"
+          style={{
+            width: 18, height: 18, borderRadius: '50%',
+            border: '2px solid var(--color-border)',
+            borderTopColor: 'var(--color-accent)',
+            animation: 'personal-notes-spin 0.7s linear infinite',
+          }}
+        />
+        <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+          Deleting…
+        </span>
+      </div>
+    )
   }
 
   if (state === 'uploading') {
@@ -401,7 +423,6 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
   // middle, and (free accounts only) a solid "PRO" pill pinned to the
   // right via marginLeft: auto — replacing the old centered vertical
   // layout, to match the provided mock.
-  const copy = PHOTO_BOX_COPY[context] || PHOTO_BOX_COPY.note
   const iconSquare = (
     <span style={{
       display:         'flex',
@@ -423,6 +444,10 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
   // short line, so reusing that same fixed height left it dwarfed inside
   // a mostly-empty dashed box — sized to its own content instead, same
   // width/radius/margin as every other box state for visual consistency.
+  // backgroundColor uses --color-surface-muted (an existing app token,
+  // already used for e.g. skeleton fills) rather than plain --color-
+  // surface, so this box reads as a distinct, slightly-recessed area
+  // instead of matching the note card above it exactly.
   const rowShell = {
     display:         'flex',
     alignItems:      'center',
@@ -434,7 +459,7 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
     boxSizing:       'border-box',
     textAlign:       'left',
     border:          '1px dashed var(--color-border)',
-    backgroundColor: 'var(--color-surface)',
+    backgroundColor: 'var(--color-surface-muted)',
   }
 
   if (!isPro) {
@@ -442,16 +467,16 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
       <button
         type="button"
         onClick={onTapEmpty}
-        aria-label={`${copy.title} — Pro feature`}
+        aria-label={`${PHOTO_BOX_TITLE} — Pro feature`}
         style={{ ...rowShell, cursor: 'pointer' }}
       >
         {iconSquare}
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-            {copy.title}
+            {PHOTO_BOX_TITLE}
           </span>
           <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-            {copy.subtitle}
+            {PHOTO_BOX_PRO_SUBTITLE}
           </span>
         </span>
         <span style={{
@@ -474,12 +499,12 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
     <button
       type="button"
       onClick={onTapEmpty}
-      aria-label={copy.title}
+      aria-label={PHOTO_BOX_TITLE}
       style={{ ...rowShell, cursor: 'pointer' }}
     >
       {iconSquare}
       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-        {copy.title}
+        {PHOTO_BOX_TITLE}
       </span>
     </button>
   )
@@ -692,11 +717,37 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
  *   - NotePhotoBox's empty-state branches (Pro-locked and Pro) rebuilt
  *     as a horizontal row — icon square, bold title + grey subtitle,
  *     and (free accounts only) a solid "PRO" pill on the right — instead
- *     of the previous centered vertical layout. Copy now varies by
- *     context ('note' for the empty/writing pill, 'saved' for an
- *     already-saved note), via the new PHOTO_BOX_COPY map and the box's
- *     new `context` prop. The uploading/offline/error sub-states are
- *     unchanged — the mock doesn't cover those.
+ *     of the previous centered vertical layout. The uploading/offline/
+ *     error sub-states are unchanged — the mock doesn't cover those.
+ *
+ * personal-notes-mock-restyle-fixes (this task, after device testing):
+ *   - The row above initially spread boxBase's fixed 140px height (meant
+ *     for a full-bleed photo), which left the short icon/title row
+ *     floating in a mostly-empty dashed box. rowShell now sizes to its
+ *     own content instead.
+ *   - Title is now always "Add a photo to your note" — a context-varying
+ *     title ("Add a photo" once a note is saved) read as inconsistent.
+ *     Dropped the context prop and PHOTO_BOX_COPY map entirely along
+ *     with it; nothing else needed per-context copy.
+ *   - Pro-locked subtitle shortened from "Photo notes are available with
+ *     Pro." to "Unlock with Pro" — same CTA, matches the "Unlock…"
+ *     wording ProUpsellBanner/NotePhotoUpsellSheet already use, and no
+ *     longer wraps to two lines in the row layout.
+ *   - rowShell's background is now --color-surface-muted instead of
+ *     --color-surface, so the box reads as a distinct, slightly-recessed
+ *     area rather than matching the note card above it exactly.
+ *   - Prompt-state placeholder gained a small MessageSquare icon before
+ *     the text, matching the icon+text pattern already used for
+ *     "Private" and "Edited … ago" elsewhere in this file.
+ *   - Editing footer's Clear button now uses a Trash2 icon instead of X,
+ *     consistent with the new Delete-note menu item's icon.
+ *   - Confirming "Delete image?" used to close the Lightbox and null
+ *     image_url with no visible feedback — the photo just disappeared.
+ *     Added a deletingPhoto flag that puts the box into its own
+ *     "Deleting…" state (same spinner+label shell as 'uploading') for
+ *     the real duration of the Storage delete call, which is now
+ *     awaited instead of fire-and-forget specifically so this state has
+ *     something real to cover.
  *
  * Props:
  *   conditionId  string
@@ -759,6 +810,14 @@ export default function PersonalNotes({ conditionId }) {
   const [lightboxOpen, setLightboxOpen] = useState(false)
   const [showProUpsell, setShowProUpsell] = useState(false)
   const fileInputRef = useRef(null)
+
+  // personal-notes-mock-restyle: true while a confirmed image delete is
+  // in flight. Previously the box just went straight from "attached" to
+  // "empty" the instant Delete was confirmed, with no indication anything
+  // was happening — this gives the box its own visible "Deleting…" state
+  // (same spinner+label pattern as the 'uploading' state below) for the
+  // real duration of the Storage delete call.
+  const [deletingPhoto, setDeletingPhoto] = useState(false)
 
   // notes-photo-uploader-redesign: true once handlePhotoSelected detects
   // the device is offline and queues the pick instead of attempting an
@@ -1050,20 +1109,33 @@ export default function PersonalNotes({ conditionId }) {
     await attemptUpload(resized)
   }
 
-  // notes-photo-uploader-redesign: closes the Lightbox, fires the storage
-  // delete, and reuses the existing saveImage(null) to null out
-  // image_url — see file header for why the storage delete isn't awaited.
-  function handleDeletePhotoConfirm() {
+  // personal-notes-mock-restyle: now awaits the Storage delete (previously
+  // fire-and-forget — see the old rationale this replaces) specifically
+  // so deletingPhoto has a real duration to cover, rather than a synthetic
+  // delay. Best-effort still applies: a Storage failure doesn't block
+  // clearing image_url, since the DB row is the source of truth for
+  // whether a note "has" a photo.
+  async function handleDeletePhotoConfirm() {
     if (!user) return
     setLightboxOpen(false)
-    deleteNoteImage(user.id, conditionId).catch(() => {})
-    saveImage(null)
+    setDeletingPhoto(true)
+    try {
+      await deleteNoteImage(user.id, conditionId)
+    } catch {
+      // best-effort — fall through to saveImage(null) regardless
+    } finally {
+      saveImage(null)
+      setDeletingPhoto(false)
+    }
   }
 
-  // notes-photo-uploader-redesign: which of the 5 box states applies,
-  // in priority order — an attached photo always wins since it means an
-  // earlier step already succeeded.
-  const photoState = savedImageUrl
+  // notes-photo-uploader-redesign: which of the 6 box states applies, in
+  // priority order. personal-notes-mock-restyle: deletingPhoto now checked
+  // first — an in-flight delete should show its own state even though
+  // savedImageUrl is still technically set until saveImage(null) resolves.
+  const photoState = deletingPhoto
+    ? 'deleting'
+    : savedImageUrl
     ? 'attached'
     : uploadingPhoto
       ? 'uploading'
@@ -1355,7 +1427,7 @@ export default function PersonalNotes({ conditionId }) {
                     cursor: 'pointer',
                   }}
                 >
-                  <Icon name="X" size={12} color="var(--color-danger)" />
+                  <Icon name="Trash2" size={12} color="var(--color-danger)" />
                   Clear
                 </button>
               ) : <span />}
@@ -1593,7 +1665,6 @@ export default function PersonalNotes({ conditionId }) {
             state={photoState}
             url={savedImageUrl}
             isPro={isPro}
-            context="saved"
             onTapEmpty={handleBoxTap}
             onTapPhoto={() => setLightboxOpen(true)}
             onRetry={retryUpload}
@@ -1656,12 +1727,16 @@ export default function PersonalNotes({ conditionId }) {
           <span style={{
             flex: 1,
             minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
             fontSize: 14,
             lineHeight: '19px',
             fontWeight: 400,
             color: 'var(--color-text-tertiary)',
             fontFamily: 'var(--font-body)',
           }}>
+            <Icon name="MessageSquare" size={14} color="var(--color-text-tertiary)" />
             Add a note or thought…
           </span>
         </div>
