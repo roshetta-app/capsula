@@ -684,6 +684,20 @@ export function AuthProvider({ children }) {
     // catch this, so there's no window where a signed-out AccountScreen
     // could still show the last signed-in person's info.
     clearCachedAuthSnapshot()
+    // notes-clear-on-signout fix (2026-09-06) — clearAllNotesStorage()
+    // above only sweeps localStorage. A PersonalNotes/useNotes() instance
+    // that's already mounted and already loaded a note into React state
+    // has no way to hear about that sweep on its own, so it kept showing
+    // the previous account's note/photo until something else happened to
+    // re-trigger a load. Dispatched only from here — the one place a
+    // REAL sign-out is guaranteed to run through — rather than from a
+    // generic "user went null" watcher inside useNotes.js itself, since
+    // that exact pattern was already tried and removed (see
+    // recently-viewed-offline-fix in useNotes.js's header): a background
+    // session recheck can report "no user" for a moment purely from being
+    // offline, and a watcher there couldn't tell that apart from a real
+    // sign-out.
+    window.dispatchEvent(new Event('capsula:signed-out'))
     return { error: error ?? null }
   }
 

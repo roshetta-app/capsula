@@ -116,6 +116,16 @@
  * clearAllNotesStorage() there. This hook no longer needs its own copy of
  * that logic.
  *
+ * notes-clear-on-signout fix (2026-09-06) — the storage sweep above left
+ * one gap: a PersonalNotes screen that's already mounted and already
+ * loaded a note into this hook's React state kept showing that note after
+ * sign-out, since clearing localStorage alone doesn't touch state that's
+ * already in memory. Re-added a reactive reset, but scoped to a
+ * 'capsula:signed-out' window event dispatched only from inside
+ * signOut() itself — not a generic watcher on `user` going to null — so
+ * it can't misfire on the same offline false-positive this file's
+ * previous fix (just above) was written to avoid.
+ *
  * Returns:
  *   savedValue     string          — the current saved note body ('' if none)
  *   savedImageUrl  string | null   — the current saved photo URL, null if none
@@ -269,6 +279,32 @@ export function useNotes(conditionId) {
   const [savedValue, setSavedValue]       = useState(() => readStorage(conditionId))
   const [savedImageUrl, setSavedImageUrl] = useState(() => readImageStorage(conditionId))
   const [updatedAt, setUpdatedAt]         = useState(() => readUpdatedAtStorage(conditionId))
+
+  // notes-clear-on-signout fix: AuthContext.jsx's signOut() already sweeps
+  // every capsula_notes_* localStorage key, but only from there — it can't
+  // reach into this hook's already-loaded React state if a note screen
+  // happens to be mounted at the moment of sign-out. Re-reading from
+  // storage here (via the same helpers the initial useState above uses)
+  // picks up the now-cleared/empty values, so the UI falls back to the
+  // empty state right away instead of continuing to show the previous
+  // account's note until something else re-triggers a load.
+  //
+  // Deliberately keyed to this specific 'capsula:signed-out' event —
+  // dispatched only from inside the real signOut() function — rather than
+  // a generic effect watching `user` go to null, since that broader
+  // pattern was already tried and removed elsewhere in this file (see
+  // recently-viewed-offline-fix above): a background session recheck can
+  // briefly report "no user" purely from being offline, and a watcher on
+  // `user` alone can't tell that apart from an actual sign-out.
+  useEffect(() => {
+    function handleSignedOut() {
+      setSavedValue(readStorage(conditionId))
+      setSavedImageUrl(readImageStorage(conditionId))
+      setUpdatedAt(readUpdatedAtStorage(conditionId))
+    }
+    window.addEventListener('capsula:signed-out', handleSignedOut)
+    return () => window.removeEventListener('capsula:signed-out', handleSignedOut)
+  }, [conditionId])
 
   const isOnlineRef = useRef(isOnline)
   useEffect(() => { isOnlineRef.current = isOnline }, [isOnline])
@@ -500,3 +536,4 @@ export function useNotes(conditionId) {
 
   return { savedValue, savedImageUrl, updatedAt, save, saveImage, queuePendingImage }
 }
+
