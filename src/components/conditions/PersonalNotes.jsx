@@ -451,10 +451,14 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       width:           36,
       height:          36,
       borderRadius:    'var(--radius-sm)',
-      backgroundColor: 'var(--color-border-subtle)',
+      // notes-photo-box-tint: white chip + accent icon, matching the PRO
+      // pill's treatment on the same tinted row — previously a neutral
+      // grey square, which read as mismatched once the row picked up the
+      // accent-light tint.
+      backgroundColor: 'var(--color-surface)',
       flexShrink:      0,
     }}>
-      <Icon name="ImagePlus" size={17} color="var(--color-text-secondary)" />
+      <Icon name="ImagePlus" size={17} color="var(--color-accent)" />
     </span>
   )
   // notes-merged-card: no longer spreading boxBase — boxBase's fixed
@@ -1837,16 +1841,12 @@ export default function PersonalNotes({ conditionId }) {
             <span style={{
               flex: 1,
               minWidth: 0,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
               fontSize: 14,
               lineHeight: '19px',
               fontWeight: 400,
               color: 'var(--color-text-tertiary)',
               fontFamily: 'var(--font-body)',
             }}>
-              <Icon name="MessageSquare" size={14} color="var(--color-text-tertiary)" />
               Add a note or thought…
             </span>
           </div>
