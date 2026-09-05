@@ -1010,11 +1010,22 @@ export default function PersonalNotes({ conditionId }) {
 
   // Auto-grow the textarea to fit content — runs when entering edit mode
   // and whenever the draft changes.
+  //
+  // notes-typing-keyboard-scroll: the keyboard-aware scroll check is
+  // called right here too, not just from the ResizeObserver further up —
+  // a line simply wrapping as you type (no Enter key involved) wasn't
+  // reliably caught by the ResizeObserver alone, since the browser
+  // doesn't always treat that as a distinct enough size change to report
+  // right away. Tying it directly to this same effect (which already
+  // reruns on every keystroke, wrap or not, since it's keyed on `draft`)
+  // guarantees the check happens every time, after the height above has
+  // already been updated.
   useLayoutEffect(() => {
     if (!isEditing || !textareaRef.current) return
     const el = textareaRef.current
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
+    scrollCardAboveKeyboard()
   }, [isEditing, draft])
 
   // Put the cursor at the end of the existing text when entering edit
