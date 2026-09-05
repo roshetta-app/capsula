@@ -328,11 +328,11 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       display:         'flex',
       alignItems:      'center',
       justifyContent:  'center',
-      width:           36,
-      height:          36,
+      width:           30,
+      height:          30,
       flexShrink:      0,
     }}>
-      <Icon name="ImagePlus" size={17} color="var(--color-text-tertiary)" />
+      <Icon name="ImagePlus" size={15} color="var(--color-text-tertiary)" />
     </span>
   )
   // notes-merged-card: no longer spreading boxBase — boxBase's fixed
@@ -347,7 +347,10 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
     alignItems:              'center',
     gap:                     12,
     width:                   '100%',
-    padding:                 '14px var(--space-4)',
+    // notes-photo-row-shrink: padding trimmed further (was 14px) to make
+    // the empty/locked row shorter still, now that it's already a single
+    // line rather than the old two-line stack.
+    padding:                 '9px var(--space-4)',
     boxSizing:               'border-box',
     textAlign:               'left',
     borderTop:               '1px solid var(--color-border)',
@@ -375,11 +378,11 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
           display:         'flex',
           alignItems:      'center',
           justifyContent:  'center',
-          width:           36,
-          height:          36,
+          width:           30,
+          height:          30,
           flexShrink:      0,
         }}>
-          <Icon name="ImagePlus" size={17} color="var(--color-accent)" />
+          <Icon name="ImagePlus" size={15} color="var(--color-accent)" />
         </span>
         <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 400, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
           Add a photo
