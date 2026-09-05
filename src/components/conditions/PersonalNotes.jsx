@@ -301,7 +301,17 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
   )
 }
 
-function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
+// personal-notes-mock-restyle: `context` picks which copy the empty
+// photo-box states use — 'note' for the empty/writing pill (a note that
+// doesn't exist yet), 'saved' for a note that's already been saved. Only
+// affects the two text lines below; tap behavior and Pro-gating are the
+// same in both.
+const PHOTO_BOX_COPY = {
+  note:  { title: 'Add a photo to your note', subtitle: 'Photo notes are available with Pro.' },
+  saved: { title: 'Add a photo',              subtitle: 'Attach an image to this note' },
+}
+
+function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPhoto, onRetry }) {
   const boxBase = {
     display:      'block',
     width:        '100%',
@@ -386,35 +396,65 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
 
   // 'empty' — same reachability the old camera button had: Pro opens the
   // picker, free opens the upsell sheet instead of silently doing nothing.
-  // notes-photo-box-copy-pass: swapped the old Camera icon (which reads
-  // as "take a photo", not "attach one") for ImagePlus everywhere. The
-  // Pro-locked look no longer leans on a single dimmed sentence — it's
-  // now a two-line label (bold title + a small "Pro" pill underneath),
-  // same pattern already used for Pro gating elsewhere in the app,
-  // rather than one long greyed-out line.
+  // personal-notes-mock-restyle: rebuilt as a horizontal row — a rounded
+  // icon square on the left, a bold title + grey subtitle stack in the
+  // middle, and (free accounts only) a solid "PRO" pill pinned to the
+  // right via marginLeft: auto — replacing the old centered vertical
+  // layout, to match the provided mock.
+  const copy = PHOTO_BOX_COPY[context] || PHOTO_BOX_COPY.note
+  const iconSquare = (
+    <span style={{
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'center',
+      width:           36,
+      height:          36,
+      borderRadius:    'var(--radius-sm)',
+      backgroundColor: 'var(--color-border-subtle)',
+      flexShrink:      0,
+    }}>
+      <Icon name="ImagePlus" size={17} color="var(--color-text-secondary)" />
+    </span>
+  )
+  const rowShell = {
+    ...boxBase,
+    border:          '1px dashed var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
+    display:         'flex',
+    alignItems:      'center',
+    gap:             12,
+    padding:         '0 var(--space-4)',
+    textAlign:       'left',
+  }
+
   if (!isPro) {
     return (
       <button
         type="button"
         onClick={onTapEmpty}
-        aria-label="Add a photo note — Pro feature"
-        style={{ ...shell, cursor: 'pointer', gap: 4 }}
+        aria-label={`${copy.title} — Pro feature`}
+        style={{ ...rowShell, cursor: 'pointer' }}
       >
-        <span style={{ display: 'flex', opacity: 0.6, marginBottom: 2 }}>
-          <Icon name="ImagePlus" size={18} color="var(--color-text-tertiary)" />
-        </span>
-        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
-          Add a photo note
+        {iconSquare}
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+            {copy.title}
+          </span>
+          <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+            {copy.subtitle}
+          </span>
         </span>
         <span style={{
-          fontSize: 11,
-          padding: '2px 8px',
-          borderRadius: 'var(--radius-sm)',
+          flexShrink:      0,
+          fontSize:        11,
+          fontWeight:      700,
+          padding:         '4px 10px',
+          borderRadius:    'var(--radius-full)',
           backgroundColor: 'var(--color-accent-light)',
-          color: 'var(--color-accent)',
-          fontFamily: 'var(--font-body)',
+          color:           'var(--color-accent)',
+          fontFamily:      'var(--font-body)',
         }}>
-          Pro
+          PRO
         </span>
       </button>
     )
@@ -424,12 +464,12 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
     <button
       type="button"
       onClick={onTapEmpty}
-      aria-label="Add a photo note"
-      style={{ ...shell, cursor: 'pointer' }}
+      aria-label={copy.title}
+      style={{ ...rowShell, cursor: 'pointer' }}
     >
-      <Icon name="ImagePlus" size={18} color="var(--color-text-tertiary)" />
-      <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-        Add a photo note
+      {iconSquare}
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+        {copy.title}
       </span>
     </button>
   )
@@ -625,6 +665,29 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
  *     also shifts the avatar in with it) across the prompt, editing, and
  *     saved states, plus the loading skeleton for consistency.
  *
+ * personal-notes-mock-restyle (this task):
+ *   - Header's right-hand slot no longer shows an "Edit" link for a
+ *     populated note — it's always "Private" (lock icon) once the
+ *     ✓ Saved flash finishes, matching the mock. Edit moved into the
+ *     saved note's own new three-dot menu (see below).
+ *   - Prompt-state pill dropped its name/"You" line — single placeholder
+ *     line next to the avatar now, not a two-line name+placeholder
+ *     column. Placeholder copy shortened to "Add a note or thought…"
+ *     (was "…or a thought…"), kept in sync between the pill and the
+ *     textarea's real placeholder attribute.
+ *   - Saved note gained a three-dot menu (top-right of the name/
+ *     timestamp row) with Edit and Delete note. Delete note reuses the
+ *     existing showConfirm/handleClear "Delete note?" ConfirmSheet
+ *     rather than a second dialog.
+ *   - NotePhotoBox's empty-state branches (Pro-locked and Pro) rebuilt
+ *     as a horizontal row — icon square, bold title + grey subtitle,
+ *     and (free accounts only) a solid "PRO" pill on the right — instead
+ *     of the previous centered vertical layout. Copy now varies by
+ *     context ('note' for the empty/writing pill, 'saved' for an
+ *     already-saved note), via the new PHOTO_BOX_COPY map and the box's
+ *     new `context` prop. The uploading/offline/error sub-states are
+ *     unchanged — the mock doesn't cover those.
+ *
  * Props:
  *   conditionId  string
  */
@@ -648,6 +711,32 @@ export default function PersonalNotes({ conditionId }) {
 
   // Clear confirmation sheet (note text)
   const [showConfirm, setShowConfirm] = useState(false)
+
+  // personal-notes-mock-restyle: the saved note's three-dot menu
+  // (Edit / Delete note) — replaces the old header "Edit" link now that
+  // the header's corner slot is always "Private" (or the ✓ Saved flash).
+  // Delete note reuses the exact same showConfirm/handleClear flow the
+  // old footer Clear button already used, rather than a second confirm
+  // dialog — it's the same destructive action, just reached from a new
+  // place.
+  const [showNoteMenu, setShowNoteMenu] = useState(false)
+  const noteMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (!showNoteMenu) return
+    function onPointerDown(e) {
+      if (noteMenuRef.current && !noteMenuRef.current.contains(e.target)) {
+        setShowNoteMenu(false)
+      }
+    }
+    function onKey(e) { if (e.key === 'Escape') setShowNoteMenu(false) }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showNoteMenu])
 
   // notes-photo-uploader-redesign: delete-photo confirmation sheet —
   // kept separate from showConfirm above since it's a different action
@@ -1061,24 +1150,6 @@ export default function PersonalNotes({ conditionId }) {
               <Icon name="Check" size={12} color="var(--color-success)" />
               Saved
             </span>
-          ) : user && savedValue ? (
-            <button
-              type="button"
-              onClick={startEditing}
-              style={{
-                marginLeft: 'auto',
-                fontSize: 12,
-                fontWeight: 500,
-                fontFamily: 'var(--font-body)',
-                color: 'var(--color-accent)',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: 'pointer',
-              }}
-            >
-              Edit
-            </button>
           ) : (
             <span style={{
               marginLeft: 'auto',
@@ -1090,7 +1161,7 @@ export default function PersonalNotes({ conditionId }) {
               fontFamily: 'var(--font-body)',
             }}>
               <Icon name="Lock" size={11} color="var(--color-text-tertiary)" />
-              Only you can see this
+              Private
             </span>
           )
         )}
@@ -1184,7 +1255,7 @@ export default function PersonalNotes({ conditionId }) {
               onChange={e => setDraft(e.target.value.slice(0, charCap))}
               onFocus={() => setIsFocused(true)}
               onBlur={() => setIsFocused(false)}
-              placeholder="Add a note or a thought…"
+              placeholder="Add a note or thought…"
               dir={getTextDirection(draft)}
               rows={2}
               autoFocus
@@ -1342,6 +1413,7 @@ export default function PersonalNotes({ conditionId }) {
               gap so it lines up with the name column above it, not with
               the avatar's left edge. */}
           <div style={{
+            position: 'relative',
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
             padding: '20px 16px 20px 22px',
@@ -1388,6 +1460,99 @@ export default function PersonalNotes({ conditionId }) {
                   </span>
                 )}
               </div>
+
+              {/* personal-notes-mock-restyle: three-dot menu — Edit and
+                  Delete note. Anchored to the outer box (position:
+                  relative above) rather than this row, so the dropdown
+                  sits flush with the box's own edges regardless of how
+                  tall the name/timestamp column is. */}
+              <div ref={noteMenuRef} style={{ position: 'relative', flexShrink: 0, alignSelf: 'flex-start' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowNoteMenu(v => !v)}
+                  aria-label="Note options"
+                  aria-haspopup="true"
+                  aria-expanded={showNoteMenu}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 24,
+                    height: 24,
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Icon name="MoreVertical" size={16} color="var(--color-text-tertiary)" />
+                </button>
+
+                {showNoteMenu && (
+                  <div
+                    role="menu"
+                    style={{
+                      position: 'absolute',
+                      top: 28,
+                      right: 0,
+                      zIndex: 10,
+                      minWidth: 140,
+                      backgroundColor: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
+                      borderRadius: 'var(--radius-sm)',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+                      padding: 4,
+                    }}
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setShowNoteMenu(false); startEditing() }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '8px 10px',
+                        fontSize: 13,
+                        fontFamily: 'var(--font-body)',
+                        color: 'var(--color-text-primary)',
+                        background: 'none',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Icon name="Pencil" size={14} color="var(--color-text-secondary)" />
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => { setShowNoteMenu(false); handleClearClick() }}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        width: '100%',
+                        padding: '8px 10px',
+                        fontSize: 13,
+                        fontFamily: 'var(--font-body)',
+                        color: 'var(--color-danger)',
+                        background: 'none',
+                        border: 'none',
+                        borderRadius: 'var(--radius-sm)',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Icon name="Trash2" size={14} color="var(--color-danger)" />
+                      Delete note
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Note text — its own body of text below the row, still
@@ -1418,6 +1583,7 @@ export default function PersonalNotes({ conditionId }) {
             state={photoState}
             url={savedImageUrl}
             isPro={isPro}
+            context="saved"
             onTapEmpty={handleBoxTap}
             onTapPhoto={() => setLightboxOpen(true)}
             onRetry={retryUpload}
@@ -1433,14 +1599,13 @@ export default function PersonalNotes({ conditionId }) {
            personal-notes-ui-polish: the photo box (below) now also
            renders here, including signed-out — as the same locked
            "Pro feature" look a signed-in free account already sees,
-           rather than being hidden until someone starts editing. Also
-           added the same name/"You" line the saved state has, above the
-           placeholder — since both lines here are always exactly one
-           line each (name never wraps, and the placeholder is a fixed
-           string), the avatar just uses alignItems: 'center' against the
-           two of them together, rather than the fixed first-line-only
-           offset the saved/editing states need for their own
-           potentially-long, wrapping text. */
+           rather than being hidden until someone starts editing.
+           personal-notes-mock-restyle: dropped the name/"You" line that
+           used to sit above the placeholder here — the mock shows this
+           state as a single placeholder line next to the avatar, so the
+           name now only appears once a note is actually saved. The row
+           keeps plain alignItems: 'center' since the placeholder is
+           always exactly one fixed-string line. */
         <>
         <div
           onClick={handlePromptTap}
@@ -1478,29 +1643,17 @@ export default function PersonalNotes({ conditionId }) {
               <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
             </div>
           )}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <span style={{
-              display: 'block',
-              fontSize: 15,
-              fontWeight: 500,
-              lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
-              fontFamily: 'var(--font-body)',
-              color: 'var(--color-text-primary)',
-            }}>
-              {profile?.fullName || 'You'}
-            </span>
-            <span style={{
-              display: 'block',
-              marginTop: 2,
-              fontSize: 13,
-              lineHeight: '19px',
-              fontWeight: 400,
-              color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
-            }}>
-              Add a note or a thought…
-            </span>
-          </div>
+          <span style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 14,
+            lineHeight: '19px',
+            fontWeight: 400,
+            color: 'var(--color-text-tertiary)',
+            fontFamily: 'var(--font-body)',
+          }}>
+            Add a note or thought…
+          </span>
         </div>
 
         <NotePhotoBox
