@@ -416,15 +416,25 @@ function NotePhotoBox({ state, url, isPro, context = 'note', onTapEmpty, onTapPh
       <Icon name="ImagePlus" size={17} color="var(--color-text-secondary)" />
     </span>
   )
+  // personal-notes-mock-restyle: deliberately NOT spreading boxBase here —
+  // boxBase's fixed PHOTO_BOX_HEIGHT (140px) exists so a full-bleed photo
+  // (attached state) or a centered spinner/message (uploading/offline/
+  // error) has a consistent footprint. This row's content is a single
+  // short line, so reusing that same fixed height left it dwarfed inside
+  // a mostly-empty dashed box — sized to its own content instead, same
+  // width/radius/margin as every other box state for visual consistency.
   const rowShell = {
-    ...boxBase,
-    border:          '1px dashed var(--color-border)',
-    backgroundColor: 'var(--color-surface)',
     display:         'flex',
     alignItems:      'center',
     gap:             12,
-    padding:         '0 var(--space-4)',
+    width:           '100%',
+    marginTop:       8,
+    padding:         '14px var(--space-4)',
+    borderRadius:    'var(--radius-md)',
+    boxSizing:       'border-box',
     textAlign:       'left',
+    border:          '1px dashed var(--color-border)',
+    backgroundColor: 'var(--color-surface)',
   }
 
   if (!isPro) {
