@@ -102,6 +102,18 @@
  * confirmed to have a real code, before the exchange starts, closing the
  * window entirely. The exchange itself is unchanged, just sequenced
  * after the tab is already gone.
+ *
+ * signin-back-gesture fix, part 2 (2026-09-06) — the fix above only
+ * covered the native app; the same back-gesture problem was still fully
+ * present on the website/PWA build, for a different underlying reason.
+ * Web sign-in used to send the whole page over to Google (a full-page
+ * redirect) and rely on Google sending it back — that's what put Google's
+ * sign-in page directly into the browser's own history, one step behind
+ * the app. There's no separate "tab" to close on web the way there was on
+ * native, so signInWithGoogle()'s web branch now opens sign-in in a small
+ * popup window instead of navigating the main page away at all. See that
+ * function's own comment, and the popup-self-close effect just above it,
+ * for the full mechanism.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -629,6 +641,32 @@ export function AuthProvider({ children }) {
     })
   }, [toast])
 
+  // signin-back-gesture fix (2026-09-06) — web only. This is the other
+  // half of the popup approach used by signInWithGoogle() below. Google
+  // sign-in on the web now opens in a small popup running this exact same
+  // app, at the exact same page it was opened from, rather than taking
+  // over the main window. `window.opener` is only ever set when a page was
+  // opened by another page via window.open() — for this app, that only
+  // ever happens for this one popup, so seeing it set here means "this
+  // particular tab is the sign-in popup, not the main app."
+  //
+  // Once Google redirects the popup back to this same page, Supabase's own
+  // built-in URL detection picks the authorization code up automatically
+  // and exchanges it for a session — no different from what the old
+  // full-page redirect already relied on. All this effect adds is closing
+  // the popup once that exchange succeeds; the main window picks up the
+  // same sign-in on its own via Supabase's cross-tab session sync, which
+  // is what the Promise inside signInWithGoogle() below is waiting on.
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) return
+    if (!window.opener || window.opener === window) return
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') window.close()
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     return { error }
@@ -637,16 +675,45 @@ export function AuthProvider({ children }) {
   // signInWithGoogle — end-user sign-in (D2: Google OAuth only, no
   // email/password at first).
   //
-  // Web: unchanged from before — Supabase handles the redirect away to
-  // Google and back in the same tab; the redirected-to page picks up the
-  // new session via onAuthStateChange above.
+  // Native (Stage 3, F6): the in-tab redirect Supabase normally does can't
+  // complete inside the app's embedded WebView, so this instead asks
+  // Supabase for the OAuth URL without auto-navigating (skipBrowserRedirect),
+  // opens that URL in the system browser via the Browser plugin, and
+  // returns. The appUrlOpen listener above picks up the rest once Google
+  // redirects back to the app.
   //
-  // Native (Stage 3, F6): the same in-tab redirect can't complete inside
-  // the app's embedded WebView, so this instead asks Supabase for the
-  // OAuth URL without auto-navigating (skipBrowserRedirect), opens that
-  // URL in the system browser via the Browser plugin, and returns. The
-  // appUrlOpen listener above picks up the rest once Google redirects
-  // back to the app.
+  // Web (signin-back-gesture fix, 2026-09-06) — this used to send the whole
+  // page over to Google (a full-page redirect) and rely on Google sending
+  // it back to the same page once done. That's what put Google's sign-in
+  // page directly into the browser's own history, one step behind the app —
+  // a back gesture right after signing in landed straight back on it,
+  // exactly the same visible problem the native app had for a different
+  // reason (see the Browser.close() fix above). The web page itself never
+  // has anything else it could "close" the way the native browser tab
+  // could, so the fix here is different: Google sign-in now happens in a
+  // small separate popup window instead of taking over this page at all.
+  // This page never navigates away, so there's nothing in its own history
+  // for a back gesture to step into.
+  //
+  // The popup is opened with a blank/empty target BEFORE the await below,
+  // not after — several browsers (Safari especially) only allow
+  // window.open() to succeed while still inside the original click's
+  // synchronous handling, and it silently gets treated as a blocked pop-up
+  // the moment any `await` runs first. Once the real sign-in URL is ready,
+  // it's handed to the already-open window by setting its location.
+  //
+  // The popup runs this exact same app, at the exact same page it was
+  // opened from. Supabase's own built-in behavior already picks the
+  // authorization code up out of the URL and exchanges it automatically
+  // once that page loads — that's the same mechanism the old full-page
+  // redirect already relied on, just now happening inside the popup
+  // instead of the main window. The popup-self-close effect above (guarded
+  // by `window.opener`) is what notices that exchange finished and closes
+  // the popup on its own. The main window never navigates anywhere; it
+  // just waits below for Supabase's cross-tab session sync to report the
+  // same sign-in (the SIGNED_IN event on the existing onAuthStateChange
+  // subscription further up this file), or for the person to close the
+  // popup without finishing, whichever happens first.
   async function signInWithGoogle() {
     if (Capacitor.isNativePlatform()) {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -661,11 +728,57 @@ export function AuthProvider({ children }) {
       return { error: null }
     }
 
-    const { error } = await supabase.auth.signInWithOAuth({
+    const popup = window.open('', 'capsula-google-signin', 'width=480,height=640')
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.href },
+      options: {
+        redirectTo: window.location.href,
+        skipBrowserRedirect: true,
+      },
     })
-    return { error }
+
+    if (error) {
+      if (popup) popup.close()
+      return { error }
+    }
+
+    if (!popup || popup.closed) {
+      // Popup blocked or already dismissed — fall back to the old
+      // full-page redirect so sign-in still works rather than silently
+      // failing. The back-gesture improvement just doesn't apply on
+      // whichever browser blocked it.
+      window.location.href = data.url
+      return { error: null }
+    }
+
+    popup.location.href = data.url
+
+    return new Promise((resolve) => {
+      let settled = false
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (event !== 'SIGNED_IN' || settled) return
+        settled = true
+        subscription.unsubscribe()
+        clearInterval(watchPopup)
+        try { popup.close() } catch {
+          // Already closed by the popup's own self-close effect — fine.
+        }
+        resolve({ error: null })
+      })
+
+      // Covers the person closing the popup themselves without finishing
+      // sign-in — otherwise the caller's `busy` state (see AccountSheet.jsx)
+      // would hang forever waiting for a SIGNED_IN event that's never coming.
+      const watchPopup = setInterval(() => {
+        if (!popup.closed || settled) return
+        settled = true
+        subscription.unsubscribe()
+        clearInterval(watchPopup)
+        resolve({ error: { message: 'Sign-in was cancelled.' } })
+      }, 400)
+    })
   }
 
   // Notes and recently-viewed each own storage keys that only get cleared
