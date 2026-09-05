@@ -988,7 +988,16 @@ export default function PersonalNotes({ conditionId }) {
     let frame = null
     const observer = new ResizeObserver(() => {
       if (frame) cancelAnimationFrame(frame)
-      frame = requestAnimationFrame(() => scrollCardAboveKeyboard())
+      // personal-notes-scroll-jitter-fix: instant, not smooth — this fires
+      // on every line added/removed while actively typing (Enter, or a
+      // Backspace that drops a wrapped line), and the auto-grow effect
+      // below can fire its own correction for the same resize a moment
+      // later. Two overlapping *smooth* scrolls fighting over the target
+      // position is what showed up as the screen visibly scrolling up and
+      // down while typing. Instant scrolls to the same position are a
+      // no-op the second time, so keeping this one (and the one below)
+      // instant removes the animation without losing the correction.
+      frame = requestAnimationFrame(() => scrollCardAboveKeyboard('auto'))
     })
     observer.observe(el)
     return () => {
@@ -1034,7 +1043,9 @@ export default function PersonalNotes({ conditionId }) {
     el.style.height = `${newHeight}px`
     if (newHeight !== lastTextareaHeightRef.current) {
       lastTextareaHeightRef.current = newHeight
-      scrollCardAboveKeyboard()
+      // personal-notes-scroll-jitter-fix: instant — see the matching note
+      // on the ResizeObserver's own call above.
+      scrollCardAboveKeyboard('auto')
     }
   }, [isEditing, draft])
 
