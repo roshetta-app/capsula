@@ -429,7 +429,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
     >
       <Icon name="ImagePlus" size={18} color="var(--color-text-tertiary)" />
       <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-        Add a photo
+        Add a photo note
       </span>
     </button>
   )
