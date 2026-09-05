@@ -12,7 +12,6 @@ import { useNotes } from '../../hooks/useNotes'
 import { useIsPro } from '../../hooks/useIsPro'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useCachedImage } from '../../hooks/useCachedImage'
-import { useKeyboardOpen } from '../../hooks/useKeyboardOpen'
 import { useNotesSignInContext } from '../../context/NotesSignInContext'
 import { getTextDirection } from '../../utils/textDirection'
 import { resizeAndCompressImage } from '../../utils/imageResize'
@@ -923,104 +922,22 @@ export default function PersonalNotes({ conditionId }) {
     return () => el.removeEventListener('transitionend', onTransitionEnd)
   }, [isEditing])
 
-  // notes-typing-keyboard-scroll: keeps whatever you're actively typing —
-  // and, once the note's long enough, the footer buttons below the photo
-  // box — visible above the on-screen keyboard.
+  // notes-typing-keyboard-scroll (rebuilt, personal-notes-scroll-rebuild):
+  // this used to work out the keyboard's height itself (via
+  // window.visualViewport) and manually scrollBy() the right amount —
+  // three separate triggers (keyboard opening, the card resizing, every
+  // keystroke) all doing their own version of that math, which is what
+  // kept fighting itself and producing the jumpy/hidden-text behavior.
   //
-  // scrollIntoView() was tried first here and does nothing useful on a
-  // real phone: it only knows about the page's full, un-shrunk layout —
-  // it has no idea the keyboard is covering the bottom portion of the
-  // screen, since the keyboard shrinks the *visible* area without
-  // shrinking the page itself. window.visualViewport is the browser API
-  // that DOES know the real, keyboard-aware visible area — it's the same
-  // one ConditionDetailScreen.jsx already uses to correctly resize this
-  // whole screen around the keyboard, so this reuses that same idea
-  // instead of the built-in method that can't see the keyboard at all.
-  //
-  // The actual move: find the nearest ancestor that can scroll (this
-  // component doesn't have a reference to ConditionDetailScreen's scroll
-  // box directly, so it looks for it — the same box either way), measure
-  // how far the card's bottom edge sticks out past the real visible
-  // bottom, and scroll exactly that far — nothing if it's already fully
-  // visible.
-  function getScrollParent(el) {
-    let node = el?.parentElement
-    while (node) {
-      if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node
-      node = node.parentElement
-    }
-    return document.scrollingElement || document.documentElement
-  }
-
-  function scrollCardAboveKeyboard(behavior = 'smooth') {
-    const el = cardRef.current
-    if (!el) return
-
-    // personal-notes-scroll-target-fix: this used to always chase the
-    // card's bottom edge (footer included) regardless of where in the
-    // text someone was actually typing. That's the right target while
-    // appending at the end — the footer is the next thing you'd want to
-    // see. But for a long note, forcing the footer into view while
-    // someone is fixing a letter higher up would push the very line
-    // they're editing off the top of the screen — the opposite of
-    // helpful. So: only chase the card's bottom when the caret is at the
-    // very end of the text; otherwise leave the scroll position alone —
-    // it's already showing the spot the person tapped into to edit.
-    const ta = textareaRef.current
-    const atEnd = !ta || (ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length)
-    if (!atEnd) return
-
-    const vv = window.visualViewport
-    const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight
-    const overflow = el.getBoundingClientRect().bottom - visibleBottom
-    if (overflow > 0) {
-      getScrollParent(el).scrollBy({ top: overflow + 12, behavior })
-    }
-  }
-
-  // Trigger 1 — the keyboard finishing opening. The very first scroll the
-  // browser attempts the moment you tap into the note happens before the
-  // keyboard has actually finished sliding up, so it's based on a taller,
-  // keyboard-not-open version of the screen. Re-checking once
-  // useKeyboardOpen confirms the keyboard is actually in place (the same
-  // signal already used elsewhere in the app) is what fixes landing on
-  // the wrong part of the note.
-  const keyboardOpen = useKeyboardOpen()
-
-  useEffect(() => {
-    if (!isEditing || !keyboardOpen) return
-    scrollCardAboveKeyboard()
-  }, [isEditing, keyboardOpen])
-
-  // Trigger 2 — the card growing taller: a new line wrapping as you type,
-  // or a photo appearing mid-edit. Collapses a burst of resize events
-  // (e.g. the FLIP height animation above firing several in quick
-  // succession) into one scroll per animation frame, instead of stacking
-  // up several smooth-scrolls back to back.
-  useEffect(() => {
-    if (!isEditing || !cardRef.current) return
-    const el = cardRef.current
-    let frame = null
-    const observer = new ResizeObserver(() => {
-      if (frame) cancelAnimationFrame(frame)
-      // personal-notes-scroll-jitter-fix: instant, not smooth — this fires
-      // on every line added/removed while actively typing (Enter, or a
-      // Backspace that drops a wrapped line), and the auto-grow effect
-      // below can fire its own correction for the same resize a moment
-      // later. Two overlapping *smooth* scrolls fighting over the target
-      // position is what showed up as the screen visibly scrolling up and
-      // down while typing. Instant scrolls to the same position are a
-      // no-op the second time, so keeping this one (and the one below)
-      // instant removes the animation without losing the correction.
-      frame = requestAnimationFrame(() => scrollCardAboveKeyboard('auto'))
-    })
-    observer.observe(el)
-    return () => {
-      if (frame) cancelAnimationFrame(frame)
-      observer.disconnect()
-    }
-  }, [isEditing])
-
+  // None of that is needed. ConditionDetailScreen.jsx already resizes the
+  // actual scrollable box on this screen to exactly the real,
+  // keyboard-aware visible area (see that file's own `measure()` effect,
+  // driven by the same window.visualViewport signal) — so the box this
+  // card sits inside is already the correct size. Once that's true, the
+  // browser's own built-in Element.scrollIntoView() correctly keeps
+  // whatever's focused/typed visible inside it, with no custom height
+  // math needed here at all. See the auto-grow effect below for the one
+  // remaining call.
   const triggerSaved = useCallback(() => {
     clearTimeout(fadeOutRef.current)
     setSavedVisible('in')
@@ -1035,33 +952,19 @@ export default function PersonalNotes({ conditionId }) {
   // Auto-grow the textarea to fit content — runs when entering edit mode
   // and whenever the draft changes.
   //
-  // notes-typing-keyboard-scroll: the keyboard-aware scroll check is
-  // called right here too, not just from the ResizeObserver further up —
-  // a line simply wrapping as you type (no Enter key involved) wasn't
-  // reliably caught by the ResizeObserver alone. lastTextareaHeightRef
-  // guards it to only actually fire when the height genuinely changed —
-  // this effect reruns on every keystroke (it's keyed on `draft`), but
-  // most keystrokes don't add a new line, and calling the scroll
-  // correction on every single one of them (even when nothing grew) was
-  // re-triggering the animation faster than the previous one could
-  // finish, which is what showed up as it running on every keystroke.
-  const lastTextareaHeightRef = useRef(0)
-
+  // notes-typing-keyboard-scroll (rebuilt): scrollIntoView() is a no-op
+  // when the caret's already visible, so calling it on every keystroke
+  // here is harmless — it only actually moves anything on the keystroke
+  // that adds/removes a line, which is exactly when it's needed. This
+  // only works correctly because the scrollable box this card sits in is
+  // already sized to the real keyboard-aware visible area by
+  // ConditionDetailScreen.jsx — see the comment above.
   useLayoutEffect(() => {
-    if (!isEditing || !textareaRef.current) {
-      lastTextareaHeightRef.current = 0
-      return
-    }
+    if (!isEditing || !textareaRef.current) return
     const el = textareaRef.current
     el.style.height = 'auto'
-    const newHeight = el.scrollHeight
-    el.style.height = `${newHeight}px`
-    if (newHeight !== lastTextareaHeightRef.current) {
-      lastTextareaHeightRef.current = newHeight
-      // personal-notes-scroll-jitter-fix: instant — see the matching note
-      // on the ResizeObserver's own call above.
-      scrollCardAboveKeyboard('auto')
-    }
+    el.style.height = `${el.scrollHeight}px`
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [isEditing, draft])
 
   // Put the cursor at the end of the existing text when entering edit
