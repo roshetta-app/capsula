@@ -955,6 +955,21 @@ export default function PersonalNotes({ conditionId }) {
   function scrollCardAboveKeyboard(behavior = 'smooth') {
     const el = cardRef.current
     if (!el) return
+
+    // personal-notes-scroll-target-fix: this used to always chase the
+    // card's bottom edge (footer included) regardless of where in the
+    // text someone was actually typing. That's the right target while
+    // appending at the end — the footer is the next thing you'd want to
+    // see. But for a long note, forcing the footer into view while
+    // someone is fixing a letter higher up would push the very line
+    // they're editing off the top of the screen — the opposite of
+    // helpful. So: only chase the card's bottom when the caret is at the
+    // very end of the text; otherwise leave the scroll position alone —
+    // it's already showing the spot the person tapped into to edit.
+    const ta = textareaRef.current
+    const atEnd = !ta || (ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length)
+    if (!atEnd) return
+
     const vv = window.visualViewport
     const visibleBottom = vv ? vv.height + vv.offsetTop : window.innerHeight
     const overflow = el.getBoundingClientRect().bottom - visibleBottom
