@@ -21,6 +21,24 @@ import { NOTES_CHAR_CAP_FREE, NOTES_CHAR_CAP_PRO } from '../../constants/feature
 const AVATAR_SIZE = 32
 const PILL_RADIUS = 18
 
+// personal-notes-ui-polish: fixed line-heights for the two spots where
+// note text can actually wrap to more than one line — used to nudge the
+// avatar so it centers on the FIRST line only, not the vertical middle of
+// the whole (possibly multi-line) block. Both text spots already declare
+// a fixed line-height in their own inline styles (20px for the saved
+// note's name line, 1.65em for the editing textarea) — these constants
+// just mirror those same values so the offset math has something fixed
+// to work from, rather than measuring the real rendered line at runtime.
+// A plain `alignItems: 'center'` isn't used instead because that centers
+// against the *whole* growing block once text wraps, which is exactly
+// the behavior this is meant to avoid.
+const SAVED_NAME_LINE_HEIGHT = 20
+const EDITING_LINE_HEIGHT = 14 * 1.65 // fontSize 14 * lineHeight 1.65
+const AVATAR_FIRST_LINE_OFFSET = {
+  saved: (SAVED_NAME_LINE_HEIGHT - AVATAR_SIZE) / 2,
+  editing: (EDITING_LINE_HEIGHT - AVATAR_SIZE) / 2,
+}
+
 // notes-photo-uploader-redesign: fixed footprint for the upload box —
 // matches the old NotePhotoStrip's footprint exactly (full width, 140px
 // tall) so this redesign doesn't change the space the photo area takes
@@ -466,14 +484,15 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
  * notes-photo-uploader-redesign (this task):
  *   - The small camera-icon button that used to sit in the header row is
  *     gone. In its place, a full-width, fixed-140px-tall upload box
- *     (NotePhotoBox above) renders directly under the pill, in both the
- *     editing and populated states — reusing exactly the same tap
- *     behavior the camera button had (Pro opens the picker, free opens
- *     NotePhotoUpsellSheet), just moved into the box's own empty state
- *     instead of a header icon. The hidden file `<input>` that used to
- *     sit next to the camera button now renders unconditionally whenever
- *     a user is signed in, since nothing about the box's position in the
- *     tree depends on the header row anymore.
+ *     (NotePhotoBox above) renders directly under the pill — originally
+ *     only in the editing and populated states; personal-notes-ui-polish
+ *     below extended this to the prompt state too — reusing exactly the
+ *     same tap behavior the camera button had (Pro opens the picker, free
+ *     opens NotePhotoUpsellSheet), just moved into the box's own empty
+ *     state instead of a header icon. The hidden file `<input>` that used
+ *     to sit next to the camera button now renders unconditionally
+ *     whenever a user is signed in, since nothing about the box's
+ *     position in the tree depends on the header row anymore.
  *   - ProfileAvatar moves from a sibling flex item beside the pill into
  *     the pill's own bordered container, and the pill is now full width
  *     (previously flex: 1, leaving room for the avatar beside it) —
@@ -542,6 +561,30 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
  *   - The <Lightbox /> call below now passes imageStore="notes", so
  *     opening a note's photo fullscreen also reads from the same
  *     prefetched store instead of always hitting the network.
+ *
+ * personal-notes-ui-polish (this task):
+ *   - Photo box (NotePhotoBox) now also renders in the prompt state
+ *     (previously editing/populated only) — signed-out visitors and
+ *     signed-in free accounts both see it in its existing locked
+ *     "Pro feature" look; tapping it signed-out opens the sign-in sheet
+ *     (handleBoxTap), same as tapping the rest of the prompt.
+ *   - Editing state: the Clear/counter/Cancel footer row now sits
+ *     directly under the text box, above the photo box (previously
+ *     below it). The saved state's "Edited … ago" line stays under the
+ *     photo box, unchanged — this reorder only applies to editing.
+ *   - Saved note now shows a name line above the note text — the
+ *     account's profile name, or "You" when none is set — in the same
+ *     column as the note, avatar to the left of both.
+ *   - Avatar alignment: in the prompt, editing, and saved states, the
+ *     avatar now centers on the FIRST line next to it (the placeholder,
+ *     the textarea's first line, or the new name line respectively)
+ *     rather than sitting flush with the top of the whole block — so it
+ *     no longer drifts visually low against a note that wraps to several
+ *     lines. See AVATAR_FIRST_LINE_OFFSET above. The loading skeleton is
+ *     unchanged (not real text, nothing to center against).
+ *   - Increased the pill's top/bottom padding and left padding (which
+ *     also shifts the avatar in with it) across the prompt, editing, and
+ *     saved states, plus the loading skeleton for consistency.
  *
  * Props:
  *   conditionId  string
@@ -695,12 +738,16 @@ export default function PersonalNotes({ conditionId }) {
   }
 
   // notes-photo-uploader-redesign: tap handler for the box's empty state —
-  // exact same reachability the old header camera button had. Requires a
-  // signed-in user the same way editing does (the box is only ever
-  // rendered when `user` is truthy, see JSX below, but this stays
-  // defensive in case that ever changes).
+  // exact same reachability the old header camera button had.
+  // personal-notes-ui-polish: the box now also renders for a signed-out
+  // visitor (as a locked "Pro feature" preview, same as a free account
+  // sees), so a tap there routes to the sign-in sheet first, same as
+  // tapping the rest of the prompt does.
   function handleBoxTap() {
-    if (!user) return
+    if (!user) {
+      requestNoteSignIn(conditionId)
+      return
+    }
     if (!isPro) {
       setShowProUpsell(true)
       return
@@ -944,7 +991,7 @@ export default function PersonalNotes({ conditionId }) {
           gap: 10,
           border: '1px solid var(--color-border)',
           borderRadius: PILL_RADIUS,
-          padding: '8px 16px',
+          padding: '14px 16px 14px 22px',
           boxSizing: 'border-box',
           backgroundColor: 'var(--color-surface)',
           width: '100%',
@@ -972,17 +1019,24 @@ export default function PersonalNotes({ conditionId }) {
               share one bordered container now (notes-photo-uploader-
               redesign moved the avatar in from a sibling row), full
               width to match the photo box below it. alignItems:
-              'flex-start' on the row keeps the avatar top-aligned even
-              as the textarea grows to multiple lines; the Send button
+              'flex-start' on the row is kept so the avatar's position
+              doesn't get pulled toward the vertical middle of the whole
+              textarea as it grows to multiple lines; the Send button
               overrides back to alignSelf: 'flex-end' so it still pins to
-              the bottom-right corner as before. */}
+              the bottom-right corner as before.
+              personal-notes-ui-polish: the avatar itself now carries a
+              small fixed marginTop (AVATAR_FIRST_LINE_OFFSET.editing) so
+              it centers on the textarea's FIRST line specifically —
+              staying put there regardless of how many lines the note
+              grows to below it — rather than sitting flush with the very
+              top of the text like before. */}
           <div style={{
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
             border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
             borderRadius: PILL_RADIUS,
-            padding: '12px 18px',
+            padding: '18px 18px 18px 24px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             transition: 'border-color 0.15s ease',
@@ -991,7 +1045,7 @@ export default function PersonalNotes({ conditionId }) {
             <ProfileAvatar
               user={user}
               fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0, marginTop: AVATAR_FIRST_LINE_OFFSET.editing }}
             />
             <textarea
               ref={textareaRef}
@@ -1048,22 +1102,16 @@ export default function PersonalNotes({ conditionId }) {
             </button>
           </div>
 
-          <NotePhotoBox
-            state={photoState}
-            url={savedImageUrl}
-            isPro={isPro}
-            onTapEmpty={handleBoxTap}
-            onTapPhoto={() => setLightboxOpen(true)}
-            onRetry={retryUpload}
-          />
-
           {/* Footer row — Clear (only when a note exists to clear) on
               the left; the live character counter and Cancel share the
               right side. notes-photo-uploader-redesign: paddingLeft
               dropped to 0 — now that the pill and photo box are both
               full width with no avatar offsetting them, aligning Clear
               to the left edge matches the box below it instead of an
-              offset that no longer means anything. */}
+              offset that no longer means anything.
+              personal-notes-ui-polish: moved above the photo box —
+              directly under the text box now, rather than below the
+              photo box — per the requested reorder. */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -1117,6 +1165,15 @@ export default function PersonalNotes({ conditionId }) {
               </button>
             </div>
           </div>
+
+          <NotePhotoBox
+            state={photoState}
+            url={savedImageUrl}
+            isPro={isPro}
+            onTapEmpty={handleBoxTap}
+            onTapPhoto={() => setLightboxOpen(true)}
+            onRetry={retryUpload}
+          />
         </div>
       ) : user && (savedValue || savedImageUrl) ? (
         /* Populated, signed in — comment-style. On the very first save
@@ -1131,13 +1188,22 @@ export default function PersonalNotes({ conditionId }) {
           transform: justPopulated ? 'scale(0.98)' : 'scale(1)',
           transition: 'opacity 0.25s ease, transform 0.25s ease',
         }}>
+          {/* personal-notes-ui-polish: name line added above the note
+              text — the account's profile name, or 'You' when none is
+              set (same fallback ProfileAvatar's own initials already use,
+              so nothing new is being read here). The avatar carries a
+              fixed marginTop (AVATAR_FIRST_LINE_OFFSET.saved) so it
+              centers on this name line specifically, rather than on the
+              vertical middle of the name + note text together — the note
+              text itself can still be any length below without pulling
+              the avatar's position around. */}
           <div style={{
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '8px 16px',
+            padding: '14px 16px 14px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
@@ -1146,9 +1212,19 @@ export default function PersonalNotes({ conditionId }) {
             <ProfileAvatar
               user={user}
               fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
+              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0, marginTop: AVATAR_FIRST_LINE_OFFSET.saved }}
             />
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{
+                display: 'block',
+                fontSize: 15,
+                fontWeight: 500,
+                lineHeight: `${SAVED_NAME_LINE_HEIGHT}px`,
+                fontFamily: 'var(--font-body)',
+                color: 'var(--color-text-primary)',
+              }}>
+                {profile?.fullName || 'You'}
+              </span>
               {/* Mixed-language display: rather than manually splitting the
                   text into per-language chunks in code (fragile — proved
                   itself buggy twice), this hands the raw saved text to the
@@ -1158,6 +1234,8 @@ export default function PersonalNotes({ conditionId }) {
                 <span
                   dir="auto"
                   style={{
+                    display: 'block',
+                    marginTop: 2,
                     fontSize: 14,
                     lineHeight: '20px',
                     fontFamily: 'var(--font-body)',
@@ -1170,6 +1248,8 @@ export default function PersonalNotes({ conditionId }) {
                 </span>
               ) : (
                 <span style={{
+                  display: 'block',
+                  marginTop: 2,
                   fontSize: 14,
                   lineHeight: '20px',
                   fontWeight: 400,
@@ -1213,20 +1293,27 @@ export default function PersonalNotes({ conditionId }) {
            straight into edit mode via handlePromptTap.
            notes-photo-uploader-redesign: avatar moved inside the pill's
            own bordered container, pill now full width, matching every
-           other state — no photo box here per the execution plan (the
-           box only renders in editing/populated, so attaching a photo
-           from a totally fresh note starts by tapping into edit mode
-           first, same as it always required for typed text). */
+           other state.
+           personal-notes-ui-polish: the photo box (below) now also
+           renders here, including signed-out — as the same locked
+           "Pro feature" look a signed-in free account already sees,
+           rather than being hidden until someone starts editing. The
+           avatar here uses alignItems: 'center' rather than the fixed
+           first-line offset the other two states use, since this
+           placeholder is always exactly one line — centering against
+           the row and centering against "the first line" are the same
+           thing here. */
+        <>
         <div
           onClick={handlePromptTap}
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             gap: 10,
             cursor: 'pointer',
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '8px 16px',
+            padding: '14px 16px 14px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
@@ -1265,6 +1352,16 @@ export default function PersonalNotes({ conditionId }) {
             </span>
           </div>
         </div>
+
+        <NotePhotoBox
+          state={photoState}
+          url={savedImageUrl}
+          isPro={isPro}
+          onTapEmpty={handleBoxTap}
+          onTapPhoto={() => setLightboxOpen(true)}
+          onRetry={retryUpload}
+        />
+        </>
       )}
 
       <ConfirmSheet
