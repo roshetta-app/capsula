@@ -250,8 +250,6 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
     return (
       <div style={{
         ...boxBase,
-        border: '1px dashed var(--color-border)',
-        backgroundColor: 'var(--color-surface)',
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
       }}>
         <span style={{ fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)' }}>
@@ -273,7 +271,7 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
       type="button"
       onClick={onTap}
       aria-label="View attached photo"
-      style={{ ...boxBase, padding: 0, border: 'none', cursor: 'pointer', background: 'none', backgroundColor: 'var(--color-surface)' }}
+      style={{ ...boxBase, padding: 0, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', cursor: 'pointer', background: 'none', backgroundColor: 'var(--color-surface)' }}
     >
       {status === 'ready' && src && (
         <>
@@ -310,28 +308,36 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
 const PHOTO_BOX_TITLE = 'Add a photo to your note'
 const PHOTO_BOX_PRO_SUBTITLE = 'Unlock with Pro'
 
-function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
+// notes-merged-card: this box no longer draws its own border/background —
+// it now always renders as a section inside the shared card the note
+// text lives in (see PersonalNotes below), separated from whatever comes
+// above it by a single hairline (borderTop). roundBottom is passed by the
+// parent only when this box is the LAST section in that card (the
+// populated and prompt states) so its bottom corners match the card's
+// own rounded corners; the editing state passes nothing (defaults to
+// false) since its footer row renders below this box instead.
+function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roundBottom = false }) {
   const boxBase = {
-    display:      'block',
-    width:        '100%',
-    marginTop:    8,
-    height:       PHOTO_BOX_HEIGHT,
-    borderRadius: 'var(--radius-md)',
-    overflow:     'hidden',
-    position:     'relative',
-    boxSizing:    'border-box',
+    display:                 'block',
+    width:                   '100%',
+    height:                  PHOTO_BOX_HEIGHT,
+    borderTop:               '1px solid var(--color-border)',
+    borderBottomLeftRadius:  roundBottom ? PILL_RADIUS : 0,
+    borderBottomRightRadius: roundBottom ? PILL_RADIUS : 0,
+    overflow:                'hidden',
+    position:                'relative',
+    boxSizing:               'border-box',
   }
 
   if (state === 'attached' && url) {
     return <NoteAttachedPhoto url={url} onTap={onTapPhoto} boxBase={boxBase} />
   }
 
-  // Every other state shares one plain dashed-border shell — only the
-  // content inside changes.
+  // Every other state shares one plain shell — only the content inside
+  // changes. No border/background of its own anymore; boxBase's borderTop
+  // is the only divider it needs.
   const shell = {
     ...boxBase,
-    border:          '1px dashed var(--color-border)',
-    backgroundColor: 'var(--color-surface)',
     display:         'flex',
     flexDirection:   'column',
     alignItems:      'center',
@@ -437,29 +443,24 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
       <Icon name="ImagePlus" size={17} color="var(--color-text-secondary)" />
     </span>
   )
-  // personal-notes-mock-restyle: deliberately NOT spreading boxBase here —
-  // boxBase's fixed PHOTO_BOX_HEIGHT (140px) exists so a full-bleed photo
-  // (attached state) or a centered spinner/message (uploading/offline/
-  // error) has a consistent footprint. This row's content is a single
-  // short line, so reusing that same fixed height left it dwarfed inside
-  // a mostly-empty dashed box — sized to its own content instead, same
-  // width/radius/margin as every other box state for visual consistency.
-  // backgroundColor uses --color-surface-muted (an existing app token,
-  // already used for e.g. skeleton fills) rather than plain --color-
-  // surface, so this box reads as a distinct, slightly-recessed area
-  // instead of matching the note card above it exactly.
+  // notes-merged-card: no longer spreading boxBase — boxBase's fixed
+  // PHOTO_BOX_HEIGHT (140px) exists so a full-bleed photo (attached
+  // state) or a centered spinner/message (uploading/offline/error) has a
+  // consistent footprint. This row's content is a single short line, so
+  // it stays sized to its own content instead — but it shares the same
+  // borderTop divider and roundBottom corner behavior as every other
+  // photo state, since it's still just a section of the same card.
   const rowShell = {
-    display:         'flex',
-    alignItems:      'center',
-    gap:             12,
-    width:           '100%',
-    marginTop:       8,
-    padding:         '14px var(--space-4)',
-    borderRadius:    'var(--radius-md)',
-    boxSizing:       'border-box',
-    textAlign:       'left',
-    border:          '1px dashed var(--color-border)',
-    backgroundColor: 'var(--color-surface-muted)',
+    display:                 'flex',
+    alignItems:              'center',
+    gap:                     12,
+    width:                   '100%',
+    padding:                 '14px var(--space-4)',
+    boxSizing:               'border-box',
+    textAlign:               'left',
+    borderTop:               '1px solid var(--color-border)',
+    borderBottomLeftRadius:  roundBottom ? PILL_RADIUS : 0,
+    borderBottomRightRadius: roundBottom ? PILL_RADIUS : 0,
   }
 
   if (!isPro) {
@@ -468,7 +469,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
         type="button"
         onClick={onTapEmpty}
         aria-label={`${PHOTO_BOX_TITLE} — Pro feature`}
-        style={{ ...rowShell, cursor: 'pointer' }}
+        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', background: 'none', cursor: 'pointer' }}
       >
         {iconSquare}
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -500,7 +501,7 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry }) {
       type="button"
       onClick={onTapEmpty}
       aria-label={PHOTO_BOX_TITLE}
-      style={{ ...rowShell, cursor: 'pointer' }}
+      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', background: 'none', cursor: 'pointer' }}
     >
       {iconSquare}
       <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
@@ -1297,12 +1298,26 @@ export default function PersonalNotes({ conditionId }) {
           </div>
         </div>
       ) : isEditing ? (
-        <div>
-          {/* Pill — avatar, text box, and the inline Send button all
-              share one bordered container now (notes-photo-uploader-
-              redesign moved the avatar in from a sibling row), full
-              width to match the photo box below it. alignItems:
-              'flex-start' on the row is kept so the avatar's position
+        /* notes-merged-card: text, photo, and the footer controls now
+           share one outer card instead of the text pill and photo box
+           being two separately-bordered pieces. The accent focus border
+           moved from the text section alone onto this whole outer card,
+           so typing highlights the entire card, not just the top half.
+           The footer (Clear / counter / Cancel) moved from directly
+           under the text box to the very bottom, after the photo
+           section — since everything's one card now, those controls
+           read as acting on the whole card (text + photo together),
+           not just the text half. */
+        <div style={{
+          border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
+          borderRadius: PILL_RADIUS,
+          boxSizing: 'border-box',
+          backgroundColor: 'var(--color-surface)',
+          transition: 'border-color 0.15s ease',
+          width: '100%',
+        }}>
+          {/* Text row — avatar, text box, and the inline Send button.
+              alignItems: 'flex-start' is kept so the avatar's position
               doesn't get pulled toward the vertical middle of the whole
               textarea as it grows to multiple lines; the Send button
               overrides back to alignSelf: 'flex-end' so it still pins to
@@ -1317,13 +1332,7 @@ export default function PersonalNotes({ conditionId }) {
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
-            border: `1px solid ${isFocused ? 'color-mix(in srgb, var(--color-accent) 45%, var(--color-border) 55%)' : 'var(--color-border)'}`,
-            borderRadius: PILL_RADIUS,
             padding: '24px 18px 24px 24px',
-            boxSizing: 'border-box',
-            backgroundColor: 'var(--color-surface)',
-            transition: 'border-color 0.15s ease',
-            width: '100%',
           }}>
             <ProfileAvatar
               user={user}
@@ -1385,30 +1394,31 @@ export default function PersonalNotes({ conditionId }) {
             </button>
           </div>
 
+          <NotePhotoBox
+            state={photoState}
+            url={savedImageUrl}
+            isPro={isPro}
+            onTapEmpty={handleBoxTap}
+            onTapPhoto={() => setLightboxOpen(true)}
+            onRetry={retryUpload}
+          />
+
           {/* Footer row — Clear (only when a note exists to clear) on
               the left; the live character counter and Cancel share the
-              right side. notes-photo-uploader-redesign: paddingLeft
-              dropped to 0 — now that the pill and photo box are both
-              full width with no avatar offsetting them, aligning Clear
-              to the left edge matches the box below it instead of an
-              offset that no longer means anything.
-              personal-notes-ui-polish: moved above the photo box —
-              directly under the text box now, rather than below the
-              photo box — per the requested reorder. Also now wrapped in
-              a grid-rows animated shell (0fr collapsed / 1fr expanded,
-              driven by footerExpanded) so it grows in when editing
-              starts and shrinks back out on Save/Cancel/Clear, instead
-              of snapping in and out — which is what actually makes the
-              photo box below look like it slides down/up smoothly,
-              since it's just the next thing in normal flow. */}
+              right side. notes-merged-card: now the card's own bottom
+              section, after the photo box, with its own divider line —
+              still wrapped in the same grid-rows animated shell (0fr
+              collapsed / 1fr expanded, driven by footerExpanded) so it
+              grows in when editing starts and shrinks back out on
+              Save/Cancel/Clear, instead of snapping in and out. */}
           <div style={{
             display: 'grid',
             gridTemplateRows: footerExpanded ? '1fr' : '0fr',
-            marginTop: footerExpanded ? 6 : 0,
             opacity: footerExpanded ? 1 : 0,
-            transition: 'grid-template-rows var(--motion-base) var(--ease-reveal), margin-top var(--motion-base) var(--ease-reveal), opacity var(--motion-base) var(--ease-reveal)',
+            borderTop: '1px solid var(--color-border)',
+            transition: 'grid-template-rows var(--motion-base) var(--ease-reveal), opacity var(--motion-base) var(--ease-reveal)',
           }}>
-            <div style={{ overflow: 'hidden', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ overflow: 'hidden', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px' }}>
               {draft ? (
                 <button
                   type="button"
@@ -1457,15 +1467,6 @@ export default function PersonalNotes({ conditionId }) {
               </div>
             </div>
           </div>
-
-          <NotePhotoBox
-            state={photoState}
-            url={savedImageUrl}
-            isPro={isPro}
-            onTapEmpty={handleBoxTap}
-            onTapPhoto={() => setLightboxOpen(true)}
-            onRetry={retryUpload}
-          />
         </div>
       ) : user && savedValue ? (
         /* Populated, signed in — comment-style. On the very first save
@@ -1498,11 +1499,11 @@ export default function PersonalNotes({ conditionId }) {
             position: 'relative',
             border: '1px solid var(--color-border)',
             borderRadius: PILL_RADIUS,
-            padding: '20px 16px 20px 22px',
             boxSizing: 'border-box',
             backgroundColor: 'var(--color-surface)',
             width: '100%',
           }}>
+          <div style={{ padding: '20px 16px 20px 22px' }}>
             <div style={{
               display: 'flex',
               alignItems: 'center',
@@ -1668,7 +1669,9 @@ export default function PersonalNotes({ conditionId }) {
             onTapEmpty={handleBoxTap}
             onTapPhoto={() => setLightboxOpen(true)}
             onRetry={retryUpload}
+            roundBottom
           />
+          </div>
         </div>
       ) : (
         /* Unified prompt state — identical whether signed out or signed
@@ -1687,69 +1690,71 @@ export default function PersonalNotes({ conditionId }) {
            name now only appears once a note is actually saved. The row
            keeps plain alignItems: 'center' since the placeholder is
            always exactly one fixed-string line. */
-        <>
-        <div
-          onClick={handlePromptTap}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            cursor: 'pointer',
-            border: '1px solid var(--color-border)',
-            borderRadius: PILL_RADIUS,
-            padding: '20px 16px 20px 22px',
-            boxSizing: 'border-box',
-            backgroundColor: 'var(--color-surface)',
-            width: '100%',
-            minHeight: AVATAR_SIZE + 2,
-          }}
-        >
-          {user ? (
-            <ProfileAvatar
-              user={user}
-              fullName={profile?.fullName}
-              style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
-            />
-          ) : (
-            <div style={{
-              width: AVATAR_SIZE,
-              height: AVATAR_SIZE,
-              borderRadius: 'var(--radius-full)',
-              backgroundColor: 'var(--color-accent-light)',
+        <div style={{
+          border: '1px solid var(--color-border)',
+          borderRadius: PILL_RADIUS,
+          boxSizing: 'border-box',
+          backgroundColor: 'var(--color-surface)',
+          width: '100%',
+        }}>
+          <div
+            onClick={handlePromptTap}
+            style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
+              gap: 10,
+              cursor: 'pointer',
+              padding: '20px 16px 20px 22px',
+              minHeight: AVATAR_SIZE + 2,
+            }}
+          >
+            {user ? (
+              <ProfileAvatar
+                user={user}
+                fullName={profile?.fullName}
+                style={{ width: AVATAR_SIZE, height: AVATAR_SIZE, fontSize: 12, flexShrink: 0 }}
+              />
+            ) : (
+              <div style={{
+                width: AVATAR_SIZE,
+                height: AVATAR_SIZE,
+                borderRadius: 'var(--radius-full)',
+                backgroundColor: 'var(--color-accent-light)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
+              </div>
+            )}
+            <span style={{
+              flex: 1,
+              minWidth: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 14,
+              lineHeight: '19px',
+              fontWeight: 400,
+              color: 'var(--color-text-tertiary)',
+              fontFamily: 'var(--font-body)',
             }}>
-              <User size={16} color="var(--color-accent)" strokeWidth={1.8} />
-            </div>
-          )}
-          <span style={{
-            flex: 1,
-            minWidth: 0,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            fontSize: 14,
-            lineHeight: '19px',
-            fontWeight: 400,
-            color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)',
-          }}>
-            <Icon name="MessageSquare" size={14} color="var(--color-text-tertiary)" />
-            Add a note or thought…
-          </span>
-        </div>
+              <Icon name="MessageSquare" size={14} color="var(--color-text-tertiary)" />
+              Add a note or thought…
+            </span>
+          </div>
 
-        <NotePhotoBox
-          state={photoState}
-          url={savedImageUrl}
-          isPro={isPro}
-          onTapEmpty={handleBoxTap}
-          onTapPhoto={() => setLightboxOpen(true)}
-          onRetry={retryUpload}
-        />
-        </>
+          <NotePhotoBox
+            state={photoState}
+            url={savedImageUrl}
+            isPro={isPro}
+            onTapEmpty={handleBoxTap}
+            onTapPhoto={() => setLightboxOpen(true)}
+            onRetry={retryUpload}
+            roundBottom
+          />
+        </div>
       )}
       </div>
 
