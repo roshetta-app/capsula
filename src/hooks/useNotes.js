@@ -20,9 +20,9 @@
  *     condition (keyed by userId:conditionId) is enough. Last-write-wins
  *     on reconnect, no merge logic.
  *
- * notes-comment-redesign (this session) — added updatedAt tracking, for
- * the new "Edited 2h ago"-style relative timestamp PersonalNotes.jsx now
- * shows under a saved note. Three parts, not just a new return value:
+ * notes-comment-redesign — added updatedAt tracking, for the
+ * "Edited 2h ago"-style relative timestamp PersonalNotes.jsx shows under
+ * a saved note. Three parts, not just a new return value:
  *   - Loaded alongside `body` from the 'notes' table (same select) and
  *     returned as `updatedAt`.
  *   - Persisted locally too (`capsula_notes_updated_${conditionId}`), same
@@ -35,6 +35,29 @@
  *     otherwise a write that sits queued for an hour would show "Edited
  *     just now" a full hour after it actually happened.
  *
+ * notes-pro-image-and-char-cap (this task):
+ *   Added a second, independent field — image_url — carried alongside
+ *   body. Kept genuinely independent rather than folded into the same
+ *   save() call/queue slot, because attaching a photo shouldn't have to
+ *   wait on (or clobber) a pending text edit and vice versa — the task
+ *   goal is explicit that picking a photo saves it immediately, without
+ *   also requiring a Send tap on whatever text happens to be mid-edit:
+ *     - Own localStorage cache (`capsula_notes_image_${conditionId}`),
+ *       same reasoning as body/updatedAt's own caches.
+ *     - Own offline-queue slot, keyed `${userId}:${conditionId}:image`
+ *       (the existing text queue is now `${userId}:${conditionId}:body`)
+ *       — so a queued photo and a queued text edit for the same
+ *       condition never overwrite one another while offline.
+ *     - `saveImage(url)` mirrors `save(value)`'s shape exactly (same
+ *       gating, same optimistic local write, same queue-on-failure
+ *       behavior) but only ever touches the image_url/updated_at columns
+ *       — never body — so a photo save can't accidentally revert
+ *       in-flight text.
+ *   This hook only persists a URL it's given; the actual upload (resize +
+ *   Storage write) happens in src/lib/noteQueries.js, called from
+ *   PersonalNotes.jsx — kept out of this hook so its job stays "save and
+ *   load", matching its existing shape.
+ *
  * Signed out (guest): still localStorage only, key
  * `capsula_notes_${conditionId}` — this hook itself doesn't change what a
  * signed-out call would do to local storage, PersonalNotes.jsx just no
@@ -45,23 +68,26 @@
  * flushing on reconnect. Condition-only for now — no item_type column,
  * matching today's feature exactly.
  *
- * recently-viewed-offline-fix (2026-09-01) — removed the reactive
- * "clear the local copy when `user` goes from signed-in to signed-out"
- * effect that used to live here (same pattern useRecentlyViewed.js just
- * had removed — see that file's header for the full explanation). The
- * sign-in library can genuinely report "signed out" for a moment purely
- * from a background session check failing while offline, which this
- * effect couldn't tell apart from someone actually tapping Sign Out.
- * AuthContext.jsx's signOut() already sweeps every `capsula_notes_*` key
- * directly, from the one place a real sign-out is guaranteed to run
- * through — see clearAllNotesStorage() there. This hook no longer needs
- * its own copy of that logic.
+ * recently-viewed-offline-fix — removed the reactive "clear the local
+ * copy when `user` goes from signed-in to signed-out" effect that used to
+ * live here (same pattern useRecentlyViewed.js just had removed — see
+ * that file's header for the full explanation). The sign-in library can
+ * genuinely report "signed out" for a moment purely from a background
+ * session check failing while offline, which this effect couldn't tell
+ * apart from someone actually tapping Sign Out. AuthContext.jsx's
+ * signOut() already sweeps every `capsula_notes_*` key directly, from the
+ * one place a real sign-out is guaranteed to run through — see
+ * clearAllNotesStorage() there. This hook no longer needs its own copy of
+ * that logic.
  *
  * Returns:
- *   savedValue  string          — the current saved note ('' if none)
- *   updatedAt   string | null   — ISO timestamp of the last save, null if
- *                                 the note has never been saved
- *   save        (value: string) => void
+ *   savedValue     string          — the current saved note body ('' if none)
+ *   savedImageUrl  string | null   — the current saved photo URL, null if none
+ *   updatedAt      string | null   — ISO timestamp of the last save (body or
+ *                                    image, whichever is more recent), null
+ *                                    if nothing has ever been saved
+ *   save           (value: string) => void
+ *   saveImage      (url: string) => void
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -71,6 +97,10 @@ import { supabase } from '../lib/supabase'
 
 function storageKeyFor(conditionId) {
   return `capsula_notes_${conditionId}`
+}
+
+function imageStorageKeyFor(conditionId) {
+  return `capsula_notes_image_${conditionId}`
 }
 
 function updatedAtKeyFor(conditionId) {
@@ -83,6 +113,20 @@ function readStorage(conditionId) {
 
 function writeStorage(conditionId, value) {
   try { localStorage.setItem(storageKeyFor(conditionId), value) } catch { /* ignore */ }
+}
+
+function readImageStorage(conditionId) {
+  try { return localStorage.getItem(imageStorageKeyFor(conditionId)) ?? null } catch { return null }
+}
+
+function writeImageStorage(conditionId, url) {
+  try {
+    if (url) {
+      localStorage.setItem(imageStorageKeyFor(conditionId), url)
+    } else {
+      localStorage.removeItem(imageStorageKeyFor(conditionId))
+    }
+  } catch { /* ignore */ }
 }
 
 function readUpdatedAtStorage(conditionId) {
@@ -100,9 +144,11 @@ function writeUpdatedAtStorage(conditionId, isoString) {
 }
 
 // ─── Pending-write queue helpers (offline fix) ─────────────────────────────
-// Single slot per userId:conditionId — a note is one value per condition,
-// so a later queued write for the same condition simply replaces an
-// earlier one rather than needing an array like favourites' queue.
+// One slot per userId:conditionId:type — 'body' and 'image' are kept as
+// separate slots (notes-pro-image-and-char-cap) so a queued photo and a
+// queued text edit for the same condition never overwrite one another
+// while offline; within a single type, a later queued write still simply
+// replaces an earlier one, same as before this task.
 
 const NOTES_PENDING_WRITES_KEY = 'capsula_notes_pending_writes'
 
@@ -125,14 +171,14 @@ function writePendingWrites(pending) {
   }
 }
 
-function queueWrite(userId, conditionId, body, updatedAt) {
+function queueTextWrite(userId, conditionId, body, updatedAt) {
   const pending = readPendingWrites()
-  pending[`${userId}:${conditionId}`] = { userId, conditionId, body, updatedAt }
+  pending[`${userId}:${conditionId}:body`] = { type: 'body', userId, conditionId, body, updatedAt }
   writePendingWrites(pending)
 }
 
-function unqueueWrite(userId, conditionId) {
-  const key = `${userId}:${conditionId}`
+function unqueueTextWrite(userId, conditionId) {
+  const key = `${userId}:${conditionId}:body`
   const pending = readPendingWrites()
   if (key in pending) {
     delete pending[key]
@@ -140,7 +186,22 @@ function unqueueWrite(userId, conditionId) {
   }
 }
 
-function buildNoteUpsert(userId, conditionId, body, updatedAt) {
+function queueImageWrite(userId, conditionId, imageUrl, updatedAt) {
+  const pending = readPendingWrites()
+  pending[`${userId}:${conditionId}:image`] = { type: 'image', userId, conditionId, imageUrl, updatedAt }
+  writePendingWrites(pending)
+}
+
+function unqueueImageWrite(userId, conditionId) {
+  const key = `${userId}:${conditionId}:image`
+  const pending = readPendingWrites()
+  if (key in pending) {
+    delete pending[key]
+    writePendingWrites(pending)
+  }
+}
+
+function buildNoteTextUpsert(userId, conditionId, body, updatedAt) {
   return supabase
     .from('notes')
     .upsert(
@@ -149,11 +210,24 @@ function buildNoteUpsert(userId, conditionId, body, updatedAt) {
     )
 }
 
+// Only touches image_url/updated_at — body is deliberately omitted from
+// this object (not set to '' or null) so an image-only save can never
+// wipe out an existing, unrelated note body on the same row.
+function buildNoteImageUpsert(userId, conditionId, imageUrl, updatedAt) {
+  return supabase
+    .from('notes')
+    .upsert(
+      { user_id: userId, condition_id: conditionId, image_url: imageUrl, updated_at: updatedAt },
+      { onConflict: 'user_id,condition_id' }
+    )
+}
+
 export function useNotes(conditionId) {
   const { user, loading: authLoading } = useAuth()
   const { isOnline } = useOnlineStatus()
-  const [savedValue, setSavedValue] = useState(() => readStorage(conditionId))
-  const [updatedAt, setUpdatedAt]   = useState(() => readUpdatedAtStorage(conditionId))
+  const [savedValue, setSavedValue]       = useState(() => readStorage(conditionId))
+  const [savedImageUrl, setSavedImageUrl] = useState(() => readImageStorage(conditionId))
+  const [updatedAt, setUpdatedAt]         = useState(() => readUpdatedAtStorage(conditionId))
 
   const isOnlineRef = useRef(isOnline)
   useEffect(() => { isOnlineRef.current = isOnline }, [isOnline])
@@ -161,8 +235,8 @@ export function useNotes(conditionId) {
   // notes-timestamp-race-fix: guards against a slow initial load
   // overwriting a note that was saved WHILE that load was still in
   // flight. Reset to false each time a fresh load starts, flipped to
-  // true by save() below — if a save lands before the load's response
-  // arrives, the load's now-stale result is discarded instead of
+  // true by save()/saveImage() below — if a save lands before the load's
+  // response arrives, the load's now-stale result is discarded instead of
   // clobbering the just-saved value/timestamp (this is what produced
   // the "edited just now" flashing back to an old "3w ago").
   const editedSinceLoadRef = useRef(false)
@@ -191,17 +265,20 @@ export function useNotes(conditionId) {
 
     supabase
       .from('notes')
-      .select('body, updated_at')
+      .select('body, image_url, updated_at')
       .eq('user_id', user.id)
       .eq('condition_id', conditionId)
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled || error || editedSinceLoadRef.current) return
-        const value = data?.body ?? ''
-        const ts    = data?.updated_at ?? null
+        const value    = data?.body ?? ''
+        const imageUrl = data?.image_url ?? null
+        const ts       = data?.updated_at ?? null
         writeStorage(conditionId, value)
+        writeImageStorage(conditionId, imageUrl)
         writeUpdatedAtStorage(conditionId, ts)
         setSavedValue(value)
+        setSavedImageUrl(imageUrl)
         setUpdatedAt(ts)
       })
 
@@ -223,8 +300,18 @@ export function useNotes(conditionId) {
       const pending = readPendingWrites()
       for (const [key, entry] of Object.entries(pending)) {
         if (cancelled) return
-        const { error } = await buildNoteUpsert(entry.userId, entry.conditionId, entry.body, entry.updatedAt)
+
+        const isSameTarget = entry.userId === user?.id && entry.conditionId === conditionId
+        let error
+
+        if (entry.type === 'image') {
+          ;({ error } = await buildNoteImageUpsert(entry.userId, entry.conditionId, entry.imageUrl, entry.updatedAt))
+        } else {
+          ;({ error } = await buildNoteTextUpsert(entry.userId, entry.conditionId, entry.body, entry.updatedAt))
+        }
+
         if (cancelled) return
+
         if (!error) {
           const current = readPendingWrites()
           delete current[key]
@@ -235,10 +322,15 @@ export function useNotes(conditionId) {
           // reasoning as useFavourites.js's flush effect: a flush can
           // land either before or after the sign-in fetch effect above,
           // so self-heal here in case this flush wins the race.
-          if (entry.userId === user?.id && entry.conditionId === conditionId) {
-            writeStorage(conditionId, entry.body)
+          if (isSameTarget) {
+            if (entry.type === 'image') {
+              writeImageStorage(conditionId, entry.imageUrl)
+              setSavedImageUrl(entry.imageUrl)
+            } else {
+              writeStorage(conditionId, entry.body)
+              setSavedValue(entry.body)
+            }
             writeUpdatedAtStorage(conditionId, entry.updatedAt)
-            setSavedValue(entry.body)
             setUpdatedAt(entry.updatedAt)
           }
         }
@@ -274,19 +366,51 @@ export function useNotes(conditionId) {
     const userId = user.id
 
     if (!isOnlineRef.current) {
-      queueWrite(userId, conditionId, value, now)
+      queueTextWrite(userId, conditionId, value, now)
       return
     }
 
-    buildNoteUpsert(userId, conditionId, value, now).then(({ error }) => {
+    buildNoteTextUpsert(userId, conditionId, value, now).then(({ error }) => {
       if (error) {
         console.error('Failed to sync note:', error)
-        queueWrite(userId, conditionId, value, now)
+        queueTextWrite(userId, conditionId, value, now)
       } else {
-        unqueueWrite(userId, conditionId)
+        unqueueTextWrite(userId, conditionId)
       }
     })
   }, [user, conditionId])
 
-  return { savedValue, updatedAt, save }
+  // notes-pro-image-and-char-cap: saves a photo's URL the moment it's
+  // picked — deliberately independent of save() above (see file header).
+  // Same shape as save(): defensive signed-out gate, optimistic local
+  // write, offline queue with its own slot, retry-on-failure.
+  const saveImage = useCallback((url) => {
+    if (!user) return
+
+    const now = new Date().toISOString()
+    editedSinceLoadRef.current = true
+
+    writeImageStorage(conditionId, url)
+    writeUpdatedAtStorage(conditionId, now)
+    setSavedImageUrl(url)
+    setUpdatedAt(now)
+
+    const userId = user.id
+
+    if (!isOnlineRef.current) {
+      queueImageWrite(userId, conditionId, url, now)
+      return
+    }
+
+    buildNoteImageUpsert(userId, conditionId, url, now).then(({ error }) => {
+      if (error) {
+        console.error('Failed to sync note image:', error)
+        queueImageWrite(userId, conditionId, url, now)
+      } else {
+        unqueueImageWrite(userId, conditionId)
+      }
+    })
+  }, [user, conditionId])
+
+  return { savedValue, savedImageUrl, updatedAt, save, saveImage }
 }

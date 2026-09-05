@@ -1,4 +1,3 @@
-
 /**
  * src/constants/features.js
  * Phase 2K — Feature flags
@@ -34,3 +33,16 @@ export const FAVOURITES_LIMIT_MESSAGE_DRUGS =
   "You've reached your free limit of 10 saved drugs — go Pro for unlimited favourites."
 export const FAVOURITES_LIMIT_MESSAGE_CONDITIONS =
   "You've reached your free limit of 10 saved conditions — go Pro for unlimited favourites."
+
+/**
+ * notes-pro-image-and-char-cap
+ *
+ * Personal Notes character caps — not shared between tiers. 280
+ * (Twitter-style) makes a free note feel like a quick jot; 2000 feels
+ * like a real upgrade next to it. The photo attachment (Pro-only, see
+ * PersonalNotes.jsx) does most of the convincing to go Pro — this number
+ * is a secondary nudge. Pro accounts are never checked against the free
+ * cap (see useIsPro.js), same pattern as the favourites caps above.
+ */
+export const NOTES_CHAR_CAP_FREE = 280
+export const NOTES_CHAR_CAP_PRO = 2000
