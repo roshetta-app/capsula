@@ -1014,7 +1014,6 @@ export default function PersonalNotes({ conditionId }) {
   // notes-typing-keyboard-scroll: the keyboard-aware scroll check is
   // called right here too, not just from the ResizeObserver further up —
   // a line simply wrapping as you type (no Enter key involved) wasn't
-<<<<<<< HEAD
   // reliably caught by the ResizeObserver alone. lastTextareaHeightRef
   // guards it to only actually fire when the height genuinely changed —
   // this effect reruns on every keystroke (it's keyed on `draft`), but
@@ -1024,14 +1023,6 @@ export default function PersonalNotes({ conditionId }) {
   // finish, which is what showed up as it running on every keystroke.
   const lastTextareaHeightRef = useRef(0)
 
-=======
-  // reliably caught by the ResizeObserver alone, since the browser
-  // doesn't always treat that as a distinct enough size change to report
-  // right away. Tying it directly to this same effect (which already
-  // reruns on every keystroke, wrap or not, since it's keyed on `draft`)
-  // guarantees the check happens every time, after the height above has
-  // already been updated.
->>>>>>> 4198e9d0337d262321b87fafe56ce39f6390d3e0
   useLayoutEffect(() => {
     if (!isEditing || !textareaRef.current) {
       lastTextareaHeightRef.current = 0
@@ -1039,17 +1030,12 @@ export default function PersonalNotes({ conditionId }) {
     }
     const el = textareaRef.current
     el.style.height = 'auto'
-<<<<<<< HEAD
     const newHeight = el.scrollHeight
     el.style.height = `${newHeight}px`
     if (newHeight !== lastTextareaHeightRef.current) {
       lastTextareaHeightRef.current = newHeight
       scrollCardAboveKeyboard()
     }
-=======
-    el.style.height = `${el.scrollHeight}px`
-    scrollCardAboveKeyboard()
->>>>>>> 4198e9d0337d262321b87fafe56ce39f6390d3e0
   }, [isEditing, draft])
 
   // Put the cursor at the end of the existing text when entering edit
