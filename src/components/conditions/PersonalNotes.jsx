@@ -1396,12 +1396,20 @@ export default function PersonalNotes({ conditionId }) {
               it centers on the textarea's FIRST line specifically —
               staying put there regardless of how many lines the note
               grows to below it — rather than sitting flush with the very
-              top of the text like before. */}
+              top of the text like before.
+              notes-avatar-icon-alignment: left padding now matches the
+              photo-uploader row below (rowShell's left inset is
+              var(--space-4)), plus half the width difference between the
+              32px avatar and the 36px icon square there (2px), so the
+              avatar's own horizontal center lines up exactly with the
+              icon+badge row's center underneath it — using the shared
+              token rather than a second hardcoded number, so the two
+              stay aligned even if the spacing scale itself ever changes. */}
           <div style={{
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
-            padding: '24px 18px 24px 24px',
+            padding: '24px 18px 24px calc(var(--space-4) + 2px)',
           }}>
             <ProfileAvatar
               user={user}
