@@ -277,16 +277,30 @@ export function writeIconCache(url, svg) {
 // IDB_VERSION bumped 2 → 3 so existing devices get this new store created
 // automatically the next time they open the app; the existing 'drugs' and
 // 'conditions' stores and their data are untouched by this bump.
+//
+// 2026-09-05 (notes-photo-uploader-redesign, Task 1): added a fourth store,
+// 'pending-note-photos', for the offline upload queue described in that
+// task's own header — a resized note photo picked while offline (or one
+// whose upload attempt fails) is held here as a single Blob per
+// 'userId:conditionId' key until the next reconnect, when useNotes.js reads
+// it back, retries the actual Storage upload, and clears the slot on
+// success. One slot per condition is enough, same reasoning as the
+// existing pending-write queues elsewhere in this file: only the latest
+// picked photo for a given note ever matters. IDB_VERSION bumped 3 → 4 so
+// existing devices get this new store created automatically the next time
+// they open the app; the 'drugs'/'conditions'/'photos' stores and their
+// data are untouched by this bump.
 
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 3
-const IDB_STORES  = ['drugs', 'conditions', 'photos']
+const IDB_VERSION = 4
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
 const CONDITIONS_STORE = 'conditions'
 const CONDITIONS_KEY   = 'conditions'
 const PHOTOS_STORE     = 'photos'
+const PENDING_NOTE_PHOTOS_STORE = 'pending-note-photos'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -584,6 +598,101 @@ export async function pruneOrphanedPhotos(validUrls) {
     })
   } catch (err) {
     logCrash(err, 'utils/cache.js: pruneOrphanedPhotos')
+  } finally {
+    db?.close()
+  }
+}
+
+// ─── Pending note-photo uploads (offline queue for the upload step) ───────
+//
+// Added 2026-09-05 (notes-photo-uploader-redesign, Task 1). One entry per
+// 'userId:conditionId', holding the resized (but not yet uploaded) photo
+// Blob picked while offline, or one whose upload attempt failed. This is
+// separate from the 'photos' store above — that store holds already-
+// uploaded gallery photos for offline viewing; this one holds a photo still
+// waiting to be uploaded in the first place. useNotes.js is the only
+// caller: it writes here on a failed/offline uploadNoteImage() call, reads
+// back and retries on reconnect, then clears the slot once the upload (and
+// the resulting saveImage()) succeeds.
+
+function pendingNotePhotoKey(userId, conditionId) {
+  return `${userId}:${conditionId}`
+}
+
+/**
+ * Save a resized note photo Blob that couldn't be uploaded yet (offline, or
+ * a failed upload attempt). Overwrites any previous pending photo for the
+ * same condition — only the latest picked photo ever matters, same
+ * single-slot-per-condition reasoning as the note text/image-URL queues in
+ * useNotes.js.
+ * @param {string} userId
+ * @param {string} conditionId
+ * @param {Blob} blob — already resized/compressed by imageResize.js
+ */
+export async function savePendingNotePhoto(userId, conditionId, blob) {
+  if (!userId || !conditionId || !blob) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PENDING_NOTE_PHOTOS_STORE, 'readwrite')
+      tx.objectStore(PENDING_NOTE_PHOTOS_STORE).put(blob, pendingNotePhotoKey(userId, conditionId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: savePendingNotePhoto')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Read a pending note photo Blob for one condition, or null if nothing's
+ * queued for it — the normal, expected case when there's no offline/failed
+ * upload waiting.
+ * @param {string} userId
+ * @param {string} conditionId
+ * @returns {Promise<Blob|null>}
+ */
+export async function getPendingNotePhoto(userId, conditionId) {
+  if (!userId || !conditionId) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    const blob = await new Promise((resolve, reject) => {
+      const tx = db.transaction(PENDING_NOTE_PHOTOS_STORE, 'readonly')
+      const req = tx.objectStore(PENDING_NOTE_PHOTOS_STORE).get(pendingNotePhotoKey(userId, conditionId))
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+    return blob
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: getPendingNotePhoto')
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Clear a condition's pending note photo once its upload has succeeded.
+ * @param {string} userId
+ * @param {string} conditionId
+ */
+export async function clearPendingNotePhoto(userId, conditionId) {
+  if (!userId || !conditionId) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PENDING_NOTE_PHOTOS_STORE, 'readwrite')
+      tx.objectStore(PENDING_NOTE_PHOTOS_STORE).delete(pendingNotePhotoKey(userId, conditionId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: clearPendingNotePhoto')
   } finally {
     db?.close()
   }
