@@ -190,12 +190,10 @@ function NoteAttachedPhoto({ url, onTap, boxBase }) {
 
 // personal-notes-mock-restyle: title is always the same regardless of
 // whether a note already exists — a context-varying title ("Add a photo"
-// once saved) read as inconsistent in testing. Subtitle only ever shows
-// for the Pro-locked look, and is the same "Unlock with Pro" wording
-// ProUpsellBanner/NotePhotoUpsellSheet already use elsewhere, kept short
-// so it doesn't wrap to two lines in the row layout below.
+// once saved) read as inconsistent in testing. (The free-tier locked row
+// below uses its own shorter "Add a photo" label instead of this one, to
+// fit its single-line layout — see notes-photo-row-single-line.)
 const PHOTO_BOX_TITLE = 'Add a photo to your note'
-const PHOTO_BOX_PRO_SUBTITLE = 'Unlock with Pro'
 
 // notes-merged-card: this box no longer draws its own border/background —
 // it now always renders as a section inside the shared card the note
@@ -358,37 +356,52 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
   }
 
   if (!isPro) {
+    // notes-photo-row-single-line: collapsed back to one line — the
+    // "Unlock with Pro" subtitle is gone entirely, replaced by a
+    // plain-text "Unlock with" + a small blue "Pro" badge pinned to the
+    // right (same badge treatment as the name-row PRO tag above, just
+    // mixed-case to match this row's copy). Icon and badge go back to
+    // accent blue (reverting notes-photo-uploader-declutter's grey pass);
+    // only the row's own weight/background and the "Add a photo" label
+    // stay on the quieter grey treatment.
     return (
       <button
         type="button"
         onClick={onTapEmpty}
-        aria-label={`${PHOTO_BOX_TITLE} — Pro feature`}
+        aria-label="Add a photo — Pro feature"
         style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}
       >
-        {iconSquare}
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-            {PHOTO_BOX_TITLE}
-          </span>
-          <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-            {PHOTO_BOX_PRO_SUBTITLE}
-          </span>
-        </span>
         <span style={{
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          width:           36,
+          height:          36,
           flexShrink:      0,
-          fontSize:        11,
-          fontWeight:      700,
-          padding:         '4px 10px',
-          borderRadius:    'var(--radius-full)',
-          // notes-photo-uploader-declutter: plain outline badge instead of
-          // a solid contrasting chip — still reads as a distinct label,
-          // just not a bright accent-colored one.
-          backgroundColor: 'transparent',
-          border:          '1px solid var(--color-border)',
-          color:           'var(--color-text-tertiary)',
-          fontFamily:      'var(--font-body)',
         }}>
-          PRO
+          <Icon name="ImagePlus" size={17} color="var(--color-accent)" />
+        </span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 400, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+          Add a photo
+        </span>
+        <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+            Unlock with
+          </span>
+          <span style={{
+            fontSize:        10,
+            fontWeight:      700,
+            letterSpacing:   '0.03em',
+            lineHeight:      1.4,
+            padding:         '1px 5px',
+            borderRadius:    4,
+            fontFamily:      'var(--font-body)',
+            color:           'var(--color-accent)',
+            backgroundColor: 'color-mix(in srgb, var(--color-accent) 15%, transparent)',
+            border:          '1px solid color-mix(in srgb, var(--color-accent) 35%, transparent)',
+          }}>
+            Pro
+          </span>
         </span>
       </button>
     )
@@ -1703,7 +1716,12 @@ export default function PersonalNotes({ conditionId }) {
               alignItems: 'center',
               gap: 10,
               cursor: 'pointer',
-              padding: '20px 16px 20px calc(var(--space-4) + 2px)',
+              // notes-photo-row-single-line: extra bottom padding (was 20,
+              // matching the other two states above) so this empty state
+              // doesn't look squashed now that the photo row under it is
+              // shorter — gives the avatar/placeholder line some breathing
+              // room instead of sitting right on top of the divider.
+              padding: '20px 16px 32px calc(var(--space-4) + 2px)',
               minHeight: AVATAR_SIZE + 2,
             }}
           >
