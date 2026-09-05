@@ -29,11 +29,6 @@ export const FEATURES = {
 export const FAVOURITES_CAP_DRUGS = 10
 export const FAVOURITES_CAP_CONDITIONS = 10
 
-export const FAVOURITES_LIMIT_MESSAGE_DRUGS =
-  "You've reached your free limit of 10 saved drugs — go Pro for unlimited favourites."
-export const FAVOURITES_LIMIT_MESSAGE_CONDITIONS =
-  "You've reached your free limit of 10 saved conditions — go Pro for unlimited favourites."
-
 /**
  * notes-pro-image-and-char-cap
  *
@@ -47,4 +42,3 @@ export const FAVOURITES_LIMIT_MESSAGE_CONDITIONS =
  */
 export const NOTES_CHAR_CAP_FREE = 400
 export const NOTES_CHAR_CAP_PRO = 2000
-

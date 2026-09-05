@@ -318,6 +318,13 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
   // middle, and (free accounts only) a solid "PRO" pill pinned to the
   // right via marginLeft: auto — replacing the old centered vertical
   // layout, to match the provided mock.
+  // notes-photo-uploader-declutter: icon/row/pill all switched from
+  // accent-colored + tinted background to plain tertiary-grey — the
+  // previous accent-light tint + bold title + colored icon made this row
+  // read louder than the actual note placeholder above it ("Add a note or
+  // thought…", which is a plain grey line), pulling attention away from
+  // the primary note-taking box. This row still needs to be tappable and
+  // legible, just not competing for attention.
   const iconSquare = (
     <span style={{
       display:         'flex',
@@ -325,15 +332,9 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       justifyContent:  'center',
       width:           36,
       height:          36,
-      borderRadius:    'var(--radius-sm)',
-      // notes-photo-box-tint: white chip + accent icon, matching the PRO
-      // pill's treatment on the same tinted row — previously a neutral
-      // grey square, which read as mismatched once the row picked up the
-      // accent-light tint.
-      backgroundColor: 'var(--color-surface)',
       flexShrink:      0,
     }}>
-      <Icon name="ImagePlus" size={17} color="var(--color-accent)" />
+      <Icon name="ImagePlus" size={17} color="var(--color-text-tertiary)" />
     </span>
   )
   // notes-merged-card: no longer spreading boxBase — boxBase's fixed
@@ -362,11 +363,11 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
         type="button"
         onClick={onTapEmpty}
         aria-label={`${PHOTO_BOX_TITLE} — Pro feature`}
-        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-accent-light)', cursor: 'pointer' }}
+        style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}
       >
         {iconSquare}
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+          <span style={{ display: 'block', fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
             {PHOTO_BOX_TITLE}
           </span>
           <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
@@ -379,12 +380,12 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
           fontWeight:      700,
           padding:         '4px 10px',
           borderRadius:    'var(--radius-full)',
-          // notes-photo-box-tint: row background is now accent-light (see
-          // rowShell style above) — this pill switches to a solid surface
-          // background instead of reusing accent-light so it still reads
-          // as a distinct chip rather than blending into the row behind it.
-          backgroundColor: 'var(--color-surface)',
-          color:           'var(--color-accent)',
+          // notes-photo-uploader-declutter: plain outline badge instead of
+          // a solid contrasting chip — still reads as a distinct label,
+          // just not a bright accent-colored one.
+          backgroundColor: 'transparent',
+          border:          '1px solid var(--color-border)',
+          color:           'var(--color-text-tertiary)',
           fontFamily:      'var(--font-body)',
         }}>
           PRO
@@ -398,10 +399,10 @@ function NotePhotoBox({ state, url, isPro, onTapEmpty, onTapPhoto, onRetry, roun
       type="button"
       onClick={onTapEmpty}
       aria-label={PHOTO_BOX_TITLE}
-      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'var(--color-accent-light)', cursor: 'pointer' }}
+      style={{ ...rowShell, borderLeft: 'none', borderRight: 'none', borderBottom: 'none', backgroundColor: 'transparent', cursor: 'pointer' }}
     >
       {iconSquare}
-      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+      <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
         {PHOTO_BOX_TITLE}
       </span>
     </button>
