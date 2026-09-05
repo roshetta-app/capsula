@@ -39,6 +39,20 @@ const AVATAR_FIRST_LINE_OFFSET = {
   editing: (EDITING_LINE_HEIGHT - AVATAR_SIZE) / 2,
 }
 
+// notes-typing-keyboard-scroll (standardized): the editing textarea used
+// to grow to fit content with no limit, which is what forced the old
+// per-keystroke "guess where the cursor is and scroll there" code to
+// exist in the first place — a textarea taller than the visible area has
+// no reliable, cross-platform way to know where the cursor is once it
+// scrolls off. Capping the textarea at a fixed number of lines and
+// letting it scroll internally past that (see the textarea's own
+// maxHeight/overflowY below) sidesteps the problem entirely: every phone
+// and browser already keeps the caret visible inside a bounded,
+// internally-scrolling text box on its own, regardless of where in the
+// text someone is typing. 4 lines matches the "Compact" size chosen.
+const MAX_EDITING_LINES = 4
+const EDITING_MAX_HEIGHT = EDITING_LINE_HEIGHT * MAX_EDITING_LINES
+
 // notes-photo-uploader-redesign: fixed footprint for the upload box —
 // matches the old NotePhotoStrip's footprint exactly (full width, 140px
 // tall) so this redesign doesn't change the space the photo area takes
@@ -922,22 +936,18 @@ export default function PersonalNotes({ conditionId }) {
     return () => el.removeEventListener('transitionend', onTransitionEnd)
   }, [isEditing])
 
-  // notes-typing-keyboard-scroll (rebuilt, personal-notes-scroll-rebuild):
-  // this used to work out the keyboard's height itself (via
-  // window.visualViewport) and manually scrollBy() the right amount —
-  // three separate triggers (keyboard opening, the card resizing, every
-  // keystroke) all doing their own version of that math, which is what
-  // kept fighting itself and producing the jumpy/hidden-text behavior.
-  //
-  // None of that is needed. ConditionDetailScreen.jsx already resizes the
-  // actual scrollable box on this screen to exactly the real,
-  // keyboard-aware visible area (see that file's own `measure()` effect,
-  // driven by the same window.visualViewport signal) — so the box this
-  // card sits inside is already the correct size. Once that's true, the
-  // browser's own built-in Element.scrollIntoView() correctly keeps
-  // whatever's focused/typed visible inside it, with no custom height
-  // math needed here at all. See the auto-grow effect below for the one
-  // remaining call.
+  // notes-typing-keyboard-scroll (standardized): this used to work out
+  // the keyboard's height itself (via window.visualViewport) and
+  // manually scrollBy() the right amount, then later tried leaning on
+  // Element.scrollIntoView() on every keystroke to chase the cursor.
+  // Neither is needed now that the editing textarea has a fixed height
+  // cap and scrolls internally past that point (see MAX_EDITING_LINES /
+  // EDITING_MAX_HEIGHT above, and the textarea's own style below) —
+  // every phone and browser already keeps the caret visible inside a
+  // bounded, internally-scrolling text box on its own, so there's no
+  // custom scroll-tracking code left to write here at all. The one
+  // remaining scroll call (below, in its own effect) just nudges the
+  // whole card into view once, the moment editing starts.
   const triggerSaved = useCallback(() => {
     clearTimeout(fadeOutRef.current)
     setSavedVisible('in')
@@ -950,22 +960,30 @@ export default function PersonalNotes({ conditionId }) {
   }, [])
 
   // Auto-grow the textarea to fit content — runs when entering edit mode
-  // and whenever the draft changes.
-  //
-  // notes-typing-keyboard-scroll (rebuilt): scrollIntoView() is a no-op
-  // when the caret's already visible, so calling it on every keystroke
-  // here is harmless — it only actually moves anything on the keystroke
-  // that adds/removes a line, which is exactly when it's needed. This
-  // only works correctly because the scrollable box this card sits in is
-  // already sized to the real keyboard-aware visible area by
-  // ConditionDetailScreen.jsx — see the comment above.
+  // and whenever the draft changes. The textarea's own maxHeight/overflowY
+  // (see its style below) do the actual capping — this just keeps handing
+  // it the full content height on every change, same as before; the
+  // browser visually clamps it to EDITING_MAX_HEIGHT and starts scrolling
+  // once content passes that point, no extra math needed here.
   useLayoutEffect(() => {
     if (!isEditing || !textareaRef.current) return
     const el = textareaRef.current
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [isEditing, draft])
+
+  // notes-typing-keyboard-scroll (standardized): nudges the whole editing
+  // card into view once, the moment editing starts — in case the note
+  // card was sitting low on the page when it was tapped. Keyed only on
+  // isEditing (not draft), so this fires once on entry and never re-runs
+  // on every keystroke — once the card is in view, keeping the caret
+  // visible inside the now height-capped textarea is the browser's own
+  // native, guaranteed behavior for a scrolling text box (see
+  // MAX_EDITING_LINES above), not something this effect needs to manage.
+  useEffect(() => {
+    if (!isEditing || !textareaRef.current) return
+    textareaRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [isEditing])
 
   // Put the cursor at the end of the existing text when entering edit
   // mode, rather than the browser's default (start of text / select-all
@@ -1390,7 +1408,8 @@ export default function PersonalNotes({ conditionId }) {
                 resize: 'none',
                 outline: 'none',
                 display: 'block',
-                overflow: 'hidden',
+                maxHeight: EDITING_MAX_HEIGHT,
+                overflowY: 'auto',
               }}
             />
             <button
