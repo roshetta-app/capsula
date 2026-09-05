@@ -90,6 +90,18 @@
  * same reasoning as the oauthCallbackListenerRegistered singleton flag
  * above, just via a real single mount point instead of a module-level
  * flag.
+ *
+ * signin-back-gesture fix (2026-09-06) — the appUrlOpen listener below
+ * used to close the sign-in browser tab only after exchangeCodeWithRetry
+ * finished, a real network round-trip that runs noticeably longer on its
+ * retry path (see OAUTH_EXCHANGE_RETRY_DELAY_MS). For that whole window
+ * the person was already back in the app, but the browser tab was still
+ * open behind it — a back gesture right then revealed it. Android has no
+ * public way for this app to close another app's task, so the fix is in
+ * this listener: Browser.close() now runs the moment the redirect is
+ * confirmed to have a real code, before the exchange starts, closing the
+ * window entirely. The exchange itself is unchanged, just sequenced
+ * after the tab is already gone.
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -503,8 +515,9 @@ export function AuthProvider({ children }) {
     // whole time profile loaded, so anything gated on `loading` (e.g.
     // AccountScreen's own `if (loading) return null`) rendered signed-in
     // right away, before profile_setup_dismissed was known — that's the
-    // gap that let AccountScreen flash briefly before ProfileSetupRedirect
-    // (see that file) could redirect a first-time signup to the wizard.
+    // gap that let AccountScreen render signed-in for a beat before the
+    // redirect to the wizard kicked in. Reading it straight off `profile`
+    // like everything else here closes that gap.
     // Scoped to SIGNED_IN only, not TOKEN_REFRESHED/other events, so a
     // routine background token refresh doesn't re-trigger a loading gate.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -588,6 +601,19 @@ export function AuthProvider({ children }) {
         return
       }
 
+      // signin-back-gesture fix (2026-09-06) — close the sign-in browser
+      // tab right here, the moment the redirect is confirmed to carry a
+      // real code, instead of waiting for exchangeCodeWithRetry below to
+      // finish first. That exchange is a real network round-trip and can
+      // run noticeably longer on its retry path (see
+      // OAUTH_EXCHANGE_RETRY_DELAY_MS) — during that whole window the
+      // person was already back in the app, but the browser tab was
+      // still fully open behind it, so a back gesture right then
+      // revealed it. Closing it here removes the window entirely; the
+      // exchange still happens exactly as before, just after the tab is
+      // already gone.
+      await Browser.close()
+
       const { error } = await exchangeCodeWithRetry(code)
       if (error) {
         // Bug fix, 2026-08-13 (intermittent-signin-fail) — this used to
@@ -600,7 +626,6 @@ export function AuthProvider({ children }) {
         console.error('OAuth callback session exchange failed:', error.message)
         toast.error('Sign-in failed. Please try again.')
       }
-      await Browser.close()
     })
   }, [toast])
 
@@ -684,20 +709,6 @@ export function AuthProvider({ children }) {
     // catch this, so there's no window where a signed-out AccountScreen
     // could still show the last signed-in person's info.
     clearCachedAuthSnapshot()
-    // notes-clear-on-signout fix (2026-09-06) — clearAllNotesStorage()
-    // above only sweeps localStorage. A PersonalNotes/useNotes() instance
-    // that's already mounted and already loaded a note into React state
-    // has no way to hear about that sweep on its own, so it kept showing
-    // the previous account's note/photo until something else happened to
-    // re-trigger a load. Dispatched only from here — the one place a
-    // REAL sign-out is guaranteed to run through — rather than from a
-    // generic "user went null" watcher inside useNotes.js itself, since
-    // that exact pattern was already tried and removed (see
-    // recently-viewed-offline-fix in useNotes.js's header): a background
-    // session recheck can report "no user" for a moment purely from being
-    // offline, and a watcher there couldn't tell that apart from a real
-    // sign-out.
-    window.dispatchEvent(new Event('capsula:signed-out'))
     return { error: error ?? null }
   }
 
