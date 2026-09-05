@@ -1206,11 +1206,37 @@ export default function PersonalNotes({ conditionId }) {
       {/* Scoped placeholder color — inline style attributes can't target
           ::placeholder, so this is the one bit of real CSS in an
           otherwise inline-styled file. Also holds the upload box's
-          spinner keyframe (notes-photo-uploader-redesign). */}
+          spinner keyframe (notes-photo-uploader-redesign).
+          notes-typing-keyboard-scroll (standardized): also styles the
+          editing textarea's own scrollbar — inline styles can't target
+          ::-webkit-scrollbar either, so this is the same workaround. A
+          thin, brand-colored thumb replaces the browser's default one,
+          and is drawn as a "classic" always-reserved scrollbar rather
+          than an overlay that fades in/out, so it stays visible as a
+          steady cue while a long note is being edited. Firefox's own
+          scrollbar-color/-width properties are set alongside for the
+          same look there. iPhone's Safari doesn't allow either of these
+          to be styled or forced visible at all — that's a restriction
+          Apple applies to every website, not something fixable here. */}
       <style>{`
         .personal-notes-textarea::placeholder {
           color: var(--color-text-tertiary);
           opacity: 1;
+        }
+        .personal-notes-textarea {
+          scrollbar-width: thin;
+          scrollbar-color: var(--color-accent) var(--color-border-subtle);
+        }
+        .personal-notes-textarea::-webkit-scrollbar {
+          width: 6px;
+        }
+        .personal-notes-textarea::-webkit-scrollbar-track {
+          background: var(--color-border-subtle);
+          border-radius: var(--radius-full);
+        }
+        .personal-notes-textarea::-webkit-scrollbar-thumb {
+          background-color: var(--color-accent);
+          border-radius: var(--radius-full);
         }
         @keyframes personal-notes-spin {
           to { transform: rotate(360deg); }
