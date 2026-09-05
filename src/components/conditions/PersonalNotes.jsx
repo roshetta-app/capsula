@@ -1395,12 +1395,16 @@ export default function PersonalNotes({ conditionId }) {
           transition: 'border-color 0.15s ease',
           width: '100%',
         }}>
-          {/* Text row — avatar, text box, and the inline Send button.
+          {/* Text row — avatar and text box only. notes-send-button-own-row:
+              the Send button used to live inline here, pinned to the
+              textarea's bottom-right corner as it grew. Moved to its own
+              row below (see the row right after this one) so it sits
+              under the textarea — and its internal scrollbar, once the
+              6-line cap kicks in — instead of floating in the corner of
+              a box that can be actively scrolling.
               alignItems: 'flex-start' is kept so the avatar's position
               doesn't get pulled toward the vertical middle of the whole
-              textarea as it grows to multiple lines; the Send button
-              overrides back to alignSelf: 'flex-end' so it still pins to
-              the bottom-right corner as before.
+              textarea as it grows to multiple lines.
               personal-notes-ui-polish: the avatar itself now carries a
               small fixed marginTop (AVATAR_FIRST_LINE_OFFSET.editing) so
               it centers on the textarea's FIRST line specifically —
@@ -1419,7 +1423,7 @@ export default function PersonalNotes({ conditionId }) {
             display: 'flex',
             alignItems: 'flex-start',
             gap: 10,
-            padding: '24px 18px 24px calc(var(--space-4) + 2px)',
+            padding: '24px 18px 0 calc(var(--space-4) + 2px)',
           }}>
             <ProfileAvatar
               user={user}
@@ -1456,6 +1460,17 @@ export default function PersonalNotes({ conditionId }) {
                 overflowY: 'auto',
               }}
             />
+          </div>
+
+          {/* Send-button row — notes-send-button-own-row: own line below
+              the textarea (and its scrollbar), right-aligned to the same
+              corner the inline button used to pin to. paddingTop is the
+              gap between the textarea/scrollbar above and this row. */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            padding: '8px 18px 20px calc(var(--space-4) + 2px)',
+          }}>
             <button
               type="button"
               onClick={handleSave}
@@ -1466,11 +1481,9 @@ export default function PersonalNotes({ conditionId }) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 flexShrink: 0,
-                alignSelf: 'flex-end',
                 background: 'none',
                 border: 'none',
                 padding: 0,
-                marginBottom: 2,
                 cursor: isDirty ? 'pointer' : 'default',
               }}
             >
