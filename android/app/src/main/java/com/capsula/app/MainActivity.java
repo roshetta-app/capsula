@@ -31,5 +31,20 @@ public class MainActivity extends BridgeActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
+
+        // Bug fix, 2026-09-06 (sheet-drag-elastic-scroll) — Android's
+        // WebView shows its own native "edge glow" bounce effect whenever
+        // a touch-drag reaches the top/bottom of scrollable content. This
+        // is separate from and invisible to the web page's own CSS
+        // (overscroll-behavior, overflow, touch-action all live inside the
+        // page; this glow is the WebView container itself, one level up) —
+        // which is why the earlier in-page fix for the sheet's background
+        // scroll conflict didn't reach it. Only shows up in the native app
+        // build, not the website/PWA, since only the native build has this
+        // WebView shell at all. setOverScrollMode is a stable API present
+        // since well before this app's minSdk (24), so this is safe across
+        // the app's full supported Android range with no version-specific
+        // behavior to track.
+        getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
     }
 }
