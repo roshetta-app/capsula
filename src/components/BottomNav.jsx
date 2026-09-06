@@ -176,14 +176,6 @@ export default function BottomNav() {
     locationRef.current = location
   }, [location])
 
-  // Phase 4's back handler should only be active on the same screens the
-  // nav bar itself is shown on. BottomNav stays mounted even when it
-  // renders null below (admin routes, keyboard open) rather than
-  // unmounting, so the guard is gated on this flag directly instead of
-  // assuming unmount will clean it up.
-  const isAdminRoute = location.pathname.startsWith('/admin')
-  const backHandlerActive = !isAdminRoute && !keyboardOpen
-
   function isActive(tabPath, pathname = location.pathname) {
     if (tabPath === '/conditions') {
       return pathname === '/' ||
@@ -204,6 +196,32 @@ export default function BottomNav() {
     }
     return location.pathname === tabPath
   }
+
+  // Phase 4's back handler should only be active while standing on the
+  // exact top-level screen of one of the four home tabs (Conditions,
+  // Drugs, Favourites, Account) — never on a nested screen underneath one
+  // (a condition/drug detail page, account edit, etc.), and never while a
+  // keyboard is open. Reuses isExactScreen above rather than a separate
+  // admin-route check, since none of the four exact tab paths can ever be
+  // an admin route anyway. BottomNav stays mounted even when it renders
+  // null below (admin routes, keyboard open) rather than unmounting, so
+  // the guard is gated on this flag directly instead of assuming unmount
+  // will clean it up.
+  //
+  // Bug fix (2026-09-06): this used to be "on" for every non-admin,
+  // non-keyboard screen, including nested detail pages — since a detail
+  // page's path starts with the same prefix as its tab (e.g.
+  // /conditions/some-condition), it was wrongly read as "still on the
+  // Conditions tab," so back showed the exit prompt instead of returning
+  // to that item's list. Restricted to an exact match against the four
+  // top-level tab screens so it switches off completely the moment you
+  // step into anything underneath them.
+  const backHandlerActive =
+    (isExactScreen('/conditions') ||
+     isExactScreen('/drugs') ||
+     isExactScreen('/favourites') ||
+     isExactScreen('/account')) &&
+    !keyboardOpen
 
   function handleTabTap(path) {
     if (isExactScreen(path)) {
