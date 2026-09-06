@@ -80,19 +80,28 @@ export default function SheetShell({
   // vaul locks scrolling on <body> while a sheet is open (its own built-in
   // behavior). This app's page actually scrolls via the <html> element
   // rather than <body>, which vaul has no way to know about — so <html>
-  // was left free to scroll/bounce underneath the drag. This mirrors the
-  // same lock onto <html>, active only while a sheet is open, restoring
-  // whatever was there before on close.
+  // was left free to scroll underneath the drag. This mirrors just the
+  // overflow lock onto <html>, active only while a sheet is open,
+  // restoring whatever was there before on close.
+  //
+  // Bug fix, 2026-09-06 (sheet-drag-false-liftoff) — this used to also set
+  // touchAction: 'none' on <html> here. That's what was actually causing
+  // the drag to feel like it thought your finger had lifted mid-drag:
+  // changing touch-action on an ancestor of the sheet's own drag target
+  // can make the browser end the in-progress touch sequence early. It's
+  // removed now for two reasons: it was the direct cause of that bug, and
+  // it was never fixing the real background-bounce issue anyway — that
+  // turned out to be Android's native WebView edge-glow effect, now fixed
+  // properly at the native level (see MainActivity.java). overflow:hidden
+  // alone is kept as a plain, low-risk safety net against any actual
+  // scroll of the page underneath.
   useEffect(() => {
     if (!isOpen) return
     const html = document.documentElement
     const prevOverflow = html.style.overflow
-    const prevTouchAction = html.style.touchAction
     html.style.overflow = 'hidden'
-    html.style.touchAction = 'none'
     return () => {
       html.style.overflow = prevOverflow
-      html.style.touchAction = prevTouchAction
     }
   }, [isOpen])
 
