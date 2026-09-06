@@ -33,6 +33,16 @@
  *    those through the zIndex / backdropOpacity props rather than losing
  *    the distinction by hardcoding one value here.
  *
+ * Drag-to-close sensitivity:
+ *  - `closeThreshold` (0–1) is how far down the sheet must be dragged,
+ *    as a fraction of its own height, before it lets go and closes
+ *    instead of snapping back. vaul's own default (0.25) meant a small,
+ *    accidental nudge was enough to close the sheet — raised here to 0.4
+ *    so it takes a real, deliberate pull (or a fast flick, which vaul
+ *    still honors separately) before it closes. Exposed as a prop, same
+ *    pattern as zIndex/backdropOpacity, in case a specific sheet ever
+ *    needs its own feel.
+ *
  * Usage:
  *   <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Select specialty">
  *     ...sheet content (everything that used to follow the old handle)...
@@ -62,6 +72,7 @@ export default function SheetShell({
   zIndex = 200,
   backdropOpacity = 0.4,
   maxHeight = '85dvh',
+  closeThreshold = 0.4,
 }) {
   useBackClose(isOpen, onClose)
 
@@ -69,6 +80,7 @@ export default function SheetShell({
     <Drawer.Root
       open={isOpen}
       onOpenChange={(open) => { if (!open) onClose() }}
+      closeThreshold={closeThreshold}
     >
       <Drawer.Portal>
         <Drawer.Overlay
