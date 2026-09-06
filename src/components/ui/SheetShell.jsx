@@ -1,55 +1,33 @@
 /**
  * src/components/ui/SheetShell.jsx
- * Phase 5 (Back-Button & State-Audit merged plan) — drag-to-dismiss vaul
- * migration.
  *
- * Shared bottom-sheet shell, replacing the hand-rolled backdrop/dialog/
- * handle markup every sheet in the app used to repeat, and the
- * useSheetDrag.js gesture that only made the small handle bar draggable.
- * Built on `vaul`'s Drawer parts, which own the drag gesture on the whole
- * sheet directly and already resolve "is this a scroll or a close-drag"
- * correctly on their own — a drag only starts closing the sheet once
- * whatever's under the finger is scrolled all the way to the top.
+ * ⚠️ TEMPORARY DIAGNOSTIC BUILD — 2026-09-06 ⚠️
+ * This is NOT the fix. This is a debug version added to figure out why a
+ * light/slow drag on the PWA (Android Chrome, added to home screen) still
+ * snaps back or closes partway through, even though the finger never
+ * lifted. Two prior targeted fixes (removing touch-action, adding
+ * overscroll-behavior) did not resolve it, so instead of guessing a third
+ * time, this build shows a small on-screen readout of exactly which
+ * browser touch/pointer events fire while you drag, in order, with
+ * timestamps.
  *
- * What this replaces, per sheet that adopts it:
- *  - The backdrop div + dialog div + drag-handle markup.
- *  - shouldRender/animateIn mount-timing state — vaul unmounts on its own
- *    once its own exit transition finishes, nothing to track by hand.
- *  - The manual Escape-key listener and body-scroll-lock effect — vaul's
- *    underlying Radix Dialog already does both while the sheet is open
- *    (the default "modal" behavior, which is what every sheet here wants).
- *  - The per-sheet useBackClose() call — wired once, here, instead of once
- *    per sheet file. (Still needed at all because vaul has no concept of
- *    Capacitor's native hardware back button.)
- *  - The per-sheet useSheetDrag() call and its dragY/isDragging/
- *    dragHandlers wiring.
+ * WHAT TO DO:
+ *  1. Place this file, rebuild, open it in the PWA (same way you tested
+ *     before — Android Chrome, added to home screen).
+ *  2. Open the specialty picker sheet.
+ *  3. Do the same light/slow drag that causes the snap-back.
+ *  4. A small black box will appear in the top-left of the screen showing
+ *     the last ~15 events (e.g. "pointerdown", "pointermove x4",
+ *     "pointercancel", "lostpointercapture", etc.) with timestamps.
+ *  5. Take a screenshot or just read off the list to me, especially
+ *     whatever appears right at/before the moment it snaps back.
  *
- * What a caller still owns:
- *  - Its own content — everything that used to sit inside the old dialog
- *    div (after the handle) is unchanged, just passed as children here.
- *  - Its own visual quirks that differed sheet-to-sheet before this
- *    migration: AccountSheet.jsx and PaywallGateSheet.jsx sit at a higher
- *    z-index tier and use a slightly darker backdrop than the rest — pass
- *    those through the zIndex / backdropOpacity props rather than losing
- *    the distinction by hardcoding one value here.
- *
- * Drag-to-close sensitivity:
- *  - `closeThreshold` (0–1) is how far down the sheet must be dragged,
- *    as a fraction of its own height, before it lets go and closes
- *    instead of snapping back. vaul's own default (0.25) meant a small,
- *    accidental nudge was enough to close the sheet — raised here to 0.4
- *    so it takes a real, deliberate pull (or a fast flick, which vaul
- *    still honors separately) before it closes. Exposed as a prop, same
- *    pattern as zIndex/backdropOpacity, in case a specific sheet ever
- *    needs its own feel.
- *
- * Usage:
- *   <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Select specialty">
- *     ...sheet content (everything that used to follow the old handle)...
- *   </SheetShell>
+ * This will be removed / replaced with the real fix once we know what's
+ * actually firing. Everything else in this file is unchanged from the
+ * last working version.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
 
@@ -65,6 +43,76 @@ const VISUALLY_HIDDEN_STYLE = {
   border:   0,
 }
 
+const DEBUG_OVERLAY_STYLE = {
+  position:       'fixed',
+  top:            8,
+  left:           8,
+  zIndex:         99999,
+  maxWidth:       '80vw',
+  maxHeight:      '40vh',
+  overflowY:      'auto',
+  backgroundColor: 'rgba(0,0,0,0.85)',
+  color:          '#0f0',
+  fontFamily:     'monospace',
+  fontSize:       11,
+  lineHeight:     1.4,
+  padding:        8,
+  borderRadius:   6,
+  pointerEvents:  'none',
+  whiteSpace:     'pre-wrap',
+}
+
+function useGestureDebugLog(isOpen) {
+  const [log, setLog] = useState([])
+  const startRef = useRef(0)
+
+  useEffect(() => {
+    if (!isOpen) {
+      setLog([])
+      return
+    }
+    startRef.current = performance.now()
+
+    const append = (label) => (e) => {
+      const t = (performance.now() - startRef.current).toFixed(0)
+      const extra = e?.pointerType ? ` type=${e.pointerType}` : ''
+      setLog((prev) => {
+        const next = [...prev, `${t}ms  ${label}${extra}`]
+        return next.slice(-15)
+      })
+    }
+
+    // Passive, non-interfering listeners purely for observation — these
+    // never call preventDefault/stopPropagation, so they cannot change
+    // the drag behavior itself, only report on it.
+    const events = [
+      ['pointerdown', append('pointerdown')],
+      ['pointermove', append('pointermove')],
+      ['pointerup', append('pointerup')],
+      ['pointercancel', append('pointercancel')],
+      ['lostpointercapture', append('lostpointercapture')],
+      ['touchstart', append('touchstart')],
+      ['touchmove', append('touchmove')],
+      ['touchend', append('touchend')],
+      ['touchcancel', append('touchcancel')],
+      ['visibilitychange', append('visibilitychange')],
+      ['scroll', append('scroll')],
+    ]
+
+    events.forEach(([type, handler]) => {
+      window.addEventListener(type, handler, { passive: true, capture: true })
+    })
+
+    return () => {
+      events.forEach(([type, handler]) => {
+        window.removeEventListener(type, handler, { capture: true })
+      })
+    }
+  }, [isOpen])
+
+  return log
+}
+
 export default function SheetShell({
   isOpen,
   onClose,
@@ -76,38 +124,8 @@ export default function SheetShell({
   closeThreshold = 0.4,
 }) {
   useBackClose(isOpen, onClose)
+  const debugLog = useGestureDebugLog(isOpen)
 
-  // vaul locks scrolling on <body> while a sheet is open (its own built-in
-  // behavior). This app's page actually scrolls via the <html> element
-  // rather than <body>, which vaul has no way to know about — so <html>
-  // was left free to scroll underneath the drag. This mirrors just the
-  // overflow lock onto <html>, active only while a sheet is open,
-  // restoring whatever was there before on close.
-  //
-  // Bug fix, 2026-09-06 (sheet-drag-false-liftoff) — this used to also set
-  // touchAction: 'none' on <html> here. That's what was causing the drag
-  // to feel like it thought your finger had lifted mid-drag: changing
-  // touch-action on an ancestor of the sheet's own drag target can make
-  // the browser end the in-progress touch sequence early. It was removed
-  // for two reasons: it was the direct cause of that bug, and it was never
-  // fixing the real background-bounce issue anyway — that turned out to
-  // be Android's native WebView edge-glow effect, fixed separately at the
-  // native level (see MainActivity.java).
-  //
-  // Bug fix, 2026-09-06 (pwa-drag-finger-lift) — the same "finger lifted"
-  // symptom persisted, but only in the browser/PWA build, not the
-  // installed app. Root cause: the browser's own built-in pull-to-
-  // refresh/rubber-band gesture, which the installed app's WebView doesn't
-  // have. Even with <html> unable to scroll, the browser can still try to
-  // take over a downward drag from the top of the page for its own
-  // gesture, which cancels the in-progress drag from the app's point of
-  // view — that hand-off is what looked like an early finger-lift.
-  // `overscroll-behavior` is the correct, narrow tool for this: unlike
-  // `touch-action`, it only tells the browser "don't run your own
-  // pull-to-refresh/bounce here," without changing how touch events are
-  // delivered to the page — so it doesn't reintroduce the earlier bug.
-  // Scoped to while a sheet is open and restored on close, same pattern as
-  // the overflow lock above.
   useEffect(() => {
     if (!isOpen) return
     const html = document.documentElement
@@ -154,17 +172,10 @@ export default function SheetShell({
             outline:         'none',
           }}
         >
-          {/* Accessible name for screen readers — visually hidden since
-              every sheet already shows its own visible title/label in its
-              content below. */}
           <Drawer.Title style={VISUALLY_HIDDEN_STYLE}>
             {ariaLabel}
           </Drawer.Title>
 
-          {/* Visual drag handle — purely decorative now. The whole sheet
-              is the real drag target (vaul owns that directly on
-              Drawer.Content above), this bar just signals "draggable" the
-              way it always has. */}
           <div
             aria-hidden="true"
             style={{
@@ -180,6 +191,12 @@ export default function SheetShell({
           {children}
         </Drawer.Content>
       </Drawer.Portal>
+
+      {isOpen && (
+        <div style={DEBUG_OVERLAY_STYLE}>
+          {debugLog.length === 0 ? 'waiting for gesture…' : debugLog.join('\n')}
+        </div>
+      )}
     </Drawer.Root>
   )
 }
