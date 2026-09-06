@@ -57,6 +57,11 @@
  * everywhere."). favouriteContext's subtext already carried that framing
  * and is unchanged.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this sheet instead of changing the route;
+ * drag handle now has a real close gesture via useSheetDrag instead of
+ * being purely decorative.
+ *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
@@ -95,6 +100,8 @@ import { createPortal } from 'react-dom'
 import { User } from 'lucide-react'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
+import { useBackClose } from '../../hooks/useBackClose'
+import { useSheetDrag } from '../../hooks/useSheetDrag'
 
 export default function AccountSheet({
   isOpen,
@@ -110,6 +117,9 @@ export default function AccountSheet({
   const [googlePressed, setGooglePressed] = useState(false)
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   // account-sheet-close-flash fix — see file header. Only updates while
   // isOpen is true, so it stays live for anything that changes during a
@@ -231,21 +241,25 @@ export default function AccountSheet({
           padding:         'var(--space-5) var(--space-4)',
           paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
           fontFamily:      'var(--font-body)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
-        {/* Drag handle — same visual affordance SpecialtiesBottomSheet.jsx
-            uses, signaling "swipe down to close" even though the sheet
-            itself doesn't need a drag gesture handler to close (backdrop
-            tap / Escape / Not now already cover it). */}
-        <div style={{
-          width:           40,
-          height:          4,
-          borderRadius:    2,
-          backgroundColor: 'var(--color-border)',
-          margin:          '0 auto var(--space-5)',
-        }} />
+        {/* Drag handle — Phase 3: now a real drag-to-close gesture via
+            useSheetDrag (was previously just the visual affordance,
+            since backdrop tap / Escape / Not now already covered
+            dismissal). */}
+        <div
+          {...dragHandlers}
+          style={{
+            width:           40,
+            height:          4,
+            borderRadius:    2,
+            backgroundColor: 'var(--color-border)',
+            margin:          '0 auto var(--space-5)',
+            touchAction:     'none',
+          }}
+        />
 
         {display.user ? (
           <div style={{ textAlign: 'center' }}>
@@ -425,4 +439,3 @@ const linkButtonStyle = {
   cursor:          'pointer',
   textDecoration:  'underline',
 }
-

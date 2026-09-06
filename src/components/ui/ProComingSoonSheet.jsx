@@ -22,6 +22,12 @@
  *   - Sparkles icon in the accent color, matching the Upgrade banner's own
  *     branding rather than reusing one of AppGate's type-specific icons.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this card instead of changing the route.
+ * No drag gesture added — unlike AppGate's AppGateSheet it's modeled on,
+ * this card has no drag handle of its own (a tinted icon band sits in that
+ * spot instead), so step 3.2 doesn't apply to it.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
@@ -30,6 +36,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles } from 'lucide-react'
+import { useBackClose } from '../../hooks/useBackClose'
 
 export default function ProComingSoonSheet({ isOpen, onClose }) {
   const overlayRef = useRef(null)
@@ -38,6 +45,8 @@ export default function ProComingSoonSheet({ isOpen, onClose }) {
   // animateIn drives the CSS open/closed visual state.
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -53,9 +62,9 @@ export default function ProComingSoonSheet({ isOpen, onClose }) {
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
   }, [isOpen, onClose])
 
   if (!shouldRender) return null

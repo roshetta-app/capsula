@@ -11,6 +11,11 @@
  * same bottom-sheet pattern already used everywhere else in the app,
  * rather than introducing a new one.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this sheet instead of changing the route;
+ * drag handle now has a real close gesture via useSheetDrag instead of
+ * being purely decorative.
+ *
  * Copy below (SOURCES and DISCLAIMER) is placeholder text — ask to have it
  * rewritten with the library's real reference sources and final wording
  * before shipping.
@@ -21,6 +26,8 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useBackClose } from '../../hooks/useBackClose'
+import { useSheetDrag } from '../../hooks/useSheetDrag'
 
 const SOURCES = [
   '[Add the primary references the drug library is built from — e.g. a national or regional formulary, WHO essential medicines list, manufacturer product inserts, or a specific clinical reference text.]',
@@ -37,6 +44,9 @@ const DISCLAIMER =
 export default function DrugsInfoSheet({ isOpen, onClose }) {
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -93,19 +103,23 @@ export default function DrugsInfoSheet({ isOpen, onClose }) {
           flexDirection:   'column',
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
         {/* Fixed header — drag handle + title + close button. */}
         <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-            margin:          '0 auto var(--space-3)',
-          }} />
+          <div
+            {...dragHandlers}
+            style={{
+              width:           40,
+              height:          4,
+              borderRadius:    2,
+              backgroundColor: 'var(--color-border)',
+              margin:          '0 auto var(--space-3)',
+              touchAction:     'none',
+            }}
+          />
           <div style={{
             display:        'flex',
             alignItems:     'center',

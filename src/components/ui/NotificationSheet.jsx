@@ -66,6 +66,13 @@
  *      same way in usePushSubscription.js, so any other caller (e.g.
  *      NotificationsBanner.jsx) gets the same protection.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose (keyed off effectiveOpen, same as every other open/close
+ * effect in this file, so back is a no-op during the brief `checking`
+ * window before the sheet is actually shown). No drag gesture added —
+ * this is a centered modal with no drag handle, same as ConfirmSheet.jsx,
+ * so step 3.2 doesn't apply to it.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
@@ -76,6 +83,7 @@ import { createPortal } from 'react-dom'
 import { Bell } from 'lucide-react'
 import { usePushSubscriptionContext } from '../../context/PushSubscriptionContext'
 import { useToast } from '../../context/ToastContext'
+import { useBackClose } from '../../hooks/useBackClose'
 
 export default function NotificationSheet({ isOpen, onClose }) {
   const overlayRef = useRef(null)
@@ -88,6 +96,8 @@ export default function NotificationSheet({ isOpen, onClose }) {
   // Don't actually open until the real status is known — avoids ever
   // showing an interim/"checking" state. See file header note above.
   const effectiveOpen = isOpen && !checking
+
+  useBackClose(effectiveOpen, onClose)
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual state.

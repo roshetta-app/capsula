@@ -20,6 +20,11 @@
  *                   two sheets are never shown stacked/simultaneously.
  *   3. Manage     — tapping it calls onManage() and closes this sheet.
  *
+ * Phase 3 (back-close + swipe-to-dismiss) — wired into useBackClose so a
+ * back press/gesture closes this sheet instead of changing the route, and
+ * gave the drag handle a real close gesture via useSheetDrag instead of
+ * its previous purely decorative role.
+ *
  * Props:
  *   isOpen              boolean
  *   onClose             () => void
@@ -36,6 +41,8 @@ import { useEffect, useState }          from 'react'
 import { ListFilter, ListChecks, ArrowUpDown, X } from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+import { useBackClose }                 from '../../hooks/useBackClose'
+import { useSheetDrag }                 from '../../hooks/useSheetDrag'
 
 export default function FavouritesManagerSheet({
   isOpen,
@@ -52,6 +59,9 @@ export default function FavouritesManagerSheet({
 
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -123,21 +133,28 @@ export default function FavouritesManagerSheet({
           backgroundColor: 'var(--color-surface)',
           borderRadius:    '16px 16px 0 0',
           paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      animateIn
-            ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
-            : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging
+            ? 'none'
+            : animateIn
+              ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
+              : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
         }}
       >
         <div style={{ padding: 'var(--space-5) var(--space-4)' }}>
-          {/* Drag handle */}
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-            margin:          '0 auto var(--space-5)',
-          }} />
+          {/* Drag handle — Phase 3: real drag-to-close gesture via
+              useSheetDrag, not just a visual affordance. */}
+          <div
+            {...dragHandlers}
+            style={{
+              width:           40,
+              height:          4,
+              borderRadius:    2,
+              backgroundColor: 'var(--color-border)',
+              margin:          '0 auto var(--space-5)',
+              touchAction:     'none',
+            }}
+          />
 
           {/* Header — title + explicit close control. Bottom sheets
               elsewhere in the app (SpecialtiesBottomSheet) rely on

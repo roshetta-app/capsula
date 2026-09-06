@@ -64,6 +64,17 @@
  * (permanent dismiss) since it's keyboard-only and carries none of that
  * accidental-trigger risk.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — AppGateSheet (the
+ * dismissible path only) is now wired into useBackClose, so a back
+ * press/gesture triggers the same permanent dismiss Escape already
+ * triggers here, instead of changing the route underneath the sheet.
+ * AppGateBlock and OfflineBlock are deliberately untouched: both are
+ * "must focus on this, can't be dismissed" surfaces and already have
+ * their own dedicated history-trap effect below (isFullyBlocked), which
+ * swallows back navigation entirely rather than closing anything — a
+ * different, already-correct mechanism that Phase 1's close-on-back hook
+ * isn't a fit for.
+ *
  * CTA button (ctaLabel/ctaUrl) still opens via @capacitor/browser,
  * falling back to window.open on the website build — unchanged from
  * Phase 1. Now also logs a gate_cta_click analytics event on tap (Phase
@@ -88,6 +99,7 @@ import { useIsPro } from '../../hooks/useIsPro'
 import { useDrugContext } from '../../context/DrugContext'
 import { useConditionContext } from '../../context/ConditionContext'
 import { logUsageEvent } from '../../analytics/usageEvents'
+import { useBackClose } from '../../hooks/useBackClose'
 
 // How long the offline block waits, once eligible, before it's actually
 // allowed to appear (2026-09-01 offline-block-forgiveness fix, plan §4.4
@@ -401,7 +413,10 @@ function OfflineBlock({ visible }) {
 // Portal + fade/scale entrance kept from the InfoSheet.jsx-derived Phase 1
 // pattern; layout itself is the new bottom-anchored card from the Phase 2
 // mockup. Backdrop click intentionally does NOT close this — see file
-// header. Escape still does (permanent dismiss, same as the X).
+// header. Escape still does (permanent dismiss, same as the X). Phase 3:
+// back press/gesture now does too, via useBackClose — same closeThen(onDismiss)
+// action Escape and the X button already use, so all three dismiss paths
+// agree.
 
 function AppGateSheet({ gate, onDismiss, onMaybeLater }) {
   const [shouldRender, setShouldRender] = useState(true)
@@ -418,6 +433,12 @@ function AppGateSheet({ gate, onDismiss, onMaybeLater }) {
       action()
     }, 220)
   }
+
+  // This component is only ever mounted while its gate should be showing
+  // (AppGate() below conditionally renders it) — isOpen is `true` for the
+  // hook's entire mount lifetime, same as a sheet whose own isOpen prop
+  // never goes false while it exists.
+  useBackClose(true, () => closeThen(onDismiss))
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') closeThen(onDismiss) }
@@ -673,6 +694,12 @@ export default function AppGate() {
   // "call the WebView's own history back if it can," which is the exact
   // same history.back() this traps — so there's no need to also touch
   // @capacitor/app's separate, version-flaky backButton listener here.
+  //
+  // Phase 3 note: this trap is deliberately separate from useBackClose
+  // (used by AppGateSheet below) — a non-dismissible surface must
+  // swallow back and change nothing, while a dismissible sheet must
+  // close on back, and those are two different mechanisms by design, not
+  // one hook doing double duty.
   const isFullyBlocked = offlineBlockActive || (gate && !gate.dismissible)
 
   useEffect(() => {

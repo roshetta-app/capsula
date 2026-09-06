@@ -16,13 +16,28 @@
  *            this is a small transient dialog, not a full-screen-level
  *            transition.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — two changes:
+ *   1. Wired into useBackClose so back closes this dialog instead of
+ *      changing the route. No drag gesture is added here (unlike the
+ *      bottom sheets in this same phase) — this is a centered modal with
+ *      no drag handle of its own, so step 3.2 doesn't apply to it.
+ *   2. onConfirm may now return a promise. While it's pending, a local
+ *      `busy` state disables both buttons and swaps the Confirm label for
+ *      a busy label; onClose() only fires once the promise resolves. On
+ *      rejection, the sheet stays open and shows a short failure message
+ *      instead of closing. A synchronous onConfirm (returning undefined)
+ *      behaves exactly as before — closes immediately, no busy state —
+ *      so every existing caller keeps working unchanged.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
- *   onConfirm     () => void
+ *   onConfirm     () => void | Promise<void>
  *   title         string
  *   message       string
  *   confirmLabel  string   (default 'Confirm')
+ *   confirmingLabel string (default 'Working…') — shown on the Confirm
+ *                 button while an async onConfirm's promise is pending.
  *   destructive   boolean  (default false)
  *   zIndex        number   (default 1000) — notes-photo-uploader-redesign:
  *                 lets a caller stack this dialog above another
@@ -38,6 +53,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../../hooks/useBackClose'
 
 export default function ConfirmSheet({
   isOpen,
@@ -46,6 +62,7 @@ export default function ConfirmSheet({
   title,
   message = '',
   confirmLabel = 'Confirm',
+  confirmingLabel = 'Working…',
   destructive = false,
   zIndex = 1000,
 }) {
@@ -56,12 +73,22 @@ export default function ConfirmSheet({
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
 
+  // Phase 3 async support — see file header. Reset whenever the sheet is
+  // reopened for a new confirmation, so a previous failure message never
+  // carries over into the next open.
+  const [busy, setBusy]             = useState(false)
+  const [failure, setFailure]       = useState(null)
+
+  useBackClose(isOpen, !busy ? onClose : () => {})
+
   useEffect(() => {
     if (isOpen) {
       // Mount first, then flip animateIn on the next frame so the
       // browser has painted the start-position before transitioning.
       setShouldRender(true)
       requestAnimationFrame(() => setAnimateIn(true))
+      setBusy(false)
+      setFailure(null)
     } else {
       // Start exit transition immediately; unmount after it finishes.
       setAnimateIn(false)
@@ -70,18 +97,50 @@ export default function ConfirmSheet({
     }
   }, [isOpen])
 
-  // Close on Escape
+  // Close on Escape — disabled while a confirm is pending, same as the
+  // buttons below, so a keyboard dismiss can't abandon an in-flight
+  // action the person can't see the outcome of.
   useEffect(() => {
     if (!isOpen) return
-    function onKey(e) { if (e.key === 'Escape') onClose() }
+    function onKey(e) { if (e.key === 'Escape' && !busy) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, busy])
 
   if (!shouldRender) return null
 
   function handleConfirm() {
-    onConfirm()
+    if (busy) return
+    const result = onConfirm()
+
+    // Backward compatibility (3.5): a synchronous onConfirm returns
+    // undefined here, so this branch is skipped entirely and the sheet
+    // closes immediately, exactly as it always has.
+    if (result && typeof result.then === 'function') {
+      setBusy(true)
+      setFailure(null)
+      result.then(
+        () => {
+          setBusy(false)
+          onClose()
+        },
+        () => {
+          setBusy(false)
+          setFailure('Check your connection and try again.')
+        }
+      )
+      return
+    }
+
+    onClose()
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target === overlayRef.current && !busy) onClose()
+  }
+
+  function handleCancel() {
+    if (busy) return
     onClose()
   }
 
@@ -94,7 +153,7 @@ export default function ConfirmSheet({
   return createPortal(
     <div
       ref={overlayRef}
-      onClick={e => { if (e.target === overlayRef.current) onClose() }}
+      onClick={handleOverlayClick}
       style={{
         position:        'fixed',
         inset:           0,
@@ -147,6 +206,21 @@ export default function ConfirmSheet({
           </p>
         )}
 
+        {failure && (
+          <div style={{
+            fontSize:        13,
+            color:           '#DC2626',
+            backgroundColor: '#FEF2F2',
+            border:          '1px solid #FECACA',
+            borderRadius:    'var(--radius-sm)',
+            padding:         'var(--space-2) var(--space-3)',
+            lineHeight:      1.4,
+            marginBottom:    'var(--space-4)',
+          }}>
+            {failure}
+          </div>
+        )}
+
         <div style={{
           display: 'flex',
           justifyContent: 'flex-end',
@@ -154,7 +228,8 @@ export default function ConfirmSheet({
         }}>
           {/* Cancel */}
           <button
-            onClick={onClose}
+            onClick={handleCancel}
+            disabled={busy}
             style={{
               padding: 'var(--space-2) var(--space-4)',
               borderRadius: 'var(--radius-sm)',
@@ -164,7 +239,8 @@ export default function ConfirmSheet({
               fontSize: 14,
               fontWeight: 500,
               fontFamily: 'var(--font-body)',
-              cursor: 'pointer',
+              cursor: busy ? 'default' : 'pointer',
+              opacity: busy ? 0.6 : 1,
             }}
           >
             Cancel
@@ -173,6 +249,7 @@ export default function ConfirmSheet({
           {/* Confirm */}
           <button
             onClick={handleConfirm}
+            disabled={busy}
             style={{
               padding: 'var(--space-2) var(--space-4)',
               borderRadius: 'var(--radius-sm)',
@@ -182,10 +259,11 @@ export default function ConfirmSheet({
               fontSize: 14,
               fontWeight: 600,
               fontFamily: 'var(--font-body)',
-              cursor: 'pointer',
+              cursor: busy ? 'default' : 'pointer',
+              opacity: busy ? 0.75 : 1,
             }}
           >
-            {confirmLabel}
+            {busy ? confirmingLabel : confirmLabel}
           </button>
         </div>
       </div>

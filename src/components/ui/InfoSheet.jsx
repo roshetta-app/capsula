@@ -12,6 +12,11 @@
  * action being confirmed, and bolting a "no confirm button" mode onto it
  * would make every ConfirmSheet caller carry a branch it doesn't need.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this dialog instead of changing the route.
+ * No drag gesture added — this is a centered modal with no drag handle,
+ * same as ConfirmSheet.jsx, so step 3.2 doesn't apply to it.
+ *
  * Props:
  *   isOpen    boolean
  *   onClose   () => void
@@ -22,6 +27,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../../hooks/useBackClose'
 
 export default function InfoSheet({ isOpen, onClose, title, children }) {
   const overlayRef = useRef(null)
@@ -30,6 +36,8 @@ export default function InfoSheet({ isOpen, onClose, title, children }) {
   // animateIn drives the CSS open/closed visual state.
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
 
   useEffect(() => {
     if (isOpen) {

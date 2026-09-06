@@ -13,6 +13,11 @@
  * The body reuses the same condition/adjustment list markup that used to
  * render as an always-visible inline card in DosingSection.jsx.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this sheet instead of changing the route;
+ * drag handle now has a real close gesture via useSheetDrag instead of
+ * being purely decorative.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -20,6 +25,8 @@
  */
 
 import { useEffect, useState } from 'react'
+import { useBackClose } from '../../../hooks/useBackClose'
+import { useSheetDrag } from '../../../hooks/useSheetDrag'
 
 export default function DoseAdjustmentsBottomSheet({
   isOpen,
@@ -28,6 +35,9 @@ export default function DoseAdjustmentsBottomSheet({
 }) {
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -84,20 +94,24 @@ export default function DoseAdjustmentsBottomSheet({
           flexDirection:   'column',
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
         {/* Fixed header — drag handle + title, since (unlike BrandsList)
             nothing rendered in the body below supplies its own heading. */}
         <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-            margin:          '0 auto var(--space-3)',
-          }} />
+          <div
+            {...dragHandlers}
+            style={{
+              width:           40,
+              height:          4,
+              borderRadius:    2,
+              backgroundColor: 'var(--color-border)',
+              margin:          '0 auto var(--space-3)',
+              touchAction:     'none',
+            }}
+          />
           <div style={{
             fontSize:     15,
             fontWeight:   700,

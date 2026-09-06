@@ -30,6 +30,10 @@
  *            duration per property instead of a longer/shorter pair, and
  *            reduced-motion is respected automatically. Exit unmount delay
  *            shortened from 320ms to 280ms to match --motion-screen.
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ *            useBackClose so back closes this sheet instead of changing
+ *            the route; drag handle now has a real close gesture via
+ *            useSheetDrag instead of being purely decorative.
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -46,6 +50,8 @@ import { useEffect, useState }          from 'react'
 import { LayoutGrid }                   from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
+import { useBackClose }                 from '../../hooks/useBackClose'
+import { useSheetDrag }                 from '../../hooks/useSheetDrag'
 
 
 export default function SpecialtiesBottomSheet({
@@ -61,6 +67,9 @@ export default function SpecialtiesBottomSheet({
   // animateIn drives the CSS open/closed visual position.
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -125,8 +134,8 @@ export default function SpecialtiesBottomSheet({
           flexDirection:   'column',
           maxHeight:       '70dvh',
           paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
         {/* Fixed header — drag handle, label, and the 'All conditions' row.
@@ -135,14 +144,19 @@ export default function SpecialtiesBottomSheet({
           flexShrink: 0,
           padding:    'var(--space-5) var(--space-4) 0',
         }}>
-          {/* Drag handle */}
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-            margin:          '0 auto var(--space-5)',
-          }} />
+          {/* Drag handle — Phase 3: real drag-to-close gesture via
+              useSheetDrag, not just a visual affordance. */}
+          <div
+            {...dragHandlers}
+            style={{
+              width:           40,
+              height:          4,
+              borderRadius:    2,
+              backgroundColor: 'var(--color-border)',
+              margin:          '0 auto var(--space-5)',
+              touchAction:     'none',
+            }}
+          />
 
           {/* Section label */}
           <div style={{

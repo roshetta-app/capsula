@@ -13,6 +13,12 @@
  * only place in the app that needs the extra type-to-confirm friction, by
  * explicit decision, since deleting an account can't be undone.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose, gated on !busy the same way Escape/backdrop-tap already
+ * are here, so back can't abandon an in-flight deletion. No drag gesture
+ * added — this is a centered modal with no drag handle, same as
+ * ConfirmSheet.jsx, so step 3.2 doesn't apply to it.
+ *
  * Props:
  *   isOpen      boolean
  *   onClose     () => void
@@ -22,6 +28,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBackClose } from '../../hooks/useBackClose'
 
 const CONFIRM_WORD = 'DELETE'
 
@@ -31,6 +38,8 @@ export default function DeleteAccountSheet({ isOpen, onClose, onConfirm, busy = 
 
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, !busy ? onClose : () => {})
 
   useEffect(() => {
     if (isOpen) {
