@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useToast } from '../../context/ToastContext'
+import { useBackClose } from '../../hooks/useBackClose'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -144,6 +145,16 @@ const EMPTY = {
 export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange, hasSearchResults, sortMode, onSortChange }) {
   const [filters, setFilters] = useState(activeFilters || EMPTY)
   const { toast } = useToast()
+
+  // Bug fix (2026-09-06): this sheet was missed entirely during the
+  // earlier pass that wired every other popup/sheet into the shared
+  // back-close mechanism. Without it, pressing back (or the equivalent
+  // gesture) while this panel was open never closed the panel — it fell
+  // straight through to whatever handles back for the screen underneath,
+  // which is what made it look like "tapping outside closes the panel
+  // and dumps me on Conditions": the panel wasn't actually being closed
+  // by that action at all, the whole Drugs screen was being left instead.
+  useBackClose(isOpen, onClose)
 
   // shouldRender keeps the DOM present during the exit transition.
   // animateIn drives the CSS open/closed visual position. Same pattern as

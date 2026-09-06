@@ -27,10 +27,10 @@
  * onClose(), rather than navigating the real route entry underneath it.
  * If the popup/sheet closes some other way first (its own X button,
  * confirming an action, etc.) the placeholder is still sitting there
- * unconsumed — cleanup removes it with a single history.back() so the
- * back stack never ends up with a dead entry someone would have to press
- * back through twice. If the placeholder was already consumed by a real
- * back press, that extra history.back() is skipped.
+ * unconsumed — cleanup neutralizes it in place with replaceState (not a
+ * history.back() pop), so the stack stays exactly where it was without
+ * ever firing a popstate event that some other back-listener could
+ * mistake for a real press.
  *
  * isAnyBackCloseOpen() — Phase 4 (Back-Button Mapping) addition. Exposes
  * whether at least one useBackClose consumer currently has its guard
@@ -94,26 +94,24 @@ export function useBackClose(isOpen, onClose) {
     window.addEventListener('popstate', handlePopState)
     return () => {
       window.removeEventListener('popstate', handlePopState)
+      openBackCloseCount--
       if (!poppedViaBrowserBackRef.current) {
-        // Bug fix (2026-09-06): closing via anything other than a real
-        // back press (backdrop tap, X button, confirming an action)
-        // still leaves our placeholder sitting on top of the stack, so
-        // it's consumed here to keep the back stack balanced. That
-        // consumption itself fires a popstate event that looks
-        // identical to a genuine back press to any other listener —
-        // most notably BottomNav's tab-level back handling, which was
-        // reading "nothing is open anymore" mid-flight (this count was
-        // decremented before this fired) and wrongly treating our own
-        // cleanup as if the user had pressed back for real: sending
-        // people to the Conditions tab, or arming/showing the
-        // press-again-to-exit prompt, whenever a popup was closed by
-        // tapping outside it. Keeping the count elevated until this
-        // phantom event has had a chance to pass through fixes that at
-        // the source, for every popup/sheet that uses this hook.
-        window.history.back()
-        setTimeout(() => { openBackCloseCount-- }, 0)
-      } else {
-        openBackCloseCount--
+        // Bug fix (2026-09-06, revised): closing via anything other than
+        // a real back press (backdrop tap, X button, confirming an
+        // action) still leaves our placeholder sitting on top of the
+        // stack. The first attempt at this fix consumed it with
+        // history.back() and delayed telling anyone else "nothing is
+        // open anymore" until just after — but that relied on our
+        // cleanup's popstate landing before a separately-scheduled
+        // timer, and different browser engines don't guarantee that
+        // ordering the same way, which is exactly why it worked on the
+        // phone app but not reliably on the installed PWA. Neutralizing
+        // the placeholder in place instead — turning it into an
+        // ordinary entry rather than popping it — never fires a
+        // popstate event at all, on any browser, so there's no phantom
+        // "back press" for anything else (BottomNav's tab handling,
+        // etc.) to ever misread, regardless of timing.
+        window.history.replaceState(null, '')
       }
     }
   }, [isOpen])
