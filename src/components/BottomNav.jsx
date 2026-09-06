@@ -85,9 +85,9 @@
  *               Favourites/Account no longer stacks one history entry per
  *               switch.
  *             - A dedicated back handler (native backButton + web/PWA
- *               placeholder-history guard, registered once for the whole
- *               time BottomNav is mounted — i.e. whenever a tab screen is
- *               showing) now owns what "back" means at the tab level,
+ *               placeholder-history guard, gated on a backHandlerActive
+ *               flag so it turns off on admin routes / while a keyboard is
+ *               open) now owns what "back" means at the tab level,
  *               independent of the underlying history depth: from any tab
  *               other than Conditions, back returns to Conditions; from
  *               Conditions itself, back shows a brief "press back again to
@@ -98,6 +98,18 @@
  *               nothing if a sheet/popup is currently registered as open,
  *               so closing a sheet with back doesn't also trigger tab
  *               navigation or the exit prompt underneath it.
+ *             - Hotfix (same session): the web/PWA guard's unmount cleanup
+ *               originally called window.history.back() whenever it wasn't
+ *               the guard's own placeholder that got consumed — copied
+ *               from useBackClose.js, where that's correct for a sheet
+ *               closing via its own X button. It was wrong here: BottomNav
+ *               unmounts on completely normal forward navigation (opening
+ *               any condition/drug detail screen, since Layout hides the
+ *               nav bar there), and that cleanup was silently reversing
+ *               that navigation the instant it happened — every screen
+ *               appeared to "close instantly." Cleanup now only removes
+ *               the popstate listener; it no longer touches history at
+ *               all on unmount.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
@@ -204,10 +216,9 @@ export default function BottomNav() {
     }
   }
 
-  // Phase 4 — tab-level back/exit handling. Registered once, for the whole
-  // time BottomNav is mounted (i.e. whenever any tab screen is showing),
-  // rather than re-registered per tab switch — see locationRef above for
-  // how it stays current without that churn.
+  // Phase 4 — tab-level back/exit handling. Registered whenever
+  // backHandlerActive is true (i.e. whenever the nav bar itself is
+  // showing), independent of ordinary tab switches.
   useEffect(() => {
     if (!backHandlerActive) return
 
@@ -249,24 +260,25 @@ export default function BottomNav() {
     }
 
     // Browser back-gesture/button guard (website/PWA only).
-    let poppedByThisPress = false
     window.history.pushState({ capsulaBottomNavGuard: true }, '')
 
     function handlePopState() {
-      poppedByThisPress = true
       const stayGuarded = goBack()
       if (stayGuarded) {
-        poppedByThisPress = false
         window.history.pushState({ capsulaBottomNavGuard: true }, '')
       }
     }
 
     window.addEventListener('popstate', handlePopState)
+    // Hotfix: cleanup only removes the listener. It must NOT touch history
+    // (no history.back() here) — this effect's cleanup also runs on
+    // completely normal forward navigation (e.g. opening a condition/drug
+    // detail screen unmounts BottomNav, since Layout hides the nav bar
+    // there), and calling history.back() in that case was undoing that
+    // navigation immediately, which is what made every screen appear to
+    // close instantly.
     return () => {
       window.removeEventListener('popstate', handlePopState)
-      if (!poppedByThisPress) {
-        window.history.back()
-      }
     }
     // goBack always reads fresh state via locationRef/lastBackPressRef, so
     // it only needs to be re-created when backHandlerActive itself flips —
