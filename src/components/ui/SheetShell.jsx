@@ -85,23 +85,39 @@ export default function SheetShell({
   // restoring whatever was there before on close.
   //
   // Bug fix, 2026-09-06 (sheet-drag-false-liftoff) — this used to also set
-  // touchAction: 'none' on <html> here. That's what was actually causing
-  // the drag to feel like it thought your finger had lifted mid-drag:
-  // changing touch-action on an ancestor of the sheet's own drag target
-  // can make the browser end the in-progress touch sequence early. It's
-  // removed now for two reasons: it was the direct cause of that bug, and
-  // it was never fixing the real background-bounce issue anyway — that
-  // turned out to be Android's native WebView edge-glow effect, now fixed
-  // properly at the native level (see MainActivity.java). overflow:hidden
-  // alone is kept as a plain, low-risk safety net against any actual
-  // scroll of the page underneath.
+  // touchAction: 'none' on <html> here. That's what was causing the drag
+  // to feel like it thought your finger had lifted mid-drag: changing
+  // touch-action on an ancestor of the sheet's own drag target can make
+  // the browser end the in-progress touch sequence early. It was removed
+  // for two reasons: it was the direct cause of that bug, and it was never
+  // fixing the real background-bounce issue anyway — that turned out to
+  // be Android's native WebView edge-glow effect, fixed separately at the
+  // native level (see MainActivity.java).
+  //
+  // Bug fix, 2026-09-06 (pwa-drag-finger-lift) — the same "finger lifted"
+  // symptom persisted, but only in the browser/PWA build, not the
+  // installed app. Root cause: the browser's own built-in pull-to-
+  // refresh/rubber-band gesture, which the installed app's WebView doesn't
+  // have. Even with <html> unable to scroll, the browser can still try to
+  // take over a downward drag from the top of the page for its own
+  // gesture, which cancels the in-progress drag from the app's point of
+  // view — that hand-off is what looked like an early finger-lift.
+  // `overscroll-behavior` is the correct, narrow tool for this: unlike
+  // `touch-action`, it only tells the browser "don't run your own
+  // pull-to-refresh/bounce here," without changing how touch events are
+  // delivered to the page — so it doesn't reintroduce the earlier bug.
+  // Scoped to while a sheet is open and restored on close, same pattern as
+  // the overflow lock above.
   useEffect(() => {
     if (!isOpen) return
     const html = document.documentElement
     const prevOverflow = html.style.overflow
+    const prevOverscrollBehavior = html.style.overscrollBehavior
     html.style.overflow = 'hidden'
+    html.style.overscrollBehavior = 'none'
     return () => {
       html.style.overflow = prevOverflow
+      html.style.overscrollBehavior = prevOverscrollBehavior
     }
   }, [isOpen])
 
