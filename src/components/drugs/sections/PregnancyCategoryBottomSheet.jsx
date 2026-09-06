@@ -160,17 +160,27 @@ export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
             BrandsList in BrandsBottomSheet.jsx) this sheet's body has no
             built-in header of its own. */}
         <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          <div
-            {...dragHandlers}
-            style={{
+          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
+          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-3)' }}>
+            <div style={{
               width:           40,
               height:          4,
               borderRadius:    2,
               backgroundColor: 'var(--color-border)',
-              margin:          '0 auto var(--space-3)',
-              touchAction:     'none',
-            }}
-          />
+            }} />
+            <div
+              {...dragHandlers}
+              style={{
+                position:    'absolute',
+                top:         '50%',
+                left:        '50%',
+                transform:   'translate(-50%, -50%)',
+                width:       64,
+                height:      32,
+                touchAction: 'none',
+              }}
+            />
+          </div>
           <div style={{
             fontSize:     17,
             fontWeight:   700,
@@ -212,3 +222,5 @@ export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
     </>
   )
 }
+
+
