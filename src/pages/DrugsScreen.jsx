@@ -406,7 +406,7 @@ export default function DrugsScreen() {
               marginBottom: 'var(--space-3)',
             }}>
               <button
-                onClick={() => navigate(ROUTES.DRUGS)}
+                onClick={() => navigate(ROUTES.DRUGS, { replace: true })}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   background: 'none', border: 'none', cursor: 'pointer',
@@ -465,7 +465,7 @@ export default function DrugsScreen() {
                   further" rather than "something's wrong." */}
               {hasQuery && activeCategory && activeCategory !== '__all' && (
                 <FilledHintButton
-                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
+                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
                   style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
                 >
                   Search all drugs instead

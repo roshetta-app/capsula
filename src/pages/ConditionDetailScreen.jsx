@@ -4,6 +4,7 @@ import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
+import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import PrescriptionsTab from '../components/conditions/PrescriptionsTab'
 import ClinicalDataTab from '../components/conditions/ClinicalDataTab'
 import BottomNav from '../components/BottomNav'
@@ -57,6 +58,13 @@ const scrollMemory = new Map()
 export default function ConditionDetailScreen() {
   const { slug }    = useParams()
   const navigate    = useNavigate()
+
+  // Bug fix (2026-09-06): a shared link or notification tap can land
+  // someone directly here with nothing real behind it in history, so back
+  // used to exit the app immediately instead of going to the Conditions
+  // list. Does nothing on a normal in-app visit (tapping in from the
+  // list) — only acts the first time anything renders this session.
+  useDeepLinkParent('/conditions')
   const navigationType = useNavigationType() // 'POP' | 'PUSH' | 'REPLACE'
   const { conditions, loading, addRecentlyViewed } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()

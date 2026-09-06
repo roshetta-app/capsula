@@ -72,6 +72,7 @@ import SourcesSection                    from '../components/drugs/sections/Sour
 import { useDrugContext }                from '../context/DrugContext'
 import { useFavouritesContext }          from '../context/FavouritesContext'
 import { useCategories }                 from '../hooks/useCategories'
+import { useDeepLinkParent }             from '../hooks/useDeepLinkParent'
 import { useIsDark }                     from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN }  from '../utils/specialtyTokens'
 import { logUsageEvent }                 from '../analytics/usageEvents'
@@ -80,6 +81,12 @@ import { ROUTES }                        from '../router'
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
+
+  // Bug fix (2026-09-06): same gap as ConditionDetailScreen — a shared
+  // link or notification tap landing directly here had nothing real
+  // behind it in history, so back exited instead of going to the Drugs
+  // list. No effect on a normal in-app visit.
+  useDeepLinkParent('/drugs')
 
   const { drugs, loading, error, retry } = useDrugContext()
   const { isDrugFavourited, toggleDrug } = useFavouritesContext()
