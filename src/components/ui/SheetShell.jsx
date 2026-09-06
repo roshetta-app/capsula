@@ -49,6 +49,7 @@
  *   </SheetShell>
  */
 
+import { useEffect } from 'react'
 import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
 
@@ -75,6 +76,25 @@ export default function SheetShell({
   closeThreshold = 0.4,
 }) {
   useBackClose(isOpen, onClose)
+
+  // vaul locks scrolling on <body> while a sheet is open (its own built-in
+  // behavior). This app's page actually scrolls via the <html> element
+  // rather than <body>, which vaul has no way to know about — so <html>
+  // was left free to scroll/bounce underneath the drag. This mirrors the
+  // same lock onto <html>, active only while a sheet is open, restoring
+  // whatever was there before on close.
+  useEffect(() => {
+    if (!isOpen) return
+    const html = document.documentElement
+    const prevOverflow = html.style.overflow
+    const prevTouchAction = html.style.touchAction
+    html.style.overflow = 'hidden'
+    html.style.touchAction = 'none'
+    return () => {
+      html.style.overflow = prevOverflow
+      html.style.touchAction = prevTouchAction
+    }
+  }, [isOpen])
 
   return (
     <Drawer.Root
