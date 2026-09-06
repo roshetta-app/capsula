@@ -79,6 +79,25 @@
  *             which didn't match the rest of the bar. Signed-in state is
  *             now a small dot on the icon instead, shown independently of
  *             which tab is currently active.
+ * Phase 4 (Back-Button Mapping) — Tab-level back/exit behavior:
+ *             - Tab taps now use navigate(path, { replace: true }) instead
+ *               of a plain push, so switching between Conditions/Drugs/
+ *               Favourites/Account no longer stacks one history entry per
+ *               switch.
+ *             - A dedicated back handler (native backButton + web/PWA
+ *               placeholder-history guard, registered once for the whole
+ *               time BottomNav is mounted — i.e. whenever a tab screen is
+ *               showing) now owns what "back" means at the tab level,
+ *               independent of the underlying history depth: from any tab
+ *               other than Conditions, back returns to Conditions; from
+ *               Conditions itself, back shows a brief "press back again to
+ *               exit" toast, and a second back press within that window
+ *               exits the app (native) or lets the press through normally
+ *               (web/PWA, where there's no in-app "exit").
+ *             - Checks useBackClose's isAnyBackCloseOpen() first and does
+ *               nothing if a sheet/popup is currently registered as open,
+ *               so closing a sheet with back doesn't also trigger tab
+ *               navigation or the exit prompt underneath it.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
@@ -94,14 +113,25 @@
  *  - Hidden while an on-screen keyboard is open (see Phase 16 note above).
  *  - Re-tapping the active tab scrolls to top; every tap gets press feedback
  *    (see Phase 19 note above).
+ *  - Tab switches replace history instead of pushing; back is handled at
+ *    the tab level with its own return-to-Conditions/exit-prompt logic
+ *    (see Phase 4 note above).
  */
 
-import { useState }                  from 'react'
-import { useLocation, useNavigate }  from 'react-router-dom'
-import { BookOpen, Pill, Heart, User } from 'lucide-react'
-import { useKeyboardOpen }          from '../hooks/useKeyboardOpen'
-import { useBackToTop }             from '../hooks/useBackToTop'
-import { useAuth }                  from '../hooks/useAuth'
+import { useState, useEffect, useRef }  from 'react'
+import { useLocation, useNavigate }     from 'react-router-dom'
+import { BookOpen, Pill, Heart, User }  from 'lucide-react'
+import { Capacitor }                    from '@capacitor/core'
+import { App as CapacitorApp }          from '@capacitor/app'
+import { useKeyboardOpen }              from '../hooks/useKeyboardOpen'
+import { useBackToTop }                 from '../hooks/useBackToTop'
+import { useAuth }                      from '../hooks/useAuth'
+import { isAnyBackCloseOpen }           from '../hooks/useBackClose'
+
+// How long the "press back again to exit" prompt stays valid — a second
+// back press on Conditions within this window exits; after it, back shows
+// the prompt again instead of exiting. Matches the common ~2s convention.
+const EXIT_PROMPT_WINDOW_MS = 2000
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -121,20 +151,35 @@ export default function BottomNav() {
   // it isn't part of the TABS array below.
   const [pressedPath, setPressedPath] = useState(null)
 
-  // Hidden on all admin routes
-  if (location.pathname.startsWith('/admin')) return null
+  // Phase 4 — "press back again to exit" toast, shown only while on the
+  // Conditions tab and only within the exit window after a first back press.
+  const [showExitPrompt, setShowExitPrompt] = useState(false)
+  const lastBackPressRef = useRef(0)
+  const exitPromptTimerRef = useRef(null)
 
-  // Hidden while an on-screen keyboard is open — instant, no animation.
-  if (keyboardOpen) return null
+  // Kept in sync every render so the back handler below always reads the
+  // current route without re-registering its listeners on every tab switch.
+  const locationRef = useRef(location)
+  useEffect(() => {
+    locationRef.current = location
+  }, [location])
 
-  function isActive(tabPath) {
+  // Phase 4's back handler should only be active on the same screens the
+  // nav bar itself is shown on. BottomNav stays mounted even when it
+  // renders null below (admin routes, keyboard open) rather than
+  // unmounting, so the guard is gated on this flag directly instead of
+  // assuming unmount will clean it up.
+  const isAdminRoute = location.pathname.startsWith('/admin')
+  const backHandlerActive = !isAdminRoute && !keyboardOpen
+
+  function isActive(tabPath, pathname = location.pathname) {
     if (tabPath === '/conditions') {
-      return location.pathname === '/' ||
-             location.pathname === '/conditions' ||
-             location.pathname.startsWith('/conditions/')
+      return pathname === '/' ||
+             pathname === '/conditions' ||
+             pathname.startsWith('/conditions/')
     }
-    return location.pathname === tabPath ||
-           location.pathname.startsWith(tabPath + '/')
+    return pathname === tabPath ||
+           pathname.startsWith(tabPath + '/')
   }
 
   // Distinct from isActive above: true only when the user is already on
@@ -152,9 +197,93 @@ export default function BottomNav() {
     if (isExactScreen(path)) {
       scrollToTop()
     } else {
-      navigate(path)
+      // Phase 4 (4.1) — replace instead of push, so switching tabs doesn't
+      // stack a history entry per switch. What "back" does from here on is
+      // fully owned by the back handler below, not by history depth.
+      navigate(path, { replace: true })
     }
   }
+
+  // Phase 4 — tab-level back/exit handling. Registered once, for the whole
+  // time BottomNav is mounted (i.e. whenever any tab screen is showing),
+  // rather than re-registered per tab switch — see locationRef above for
+  // how it stays current without that churn.
+  useEffect(() => {
+    if (!backHandlerActive) return
+
+    function goBack() {
+      // A sheet/popup is already claiming this back press (Phase 1/3) —
+      // step aside so it isn't also treated as a tab-level back.
+      if (isAnyBackCloseOpen()) return true
+
+      if (!isActive('/conditions', locationRef.current.pathname)) {
+        navigate('/conditions', { replace: true })
+        return true
+      }
+
+      const now = Date.now()
+      if (now - lastBackPressRef.current < EXIT_PROMPT_WINDOW_MS) {
+        if (Capacitor.isNativePlatform()) {
+          CapacitorApp.exitApp()
+        }
+        // Website/PWA: there's no in-app "exit" — let this press proceed
+        // as a normal back instead of re-arming the guard.
+        return false
+      }
+
+      lastBackPressRef.current = now
+      setShowExitPrompt(true)
+      clearTimeout(exitPromptTimerRef.current)
+      exitPromptTimerRef.current = setTimeout(() => setShowExitPrompt(false), EXIT_PROMPT_WINDOW_MS)
+      return true
+    }
+
+    // Native back-button guard. No-ops on the website build.
+    if (Capacitor.isNativePlatform()) {
+      const listenerPromise = CapacitorApp.addListener('backButton', () => {
+        goBack()
+      })
+      return () => {
+        listenerPromise.then((handle) => handle.remove())
+      }
+    }
+
+    // Browser back-gesture/button guard (website/PWA only).
+    let poppedByThisPress = false
+    window.history.pushState({ capsulaBottomNavGuard: true }, '')
+
+    function handlePopState() {
+      poppedByThisPress = true
+      const stayGuarded = goBack()
+      if (stayGuarded) {
+        poppedByThisPress = false
+        window.history.pushState({ capsulaBottomNavGuard: true }, '')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      if (!poppedByThisPress) {
+        window.history.back()
+      }
+    }
+    // goBack always reads fresh state via locationRef/lastBackPressRef, so
+    // it only needs to be re-created when backHandlerActive itself flips —
+    // not on every ordinary tab switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backHandlerActive])
+
+  // Clear any pending exit-prompt timeout on unmount.
+  useEffect(() => {
+    return () => clearTimeout(exitPromptTimerRef.current)
+  }, [])
+
+  // Hidden on all admin routes
+  if (location.pathname.startsWith('/admin')) return null
+
+  // Hidden while an on-screen keyboard is open — instant, no animation.
+  if (keyboardOpen) return null
 
   const TABS = [
     // BookOpen — matches the Conditions tab icon already used inside
@@ -182,136 +311,164 @@ export default function BottomNav() {
   const accountActive = location.pathname === '/account'
 
   return (
-    <nav style={{
-      position:                'fixed',
-      bottom:                  0,
-      left:                    0,
-      right:                   0,
-      zIndex:                  100,
-      backgroundColor:         'var(--color-surface)',
-      borderTop:               '1px solid var(--color-border)',
-      paddingBottom:           'env(safe-area-inset-bottom)',
-      WebkitTapHighlightColor: 'transparent',
-    }}>
-      <div style={{
-        maxWidth:   680,
-        margin:     '0 auto',
-        display:    'flex',
-        alignItems: 'stretch',
-        height:     60,
-      }}>
-        {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
-          const active  = isActive(path)
-          const pressed = pressedPath === path
-          return (
-            <button
-              key={path}
-              onClick={() => handleTabTap(path)}
-              onPointerDown={() => setPressedPath(path)}
-              onPointerUp={() => setPressedPath(null)}
-              onPointerLeave={() => setPressedPath(null)}
-              aria-label={label}
-              aria-current={active ? 'page' : undefined}
-              style={{
-                flex:                    '1 1 0',
-                display:                 'flex',
-                flexDirection:           'column',
-                alignItems:              'center',
-                justifyContent:          'center',
-                gap:                     3,
-                border:                  'none',
-                background:              'none',
-                cursor:                  'pointer',
-                // Active: accent (or a tab's own activeColor override).
-                // Inactive: text-secondary (was text-tertiary — increased
-                // contrast so tabs are clearly readable at rest).
-                color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
-                transform:               pressed ? 'scale(0.92)' : 'scale(1)',
-                transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
-                fontFamily:              'var(--font-body)',
-                padding:                 '8px 0',
-                outline:                 'none',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Icon
-                size={22}
-                strokeWidth={active ? 2.5 : 2.0}
-                fill={active && fillWhenActive ? 'currentColor' : 'none'}
-              />
-              <span style={{
-                fontSize:      10,
-                fontWeight:    active ? 600 : 500,
-                letterSpacing: '0.01em',
-              }}>
-                {label}
-              </span>
-            </button>
-          )
-        })}
-
-        {/* Account — Phase 20, now a real route as of Phase F13 Mini-stage 1.
-            Active state (filled + accent) now matches the other three tabs:
-            it reflects whether /account is the open screen, not sign-in
-            state. Signed-in state shows as a small dot on the icon instead,
-            independent of whether the tab is currently active. */}
-        <button
-          onClick={() => navigate('/account')}
-          onPointerDown={() => setPressedPath('account')}
-          onPointerUp={() => setPressedPath(null)}
-          onPointerLeave={() => setPressedPath(null)}
-          aria-label="Account"
-          aria-current={accountActive ? 'page' : undefined}
+    <>
+      {/* Phase 4 — "press back again to exit" toast. Only ever shown while
+          on the Conditions tab, since that's the only place goBack sets it. */}
+      {showExitPrompt && isActive('/conditions') && (
+        <div
+          role="status"
           style={{
-            flex:                    '1 1 0',
-            display:                 'flex',
-            flexDirection:           'column',
-            alignItems:              'center',
-            justifyContent:          'center',
-            gap:                     3,
-            border:                  'none',
-            background:              'none',
-            cursor:                  'pointer',
-            color:                   accountActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            transform:               accountPressed ? 'scale(0.92)' : 'scale(1)',
-            transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
-            fontFamily:              'var(--font-body)',
-            padding:                 '8px 0',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
+            position:        'fixed',
+            left:            '50%',
+            transform:       'translateX(-50%)',
+            bottom:          'calc(60px + env(safe-area-inset-bottom) + 12px)',
+            zIndex:          101,
+            backgroundColor: 'var(--color-text-primary)',
+            color:           'var(--color-surface)',
+            padding:         '8px 16px',
+            borderRadius:    'var(--radius-full)',
+            fontFamily:      'var(--font-body)',
+            fontSize:        13,
+            fontWeight:      500,
+            whiteSpace:      'nowrap',
+            pointerEvents:   'none',
           }}
         >
-          <div style={{ position: 'relative', display: 'flex' }}>
-            <User
-              size={22}
-              strokeWidth={accountActive ? 2.5 : 2.0}
-              fill={accountActive ? 'currentColor' : 'none'}
-            />
-            {user && (
-              <span
-                aria-hidden="true"
+          Press back again to exit
+        </div>
+      )}
+
+      <nav style={{
+        position:                'fixed',
+        bottom:                  0,
+        left:                    0,
+        right:                   0,
+        zIndex:                  100,
+        backgroundColor:         'var(--color-surface)',
+        borderTop:               '1px solid var(--color-border)',
+        paddingBottom:           'env(safe-area-inset-bottom)',
+        WebkitTapHighlightColor: 'transparent',
+      }}>
+        <div style={{
+          maxWidth:   680,
+          margin:     '0 auto',
+          display:    'flex',
+          alignItems: 'stretch',
+          height:     60,
+        }}>
+          {TABS.map(({ path, label, Icon, activeColor, fillWhenActive }) => {
+            const active  = isActive(path)
+            const pressed = pressedPath === path
+            return (
+              <button
+                key={path}
+                onClick={() => handleTabTap(path)}
+                onPointerDown={() => setPressedPath(path)}
+                onPointerUp={() => setPressedPath(null)}
+                onPointerLeave={() => setPressedPath(null)}
+                aria-label={label}
+                aria-current={active ? 'page' : undefined}
                 style={{
-                  position:        'absolute',
-                  top:             -1,
-                  right:           -1,
-                  width:           7,
-                  height:          7,
-                  borderRadius:    'var(--radius-full)',
-                  backgroundColor: 'var(--color-accent)',
-                  border:          '1.5px solid var(--color-surface)',
+                  flex:                    '1 1 0',
+                  display:                 'flex',
+                  flexDirection:           'column',
+                  alignItems:              'center',
+                  justifyContent:          'center',
+                  gap:                     3,
+                  border:                  'none',
+                  background:              'none',
+                  cursor:                  'pointer',
+                  // Active: accent (or a tab's own activeColor override).
+                  // Inactive: text-secondary (was text-tertiary — increased
+                  // contrast so tabs are clearly readable at rest).
+                  color:                   active ? (activeColor ?? 'var(--color-accent)') : 'var(--color-text-secondary)',
+                  transform:               pressed ? 'scale(0.92)' : 'scale(1)',
+                  transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
+                  fontFamily:              'var(--font-body)',
+                  padding:                 '8px 0',
+                  outline:                 'none',
+                  WebkitTapHighlightColor: 'transparent',
                 }}
+              >
+                <Icon
+                  size={22}
+                  strokeWidth={active ? 2.5 : 2.0}
+                  fill={active && fillWhenActive ? 'currentColor' : 'none'}
+                />
+                <span style={{
+                  fontSize:      10,
+                  fontWeight:    active ? 600 : 500,
+                  letterSpacing: '0.01em',
+                }}>
+                  {label}
+                </span>
+              </button>
+            )
+          })}
+
+          {/* Account — Phase 20, now a real route as of Phase F13 Mini-stage 1.
+              Active state (filled + accent) now matches the other three tabs:
+              it reflects whether /account is the open screen, not sign-in
+              state. Signed-in state shows as a small dot on the icon instead,
+              independent of whether the tab is currently active. */}
+          <button
+            onClick={() => navigate('/account', { replace: true })}
+            onPointerDown={() => setPressedPath('account')}
+            onPointerUp={() => setPressedPath(null)}
+            onPointerLeave={() => setPressedPath(null)}
+            aria-label="Account"
+            aria-current={accountActive ? 'page' : undefined}
+            style={{
+              flex:                    '1 1 0',
+              display:                 'flex',
+              flexDirection:           'column',
+              alignItems:              'center',
+              justifyContent:          'center',
+              gap:                     3,
+              border:                  'none',
+              background:              'none',
+              cursor:                  'pointer',
+              color:                   accountActive ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              transform:               accountPressed ? 'scale(0.92)' : 'scale(1)',
+              transition:              'color 0.15s ease, transform var(--motion-fast) var(--ease-settle)',
+              fontFamily:              'var(--font-body)',
+              padding:                 '8px 0',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <div style={{ position: 'relative', display: 'flex' }}>
+              <User
+                size={22}
+                strokeWidth={accountActive ? 2.5 : 2.0}
+                fill={accountActive ? 'currentColor' : 'none'}
               />
-            )}
-          </div>
-          <span style={{
-            fontSize:      10,
-            fontWeight:    accountActive ? 600 : 500,
-            letterSpacing: '0.01em',
-          }}>
-            Account
-          </span>
-        </button>
-      </div>
-    </nav>
+              {user && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position:        'absolute',
+                    top:             -1,
+                    right:           -1,
+                    width:           7,
+                    height:          7,
+                    borderRadius:    'var(--radius-full)',
+                    backgroundColor: 'var(--color-accent)',
+                    border:          '1.5px solid var(--color-surface)',
+                  }}
+                />
+              )}
+            </div>
+            <span style={{
+              fontSize:      10,
+              fontWeight:    accountActive ? 600 : 500,
+              letterSpacing: '0.01em',
+            }}>
+              Account
+            </span>
+          </button>
+        </div>
+      </nav>
+    </>
   )
 }

@@ -31,11 +31,27 @@
  * back stack never ends up with a dead entry someone would have to press
  * back through twice. If the placeholder was already consumed by a real
  * back press, that extra history.back() is skipped.
+ *
+ * isAnyBackCloseOpen() — Phase 4 (Back-Button Mapping) addition. Exposes
+ * whether at least one useBackClose consumer currently has its guard
+ * registered (isOpen === true), via a plain module-level counter. Added
+ * so BottomNav's own always-on tab-level back handling (which isn't
+ * itself a useBackClose consumer — it isn't an isOpen/onClose overlay,
+ * it's the fallback that applies when nothing else is open) can check
+ * this and step aside whenever a sheet is already claiming the back
+ * press, instead of both reacting to the same press at once. Purely
+ * additive: existing useBackClose callers are unaffected.
  */
 
 import { useEffect, useRef } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
+
+let openBackCloseCount = 0
+
+export function isAnyBackCloseOpen() {
+  return openBackCloseCount > 0
+}
 
 export function useBackClose(isOpen, onClose) {
   const poppedViaBrowserBackRef = useRef(false)
@@ -53,8 +69,10 @@ export function useBackClose(isOpen, onClose) {
     const listenerPromise = CapacitorApp.addListener('backButton', () => {
       onCloseRef.current()
     })
+    openBackCloseCount++
 
     return () => {
+      openBackCloseCount--
       listenerPromise.then((handle) => handle.remove())
     }
   }, [isOpen])
@@ -66,6 +84,7 @@ export function useBackClose(isOpen, onClose) {
 
     poppedViaBrowserBackRef.current = false
     window.history.pushState({ capsulaBackClose: true }, '')
+    openBackCloseCount++
 
     function handlePopState() {
       poppedViaBrowserBackRef.current = true
@@ -74,6 +93,7 @@ export function useBackClose(isOpen, onClose) {
 
     window.addEventListener('popstate', handlePopState)
     return () => {
+      openBackCloseCount--
       window.removeEventListener('popstate', handlePopState)
       if (!poppedViaBrowserBackRef.current) {
         window.history.back()
