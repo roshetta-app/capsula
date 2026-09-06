@@ -476,6 +476,7 @@ import { useConditionSearch } from '../hooks/useConditionSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useSortToggle } from '../hooks/useSortToggle'
 import { useBackToTop } from '../hooks/useBackToTop'
+import { useBackClose } from '../hooks/useBackClose'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import ProUpsellBanner from '../components/ui/ProUpsellBanner'
@@ -1518,37 +1519,27 @@ export default function FavouritesScreen() {
   const [isManaging, setIsManaging] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
 
-  // Entering manage mode pushes a throwaway history entry (same URL, no
-  // navigation) so the phone's back gesture/button has something of ours to
-  // consume first — without this, back would leave the whole screen instead
-  // of just closing the selector, which isn't what a bottom-sheet-adjacent
-  // control should do. Popping that entry (whether via toggleManage's own
-  // exit branch or a real back gesture) fires 'popstate', and this listener
-  // is the single place that actually closes manage mode — so both exit
-  // paths behave identically.
-  useEffect(() => {
-    function handlePopState() {
-      setIsManaging(false)
-      setSelectedIds(new Set())
-    }
-    window.addEventListener('popstate', handlePopState)
-    return () => window.removeEventListener('popstate', handlePopState)
-  }, [])
+  // Bug fix (2026-09-06): this used to hand-roll its own placeholder
+  // history entry + popstate listener to make back close manage mode
+  // instead of leaving the screen. Two problems with that: it only
+  // handled the web/PWA back gesture and never registered an Android
+  // hardware-back listener at all, and it had no way to tell BottomNav's
+  // tab-level back handling "something of mine is open, step aside" —
+  // so exiting manage mode (by back OR by tapping Done) could get
+  // misread as a real tab-level back press and bounce you to Conditions.
+  // Swapped for the same shared back-close hook every popup/sheet in the
+  // app already uses, which covers both platforms and coordinates
+  // correctly with everything else.
+  useBackClose(isManaging, () => {
+    setIsManaging(false)
+    setSelectedIds(new Set())
+  })
 
   function toggleManage() {
     if (isManaging) {
-      // Exiting — if we're still sitting on the history entry pushed below,
-      // pop it via back() so the stack stays balanced; handlePopState above
-      // does the actual state cleanup. Otherwise (entry already consumed by
-      // a real back-gesture) just close directly.
-      if (window.history.state?.favouritesManaging) {
-        window.history.back()
-      } else {
-        setIsManaging(false)
-        setSelectedIds(new Set())
-      }
+      setIsManaging(false)
+      setSelectedIds(new Set())
     } else {
-      window.history.pushState({ favouritesManaging: true }, '')
       setIsManaging(true)
     }
   }

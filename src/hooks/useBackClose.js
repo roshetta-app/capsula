@@ -93,10 +93,27 @@ export function useBackClose(isOpen, onClose) {
 
     window.addEventListener('popstate', handlePopState)
     return () => {
-      openBackCloseCount--
       window.removeEventListener('popstate', handlePopState)
       if (!poppedViaBrowserBackRef.current) {
+        // Bug fix (2026-09-06): closing via anything other than a real
+        // back press (backdrop tap, X button, confirming an action)
+        // still leaves our placeholder sitting on top of the stack, so
+        // it's consumed here to keep the back stack balanced. That
+        // consumption itself fires a popstate event that looks
+        // identical to a genuine back press to any other listener —
+        // most notably BottomNav's tab-level back handling, which was
+        // reading "nothing is open anymore" mid-flight (this count was
+        // decremented before this fired) and wrongly treating our own
+        // cleanup as if the user had pressed back for real: sending
+        // people to the Conditions tab, or arming/showing the
+        // press-again-to-exit prompt, whenever a popup was closed by
+        // tapping outside it. Keeping the count elevated until this
+        // phantom event has had a chance to pass through fixes that at
+        // the source, for every popup/sheet that uses this hook.
         window.history.back()
+        setTimeout(() => { openBackCloseCount-- }, 0)
+      } else {
+        openBackCloseCount--
       }
     }
   }, [isOpen])
