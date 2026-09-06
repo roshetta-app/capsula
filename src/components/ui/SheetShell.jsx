@@ -139,19 +139,31 @@ export default function SheetShell({
         <Drawer.Content
           aria-describedby={undefined}
           style={{
-            position:        'fixed',
-            bottom:          0,
-            left:            0,
-            right:           0,
-            zIndex:          zIndex + 1,
-            backgroundColor: 'var(--color-surface)',
-            borderRadius:    '16px 16px 0 0',
-            paddingBottom:   'env(safe-area-inset-bottom)',
-            display:         'flex',
-            flexDirection:   'column',
+            position:          'fixed',
+            bottom:            0,
+            left:              0,
+            right:             0,
+            zIndex:            zIndex + 1,
+            backgroundColor:   'var(--color-surface)',
+            borderRadius:      '16px 16px 0 0',
+            paddingBottom:     'env(safe-area-inset-bottom)',
+            display:           'flex',
+            flexDirection:     'column',
             maxHeight,
-            overflowY:       'auto',
-            outline:         'none',
+            overflowY:         'auto',
+            // Bug fix, 2026-09-06 (sheet-overscroll-and-liftoff) — this
+            // box holds the header/handle and the scrollable list
+            // together as one scroll region. Without this, the browser's
+            // own rubber-band/bounce effect kicks in once you scroll past
+            // the top or bottom of the list (or drag near the header with
+            // nowhere left to scroll) — that bounce is what was pulling
+            // the sheet open past its edge and showing blank space below
+            // the last item. This is the same fix already applied to the
+            // whole page (see the <html> lock below), just scoped to this
+            // box specifically, since it's a separate scrollable region
+            // vaul doesn't know about.
+            overscrollBehavior: 'none',
+            outline:           'none',
           }}
         >
           {/* Accessible name for screen readers — visually hidden since
