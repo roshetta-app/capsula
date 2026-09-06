@@ -1,33 +1,32 @@
 /**
  * src/components/ui/SheetShell.jsx
  *
- * ⚠️ TEMPORARY DIAGNOSTIC BUILD — 2026-09-06 ⚠️
- * This is NOT the fix. This is a debug version added to figure out why a
- * light/slow drag on the PWA (Android Chrome, added to home screen) still
- * snaps back or closes partway through, even though the finger never
- * lifted. Two prior targeted fixes (removing touch-action, adding
- * overscroll-behavior) did not resolve it, so instead of guessing a third
- * time, this build shows a small on-screen readout of exactly which
- * browser touch/pointer events fire while you drag, in order, with
- * timestamps.
+ * ⚠️ TEMPORARY DIAGNOSTIC BUILD (console version) — 2026-09-06 ⚠️
+ * This is NOT the fix. This logs every touch/pointer/scroll event that
+ * fires while a sheet is open straight to the browser console, so it can
+ * be watched live via chrome://inspect while testing on the phone.
  *
  * WHAT TO DO:
- *  1. Place this file, rebuild, open it in the PWA (same way you tested
- *     before — Android Chrome, added to home screen).
- *  2. Open the specialty picker sheet.
- *  3. Do the same light/slow drag that causes the snap-back.
- *  4. A small black box will appear in the top-left of the screen showing
- *     the last ~15 events (e.g. "pointerdown", "pointermove x4",
- *     "pointercancel", "lostpointercapture", etc.) with timestamps.
- *  5. Take a screenshot or just read off the list to me, especially
- *     whatever appears right at/before the moment it snaps back.
+ *  1. Plug the phone into the computer via USB, enable USB debugging on
+ *     the phone if not already on.
+ *  2. On the computer, open chrome://inspect/#devices in desktop Chrome.
+ *  3. Find the phone in the list, then click "inspect" under either the
+ *     PWA tab or the Capsula app's WebView (whichever you're testing) —
+ *     this opens a live DevTools window connected to the phone.
+ *  4. Open the DevTools "Console" tab in that window.
+ *  5. On the phone, place this file, rebuild, open the specialty picker.
+ *  6. Do the light/slow drag that snaps back, and separately, scroll the
+ *     list past its top/bottom.
+ *  7. Every event will print as: [sheet-debug] 123ms  pointermove type=touch
+ *  8. Copy/screenshot the console output around the moment it breaks and
+ *     send it over.
  *
  * This will be removed / replaced with the real fix once we know what's
  * actually firing. Everything else in this file is unchanged from the
  * last working version.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
 
@@ -43,43 +42,20 @@ const VISUALLY_HIDDEN_STYLE = {
   border:   0,
 }
 
-const DEBUG_OVERLAY_STYLE = {
-  position:       'fixed',
-  top:            8,
-  left:           8,
-  zIndex:         99999,
-  maxWidth:       '80vw',
-  maxHeight:      '40vh',
-  overflowY:      'auto',
-  backgroundColor: 'rgba(0,0,0,0.85)',
-  color:          '#0f0',
-  fontFamily:     'monospace',
-  fontSize:       11,
-  lineHeight:     1.4,
-  padding:        8,
-  borderRadius:   6,
-  pointerEvents:  'none',
-  whiteSpace:     'pre-wrap',
-}
-
 function useGestureDebugLog(isOpen) {
-  const [log, setLog] = useState([])
   const startRef = useRef(0)
 
   useEffect(() => {
-    if (!isOpen) {
-      setLog([])
-      return
-    }
+    if (!isOpen) return
     startRef.current = performance.now()
+    // eslint-disable-next-line no-console
+    console.log('%c[sheet-debug] sheet opened, logging starts now', 'color:#0a0')
 
     const append = (label) => (e) => {
       const t = (performance.now() - startRef.current).toFixed(0)
       const extra = e?.pointerType ? ` type=${e.pointerType}` : ''
-      setLog((prev) => {
-        const next = [...prev, `${t}ms  ${label}${extra}`]
-        return next.slice(-15)
-      })
+      // eslint-disable-next-line no-console
+      console.log(`%c[sheet-debug] ${t}ms  ${label}${extra}`, 'color:#0a0')
     }
 
     // Passive, non-interfering listeners purely for observation — these
@@ -109,8 +85,6 @@ function useGestureDebugLog(isOpen) {
       })
     }
   }, [isOpen])
-
-  return log
 }
 
 export default function SheetShell({
@@ -124,7 +98,7 @@ export default function SheetShell({
   closeThreshold = 0.4,
 }) {
   useBackClose(isOpen, onClose)
-  const debugLog = useGestureDebugLog(isOpen)
+  useGestureDebugLog(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
@@ -191,12 +165,6 @@ export default function SheetShell({
           {children}
         </Drawer.Content>
       </Drawer.Portal>
-
-      {isOpen && (
-        <div style={DEBUG_OVERLAY_STYLE}>
-          {debugLog.length === 0 ? 'waiting for gesture…' : debugLog.join('\n')}
-        </div>
-      )}
     </Drawer.Root>
   )
 }
