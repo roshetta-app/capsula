@@ -34,6 +34,17 @@
  *            useBackClose so back closes this sheet instead of changing
  *            the route; drag handle now has a real close gesture via
  *            useSheetDrag instead of being purely decorative.
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Replaces the backdrop/dialog/
+ *            handle markup, the shouldRender/animateIn timing, the manual
+ *            Escape-key + body-scroll-lock effects, and useSheetDrag with
+ *            one shared shell. The whole sheet is now the drag target
+ *            (not just the handle), and dragging over the scrollable
+ *            specialty list below only closes the sheet once that list is
+ *            scrolled to the very top — everywhere above it (the fixed
+ *            header) still drags immediately, same as before. This is the
+ *            first sheet migrated, chosen because the rest were originally
+ *            copied from its shell pattern.
  *
  * Bottom sheet showing all specialties as a scrollable row list.
  * Opened by the "More" chip in SpecialtyFilterPills when specialty count > 8.
@@ -46,12 +57,10 @@
  *   isOpen           boolean
  */
 
-import { useEffect, useState }          from 'react'
 import { LayoutGrid }                   from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-import { useBackClose }                 from '../../hooks/useBackClose'
-import { useSheetDrag }                 from '../../hooks/useSheetDrag'
+import SheetShell                       from '../ui/SheetShell'
 
 
 export default function SpecialtiesBottomSheet({
@@ -63,226 +72,132 @@ export default function SpecialtiesBottomSheet({
 }) {
   const isDark = useIsDark()
 
-  // shouldRender keeps the DOM present during the exit transition.
-  // animateIn drives the CSS open/closed visual position.
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      // Mount first, then flip animateIn on the next frame so the
-      // browser has painted the start-position before transitioning.
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      // Start exit transition immediately; unmount after it finishes.
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   function handleSelect(id) {
     onSelect(id)
     onClose()
   }
 
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Select specialty"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          display:         'flex',
-          flexDirection:   'column',
-          maxHeight:       '70dvh',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Fixed header — drag handle, label, and the 'All conditions' row.
-            Does not scroll; only the specialty list below it does. */}
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Select specialty" maxHeight="70dvh">
+      {/* Fixed header — label and the 'All conditions' row. Does not
+          scroll; only the specialty list below it does. The drag handle
+          itself now lives in SheetShell, above this. */}
+      <div style={{
+        flexShrink: 0,
+        padding:    '0 var(--space-4)',
+      }}>
+        {/* Section label */}
         <div style={{
-          flexShrink: 0,
-          padding:    'var(--space-5) var(--space-4) 0',
+          fontSize:      13,
+          fontWeight:    500,
+          color:         'var(--color-text-tertiary)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom:  'var(--space-3)',
         }}>
-          {/* Drag handle — Phase 3: real drag-to-close gesture via
-              useSheetDrag, not just a visual affordance. */}
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-5)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-
-          {/* Section label */}
-          <div style={{
-            fontSize:      13,
-            fontWeight:    500,
-            color:         'var(--color-text-tertiary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            marginBottom:  'var(--space-3)',
-          }}>
-            Select Specialty
-          </div>
-
-          {/* All conditions — first row, distinct from the specialty rows
-              below it: a grid icon (colored in the same neutral token used
-              for its own background tint, since 'all' has no specialty
-              color of its own — mirrors how each specialty row's icon is
-              always colored in its own accent below) plus weight 600
-              (was 700 — matches an actively-selected specialty row's
-              weight rather than sitting a full step heavier than it) so
-              it reads as related to the list but still the standout reset
-              action, per the "different but the same" brief. Same
-              tinted-background treatment when selected as before —
-              unchanged, since that's the only cue confirming 'All
-              conditions' is the current choice, same as every specialty
-              row below it. No divider — divider style removed sheet-wide;
-              the icon/weight/size difference plus the margin below it is
-              what separates it from the list. */}
-          <button
-            onClick={() => handleSelect('all')}
-            style={{
-              width:                   '100%',
-              display:                 'flex',
-              alignItems:              'center',
-              gap:                     'var(--space-3)',
-              textAlign:               'left',
-              padding:                 '12px 14px',
-              marginBottom:            'var(--space-2)',
-              borderRadius:            'var(--radius-md)',
-              background:              activeSpecialty === 'all'
-                ? resolveToken(FALLBACK_TOKEN, isDark).bg
-                : 'none',
-              border:                  'none',
-              fontSize:                16,
-              fontFamily:              'var(--font-body)',
-              fontWeight:              600,
-              color:                   activeSpecialty === 'all'
-                ? resolveToken(FALLBACK_TOKEN, isDark).fg
-                : 'var(--color-text-primary)',
-              cursor:                  'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              outline:                 'none',
-            }}
-          >
-            <LayoutGrid
-              size={18}
-              color={resolveToken(FALLBACK_TOKEN, isDark).fg}
-            />
-            All conditions
-          </button>
+          Select Specialty
         </div>
 
-        {/* Scrollable specialty list — one row per specialty, in the order
-            received (CMS-defined order, unmodified by this component).
-            Bare icon + name, no icon background, no item border, no
-            divider between rows — rows are separated by the selected
-            row's rounded color tint alone. Idle-state icons render in
-            their own specialty accent color (not flat grey) so the list
-            reads colorfully even before a selection is made. */}
-        <div style={{
-          flex:      1,
-          overflowY: 'auto',
-          padding:   '0 var(--space-4) var(--space-6)',
-        }}>
-          {specialties.map(s => {
-            const isActive = activeSpecialty === s.id
-            const tokenKey = s.colorToken ?? FALLBACK_TOKEN
-            const colors   = resolveToken(tokenKey, isDark)
-
-            return (
-              <button
-                key={s.id}
-                onClick={() => handleSelect(s.id)}
-                style={{
-                  width:                   '100%',
-                  display:                 'flex',
-                  alignItems:              'center',
-                  gap:                     'var(--space-3)',
-                  padding:                 '12px 14px',
-                  border:                  'none',
-                  borderRadius:            'var(--radius-md)',
-                  backgroundColor:         isActive ? colors.bg : 'transparent',
-                  fontSize:                15,
-                  fontFamily:              'var(--font-body)',
-                  fontWeight:              isActive ? 600 : 400,
-                  color:                   isActive ? colors.fg : 'var(--color-text-primary)',
-                  cursor:                  'pointer',
-                  textAlign:               'left',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline:                 'none',
-                }}
-              >
-                <SpecialtyIcon
-                  iconType={s.iconType   ?? 'lucide'}
-                  iconValue={s.iconValue ?? 'Stethoscope'}
-                  size={18}
-                  color={colors.fg}
-                />
-                {s.name}
-              </button>
-            )
-          })}
-        </div>
+        {/* All conditions — first row, distinct from the specialty rows
+            below it: a grid icon (colored in the same neutral token used
+            for its own background tint, since 'all' has no specialty
+            color of its own — mirrors how each specialty row's icon is
+            always colored in its own accent below) plus weight 600
+            (was 700 — matches an actively-selected specialty row's
+            weight rather than sitting a full step heavier than it) so
+            it reads as related to the list but still the standout reset
+            action, per the "different but the same" brief. Same
+            tinted-background treatment when selected as before —
+            unchanged, since that's the only cue confirming 'All
+            conditions' is the current choice, same as every specialty
+            row below it. No divider — divider style removed sheet-wide;
+            the icon/weight/size difference plus the margin below it is
+            what separates it from the list. */}
+        <button
+          onClick={() => handleSelect('all')}
+          style={{
+            width:                   '100%',
+            display:                 'flex',
+            alignItems:              'center',
+            gap:                     'var(--space-3)',
+            textAlign:               'left',
+            padding:                 '12px 14px',
+            marginBottom:            'var(--space-2)',
+            borderRadius:            'var(--radius-md)',
+            background:              activeSpecialty === 'all'
+              ? resolveToken(FALLBACK_TOKEN, isDark).bg
+              : 'none',
+            border:                  'none',
+            fontSize:                16,
+            fontFamily:              'var(--font-body)',
+            fontWeight:              600,
+            color:                   activeSpecialty === 'all'
+              ? resolveToken(FALLBACK_TOKEN, isDark).fg
+              : 'var(--color-text-primary)',
+            cursor:                  'pointer',
+            WebkitTapHighlightColor: 'transparent',
+            outline:                 'none',
+          }}
+        >
+          <LayoutGrid
+            size={18}
+            color={resolveToken(FALLBACK_TOKEN, isDark).fg}
+          />
+          All conditions
+        </button>
       </div>
-    </>
+
+      {/* Scrollable specialty list — one row per specialty, in the order
+          received (CMS-defined order, unmodified by this component).
+          Bare icon + name, no icon background, no item border, no
+          divider between rows — rows are separated by the selected
+          row's rounded color tint alone. Idle-state icons render in
+          their own specialty accent color (not flat grey) so the list
+          reads colorfully even before a selection is made. */}
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-6)',
+      }}>
+        {specialties.map(s => {
+          const isActive = activeSpecialty === s.id
+          const tokenKey = s.colorToken ?? FALLBACK_TOKEN
+          const colors   = resolveToken(tokenKey, isDark)
+
+          return (
+            <button
+              key={s.id}
+              onClick={() => handleSelect(s.id)}
+              style={{
+                width:                   '100%',
+                display:                 'flex',
+                alignItems:              'center',
+                gap:                     'var(--space-3)',
+                padding:                 '12px 14px',
+                border:                  'none',
+                borderRadius:            'var(--radius-md)',
+                backgroundColor:         isActive ? colors.bg : 'transparent',
+                fontSize:                15,
+                fontFamily:              'var(--font-body)',
+                fontWeight:              isActive ? 600 : 400,
+                color:                   isActive ? colors.fg : 'var(--color-text-primary)',
+                cursor:                  'pointer',
+                textAlign:               'left',
+                WebkitTapHighlightColor: 'transparent',
+                outline:                 'none',
+              }}
+            >
+              <SpecialtyIcon
+                iconType={s.iconType   ?? 'lucide'}
+                iconValue={s.iconValue ?? 'Stethoscope'}
+                size={18}
+                color={colors.fg}
+              />
+              {s.name}
+            </button>
+          )
+        })}
+      </div>
+    </SheetShell>
   )
 }
-
-
