@@ -110,6 +110,20 @@
  *               appeared to "close instantly." Cleanup now only removes
  *               the popstate listener; it no longer touches history at
  *               all on unmount.
+ * Back-button UX simplification (this session) — the "press back again to
+ *             exit" toast and its 2-second arming window were removed
+ *             entirely. That mechanism relied on a native backButton
+ *             listener and a web/PWA popstate guard both reacting to the
+ *             same physical back press, and on-device testing showed it
+ *             misfiring — the toast could appear on the very first press,
+ *             and also right after landing on Conditions from another tab
+ *             (which should only navigate, never arm the prompt). Rather
+ *             than chase that race down in an already-fragile piece of
+ *             glue code, back on Conditions now does the plain, ordinary
+ *             thing: exits the app on native, behaves like a normal
+ *             browser back on web/PWA. No confirmation step, no timing
+ *             window, no toast. Back from any other tab still lands you on
+ *             Conditions first, unchanged.
  *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
@@ -126,8 +140,8 @@
  *  - Re-tapping the active tab scrolls to top; every tap gets press feedback
  *    (see Phase 19 note above).
  *  - Tab switches replace history instead of pushing; back is handled at
- *    the tab level with its own return-to-Conditions/exit-prompt logic
- *    (see Phase 4 note above).
+ *    the tab level with its own return-to-Conditions logic (see Phase 4 /
+ *    Back-button UX simplification notes above).
  */
 
 import { useState, useEffect, useRef }  from 'react'
@@ -139,11 +153,6 @@ import { useKeyboardOpen }              from '../hooks/useKeyboardOpen'
 import { useBackToTop }                 from '../hooks/useBackToTop'
 import { useAuth }                      from '../hooks/useAuth'
 import { isAnyBackCloseOpen }           from '../hooks/useBackClose'
-
-// How long the "press back again to exit" prompt stays valid — a second
-// back press on Conditions within this window exits; after it, back shows
-// the prompt again instead of exiting. Matches the common ~2s convention.
-const EXIT_PROMPT_WINDOW_MS = 2000
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -162,12 +171,6 @@ export default function BottomNav() {
   // uses the same pressedPath state under a synthetic 'account' key since
   // it isn't part of the TABS array below.
   const [pressedPath, setPressedPath] = useState(null)
-
-  // Phase 4 — "press back again to exit" toast, shown only while on the
-  // Conditions tab and only within the exit window after a first back press.
-  const [showExitPrompt, setShowExitPrompt] = useState(false)
-  const lastBackPressRef = useRef(0)
-  const exitPromptTimerRef = useRef(null)
 
   // Kept in sync every render so the back handler below always reads the
   // current route without re-registering its listeners on every tab switch.
@@ -234,7 +237,7 @@ export default function BottomNav() {
     }
   }
 
-  // Phase 4 — tab-level back/exit handling. Registered whenever
+  // Phase 4 — tab-level back handling. Registered whenever
   // backHandlerActive is true (i.e. whenever the nav bar itself is
   // showing), independent of ordinary tab switches.
   useEffect(() => {
@@ -250,21 +253,15 @@ export default function BottomNav() {
         return true
       }
 
-      const now = Date.now()
-      if (now - lastBackPressRef.current < EXIT_PROMPT_WINDOW_MS) {
-        if (Capacitor.isNativePlatform()) {
-          CapacitorApp.exitApp()
-        }
-        // Website/PWA: there's no in-app "exit" — let this press proceed
-        // as a normal back instead of re-arming the guard.
-        return false
+      // Already on Conditions — back-button UX simplification (this
+      // session): let back behave normally instead of arming a "press
+      // again to exit" prompt. Exits the app on native; on web/PWA there's
+      // no in-app "exit," so the press that already moved history back one
+      // step is simply allowed to stand (no re-guard pushed below).
+      if (Capacitor.isNativePlatform()) {
+        CapacitorApp.exitApp()
       }
-
-      lastBackPressRef.current = now
-      setShowExitPrompt(true)
-      clearTimeout(exitPromptTimerRef.current)
-      exitPromptTimerRef.current = setTimeout(() => setShowExitPrompt(false), EXIT_PROMPT_WINDOW_MS)
-      return true
+      return false
     }
 
     // Native back-button guard. No-ops on the website build.
@@ -298,16 +295,11 @@ export default function BottomNav() {
     return () => {
       window.removeEventListener('popstate', handlePopState)
     }
-    // goBack always reads fresh state via locationRef/lastBackPressRef, so
-    // it only needs to be re-created when backHandlerActive itself flips —
-    // not on every ordinary tab switch.
+    // goBack always reads fresh state via locationRef, so it only needs to
+    // be re-created when backHandlerActive itself flips — not on every
+    // ordinary tab switch.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backHandlerActive])
-
-  // Clear any pending exit-prompt timeout on unmount.
-  useEffect(() => {
-    return () => clearTimeout(exitPromptTimerRef.current)
-  }, [])
 
   // Hidden on all admin routes
   if (location.pathname.startsWith('/admin')) return null
@@ -342,32 +334,6 @@ export default function BottomNav() {
 
   return (
     <>
-      {/* Phase 4 — "press back again to exit" toast. Only ever shown while
-          on the Conditions tab, since that's the only place goBack sets it. */}
-      {showExitPrompt && isActive('/conditions') && (
-        <div
-          role="status"
-          style={{
-            position:        'fixed',
-            left:            '50%',
-            transform:       'translateX(-50%)',
-            bottom:          'calc(60px + env(safe-area-inset-bottom) + 12px)',
-            zIndex:          101,
-            backgroundColor: 'var(--color-text-primary)',
-            color:           'var(--color-surface)',
-            padding:         '8px 16px',
-            borderRadius:    'var(--radius-full)',
-            fontFamily:      'var(--font-body)',
-            fontSize:        13,
-            fontWeight:      500,
-            whiteSpace:      'nowrap',
-            pointerEvents:   'none',
-          }}
-        >
-          Press back again to exit
-        </div>
-      )}
-
       <nav style={{
         position:                'fixed',
         bottom:                  0,
