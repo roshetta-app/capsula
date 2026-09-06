@@ -26,6 +26,14 @@
  * used. The `ctaSubtitle` prop this replaced is removed — no caller needs
  * it now that the button has no subtitle.
  *
+ * Phase 3 (Back-Button & State-Audit merged plan) — wired into
+ * useBackClose so back closes this sheet instead of changing the route;
+ * drag handle now has a real close gesture via useSheetDrag instead of
+ * being purely decorative. Fixing it here covers both callers built on
+ * this shared shell (FavouriteLimitSheet.jsx and PersonalNotes.jsx's
+ * photo-upsell sheet) at once — this shell is where their actual sheet
+ * chrome lives, not in either caller's own file.
+ *
  * Props:
  *   isOpen       boolean
  *   onClose      () => void
@@ -43,6 +51,8 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Lock } from 'lucide-react'
+import { useBackClose } from '../../hooks/useBackClose'
+import { useSheetDrag } from '../../hooks/useSheetDrag'
 
 export default function PaywallGateSheet({
   isOpen,
@@ -58,6 +68,9 @@ export default function PaywallGateSheet({
   // shouldRender/animateIn pattern AccountSheet.jsx / FavouriteLimitSheet.jsx use.
   const [shouldRender, setShouldRender] = useState(isOpen)
   const [animateIn,    setAnimateIn]    = useState(isOpen)
+
+  useBackClose(isOpen, onClose)
+  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
 
   useEffect(() => {
     if (isOpen) {
@@ -120,18 +133,23 @@ export default function PaywallGateSheet({
           padding:         'var(--space-5) var(--space-4)',
           paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
           fontFamily:      'var(--font-body)',
-          transform:       animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:      'transform var(--motion-screen) var(--ease-settle)',
+          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
+          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
         }}
       >
-        {/* Drag handle — same visual affordance AccountSheet.jsx uses. */}
-        <div style={{
-          width:           40,
-          height:          4,
-          borderRadius:    2,
-          backgroundColor: 'var(--color-border)',
-          margin:          '0 auto var(--space-5)',
-        }} />
+        {/* Drag handle — Phase 3: now a real drag-to-close gesture via
+            useSheetDrag, not just a visual affordance. */}
+        <div
+          {...dragHandlers}
+          style={{
+            width:           40,
+            height:          4,
+            borderRadius:    2,
+            backgroundColor: 'var(--color-border)',
+            margin:          '0 auto var(--space-5)',
+            touchAction:     'none',
+          }}
+        />
 
         <div style={{ textAlign: 'center' }}>
           {/* Icon circle + corner lock badge. */}
