@@ -15,7 +15,7 @@
  * that Lucide lacks.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getIconCache, writeIconCache } from './cache'
 
 // ─── Lucide (general purpose) ─────────────────────────────────────────────────
@@ -170,6 +170,18 @@ const svgCache = new Map()
  * This makes the system color-agnostic: whatever solid color an uploaded
  * (monochrome) SVG was authored in, it gets normalized to currentColor and
  * tinted by the specialty's color token.
+ *
+ * Cost note: this does several regex passes over the full SVG string, so it
+ * isn't free — see InlineSvg below, which memoizes the result per
+ * (markup, size, color) combination rather than calling this on every
+ * render. Bug fix, 2026-09-07 (sheet-drag-icon-reparse): before that
+ * memoization existed, InlineSvg re-ran this and re-injected the rebuilt
+ * markup via dangerouslySetInnerHTML on every single render, which forces
+ * the browser to reparse and rebuild the icon's DOM from scratch each time.
+ * That showed up as real, measured stutter (flagged as "Parse HTML" in a
+ * performance trace) specifically over sheet content containing custom
+ * icons — never over plain Lucide/Phosphor icons (which don't go through
+ * this path at all), and never over sheet headers (which have no icons).
  */
 function patchSvg(raw, size, color) {
   let s = raw
@@ -248,7 +260,16 @@ function InlineSvg({ url, size, color, style }) {
     return () => { cancelled = true }
   }, [url])
 
-  if (!markup) {
+  // Memoized so patchSvg's regex work (and the DOM reparse dangerouslySetInnerHTML
+  // triggers) only reruns when the actual icon, size, or color changes — not on
+  // every re-render this component happens to go through for unrelated reasons
+  // (e.g. a parent re-rendering during a sheet drag).
+  const patchedMarkup = useMemo(
+    () => (markup ? patchSvg(markup, size, color) : null),
+    [markup, size, color],
+  )
+
+  if (!patchedMarkup) {
     return (
       <span
         aria-hidden="true"
@@ -269,7 +290,7 @@ function InlineSvg({ url, size, color, style }) {
         lineHeight: 0,
         ...style,
       }}
-      dangerouslySetInnerHTML={{ __html: patchSvg(markup, size, color) }}
+      dangerouslySetInnerHTML={{ __html: patchedMarkup }}
     />
   )
 }
