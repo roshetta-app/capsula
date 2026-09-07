@@ -32,19 +32,23 @@ public class MainActivity extends BridgeActivity {
             return insets;
         });
 
-        // Bug fix, 2026-09-06 (sheet-drag-elastic-scroll) — Android's
-        // WebView shows its own native "edge glow" bounce effect whenever
-        // a touch-drag reaches the top/bottom of scrollable content. This
-        // is separate from and invisible to the web page's own CSS
-        // (overscroll-behavior, overflow, touch-action all live inside the
-        // page; this glow is the WebView container itself, one level up) —
-        // which is why the earlier in-page fix for the sheet's background
-        // scroll conflict didn't reach it. Only shows up in the native app
-        // build, not the website/PWA, since only the native build has this
-        // WebView shell at all. setOverScrollMode is a stable API present
-        // since well before this app's minSdk (24), so this is safe across
-        // the app's full supported Android range with no version-specific
-        // behavior to track.
-        getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER);
+        // Bug fix, 2026-09-06 (sheet-drag-elastic-scroll), REVERTED
+        // 2026-09-07 — this used to call
+        // getBridge().getWebView().setOverScrollMode(View.OVER_SCROLL_NEVER)
+        // here, to suppress Android's native "edge glow" bounce on the
+        // sheet's background. That call disables the WebView's native
+        // scroll-boundary handling app-wide — not just for the background,
+        // for every scrollable element in the app, including the sheet's
+        // own scrollable content. It was added before the real cause of
+        // the sheet's drag/scroll conflict was found and fixed on the JS
+        // side (see SheetShell.jsx, 2026-09-07): the drag surface and the
+        // scroll surface being the same element. That fix addresses the
+        // conflict properly; this native-level override was very likely
+        // fighting with it whenever a drag started over scrollable content,
+        // producing the stutter reported over the specialty list (but not
+        // over the sheet's header, which has nothing scrollable to
+        // conflict with). Removed rather than narrowed, since the
+        // background-bounce problem it was meant to solve is already
+        // covered by the JS-side fix.
     }
 }
