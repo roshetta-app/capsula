@@ -1,2 +1,23 @@
 /* Single entry point — all styles, tokens, and Tailwind come from globals.css */
 @import "./styles/globals.css";
+
+/*
+ * Bug fix, 2026-09-07 (bg-bounce-scope) — replaces the app-wide native
+ * MainActivity.java setting removed earlier (setOverScrollMode(OVER_SCROLL_NEVER)),
+ * which suppressed Android's native "edge glow" rubber-band bounce for the
+ * entire app's WebView. That fixed the visual bounce but was suspected of
+ * contributing to a separate stutter bug (it turned out not to be the actual
+ * stutter cause, which was the specialty icons' render timing instead) — but
+ * removing it did bring the bounce back, since it was disabling the effect
+ * everywhere, not just where it was actually needed.
+ *
+ * overscroll-behavior is the correct, web-standard way to suppress this same
+ * rubber-band/bounce effect, and — unlike the native Android setting it
+ * replaces — it can be scoped to exactly where it's needed instead of
+ * disabling native scroll-boundary handling for the whole app. Applied here
+ * on <html>, which is this app's actual scrolling element (see the comment
+ * in SheetShell.jsx — this app scrolls via <html>, not <body>).
+ */
+html {
+  overscroll-behavior: none;
+}
