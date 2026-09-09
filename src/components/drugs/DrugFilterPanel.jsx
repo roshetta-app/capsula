@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useToast } from '../../context/ToastContext'
-import { useBackClose } from '../../hooks/useBackClose'
+import SheetShell from '../ui/SheetShell'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -92,6 +92,17 @@ import { useBackClose } from '../../hooks/useBackClose'
  * secondary text color, so the sheet title and the section labels read as
  * two different levels of hierarchy instead of two stacked titles.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based), same as every other sheet in
+ *            this migration. This is the one sheet in the batch gaining
+ *            real drag-to-close for the first time (it never had
+ *            useSheetDrag before — only useBackClose). Backdrop/dialog
+ *            markup, shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, and the standalone useBackClose
+ *            call are all replaced by the shared shell. Content below the
+ *            handle (Search By / Sort By / Form-Route sections, Clear All)
+ *            is unchanged.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -146,57 +157,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   const [filters, setFilters] = useState(activeFilters || EMPTY)
   const { toast } = useToast()
 
-  // Bug fix (2026-09-06): this sheet was missed entirely during the
-  // earlier pass that wired every other popup/sheet into the shared
-  // back-close mechanism. Without it, pressing back (or the equivalent
-  // gesture) while this panel was open never closed the panel — it fell
-  // straight through to whatever handles back for the screen underneath,
-  // which is what made it look like "tapping outside closes the panel
-  // and dumps me on Conditions": the panel wasn't actually being closed
-  // by that action at all, the whole Drugs screen was being left instead.
-  useBackClose(isOpen, onClose)
-
-  // shouldRender keeps the DOM present during the exit transition.
-  // animateIn drives the CSS open/closed visual position. Same pattern as
-  // SpecialtiesBottomSheet.jsx (decision 4.20, step 1f.1).
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  // Discard any unapplied taps: re-sync local selections to the real
-  // applied state every time the sheet opens, rather than only once on
-  // mount (see file header note above).
-  useEffect(() => {
-    if (isOpen) setFilters(activeFilters || EMPTY)
-  }, [isOpen, activeFilters])
-
-  useEffect(() => {
-    if (isOpen) {
-      // Mount first, then flip animateIn on the next frame so the
-      // browser has painted the start-position before transitioning.
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      // Start exit transition immediately; unmount after it finishes.
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   // Instant-apply: compute the next forms list and immediately push it out
   // via onApply, instead of buffering in local state until a separate
   // Apply Filters action. Local 'filters' state stays in sync purely so
@@ -234,46 +194,12 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   const hasActiveFilter = !(filters.forms.length === 1 && filters.forms[0] === 'all')
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.4)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-
-      {/* Sheet */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Filter drugs"
-        style={{
-          position:      'fixed', bottom: 0, left: 0, right: 0,
-          zIndex:        201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:  '16px 16px 0 0',
-          padding:       'var(--space-4) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom))',
-          maxHeight:     '80vh',
-          overflowY:     'auto',
-          boxShadow:     '0 -4px 24px rgba(0,0,0,0.12)',
-          transform:     animateIn ? 'translateY(0)' : 'translateY(100%)',
-          transition:    'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Handle */}
-        <div style={{
-          width: 36, height: 4, borderRadius: 2,
-          backgroundColor: 'var(--color-border)',
-          margin: '0 auto var(--space-4)',
-        }} />
-
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Filter drugs" maxHeight="80dvh">
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-4)',
+      }}>
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', marginBottom: 'var(--space-4)' }}>
           Filter Drugs
         </div>
@@ -391,7 +317,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           <ClearAllButton onClick={handleClear} disabled={!hasActiveFilter} />
         </div>
       </div>
-    </>
+    </SheetShell>
   )
 }
 

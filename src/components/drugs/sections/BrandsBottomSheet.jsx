@@ -21,6 +21,15 @@
  * drag handle now has a real close gesture via useSheetDrag instead of
  * being purely decorative.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Backdrop/dialog markup, the
+ *            shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, and useSheetDrag are all replaced
+ *            by the shared shell — the drag handle itself now lives in
+ *            SheetShell, so this sheet no longer needs its own
+ *            handle-only fixed header. BrandsList's own section header +
+ *            scrollable body is unchanged.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -28,10 +37,8 @@
  *   onSelectBrand (item) => void — called after this sheet closes
  */
 
-import { useEffect, useState } from 'react'
 import BrandsList from '../BrandsList.jsx'
-import { useBackClose } from '../../../hooks/useBackClose'
-import { useSheetDrag } from '../../../hooks/useSheetDrag'
+import SheetShell from '../../ui/SheetShell'
 
 export default function BrandsBottomSheet({
   isOpen,
@@ -39,115 +46,24 @@ export default function BrandsBottomSheet({
   siblings = [],
   onSelectBrand,
 }) {
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   function handleTap(item) {
     onClose()
     onSelectBrand?.(item)
   }
 
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Available brands"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          display:         'flex',
-          flexDirection:   'column',
-          maxHeight:       '70dvh',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Fixed header — drag handle only; BrandsList below already
-            renders its own "Available Brands (Egypt)" section header,
-            so this sheet doesn't duplicate a title. */}
-        <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-3)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
-            sibling-list internals, unchanged. */}
-        <div style={{
-          flex:      1,
-          overflowY: 'auto',
-          padding:   '0 var(--space-4) var(--space-6)',
-        }}>
-          <BrandsList siblings={siblings} onTap={handleTap} />
-        </div>
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Available brands" maxHeight="70dvh">
+      {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
+          sibling-list internals, unchanged. BrandsList renders its own
+          "Available Brands (Egypt)" section header, so this sheet doesn't
+          duplicate a title. */}
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-6)',
+      }}>
+        <BrandsList siblings={siblings} onTap={handleTap} />
       </div>
-    </>
+    </SheetShell>
   )
 }
-
-

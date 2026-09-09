@@ -62,6 +62,23 @@
  * drag handle now has a real close gesture via useSheetDrag instead of
  * being purely decorative.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Backdrop/dialog markup, the
+ *            shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, useSheetDrag, and the manual
+ *            createPortal-to-document.body call are all replaced by the
+ *            shared shell — vaul's own Drawer.Portal already portals to
+ *            document.body, covering the same "position: fixed needs to
+ *            resolve against the viewport, not a transformed ancestor"
+ *            reasoning the old manual portal existed for. z-index stays
+ *            1000/1001 (passed via SheetShell's zIndex prop) rather than
+ *            the 200/201 most other sheets use, unchanged from before —
+ *            this sheet can be opened on top of another already-open
+ *            sheet/overlay, so it still needs to sit above the rest. The
+ *            account-sheet-close-flash 'display' snapshot fix (below)
+ *            still applies unchanged: it only depends on 'isOpen', not on
+ *            the removed shouldRender/animateIn state.
+ *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
@@ -84,24 +101,19 @@
  * noteContext/user are driven by state elsewhere (pendingFavourite,
  * pendingNoteConditionId) that clears the instant the sheet is dismissed
  * or sign-in completes — the same render that flips isOpen to false also
- * flips these back to their defaults. But shouldRender keeps this
- * component mounted for another 280ms after that so the close transition
- * can play, and it kept re-rendering with those now-stale live props
- * during that window — visible as a flash of the generic "Sign in or
- * create account" copy behind whatever context-specific content had
- * actually been showing, right as the sheet faded out. `display` below
- * snapshots {user, favouriteContext, noteContext} only while isOpen is
- * true, so the close animation always plays out on the last real state
- * instead of whatever the props happen to become a moment later.
+ * flips these back to their defaults. But the close transition still needs
+ * to play out on the last real state, not whatever the props happen to
+ * become a moment later. 'display' below snapshots {user, favouriteContext,
+ * noteContext} only while isOpen is true, so re-renders during the close
+ * animation keep showing the content that was actually on screen when the
+ * dismissal started.
  */
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { User } from 'lucide-react'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
-import { useBackClose } from '../../hooks/useBackClose'
-import { useSheetDrag } from '../../hooks/useSheetDrag'
+import SheetShell from './SheetShell'
 
 export default function AccountSheet({
   isOpen,
@@ -118,9 +130,6 @@ export default function AccountSheet({
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
 
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
   // account-sheet-close-flash fix — see file header. Only updates while
   // isOpen is true, so it stays live for anything that changes during a
   // genuinely open sheet (e.g. signing in without closing first), but
@@ -131,42 +140,9 @@ export default function AccountSheet({
   useEffect(() => {
     if (isOpen) {
       setDisplay({ user, favouriteContext, noteContext })
+      setError(null)
     }
   }, [isOpen, user, favouriteContext, noteContext])
-
-  // shouldRender keeps the DOM present during the exit transition.
-  // animateIn drives the CSS open/closed visual position — same
-  // shouldRender/animateIn pattern SpecialtiesBottomSheet.jsx uses.
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-      setError(null)
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  // Same body-scroll lock SpecialtiesBottomSheet.jsx uses while a bottom
-  // sheet is open.
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
 
   async function handleGoogleSignIn() {
     if (busy) return
@@ -207,70 +183,14 @@ export default function AccountSheet({
     onClose()
   }
 
-  // Rendered via portal to document.body — same reasoning as ConfirmSheet
-  // and SpecialtiesBottomSheet: position: fixed only resolves against the
-  // viewport if no ancestor has a transform/filter/etc that creates its
-  // own containing block, and this can be opened from screens that do
-  // (e.g. condition detail's tab-swipe wrapper).
-  return createPortal(
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          1000,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={display.user ? 'Account' : 'Sign in'}
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          1001,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          padding:         'var(--space-5) var(--space-4)',
-          paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
-          fontFamily:      'var(--font-body)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Drag handle — Phase 3: now a real drag-to-close gesture via
-            useSheetDrag (was previously just the visual affordance,
-            since backdrop tap / Escape / Not now already covered
-            dismissal). */}
-        {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-        <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-5)' }}>
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-          }} />
-          <div
-            {...dragHandlers}
-            style={{
-              position:    'absolute',
-              top:         '50%',
-              left:        '50%',
-              transform:   'translate(-50%, -50%)',
-              width:       64,
-              height:      32,
-              touchAction: 'none',
-            }}
-          />
-        </div>
-
+  return (
+    <SheetShell
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={display.user ? 'Account' : 'Sign in'}
+      zIndex={1000}
+    >
+      <div style={{ padding: '0 var(--space-4) var(--space-5)', fontFamily: 'var(--font-body)' }}>
         {display.user ? (
           <div style={{ textAlign: 'center' }}>
             <div style={{
@@ -406,8 +326,7 @@ export default function AccountSheet({
           </div>
         )}
       </div>
-    </>,
-    document.body
+    </SheetShell>
   )
 }
 
@@ -449,5 +368,3 @@ const linkButtonStyle = {
   cursor:          'pointer',
   textDecoration:  'underline',
 }
-
-

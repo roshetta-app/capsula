@@ -9,11 +9,6 @@
  * had already drifted apart between the two. Pulled out once so both read
  * as the same pattern and share one place to fix.
  *
- * Same shouldRender/animateIn delayed-unmount, Escape-to-close, and
- * body-scroll-lock behavior AccountSheet.jsx and FavouriteLimitSheet.jsx
- * already use — kept identical here rather than introducing a new
- * mechanic.
- *
  * Dismiss is a plain text link, not a bordered button — matches the
  * mockup's "Clean Dismiss Action" note.
  *
@@ -23,7 +18,7 @@
  * sheet using this shell should show the same minimal button, nothing
  * else. Non-interactive (no onClick/cursor) since no real Pro upsell page
  * exists yet, same reasoning ProUpsellBanner's decorative mode already
- * used. The `ctaSubtitle` prop this replaced is removed — no caller needs
+ * used. The 'ctaSubtitle' prop this replaced is removed — no caller needs
  * it now that the button has no subtitle.
  *
  * Phase 3 (Back-Button & State-Audit merged plan) — wired into
@@ -33,6 +28,20 @@
  * this shared shell (FavouriteLimitSheet.jsx and PersonalNotes.jsx's
  * photo-upsell sheet) at once — this shell is where their actual sheet
  * chrome lives, not in either caller's own file.
+ *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Backdrop/dialog markup, the
+ *            shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, useSheetDrag, and the manual
+ *            createPortal-to-document.body call are all replaced by the
+ *            shared shell — vaul's own Drawer.Portal already portals to
+ *            document.body, covering the same "position: fixed needs to
+ *            resolve against the viewport, not a transformed ancestor"
+ *            reasoning the old manual portal existed for. z-index stays
+ *            1000/1001 (passed via SheetShell's zIndex prop) rather than
+ *            the 200/201 most other sheets use, unchanged from before —
+ *            same reasoning as AccountSheet.jsx. Fixing it here again
+ *            covers both callers built on this shared shell at once.
  *
  * Props:
  *   isOpen       boolean
@@ -48,11 +57,8 @@
  *   dismissLabel string   — text of the plain-link dismiss underneath.
  */
 
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { Lock } from 'lucide-react'
-import { useBackClose } from '../../hooks/useBackClose'
-import { useSheetDrag } from '../../hooks/useSheetDrag'
+import SheetShell from './SheetShell'
 
 export default function PaywallGateSheet({
   isOpen,
@@ -63,104 +69,9 @@ export default function PaywallGateSheet({
   message,
   dismissLabel,
 }) {
-  // shouldRender keeps the DOM present during the exit transition.
-  // animateIn drives the CSS open/closed visual position — same
-  // shouldRender/animateIn pattern AccountSheet.jsx / FavouriteLimitSheet.jsx use.
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    function onKey(e) { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [isOpen, onClose])
-
-  // Same body-scroll lock AccountSheet.jsx / FavouriteLimitSheet.jsx use
-  // while a bottom sheet is open.
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
-  // Rendered via portal to document.body — same reasoning as
-  // AccountSheet/FavouriteLimitSheet: position: fixed only resolves
-  // against the viewport if no ancestor has a transform/filter/etc that
-  // creates its own containing block, and this sheet can be opened from
-  // screens that do.
-  return createPortal(
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          1000,
-          backgroundColor: 'rgba(0,0,0,0.45)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label={headline}
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          1001,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          padding:         'var(--space-5) var(--space-4)',
-          paddingBottom:   'calc(var(--space-5) + env(safe-area-inset-bottom))',
-          fontFamily:      'var(--font-body)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Drag handle — Phase 3: now a real drag-to-close gesture via
-            useSheetDrag, not just a visual affordance. */}
-        {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-        <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-5)' }}>
-          <div style={{
-            width:           40,
-            height:          4,
-            borderRadius:    2,
-            backgroundColor: 'var(--color-border)',
-          }} />
-          <div
-            {...dragHandlers}
-            style={{
-              position:    'absolute',
-              top:         '50%',
-              left:        '50%',
-              transform:   'translate(-50%, -50%)',
-              width:       64,
-              height:      32,
-              touchAction: 'none',
-            }}
-          />
-        </div>
-
+  return (
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel={headline} zIndex={1000}>
+      <div style={{ padding: '0 var(--space-4) var(--space-5)', fontFamily: 'var(--font-body)' }}>
         <div style={{ textAlign: 'center' }}>
           {/* Icon circle + corner lock badge. */}
           <div style={{
@@ -240,8 +151,7 @@ export default function PaywallGateSheet({
           {dismissLabel}
         </button>
       </div>
-    </>,
-    document.body
+    </SheetShell>
   )
 }
 
@@ -276,5 +186,3 @@ const dismissLinkStyle = {
   textDecoration:  'underline',
   cursor:          'pointer',
 }
-
-

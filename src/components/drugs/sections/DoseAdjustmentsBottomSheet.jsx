@@ -18,149 +18,72 @@
  * drag handle now has a real close gesture via useSheetDrag instead of
  * being purely decorative.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based), the same shared shell every
+ *            sheet in this migration now uses instead of copying the
+ *            shell per file (superseding the "copy the shell per sheet"
+ *            convention decision 4.11 described above). Backdrop/dialog
+ *            markup, the shouldRender/animateIn timing, manual Escape-key
+ *            and body-scroll-lock effects, and useSheetDrag are all
+ *            replaced by the shared shell — the drag handle itself now
+ *            lives in SheetShell. Fixed-header/scrollable-body split
+ *            (title pinned, adjustment list scrolls) is unchanged.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
  *   doseAdjustments  { condition: string, adjustment?: string }[]
  */
 
-import { useEffect, useState } from 'react'
-import { useBackClose } from '../../../hooks/useBackClose'
-import { useSheetDrag } from '../../../hooks/useSheetDrag'
+import SheetShell from '../../ui/SheetShell'
 
 export default function DoseAdjustmentsBottomSheet({
   isOpen,
   onClose,
   doseAdjustments = [],
 }) {
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Dose adjustments"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          display:         'flex',
-          flexDirection:   'column',
-          maxHeight:       '70dvh',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Fixed header — drag handle + title, since (unlike BrandsList)
-            nothing rendered in the body below supplies its own heading. */}
-        <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-3)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-          <div style={{
-            fontSize:     15,
-            fontWeight:   700,
-            color:        'var(--color-text-primary)',
-            marginBottom: 'var(--space-3)',
-          }}>
-            Dose adjustments
-          </div>
-        </div>
-
-        {/* Scrollable body — condition/adjustment list, carried over
-            unchanged from the old always-visible inline card. */}
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Dose adjustments" maxHeight="70dvh">
+      {/* Fixed header — title, since nothing rendered in the body below
+          supplies its own heading. The drag handle itself now lives in
+          SheetShell, above this. */}
+      <div style={{ flexShrink: 0, padding: '0 var(--space-4)' }}>
         <div style={{
-          flex:      1,
-          overflowY: 'auto',
-          padding:   '0 var(--space-4) var(--space-6)',
+          fontSize:     15,
+          fontWeight:   700,
+          color:        'var(--color-text-primary)',
+          marginBottom: 'var(--space-3)',
         }}>
-          <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-            {doseAdjustments.map((da, i) => (
-              <li key={i} style={{
-                padding:      'var(--space-2) 0',
-                borderBottom: i < doseAdjustments.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
-                lineHeight:   1.5,
-              }}>
-                <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-                  {da.condition}
-                </span>
-                {da.adjustment && (
-                  <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-                    {da.adjustment}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
+          Dose adjustments
         </div>
       </div>
-    </>
+
+      {/* Scrollable body — condition/adjustment list, carried over
+          unchanged from the old always-visible inline card. */}
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-6)',
+      }}>
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+          {doseAdjustments.map((da, i) => (
+            <li key={i} style={{
+              padding:      'var(--space-2) 0',
+              borderBottom: i < doseAdjustments.length - 1 ? '1px solid var(--color-border-subtle)' : 'none',
+              lineHeight:   1.5,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {da.condition}
+              </span>
+              {da.adjustment && (
+                <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+                  {da.adjustment}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </SheetShell>
   )
 }
-
-

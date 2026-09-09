@@ -15,13 +15,23 @@
  * mounts BrandsList and relies on that child's own section header), nothing
  * rendered inside this sheet provides a title on its own, so — like
  * FavouritesManagerSheet — this shell renders its own "Recently viewed"
- * heading next to the drag handle, with a close button since there's no
- * child list here to carry its own dismiss affordance.
+ * heading next to the drag handle. Unlike FavouritesManagerSheet, no
+ * separate close button — this list has no other controls competing for
+ * attention, so backdrop-tap/gesture alone is enough, same as
+ * BrandsBottomSheet and SpecialtiesBottomSheet.
  *
  * Phase 3 (Back-Button & State-Audit merged plan) — wired into
  * useBackClose so back closes this sheet instead of changing the route;
  * drag handle now has a real close gesture via useSheetDrag instead of
  * being purely decorative.
+ *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Backdrop/dialog markup, the
+ *            shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, and useSheetDrag are all replaced
+ *            by the shared shell — the drag handle itself now lives in
+ *            SheetShell. Fixed-header/scrollable-body split (title pinned,
+ *            drug list scrolls) is unchanged.
  *
  * Props:
  *   isOpen      boolean
@@ -37,11 +47,9 @@
  *   onSelectDrug (drug) => void — called after this sheet closes
  */
 
-import { useEffect, useState } from 'react'
 import { Clock } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard'
-import { useBackClose } from '../../hooks/useBackClose'
-import { useSheetDrag } from '../../hooks/useSheetDrag'
+import SheetShell from '../ui/SheetShell'
 
 export default function RecentlyViewedSheet({
   isOpen,
@@ -51,152 +59,65 @@ export default function RecentlyViewedSheet({
   isDark,
   onSelectDrug,
 }) {
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   function handleTap(drug) {
     onClose()
     onSelectDrug?.(drug)
   }
 
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Recently viewed"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          display:         'flex',
-          flexDirection:   'column',
-          maxHeight:       '70dvh',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Fixed header — drag handle + title, since (unlike
-            BrandsBottomSheet) nothing mounted below provides its own
-            section header. */}
-        <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-3)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-          <div style={{
-            display:      'flex',
-            alignItems:   'center',
-            gap:          'var(--space-2)',
-            marginBottom: 'var(--space-3)',
-          }}>
-            <Clock size={16} strokeWidth={1.8} color="var(--color-text-tertiary)" />
-            <h2 style={{
-              fontSize:   16,
-              fontWeight: 700,
-              color:      'var(--color-text-primary)',
-              margin:     0,
-            }}>
-              Recently viewed
-            </h2>
-          </div>
-        </div>
-
-        {/* Scrollable body — same SharedDrugCard row used by search
-            results and Favourites' Drugs tab, no trailing bookmark slot
-            since this list is about history, not saved status. */}
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Recently viewed" maxHeight="70dvh">
+      {/* Fixed header — title, since (unlike BrandsBottomSheet) nothing
+          mounted below provides its own section header. The drag handle
+          itself now lives in SheetShell, above this. */}
+      <div style={{ flexShrink: 0, padding: '0 var(--space-4)' }}>
         <div style={{
-          flex:      1,
-          overflowY: 'auto',
-          padding:   '0 var(--space-4) var(--space-6)',
+          display:      'flex',
+          alignItems:   'center',
+          gap:          'var(--space-2)',
+          marginBottom: 'var(--space-3)',
         }}>
-          {drugs.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding:   'var(--space-8) var(--space-4)',
-              color:     'var(--color-text-tertiary)',
-              fontSize:  14,
-            }}>
-              No recently viewed drugs yet.
-            </div>
-          ) : (
-            drugs.map((drug, i) => (
-              <SharedDrugCard
-                key={drug.id}
-                drug={drug}
-                categories={categories}
-                isDark={isDark}
-                isLast={i === drugs.length - 1}
-                onTap={handleTap}
-              />
-            ))
-          )}
+          <Clock size={16} strokeWidth={1.8} color="var(--color-text-tertiary)" />
+          <h2 style={{
+            fontSize:   16,
+            fontWeight: 700,
+            color:      'var(--color-text-primary)',
+            margin:     0,
+          }}>
+            Recently viewed
+          </h2>
         </div>
       </div>
-    </>
+
+      {/* Scrollable body — same SharedDrugCard row used by search
+          results and Favourites' Drugs tab, no trailing bookmark slot
+          since this list is about history, not saved status. */}
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-6)',
+      }}>
+        {drugs.length === 0 ? (
+          <div style={{
+            textAlign: 'center',
+            padding:   'var(--space-8) var(--space-4)',
+            color:     'var(--color-text-tertiary)',
+            fontSize:  14,
+          }}>
+            No recently viewed drugs yet.
+          </div>
+        ) : (
+          drugs.map((drug, i) => (
+            <SharedDrugCard
+              key={drug.id}
+              drug={drug}
+              categories={categories}
+              isDark={isDark}
+              isLast={i === drugs.length - 1}
+              onTap={handleTap}
+            />
+          ))
+        )}
+      </div>
+    </SheetShell>
   )
 }
-
-

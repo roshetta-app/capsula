@@ -35,12 +35,19 @@
  * drag handle now has a real close gesture via useSheetDrag instead of
  * being purely decorative.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Backdrop/dialog markup, the
+ *            shouldRender/animateIn timing, manual Escape-key and
+ *            body-scroll-lock effects, and useSheetDrag are all replaced
+ *            by the shared shell — the drag handle itself now lives in
+ *            SheetShell. Fixed-header/scrollable-body split (title pinned,
+ *            three grouped sections scroll) is unchanged.
+ *
  * Props:
  *   isOpen   boolean
  *   onClose  () => void
  */
 
-import { useEffect, useState } from 'react'
 import {
   PREGNANCY_META,
   PregnancyBadge,
@@ -48,8 +55,7 @@ import {
   CROSSES_META,
   SectionHeader,
 } from './sectionPrimitives.jsx'
-import { useBackClose } from '../../../hooks/useBackClose'
-import { useSheetDrag } from '../../../hooks/useSheetDrag'
+import SheetShell from '../../ui/SheetShell'
 
 function BreastfeedingBadge({ level }) {
   const meta = BREASTFEEDING_META[level]
@@ -91,136 +97,49 @@ function CrossesItem({ item }) {
 }
 
 export default function PregnancyCategoryBottomSheet({ isOpen, onClose }) {
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 280)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
-
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      'opacity var(--motion-base) var(--ease-reveal)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Pregnancy & breastfeeding"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          display:         'flex',
-          flexDirection:   'column',
-          maxHeight:       '70dvh',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging ? 'none' : 'transform var(--motion-screen) var(--ease-settle)',
-        }}
-      >
-        {/* Fixed header — drag handle + a plain title, since (unlike
-            BrandsList in BrandsBottomSheet.jsx) this sheet's body has no
-            built-in header of its own. */}
-        <div style={{ flexShrink: 0, padding: 'var(--space-5) var(--space-4) 0' }}>
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-3)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-          <div style={{
-            fontSize:     17,
-            fontWeight:   700,
-            color:        'var(--color-text-primary)',
-            marginBottom: 'var(--space-4)',
-          }}>
-            Pregnancy & Breastfeeding
-          </div>
-        </div>
-
-        {/* Scrollable body — three grouped sections, one per meta object. */}
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Pregnancy & breastfeeding" maxHeight="70dvh">
+      {/* Fixed header — a plain title, since this sheet's body has no
+          built-in header of its own. The drag handle itself now lives in
+          SheetShell, above this. */}
+      <div style={{ flexShrink: 0, padding: '0 var(--space-4)' }}>
         <div style={{
-          flex:      1,
-          overflowY: 'auto',
-          padding:   '0 var(--space-4) var(--space-6)',
+          fontSize:     17,
+          fontWeight:   700,
+          color:        'var(--color-text-primary)',
+          marginBottom: 'var(--space-4)',
         }}>
-          <div style={{ marginBottom: 'var(--space-5)' }}>
-            <SectionHeader title="Pregnancy Category" />
-            {Object.keys(PREGNANCY_META).map(category => (
-              <PregnancyBadge key={category} category={category} />
-            ))}
-          </div>
-
-          <div style={{ marginBottom: 'var(--space-5)' }}>
-            <SectionHeader title="Breastfeeding Safety" />
-            {Object.keys(BREASTFEEDING_META).map(level => (
-              <BreastfeedingBadge key={level} level={level} />
-            ))}
-          </div>
-
-          <div>
-            <SectionHeader title="Crosses Placenta / Blood-Brain Barrier" />
-            {Object.values(CROSSES_META).map(item => (
-              <CrossesItem key={item.label} item={item} />
-            ))}
-          </div>
+          Pregnancy & Breastfeeding
         </div>
       </div>
-    </>
+
+      {/* Scrollable body — three grouped sections, one per meta object. */}
+      <div style={{
+        flex:      1,
+        overflowY: 'auto',
+        padding:   '0 var(--space-4) var(--space-6)',
+      }}>
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <SectionHeader title="Pregnancy Category" />
+          {Object.keys(PREGNANCY_META).map(category => (
+            <PregnancyBadge key={category} category={category} />
+          ))}
+        </div>
+
+        <div style={{ marginBottom: 'var(--space-5)' }}>
+          <SectionHeader title="Breastfeeding Safety" />
+          {Object.keys(BREASTFEEDING_META).map(level => (
+            <BreastfeedingBadge key={level} level={level} />
+          ))}
+        </div>
+
+        <div>
+          <SectionHeader title="Crosses Placenta / Blood-Brain Barrier" />
+          {Object.values(CROSSES_META).map(item => (
+            <CrossesItem key={item.label} item={item} />
+          ))}
+        </div>
+      </div>
+    </SheetShell>
   )
 }
-
-

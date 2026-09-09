@@ -25,6 +25,17 @@
  * gave the drag handle a real close gesture via useSheetDrag instead of
  * its previous purely decorative role.
  *
+ * Phase 5 (Back-Button & State-Audit merged plan) — rebuilt on
+ *            SheetShell.jsx (vaul-based). Replaces the backdrop/dialog
+ *            markup, the shouldRender/animateIn timing, the manual
+ *            Escape-key + body-scroll-lock effects, and useSheetDrag with
+ *            the shared shell — the whole sheet is now the drag target.
+ *            The header's own explicit close (X) button is kept as-is:
+ *            unlike SpecialtiesBottomSheet, this sheet groups three
+ *            distinct controls rather than a single pick-one list, so it
+ *            still gets its own dismiss affordance rather than relying on
+ *            backdrop-tap/gesture alone.
+ *
  * Props:
  *   isOpen              boolean
  *   onClose             () => void
@@ -37,12 +48,10 @@
  *   onManage            () => void  — called after this sheet closes
  */
 
-import { useEffect, useState }          from 'react'
 import { ListFilter, ListChecks, ArrowUpDown, X } from 'lucide-react'
 import { SpecialtyIcon, useIsDark }     from '../../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../../utils/specialtyTokens'
-import { useBackClose }                 from '../../hooks/useBackClose'
-import { useSheetDrag }                 from '../../hooks/useSheetDrag'
+import SheetShell                       from '../ui/SheetShell'
 
 export default function FavouritesManagerSheet({
   isOpen,
@@ -56,37 +65,6 @@ export default function FavouritesManagerSheet({
   onManage,
 }) {
   const isDark = useIsDark()
-
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  const [animateIn,    setAnimateIn]    = useState(isOpen)
-
-  useBackClose(isOpen, onClose)
-  const { dragY, isDragging, dragHandlers } = useSheetDrag(onClose)
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true)
-      requestAnimationFrame(() => setAnimateIn(true))
-    } else {
-      setAnimateIn(false)
-      const t = setTimeout(() => setShouldRender(false), 320)
-      return () => clearTimeout(t)
-    }
-  }, [isOpen])
-
-  useEffect(() => {
-    if (!isOpen) return
-    const handler = (e) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [isOpen, onClose])
-
-  useEffect(() => {
-    document.body.style.overflow = isOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [isOpen])
-
-  if (!shouldRender) return null
 
   const hasSpecialty = !!activeSpecialtyObj
   const tokenKey      = activeSpecialtyObj?.colorToken ?? FALLBACK_TOKEN
@@ -105,263 +83,128 @@ export default function FavouritesManagerSheet({
   }
 
   return (
-    <>
-      <div
-        onClick={onClose}
-        aria-hidden="true"
-        style={{
-          position:        'fixed',
-          inset:           0,
-          zIndex:          200,
-          backgroundColor: 'rgba(0,0,0,0.35)',
-          opacity:         animateIn ? 1 : 0,
-          transition:      animateIn
-            ? 'opacity 0.3s cubic-bezier(0.32, 0.72, 0, 1)'
-            : 'opacity 0.25s cubic-bezier(0.32, 0.72, 0, 1)',
-        }}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Manage favourites"
-        style={{
-          position:        'fixed',
-          bottom:          0,
-          left:            0,
-          right:           0,
-          zIndex:          201,
-          backgroundColor: 'var(--color-surface)',
-          borderRadius:    '16px 16px 0 0',
-          paddingBottom:   'env(safe-area-inset-bottom)',
-          transform:       animateIn ? `translateY(${dragY}px)` : 'translateY(100%)',
-          transition:      isDragging
-            ? 'none'
-            : animateIn
-              ? 'transform 0.42s cubic-bezier(0.32, 0.72, 0, 1)'
-              : 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
-        }}
-      >
-        <div style={{ padding: 'var(--space-5) var(--space-4)' }}>
-          {/* Drag handle — Phase 3: real drag-to-close gesture via
-              useSheetDrag, not just a visual affordance. */}
-          {/* Phase 3.2 fix — hit area enlarged; the visible bar stays the same small size, the actual touch target underneath it is bigger so the gesture is easy to grab. */}
-          <div style={{ position: 'relative', width: 40, height: 4, margin: '0 auto var(--space-5)' }}>
-            <div style={{
-              width:           40,
-              height:          4,
-              borderRadius:    2,
-              backgroundColor: 'var(--color-border)',
-            }} />
-            <div
-              {...dragHandlers}
-              style={{
-                position:    'absolute',
-                top:         '50%',
-                left:        '50%',
-                transform:   'translate(-50%, -50%)',
-                width:       64,
-                height:      32,
-                touchAction: 'none',
-              }}
-            />
-          </div>
-
-          {/* Header — title + explicit close control. Bottom sheets
-              elsewhere in the app (SpecialtiesBottomSheet) rely on
-              backdrop-tap/Escape alone, but this sheet groups three
-              distinct controls rather than a single pick-one list, so it
-              gets its own dismiss affordance instead of relying on an
-              implicit gesture. */}
-          <div style={{
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'space-between',
-            marginBottom:   'var(--space-4)',
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Manage favourites">
+      <div style={{ padding: '0 var(--space-4) var(--space-5)' }}>
+        {/* Header — title + explicit close control. Bottom sheets
+            elsewhere in the app (SpecialtiesBottomSheet) rely on
+            backdrop-tap/Escape alone, but this sheet groups three
+            distinct controls rather than a single pick-one list, so it
+            gets its own dismiss affordance instead of relying on an
+            implicit gesture. */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          marginBottom:   'var(--space-4)',
+        }}>
+          <span style={{
+            fontSize:   15,
+            fontWeight: 700,
+            fontFamily: 'var(--font-body)',
+            color:      'var(--color-text-primary)',
           }}>
+            Manage Favourites
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            style={{
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              flexShrink:              0,
+              width:                   28,
+              height:                  28,
+              borderRadius:            '50%',
+              border:                  'none',
+              backgroundColor:         'var(--color-border-subtle)',
+              cursor:                  'pointer',
+              outline:                 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <X size={15} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+          </button>
+        </div>
+
+        {/* Sort — icon + label now match the visual language of the
+            Filter/Select rows below it (was previously a small uppercase
+            section label, inconsistent with the rest of the sheet).
+            Label and control still share one row, buttons stay
+            hug-content so the row doesn't stretch a two-word toggle
+            across the sheet's full width. */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          gap:            10,
+          padding:        '12px 10px',
+          marginBottom:   6,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <ArrowUpDown size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
             <span style={{
-              fontSize:   15,
-              fontWeight: 700,
+              fontSize:   14,
               fontFamily: 'var(--font-body)',
               color:      'var(--color-text-primary)',
             }}>
-              Manage Favourites
+              Sort by
             </span>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              style={{
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                flexShrink:              0,
-                width:                   28,
-                height:                  28,
-                borderRadius:            '50%',
-                border:                  'none',
-                backgroundColor:         'var(--color-border-subtle)',
-                cursor:                  'pointer',
-                outline:                 'none',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <X size={15} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
-            </button>
           </div>
-
-          {/* Sort — icon + label now match the visual language of the
-              Filter/Select rows below it (was previously a small uppercase
-              section label, inconsistent with the rest of the sheet).
-              Label and control still share one row, buttons stay
-              hug-content so the row doesn't stretch a two-word toggle
-              across the sheet's full width. */}
           <div style={{
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'space-between',
-            gap:            10,
-            padding:        '12px 10px',
-            marginBottom:   6,
+            display:         'flex',
+            backgroundColor: 'var(--color-border-subtle)',
+            borderRadius:    'var(--radius-md)',
+            padding:         2,
+            gap:             2,
+            flexShrink:      0,
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-              <ArrowUpDown size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
-              <span style={{
-                fontSize:   14,
-                fontFamily: 'var(--font-body)',
-                color:      'var(--color-text-primary)',
-              }}>
-                Sort by
-              </span>
-            </div>
-            <div style={{
-              display:         'flex',
-              backgroundColor: 'var(--color-border-subtle)',
-              borderRadius:    'var(--radius-md)',
-              padding:         2,
-              gap:             2,
-              flexShrink:      0,
-            }}>
-              {['az', 'recent'].map(mode => {
-                const isActive = sortMode === mode
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => onSetSortMode(mode)}
-                    style={{
-                      padding:                 '6px 10px',
-                      borderRadius:            'var(--radius-sm)',
-                      border:                  'none',
-                      backgroundColor:         isActive ? 'var(--color-surface)' : 'transparent',
-                      boxShadow:               isActive ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
-                      fontSize:                12,
-                      fontFamily:              'var(--font-body)',
-                      fontWeight:              isActive ? 600 : 400,
-                      color:                   isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-                      cursor:                  'pointer',
-                      outline:                 'none',
-                      whiteSpace:              'nowrap',
-                      WebkitTapHighlightColor: 'transparent',
-                      transition:              'background-color 0.15s ease, box-shadow 0.15s ease',
-                    }}
-                  >
-                    {sortLabels[mode]}
-                  </button>
-                )
-              })}
-            </div>
+            {['az', 'recent'].map(mode => {
+              const isActive = sortMode === mode
+              return (
+                <button
+                  key={mode}
+                  onClick={() => onSetSortMode(mode)}
+                  style={{
+                    padding:                 '6px 10px',
+                    borderRadius:            'var(--radius-sm)',
+                    border:                  'none',
+                    backgroundColor:         isActive ? 'var(--color-surface)' : 'transparent',
+                    boxShadow:               isActive ? '0 1px 2px rgba(0, 0, 0, 0.06)' : 'none',
+                    fontSize:                12,
+                    fontFamily:              'var(--font-body)',
+                    fontWeight:              isActive ? 600 : 400,
+                    color:                   isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                    cursor:                  'pointer',
+                    outline:                 'none',
+                    whiteSpace:              'nowrap',
+                    WebkitTapHighlightColor: 'transparent',
+                    transition:              'background-color 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                >
+                  {sortLabels[mode]}
+                </button>
+              )
+            })}
           </div>
+        </div>
 
-          {/* Specialty — split into two adjacent controls rather than one
-              button: the label area still opens SpecialtiesBottomSheet,
-              while an inline X (only rendered once a specialty is active)
-              resets straight to 'all' without leaving this sheet. A
-              clickable clear control can't be nested inside the label's
-              own <button>, hence the wrapping row here. */}
-          <div style={{
-            display:      'flex',
-            alignItems:   'center',
-            marginBottom: 6,
-          }}>
-            <button
-              onClick={handleOpenSpecialties}
-              style={{
-                flex:                    1,
-                minWidth:                0,
-                display:                 'flex',
-                alignItems:              'center',
-                gap:                     10,
-                padding:                 '12px 10px',
-                background:              'none',
-                border:                  'none',
-                borderRadius:            'var(--radius-md)',
-                textAlign:               'left',
-                cursor:                  'pointer',
-                outline:                 'none',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {hasSpecialty ? (
-                <SpecialtyIcon
-                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                  size={17}
-                  color={specialtyIconColor}
-                />
-              ) : (
-                <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
-              )}
-              <span style={{
-                flex:         1,
-                minWidth:     0,
-                overflow:     'hidden',
-                whiteSpace:   'nowrap',
-                textOverflow: 'ellipsis',
-                fontSize:     14,
-                fontFamily:   'var(--font-body)',
-                color:        'var(--color-text-primary)',
-              }}>
-                {hasSpecialty ? activeSpecialtyObj.name : 'Filter by specialty'}
-              </span>
-              {!hasSpecialty && (
-                <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-                  style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
-                  <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
-                    strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </button>
-
-            {hasSpecialty && (
-              <button
-                onClick={onClearSpecialty}
-                aria-label="Clear specialty filter"
-                style={{
-                  display:                 'flex',
-                  alignItems:              'center',
-                  justifyContent:          'center',
-                  flexShrink:              0,
-                  width:                   28,
-                  height:                  28,
-                  marginRight:             6,
-                  borderRadius:            '50%',
-                  border:                  'none',
-                  background:              'none',
-                  cursor:                  'pointer',
-                  outline:                 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <X size={15} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
-              </button>
-            )}
-          </div>
-
-          <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
-
-          {/* Manage */}
+        {/* Specialty — split into two adjacent controls rather than one
+            button: the label area still opens SpecialtiesBottomSheet,
+            while an inline X (only rendered once a specialty is active)
+            resets straight to 'all' without leaving this sheet. A
+            clickable clear control can't be nested inside the label's
+            own <button>, hence the wrapping row here. */}
+        <div style={{
+          display:      'flex',
+          alignItems:   'center',
+          marginBottom: 6,
+        }}>
           <button
-            onClick={handleManage}
+            onClick={handleOpenSpecialties}
             style={{
-              width:                   '100%',
+              flex:                    1,
+              minWidth:                0,
               display:                 'flex',
               alignItems:              'center',
               gap:                     10,
@@ -375,19 +218,92 @@ export default function FavouritesManagerSheet({
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            <ListChecks size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+            {hasSpecialty ? (
+              <SpecialtyIcon
+                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                size={17}
+                color={specialtyIconColor}
+              />
+            ) : (
+              <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
+            )}
             <span style={{
-              fontSize:   14,
-              fontFamily: 'var(--font-body)',
-              color:      'var(--color-text-primary)',
+              flex:         1,
+              minWidth:     0,
+              overflow:     'hidden',
+              whiteSpace:   'nowrap',
+              textOverflow: 'ellipsis',
+              fontSize:     14,
+              fontFamily:   'var(--font-body)',
+              color:        'var(--color-text-primary)',
             }}>
-              Select favourites
+              {hasSpecialty ? activeSpecialtyObj.name : 'Filter by specialty'}
             </span>
+            {!hasSpecialty && (
+              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+                style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+                <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
+                  strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            )}
           </button>
+
+          {hasSpecialty && (
+            <button
+              onClick={onClearSpecialty}
+              aria-label="Clear specialty filter"
+              style={{
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                flexShrink:              0,
+                width:                   28,
+                height:                  28,
+                marginRight:             6,
+                borderRadius:            '50%',
+                border:                  'none',
+                background:              'none',
+                cursor:                  'pointer',
+                outline:                 'none',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <X size={15} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
+            </button>
+          )}
         </div>
+
+        <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
+
+        {/* Manage */}
+        <button
+          onClick={handleManage}
+          style={{
+            width:                   '100%',
+            display:                 'flex',
+            alignItems:              'center',
+            gap:                     10,
+            padding:                 '12px 10px',
+            background:              'none',
+            border:                  'none',
+            borderRadius:            'var(--radius-md)',
+            textAlign:               'left',
+            cursor:                  'pointer',
+            outline:                 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          <ListChecks size={17} strokeWidth={1.8} color="var(--color-text-secondary)" aria-hidden="true" />
+          <span style={{
+            fontSize:   14,
+            fontFamily: 'var(--font-body)',
+            color:      'var(--color-text-primary)',
+          }}>
+            Select favourites
+          </span>
+        </button>
       </div>
-    </>
+    </SheetShell>
   )
 }
-
-
