@@ -9,12 +9,14 @@
  *   browser back closes the sheet instead of changing the route.
  * - Locks <html> scrolling while open. vaul's own scroll-lock only covers
  *   <body>, but this app's page actually scrolls via <html>, so without
- *   this the page behind the sheet could still move during a drag. Sets
- *   both `overflow: hidden` (stops the scroll position itself from
- *   moving) and `touch-action: none` (stops the browser from treating a
- *   touch-drag on <html> as a pan/scroll gesture in the first place —
- *   without this, a drag on the sheet could still visually drag the page
- *   underneath it, confirmed 2026-09-09).
+ *   this the page behind the sheet could still move during a drag.
+ *   `touch-action: none` was tried here too on 2026-09-09, on the theory
+ *   that `overflow: hidden` alone wasn't enough — reverted the same day:
+ *   it affects every descendant of <html>, including the sheet itself,
+ *   and broke the sheet's own ability to tell a scroll over its list from
+ *   a drag on the sheet. A real fix for the page-drags-along symptom
+ *   needs to be scoped to the page's own content, not to <html> — not yet
+ *   attempted.
  * - The drag surface (Drawer.Content) never scrolls itself — it's
  *   `overflow: hidden` here, full stop. Any inner scrollable content
  *   (e.g. the specialty list) handles its own scroll separately, inside
@@ -59,13 +61,10 @@ export default function SheetShell({
   useEffect(() => {
     if (!isOpen) return
     const html = document.documentElement
-    const prevOverflow    = html.style.overflow
-    const prevTouchAction = html.style.touchAction
-    html.style.overflow    = 'hidden'
-    html.style.touchAction = 'none'
+    const prevOverflow = html.style.overflow
+    html.style.overflow = 'hidden'
     return () => {
-      html.style.overflow    = prevOverflow
-      html.style.touchAction = prevTouchAction
+      html.style.overflow = prevOverflow
     }
   }, [isOpen])
 
