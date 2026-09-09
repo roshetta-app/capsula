@@ -1,39 +1,26 @@
 /**
  * src/components/ui/SheetShell.jsx
  *
- * ⚠️ TEMPORARY DIAGNOSTIC BUILD #4 (long-stall detector) — 2026-09-07 ⚠️
- * Chasing occasional big stalls (50-65ms) found via adb gfxinfo, on top of
- * the smaller, mostly-fixed per-frame cost from the icon memoization fix.
- * This build does NOT use DevTools at all — everything logs to console,
- * captured with plain `adb logcat`, same as before.
+ * Shared bottom-sheet shell built on vaul's Drawer. Used by every sheet
+ * migrated in Phase 5 of the Back-Button & State-Audit merged plan;
+ * SpecialtiesBottomSheet.jsx was the first, and the pattern the rest copy.
  *
- * WHAT THIS LOGS:
- *   [long-stall] <duration>ms starting at <time>ms
- *       Printed automatically by the browser itself whenever the main
- *       thread is blocked for 50ms or more (the browser's own "long task"
- *       detector) — this is exactly the kind of stall behind the stutter.
- *   [sheet-debug] pointerdown / pointermove / pointerup / pointercancel
- *       Same touch event log as before, so we can see whether a long-stall
- *       line lines up with a specific moment in the drag (e.g. right when
- *       you cross into the scrollable list, or right when you reverse
- *       direction).
- *
- * WHAT TO DO:
- *  1. Place this as src/components/ui/SheetShell.jsx, replacing the
- *     current one.
- *  2. Full rebuild:
- *     npm run build:capacitor && npx cap sync android && npx cap run android --target=<your device target>
- *  3. In a terminal:
- *     adb -s <your device id> logcat -s chromium:I > stall_log.txt
- *  4. On your phone: open the specialty picker, do the stuttery drag over
- *     the list a few times.
- *  5. Back in the terminal: Ctrl+C to stop logging.
- *  6. Upload stall_log.txt here. That's it — no DevTools, no screenshots
- *     of graphs needed.
- *
- * Everything else here is unchanged from the working version — the
- * drag/scroll box-split fix (overflow: hidden on the drag surface) stays
- * in place.
+ * - Wires this app's own back-close behavior (useBackClose) so hardware/
+ *   browser back closes the sheet instead of changing the route.
+ * - Locks <html> scrolling while open. vaul's own scroll-lock only covers
+ *   <body>, but this app's page actually scrolls via <html>, so without
+ *   this the page behind the sheet could still move during a drag.
+ * - The drag surface (Drawer.Content) never scrolls itself — it's
+ *   `overflow: hidden` here, full stop. Any inner scrollable content
+ *   (e.g. the specialty list) handles its own scroll separately, inside
+ *   its own scrollable element. This split is what fixed the sheet
+ *   closing/snapping back mid-drag (confirmed 2026-09-08): before it, the
+ *   drag surface and its inner list were both independently scrollable,
+ *   which confused the phone about whether a touch was a drag or a
+ *   scroll, and sometimes yanked control away mid-gesture.
+ * - `closeThreshold` defaults to 0.4 (raised from vaul's own 0.25
+ *   default) so a light, accidental touch doesn't close the sheet — it
+ *   takes a real, deliberate drag or a fast flick before it lets go.
  */
 
 import { useEffect } from 'react'
@@ -41,69 +28,15 @@ import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
 
 const VISUALLY_HIDDEN_STYLE = {
-  position: 'absolute',
-  width:    1,
-  height:   1,
-  padding:  0,
-  margin:   -1,
-  overflow: 'hidden',
-  clip:     'rect(0,0,0,0)',
+  position:   'absolute',
+  width:      1,
+  height:     1,
+  padding:    0,
+  margin:     -1,
+  overflow:   'hidden',
+  clip:       'rect(0,0,0,0)',
   whiteSpace: 'nowrap',
-  border:   0,
-}
-
-function useLongStallLogger(isOpen) {
-  useEffect(() => {
-    if (!isOpen) return
-    if (typeof PerformanceObserver === 'undefined') return
-
-    let observer
-    try {
-      observer = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          // eslint-disable-next-line no-console
-          console.log(
-            `%c[long-stall] ${entry.duration.toFixed(0)}ms starting at ${entry.startTime.toFixed(0)}ms`,
-            'color:#f00; font-weight:bold',
-          )
-        }
-      })
-      observer.observe({ entryTypes: ['longtask'] })
-    } catch {
-      // eslint-disable-next-line no-console
-      console.log('[long-stall] longtask API not supported on this WebView')
-    }
-
-    return () => observer && observer.disconnect()
-  }, [isOpen])
-}
-
-function useGestureDebugLog(isOpen) {
-  useEffect(() => {
-    if (!isOpen) return
-    const startTime = performance.now()
-    const elapsed = () => (performance.now() - startTime).toFixed(0)
-
-    const append = (label) => () => {
-      // eslint-disable-next-line no-console
-      console.log(`%c[sheet-debug] ${elapsed()}ms  ${label}`, 'color:#0a0')
-    }
-
-    const events = [
-      ['pointerdown', append('pointerdown')],
-      ['pointermove', append('pointermove')],
-      ['pointerup', append('pointerup')],
-      ['pointercancel', append('pointercancel')],
-    ]
-    events.forEach(([type, handler]) => {
-      window.addEventListener(type, handler, { passive: true, capture: true })
-    })
-    return () => {
-      events.forEach(([type, handler]) => {
-        window.removeEventListener(type, handler, { capture: true })
-      })
-    }
-  }, [isOpen])
+  border:     0,
 }
 
 export default function SheetShell({
@@ -117,8 +50,6 @@ export default function SheetShell({
   closeThreshold = 0.4,
 }) {
   useBackClose(isOpen, onClose)
-  useLongStallLogger(isOpen)
-  useGestureDebugLog(isOpen)
 
   useEffect(() => {
     if (!isOpen) return
