@@ -776,6 +776,18 @@ export default function ConditionsScreen() {
   const searchInputRef = useRef(null)
   const listHeaderRef  = useRef(null)
 
+  // ── Cold-start skeleton row count — proportional-skeleton-fill.
+  // Previously hardcoded to 5 rows regardless of device height, which left
+  // a large empty gap on taller screens and could underfill vs. what the
+  // real list shows. skeletonHeaderRef marks the bottom edge of the fixed
+  // skeleton header block (title/subtitle + search bar + selector); the
+  // remaining space down to the bottom nav is divided by one skeleton
+  // row's height to decide how many rows to render. Recomputed on resize
+  // (covers rotation/foldables) but this only ever runs while the cold-
+  // start skeleton itself is showing.
+  const skeletonHeaderRef = useRef(null)
+  const [skeletonRowCount, setSkeletonRowCount] = useState(5)
+
   // ── Entrance stagger — conditions-screen-polish-master-plan Phase 11.
   // playEntrance is decided once, on first mount: false if this session has
   // already shown the entrance, or if the user prefers reduced motion.
@@ -852,6 +864,31 @@ export default function ConditionsScreen() {
     const raf = requestAnimationFrame(() => setEntranceIn(true))
     return () => cancelAnimationFrame(raf)
   }, [playEntrance, loading])
+
+  // Recomputes the cold-start skeleton's row count to fill the actual
+  // available space instead of a hardcoded 5 — see skeletonHeaderRef above.
+  // window.visualViewport is the same source useVisualViewport.js already
+  // uses app-wide, so this stays consistent with how "available height" is
+  // measured everywhere else. 60 is BottomNav's own fixed height, matching
+  // the literal Layout.jsx already uses for its bottom-nav clearance.
+  useEffect(() => {
+    if (!(loading && conditions.length === 0)) return
+
+    const BOTTOM_NAV_HEIGHT = 60
+    const ROW_HEIGHT = 53 // SkeletonCard: 36px icon + 8px top/bottom padding + ~0.5px border
+
+    function computeRows() {
+      if (!skeletonHeaderRef.current) return
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+      const headerBottom   = skeletonHeaderRef.current.getBoundingClientRect().bottom
+      const available      = viewportHeight - headerBottom - BOTTOM_NAV_HEIGHT
+      setSkeletonRowCount(Math.max(3, Math.floor(available / ROW_HEIGHT)))
+    }
+
+    computeRows()
+    window.addEventListener('resize', computeRows)
+    return () => window.removeEventListener('resize', computeRows)
+  }, [loading, conditions.length])
 
   // Returns the fade/rise + stagger delay for entrance stage 0/1/2, or an
   // empty object on any repeat visit within this session (or reduced
@@ -1001,15 +1038,17 @@ export default function ConditionsScreen() {
   if (loading && conditions.length === 0) {
     return (
       <>
-        <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
+        <div ref={skeletonHeaderRef}>
+          <div style={{ paddingTop: 'var(--space-4)', paddingBottom: 'var(--space-3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+              <div style={shimmer({ width: 154, height: 27, borderRadius: 'var(--radius-sm)' })} />
+            </div>
+            <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
           </div>
-          <div style={shimmer({ width: '55%', height: 16, borderRadius: 'var(--radius-sm)' })} />
+          <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
+          <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
         </div>
-        <div style={shimmer({ width: '100%', height: 46, marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-full)' })} />
-        <div style={shimmer({ width: '100%', height: 40, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-md)' })} />
-        {[1, 2, 3, 4, 5].map(i => <SkeletonCard key={i} />)}
+        {Array.from({ length: skeletonRowCount }, (_, i) => <SkeletonCard key={i} />)}
       </>
     )
   }
