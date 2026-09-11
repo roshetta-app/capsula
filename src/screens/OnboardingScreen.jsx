@@ -97,12 +97,24 @@
  * effect below, the mirror image of the existing reconnect effect. The
  * 28s stall timer stays in place as a backstop for the different case of
  * a connection that reports fine but is just very slow.
+ *
+ * 2026-09-12 (Phase 13 — Onboarding back handling): hardware/browser back
+ * now mirrors the on-screen back arrow exactly, via useBackClose — reusing
+ * showBackArrow as-is as the guard, rather than a separate condition, so
+ * hardware back and the visible arrow can never drift out of sync. Active
+ * on slides 2-4 only: a back press there steps back one slide, same as
+ * tapping the arrow. On slide 1, showBackArrow is false, so the hook is
+ * inactive and back falls through to its normal platform behavior (exits
+ * the app / leaves the site) — the only slide that does. On slide 5,
+ * showBackArrow is also false (loading), matching the existing "going
+ * back mid-download isn't a supported flow" behavior of the arrow itself.
  */
 
 import { useState, useRef, useEffect } from 'react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useBackClose } from '../hooks/useBackClose'
 
 import welcomeHero from '../assets/onboarding/onboarding-1-welcome-hero.jpg'
 import libraryIllustration from '../assets/onboarding/onboarding-2-library-illustration.png'
@@ -385,6 +397,15 @@ export default function OnboardingScreen({ onDone }) {
   // (nothing before it) or slide 5 (nothing to go back to once loading
   // starts, and going back mid-download isn't a supported flow here).
   const showBackArrow = !isFirst && !isLoadingSlide
+
+  // 2026-09-12 (Phase 13 — Onboarding back handling): hardware/browser
+  // back mirrors the on-screen back arrow exactly — reuses showBackArrow
+  // itself as the guard (not a separate condition) so the two can never
+  // drift out of sync. Inactive on slide 1 (showBackArrow is false there),
+  // so a back press falls through to the platform's normal behavior and
+  // exits — the only slide where that happens. Also inactive on slide 5
+  // for the same reason the arrow is hidden there.
+  useBackClose(showBackArrow, prev)
 
   // 2026-08-31 (plan step 1.15): fades the whole screen out before
   // actually completing, instead of cutting straight to the real app.
