@@ -81,6 +81,25 @@ export default function ConfirmSheet({
 
   useBackClose(isOpen, !busy ? onClose : () => {})
 
+  // Locks <html> scrolling while this dialog is open — matches
+  // SheetShell.jsx's existing scroll-lock (see its file header for why
+  // <html>, not <body>, is the element that actually scrolls in this
+  // app). SheetShell's own history also tried touch-action: none and
+  // position: fixed on top of this, both reverted because they broke a
+  // sheet's own drag-to-close gesture — that risk doesn't apply here
+  // since this dialog has no drag gesture of its own, so the plain
+  // overflow: hidden lock is kept as-is, deliberately not layering on
+  // either of those reverted attempts.
+  useEffect(() => {
+    if (!isOpen) return
+    const html = document.documentElement
+    const prevOverflow = html.style.overflow
+    html.style.overflow = 'hidden'
+    return () => {
+      html.style.overflow = prevOverflow
+    }
+  }, [isOpen])
+
   useEffect(() => {
     if (isOpen) {
       // Mount first, then flip animateIn on the next frame so the
