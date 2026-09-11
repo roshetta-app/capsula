@@ -1831,17 +1831,26 @@ export default function FavouritesScreen() {
     const id = confirmingCondition.id
     const index = favourites.conditions.indexOf(id)
     beginRowExit(id)
-    showSnack('Removed from favourites', {
-      label: 'Undo',
-      onAction: () => {
-        restoreConditionAt(id, index)
-        beginRowRestore(id)
-      },
-    })
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         toggleCondition(id, { silent: true }).then(
-          () => { endRowExit(id); resolve() },
+          () => {
+            endRowExit(id)
+            // Bug fix (post-11.3): this used to fire synchronously at the
+            // top of the handler, so the snackbar appeared well before
+            // ConfirmSheet actually closed (it stays open through the exit
+            // animation + real sync result). Moved here so it only shows
+            // once removal has genuinely succeeded — right as the sheet is
+            // about to close, not while it's still open.
+            showSnack('Removed from favourites', {
+              label: 'Undo',
+              onAction: () => {
+                restoreConditionAt(id, index)
+                beginRowRestore(id)
+              },
+            })
+            resolve()
+          },
           (err) => { endRowExit(id); reject(err) }
         )
       }, ROW_EXIT_MS)
@@ -1865,11 +1874,15 @@ export default function FavouritesScreen() {
     if (!confirmingDrug) return Promise.resolve()
     const id = confirmingDrug.id
     const index = favourites.drugs.indexOf(id)
-    showSnack('Removed from favourites', {
-      label: 'Undo',
-      onAction: () => restoreDrugAt(id, index),
+    // Bug fix (post-11.3): snackbar moved into the success branch, same
+    // reasoning as handleConfirmRemoveCondition above — only show it once
+    // the removal has actually resolved, not the moment Confirm was tapped.
+    return toggleDrug(id, { silent: true }).then(() => {
+      showSnack('Removed from favourites', {
+        label: 'Undo',
+        onAction: () => restoreDrugAt(id, index),
+      })
     })
-    return toggleDrug(id, { silent: true })
   }
 
   // ── Tab switching (swipe restored) ──────────────────────────────────────────
