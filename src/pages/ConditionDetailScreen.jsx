@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { useParams, useNavigate, useNavigationType } from 'react-router-dom'
-import { ArrowLeft, Share2, Heart } from 'lucide-react'
+import { ArrowLeft, Share2, Heart, WifiOff } from 'lucide-react'
 import { useConditionContext } from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useKeyboardOpen } from '../hooks/useKeyboardOpen'
@@ -66,7 +66,7 @@ export default function ConditionDetailScreen() {
   // list) — only acts the first time anything renders this session.
   useDeepLinkParent('/conditions')
   const navigationType = useNavigationType() // 'POP' | 'PUSH' | 'REPLACE'
-  const { conditions, loading, addRecentlyViewed } = useConditionContext()
+  const { conditions, loading, error, refresh, addRecentlyViewed } = useConditionContext()
   const { isConditionFavourited, toggleCondition } = useFavouritesContext()
 
   const [activeTab, setActiveTab] = useState(0)
@@ -249,22 +249,104 @@ export default function ConditionDetailScreen() {
     shareConditionPrescription(condition, buildSharePrescription(), shareCardRef)
   }
 
+  // Phase 9 (back-arrow consistency, §9.5): every render state below now
+  // points back through this single function. useDeepLinkParent (above)
+  // already guarantees a synthetic '/conditions' history entry sits behind
+  // this screen whenever it's the very first thing to mount (a shared link
+  // or notification tap), so navigate(-1) is now safe in every case, not
+  // just normal in-app visits. Previously the loading/not-found states
+  // used a hardcoded navigate('/') instead — that always landed on the
+  // Conditions tab regardless of where the user actually came from (e.g.
+  // Favourites), which happened to look "correct" but wasn't actually
+  // following the real navigation history the way the loaded state's
+  // navigate(-1) did.
+  function handleBack() {
+    navigate(-1)
+  }
+
+  // ── Loading — Phase 9 (SA Phase 1 + BB Phase 6). Was plain "Loading…"
+  // text; replaced with a shimmer skeleton shaped to this screen's real
+  // layout (header bar, title bar, two tab bars, a few content-block
+  // rectangles), reusing the shimmer() convention ConditionsScreen.jsx
+  // already uses. ConditionsScreen's proportional-row-count technique
+  // (measure remaining space, divide by one row's height, render that many
+  // rows) does NOT transfer here as-is — that technique fills a scrollable
+  // list of identical rows, and this screen's real content
+  // (PrescriptionsTab / ClinicalDataTab) isn't a repeating row list, it's a
+  // fixed set of varied content blocks. Using a fixed block count instead
+  // (see SKELETON_CONTENT_BLOCK_COUNT below), sized to read as plausible
+  // content rather than computed to exactly fill the viewport.
   if (loading) {
     return (
       <div style={simplePageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
-        <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center', color: 'var(--color-text-tertiary)', fontSize: 14 }}>
-          Loading…
+        <ConditionDetailSkeleton />
+        <BottomNav />
+      </div>
+    )
+  }
+
+  // ── Load failed — Phase 9 (SA Phase 1). Same icon/heading/supporting-line/
+  // button shape as DrugDetailScreen.jsx's failed-load state, wording
+  // adjusted for a single condition rather than a whole library. Checked
+  // before the not-found branch below (§9.4's guard reorder), so a failed
+  // fetch never gets misreported as "this condition doesn't exist."
+  if (!condition && error) {
+    return (
+      <div style={simplePageStyle}>
+        <DetailHeader onBack={handleBack} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
+        <div style={{
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          justifyContent: 'center',
+          minHeight:      '50dvh',
+          gap:            'var(--space-3)',
+          color:          'var(--color-text-tertiary)',
+          padding:        'var(--space-6)',
+          textAlign:      'center',
+        }}>
+          <WifiOff size={28} color="var(--color-text-tertiary)" />
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            Couldn't load this condition
+          </div>
+          <div style={{ fontSize: 13 }}>
+            Check your connection and try again
+          </div>
+          <button
+            onClick={refresh}
+            style={{
+              marginTop:       'var(--space-2)',
+              display:         'inline-flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              padding:         '6px 20px',
+              borderRadius:    'var(--radius-md)',
+              border:          '1.5px solid var(--color-accent)',
+              backgroundColor: 'var(--color-accent)',
+              color:           '#fff',
+              fontSize:        13,
+              fontWeight:      600,
+              cursor:          'pointer',
+              fontFamily:      'var(--font-body)',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            Try again
+          </button>
         </div>
         <BottomNav />
       </div>
     )
   }
 
+  // ── Not found — Phase 9 (BB Phase 6, §9.4 guard reorder). Only renders
+  // now once both loading and error are ruled out above
+  // (!loading && !error && !condition), so a failed fetch can no longer
+  // fall through and be misreported as a bad slug.
   if (!condition) {
     return (
       <div style={simplePageStyle}>
-        <DetailHeader onBack={() => navigate('/')} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
+        <DetailHeader onBack={handleBack} condition={null} activeTab={activeTab} setActiveTab={switchTab} />
         <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-8) var(--space-6)', textAlign: 'center' }}>
           <div style={{ fontSize: 15, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>Condition not found</div>
           <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>"{slug}" does not match any condition in the database.</div>
@@ -284,7 +366,7 @@ export default function ConditionDetailScreen() {
     >
       {/* ─── Header + Tab strip — one combined sticky block, one border at bottom */}
       <DetailHeader
-        onBack={() => navigate(-1)}
+        onBack={handleBack}
         condition={condition}
         isFav={isFav}
         onFavToggle={() => toggleCondition(condition.id)}
@@ -376,9 +458,9 @@ export default function ConditionDetailScreen() {
 
 // ─── Shared page styles ─────────────────────────────────────────────────────
 
-// Used only by the loading/not-found states above — those have no tabs, so
-// they keep the simple page-scrolling behavior; there's nothing there that
-// can trigger the bug this file fixes.
+// Used only by the loading/error/not-found states above — those have no
+// tabs, so they keep the simple page-scrolling behavior; there's nothing
+// there that can trigger the bug this file fixes.
 const simplePageStyle = {
   minHeight: '100svh',
   display: 'flex',
@@ -398,6 +480,66 @@ const rootStyle = {
   backgroundColor: 'var(--color-bg)',
   fontFamily: 'var(--font-body)',
   color: 'var(--color-text-primary)',
+}
+
+// ─── Loading skeleton (Phase 9) ─────────────────────────────────────────────
+// Same shimmer() convention ConditionsScreen.jsx uses for its own cold-start
+// skeleton — reused here rather than reinvented, since that's the existing
+// app-wide pattern for loading placeholders.
+
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
+
+// Fixed count, not computed from available height — see the loading-branch
+// comment above (in the component) for why ConditionsScreen's
+// proportional-row-count technique doesn't transfer to this screen's
+// fixed-block content shape.
+const SKELETON_CONTENT_BLOCK_COUNT = 4
+
+function ConditionDetailSkeleton() {
+  return (
+    <>
+      <header style={{
+        position:        'sticky',
+        top:             0,
+        zIndex:          50,
+        backgroundColor: 'var(--color-surface)',
+        borderRadius:    '0 0 18px 18px',
+        boxShadow:       '0 2px 6px rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) 16px' }}>
+          {/* Back button placeholder */}
+          <div style={shimmer({ width: 60, height: 16, marginBottom: 'var(--space-3)' })} />
+          {/* Title placeholder */}
+          <div style={shimmer({ width: '70%', height: 26, marginBottom: 10 })} />
+          {/* Tab strip placeholder — two tabs, matches TABS.length */}
+          <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div style={shimmer({ flex: 1, height: 32, borderRadius: 'var(--radius-md)' })} />
+            <div style={shimmer({ flex: 1, height: 32, borderRadius: 'var(--radius-md)' })} />
+          </div>
+        </div>
+      </header>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-5) var(--space-6)' }}>
+        {Array.from({ length: SKELETON_CONTENT_BLOCK_COUNT }, (_, i) => (
+          <div
+            key={i}
+            style={shimmer({
+              width:        i % 2 === 0 ? '100%' : '85%',
+              height:       72,
+              marginBottom: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+            })}
+          />
+        ))}
+      </div>
+    </>
+  )
 }
 
 // ─── DetailHeader ─────────────────────────────────────────────────────────────
