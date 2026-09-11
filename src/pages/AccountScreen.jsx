@@ -190,6 +190,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
   Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
+  Loader2,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -568,7 +569,25 @@ export default function AccountScreen() {
   // Same convention AccountEditScreen.jsx uses — wait for AuthContext's
   // initial session+profile check to resolve before rendering, so nothing
   // (avatar, name, email) ever flashes empty/wrong for a moment first.
-  if (loading) return null
+  // Phase 7 (2026-09-10): previously `return null` here, which showed as
+  // a blank white flash before the real content appeared. A minimal
+  // spinner now fills that gap instead.
+  if (loading) {
+    return (
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'center',
+        minHeight:      '50vh',
+        color:          'var(--color-text-tertiary)',
+      }}>
+        <style>{`
+          @keyframes capsulaAccountSpin { to { transform: rotate(360deg) } }
+        `}</style>
+        <Loader2 size={28} style={{ animation: 'capsulaAccountSpin 0.8s linear infinite' }} />
+      </div>
+    )
+  }
 
   const fullName = profile?.fullName
 
@@ -1054,4 +1073,3 @@ export default function AccountScreen() {
       />
     </div>
   )
-}
