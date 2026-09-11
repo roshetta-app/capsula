@@ -51,6 +51,14 @@
  * deletes the now-pointless empty mounts and their imports. No behavior
  * change; the page renders identically to before this pass.
  *
+ * 2026-09-11 (Phase 9/10 merged plan, §10.1 — copy fix): failed-load
+ * heading changed from "Couldn't load your library" to "Couldn't load this
+ * drug" — the old text described the whole Drugs library, which misdescribed
+ * what actually failed (loading a single drug). Wording now matches
+ * ConditionDetailScreen.jsx's equivalent state ("Couldn't load this
+ * condition"). No other behavior changed — the back arrow already used
+ * useDeepLinkParent + navigate(-1) with no split to reconcile (§10.2).
+ *
  * Route: /drugs/:slug
  */
 
@@ -166,6 +174,11 @@ export default function DrugDetailScreen() {
   // already exist on DrugContext (same ones the drug list screen's own
   // LibraryErrorState uses) — this just reads them here too. Wording/colors
   // match that same screen's failed-load state.
+  //
+  // 2026-09-11 (Phase 9/10 merged plan, §10.1): heading text corrected from
+  // "Couldn't load your library" (described the whole Drugs library) to
+  // "Couldn't load this drug" (describes what actually failed — a single
+  // drug fetch). Matches ConditionDetailScreen.jsx's equivalent wording.
   if (!drug && !loading && error) {
     return (
       <div style={{
@@ -181,7 +194,7 @@ export default function DrugDetailScreen() {
       }}>
         <WifiOff size={28} color="var(--color-text-tertiary)" />
         <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-          Couldn't load your library
+          Couldn't load this drug
         </div>
         <div style={{ fontSize: 13 }}>
           Check your connection and try again
