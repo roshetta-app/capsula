@@ -152,7 +152,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, ListFilter, Heart, Bell } from 'lucide-react'
+import { Search, ListFilter, Heart, Bell, WifiOff } from 'lucide-react'
 import BackToTopButton         from '../components/ui/BackToTopButton'
 import SearchBar               from '../components/ui/SearchBar'
 import ConditionCard           from '../components/ConditionCard'
@@ -167,6 +167,7 @@ import { useConditionContext }  from '../context/ConditionContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useDarkMode }         from '../hooks/useDarkMode'
 import { useBackToTop }        from '../hooks/useBackToTop'
+import { useBackClose }        from '../hooks/useBackClose'
 import { alphabetGroup }                           from '../utils/alphabetGroup'
 import { SpecialtyIcon, useIsDark }                from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN, tintedBg }  from '../utils/specialtyTokens'
@@ -209,6 +210,69 @@ function SkeletonCard() {
         <div style={shimmer({ width: '60%', height: 15 })} />
       </div>
     </div>
+  )
+}
+
+// ─── ConditionsErrorState ───────────────────────────────────────────────────
+// Phase 6 (2026-09-10): shown when loading finishes trying but nothing
+// actually came through — previously this fell straight through to either
+// an indefinite skeleton or an empty list, with no explanation and no way
+// to recover short of restarting the app. Same icon → headline →
+// supporting-line → button shape as DrugsScreen.jsx's LibraryErrorState;
+// onRetry is this screen's own refresh() from ConditionContext.
+
+function ConditionsErrorState({ onRetry }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <WifiOff size={28} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        Couldn't load your conditions
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        Check your connection and try again
+      </div>
+      <FilledHintButton onClick={onRetry}>
+        Try again
+      </FilledHintButton>
+    </div>
+  )
+}
+
+// ─── FilledHintButton ───────────────────────────────────────────────────────
+// Same filled/bordered treatment as DrugsScreen.jsx's FilledHintButton —
+// var(--color-accent), this app's single action color, not red (red is
+// reserved for destructive actions elsewhere).
+
+function FilledHintButton({ onClick, children }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        cursor: 'pointer',
+        border: '1.5px solid var(--color-accent)',
+        backgroundColor: 'var(--color-accent)',
+        color: '#fff',
+        fontSize: 13, fontWeight: 600,
+        fontFamily: 'var(--font-body)',
+        padding: '6px 12px',
+        borderRadius: 'var(--radius-md)',
+        lineHeight: 1,
+        flexShrink: 0,
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'transform 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {children}
+    </button>
   )
 }
 
@@ -753,7 +817,7 @@ function StickyLogoHeader({
 export default function ConditionsScreen() {
   const navigate = useNavigate()
   const {
-    conditions, specialties, loading,
+    conditions, specialties, loading, error, refresh,
     recentlyViewed, recentOrder,
     sortMode, cycleSortMode, SORT_LABELS,
     query, setQuery,
@@ -930,6 +994,13 @@ export default function ConditionsScreen() {
     setQuery('')
   }
 
+  // Phase 6 (search-clears-on-back): while the search box has text, back
+  // clears it — same action as the existing clear/X button — instead of
+  // leaving the screen. Once the box is already empty, isSearching is
+  // false and this hook's guard goes fully inactive, so back behaves
+  // completely normally.
+  useBackClose(isSearching, handleClearSearch)
+
   function snapToListHeader() {
     if (!listHeaderRef.current) return
     const el            = listHeaderRef.current
@@ -1031,6 +1102,16 @@ export default function ConditionsScreen() {
         </div>
       )
     })
+  }
+
+  // ── Fail state — Phase 6. Sibling to the cold-start skeleton check above:
+  // once loading has finished trying and nothing came through, show a
+  // recoverable message instead of falling through to an empty list or
+  // sitting on the skeleton forever. Mirrors DrugsScreen.jsx's
+  // LibraryErrorState (icon, message, Try again button), calling this
+  // context's own refresh() instead of DrugContext's retry().
+  if (!loading && error && conditions.length === 0) {
+    return <ConditionsErrorState onRetry={refresh} />
   }
 
   // ── Cold start skeleton ──────────────────────────────────────────────────────
