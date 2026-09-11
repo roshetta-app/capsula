@@ -1816,21 +1816,35 @@ export default function FavouritesScreen() {
   // instead of vanishing instantly. Undo mirrors this: restoreConditionAt
   // splices the id back in immediately (so sort/position is correct right
   // away), and beginRowRestore(id) flags it to play the entrance animation.
+  //
+  // Phase 11 (Back-Button & State-Audit merged plan, 11.3) — this now
+  // returns a promise (toggleCondition's own, via useFavourites.js), so
+  // ConfirmSheet's Phase-3 busy/failure handling reflects what actually
+  // happened instead of assuming success. The snackbar/Undo option and the
+  // exit animation still fire immediately, unchanged — the removal itself
+  // is genuinely instant and unconditional (see useFavourites.js's own
+  // comment on writeThrough) — only the promise this function returns
+  // waits for the exit animation plus the real sync result, which is what
+  // keeps the Confirm sheet open with a busy state for that same window.
   function handleConfirmRemoveCondition() {
-    if (!confirmingCondition) return
+    if (!confirmingCondition) return Promise.resolve()
     const id = confirmingCondition.id
     const index = favourites.conditions.indexOf(id)
     beginRowExit(id)
-    setTimeout(() => {
-      toggleCondition(id, { silent: true })
-      endRowExit(id)
-    }, ROW_EXIT_MS)
     showSnack('Removed from favourites', {
       label: 'Undo',
       onAction: () => {
         restoreConditionAt(id, index)
         beginRowRestore(id)
       },
+    })
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        toggleCondition(id, { silent: true }).then(
+          () => { endRowExit(id); resolve() },
+          (err) => { endRowExit(id); reject(err) }
+        )
+      }, ROW_EXIT_MS)
     })
   }
 
@@ -1842,15 +1856,20 @@ export default function FavouritesScreen() {
   // measuring (rowNodeRefs) is set up on the row JSX itself, which this
   // step doesn't touch (see SharedDrugCard note above — nothing renders
   // this yet until step 1d.8 wires it to the trailing slot).
+  //
+  // Phase 11 (Back-Button & State-Audit merged plan, 11.3) — same promise
+  // wiring as handleConfirmRemoveCondition above, minus the exit-animation
+  // wait (there isn't one here): returns toggleDrug's own promise directly,
+  // so ConfirmSheet reflects the real outcome.
   function handleConfirmRemoveDrug() {
-    if (!confirmingDrug) return
+    if (!confirmingDrug) return Promise.resolve()
     const id = confirmingDrug.id
     const index = favourites.drugs.indexOf(id)
-    toggleDrug(id, { silent: true })
     showSnack('Removed from favourites', {
       label: 'Undo',
       onAction: () => restoreDrugAt(id, index),
     })
+    return toggleDrug(id, { silent: true })
   }
 
   // ── Tab switching (swipe restored) ──────────────────────────────────────────

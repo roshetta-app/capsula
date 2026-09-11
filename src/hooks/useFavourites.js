@@ -217,8 +217,8 @@ function buildFavouriteQuery(userId, itemType, id, nowFavourited) {
  *
  * Returns:
  *   favourites            { drugs: string[], conditions: string[] }
- *   toggleDrug            (id: string) => void
- *   toggleCondition       (id: string) => void
+ *   toggleDrug            (id: string) => Promise<void>
+ *   toggleCondition       (id: string) => Promise<void>
  *   restoreConditionAt    (id: string, index: number) => void
  *   restoreDrugAt         (id: string, index: number) => void
  *   isDrugFavourited      (id: string) => boolean
@@ -269,10 +269,10 @@ export function useFavourites() {
     clearPendingFavouriteStorage()
   }, [])
 
-  // Fire-and-forget write-through to the database. No-ops for guests.
-  // Upsert (not plain insert) on add, since the table has a unique
-  // constraint on (user_id, item_type, item_id) — this keeps a fast
-  // double-tap from erroring out or creating a duplicate row.
+  // Write-through to the database. No-ops for guests. Upsert (not plain
+  // insert) on add, since the table has a unique constraint on (user_id,
+  // item_type, item_id) — this keeps a fast double-tap from erroring out
+  // or creating a duplicate row.
   //
   // offline-favourite-sync fix — previously, a failed (or offline) write
   // was only logged, never retried, so it could silently never reach the
@@ -280,25 +280,46 @@ export function useFavourites() {
   // altogether and queue it straight away; if the request is attempted and
   // fails for any other reason, queue it too. Either way it retries via
   // the flush effect below.
+  //
+  // Phase 11 (Back-Button & State-Audit merged plan, 11.3) — this used to
+  // be pure fire-and-forget with no way for a caller to know the outcome.
+  // Now returns a promise so a caller that cares (FavouritesScreen's
+  // remove-confirm flow, via ConfirmSheet's Phase-3 busy/failure support)
+  // can reflect it. The two outcomes are deliberately not symmetric:
+  //   - Offline: resolves immediately. The write is safely queued and
+  //     guaranteed to reach the account automatically once back online
+  //     (see the flush effect below) — this is the whole point of the
+  //     offline queue, so treating it as a "failure" the person needs to
+  //     act on would be both inaccurate and needlessly alarming for what
+  //     is, for this app, an expected and already-handled situation.
+  //   - Online attempt that errors: still queued for the same automatic
+  //     retry (nothing about that resilience changes), but the promise
+  //     rejects too — this is a real, currently-unexplained failure
+  //     (not just being offline), so a caller showing a "check your
+  //     connection and try again" message for it is being honest, not
+  //     alarmist.
+  // Every existing caller that doesn't read the return value keeps working
+  // exactly as before — an unhandled resolved/rejected promise here is
+  // harmless if nothing awaits it.
   const writeThrough = useCallback((itemType, id, nowFavourited) => {
-    if (!user) return
+    if (!user) return Promise.resolve()
     const userId = user.id
 
     if (!isOnlineRef.current) {
       queueWrite(userId, itemType, id, nowFavourited)
-      return
+      return Promise.resolve()
     }
 
-    buildFavouriteQuery(userId, itemType, id, nowFavourited).then(({ error }) => {
+    return buildFavouriteQuery(userId, itemType, id, nowFavourited).then(({ error }) => {
       if (error) {
         console.error('Failed to sync favourite:', error)
         queueWrite(userId, itemType, id, nowFavourited)
-      } else {
-        // Succeeded directly — clear any older queued entry for this same
-        // item so a stale queued write can't overwrite this newer result
-        // on a later flush.
-        unqueueWrite(userId, itemType, id)
+        throw error
       }
+      // Succeeded directly — clear any older queued entry for this same
+      // item so a stale queued write can't overwrite this newer result
+      // on a later flush.
+      unqueueWrite(userId, itemType, id)
     })
   }, [user])
 
@@ -383,7 +404,19 @@ export function useFavourites() {
   // FavouritesScreen's own Undo snackbar) can skip this generic toast
   // instead of showing both at once. Defaults to false everywhere else,
   // so every other call site's behavior is unchanged.
+  //
+  // Phase 11 (Back-Button & State-Audit merged plan, 11.3) — now returns
+  // the write-through promise (see writeThrough's own comment above for
+  // what resolve/reject mean) so a caller can genuinely wait on the real
+  // outcome instead of assuming success. The cap-blocked add path
+  // deliberately keeps resolving rather than rejecting: that state is
+  // already surfaced synchronously via `capBlocked` above, nothing
+  // currently awaits this promise for an add, and rejecting it here would
+  // risk an unhandled-rejection warning at every other call site in the
+  // app that calls toggleDrug/toggleCondition without awaiting it.
   const applyToggle = useCallback((type, id, { silent = false } = {}) => {
+    let resultPromise = Promise.resolve()
+
     setFavourites(prev => {
       const list = prev[type]
       const itemType = type === 'drugs' ? 'drug' : 'condition'
@@ -391,7 +424,7 @@ export function useFavourites() {
       if (list.includes(id)) {
         const next = { ...prev, [type]: list.filter(x => x !== id) }
         writeStorage(next)
-        writeThrough(itemType, id, false)
+        resultPromise = writeThrough(itemType, id, false)
         if (!silent) toast.info('Removed from Favourites')
         return next
       }
@@ -403,10 +436,12 @@ export function useFavourites() {
 
       const next = { ...prev, [type]: [...list, id] }
       writeStorage(next)
-      writeThrough(itemType, id, true)
+      resultPromise = writeThrough(itemType, id, true)
       if (!silent) toast.success('Added to Favourites')
       return next
     })
+
+    return resultPromise
   }, [isPro, writeThrough, toast])
 
   // Load from the database once signed in, and whenever the signed-in
@@ -499,17 +534,17 @@ export function useFavourites() {
   const toggleDrug = useCallback((id, options) => {
     if (!user) {
       recordPendingFavourite({ type: 'drugs', id })
-      return
+      return Promise.resolve()
     }
-    applyToggle('drugs', id, options)
+    return applyToggle('drugs', id, options)
   }, [user, applyToggle, recordPendingFavourite])
 
   const toggleCondition = useCallback((id, options) => {
     if (!user) {
       recordPendingFavourite({ type: 'conditions', id })
-      return
+      return Promise.resolve()
     }
-    applyToggle('conditions', id, options)
+    return applyToggle('conditions', id, options)
   }, [user, applyToggle, recordPendingFavourite])
 
   // restoreConditionAt — reinserts a condition id at a specific index instead
