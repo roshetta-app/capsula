@@ -118,6 +118,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { ArrowLeft, Pencil, X, User, Phone, Mail, MapPin, Stethoscope, HeartPulse, GraduationCap, Trash2, WifiOff } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
+import { useBackClose } from '../hooks/useBackClose'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { updateOwnProfile, deleteOwnAccount } from '../lib/queries'
@@ -341,6 +342,23 @@ export default function AccountEditScreen() {
   // Skip for now link — moved here along with the link, see header below.
   const [skipping, setSkipping] = useState(false)
 
+  // Phase 8 (2026-09-10): canCancel/isFirstTimeSetup moved up from below
+  // the loading/user early-return guards — purely a reordering, same
+  // values, same dependencies (editing, saved.profileSetupDismissed),
+  // neither of which depends on loading/user. Needed here because
+  // useBackClose (a hook) can't be called after a conditional return.
+  const canCancel = editing && saved.profileSetupDismissed
+  const isFirstTimeSetup = editing && !canCancel
+
+  // Phase 8.1: during the forced first-time wizard there's no back arrow
+  // and no Cancel (X) — the header's Skip action (see handleSkipAction
+  // below) is the one intended way out. Without this, the device back
+  // button/gesture fell through to default routing instead, leaving the
+  // forced setup through an unintended path. Guard is only active while
+  // isFirstTimeSetup is true — normal editing (canCancel true) and the
+  // read-only view are both unaffected.
+  useBackClose(isFirstTimeSetup, handleSkipAction)
+
   // offline-profile-account (2026-09-01) — decides once per signed-in
   // user whether to auto-open the wizard (first-time signup, or the
   // completeness nudge asking for it), same once-per-user guard pattern
@@ -393,6 +411,24 @@ export default function AccountEditScreen() {
     await updateOwnProfile(supabase, user.id, { profileSetupDismissed: true })
     await refreshProfile()
     navigate(ROUTES.ACCOUNT)
+  }
+
+  // Phase 8.1: shared guarded wrapper around handleSkip, used by both the
+  // header button's onClick (below) and useBackClose above — same
+  // busy/double-fire guard either way, so pressing back mid-request
+  // behaves identically to tapping the button mid-request rather than
+  // firing handleSkip a second time.
+  async function handleSkipAction() {
+    if (skipping) return
+    setSkipping(true)
+    try {
+      await handleSkip()
+    } finally {
+      // handleSkip navigates away on success, so this mostly only matters
+      // if it throws — keeps the button from getting stuck disabled/busy
+      // on a failed attempt.
+      setSkipping(false)
+    }
   }
 
   async function handleWizardComplete(values) {
@@ -456,16 +492,14 @@ export default function AccountEditScreen() {
     return null
   }
 
-  const canCancel = editing && saved.profileSetupDismissed
-
   // account-header-tweaks (2026-08-23): the mandatory first-time wizard
   // (no saved profile to cancel back to — same condition canCancel above
   // already keys off) gets its own friendly title instead of the normal
   // "Manage Profile" header, and drops the back arrow since there's
   // nothing meaningful to go back to on a first-time signup — the header's
   // own Skip button (see welcome-header-skip below) is already the escape
-  // hatch for this view.
-  const isFirstTimeSetup = editing && !canCancel
+  // hatch for this view. (canCancel/isFirstTimeSetup themselves are
+  // computed further up now — see Phase 8 note above.)
 
   const genderLabel = GENDER_LABELS[saved.gender] || ''
   const phoneLabel = saved.phoneNumber ? `${saved.phoneCountryCode} ${saved.phoneNumber}` : ''
@@ -558,37 +592,34 @@ export default function AccountEditScreen() {
             // top-right corner of a welcome screen is the spot people
             // already expect a Skip option, and it was sitting empty here
             // for this exact case (no back arrow, no Edit/Cancel button).
+            //
+            // Phase 8.2 (2026-09-10): renamed "Skip" → "I'll do it later"
+            // and restyled from a plain underlined text link to a bordered
+            // pill, so it reads as a deliberate choice rather than
+            // something easy to tap by accident or overlook entirely.
+            // onClick now goes through the shared handleSkipAction (also
+            // used by Phase 8.1's back-button guard above) instead of its
+            // own inline copy of the same guard logic.
             <button
-              onClick={async () => {
-                if (skipping) return
-                setSkipping(true)
-                try {
-                  await handleSkip()
-                } finally {
-                  // handleSkip navigates away on success, so this mostly
-                  // only matters if it throws — keeps the link from
-                  // getting stuck disabled/busy on a failed attempt.
-                  setSkipping(false)
-                }
-              }}
+              onClick={handleSkipAction}
               disabled={skipping}
-              aria-label="Skip for now"
+              aria-label="I'll do it later"
               style={{
-                border:                  'none',
-                background:              'none',
-                padding:                 'var(--space-1)',
+                border:                  '1px solid var(--color-border)',
+                borderRadius:            'var(--radius-full)',
+                background:              'var(--color-surface)',
+                padding:                 '6px 12px',
                 fontSize:                13,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
                 color:                   'var(--color-text-secondary)',
-                textDecoration:          'underline',
                 cursor:                  skipping ? 'default' : 'pointer',
                 opacity:                 skipping ? 0.6 : 1,
                 flexShrink:              0,
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {skipping ? 'Skipping…' : 'Skip'}
+              {skipping ? 'Skipping…' : "I'll do it later"}
             </button>
           ) : (!editing && (
             // offline-profile-account (2026-09-01): disabled outright
@@ -763,4 +794,3 @@ export default function AccountEditScreen() {
       />
     </div>
   )
-}
