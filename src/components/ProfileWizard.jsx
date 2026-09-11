@@ -84,6 +84,11 @@ import {
 } from 'lucide-react'
 import { AsYouType, isValidPhoneNumber, validatePhoneNumberLength } from 'libphonenumber-js'
 import ProfileAvatar from './ui/ProfileAvatar'
+// Phase 12 (Back-Button & State-Audit merged plan) — reuses the existing
+// shared dirty-tracking hook rather than inventing a one-off comparison,
+// so AccountEditScreen.jsx can know whether anything's actually changed
+// even though `values` itself lives entirely inside this component.
+import { useDirtyState } from '../hooks/useDirtyState'
 
 // ─── Static option data ─────────────────────────────────────────────────────
 
@@ -721,6 +726,26 @@ function isPhoneInvalid(dialCode, digits) {
   return !isValidPhoneNumber(digits, iso2)
 }
 
+// Phase 12 — shared by the `values` initializer below and the dirty-check
+// baseline, so the two always agree on shape. initialValues (AccountEditScreen's
+// `saved`) carries extra fields this wizard doesn't track (e.g.
+// profileSetupDismissed) — comparing the raw prop against `values` directly
+// would make isDirty true immediately on every open, since the key sets
+// would never match.
+function pickWizardFields(source) {
+  return {
+    fullName:         source?.fullName ?? '',
+    gender:           source?.gender ?? '',
+    phoneCountryCode: source?.phoneCountryCode ?? '',
+    phoneNumber:      source?.phoneNumber ?? '',
+    occupation:       source?.occupation ?? '',
+    occupationOther:  source?.occupationOther ?? '',
+    specialty:        source?.specialty ?? '',
+    studentType:      source?.studentType ?? '',
+    country:          source?.country ?? '',
+  }
+}
+
 // ─── Wizard ──────────────────────────────────────────────────────────────────
 
 
@@ -734,22 +759,31 @@ function isPhoneInvalid(dialCode, digits) {
  *   (never when editing an existing profile). Shows the big two-line welcome headline above Personal info on
  *   step 1. The actual Skip action now lives in AccountEditScreen's header, not here — this prop is just the
  *   headline's on/off switch.
+ * @param {(isDirty: boolean) => void} [props.onDirtyChange] — Phase 12 (Back-Button & State-Audit merged
+ *   plan): fires whenever `values` differs from `initialValues` (or stops differing). `values` lives entirely
+ *   inside this component, so this is the only way AccountEditScreen.jsx can know whether to warn about
+ *   unsaved changes before X / back / "I'll do it later" actually exit the edit flow. Optional — omitting it
+ *   changes nothing for any existing caller.
  */
-export default function ProfileWizard({ initialValues, user, onComplete, onBack, isWelcome }) {
+export default function ProfileWizard({ initialValues, user, onComplete, onBack, isWelcome, onDirtyChange }) {
   const [step, setStep]     = useState(1)
-  const [values, setValues] = useState({
-    fullName:         initialValues?.fullName ?? '',
-    gender:           initialValues?.gender ?? '',
-    phoneCountryCode: initialValues?.phoneCountryCode ?? '',
-    phoneNumber:      initialValues?.phoneNumber ?? '',
-    occupation:       initialValues?.occupation ?? '',
-    occupationOther:  initialValues?.occupationOther ?? '',
-    specialty:        initialValues?.specialty ?? '',
-    studentType:      initialValues?.studentType ?? '',
-    country:          initialValues?.country ?? '',
-  })
+  const [values, setValues] = useState(() => pickWizardFields(initialValues))
   const [saving, setSaving]     = useState(false)
   const [saveError, setSaveError] = useState(null)
+
+  // Phase 12 — compares the live form against the values this instance was
+  // opened with. The baseline is captured once (via the lazy useState
+  // initializer, same shape as `values` itself — see pickWizardFields
+  // above) rather than re-read from the initialValues prop on every render,
+  // since AccountEditScreen re-mounts a fresh ProfileWizard whenever editing
+  // starts/stops anyway, so this only ever reflects changes made in this
+  // session, and reports them upward so the parent can decide whether to
+  // warn before exiting.
+  const [initialSnapshot] = useState(() => pickWizardFields(initialValues))
+  const isDirty = useDirtyState(initialSnapshot, values)
+  useEffect(() => {
+    onDirtyChange?.(isDirty)
+  }, [isDirty, onDirtyChange])
   const [phoneSheetOpen, setPhoneSheetOpen] = useState(false)
   // Focus state for the plain text inputs (Full name, Other occupation,
   // phone number) — WizardDropdown tracks its own `open` state instead,

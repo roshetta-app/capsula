@@ -126,6 +126,7 @@ import { ROUTES } from '../router'
 import ProfileWizard from '../components/ProfileWizard'
 import ProfileAvatar from '../components/ui/ProfileAvatar'
 import DeleteAccountSheet from '../components/ui/DeleteAccountSheet'
+import ConfirmSheet from '../components/ui/ConfirmSheet'
 
 const EMPTY_FIELDS = {
   fullName:              '',
@@ -241,29 +242,22 @@ function ProfileHero({ user, fullName, occupationLine }) {
 }
 
 function ReadOnlySkeleton() {
+  // Phase 12.1 (Back-Button & State-Audit merged plan) — was a local
+  // .capsula-skeleton class + capsulaSkeletonPulse keyframes defined
+  // right here; now uses the shared .shimmer class (src/styles/globals.css)
+  // that ConditionsScreen/AccountScreen already use, so this reads as the
+  // same animation system app-wide instead of a slightly different one.
   return (
     <div>
-      <style>{`
-        @keyframes capsulaSkeletonPulse {
-          0%, 100% { opacity: 0.5; }
-          50% { opacity: 1; }
-        }
-        .capsula-skeleton {
-          animation: capsulaSkeletonPulse 1.4s ease-in-out infinite;
-          background-color: var(--color-border);
-          border-radius: var(--radius-sm);
-        }
-      `}</style>
-
       <div style={{
         display:       'flex',
         flexDirection: 'column',
         alignItems:    'center',
         marginBottom:  'var(--space-6)',
       }}>
-        <div className="capsula-skeleton" style={{ width: 72, height: 72, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-3)' }} />
-        <div className="capsula-skeleton" style={{ width: 140, height: 16, marginBottom: 'var(--space-2)' }} />
-        <div className="capsula-skeleton" style={{ width: 100, height: 12 }} />
+        <div className="shimmer" style={{ width: 72, height: 72, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-3)' }} />
+        <div className="shimmer" style={{ width: 140, height: 16, marginBottom: 'var(--space-2)' }} />
+        <div className="shimmer" style={{ width: 100, height: 12 }} />
       </div>
 
       {[5, 2].map((rowCount, groupIdx) => (
@@ -282,8 +276,8 @@ function ReadOnlySkeleton() {
               padding:      'var(--space-3) var(--space-1)',
               borderBottom: i === rowCount - 1 ? 'none' : '1px solid var(--color-border)',
             }}>
-              <div className="capsula-skeleton" style={{ width: 17, height: 17, flexShrink: 0 }} />
-              <div className="capsula-skeleton" style={{ width: '40%', height: 12 }} />
+              <div className="shimmer" style={{ width: 17, height: 17, flexShrink: 0 }} />
+              <div className="shimmer" style={{ width: '40%', height: 12 }} />
             </div>
           ))}
         </div>
@@ -357,7 +351,49 @@ export default function AccountEditScreen() {
   // forced setup through an unintended path. Guard is only active while
   // isFirstTimeSetup is true — normal editing (canCancel true) and the
   // read-only view are both unaffected.
-  useBackClose(isFirstTimeSetup, handleSkipAction)
+  useBackClose(isFirstTimeSetup, () => attemptExit('skip'))
+
+  // Phase 12 (Back-Button & State-Audit merged plan) — mirrors the guard
+  // above, but for the normal pencil-icon edit flow (canCancel true): back
+  // closes the edit view the same way the X button does, instead of
+  // falling through to whatever the device's default back action would
+  // otherwise be. Both guards route through attemptExit (below) rather
+  // than calling their exit action directly, so an in-progress, unsaved
+  // change gets the same confirmation every exit path shares.
+  useBackClose(canCancel, () => attemptExit('cancel'))
+
+  // Phase 12 — tracks whether the open ProfileWizard has any unsaved
+  // changes (reported by its own onDirtyChange prop — see that file,
+  // since `values` itself lives entirely inside it) and gates every exit
+  // path (X button, the two back-close guards above, "I'll do it later")
+  // behind one shared confirmation instead of silently discarding
+  // whatever was typed.
+  const [isDirty, setIsDirty] = useState(false)
+  const [unsavedConfirmOpen, setUnsavedConfirmOpen] = useState(false)
+  const pendingExitRef = useRef(null) // 'cancel' | 'skip'
+
+  // Runs the actual exit action. For 'skip' this returns handleSkipAction's
+  // promise so ConfirmSheet's existing async support (Phase 3) can show
+  // "Working…" and a real connection-error message if it fails offline,
+  // instead of closing optimistically — same pattern Phase 11 already uses
+  // for FavouritesScreen's removal confirm.
+  function runExit(action) {
+    if (action === 'skip') return handleSkipAction()
+    handleCancelEdit()
+  }
+
+  function attemptExit(action) {
+    if (isDirty) {
+      pendingExitRef.current = action
+      setUnsavedConfirmOpen(true)
+      return
+    }
+    runExit(action)
+  }
+
+  function handleConfirmDiscard() {
+    return runExit(pendingExitRef.current)
+  }
 
   // offline-profile-account (2026-09-01) — decides once per signed-in
   // user whether to auto-open the wizard (first-time signup, or the
@@ -484,10 +520,18 @@ export default function AccountEditScreen() {
   // fired this redirect on the brief null tick every single mount, even
   // for an already-signed-in user, sending them straight back to /account
   // before the real session ever had a chance to load (bug fix, 2026-08-21).
-  if (loading) return null
-
+  //
+  // Phase 12.1 (Back-Button & State-Audit merged plan) — this used to be a
+  // separate `if (loading) return null` above this check, which blanked
+  // the whole screen (header included) while loading, and meant
+  // ReadOnlySkeleton below could never actually render — by the time
+  // execution reached it, loading was already guaranteed false. Folded
+  // into one check: the redirect-race protection is unchanged (still only
+  // fires once loading has resolved), but the header/main now render
+  // during the loading tick too, so `loading ? <ReadOnlySkeleton /> : ...`
+  // further down actually shows the skeleton instead of a blank screen.
   // Signed out (stale bookmark, deep link, etc.) — nothing to edit.
-  if (!user) {
+  if (!loading && !user) {
     navigate(ROUTES.ACCOUNT, { replace: true })
     return null
   }
@@ -570,7 +614,7 @@ export default function AccountEditScreen() {
         {!loading && (
           canCancel ? (
             <button
-              onClick={handleCancelEdit}
+              onClick={() => attemptExit('cancel')}
               aria-label="Cancel editing"
               style={{
                 border:     'none',
@@ -600,8 +644,11 @@ export default function AccountEditScreen() {
             // onClick now goes through the shared handleSkipAction (also
             // used by Phase 8.1's back-button guard above) instead of its
             // own inline copy of the same guard logic.
+            // Phase 12: now routed through attemptExit, same as the X
+            // button and both back-close guards, so an unsaved change
+            // gets the same confirmation here too.
             <button
-              onClick={handleSkipAction}
+              onClick={() => attemptExit('skip')}
               disabled={skipping}
               aria-label="I'll do it later"
               style={{
@@ -679,13 +726,21 @@ export default function AccountEditScreen() {
             // this case. Step 2 -> step 1 navigation inside the wizard is
             // unaffected either way. Existing users editing via the pencil
             // icon (canCancel true) are unaffected.
-            onBack={canCancel ? handleCancelEdit : undefined}
+            // Phase 12: routed through attemptExit rather than
+            // handleCancelEdit directly — this footer Back button is the
+            // same exit action as the header's X button (both end the
+            // canCancel edit session), so it gets the same unsaved-changes
+            // confirmation instead of a silent, unwarned discard.
+            onBack={canCancel ? () => attemptExit('cancel') : undefined}
             // welcome-header-skip: Skip itself moved to the header button
             // above — the wizard just needs to know whether this is the
             // first-time welcome flow, to show its big welcome headline
             // (see ProfileWizard.jsx). Same canCancel condition as before,
             // just renamed for clarity now that it's not tied to Skip.
             isWelcome={!canCancel}
+            // Phase 12: reports whether the form has unsaved changes, so
+            // every exit path above can decide whether to confirm first.
+            onDirtyChange={setIsDirty}
           />
         ) : (
           <div>
@@ -791,6 +846,23 @@ export default function AccountEditScreen() {
         onClose={() => setDeleteSheetOpen(false)}
         onConfirm={handleDeleteAccount}
         busy={deleting}
+      />
+
+      {/* Phase 12 (Back-Button & State-Audit merged plan) — shown whenever
+          X, either back-close guard, or "I'll do it later" is triggered
+          while the open wizard has unsaved changes (see attemptExit
+          above). Confirming runs the originally-requested exit action;
+          for the "skip" path that's async, so onConfirm returns its
+          promise and lets this sheet's own busy/failure state (Phase 3)
+          handle a genuine offline failure instead of closing early. */}
+      <ConfirmSheet
+        isOpen={unsavedConfirmOpen}
+        onClose={() => setUnsavedConfirmOpen(false)}
+        onConfirm={handleConfirmDiscard}
+        title="Unsaved changes"
+        message="You have unsaved changes. Are you sure you want to leave without saving?"
+        confirmLabel="Discard"
+        destructive
       />
     </div>
   )
