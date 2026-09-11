@@ -458,7 +458,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
+import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2, Loader2 } from 'lucide-react'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -710,6 +710,33 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCa
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── Loading placeholder: first-load guard ──────────────────────────────────
+// Phase 11 (Back-Button & State-Audit merged plan) — shown in place of
+// NothingSavedEmptyState while a tab's underlying context is still on its
+// very first load. Without this, a slow first load could show "Nothing
+// saved yet" for a moment before the real (non-empty) list arrives, which
+// reads as a false claim rather than a loading state. Deliberately
+// lightweight — a small centered spinner, same technique already used for
+// AccountScreen's own loading guard (Loader2 from lucide-react, plain CSS
+// keyframe rotation) — not a shaped skeleton, since this only needs to
+// cover a brief first-load window, not a large content area.
+
+function FavouritesLoadingPlaceholder() {
+  return (
+    <div style={{
+      display:        'flex',
+      justifyContent: 'center',
+      padding:        'var(--space-12) var(--space-4)',
+    }}>
+      <Loader2
+        size={28}
+        strokeWidth={2}
+        style={{ color: 'var(--color-text-tertiary)', animation: 'favLoadingSpin 0.8s linear infinite' }}
+      />
     </div>
   )
 }
@@ -1514,6 +1541,12 @@ export default function FavouritesScreen() {
     })
   }
 
+  // Back-button handling (Phase 11, Back-Button & State-Audit merged plan) —
+  // while searching, back closes the search first (same close action as the
+  // header's own back-arrow) instead of leaving the screen. Same shared
+  // hook already used below for manage mode.
+  useBackClose(isSearching, toggleSearch)
+
   // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
   // Phase 6 note below) ───────────────────────────────────────────────────
   const [isManaging, setIsManaging] = useState(false)
@@ -1587,10 +1620,27 @@ export default function FavouritesScreen() {
   }
 
   const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt } = useFavouritesContext()
-  const { conditions, specialties } = useConditionContext()
-  const { drugs }      = useDrugContext()
+  const { conditions, specialties, loading: conditionsLoading } = useConditionContext()
+  const { drugs, loading: drugsLoading } = useDrugContext()
   const { user } = useAuth()
   const isPro = useIsPro()
+
+  // Loading-flag fix (Phase 11, Back-Button & State-Audit merged plan) —
+  // each flag latches to true the first time its context's own loading
+  // flag resolves to false, and stays true from then on (a later refresh
+  // going back to loading briefly shouldn't re-show the loading placeholder
+  // over an already-known, possibly non-empty list). Read by
+  // FavouritesLoadingPlaceholder's render guard below, per tab.
+  const [conditionsEverLoaded, setConditionsEverLoaded] = useState(false)
+  const [drugsEverLoaded, setDrugsEverLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!conditionsLoading) setConditionsEverLoaded(true)
+  }, [conditionsLoading])
+
+  useEffect(() => {
+    if (!drugsLoading) setDrugsEverLoaded(true)
+  }, [drugsLoading])
 
   // Look up full objects from context. Memoized — without this, a new array
   // reference was created every render, which re-triggered
@@ -1935,6 +1985,10 @@ export default function FavouritesScreen() {
           from { opacity: 0; max-height: 0; transform: translateY(-6px); }
           to   { opacity: 1; max-height: 120px; transform: translateY(0); }
         }
+        @keyframes favLoadingSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
         .fav-search-micro input {
           padding-left: 34px !important;
           height: 40px !important;
@@ -2017,7 +2071,9 @@ export default function FavouritesScreen() {
                     onClear={() => setActiveSpecialty('all')}
                   />
                 )}
-                {savedConditions.length === 0
+                {!conditionsEverLoaded ? (
+                  <FavouritesLoadingPlaceholder />
+                ) : savedConditions.length === 0
                   ? <NothingSavedEmptyState label="conditions" />
                   : conditionSearchEmpty
                     ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
@@ -2117,7 +2173,9 @@ export default function FavouritesScreen() {
                     <ProUpsellBanner subtitle="Unlock unlimited favourites" />
                   </div>
                 )}
-                {savedDrugs.length === 0
+                {!drugsEverLoaded ? (
+                  <FavouritesLoadingPlaceholder />
+                ) : savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
                 : savedDrugs.map((drug, i) => (
                     <SharedDrugCard
