@@ -7,16 +7,36 @@
  *
  * - Wires this app's own back-close behavior (useBackClose) so hardware/
  *   browser back closes the sheet instead of changing the route.
- * - Locks <html> scrolling while open. vaul's own scroll-lock only covers
- *   <body>, but this app's page actually scrolls via <html>, so without
- *   this the page behind the sheet could still move during a drag.
- *   `touch-action: none` was tried here too on 2026-09-09, on the theory
- *   that `overflow: hidden` alone wasn't enough — reverted the same day:
- *   it affects every descendant of <html>, including the sheet itself,
- *   and broke the sheet's own ability to tell a scroll over its list from
- *   a drag on the sheet. A real fix for the page-drags-along symptom
- *   needs to be scoped to the page's own content, not to <html> — not yet
- *   attempted.
+ * - Locks the page in place while open by pinning <html> with
+ *   `position: fixed` (saving and restoring the exact scroll position),
+ *   rather than the earlier `overflow: hidden`-only lock. This app's page
+ *   scrolls via <html>, not <body>, which is why vaul's own built-in
+ *   scroll-lock (aimed at <body>) doesn't cover it. History on this exact
+ *   spot, for anyone revisiting it:
+ *     - `overflow: hidden` alone (the original approach here) is a
+ *       known-weak technique on mobile — many browsers/WebViews still let
+ *       a touch-drag "reach through" an `overflow: hidden` element and
+ *       scroll it anyway. Confirmed present on this app's real APK, not
+ *       just a PWA quirk.
+ *     - `touch-action: none` added on top of it (2026-09-09) fixed that,
+ *       but broke the sheet's own drag-vs-scroll handling — the property
+ *       cascades to every descendant of <html>, including the sheet
+ *       itself and its inner list, so the browser could no longer tell a
+ *       scroll over the list from a drag on the sheet. Reverted same day.
+ *       Do not reapply `touch-action: none` broadly to <html> again.
+ *     - `position: fixed` (this version) was then built and tested
+ *       on-device successfully, but reverted the same day anyway with no
+ *       specific broken behavior identified — worth double-checking
+ *       on-device again for anything subtle (a visible jump/flicker on
+ *       open or close, or the sheet's own inner list losing its scroll)
+ *       before trusting this is fully clean. `position: fixed` removes
+ *       the element from being scrollable at all, rather than just
+ *       hiding overflow, so there's no drag gesture left for the browser
+ *       to misinterpret in the first place — this is also what vaul's
+ *       own built-in lock does, just at <body> by default. The sheet's
+ *       own scrollable content lives in a separate element from <html>
+ *       (its own list, inside its own box), so it isn't the element being
+ *       pinned here and shouldn't be affected.
  * - The drag surface (Drawer.Content) never scrolls itself — it's
  *   `overflow: hidden` here, full stop. Any inner scrollable content
  *   (e.g. the specialty list) handles its own scroll separately, inside
@@ -61,10 +81,23 @@ export default function SheetShell({
   useEffect(() => {
     if (!isOpen) return
     const html = document.documentElement
+    const scrollY = window.scrollY
+    const prevPosition = html.style.position
+    const prevTop = html.style.top
+    const prevWidth = html.style.width
     const prevOverflow = html.style.overflow
+
+    html.style.position = 'fixed'
+    html.style.top = `-${scrollY}px`
+    html.style.width = '100%'
     html.style.overflow = 'hidden'
+
     return () => {
+      html.style.position = prevPosition
+      html.style.top = prevTop
+      html.style.width = prevWidth
       html.style.overflow = prevOverflow
+      window.scrollTo(0, scrollY)
     }
   }, [isOpen])
 
