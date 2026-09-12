@@ -48,6 +48,16 @@
  * - `closeThreshold` defaults to 0.4 (raised from vaul's own 0.25
  *   default) so a light, accidental touch doesn't close the sheet — it
  *   takes a real, deliberate drag or a fast flick before it lets go.
+ * - `disablePreventScroll` (2026-09-12): vaul runs its own automatic
+ *   background-scroll-lock on every open, applying `position: fixed`
+ *   directly to `<body>` unless this is set. This app's page scrolls via
+ *   `<html>`, not `<body>` — so vaul was quietly running a second,
+ *   uncoordinated lock on an element that was never actually the one
+ *   scrolling, at the same time as the `<html>` lock above. Two
+ *   independent scroll-locks fighting over two different elements is the
+ *   likely real explanation for why every earlier attempt at the `<html>`
+ *   lock alone (see history above) never fully settled — this flag lets
+ *   the `<html>` lock above be the only one running.
  */
 
 import { useEffect } from 'react'
@@ -106,6 +116,7 @@ export default function SheetShell({
       open={isOpen}
       onOpenChange={(open) => { if (!open) onClose() }}
       closeThreshold={closeThreshold}
+      disablePreventScroll
     >
       <Drawer.Portal>
         <Drawer.Overlay
