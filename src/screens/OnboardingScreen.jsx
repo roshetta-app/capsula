@@ -414,23 +414,15 @@ function useCombinedLibraryProgress() {
   return { fraction, done, failed, start, retry, hasRealProgress, categories }
 }
 
-// 2026-09-12 (onboarding-redesign-refine): plain "loaded of total" label
-// for one Downloading-state row — deliberately no unit word ("batch",
-// "page", etc.) attached, per the refined-copy decision: just the numbers.
-// Never fabricates a number — a category with nothing to report yet reads
-// "Waiting…" rather than a fake 0.
-function categoryStatusLabel(category) {
-  if (category.done) return 'Done'
-  if (category.progress && category.progress.total > 0) {
-    return `${category.progress.loaded} of ${category.progress.total}`
-  }
-  return 'Waiting…'
-}
-
 // One row of the Downloading state's per-category breakdown. `dotColor`
 // mirrors the pending/downloading/completed states called for in the
 // brief — hollow gray (pending), filled accent (downloading), filled
 // green (completed) — without needing a separate icon asset.
+//
+// 2026-09-12 (spinner-not-counts): the right-hand side no longer shows a
+// raw "X of Y" number — replaced with a plain spinning ring while a
+// category is actively downloading, and nothing extra once it's done (the
+// checkmark on the left already says so) or while it's still pending.
 function CategoryRow({ name, category }) {
   const state = category.done ? 'done' : (category.progress ? 'active' : 'pending')
   const dotColor = state === 'done' ? COLORS.success : state === 'active' ? COLORS.accent : COLORS.dotInactive
@@ -447,7 +439,17 @@ function CategoryRow({ name, category }) {
         )}
       </div>
       <div style={{ flex: 1, textAlign: 'left', fontSize: 14, color: COLORS.textPrimary }}>{name}</div>
-      <div style={{ fontSize: 13, color: COLORS.textSecondary }}>{categoryStatusLabel(category)}</div>
+      {state === 'active' && (
+        <div
+          className="capsula-onboarding-spinner"
+          style={{
+            width: 16, height: 16, borderRadius: '50%',
+            border: `2px solid ${COLORS.dotInactive}`,
+            borderTopColor: COLORS.accent,
+          }}
+          aria-label="Downloading"
+        />
+      )}
     </div>
   )
 }
@@ -773,6 +775,10 @@ export default function OnboardingScreen({ onDone }) {
         transition: `opacity ${COMPLETE_FADE_MS}ms ease`,
       }}
     >
+      {/* 2026-09-12: single small stylesheet for the Downloading state's
+          per-category spinner (CategoryRow above) — inline styles alone
+          can't express a CSS keyframe animation. */}
+      <style>{'@keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } } .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }'}</style>
       <div
         style={{
           display:       'flex',
@@ -782,12 +788,18 @@ export default function OnboardingScreen({ onDone }) {
           transition:    `opacity ${SLIDE_FADE_MS}ms ease`,
         }}
       >
-      {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ── */}
+      {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
+          2026-09-12: shrunk further once setup begins — the Preparing/
+          Downloading/Error/Success illustrations are already much smaller
+          than a slide illustration, so giving the card more height here is
+          a free win, not a visual cost. Combined with the card's own
+          scroll fallback below, this is the fix for the Downloading
+          state's content overflowing with no way to reach what's cut off. */}
       <div
         style={{
           position:        'relative',
           flex:            '0 0 auto',
-          height:          HERO_HEIGHT,
+          height:          setupStarted ? '38%' : HERO_HEIGHT,
           backgroundColor: heroOnBlue ? COLORS.heroBlue : COLORS.surface,
           display:         'flex',
           flexDirection:   'column',
@@ -881,7 +893,12 @@ export default function OnboardingScreen({ onDone }) {
         )}
       </div>
 
-      {/* ── Card area ── */}
+      {/* ── Card area — 2026-09-12: scrolls internally if its content runs
+            taller than the available space (e.g. the Downloading state's
+            title + bar + 3-row breakdown on a shorter phone), instead of
+            silently clipping content with no way to reach it. Standard,
+            sturdier fix than resizing the sheet to fit today's content —
+            it keeps working regardless of message length or screen size. ── */}
       <div
         style={{
           flex:            1,
@@ -896,6 +913,8 @@ export default function OnboardingScreen({ onDone }) {
           position:        'relative',
           zIndex:          1,
           boxShadow:       '0 -4px 20px rgba(0,0,0,0.04)',
+          overflowY:       'auto',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Dots — visual progress indicator only, not interactive: no
@@ -1095,7 +1114,10 @@ export default function OnboardingScreen({ onDone }) {
             onClick={next}
             style={{
               ...PRIMARY_BUTTON_STYLE,
-              width:     current === 0 ? '100%' : 'auto',
+              // 2026-09-12: Next is now always full-width, matching the
+              // Welcome slide's "Let's Get Started" button — previously
+              // only slide 1 was full-width, the rest were auto-sized.
+              width:     '100%',
               marginTop: 12,
             }}
             onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
