@@ -160,6 +160,14 @@
  * with a small translateY(6px) rise instead of being a flat opacity-only
  * cross-fade; and the completion fade-out now scales down slightly
  * (0.98) to match the opening animation, instead of a plain fade.
+ *
+ * 2026-09-12 (fifth pass, same day): HERO_HEIGHT increased again, 46% →
+ * 50% (sheet is shorter still), and slides 2-4's illustration box grown
+ * again, 52%/58% → 56%/62%. The sheet has had no scroll fallback since the
+ * second pass — every further reduction makes the Downloading state (the
+ * tallest content: title + bar + 3-row breakdown) more likely to actually
+ * clip on a short device rather than just look cramped. Genuinely worth
+ * checking that specific screen this time, not just the general layout.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -195,7 +203,7 @@ const FONT_BODY = '"IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif'
 // Same height on every slide — was 55% (slides 2–5) vs 57% (slide 1), which
 // put the white card's rounded top at a slightly different point depending
 // on the slide.
-const HERO_HEIGHT = '46%'
+const HERO_HEIGHT = '50%'
 
 // ─── Slide data ─────────────────────────────────────────────────────────────
 const SLIDES = [
@@ -934,8 +942,8 @@ export default function OnboardingScreen({ onDone }) {
               // more visual weight; slide 1's full-bleed photo (heroOnBlue
               // false) is untouched, per brief — it's the brand-welcome
               // moment and can stay prominent.
-              width:     heroOnBlue ? '52%' : '100%',
-              height:    heroOnBlue ? '58%' : '100%',
+              width:     heroOnBlue ? '56%' : '100%',
+              height:    heroOnBlue ? '62%' : '100%',
               objectFit: heroOnBlue ? 'contain' : 'cover',
               flex:      heroOnBlue ? undefined : 1,
               // 'auto 0' (top/bottom auto, left/right 0) centers the image
