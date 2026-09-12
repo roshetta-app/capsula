@@ -178,6 +178,14 @@
  * render instead (see slideVisible below) so the hidden state is in place
  * before the new slide ever paints — this is the actual fix, not a timing
  * tweak.
+ *
+ * 2026-09-12 (seventh pass, same day): the Preparing state had no minimum
+ * display time — it was shown until hasRealProgress flipped true, which
+ * could happen in well under a frame on a fast connection (the first
+ * page-count response landing counts as "real progress" even at 0
+ * downloaded), so Preparing flashed by too fast to actually read. Added
+ * PREPARING_FLOOR_MS (900ms), mirroring how LOADING_FLOOR_MS already
+ * guarantees a minimum display time elsewhere on this slide.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -285,6 +293,13 @@ const SUCCESS_HOLD_MS = 900
 // runs for the offline pre-check case in 1.12, since no attempt is made
 // there at all.
 const DOWNLOAD_TIMEOUT_MS = 28000
+
+// How long the Preparing state is guaranteed to stay visible before it's
+// allowed to hand off to Downloading, regardless of how fast the first
+// real progress signal comes back. Without this, a fast connection could
+// get its first page-count response back in well under a frame, and
+// Preparing would flash by too quickly to actually read.
+const PREPARING_FLOOR_MS = 900
 
 // How long the whole screen takes to fade out once onboarding completes,
 // instead of cutting straight to the real app (plan step 1.15).
@@ -659,6 +674,9 @@ export default function OnboardingScreen({ onDone }) {
   // below.
   const [showSuccess, setShowSuccess] = useState(false)
   const alreadyDoneAtEntryRef = useRef(false)
+  // 2026-09-12 (bugfix): mirrors floorElapsed above, but for the Preparing
+  // state specifically — see PREPARING_FLOOR_MS.
+  const [preparingFloorElapsed, setPreparingFloorElapsed] = useState(false)
 
   useEffect(() => {
     if (!setupStarted) {
@@ -666,16 +684,19 @@ export default function OnboardingScreen({ onDone }) {
       setEntryFillStarted(false)
       setShowSuccess(false)
       setTimedOut(false)
+      setPreparingFloorElapsed(false)
       return
     }
     alreadyDoneAtEntryRef.current = doneRef.current
     setEntryFillStarted(false)
     const floorTimer = setTimeout(() => setFloorElapsed(true), LOADING_FLOOR_MS)
+    const preparingFloorTimer = setTimeout(() => setPreparingFloorElapsed(true), PREPARING_FLOOR_MS)
     // Flips on the next frame (not synchronously) so the width change
     // below is picked up as a CSS transition instead of an instant jump.
     const fillFrame = requestAnimationFrame(() => setEntryFillStarted(true))
     return () => {
       clearTimeout(floorTimer)
+      clearTimeout(preparingFloorTimer)
       cancelAnimationFrame(fillFrame)
     }
   }, [setupStarted])
@@ -803,10 +824,11 @@ export default function OnboardingScreen({ onDone }) {
   // 2026-09-12 (onboarding-redesign-refine): Preparing is shown from the
   // instant setup begins until either library's first real signal comes
   // back (hasRealProgress) — see useCombinedLibraryProgress's comment.
-  // Once failed/showSuccess/hasRealProgress, this is moot (those states
-  // take over below), so it only actually matters for the brief window
-  // right after Next is tapped.
-  const showPreparing = setupStarted && !failed && !showSuccess && !hasRealProgress
+  // 2026-09-12 (bugfix): also gated on preparingFloorElapsed now — on a
+  // fast connection, hasRealProgress could flip true in well under a
+  // frame, and Preparing would flash by too fast to read. See
+  // PREPARING_FLOOR_MS.
+  const showPreparing = setupStarted && !failed && !showSuccess && (!hasRealProgress || !preparingFloorElapsed)
 
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
