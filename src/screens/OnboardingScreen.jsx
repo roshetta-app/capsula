@@ -129,7 +129,10 @@
  * that slide 5's setup states already had. Slides 2-4's PNG illustrations
  * now get a fixed height (46%) instead of 'auto' capped at a maxHeight, so
  * all three render at the same size regardless of each file's own aspect
- * ratio, instead of each auto-sizing to a different height.
+ * ratio, instead of each auto-sizing to a different height. The Downloading
+ * and Success copy no longer claims Capsula works "without an internet
+ * connection" — that's a Pro-only capability, so both moments now read as
+ * quick, on-device access instead of a blanket offline promise.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -966,10 +969,10 @@ export default function OnboardingScreen({ onDone }) {
                 {failed
                   ? failedMessage
                   : showSuccess
-                    ? 'Your offline library is ready. You can now use Capsula without an internet connection.'
+                    ? 'Your library is ready for quick access, right on this device.'
                     : showPreparing
                       ? 'Getting everything ready for offline access.'
-                      : 'Your medical reference is being saved so you can use Capsula without an internet connection.'}
+                      : 'Setting up your library for quick access.'}
               </p>
             </>
           ) : slide.brand ? (
