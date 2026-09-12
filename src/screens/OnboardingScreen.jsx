@@ -144,6 +144,16 @@
  * fixed card without it. Since there's no scroll fallback left, this is
  * worth a real check on a short device — the Downloading state has the
  * most content of any slide and is the one most likely to run tight.
+ *
+ * 2026-09-12 (third pass, same day): both the Downloading and Success
+ * category lists are now ordered fastest-to-slowest — Images & references,
+ * then Drug library, then Medical library last — instead of the previous
+ * fixed conditions/drugs/photos order. Medical library last is confirmed
+ * (it's the one observed to finish last in practice). The Images-before-
+ * Drugs ordering is an assumption based on CONDITIONS_WEIGHT/PHOTOS_WEIGHT
+ * giving drugs the dominant 70% share of the bar (usually the largest
+ * dataset loads slowest) — not confirmed against real device timings, so
+ * worth flagging if it doesn't match what's actually observed.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -1058,11 +1068,9 @@ export default function OnboardingScreen({ onDone }) {
             // deliberately no Continue button anywhere (brief §17).
             <div style={{ width: '100%', marginTop: 4 }}>
               <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px' }}>
-                <CategoryRow name="Medical library" category={categories.conditions} />
-                <CategoryRow name="Drug library" category={categories.drugs} />
                 <CategoryRow name="Images & references" category={categories.photos} />
-              </div>
-              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 12 }}>
+                <CategoryRow name="Drug library" category={categories.drugs} />
+                <CategoryRow name="Medical library" category={categories.conditions} />
                 Opening Capsula…
               </div>
             </div>
@@ -1119,9 +1127,9 @@ export default function OnboardingScreen({ onDone }) {
                 {Math.round(displayFraction * 100)}%
               </div>
               <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px', textAlign: 'left' }}>
-                <CategoryRow name="Medical library" category={categories.conditions} />
-                <CategoryRow name="Drug library" category={categories.drugs} />
                 <CategoryRow name="Images & references" category={categories.photos} />
+                <CategoryRow name="Drug library" category={categories.drugs} />
+                <CategoryRow name="Medical library" category={categories.conditions} />
               </div>
             </div>
           )
