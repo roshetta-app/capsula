@@ -145,15 +145,21 @@
  * worth a real check on a short device — the Downloading state has the
  * most content of any slide and is the one most likely to run tight.
  *
- * 2026-09-12 (third pass, same day): both the Downloading and Success
- * category lists are now ordered fastest-to-slowest — Images & references,
- * then Drug library, then Medical library last — instead of the previous
- * fixed conditions/drugs/photos order. Medical library last is confirmed
- * (it's the one observed to finish last in practice). The Images-before-
- * Drugs ordering is an assumption based on CONDITIONS_WEIGHT/PHOTOS_WEIGHT
- * giving drugs the dominant 70% share of the bar (usually the largest
- * dataset loads slowest) — not confirmed against real device timings, so
- * worth flagging if it doesn't match what's actually observed.
+ * 2026-09-12 (third pass, same day, superseded below): category lists were
+ * briefly ordered Images, Drugs, Medical last, on an assumption about the
+ * bar's weight split. Corrected in the next pass.
+ *
+ * 2026-09-12 (fourth pass, same day): confirmed order is Medical library
+ * first, Images & references second, Drug library last (slowest) — applied
+ * to both the Downloading and Success lists. This pass also fixed a
+ * regression from the previous pass where "Opening Capsula…" had ended up
+ * merged inside the category box instead of its own centered line below
+ * it; it's now back in its own div, explicitly centered. Added: a fade +
+ * slight scale-in (OPEN_FADE_MS) when the screen first mounts, so slide 1
+ * doesn't just snap into view; the existing between-slide fade now pairs
+ * with a small translateY(6px) rise instead of being a flat opacity-only
+ * cross-fade; and the completion fade-out now scales down slightly
+ * (0.98) to match the opening animation, instead of a plain fade.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -265,6 +271,10 @@ const DOWNLOAD_TIMEOUT_MS = 28000
 // How long the whole screen takes to fade out once onboarding completes,
 // instead of cutting straight to the real app (plan step 1.15).
 const COMPLETE_FADE_MS = 400
+
+// How long the whole screen takes to fade + scale in when onboarding first
+// mounts, instead of just snapping into view on open.
+const OPEN_FADE_MS = 380
 
 // How long each slide takes to fade in on arrival (plan step 1.15).
 const SLIDE_FADE_MS = 220
@@ -786,13 +796,25 @@ export default function OnboardingScreen({ onDone }) {
   // 2026-08-31 (plan step 1.15): fades the slide content in on arrival —
   // starts hidden, flips visible next frame so the opacity change is
   // picked up as a transition rather than an instant jump (same
-  // next-frame trick as entryFillStarted above).
+  // next-frame trick as entryFillStarted above). 2026-09-12: paired with a
+  // slight translateY so slide changes read as a gentle rise-in rather
+  // than a flat cross-fade — kept small (6px) to stay subtle.
   const [slideVisible, setSlideVisible] = useState(false)
   useEffect(() => {
     setSlideVisible(false)
     const frame = requestAnimationFrame(() => setSlideVisible(true))
     return () => cancelAnimationFrame(frame)
   }, [current])
+
+  // 2026-09-12: fades + slightly scales the whole screen in the instant it
+  // mounts, instead of the first slide just snapping into view on open.
+  // Same next-frame trick as slideVisible above — starts hidden so the
+  // transition is picked up rather than skipped.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
 
   return (
     <div
@@ -803,8 +825,11 @@ export default function OnboardingScreen({ onDone }) {
         fontFamily: FONT_BODY,
         userSelect: 'none',
         zIndex:     9999,
-        opacity:    completing ? 0 : 1,
-        transition: `opacity ${COMPLETE_FADE_MS}ms ease`,
+        opacity:    mounted && !completing ? 1 : 0,
+        transform:  mounted && !completing ? 'scale(1)' : 'scale(0.98)',
+        transition: completing
+          ? `opacity ${COMPLETE_FADE_MS}ms ease, transform ${COMPLETE_FADE_MS}ms ease`
+          : `opacity ${OPEN_FADE_MS}ms ease, transform ${OPEN_FADE_MS}ms ease`,
       }}
     >
       {/* 2026-09-12: single small stylesheet for the Downloading state's
@@ -817,16 +842,15 @@ export default function OnboardingScreen({ onDone }) {
           flexDirection: 'column',
           height:        '100%',
           opacity:       slideVisible ? 1 : 0,
-          transition:    `opacity ${SLIDE_FADE_MS}ms ease`,
+          transform:     slideVisible ? 'translateY(0)' : 'translateY(6px)',
+          transition:    `opacity ${SLIDE_FADE_MS}ms ease, transform ${SLIDE_FADE_MS}ms ease`,
         }}
       >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
-          2026-09-12: shrunk further once setup begins — the Preparing/
-          Downloading/Error/Success illustrations are already much smaller
-          than a slide illustration, so giving the card more height here is
-          a free win, not a visual cost. Combined with the card's own
-          scroll fallback below, this is the fix for the Downloading
-          state's content overflowing with no way to reach what's cut off. */}
+          2026-09-12: hero height is fixed and identical on every slide
+          (see HERO_HEIGHT) — the sheet below has no scroll fallback, so
+          content on every slide needs to fit within its fixed share of
+          the screen. */}
       <div
         style={{
           position:        'relative',
@@ -1068,9 +1092,11 @@ export default function OnboardingScreen({ onDone }) {
             // deliberately no Continue button anywhere (brief §17).
             <div style={{ width: '100%', marginTop: 4 }}>
               <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px' }}>
+                <CategoryRow name="Medical library" category={categories.conditions} />
                 <CategoryRow name="Images & references" category={categories.photos} />
                 <CategoryRow name="Drug library" category={categories.drugs} />
-                <CategoryRow name="Medical library" category={categories.conditions} />
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 12, textAlign: 'center' }}>
                 Opening Capsula…
               </div>
             </div>
@@ -1127,9 +1153,9 @@ export default function OnboardingScreen({ onDone }) {
                 {Math.round(displayFraction * 100)}%
               </div>
               <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px', textAlign: 'left' }}>
+                <CategoryRow name="Medical library" category={categories.conditions} />
                 <CategoryRow name="Images & references" category={categories.photos} />
                 <CategoryRow name="Drug library" category={categories.drugs} />
-                <CategoryRow name="Medical library" category={categories.conditions} />
               </div>
             </div>
           )
