@@ -127,12 +127,23 @@
  * slide, not just once setup begins — the setupStarted ternary on the hero
  * area's height is gone, so slides 1-4 now use the same taller card/sheet
  * that slide 5's setup states already had. Slides 2-4's PNG illustrations
- * now get a fixed height (46%) instead of 'auto' capped at a maxHeight, so
- * all three render at the same size regardless of each file's own aspect
+ * now get a fixed height instead of 'auto' capped at a maxHeight, so all
+ * three render at the same size regardless of each file's own aspect
  * ratio, instead of each auto-sizing to a different height. The Downloading
  * and Success copy no longer claims Capsula works "without an internet
  * connection" — that's a Pro-only capability, so both moments now read as
  * quick, on-device access instead of a blanket offline promise.
+ *
+ * 2026-09-12 (second pass, same day): HERO_HEIGHT reduced to 46% (sheet is
+ * shorter, hero/illustrations are bigger) and slides 2-4's illustration box
+ * grown to 52%/58%. The card's scroll fallback (overflowY: auto) is gone —
+ * the sheet is now a genuinely fixed size on every slide, including the
+ * setup states, with no scrolling or height auto-adjustment of any kind.
+ * The setup states' top spacer was trimmed (20/20 → 8/12) to help the
+ * Downloading state's title + bar + 3-row breakdown fit in the smaller,
+ * fixed card without it. Since there's no scroll fallback left, this is
+ * worth a real check on a short device — the Downloading state has the
+ * most content of any slide and is the one most likely to run tight.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -168,7 +179,7 @@ const FONT_BODY = '"IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif'
 // Same height on every slide — was 55% (slides 2–5) vs 57% (slide 1), which
 // put the white card's rounded top at a slightly different point depending
 // on the slide.
-const HERO_HEIGHT = '38%'
+const HERO_HEIGHT = '46%'
 
 // ─── Slide data ─────────────────────────────────────────────────────────────
 const SLIDES = [
@@ -889,8 +900,8 @@ export default function OnboardingScreen({ onDone }) {
               // more visual weight; slide 1's full-bleed photo (heroOnBlue
               // false) is untouched, per brief — it's the brand-welcome
               // moment and can stay prominent.
-              width:     heroOnBlue ? '42%' : '100%',
-              height:    heroOnBlue ? '46%' : '100%',
+              width:     heroOnBlue ? '52%' : '100%',
+              height:    heroOnBlue ? '58%' : '100%',
               objectFit: heroOnBlue ? 'contain' : 'cover',
               flex:      heroOnBlue ? undefined : 1,
               // 'auto 0' (top/bottom auto, left/right 0) centers the image
@@ -905,10 +916,7 @@ export default function OnboardingScreen({ onDone }) {
 
       {/* ── Card area — 2026-09-12: scrolls internally if its content runs
             taller than the available space (e.g. the Downloading state's
-            title + bar + 3-row breakdown on a shorter phone), instead of
-            silently clipping content with no way to reach it. Standard,
-            sturdier fix than resizing the sheet to fit today's content —
-            it keeps working regardless of message length or screen size. ── */}
+            title + bar + 3-row breakdown on a shorter phone. */}
       <div
         style={{
           flex:            1,
@@ -923,8 +931,6 @@ export default function OnboardingScreen({ onDone }) {
           position:        'relative',
           zIndex:          1,
           boxShadow:       '0 -4px 20px rgba(0,0,0,0.04)',
-          overflowY:       'auto',
-          WebkitOverflowScrolling: 'touch',
         }}
       >
         {/* Dots — visual progress indicator only, not interactive: no
@@ -950,7 +956,7 @@ export default function OnboardingScreen({ onDone }) {
         )}
 
         {setupStarted && (
-          <div style={{ height: 20, marginBottom: 20 }} />
+          <div style={{ height: 8, marginBottom: 12 }} />
         )}
 
         <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
