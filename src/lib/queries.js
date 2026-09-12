@@ -632,9 +632,16 @@ const CONDITION_PAGE_BATCH_SIZE = 4
  * for anything, and skipping it avoids the same kind of deep-page cost a
  * database-side sort adds as the table grows.
  *
+ * 2026-09-12 (onboarding-progress-parity): added the same onProgress
+ * callback fetchAllBrandRows already has — the paging here was always
+ * real, it just never told anyone how far along it was. Same contract:
+ * called once up front with (0, totalPages), then again as each page
+ * lands, only counting a page once it has actually succeeded.
+ *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {(loaded: number, total: number) => void} [onProgress]
  */
-async function fetchAllConditionRows(supabase) {
+async function fetchAllConditionRows(supabase, onProgress) {
   const { count, error: countError } = await supabase
     .from('conditions')
     .select('id', { count: 'exact', head: true })
@@ -643,6 +650,9 @@ async function fetchAllConditionRows(supabase) {
   if (countError) throw countError
 
   const totalPages = Math.max(1, Math.ceil((count ?? 0) / SUPABASE_MAX_ROWS))
+  let loaded = 0
+  onProgress?.(0, totalPages)
+
   const allRows = []
 
   for (let batchStart = 0; batchStart < totalPages; batchStart += CONDITION_PAGE_BATCH_SIZE) {
@@ -665,7 +675,14 @@ async function fetchAllConditionRows(supabase) {
               if (error) throw error
               return data
             })
-        )
+        ).then(data => {
+          // Only counted once this page has actually succeeded — mirrors
+          // fetchAllBrandRows: a page that needed a quiet retry still only
+          // reports progress once, on the attempt that actually landed.
+          loaded += 1
+          onProgress?.(loaded, totalPages)
+          return data
+        })
       })
     )
 
@@ -688,11 +705,19 @@ async function fetchAllConditionRows(supabase) {
  * instead of a single request, so it can't silently drop rows once the
  * library passes 1,000 published conditions.
  *
+ * 2026-09-12 (onboarding-progress-parity): now accepts an optional
+ * onProgress callback and forwards it straight to fetchAllConditionRows —
+ * same shape fetchFlatDrugs already exposes for drugs, so useConditions.js
+ * can report real page-by-page progress the same way useDrugs.js does.
+ * Optional and additive: every existing caller that doesn't pass a second
+ * argument is unaffected.
+ *
  * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ * @param {(loaded: number, total: number) => void} [onProgress]
  * @returns {Promise<ConditionFull[]>}
  */
-export async function fetchConditions(supabase) {
-  const data = await fetchAllConditionRows(supabase)
+export async function fetchConditions(supabase, onProgress) {
+  const data = await fetchAllConditionRows(supabase, onProgress)
   return mapConditions(data)
 }
 

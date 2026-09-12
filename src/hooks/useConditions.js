@@ -51,6 +51,14 @@ const PHOTO_DOWNLOAD_CONCURRENCY = 4
  * next time it's actually viewed online via useCachedImage.js's
  * cache-on-view.
  *
+ * 2026-09-12 (onboarding-progress-parity): fetchConditions now pages
+ * through the table exactly like fetchFlatDrugs already does for drugs
+ * (see fetchAllConditionRows in lib/queries.js) — it always did, this just
+ * wires up the same progress signal drugs already reports. `progress`
+ * below mirrors useDrugs.js's own `progress` field exactly: null while
+ * nothing is in flight, { loaded, total } (pages, not individual
+ * conditions) while a real fetch is running.
+ *
  * On mount:
  *   1. Read the saved copy from IndexedDB → show it immediately once ready
  *   2. Fetch app_metadata.conditions_updated_at from Supabase
@@ -64,6 +72,8 @@ const PHOTO_DOWNLOAD_CONCURRENCY = 4
  *   specialties     — Specialty[]  (unique, sorted by admin sort_order, Uncategorized excluded)
  *   loading         — true only on cold start
  *   error           — string | null
+ *   progress        — { loaded, total } (pages) while a real fetch is in
+ *                      flight, null otherwise — mirrors useDrugs.js's progress
  *   photosLoading   — true while the gallery-photo sync step is running
  *   photosProgress  — { loaded, total } for the gallery-photo sync step
  *   refresh         — () => void  (force re-fetch, e.g. after CMS save)
@@ -74,6 +84,12 @@ export function useConditions() {
   const [conditions, setConditions] = useState([])
   const [loading,    setLoading]    = useState(true)
   const [error,      setError]      = useState(null)
+
+  // 2026-09-12 (onboarding-progress-parity): mirrors useDrugs.js's
+  // `progress` state exactly — null while nothing is in flight, { loaded,
+  // total } (pages, not individual conditions) while fetchAndCache's real
+  // fetch is actually running.
+  const [progress, setProgress] = useState(null)
 
   // Image System Refinement Plan, Part A — separate from `loading` on
   // purpose: conditions themselves should show the instant they're cached,
@@ -187,6 +203,10 @@ export function useConditions() {
   async function fetchAndCache() {
     const myAttempt = ++attemptIdRef.current
     setError(null)
+    // 2026-09-12 (onboarding-progress-parity): clear any stale progress
+    // from a previous attempt before this one starts reporting its own —
+    // mirrors useDrugs.js's fetchColdStart resetting progress at the top.
+    setProgress(null)
     try {
       // Phase F14 Stage 3: also captures a fresh audit_log cursor
       // alongside the fetch — mirrors useDrugs.js's fetchAndCache. Leaves
@@ -194,7 +214,14 @@ export function useConditions() {
       // check regardless of why this particular fetch was a full one.
       const [auditCursor, fresh, { conditionsUpdatedAt }] = await Promise.all([
         fetchAuditCursorNow(supabase).catch(() => null),
-        fetchConditions(supabase),
+        fetchConditions(supabase, (loaded, total) => {
+          // 2026-09-12 (onboarding-progress-parity): same staleness guard
+          // as every other attempt-tagged callback in this file — a page
+          // landing from a superseded attempt (e.g. after a Retry tap)
+          // must never overwrite the current attempt's progress.
+          if (attemptIdRef.current !== myAttempt) return
+          setProgress({ loaded, total })
+        }),
         fetchMetadataTimestamps(supabase),
       ])
       if (attemptIdRef.current !== myAttempt) return // a newer attempt has taken over
@@ -220,6 +247,11 @@ export function useConditions() {
     } finally {
       if (attemptIdRef.current === myAttempt) {
         setLoading(false)
+        // 2026-09-12 (onboarding-progress-parity): mirrors useDrugs.js's
+        // fetchColdStart clearing progress back to null once the attempt
+        // resolves either way — OnboardingScreen already switches to
+        // reading `loading`/`error` at that point, not the raw progress.
+        setProgress(null)
       }
     }
   }
@@ -411,6 +443,7 @@ export function useConditions() {
     specialties,
     loading,
     error,
+    progress,
     photosLoading,
     photosProgress,
     refresh: fetchAndCache,

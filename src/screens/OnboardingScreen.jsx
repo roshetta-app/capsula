@@ -4,19 +4,33 @@
  * Phase 1, steps 1.6–1.9 for the full decision trail.
  *
  * Shown only on first launch (localStorage key: capsula_onboarded absent).
- * 5 fixed slides, Next-button only — no swipe, no skip button, no dot-jump —
- * every slide must be moved through in order:
+ * 4 fixed onboarding slides, Next-button only — no swipe, no skip button, no
+ * dot-jump — every slide must be moved through in order:
  *   1. Welcome            — photo hero, no body text, "Lets Get Started"
  *   2. Your Medical Library, All in One Place
  *   3. Know Your Drugs
  *   4. Keep What Matters Close
- *   5. Setting up your library — the TRUE last step, not a banner shown
- *      after onboarding. Has no Next button: a combined progress bar
- *      (weighted split — see below) tracks both libraries loading, and
- *      the screen auto-completes once both are actually done — held for
- *      a minimum LOADING_FLOOR_MS so this slide is never skipped past in
- *      under a frame when the data was already loaded before the user
- *      ever reached it.
+ *
+ * 2026-09-12 (onboarding-redesign-refine): library setup is explicitly NOT
+ * a 5th slide any more — it's a separate process that begins the instant
+ * Next is tapped on slide 4, tracked by its own `setupStarted` flag rather
+ * than by advancing `current` past the last real slide. `current` now only
+ * ever ranges over the 4 onboarding slides; the dot pagination is derived
+ * from it directly and disappears the moment setup begins, since there is
+ * nothing left to paginate. Setup itself has four states, rendered in the
+ * same card area the slides use: Preparing (shown until either library's
+ * first real signal comes back), Downloading (the combined bar plus a
+ * per-category breakdown — Medical library / Drug library / Images &
+ * references — each showing real page counts, never fabricated numbers),
+ * Error (redesigned problem-first, with a short troubleshooting list, a
+ * Retry button, and a Back to onboarding button that returns to slide 4),
+ * and Success ("All set!" plus a completed-categories checklist, then an
+ * "Opening Capsula…" caption before the existing auto-complete fires — no
+ * Continue button anywhere). The underlying download/error/retry/complete
+ * machinery below (LOADING_FLOOR_MS, SUCCESS_HOLD_MS, DOWNLOAD_TIMEOUT_MS,
+ * the reconnect/stall effects, complete()) is unchanged — this only adds a
+ * `setupStarted` flag alongside `current` and changes what gets rendered
+ * for the Preparing/Downloading/Error/Success moments.
  *
  * Removed from the previous version, on purpose:
  *   - The notifications-permission slide — a separate in-app banner now
@@ -158,29 +172,25 @@ const SLIDES = [
     id: 'library',
     image: libraryIllustration,
     headline: 'Your Medical Library, All in One Place',
-    body: 'Access a growing library of clinical information, conditions, treatments, and more — whenever you need it.',
+    body: 'Find the clinical information you need, organized for quick reference.',
   },
   {
     id: 'drugs',
     image: drugsIllustration,
     headline: 'Know Your Drugs',
-    body: 'Quickly find essential drug information, doses, indications, contraindications, and more.',
+    body: 'Quickly find doses, indications, contraindications, interactions, and essential drug information.',
   },
   {
     id: 'favourites',
     image: favouritesIllustration,
     headline: 'Keep What Matters Close',
-    body: 'Save your most-used drugs, conditions, and references to your favourites for quick access.',
-  },
-  {
-    id: 'loading',
-    image: loadingIllustration,
-    headline: 'Setting up your library',
-    body: 'This only needs to happen once …',
-    isLoading: true,
+    body: 'Save frequently used drugs and conditions to your favourites for instant access.',
   },
 ]
 
+// Index of the last real onboarding slide (Favourites) — tapping Next here
+// begins library setup instead of advancing to another slide. See
+// `setupStarted` below; setup is a separate process, not a 5th slide.
 const LAST_INDEX = SLIDES.length - 1
 
 // How much of the combined bar belongs to conditions (binary: 0 or fully
@@ -242,6 +252,21 @@ const PRIMARY_BUTTON_STYLE = {
   cursor:          'pointer',
 }
 
+// 2026-09-12 (onboarding-redesign-refine): plain-text secondary action,
+// used by the Error state's "Back to onboarding" button — deliberately
+// much lower-emphasis than PRIMARY_BUTTON_STYLE's filled pill, since Retry
+// is the expected/primary action there.
+const SECONDARY_BUTTON_STYLE = {
+  backgroundColor: 'transparent',
+  color:           COLORS.textSecondary,
+  border:          'none',
+  padding:         '8px 12px',
+  fontSize:        14,
+  fontWeight:      500,
+  fontFamily:      FONT_BODY,
+  cursor:          'pointer',
+}
+
 // ─── Shared app logo — same asset layout.jsx's header uses (public/logo.svg),
 // rendered white via a CSS filter on the blue hero slides so no second,
 // light-on-dark image asset is needed. ─────────────────────────────────────
@@ -271,6 +296,11 @@ function useCombinedLibraryProgress() {
   const {
     loading: conditionsLoading,
     error:   conditionsError,
+    // 2026-09-12 (onboarding-progress-parity): conditions now reports real
+    // page-by-page progress the same shape drugs' `progress` always has
+    // (see useConditions.js) — replaces the old binary "0 until done, then
+    // 1" treatment below with the same real-fraction logic drugs uses.
+    progress: conditionsProgress,
     start:   startConditions,
     retry:   retryConditions,
     // 2026-09-01 (Image System Refinement Plan, Part A): gallery-photo
@@ -296,6 +326,7 @@ function useCombinedLibraryProgress() {
   // split; that split no longer exists, so there's nothing left here for
   // this hook to reconcile between two stages.)
   const drugsDone = !drugsLoading && !drugsError
+  const conditionsDone = !conditionsLoading && !conditionsError
 
   // 2026-09-01 (Image System Refinement Plan, Part A): a failed individual
   // photo download is non-fatal (plan §4) and never surfaces as an error
@@ -306,7 +337,16 @@ function useCombinedLibraryProgress() {
 
   const failed = !!drugsError || !!conditionsError
 
-  const conditionsFraction = (conditionsLoading || conditionsError) ? 0 : 1
+  // 2026-09-12 (onboarding-progress-parity): same real loaded/total
+  // treatment drugsFraction below already uses — conditions' paging was
+  // always real, it just wasn't reported until now (see useConditions.js).
+  const conditionsFraction = conditionsError
+    ? 0
+    : conditionsDone
+      ? 1
+      : (conditionsProgress && conditionsProgress.total > 0
+          ? Math.min(1, conditionsProgress.loaded / conditionsProgress.total)
+          : 0)
   // Once drugsDone is true, pin the bar at full. 'loading' and 'progress'
   // now resolve together at the end of the single cold-start download (see
   // useDrugs.js's fetchColdStart), so this is a plain safety net rather
@@ -333,7 +373,16 @@ function useCombinedLibraryProgress() {
     photosFraction * PHOTOS_WEIGHT +
     drugsFraction * (1 - CONDITIONS_WEIGHT - PHOTOS_WEIGHT)
 
-  const done = !failed && !conditionsLoading && drugsDone && photosDone
+  const done = !failed && conditionsDone && drugsDone && photosDone
+
+  // 2026-09-12 (onboarding-redesign-refine): true the moment either
+  // library's first real signal has actually come back (its own page-count
+  // query has landed) — used to tell the Preparing state apart from
+  // Downloading. Before this, nothing has actually started moving yet:
+  // the connection check and the very first request round-trip are still
+  // in flight. Also true once done/failed, so a device that finishes (or
+  // fails) unusually fast never gets stuck showing Preparing.
+  const hasRealProgress = !!drugsProgress || !!conditionsProgress || done || failed
 
   function start() {
     startDrugs()
@@ -351,7 +400,76 @@ function useCombinedLibraryProgress() {
     retryConditions()
   }
 
-  return { fraction, done, failed, start, retry }
+  // 2026-09-12 (onboarding-redesign-refine): per-category breakdown for
+  // the Downloading state's three rows (Medical library / Drug library /
+  // Images & references). Each entry carries the real { loaded, total }
+  // this category's own hook reports (or null if it hasn't started yet),
+  // plus done/failed — the UI never invents a number that isn't here.
+  const categories = {
+    conditions: { progress: conditionsProgress, done: conditionsDone, failed: !!conditionsError },
+    drugs:      { progress: drugsProgress,      done: drugsDone,      failed: !!drugsError },
+    photos:     { progress: photosProgress,     done: photosDone,     failed: false },
+  }
+
+  return { fraction, done, failed, start, retry, hasRealProgress, categories }
+}
+
+// 2026-09-12 (onboarding-redesign-refine): plain "loaded of total" label
+// for one Downloading-state row — deliberately no unit word ("batch",
+// "page", etc.) attached, per the refined-copy decision: just the numbers.
+// Never fabricates a number — a category with nothing to report yet reads
+// "Waiting…" rather than a fake 0.
+function categoryStatusLabel(category) {
+  if (category.done) return 'Done'
+  if (category.progress && category.progress.total > 0) {
+    return `${category.progress.loaded} of ${category.progress.total}`
+  }
+  return 'Waiting…'
+}
+
+// One row of the Downloading state's per-category breakdown. `dotColor`
+// mirrors the pending/downloading/completed states called for in the
+// brief — hollow gray (pending), filled accent (downloading), filled
+// green (completed) — without needing a separate icon asset.
+function CategoryRow({ name, category }) {
+  const state = category.done ? 'done' : (category.progress ? 'active' : 'pending')
+  const dotColor = state === 'done' ? COLORS.success : state === 'active' ? COLORS.accent : COLORS.dotInactive
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0' }}>
+      <div style={{ width: 18, height: 18, flex: '0 0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {state === 'done' ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="12" cy="12" r="11" stroke={COLORS.success} strokeWidth="2" />
+            <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.success} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <div style={{ width: 10, height: 10, borderRadius: '50%', backgroundColor: dotColor }} />
+        )}
+      </div>
+      <div style={{ flex: 1, textAlign: 'left', fontSize: 14, color: COLORS.textPrimary }}>{name}</div>
+      <div style={{ fontSize: 13, color: COLORS.textSecondary }}>{categoryStatusLabel(category)}</div>
+    </div>
+  )
+}
+
+// One row of the Preparing state's checklist — 'done' (filled green
+// check), or 'pending' (hollow gray circle). There's no in-between state
+// tracked for these two items on purpose: Preparing only ever shows
+// Downloading/Installing as still ahead of it (see file header).
+function PreparingRow({ label, done }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
+      {done ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="12" cy="12" r="11" stroke={COLORS.success} strokeWidth="2" />
+          <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.success} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      ) : (
+        <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${COLORS.dotInactive}` }} />
+      )}
+      <span style={{ fontSize: 14, color: done ? COLORS.textPrimary : COLORS.textSecondary }}>{label}</span>
+    </div>
+  )
 }
 
 // ─── OnboardingScreen ───────────────────────────────────────────────────────
@@ -359,7 +477,15 @@ function useCombinedLibraryProgress() {
 export default function OnboardingScreen({ onDone }) {
   const [current, setCurrent] = useState(0)
 
-  const { fraction, done, failed: hookFailed, start: startBoth, retry: retryBoth } = useCombinedLibraryProgress()
+  // 2026-09-12 (onboarding-redesign-refine): true once Next has been
+  // tapped on the last onboarding slide (Favourites) — library setup is a
+  // separate process from here on, not a 5th slide. See file header.
+  const [setupStarted, setSetupStarted] = useState(false)
+
+  const {
+    fraction, done, failed: hookFailed, start: startBoth, retry: retryBoth,
+    hasRealProgress, categories,
+  } = useCombinedLibraryProgress()
   const { isOnline } = useOnlineStatus()
 
   // 2026-08-31 (plan step 1.12): true when slide 4's Next tap found no
@@ -389,14 +515,18 @@ export default function OnboardingScreen({ onDone }) {
   const doneRef = useRef(done)
   doneRef.current = done
 
-  const isLoadingSlide = SLIDES[current].isLoading
   const isLast = current === LAST_INDEX
   const isFirst = current === 0
-  const isFavouritesSlide = current === 3 // slide 4 — see file header
+  // Slide 4 (Favourites) is the last real slide and the one whose Next tap
+  // begins library setup — same index isLast already checks, kept as its
+  // own name for clarity at each call site below.
+  const isFavouritesSlide = isLast
   // Back arrow only on slides 2-4 (plan step 1.15) — never slide 1
-  // (nothing before it) or slide 5 (nothing to go back to once loading
-  // starts, and going back mid-download isn't a supported flow here).
-  const showBackArrow = !isFirst && !isLoadingSlide
+  // (nothing before it) or during setup (nothing to go back to once
+  // loading starts, and going back mid-download isn't a supported flow —
+  // the Error state's own "Back to onboarding" button is the one
+  // supported way back, see handleBackToOnboarding below).
+  const showBackArrow = !isFirst && !setupStarted
 
   // 2026-09-12 (Phase 13 — Onboarding back handling): hardware/browser
   // back mirrors the on-screen back arrow exactly — reuses showBackArrow
@@ -431,23 +561,26 @@ export default function OnboardingScreen({ onDone }) {
   // (done) or fails for a real reason (hookFailed) — no point letting a
   // stale timer fire after the outcome is already known.
   useEffect(() => {
-    if (!isLoadingSlide || attemptId === 0 || done || hookFailed) return
+    if (!setupStarted || attemptId === 0 || done || hookFailed) return
     const timer = setTimeout(() => setTimedOut(true), DOWNLOAD_TIMEOUT_MS)
     return () => clearTimeout(timer)
-  }, [isLoadingSlide, attemptId, done, hookFailed, fraction])
+  }, [setupStarted, attemptId, done, hookFailed, fraction])
 
-  // ── Preload every slide image on mount ─────────────────────────────────
+  // ── Preload every slide image, plus the setup illustration, on mount ───
   // A statically-imported image is only actually fetched by the browser
   // once an <img> referencing it mounts. Without preloading, reaching a
   // new slide kicked off that fetch right then — which is what let the
   // previous slide's image visibly hang around while the new one loaded.
-  // Warming the cache for all 5 up front means every slide's image is
-  // already decoded and ready the moment it's reached.
+  // Warming the cache for all of them up front means every slide's image,
+  // and the Preparing/Downloading illustration, are already decoded and
+  // ready the moment each is reached.
   useEffect(() => {
     SLIDES.forEach(s => {
       const preload = new Image()
       preload.src = s.image
     })
+    const setupPreload = new Image()
+    setupPreload.src = loadingIllustration
   }, [])
 
   // ── Minimum display time for the final (loading) slide ─────────────────
@@ -466,7 +599,7 @@ export default function OnboardingScreen({ onDone }) {
   const alreadyDoneAtEntryRef = useRef(false)
 
   useEffect(() => {
-    if (!isLoadingSlide) {
+    if (!setupStarted) {
       setFloorElapsed(false)
       setEntryFillStarted(false)
       setShowSuccess(false)
@@ -483,7 +616,7 @@ export default function OnboardingScreen({ onDone }) {
       clearTimeout(floorTimer)
       cancelAnimationFrame(fillFrame)
     }
-  }, [isLoadingSlide])
+  }, [setupStarted])
 
   // 2026-08-31: once both libraries are genuinely done (and the minimum
   // floor time has passed) with no error, show the brief Success
@@ -491,25 +624,27 @@ export default function OnboardingScreen({ onDone }) {
   // complete() after SUCCESS_HOLD_MS. Never fires while `failed` is true;
   // the Failed state (rendered below) takes over instead.
   useEffect(() => {
-    if (isLoadingSlide && done && floorElapsed && !failed) {
+    if (setupStarted && done && floorElapsed && !failed) {
       setShowSuccess(true)
       const holdTimer = setTimeout(() => complete(), SUCCESS_HOLD_MS)
       return () => clearTimeout(holdTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoadingSlide, done, floorElapsed, failed])
+  }, [setupStarted, done, floorElapsed, failed])
 
   function next() {
-    if (isLast) return
+    if (setupStarted) return // no Next button renders once setup begins
 
-    // Slide 4 (favourites) is where the first-ever library download
-    // begins — see useDrugs.js/useConditions.js's start(). Plan step
-    // 1.12: offline still advances to slide 5, it just skips straight to
-    // the Failed state there instead of ever attempting the fetch — no
-    // slow timeout to sit through for a connection that plainly isn't
-    // there.
+    // Slide 4 (Favourites) is where the first-ever library download
+    // begins — see useDrugs.js/useConditions.js's start(). 2026-09-12:
+    // this now flips setupStarted instead of advancing `current` past the
+    // last slide — setup is its own process, not a 5th slide (see file
+    // header). Plan step 1.12: offline still enters setup, it just skips
+    // straight to the Error state there instead of ever attempting the
+    // fetch — no slow timeout to sit through for a connection that
+    // plainly isn't there.
     if (isFavouritesSlide) {
-      setCurrent(c => c + 1)
+      setSetupStarted(true)
       if (!isOnline) {
         setOfflinePreCheck(true)
         return
@@ -526,7 +661,22 @@ export default function OnboardingScreen({ onDone }) {
 
   // Plan step 1.15 — back arrow, slides 2-4 only (see showBackArrow above).
   function prev() {
-    if (current > 0 && !isLoadingSlide) setCurrent(c => c - 1)
+    if (current > 0 && !setupStarted) setCurrent(c => c - 1)
+  }
+
+  // 2026-09-12 (onboarding-redesign-refine): the Error state's "Back to
+  // onboarding" button. Genuinely returns to the onboarding flow at the
+  // last slide before setup began (Favourites), rather than resetting to
+  // slide 1 — the "appropriate point" the brief calls for. Doesn't stop or
+  // reset any already-started download: useDrugs.js/useConditions.js's
+  // start() is a no-op once startedRef is set, so tapping Next again here
+  // simply re-enters setup and picks up whatever's already in flight (or
+  // already finished) rather than restarting it.
+  function handleBackToOnboarding() {
+    setSetupStarted(false)
+    setOfflinePreCheck(false)
+    setTimedOut(false)
+    setCurrent(LAST_INDEX)
   }
 
   // Failed-state Retry button (plan steps 1.12-1.14) — covers all three
@@ -555,7 +705,7 @@ export default function OnboardingScreen({ onDone }) {
   useEffect(() => {
     const cameBackOnline = !wasOnlineRef.current && isOnline
     wasOnlineRef.current = isOnline
-    if (cameBackOnline && isLoadingSlide && failed) {
+    if (cameBackOnline && setupStarted && failed) {
       handleRetry()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -573,20 +723,28 @@ export default function OnboardingScreen({ onDone }) {
   // next()/1.12, which already handles offline before an attempt even
   // starts.
   useEffect(() => {
-    if (!isOnline && isLoadingSlide && attemptId > 0 && !done && !hookFailed) {
+    if (!isOnline && setupStarted && attemptId > 0 && !done && !hookFailed) {
       setOfflinePreCheck(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOnline, isLoadingSlide, attemptId, done, hookFailed])
+  }, [isOnline, setupStarted, attemptId, done, hookFailed])
 
   // Real progress while genuinely still loading — unchanged from before.
   // If the data was already done the instant this slide was reached, show
   // a smooth synthetic fill to 100% over LOADING_FLOOR_MS instead (driven
   // by the CSS transition below), so the bar never appears to skip ahead
   // of what the floor timer allows.
-  const displayFraction = isLoadingSlide
+  const displayFraction = setupStarted
     ? (alreadyDoneAtEntryRef.current ? (entryFillStarted ? 1 : 0) : fraction)
     : 0
+
+  // 2026-09-12 (onboarding-redesign-refine): Preparing is shown from the
+  // instant setup begins until either library's first real signal comes
+  // back (hasRealProgress) — see useCombinedLibraryProgress's comment.
+  // Once failed/showSuccess/hasRealProgress, this is moot (those states
+  // take over below), so it only actually matters for the brief window
+  // right after Next is tapped.
+  const showPreparing = setupStarted && !failed && !showSuccess && !hasRealProgress
 
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
@@ -669,22 +827,58 @@ export default function OnboardingScreen({ onDone }) {
             <CapsulaLogo light height={26} />
           </div>
         )}
-        <img
-          src={slide.image}
-          alt=""
-          style={{
-            width:     heroOnBlue ? '56%' : '100%',
-            height:    heroOnBlue ? 'auto' : '100%',
-            maxHeight: heroOnBlue ? '58%' : undefined,
-            objectFit: heroOnBlue ? 'contain' : 'cover',
-            flex:      heroOnBlue ? undefined : 1,
-            // 'auto 0' (top/bottom auto, left/right 0) centers the image
-            // vertically in the leftover space below the logo — it used
-            // to be 'auto 0 0' (bottom pinned to 0), which pushed the
-            // image down against the card instead of centering it.
-            margin:    heroOnBlue ? 'auto 0' : 0,
-          }}
-        />
+        {setupStarted ? (
+          failed ? (
+            // 2026-09-12: error illustration deliberately small/subordinate
+            // (brief §14) — the problem and the fix matter more here than
+            // a picture, unlike slides 2-4 where the illustration is the
+            // point.
+            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ margin: 'auto 0' }}>
+              <circle cx="12" cy="12" r="11" stroke={COLORS.surface} strokeWidth="2" opacity="0.9" />
+              <path d="M12 7V13" stroke={COLORS.surface} strokeWidth="2.2" strokeLinecap="round" />
+              <circle cx="12" cy="16.5" r="1.2" fill={COLORS.surface} />
+            </svg>
+          ) : showSuccess ? (
+            // Bigger, celebratory checkmark for the Success moment.
+            <svg width="72" height="72" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ margin: 'auto 0' }}>
+              <circle cx="12" cy="12" r="11" stroke={COLORS.surface} strokeWidth="2" />
+              <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.surface} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ) : (
+            // Preparing / Downloading — same download/library illustration
+            // used before, but noticeably smaller than a slide illustration
+            // (brief §10: "smaller and less dominant than the onboarding
+            // illustrations").
+            <img
+              src={loadingIllustration}
+              alt=""
+              style={{ width: '34%', height: 'auto', maxHeight: '38%', objectFit: 'contain', margin: 'auto 0' }}
+            />
+          )
+        ) : (
+          <img
+            src={slide.image}
+            alt=""
+            style={{
+              // 2026-09-12 (onboarding-redesign-refine): slides 2-4's
+              // illustrations reduced roughly 15-25% from their previous
+              // 56%/58% sizing (brief §7) so the headline/body/button carry
+              // more visual weight; slide 1's full-bleed photo (heroOnBlue
+              // false) is untouched, per brief — it's the brand-welcome
+              // moment and can stay prominent.
+              width:     heroOnBlue ? '42%' : '100%',
+              height:    heroOnBlue ? 'auto' : '100%',
+              maxHeight: heroOnBlue ? '46%' : undefined,
+              objectFit: heroOnBlue ? 'contain' : 'cover',
+              flex:      heroOnBlue ? undefined : 1,
+              // 'auto 0' (top/bottom auto, left/right 0) centers the image
+              // vertically in the leftover space below the logo — it used
+              // to be 'auto 0 0' (bottom pinned to 0), which pushed the
+              // image down against the card instead of centering it.
+              margin:    heroOnBlue ? 'auto 0' : 0,
+            }}
+          />
+        )}
       </div>
 
       {/* ── Card area ── */}
@@ -705,24 +899,54 @@ export default function OnboardingScreen({ onDone }) {
         }}
       >
         {/* Dots — visual progress indicator only, not interactive: no
-            slide can be skipped or jumped to out of order. */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
-          {SLIDES.map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width:           i === current ? 20 : 6,
-                height:          6,
-                borderRadius:    3,
-                backgroundColor: i === current ? COLORS.accent : COLORS.dotInactive,
-                transition:      'all 0.25s ease',
-              }}
-            />
-          ))}
-        </div>
+            slide can be skipped or jumped to out of order. 2026-09-12:
+            disappear completely once setup begins (brief §8) — there are
+            only ever 4 positions, one per real onboarding slide, and
+            nothing left to paginate once setup takes over the card. */}
+        {!setupStarted && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 20 }}>
+            {SLIDES.map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width:           i === current ? 20 : 6,
+                  height:          6,
+                  borderRadius:    3,
+                  backgroundColor: i === current ? COLORS.accent : COLORS.dotInactive,
+                  transition:      'all 0.25s ease',
+                }}
+              />
+            ))}
+          </div>
+        )}
+
+        {setupStarted && (
+          <div style={{ height: 20, marginBottom: 20 }} />
+        )}
 
         <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          {slide.brand ? (
+          {setupStarted ? (
+            <>
+              <h2 style={{ fontSize: 24, fontWeight: 700, color: failed ? COLORS.warning : COLORS.accent, margin: '0 0 12px', lineHeight: 1.25 }}>
+                {failed
+                  ? "Couldn't finish downloading"
+                  : showSuccess
+                    ? 'All set!'
+                    : showPreparing
+                      ? 'Preparing your library'
+                      : 'Downloading your library'}
+              </h2>
+              <p style={{ fontSize: 15, color: COLORS.textSecondary, lineHeight: 1.6, margin: 0 }}>
+                {failed
+                  ? failedMessage
+                  : showSuccess
+                    ? 'Your offline library is ready. You can now use Capsula without an internet connection.'
+                    : showPreparing
+                      ? 'Getting everything ready for offline access.'
+                      : 'Your medical reference is being saved so you can use Capsula without an internet connection.'}
+              </p>
+            </>
+          ) : slide.brand ? (
             <div>
               <div style={{ fontSize: 20, color: COLORS.textSecondary, marginBottom: 6 }}>
                 {slide.headline}
@@ -743,7 +967,7 @@ export default function OnboardingScreen({ onDone }) {
             </h2>
           )}
 
-          {slide.body && (
+          {!setupStarted && slide.body && (
             <p
               style={{
                 fontSize:   15,
@@ -759,33 +983,71 @@ export default function OnboardingScreen({ onDone }) {
         </div>
 
         {/* ── Bottom action: Next/Get Started button on slides 1–4, or
-              one of slide 5's three real states (Downloading/Success/
-              Failed) on the final slide. ── */}
-        {isLoadingSlide ? (
+              one of setup's four real states (Preparing/Downloading/
+              Error/Success) once setup has begun. ── */}
+        {setupStarted ? (
           failed ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, width: '100%', marginTop: 12 }}>
-              <p style={{ fontSize: 14, color: COLORS.warning, margin: 0, textAlign: 'center', lineHeight: 1.5 }}>
-                {failedMessage}
-              </p>
+            // 2026-09-12: redesigned problem-first — the message and the
+            // fixes come before anything decorative (brief §14). Retry
+            // stays the primary action; "Back to onboarding" is a genuine,
+            // low-emphasis secondary that returns to slide 4 without
+            // restarting whatever's already downloaded (see
+            // handleBackToOnboarding above).
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 14, width: '100%', marginTop: 4 }}>
+              <div style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: '14px 16px', textAlign: 'left' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.warning, marginBottom: 8 }}>
+                  Try these fixes
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.7 }}>
+                  <li>Check your internet connection</li>
+                  <li>Make sure you have enough storage</li>
+                  <li>Try again in a moment</li>
+                </ul>
+              </div>
               <button
                 onClick={handleRetry}
                 style={PRIMARY_BUTTON_STYLE}
                 onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
                 onMouseUp={e => { e.currentTarget.style.backgroundColor = COLORS.accent }}
               >
-                Try Again
+                Retry
+              </button>
+              <button onClick={handleBackToOnboarding} style={SECONDARY_BUTTON_STYLE}>
+                Back to onboarding
               </button>
             </div>
           ) : showSuccess ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginTop: 12 }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <circle cx="12" cy="12" r="11" stroke={COLORS.success} strokeWidth="2" />
-                <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.success} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span style={{ fontSize: 15, fontWeight: 600, color: COLORS.success }}>All set!</span>
+            // 2026-09-12: checkmark now lives in the hero area above; this
+            // is the completed-categories checklist plus the brief
+            // "Opening Capsula…" status right before complete() fires —
+            // deliberately no Continue button anywhere (brief §17).
+            <div style={{ width: '100%', marginTop: 4 }}>
+              <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px' }}>
+                <CategoryRow name="Medical library" category={categories.conditions} />
+                <CategoryRow name="Drug library" category={categories.drugs} />
+                <CategoryRow name="Images & references" category={categories.photos} />
+              </div>
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 12 }}>
+                Opening Capsula…
+              </div>
+            </div>
+          ) : showPreparing ? (
+            // 2026-09-12: shown from the instant Next is tapped until
+            // either library's first real signal comes back (brief §10) —
+            // Downloading/Installing are always shown as still ahead of
+            // this moment, never marked done here.
+            <div style={{ width: '100%', marginTop: 4, textAlign: 'left' }}>
+              <PreparingRow label="Checking connection" done />
+              <PreparingRow label="Preparing library" done />
+              <PreparingRow label="Downloading" done={false} />
+              <PreparingRow label="Installing" done={false} />
             </div>
           ) : (
-            <div style={{ width: '100%', marginTop: 12 }}>
+            // Downloading — overall percentage (unchanged mechanism from
+            // before) plus the real per-category breakdown (brief §11-12).
+            // 2026-09-12: numbers only, no unit word ("batch"/"page")
+            // attached — see categoryStatusLabel's comment.
+            <div style={{ width: '100%', marginTop: 4 }}>
               <div
                 role="progressbar"
                 aria-valuenow={Math.round(displayFraction * 100)}
@@ -818,8 +1080,13 @@ export default function OnboardingScreen({ onDone }) {
               {/* 2026-08-31 bugfix: the bar previously had no readable
                   number anywhere near it — just a plain shape with no way
                   to tell how far along it actually was. */}
-              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 8, marginBottom: 12 }}>
                 {Math.round(displayFraction * 100)}%
+              </div>
+              <div style={{ border: `1px solid ${COLORS.dotInactive}`, borderRadius: 14, padding: '4px 16px', textAlign: 'left' }}>
+                <CategoryRow name="Medical library" category={categories.conditions} />
+                <CategoryRow name="Drug library" category={categories.drugs} />
+                <CategoryRow name="Images & references" category={categories.photos} />
               </div>
             </div>
           )
