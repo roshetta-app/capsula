@@ -168,6 +168,16 @@
  * tallest content: title + bar + 3-row breakdown) more likely to actually
  * clip on a short device rather than just look cramped. Genuinely worth
  * checking that specific screen this time, not just the general layout.
+ *
+ * 2026-09-12 (sixth pass, same day): two fixes. First, slide 5's setup/
+ * loading illustration was missed in the last two enlargement passes —
+ * it's now 44%/48% (was still the original 34%/38%). Second, the between-
+ * slide fade was never actually visible: it reset via useEffect, which
+ * only runs after the new slide already painted at full opacity, so it
+ * flashed in and then flickered rather than fading. Now reset during
+ * render instead (see slideVisible below) so the hidden state is in place
+ * before the new slide ever paints — this is the actual fix, not a timing
+ * tweak.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -801,18 +811,30 @@ export default function OnboardingScreen({ onDone }) {
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
 
-  // 2026-08-31 (plan step 1.15): fades the slide content in on arrival —
-  // starts hidden, flips visible next frame so the opacity change is
-  // picked up as a transition rather than an instant jump (same
-  // next-frame trick as entryFillStarted above). 2026-09-12: paired with a
-  // slight translateY so slide changes read as a gentle rise-in rather
-  // than a flat cross-fade — kept small (6px) to stay subtle.
-  const [slideVisible, setSlideVisible] = useState(false)
-  useEffect(() => {
+  // 2026-08-31 (plan step 1.15): fades the slide content in on arrival.
+  // 2026-09-12 (bugfix): the previous version reset this via useEffect,
+  // which only runs after the new slide has already painted at whatever
+  // opacity it last had — so instead of fading in, the new slide flashed
+  // in at full opacity and then briefly flickered down and back up. Fixed
+  // by adjusting state during render (React's supported pattern for
+  // "derived state that resets when a prop/value changes"): the moment
+  // `current` differs from what was last rendered, slideVisible is set to
+  // false in the SAME render pass, before anything paints. The effect
+  // below only handles flipping it back to true one frame later, which is
+  // what actually produces the visible fade-in. Paired with a slight
+  // translateY so slide changes read as a gentle rise-in rather than a
+  // flat cross-fade — kept small (6px) to stay subtle.
+  const [slideVisible, setSlideVisible] = useState(true)
+  const [lastRenderedSlide, setLastRenderedSlide] = useState(current)
+  if (current !== lastRenderedSlide) {
+    setLastRenderedSlide(current)
     setSlideVisible(false)
+  }
+  useEffect(() => {
+    if (slideVisible) return
     const frame = requestAnimationFrame(() => setSlideVisible(true))
     return () => cancelAnimationFrame(frame)
-  }, [current])
+  }, [slideVisible])
 
   // 2026-09-12: fades + slightly scales the whole screen in the instant it
   // mounts, instead of the first slide just snapping into view on open.
@@ -928,7 +950,7 @@ export default function OnboardingScreen({ onDone }) {
             <img
               src={loadingIllustration}
               alt=""
-              style={{ width: '34%', height: 'auto', maxHeight: '38%', objectFit: 'contain', margin: 'auto 0' }}
+              style={{ width: '44%', height: 'auto', maxHeight: '48%', objectFit: 'contain', margin: 'auto 0' }}
             />
           )
         ) : (
