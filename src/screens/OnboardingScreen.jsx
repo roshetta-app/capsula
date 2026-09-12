@@ -122,6 +122,14 @@
  * the app / leaves the site) — the only slide that does. On slide 5,
  * showBackArrow is also false (loading), matching the existing "going
  * back mid-download isn't a supported flow" behavior of the arrow itself.
+ *
+ * 2026-09-12 (onboarding minor fixes): HERO_HEIGHT is now '38%' on every
+ * slide, not just once setup begins — the setupStarted ternary on the hero
+ * area's height is gone, so slides 1-4 now use the same taller card/sheet
+ * that slide 5's setup states already had. Slides 2-4's PNG illustrations
+ * now get a fixed height (46%) instead of 'auto' capped at a maxHeight, so
+ * all three render at the same size regardless of each file's own aspect
+ * ratio, instead of each auto-sizing to a different height.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -157,7 +165,7 @@ const FONT_BODY = '"IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif'
 // Same height on every slide — was 55% (slides 2–5) vs 57% (slide 1), which
 // put the white card's rounded top at a slightly different point depending
 // on the slide.
-const HERO_HEIGHT = '56%'
+const HERO_HEIGHT = '38%'
 
 // ─── Slide data ─────────────────────────────────────────────────────────────
 const SLIDES = [
@@ -799,7 +807,7 @@ export default function OnboardingScreen({ onDone }) {
         style={{
           position:        'relative',
           flex:            '0 0 auto',
-          height:          setupStarted ? '38%' : HERO_HEIGHT,
+          height:          HERO_HEIGHT,
           backgroundColor: heroOnBlue ? COLORS.heroBlue : COLORS.surface,
           display:         'flex',
           flexDirection:   'column',
@@ -879,8 +887,7 @@ export default function OnboardingScreen({ onDone }) {
               // false) is untouched, per brief — it's the brand-welcome
               // moment and can stay prominent.
               width:     heroOnBlue ? '42%' : '100%',
-              height:    heroOnBlue ? 'auto' : '100%',
-              maxHeight: heroOnBlue ? '46%' : undefined,
+              height:    heroOnBlue ? '46%' : '100%',
               objectFit: heroOnBlue ? 'contain' : 'cover',
               flex:      heroOnBlue ? undefined : 1,
               // 'auto 0' (top/bottom auto, left/right 0) centers the image
