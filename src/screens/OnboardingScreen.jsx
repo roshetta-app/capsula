@@ -157,7 +157,7 @@
  * it; it's now back in its own div, explicitly centered. Added: a fade +
  * slight scale-in (OPEN_FADE_MS) when the screen first mounts, so slide 1
  * doesn't just snap into view; the existing between-slide fade now pairs
- * with a small translateY(6px) rise instead of being a flat opacity-only
+ * with a translateY(10px) rise instead of being a flat opacity-only
  * cross-fade; and the completion fade-out now scales down slightly
  * (0.98) to match the opening animation, instead of a plain fade.
  *
@@ -186,6 +186,23 @@
  * downloaded), so Preparing flashed by too fast to actually read. Added
  * PREPARING_FLOOR_MS (900ms), mirroring how LOADING_FLOOR_MS already
  * guarantees a minimum display time elsewhere on this slide.
+ *
+ * 2026-09-12 (eighth pass, same day): three fixes from an on-device
+ * screenshot. (1) The Failed state's "Back to onboarding" button was
+ * overflowing past the fixed card, unreachable — tightened its title/body
+ * text, the fixes box, both buttons, and the card's bottom padding, all
+ * scoped to the Failed state only (other states are visually unchanged);
+ * also added minHeight: 0 to the title/body flex item so it can shrink
+ * under pressure instead of forcing hard overflow, as a safety margin for
+ * unusually short devices. (2) PREPARING_FLOOR_MS raised 900ms → 10000ms
+ * per explicit request — this is now a deliberate fixed hold, not a
+ * flash-prevention floor, so Preparing will show its full 10s even on a
+ * near-instant download. (3) SLIDE_FADE_MS 220ms → 300ms and the
+ * between-slide rise 6px → 10px, in case the previous fix (render-time
+ * reset) was correct but just too subtle to register — also worth
+ * checking whether testing has been against a deployed URL rather than a
+ * fresh local build, since a push is required for a live site to reflect
+ * any of this session's changes.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -296,10 +313,11 @@ const DOWNLOAD_TIMEOUT_MS = 28000
 
 // How long the Preparing state is guaranteed to stay visible before it's
 // allowed to hand off to Downloading, regardless of how fast the first
-// real progress signal comes back. Without this, a fast connection could
-// get its first page-count response back in well under a frame, and
-// Preparing would flash by too quickly to actually read.
-const PREPARING_FLOOR_MS = 900
+// real progress signal comes back. Deliberately a long, fixed hold (not
+// tuned to the fastest realistic connection) per explicit request — this
+// means Preparing will show for its full duration even on downloads that
+// finish almost instantly, not just long enough to avoid a flash.
+const PREPARING_FLOOR_MS = 10000
 
 // How long the whole screen takes to fade out once onboarding completes,
 // instead of cutting straight to the real app (plan step 1.15).
@@ -310,7 +328,7 @@ const COMPLETE_FADE_MS = 400
 const OPEN_FADE_MS = 380
 
 // How long each slide takes to fade in on arrival (plan step 1.15).
-const SLIDE_FADE_MS = 220
+const SLIDE_FADE_MS = 300
 
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
@@ -335,8 +353,8 @@ const SECONDARY_BUTTON_STYLE = {
   backgroundColor: 'transparent',
   color:           COLORS.textSecondary,
   border:          'none',
-  padding:         '8px 12px',
-  fontSize:        14,
+  padding:         '4px 12px',
+  fontSize:        13,
   fontWeight:      500,
   fontFamily:      FONT_BODY,
   cursor:          'pointer',
@@ -894,7 +912,7 @@ export default function OnboardingScreen({ onDone }) {
           flexDirection: 'column',
           height:        '100%',
           opacity:       slideVisible ? 1 : 0,
-          transform:     slideVisible ? 'translateY(0)' : 'translateY(6px)',
+          transform:     slideVisible ? 'translateY(0)' : 'translateY(10px)',
           transition:    `opacity ${SLIDE_FADE_MS}ms ease, transform ${SLIDE_FADE_MS}ms ease`,
         }}
       >
@@ -1013,7 +1031,7 @@ export default function OnboardingScreen({ onDone }) {
           borderTopLeftRadius:  28,
           borderTopRightRadius: 28,
           marginTop:       -20,
-          padding:         '20px 32px 40px',
+          padding:         '20px 32px 28px',
           position:        'relative',
           zIndex:          1,
           boxShadow:       '0 -4px 20px rgba(0,0,0,0.04)',
@@ -1042,13 +1060,19 @@ export default function OnboardingScreen({ onDone }) {
         )}
 
         {setupStarted && (
-          <div style={{ height: 8, marginBottom: 12 }} />
+          <div style={{ height: failed ? 2 : 8, marginBottom: failed ? 4 : 12 }} />
         )}
 
-        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        {/* minHeight: 0 lets this flex item actually shrink if the action
+            content below (worst case: Failed's fixes box + two buttons)
+            needs more room than the fixed card has — without it, a flex
+            item's default auto min-size would refuse to shrink below its
+            own content height, forcing the action content below to
+            overflow the card instead. */}
+        <div style={{ textAlign: 'center', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           {setupStarted ? (
             <>
-              <h2 style={{ fontSize: 24, fontWeight: 700, color: failed ? COLORS.warning : COLORS.accent, margin: '0 0 12px', lineHeight: 1.25 }}>
+              <h2 style={{ fontSize: failed ? 20 : 24, fontWeight: 700, color: failed ? COLORS.warning : COLORS.accent, margin: failed ? '0 0 6px' : '0 0 12px', lineHeight: 1.2 }}>
                 {failed
                   ? "Couldn't finish downloading"
                   : showSuccess
@@ -1057,7 +1081,7 @@ export default function OnboardingScreen({ onDone }) {
                       ? 'Preparing your library'
                       : 'Downloading your library'}
               </h2>
-              <p style={{ fontSize: 15, color: COLORS.textSecondary, lineHeight: 1.6, margin: 0 }}>
+              <p style={{ fontSize: failed ? 13 : 15, color: COLORS.textSecondary, lineHeight: failed ? 1.4 : 1.6, margin: 0 }}>
                 {failed
                   ? failedMessage
                   : showSuccess
@@ -1114,12 +1138,12 @@ export default function OnboardingScreen({ onDone }) {
             // low-emphasis secondary that returns to slide 4 without
             // restarting whatever's already downloaded (see
             // handleBackToOnboarding above).
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 14, width: '100%', marginTop: 4 }}>
-              <div style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: '14px 16px', textAlign: 'left' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: COLORS.warning, marginBottom: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 8, width: '100%', marginTop: 4 }}>
+              <div style={{ backgroundColor: '#FEF2F2', borderRadius: 14, padding: '10px 14px', textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: COLORS.warning, marginBottom: 4 }}>
                   Try these fixes
                 </div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: COLORS.textSecondary, lineHeight: 1.7 }}>
+                <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12, color: COLORS.textSecondary, lineHeight: 1.4 }}>
                   <li>Check your internet connection</li>
                   <li>Make sure you have enough storage</li>
                   <li>Try again in a moment</li>
@@ -1127,7 +1151,7 @@ export default function OnboardingScreen({ onDone }) {
               </div>
               <button
                 onClick={handleRetry}
-                style={PRIMARY_BUTTON_STYLE}
+                style={{ ...PRIMARY_BUTTON_STYLE, padding: '10px 32px' }}
                 onMouseDown={e => { e.currentTarget.style.backgroundColor = COLORS.accentHover }}
                 onMouseUp={e => { e.currentTarget.style.backgroundColor = COLORS.accent }}
               >
