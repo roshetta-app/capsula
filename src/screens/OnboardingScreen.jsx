@@ -17,20 +17,21 @@
  * than by advancing `current` past the last real slide. `current` now only
  * ever ranges over the 4 onboarding slides; the dot pagination is derived
  * from it directly and disappears the moment setup begins, since there is
- * nothing left to paginate. Setup itself has four states, rendered in the
- * same card area the slides use: Preparing (shown until either library's
- * first real signal comes back), Downloading (the combined bar plus a
+ * nothing left to paginate. Setup itself has three states (Preparing was
+ * dropped — see the tenth-pass changelog note below), rendered in the
+ * same card area the slides use: Downloading (the combined bar plus a
  * per-category breakdown — Medical library / Drug library / Images &
- * references — each showing real page counts, never fabricated numbers),
- * Error (redesigned problem-first, with a short troubleshooting list, a
- * Retry button, and a Back to onboarding button that returns to slide 4),
- * and Success ("All set!" plus a completed-categories checklist, then an
- * "Opening Capsula…" caption before the existing auto-complete fires — no
- * Continue button anywhere). The underlying download/error/retry/complete
- * machinery below (LOADING_FLOOR_MS, SUCCESS_HOLD_MS, DOWNLOAD_TIMEOUT_MS,
- * the reconnect/stall effects, complete()) is unchanged — this only adds a
+ * references — each showing real page counts, never fabricated numbers,
+ * shown immediately from setup start at 0%), Error (redesigned problem-
+ * first, with a short troubleshooting list, a Retry button, and a Back to
+ * onboarding button that returns to slide 4), and Success ("All set!"
+ * plus a completed-categories checklist, then an "Opening Capsula…"
+ * caption before the existing auto-complete fires — no Continue button
+ * anywhere). The underlying download/error/retry/complete machinery below
+ * (LOADING_FLOOR_MS, SUCCESS_HOLD_MS, DOWNLOAD_TIMEOUT_MS, the reconnect/
+ * stall effects, complete()) is unchanged — this only adds a
  * `setupStarted` flag alongside `current` and changes what gets rendered
- * for the Preparing/Downloading/Error/Success moments.
+ * for the Downloading/Error/Success moments.
  *
  * Removed from the previous version, on purpose:
  *   - The notifications-permission slide — a separate in-app banner now
@@ -174,10 +175,9 @@
  * it's now 44%/48% (was still the original 34%/38%). Second, the between-
  * slide fade was never actually visible: it reset via useEffect, which
  * only runs after the new slide already painted at full opacity, so it
- * flashed in and then flickered rather than fading. Now reset during
- * render instead (see slideVisible below) so the hidden state is in place
- * before the new slide ever paints — this is the actual fix, not a timing
- * tweak.
+ * flashed in and then flickered rather than fading. Attempted fix: reset
+ * during render instead — see the ninth-pass note below for why this
+ * still didn't work and what replaced it.
  *
  * 2026-09-12 (seventh pass, same day): the Preparing state had no minimum
  * display time — it was shown until hasRealProgress flipped true, which
@@ -203,6 +203,35 @@
  * checking whether testing has been against a deployed URL rather than a
  * fresh local build, since a push is required for a live site to reflect
  * any of this session's changes.
+ *
+ * 2026-09-12 (ninth pass, same day): confirmed on device that the render-
+ * time-reset fade genuinely does not fire on slides 2-5 (only the one-
+ * shot mount/completion animations were visible). Replaced the whole
+ * mechanism: instead of toggling opacity/transform via JS state on a
+ * persistent DOM node, the per-slide wrapper now has key={current} (forces
+ * a real unmount/remount on every slide change) and plays a CSS
+ * @keyframes animation, which always runs once on a freshly inserted
+ * node regardless of React effect/paint timing. No slideVisible state, no
+ * useEffect, no rAF — this class of bug can't recur the same way. Also
+ * flagged as an open design question (not yet resolved): the real
+ * download starts the moment Next is tapped on slide 4, so by the time
+ * PREPARING_FLOOR_MS's fixed 10s elapses, the download may already be
+ * mostly or fully done underneath a static Preparing screen with no
+ * spinner motion — worth revisiting PREPARING_FLOOR_MS and/or adding real
+ * motion to Preparing rather than treating 10s as fixed.
+ *
+ * 2026-09-12 (tenth pass, same day): resolved the open question above —
+ * Preparing is removed entirely, by explicit choice (options presented:
+ * drop it / keep it short+animated / delay the real download to match;
+ * dropping it was chosen). Downloading is now shown immediately when
+ * setup starts, at 0%, filling as real progress comes in — no more gap
+ * where a static screen sits in front of a download already in progress.
+ * Removed: PREPARING_FLOOR_MS, preparingFloorElapsed and its timer, the
+ * showPreparing flag, the PreparingRow component, and the "Preparing your
+ * library" / "Getting everything ready…" copy. hasRealProgress is still
+ * computed by useCombinedLibraryProgress (untouched, in case another
+ * consumer wants it) but is no longer destructured here, since Preparing
+ * was its only reader.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -310,14 +339,6 @@ const SUCCESS_HOLD_MS = 900
 // runs for the offline pre-check case in 1.12, since no attempt is made
 // there at all.
 const DOWNLOAD_TIMEOUT_MS = 28000
-
-// How long the Preparing state is guaranteed to stay visible before it's
-// allowed to hand off to Downloading, regardless of how fast the first
-// real progress signal comes back. Deliberately a long, fixed hold (not
-// tuned to the fastest realistic connection) per explicit request — this
-// means Preparing will show for its full duration even on downloads that
-// finish almost instantly, not just long enough to avoid a flash.
-const PREPARING_FLOOR_MS = 10000
 
 // How long the whole screen takes to fade out once onboarding completes,
 // instead of cutting straight to the real app (plan step 1.15).
@@ -470,11 +491,10 @@ function useCombinedLibraryProgress() {
 
   // 2026-09-12 (onboarding-redesign-refine): true the moment either
   // library's first real signal has actually come back (its own page-count
-  // query has landed) — used to tell the Preparing state apart from
-  // Downloading. Before this, nothing has actually started moving yet:
-  // the connection check and the very first request round-trip are still
-  // in flight. Also true once done/failed, so a device that finishes (or
-  // fails) unusually fast never gets stuck showing Preparing.
+  // query has landed). 2026-09-12 (tenth pass): no longer consumed by
+  // OnboardingScreen (it used this to tell Preparing apart from
+  // Downloading, a state since removed) — left computed here in case
+  // another consumer of this hook wants it.
   const hasRealProgress = !!drugsProgress || !!conditionsProgress || done || failed
 
   function start() {
@@ -547,26 +567,6 @@ function CategoryRow({ name, category }) {
   )
 }
 
-// One row of the Preparing state's checklist — 'done' (filled green
-// check), or 'pending' (hollow gray circle). There's no in-between state
-// tracked for these two items on purpose: Preparing only ever shows
-// Downloading/Installing as still ahead of it (see file header).
-function PreparingRow({ label, done }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0' }}>
-      {done ? (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <circle cx="12" cy="12" r="11" stroke={COLORS.success} strokeWidth="2" />
-          <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.success} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ) : (
-        <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${COLORS.dotInactive}` }} />
-      )}
-      <span style={{ fontSize: 14, color: done ? COLORS.textPrimary : COLORS.textSecondary }}>{label}</span>
-    </div>
-  )
-}
-
 // ─── OnboardingScreen ───────────────────────────────────────────────────────
 
 export default function OnboardingScreen({ onDone }) {
@@ -579,7 +579,7 @@ export default function OnboardingScreen({ onDone }) {
 
   const {
     fraction, done, failed: hookFailed, start: startBoth, retry: retryBoth,
-    hasRealProgress, categories,
+    categories,
   } = useCombinedLibraryProgress()
   const { isOnline } = useOnlineStatus()
 
@@ -667,7 +667,8 @@ export default function OnboardingScreen({ onDone }) {
   // new slide kicked off that fetch right then — which is what let the
   // previous slide's image visibly hang around while the new one loaded.
   // Warming the cache for all of them up front means every slide's image,
-  // and the Preparing/Downloading illustration, are already decoded and
+  // and the setup-state illustration (used by Downloading/Error/Success),
+  // are already decoded and
   // ready the moment each is reached.
   useEffect(() => {
     SLIDES.forEach(s => {
@@ -692,9 +693,6 @@ export default function OnboardingScreen({ onDone }) {
   // below.
   const [showSuccess, setShowSuccess] = useState(false)
   const alreadyDoneAtEntryRef = useRef(false)
-  // 2026-09-12 (bugfix): mirrors floorElapsed above, but for the Preparing
-  // state specifically — see PREPARING_FLOOR_MS.
-  const [preparingFloorElapsed, setPreparingFloorElapsed] = useState(false)
 
   useEffect(() => {
     if (!setupStarted) {
@@ -702,19 +700,16 @@ export default function OnboardingScreen({ onDone }) {
       setEntryFillStarted(false)
       setShowSuccess(false)
       setTimedOut(false)
-      setPreparingFloorElapsed(false)
       return
     }
     alreadyDoneAtEntryRef.current = doneRef.current
     setEntryFillStarted(false)
     const floorTimer = setTimeout(() => setFloorElapsed(true), LOADING_FLOOR_MS)
-    const preparingFloorTimer = setTimeout(() => setPreparingFloorElapsed(true), PREPARING_FLOOR_MS)
     // Flips on the next frame (not synchronously) so the width change
     // below is picked up as a CSS transition instead of an instant jump.
     const fillFrame = requestAnimationFrame(() => setEntryFillStarted(true))
     return () => {
       clearTimeout(floorTimer)
-      clearTimeout(preparingFloorTimer)
       cancelAnimationFrame(fillFrame)
     }
   }, [setupStarted])
@@ -839,47 +834,31 @@ export default function OnboardingScreen({ onDone }) {
     ? (alreadyDoneAtEntryRef.current ? (entryFillStarted ? 1 : 0) : fraction)
     : 0
 
-  // 2026-09-12 (onboarding-redesign-refine): Preparing is shown from the
-  // instant setup begins until either library's first real signal comes
-  // back (hasRealProgress) — see useCombinedLibraryProgress's comment.
-  // 2026-09-12 (bugfix): also gated on preparingFloorElapsed now — on a
-  // fast connection, hasRealProgress could flip true in well under a
-  // frame, and Preparing would flash by too fast to read. See
-  // PREPARING_FLOOR_MS.
-  const showPreparing = setupStarted && !failed && !showSuccess && (!hasRealProgress || !preparingFloorElapsed)
+  // 2026-09-12 (tenth pass): Preparing was dropped entirely — the real
+  // download starts the instant Next is tapped on slide 4, so by the time
+  // any fixed/floor delay elapsed, the download was often already mostly
+  // or fully done underneath a static screen with no visible motion.
+  // Downloading is now shown immediately at 0% and fills as real progress
+  // comes in, instead of gating on a separate "preparing" moment.
 
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
 
   // 2026-08-31 (plan step 1.15): fades the slide content in on arrival.
-  // 2026-09-12 (bugfix): the previous version reset this via useEffect,
-  // which only runs after the new slide has already painted at whatever
-  // opacity it last had — so instead of fading in, the new slide flashed
-  // in at full opacity and then briefly flickered down and back up. Fixed
-  // by adjusting state during render (React's supported pattern for
-  // "derived state that resets when a prop/value changes"): the moment
-  // `current` differs from what was last rendered, slideVisible is set to
-  // false in the SAME render pass, before anything paints. The effect
-  // below only handles flipping it back to true one frame later, which is
-  // what actually produces the visible fade-in. Paired with a slight
-  // translateY so slide changes read as a gentle rise-in rather than a
-  // flat cross-fade — kept small (6px) to stay subtle.
-  const [slideVisible, setSlideVisible] = useState(true)
-  const [lastRenderedSlide, setLastRenderedSlide] = useState(current)
-  if (current !== lastRenderedSlide) {
-    setLastRenderedSlide(current)
-    setSlideVisible(false)
-  }
-  useEffect(() => {
-    if (slideVisible) return
-    const frame = requestAnimationFrame(() => setSlideVisible(true))
-    return () => cancelAnimationFrame(frame)
-  }, [slideVisible])
+  // 2026-09-12 (bugfix, take 2): the previous two versions (useEffect
+  // reset, then render-time state reset) both relied on toggling opacity
+  // on the SAME DOM node across renders, which depends on exact paint/
+  // effect timing lining up — apparently unreliable in practice (reported
+  // as not firing at all on device, on slides 2-5, after the first fix).
+  // Replaced with the standard, more bulletproof pattern for "replay an
+  // animation every time a value changes": key={current} below forces
+  // React to unmount the old slide's DOM node and mount a brand new one,
+  // and a CSS @keyframes animation (not a transition) always plays once
+  // on a freshly inserted node — no JS state, no effect, no timing to get
+  // right. Same visual result (fade + 10px rise), simpler mechanism.
 
   // 2026-09-12: fades + slightly scales the whole screen in the instant it
   // mounts, instead of the first slide just snapping into view on open.
-  // Same next-frame trick as slideVisible above — starts hidden so the
-  // transition is picked up rather than skipped.
   const [mounted, setMounted] = useState(false)
   useEffect(() => {
     const frame = requestAnimationFrame(() => setMounted(true))
@@ -903,17 +882,24 @@ export default function OnboardingScreen({ onDone }) {
       }}
     >
       {/* 2026-09-12: single small stylesheet for the Downloading state's
-          per-category spinner (CategoryRow above) — inline styles alone
-          can't express a CSS keyframe animation. */}
-      <style>{'@keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } } .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }'}</style>
+          per-category spinner (CategoryRow above), plus the between-slide
+          entrance animation below — inline styles alone can't express a
+          CSS keyframe animation. */}
+      <style>{`
+        @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
+        .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
+        @keyframes capsula-onboarding-slide-in {
+          from { opacity: 0; transform: translateY(10px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <div
+        key={current}
         style={{
           display:       'flex',
           flexDirection: 'column',
           height:        '100%',
-          opacity:       slideVisible ? 1 : 0,
-          transform:     slideVisible ? 'translateY(0)' : 'translateY(10px)',
-          transition:    `opacity ${SLIDE_FADE_MS}ms ease, transform ${SLIDE_FADE_MS}ms ease`,
+          animation:     `capsula-onboarding-slide-in ${SLIDE_FADE_MS}ms ease`,
         }}
       >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
@@ -983,8 +969,8 @@ export default function OnboardingScreen({ onDone }) {
               <path d="M7 12.5L10.2 15.5L17 8.5" stroke={COLORS.surface} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           ) : (
-            // Preparing / Downloading — same download/library illustration
-            // used before, but noticeably smaller than a slide illustration
+            // Downloading — same download/library illustration used
+            // before, but noticeably smaller than a slide illustration
             // (brief §10: "smaller and less dominant than the onboarding
             // illustrations").
             <img
@@ -1077,18 +1063,14 @@ export default function OnboardingScreen({ onDone }) {
                   ? "Couldn't finish downloading"
                   : showSuccess
                     ? 'All set!'
-                    : showPreparing
-                      ? 'Preparing your library'
-                      : 'Downloading your library'}
+                    : 'Downloading your library'}
               </h2>
               <p style={{ fontSize: failed ? 13 : 15, color: COLORS.textSecondary, lineHeight: failed ? 1.4 : 1.6, margin: 0 }}>
                 {failed
                   ? failedMessage
                   : showSuccess
                     ? 'Your library is ready for quick access, right on this device.'
-                    : showPreparing
-                      ? 'Getting everything ready for offline access.'
-                      : 'Setting up your library for quick access.'}
+                    : 'Setting up your library for quick access.'}
               </p>
             </>
           ) : slide.brand ? (
@@ -1128,8 +1110,8 @@ export default function OnboardingScreen({ onDone }) {
         </div>
 
         {/* ── Bottom action: Next/Get Started button on slides 1–4, or
-              one of setup's four real states (Preparing/Downloading/
-              Error/Success) once setup has begun. ── */}
+              one of setup's three real states (Downloading/Error/Success)
+              once setup has begun. ── */}
         {setupStarted ? (
           failed ? (
             // 2026-09-12: redesigned problem-first — the message and the
@@ -1175,17 +1157,6 @@ export default function OnboardingScreen({ onDone }) {
               <div style={{ fontSize: 13, color: COLORS.textSecondary, marginTop: 12, textAlign: 'center' }}>
                 Opening Capsula…
               </div>
-            </div>
-          ) : showPreparing ? (
-            // 2026-09-12: shown from the instant Next is tapped until
-            // either library's first real signal comes back (brief §10) —
-            // Downloading/Installing are always shown as still ahead of
-            // this moment, never marked done here.
-            <div style={{ width: '100%', marginTop: 4, textAlign: 'left' }}>
-              <PreparingRow label="Checking connection" done />
-              <PreparingRow label="Preparing library" done />
-              <PreparingRow label="Downloading" done={false} />
-              <PreparingRow label="Installing" done={false} />
             </div>
           ) : (
             // Downloading — overall percentage (unchanged mechanism from
