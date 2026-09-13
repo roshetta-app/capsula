@@ -253,6 +253,22 @@
  * light" on device — swapped to a plain opacity fade, no transform at
  * all. Same key={current} + CSS keyframe mechanism, same SLIDE_FADE_MS
  * (180ms), just opacity 0 → 1 with nothing moving or scaling.
+ *
+ * 2026-09-12 (fourteenth pass, same day): the flash persisted even after
+ * changing the animation itself — correctly diagnosed as the mechanism,
+ * not the keyframe values. Root cause: applying a CSS @keyframes
+ * animation via inline style at the exact moment a node is inserted has a
+ * known quirk on some WebView engines, where the first painted frame
+ * shows the element at its normal (fully visible) state before the
+ * animation's `from` keyframe is picked up — a flash-then-animate,
+ * regardless of what the animation does. Replaced with a new SlideFade
+ * component (see above CategoryRow) used as `<SlideFade key={current}>`:
+ * a genuinely fresh component instance per slide, whose own useState(false)
+ * guarantees the very first paint is opacity 0, revealed via a plain CSS
+ * transition one frame later. This is the exact same pattern the
+ * whole-screen open animation already uses successfully (`mounted`
+ * below) — unifying on the mechanism that's actually proven to work
+ * reliably in this file, instead of the animation-based one that wasn't.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -588,6 +604,39 @@ function CategoryRow({ name, category }) {
   )
 }
 
+// 2026-09-12 (fourteenth pass): wraps each slide's content, used with
+// key={current} in the render below so React gives every slide change a
+// genuinely fresh component instance — a fresh useState(false) every time,
+// no carried-over value from the previous slide. That's what actually
+// makes this reliable: it's the same "mount hidden, reveal one frame
+// later via a plain CSS transition" pattern the whole-screen open/close
+// animation already uses successfully (see `mounted` below), instead of
+// applying a CSS @keyframes animation at insertion time — some WebView
+// engines paint one frame at the element's normal end state before
+// picking up an animation's `from` keyframe, which reads as a flash
+// followed by the animation, regardless of what the animation itself
+// does. A transition state-change doesn't have that failure mode.
+function SlideFade({ children }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return (
+    <div
+      style={{
+        display:       'flex',
+        flexDirection: 'column',
+        height:        '100%',
+        opacity:       visible ? 1 : 0,
+        transition:    `opacity ${SLIDE_FADE_MS}ms ease`,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 // ─── OnboardingScreen ───────────────────────────────────────────────────────
 
 export default function OnboardingScreen({ onDone }) {
@@ -890,26 +939,13 @@ export default function OnboardingScreen({ onDone }) {
       }}
     >
       {/* 2026-09-12: single small stylesheet for the Downloading state's
-          per-category spinner (CategoryRow above), plus the between-slide
-          entrance animation below — inline styles alone can't express a
-          CSS keyframe animation. */}
+          per-category spinner (CategoryRow above) — inline styles alone
+          can't express a CSS keyframe animation. */}
       <style>{`
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
-        @keyframes capsula-onboarding-slide-in {
-          from { opacity: 0; }
-          to   { opacity: 1; }
-        }
       `}</style>
-      <div
-        key={current}
-        style={{
-          display:       'flex',
-          flexDirection: 'column',
-          height:        '100%',
-          animation:     `capsula-onboarding-slide-in ${SLIDE_FADE_MS}ms ease`,
-        }}
-      >
+      <SlideFade key={current}>
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
           2026-09-12: hero height is fixed and identical on every slide
           (see HERO_HEIGHT) — the sheet below has no scroll fallback, so
@@ -1232,7 +1268,7 @@ export default function OnboardingScreen({ onDone }) {
           </button>
         )}
       </div>
-      </div>
+      </SlideFade>
     </div>
   )
 }
