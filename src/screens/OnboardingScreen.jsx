@@ -240,6 +240,14 @@
  * removed as it's now unused. The whole-screen open/close animation
  * (mounted/completing, OPEN_FADE_MS/COMPLETE_FADE_MS) is untouched — that
  * one wasn't part of this complaint.
+ *
+ * 2026-09-12 (twelfth pass, same day): re-added, using the same key=
+ * {current} + CSS keyframe method confirmed to actually fire on device —
+ * this time a tiny zoom-in (scale 0.98 → 1, opacity 0 → 1) instead of the
+ * previous fade+rise, no vertical translateY at all, and shorter
+ * (SLIDE_FADE_MS 180ms vs the old 300ms). Chosen from three options
+ * presented (plain fade / fade+tiny-2-3px-rise / tiny zoom-in) — zoom-in
+ * was the final pick after initially choosing the tiny-rise option.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -355,6 +363,9 @@ const COMPLETE_FADE_MS = 400
 // How long the whole screen takes to fade + scale in when onboarding first
 // mounts, instead of just snapping into view on open.
 const OPEN_FADE_MS = 380
+
+// How long each slide's tiny zoom-in takes on arrival — short and subtle.
+const SLIDE_FADE_MS = 180
 
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
@@ -874,17 +885,24 @@ export default function OnboardingScreen({ onDone }) {
       }}
     >
       {/* 2026-09-12: single small stylesheet for the Downloading state's
-          per-category spinner (CategoryRow above) — inline styles alone
-          can't express a CSS keyframe animation. */}
+          per-category spinner (CategoryRow above), plus the between-slide
+          entrance animation below — inline styles alone can't express a
+          CSS keyframe animation. */}
       <style>{`
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
+        @keyframes capsula-onboarding-slide-in {
+          from { opacity: 0; transform: scale(0.98); }
+          to   { opacity: 1; transform: scale(1); }
+        }
       `}</style>
       <div
+        key={current}
         style={{
           display:       'flex',
           flexDirection: 'column',
           height:        '100%',
+          animation:     `capsula-onboarding-slide-in ${SLIDE_FADE_MS}ms ease`,
         }}
       >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
