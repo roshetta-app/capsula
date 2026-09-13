@@ -248,6 +248,11 @@
  * (SLIDE_FADE_MS 180ms vs the old 300ms). Chosen from three options
  * presented (plain fade / fade+tiny-2-3px-rise / tiny zoom-in) — zoom-in
  * was the final pick after initially choosing the tiny-rise option.
+ *
+ * 2026-09-12 (thirteenth pass, same day): the zoom read as a "flashing
+ * light" on device — swapped to a plain opacity fade, no transform at
+ * all. Same key={current} + CSS keyframe mechanism, same SLIDE_FADE_MS
+ * (180ms), just opacity 0 → 1 with nothing moving or scaling.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -892,8 +897,8 @@ export default function OnboardingScreen({ onDone }) {
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
         @keyframes capsula-onboarding-slide-in {
-          from { opacity: 0; transform: scale(0.98); }
-          to   { opacity: 1; transform: scale(1); }
+          from { opacity: 0; }
+          to   { opacity: 1; }
         }
       `}</style>
       <div
