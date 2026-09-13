@@ -232,6 +232,14 @@
  * computed by useCombinedLibraryProgress (untouched, in case another
  * consumer wants it) but is no longer destructured here, since Preparing
  * was its only reader.
+ *
+ * 2026-09-12 (eleventh pass, same day): the between-slide fade+rise
+ * (key={current} + CSS keyframe from the ninth pass) is removed entirely,
+ * per explicit request. Slides now switch instantly with no transition at
+ * all — no opacity/transform animation, no key remount. SLIDE_FADE_MS is
+ * removed as it's now unused. The whole-screen open/close animation
+ * (mounted/completing, OPEN_FADE_MS/COMPLETE_FADE_MS) is untouched — that
+ * one wasn't part of this complaint.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -347,9 +355,6 @@ const COMPLETE_FADE_MS = 400
 // How long the whole screen takes to fade + scale in when onboarding first
 // mounts, instead of just snapping into view on open.
 const OPEN_FADE_MS = 380
-
-// How long each slide takes to fade in on arrival (plan step 1.15).
-const SLIDE_FADE_MS = 300
 
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
@@ -844,19 +849,6 @@ export default function OnboardingScreen({ onDone }) {
   const slide = SLIDES[current]
   const heroOnBlue = current !== 0 // slide 1 is a plain photo, 2–5 sit on the blue hero
 
-  // 2026-08-31 (plan step 1.15): fades the slide content in on arrival.
-  // 2026-09-12 (bugfix, take 2): the previous two versions (useEffect
-  // reset, then render-time state reset) both relied on toggling opacity
-  // on the SAME DOM node across renders, which depends on exact paint/
-  // effect timing lining up — apparently unreliable in practice (reported
-  // as not firing at all on device, on slides 2-5, after the first fix).
-  // Replaced with the standard, more bulletproof pattern for "replay an
-  // animation every time a value changes": key={current} below forces
-  // React to unmount the old slide's DOM node and mount a brand new one,
-  // and a CSS @keyframes animation (not a transition) always plays once
-  // on a freshly inserted node — no JS state, no effect, no timing to get
-  // right. Same visual result (fade + 10px rise), simpler mechanism.
-
   // 2026-09-12: fades + slightly scales the whole screen in the instant it
   // mounts, instead of the first slide just snapping into view on open.
   const [mounted, setMounted] = useState(false)
@@ -882,24 +874,17 @@ export default function OnboardingScreen({ onDone }) {
       }}
     >
       {/* 2026-09-12: single small stylesheet for the Downloading state's
-          per-category spinner (CategoryRow above), plus the between-slide
-          entrance animation below — inline styles alone can't express a
-          CSS keyframe animation. */}
+          per-category spinner (CategoryRow above) — inline styles alone
+          can't express a CSS keyframe animation. */}
       <style>{`
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
-        @keyframes capsula-onboarding-slide-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
       `}</style>
       <div
-        key={current}
         style={{
           display:       'flex',
           flexDirection: 'column',
           height:        '100%',
-          animation:     `capsula-onboarding-slide-in ${SLIDE_FADE_MS}ms ease`,
         }}
       >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
