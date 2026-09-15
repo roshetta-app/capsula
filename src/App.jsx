@@ -100,7 +100,7 @@
  *   ConditionProvider → DrugProvider →
  *     ┌─ ErrorBoundary → AdminRoutes                     (admin branch)
  *     └─ ErrorBoundary → OnlineStatusProvider → ThemeProvider →
- *          FavouritesProvider → NotesSignInProvider → FavouritesSignInProvider →
+ *          FavouritesProvider → NotesSignInProvider →
  *          PushSubscriptionProvider → AppGateProvider →
  *          [AppGateResumeListener, AppGate, OnboardingGate → PublicRoutes,
  *          ProfileSetupRedirect, SignInNudge]              (public branch)
@@ -135,11 +135,13 @@
  * — so a maintenance/force-update block can show before onboarding even
  * does.)
  *
- * Favourites empty-state sign-in banner (this session) — added
- * FavouritesSignInProvider, grouped as a sibling of NotesSignInProvider
- * (no dependency between them, same reasoning already used for that
- * pairing) so SignInNudge below can also recognize a deliberate "Sign in"
- * tap from an empty Favourites tab, not just a pending favourite/note.
+ * Favourites empty-state sign-in banner (this session) — briefly added a
+ * FavouritesSignInProvider here, grouped as a sibling of
+ * NotesSignInProvider, so SignInNudge could recognize a deliberate "Sign
+ * in" tap from an empty Favourites tab. Removed again in the same session
+ * once that tap was changed to call signInWithGoogle() directly instead
+ * of opening AccountSheet — see FavouritesEmptyStates.jsx's header. No
+ * other consumer ever used this provider, so it's gone from here too.
  */
 
 import { useEffect, useRef } from 'react'
@@ -158,7 +160,6 @@ import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { NotesSignInProvider } from './context/NotesSignInContext'
-import { FavouritesSignInProvider } from './context/FavouritesSignInContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { OnlineStatusProvider } from './context/OnlineStatusContext'
 import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
@@ -264,7 +265,6 @@ export default function App() {
                     <ThemeProvider>
                       <FavouritesProvider>
                         <NotesSignInProvider>
-                          <FavouritesSignInProvider>
                           {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
                               scoped here rather than at the top of the
                               tree, same reasoning as PushSubscriptionProvider
@@ -283,7 +283,6 @@ export default function App() {
                               </AppGateProvider>
                             </PushSubscriptionProvider>
                           </PushBannerProvider>
-                          </FavouritesSignInProvider>
                         </NotesSignInProvider>
                       </FavouritesProvider>
                     </ThemeProvider>

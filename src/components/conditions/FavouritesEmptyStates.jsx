@@ -22,12 +22,10 @@
  * visual look exactly (same border/fill/radius/press-scale treatment).
  *
  * Favourites empty-state sign-in banner (this session) —
- * NothingSavedEmptyState gained a showSignIn prop. When true (a guest
- * viewing this tab), a quiet bordered "Sign in" banner renders below the
- * existing icon/headline/subtext/button. Tapping it calls requestSignIn()
- * from FavouritesSignInContext, the same way PersonalNotes.jsx already
- * calls requestNoteSignIn() — SignInNudge.jsx opens the shared account
- * sheet with its generic copy in response.
+ * NothingSavedEmptyState gained a showSignIn prop, true for guests only,
+ * shown below the existing icon/headline/subtext/button. Originally
+ * opened the shared AccountSheet popup via FavouritesSignInContext — see
+ * "Direct-to-Google sign-in" below for what replaced that.
  *
  * Favourites empty-state graphic (this session) — NothingSavedEmptyState's
  * placeholder Heart-in-circle icon is replaced with the provided PNG
@@ -55,12 +53,22 @@
  *  - Sign-in copy simplified to "Already have saved favourites?"; the
  *    Sign in button itself stays a small outlined secondary action so it
  *    doesn't compete with Browse.
+ *
+ * Direct-to-Google sign-in (this session, follow-up) — per feedback, the
+ * Sign in action here no longer opens the shared AccountSheet popup; it
+ * calls signInWithGoogle() directly, using the exact same "Continue with
+ * Google" button (styling, GoogleIcon mark, busy/error handling) copied
+ * verbatim from AccountSheet.jsx, so it matches the app's one standard
+ * Google button pixel-for-pixel rather than introducing a second style.
+ * FavouritesSignInContext is no longer used by this file as a result —
+ * it had no other consumer, so it's been dropped from App.jsx and
+ * SignInNudge.jsx too (see those files' headers).
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { SearchX } from 'lucide-react'
-import { useFavouritesSignInContext } from '../../context/FavouritesSignInContext'
+import { useAuth } from '../../hooks/useAuth'
 import favouritesEmptyIllustration from '../../assets/favourites-empty-illustration.png'
 
 
@@ -151,7 +159,25 @@ function EmptyStatePressableButton({ onClick, filled, fullWidth, children }) {
 export function NothingSavedEmptyState({ label, showSignIn }) {
   const navigate = useNavigate()
   const isConditions = label === 'conditions'
-  const { requestSignIn } = useFavouritesSignInContext()
+  const { signInWithGoogle } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const [googlePressed, setGooglePressed] = useState(false)
+
+  // Copied from AccountSheet.jsx's handleGoogleSignIn — same busy/error
+  // handling, including resetting `busy` on every path (native
+  // signInWithGoogle() only opens the system browser and returns right
+  // away, so this keeps the button from getting stuck busy).
+  async function handleGoogleSignIn() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    const { error: authError } = await signInWithGoogle()
+    if (authError) {
+      setError(authError.message ?? 'Sign-in failed. Please try again.')
+    }
+    setBusy(false)
+  }
 
   return (
     <div style={{
@@ -216,6 +242,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
         {showSignIn && (
           <div style={{
             marginTop:     'var(--space-2)',
+            width:         '100%',
             display:       'flex',
             flexDirection: 'column',
             alignItems:    'center',
@@ -224,13 +251,83 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               Already have saved favourites?
             </div>
-            <EmptyStatePressableButton onClick={requestSignIn}>
-              Sign in
-            </EmptyStatePressableButton>
+
+            {error && (
+              <div style={{
+                width:           '100%',
+                fontSize:        12,
+                color:           '#DC2626',
+                backgroundColor: '#FEF2F2',
+                border:          '1px solid #FECACA',
+                borderRadius:    'var(--radius-sm)',
+                padding:         'var(--space-2) var(--space-3)',
+                lineHeight:      1.4,
+                textAlign:       'left',
+              }}>
+                {error}
+              </div>
+            )}
+
+            {/* Copied verbatim from AccountSheet.jsx's "Continue with
+                Google" button — same styling, icon, and busy label, so
+                this matches the app's one standard Google button instead
+                of a second look. */}
+            <button
+              onClick={handleGoogleSignIn}
+              onPointerDown={() => setGooglePressed(true)}
+              onPointerUp={() => setGooglePressed(false)}
+              onPointerLeave={() => setGooglePressed(false)}
+              disabled={busy}
+              style={{
+                width:                   '100%',
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                gap:                     'var(--space-2)',
+                padding:                 'var(--space-2) var(--space-4)',
+                borderRadius:            'var(--radius-sm)',
+                border:                  'none',
+                backgroundColor:         busy ? 'var(--color-border)' : 'var(--color-accent)',
+                color:                   busy ? 'var(--color-text-tertiary)' : '#fff',
+                fontSize:                14,
+                fontWeight:              600,
+                fontFamily:              'var(--font-body)',
+                cursor:                  busy ? 'not-allowed' : 'pointer',
+                transform:               googlePressed ? 'scale(0.97)' : 'scale(1)',
+                transition:              'transform var(--motion-fast) var(--ease-settle)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {!busy && (
+                <span style={{
+                  display:         'inline-flex',
+                  backgroundColor: '#fff',
+                  borderRadius:    'var(--radius-sm)',
+                  padding:         2,
+                }}>
+                  <GoogleIcon size={16} />
+                </span>
+              )}
+              {busy ? 'Opening Google…' : 'Continue with Google'}
+            </button>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+// Copied verbatim from AccountSheet.jsx's local GoogleIcon (itself copied
+// from AccountScreen.jsx originally) so this button's mark matches the
+// rest of the app's Google buttons exactly, pixel for pixel.
+function GoogleIcon({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 18 18" aria-hidden="true">
+      <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.9c1.7-1.56 2.7-3.87 2.7-6.62z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.9-2.26c-.8.54-1.84.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.95v2.33A9 9 0 0 0 9 18z" />
+      <path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.66 9c0-.59.1-1.17.29-1.7V4.97H.95A9 9 0 0 0 0 9c0 1.45.35 2.83.95 4.03z" />
+      <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.46 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .95 4.97L3.95 7.3C4.66 5.17 6.65 3.58 9 3.58z" />
+    </svg>
   )
 }
 
