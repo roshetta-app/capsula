@@ -18,6 +18,7 @@
  *   2. Specialty  — a drill-in row. Tapping it closes this sheet and opens
  *                   SpecialtiesBottomSheet (unchanged, reused as-is) — the
  *                   two sheets are never shown stacked/simultaneously.
+ *                   Conditions-only — see showSpecialty below.
  *   3. Manage     — tapping it calls onManage() and closes this sheet.
  *
  * Phase 3 (back-close + swipe-to-dismiss) — wired into useBackClose so a
@@ -36,12 +37,20 @@
  *            still gets its own dismiss affordance rather than relying on
  *            backdrop-tap/gesture alone.
  *
+ * Favourites Screen Refactor plan — new showSpecialty prop (default true,
+ * so a caller that doesn't pass it yet sees no change). The Drugs tab has
+ * no specialty concept, so FavouritesScreen.jsx will pass
+ * showSpecialty={activeTab === 'conditions'} once its own rewrite lands.
+ * Sort and Manage are unaffected — both stay shared across tabs.
+ *
  * Props:
  *   isOpen              boolean
  *   onClose             () => void
  *   sortMode            string  — 'az' | 'recent'
  *   sortLabels          { az: string, recent: string }
  *   onSetSortMode       (mode: string) => void
+ *   showSpecialty       boolean  (optional, default true) — hides the
+ *                       Specialty row entirely (e.g. on the Drugs tab)
  *   activeSpecialtyObj  { name, iconType, iconValue, colorToken } | null
  *   onOpenSpecialties   () => void  — called after this sheet closes
  *   onClearSpecialty    () => void  — resets specialty to 'all'; sheet stays open
@@ -59,6 +68,7 @@ export default function FavouritesManagerSheet({
   sortMode,
   sortLabels,
   onSetSortMode,
+  showSpecialty = true,
   activeSpecialtyObj,
   onOpenSpecialties,
   onClearSpecialty,
@@ -194,85 +204,89 @@ export default function FavouritesManagerSheet({
             while an inline X (only rendered once a specialty is active)
             resets straight to 'all' without leaving this sheet. A
             clickable clear control can't be nested inside the label's
-            own <button>, hence the wrapping row here. */}
-        <div style={{
-          display:      'flex',
-          alignItems:   'center',
-          marginBottom: 6,
-        }}>
-          <button
-            onClick={handleOpenSpecialties}
-            style={{
-              flex:                    1,
-              minWidth:                0,
-              display:                 'flex',
-              alignItems:              'center',
-              gap:                     10,
-              padding:                 '12px 10px',
-              background:              'none',
-              border:                  'none',
-              borderRadius:            'var(--radius-md)',
-              textAlign:               'left',
-              cursor:                  'pointer',
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            {hasSpecialty ? (
-              <SpecialtyIcon
-                iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
-                iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
-                size={17}
-                color={specialtyIconColor}
-              />
-            ) : (
-              <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
-            )}
-            <span style={{
-              flex:         1,
-              minWidth:     0,
-              overflow:     'hidden',
-              whiteSpace:   'nowrap',
-              textOverflow: 'ellipsis',
-              fontSize:     14,
-              fontFamily:   'var(--font-body)',
-              color:        'var(--color-text-primary)',
-            }}>
-              {hasSpecialty ? activeSpecialtyObj.name : 'Filter by specialty'}
-            </span>
-            {!hasSpecialty && (
-              <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-                style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
-                <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
-                  strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            )}
-          </button>
-
-          {hasSpecialty && (
+            own <button>, hence the wrapping row here.
+            Conditions-only: hidden entirely when showSpecialty is false
+            (e.g. the Drugs tab, which has no specialty concept). */}
+        {showSpecialty && (
+          <div style={{
+            display:      'flex',
+            alignItems:   'center',
+            marginBottom: 6,
+          }}>
             <button
-              onClick={onClearSpecialty}
-              aria-label="Clear specialty filter"
+              onClick={handleOpenSpecialties}
               style={{
+                flex:                    1,
+                minWidth:                0,
                 display:                 'flex',
                 alignItems:              'center',
-                justifyContent:          'center',
-                flexShrink:              0,
-                width:                   28,
-                height:                  28,
-                marginRight:             6,
-                borderRadius:            '50%',
-                border:                  'none',
+                gap:                     10,
+                padding:                 '12px 10px',
                 background:              'none',
+                border:                  'none',
+                borderRadius:            'var(--radius-md)',
+                textAlign:               'left',
                 cursor:                  'pointer',
                 outline:                 'none',
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <X size={15} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
+              {hasSpecialty ? (
+                <SpecialtyIcon
+                  iconType={activeSpecialtyObj.iconType   ?? 'lucide'}
+                  iconValue={activeSpecialtyObj.iconValue ?? 'Stethoscope'}
+                  size={17}
+                  color={specialtyIconColor}
+                />
+              ) : (
+                <ListFilter size={17} strokeWidth={1.8} color={specialtyIconColor} aria-hidden="true" />
+              )}
+              <span style={{
+                flex:         1,
+                minWidth:     0,
+                overflow:     'hidden',
+                whiteSpace:   'nowrap',
+                textOverflow: 'ellipsis',
+                fontSize:     14,
+                fontFamily:   'var(--font-body)',
+                color:        'var(--color-text-primary)',
+              }}>
+                {hasSpecialty ? activeSpecialtyObj.name : 'Filter by specialty'}
+              </span>
+              {!hasSpecialty && (
+                <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
+                  style={{ flexShrink: 0, color: 'var(--color-text-tertiary)', transform: 'rotate(-90deg)' }}>
+                  <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
+                    strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
             </button>
-          )}
-        </div>
+
+            {hasSpecialty && (
+              <button
+                onClick={onClearSpecialty}
+                aria-label="Clear specialty filter"
+                style={{
+                  display:                 'flex',
+                  alignItems:              'center',
+                  justifyContent:          'center',
+                  flexShrink:              0,
+                  width:                   28,
+                  height:                  28,
+                  marginRight:             6,
+                  borderRadius:            '50%',
+                  border:                  'none',
+                  background:              'none',
+                  cursor:                  'pointer',
+                  outline:                 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                <X size={15} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
 
