@@ -136,6 +136,17 @@
  *    secondary button. GoogleIcon and the press-scale state that only
  *    that button used (googlePressed) are removed as unused along with
  *    it — nothing else in this file referenced either.
+ *
+ * Empty-state visual pass 4 (this session) — per feedback:
+ *  - Heart icon no longer centers against the whole (possibly two-line)
+ *    subtitle block — it's inline with the text now (verticalAlign:
+ *    'middle' on the icon itself, no flex/align-items), so it sits
+ *    against the first word's line only, not the block's overall height.
+ *  - Both tabs' subtitle now forces the same two-line shape with an
+ *    explicit <br /> ("...condition" / "...drug" on line 1, "to save it
+ *    here" on line 2 — identical — for both), rather than trusting the
+ *    two different-length sentences to happen to wrap the same way at
+ *    maxWidth 260.
  */
 
 import { useState } from 'react'
@@ -287,19 +298,22 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
       </div>
 
       <div style={{
-        display:    'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap:        6,
         fontSize:   13,
         color:      'var(--color-text-tertiary)',
         lineHeight: 1.5,
         maxWidth:   260,
+        margin:     '0 auto',
       }}>
-        <Heart size={14} color="var(--color-favourite)" fill="var(--color-favourite)" strokeWidth={0} style={{ flexShrink: 0 }} />
+        <Heart
+          size={14}
+          color="var(--color-favourite)"
+          fill="var(--color-favourite)"
+          strokeWidth={0}
+          style={{ verticalAlign: 'middle', marginTop: -2, marginRight: 6 }}
+        />
         {isConditions
-          ? 'Tap the heart on any condition to save it here'
-          : 'Tap the heart on any drug to save it here'}
+          ? <>Tap the heart on any condition<br />to save it here</>
+          : <>Tap the heart on any drug<br />to save it here</>}
       </div>
 
       {/* Gap between the top group and the action buttons below. */}
