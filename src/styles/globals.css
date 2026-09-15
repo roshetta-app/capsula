@@ -295,6 +295,27 @@ textarea,
   -webkit-touch-callout: default;
 }
 
+/* ─── Hide scrollbars app-wide ───────────────────────────────────────────────
+   (hide-scrollbars) — a visible scrollbar reads as "this is a browser tab,"
+   not a native app. Hides it everywhere scrolling happens — the page itself
+   (html, this app's real scrolling element — see SheetShell.jsx) plus every
+   internal scroll box (condition/drug detail tab content, the virtualized
+   drug list, bottom sheets) — without touching the actual scroll behavior,
+   just the visual bar. scrollbar-width/-ms-overflow-style cover Firefox and
+   legacy Edge; the ::-webkit-scrollbar pseudo-element covers Chrome,
+   Safari, and current Edge. Universal `*` selector rather than naming each
+   scroll container individually, so a future sheet or list inherits this
+   automatically instead of needing to be added by hand every time one's
+   built. */
+* {
+  scrollbar-width: none;      /* Firefox */
+  -ms-overflow-style: none;   /* legacy Edge / IE */
+}
+
+*::-webkit-scrollbar {
+  display: none;               /* Chrome, Safari, current Edge */
+}
+
 html {
   font-family: var(--font-body);
   background-color: var(--color-bg);
