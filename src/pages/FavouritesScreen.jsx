@@ -499,6 +499,11 @@
  *  is now wired to the Drugs tab too, keyed on drugQuery/setDrugQuery.
  * Phase 11: handleConfirmRemoveDrug now plays the same row-exit animation
  *  handleConfirmRemoveCondition already used, instead of removing instantly.
+ *
+ * Favourites empty-state sign-in banner (this session) — both tabs' call
+ * to NothingSavedEmptyState now pass showSignIn={!user}. `user` was
+ * already read here via useAuth() for other purposes, so no new context
+ * read was needed.
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react'
@@ -1339,7 +1344,7 @@ export default function FavouritesScreen() {
                 {!conditionsEverLoaded ? (
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedConditions.length === 0
-                  ? <NothingSavedEmptyState label="conditions" />
+                  ? <NothingSavedEmptyState label="conditions" showSignIn={!user} />
                   : conditionSearchEmpty
                     ? <NoSearchResultsState query={conditionQuery} onClear={() => setConditionQuery('')} />
                     : (!isSearchingConditions && activeSpecialty !== 'all' && conditionResults.length === 0)
@@ -1442,7 +1447,7 @@ export default function FavouritesScreen() {
                 {!drugsEverLoaded ? (
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedDrugs.length === 0
-                ? <NothingSavedEmptyState label="drugs" />
+                ? <NothingSavedEmptyState label="drugs" showSignIn={!user} />
                 : drugSearchEmpty
                   ? <NoSearchResultsState query={drugQuery} onClear={() => setDrugQuery('')} />
                   : drugSearchResults.map((drug, i) => {

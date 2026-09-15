@@ -24,6 +24,13 @@
  * mechanism with pendingFavourite in the same way. AccountSheet now opens
  * on pendingFavourite || pendingNoteConditionId, full stop.
  *
+ * Favourites empty-state sign-in banner (this session) — AccountSheet now
+ * also opens on signInRequested (FavouritesSignInContext), set when a
+ * guest taps "Sign in" directly from an empty Favourites tab rather than
+ * a pending favourite/note action. favouriteContext/noteContext stay
+ * false in that case, so the sheet falls through to its existing generic
+ * copy unchanged.
+ *
  * Mounted once in App.jsx, in the same spot ProfileSetupRedirect sits — as
  * a sibling of OnboardingGate/AppRoutes, inside AuthProvider,
  * FavouritesProvider, and NotesSignInProvider so all three contexts are
@@ -36,6 +43,7 @@
 import { useAuth } from '../hooks/useAuth'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useNotesSignInContext } from '../context/NotesSignInContext'
+import { useFavouritesSignInContext } from '../context/FavouritesSignInContext'
 import AccountSheet from './ui/AccountSheet'
 import FavouriteLimitSheet from './ui/FavouriteLimitSheet'
 
@@ -48,6 +56,7 @@ export default function SignInNudge() {
     dismissCapBlocked,
   } = useFavouritesContext()
   const { pendingNoteConditionId, dismissNoteSignIn } = useNotesSignInContext()
+  const { signInRequested, dismissSignInRequest } = useFavouritesSignInContext()
 
   function handleAccountSheetClose() {
     if (pendingFavourite) {
@@ -58,12 +67,16 @@ export default function SignInNudge() {
       dismissNoteSignIn()
       return
     }
+    if (signInRequested) {
+      dismissSignInRequest()
+      return
+    }
   }
 
   return (
     <>
       <AccountSheet
-        isOpen={!!pendingFavourite || !!pendingNoteConditionId}
+        isOpen={!!pendingFavourite || !!pendingNoteConditionId || signInRequested}
         onClose={handleAccountSheetClose}
         user={user}
         signInWithGoogle={signInWithGoogle}

@@ -100,7 +100,7 @@
  *   ConditionProvider → DrugProvider →
  *     ┌─ ErrorBoundary → AdminRoutes                     (admin branch)
  *     └─ ErrorBoundary → OnlineStatusProvider → ThemeProvider →
- *          FavouritesProvider → NotesSignInProvider →
+ *          FavouritesProvider → NotesSignInProvider → FavouritesSignInProvider →
  *          PushSubscriptionProvider → AppGateProvider →
  *          [AppGateResumeListener, AppGate, OnboardingGate → PublicRoutes,
  *          ProfileSetupRedirect, SignInNudge]              (public branch)
@@ -134,6 +134,12 @@
  * (AppGateProvider + AppGate sit outside OnboardingGate entirely, Step 4e
  * — so a maintenance/force-update block can show before onboarding even
  * does.)
+ *
+ * Favourites empty-state sign-in banner (this session) — added
+ * FavouritesSignInProvider, grouped as a sibling of NotesSignInProvider
+ * (no dependency between them, same reasoning already used for that
+ * pairing) so SignInNudge below can also recognize a deliberate "Sign in"
+ * tap from an empty Favourites tab, not just a pending favourite/note.
  */
 
 import { useEffect, useRef } from 'react'
@@ -152,6 +158,7 @@ import { ConditionProvider } from './context/ConditionContext'
 import { DrugProvider } from './context/DrugContext'
 import { FavouritesProvider } from './context/FavouritesContext'
 import { NotesSignInProvider } from './context/NotesSignInContext'
+import { FavouritesSignInProvider } from './context/FavouritesSignInContext'
 import { PushSubscriptionProvider } from './context/PushSubscriptionContext'
 import { OnlineStatusProvider } from './context/OnlineStatusContext'
 import { AppGateProvider, useAppGateContext } from './context/AppGateContext'
@@ -257,6 +264,7 @@ export default function App() {
                     <ThemeProvider>
                       <FavouritesProvider>
                         <NotesSignInProvider>
+                          <FavouritesSignInProvider>
                           {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
                               scoped here rather than at the top of the
                               tree, same reasoning as PushSubscriptionProvider
@@ -275,6 +283,7 @@ export default function App() {
                               </AppGateProvider>
                             </PushSubscriptionProvider>
                           </PushBannerProvider>
+                          </FavouritesSignInProvider>
                         </NotesSignInProvider>
                       </FavouritesProvider>
                     </ThemeProvider>
@@ -288,4 +297,3 @@ export default function App() {
       </BrowserRouter>
     </ErrorBoundary>
   )
-}

@@ -20,11 +20,20 @@
  * private FilledHintButton (not imported/reused — that file stays out of
  * scope, and FilledHintButton isn't exported from it anyway). Mirrors its
  * visual look exactly (same border/fill/radius/press-scale treatment).
+ *
+ * Favourites empty-state sign-in banner (this session) —
+ * NothingSavedEmptyState gained a showSignIn prop. When true (a guest
+ * viewing this tab), a quiet bordered "Sign in" banner renders below the
+ * existing icon/headline/subtext/button. Tapping it calls requestSignIn()
+ * from FavouritesSignInContext, the same way PersonalNotes.jsx already
+ * calls requestNoteSignIn() — SignInNudge.jsx opens the shared account
+ * sheet with its generic copy in response.
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Heart, SearchX } from 'lucide-react'
+import { useFavouritesSignInContext } from '../../context/FavouritesSignInContext'
 
 // Favourites' own identity color — same token used across this screen's
 // extracted pieces (RowStarButton.jsx already keeps its own local copy of
@@ -73,9 +82,10 @@ function FavFilledHintButton({ onClick, children }) {
 // circular icon background, short body copy, verb-first CTA to go save
 // something. Shared between both tabs — only the label/destination differ.
 
-export function NothingSavedEmptyState({ label }) {
+export function NothingSavedEmptyState({ label, showSignIn }) {
   const navigate = useNavigate()
   const isConditions = label === 'conditions'
+  const { requestSignIn } = useFavouritesSignInContext()
 
   return (
     <div style={{
@@ -130,6 +140,28 @@ export function NothingSavedEmptyState({ label }) {
       >
         {isConditions ? 'Browse conditions' : 'Browse drugs'}
       </button>
+
+      {showSignIn && (
+        <button
+          onClick={requestSignIn}
+          style={{
+            marginTop:       'var(--space-2)',
+            width:           '100%',
+            maxWidth:        240,
+            padding:         '9px 16px',
+            borderRadius:    'var(--radius-md)',
+            border:          '1px solid var(--color-border)',
+            backgroundColor: 'transparent',
+            color:           'var(--color-text-secondary)',
+            fontSize:        13,
+            fontWeight:      500,
+            fontFamily:      'var(--font-body)',
+            cursor:          'pointer',
+          }}
+        >
+          Sign in
+        </button>
+      )}
     </div>
   )
 }
