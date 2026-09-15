@@ -71,6 +71,18 @@
  * of accent-blue, keeping it visually secondary to Browse. An "or"
  * divider now sits between the two, above "Already have saved
  * favourites?".
+ *
+ * Button pass 2 (this session, follow-up) — per feedback: corner radius
+ * bumped from var(--radius-sm) to var(--radius-md) on both Browse and the
+ * Google button, matching SpecialtiesBottomSheet.jsx's row-button radius
+ * instead of the tighter one used elsewhere. Both buttons' height/padding
+ * trimmed down slightly, and the button group's container narrowed
+ * (maxWidth 320 → 280) so the pair reads a touch smaller overall. The
+ * Google button's fill was hardcoded '#fff', which stayed white in dark
+ * mode instead of following the app's theme — switched to
+ * var(--color-surface), the same token AccountSheet.jsx's own idle-state
+ * surface color resolves to, so it now darkens correctly with the rest of
+ * the app.
  */
 
 import { useState } from 'react'
@@ -136,9 +148,9 @@ function EmptyStatePressableButton({ onClick, filled, fullWidth, children }) {
       style={{
         width:                   fullWidth ? '100%' : 'auto',
         minWidth:                fullWidth ? undefined : 160,
-        minHeight:               filled ? 46 : undefined,
-        padding:                 filled ? '12px 20px' : '9px 18px',
-        borderRadius:            'var(--radius-sm)',
+        minHeight:               filled ? 42 : undefined,
+        padding:                 filled ? '10px 18px' : '9px 18px',
+        borderRadius:            'var(--radius-md)',
         border:                  filled ? 'none' : '1.5px solid var(--color-border)',
         backgroundColor:         filled ? 'var(--color-accent)' : 'transparent',
         color:                   filled ? '#fff' : 'var(--color-text-secondary)',
@@ -232,7 +244,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
       {/* Gap between the top group and the action buttons below. */}
       <div style={{
         width:         '100%',
-        maxWidth:      320,
+        maxWidth:      280,
         marginTop:     'var(--space-6)',
         display:       'flex',
         flexDirection: 'column',
@@ -295,7 +307,9 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
                 secondary action here, so it stays visually quieter than
                 the primary Browse button above rather than matching its
                 blue fill. Height/radius/padding match Browse exactly so
-                the two read as one consistent button pair. */}
+                the two read as one consistent button pair. Fill uses
+                var(--color-surface) rather than a literal '#fff' so it
+                darkens in dark mode instead of staying stuck white. */}
             <button
               onClick={handleGoogleSignIn}
               onPointerDown={() => setGooglePressed(true)}
@@ -304,15 +318,15 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
               disabled={busy}
               style={{
                 width:                   '100%',
-                minHeight:               46,
+                minHeight:               42,
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
                 gap:                     'var(--space-2)',
-                padding:                 '12px 20px',
-                borderRadius:            'var(--radius-sm)',
+                padding:                 '10px 18px',
+                borderRadius:            'var(--radius-md)',
                 border:                  '1.5px solid var(--color-border)',
-                backgroundColor:         busy ? 'var(--color-bg)' : '#fff',
+                backgroundColor:         busy ? 'var(--color-bg)' : 'var(--color-surface)',
                 color:                   busy ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
                 fontSize:                14,
                 fontWeight:              600,
