@@ -212,12 +212,20 @@ export default function DrugsScreen() {
   const isDark = useIsDark()
   const heroRef = useRef(null)
 
-  // Bookmark tap behavior (step 1d.6, decision 4.16 first half): on Drugs,
-  // tapping the bookmark toggles favourite status right away — no confirm
-  // step, unlike Favourites' remove flow. Screen-owned, not card-owned,
-  // mirroring ConditionCard's precedent. Wired to each row's trailing slot
-  // below (step 1d.8).
+  // Bookmark tap behavior (step 1d.6, decision 4.16 first half, CORRECTED
+  // drug-fav-toggle-scope): on Drugs, tapping the bookmark used to toggle
+  // favourite status both ways (add and remove) right on this screen. That
+  // let a stray tap on an already-saved drug silently un-favourite it while
+  // just browsing, with no confirm step — unlike Favourites' own remove
+  // flow, which is deliberately gated behind ConfirmSheet. Now add-only
+  // here: tapping an unfavourited drug still favourites it instantly (no
+  // change there), but tapping an already-favourited one is a no-op.
+  // Removing a favourite is only possible from the Favourites screen's own
+  // confirm-then-remove flow. Screen-owned, not card-owned, mirroring
+  // ConditionCard's precedent. Wired to each row's trailing slot below
+  // (step 1d.8).
   function handleToggleDrugFavourite(id) {
+    if (isDrugFavourited(id)) return
     toggleDrug(id)
   }
 
