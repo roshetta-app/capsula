@@ -25,8 +25,12 @@
     -->
     <meta http-equiv="Cache-Control" content="no-store" />
 
-    <!-- Critical for mobile display -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <!-- Critical for mobile display.
+         maximum-scale=1, user-scalable=no (prevent-pwa-zoom): stops
+         pinch-to-zoom. Kept alongside a CSS touch-action backup in
+         globals.css, since iOS Safari has ignored user-scalable=no on its
+         own since iOS 10 — the meta tag alone isn't reliable there. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
 
     <!-- Theme color (browser chrome color on Android) -->
     <meta name="theme-color" content="#FAFAF9" />

@@ -315,6 +315,15 @@ html {
      gesture. Purely a "don't trigger a native reload" rule; doesn't change
      how anything scrolls or looks. */
   overscroll-behavior-y: none;
+  /* (prevent-pwa-zoom): backs up the viewport meta tag's user-scalable=no
+     in index.html. iOS Safari has ignored user-scalable=no on its own
+     since iOS 10 (an accessibility decision), so the meta tag alone
+     doesn't reliably stop pinch-to-zoom there — touch-action does. Set to
+     pan-x pan-y specifically, not the broader "manipulation" keyword:
+     manipulation still permits pinch-zoom, it only drops double-tap-zoom
+     and a few non-standard gestures — pan-x pan-y is what actually blocks
+     pinch-zoom while still allowing normal scrolling in both directions. */
+  touch-action: pan-x pan-y;
 }
 
 body {
