@@ -319,6 +319,15 @@
  * (`mounted`, OPEN_FADE_MS) and completion animation (`completing`,
  * COMPLETE_FADE_MS) are explicitly untouched — those were confirmed
  * working and were never part of this complaint.
+ *
+ * Favourites empty-state illustration preload (this session) — the existing
+ * mount-time preload effect (warms every slide image + the setup
+ * illustration) now also warms favourites-empty-illustration.png, the same
+ * asset FavouritesEmptyStates.jsx renders for a guest/empty Favourites tab.
+ * It isn't part of any onboarding slide, but this effect is already the
+ * app's one guaranteed "fetch everything once, up front" moment, so it's
+ * added here rather than left to download on whatever later screen first
+ * happens to render it.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -332,6 +341,7 @@ import libraryIllustration from '../assets/onboarding/onboarding-2-library-illus
 import drugsIllustration from '../assets/onboarding/onboarding-3-drugs-illustration.png'
 import favouritesIllustration from '../assets/onboarding/onboarding-4-favourites-illustration.png'
 import loadingIllustration from '../assets/onboarding/onboarding-5-loading-illustration.png'
+import favouritesEmptyIllustration from '../assets/favourites-empty-illustration.png'
 
 // ─── Design tokens (light-mode values only — see file header) ─────────────────
 const COLORS = {
@@ -754,6 +764,12 @@ export default function OnboardingScreen({ onDone }) {
   // and the setup-state illustration (used by Downloading/Error/Success),
   // are already decoded and
   // ready the moment each is reached.
+  //
+  // Also warms the Favourites empty-state illustration (FavouritesEmptyStates.jsx)
+  // the same way — it isn't shown anywhere in onboarding itself, but this is the
+  // one guaranteed moment every install already fetches its other one-off images,
+  // so a first-time visit to an empty Favourites tab later doesn't pay for its
+  // own separate download.
   useEffect(() => {
     SLIDES.forEach(s => {
       const preload = new Image()
@@ -761,6 +777,8 @@ export default function OnboardingScreen({ onDone }) {
     })
     const setupPreload = new Image()
     setupPreload.src = loadingIllustration
+    const favEmptyPreload = new Image()
+    favEmptyPreload.src = favouritesEmptyIllustration
   }, [])
 
   // ── Minimum display time for the final (loading) slide ─────────────────
@@ -1292,3 +1310,4 @@ export default function OnboardingScreen({ onDone }) {
     </div>
   )
 }
+
