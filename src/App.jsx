@@ -147,6 +147,28 @@
  * once that tap was changed to call signInWithGoogle() directly instead
  * of opening AccountSheet — see FavouritesEmptyStates.jsx's header. No
  * other consumer ever used this provider, so it's gone from here too.
+ *
+ * signup-wizard-flash fix, part 2 (2026-09-15) — the first part of this
+ * fix (ProfileSetupRedirect becoming a gate) only covered the MAIN
+ * window. On web, signInWithGoogle() (AuthContext.jsx) opens Google
+ * sign-in in a small popup pointed at window.location.href — the exact
+ * page the person was on — so that popup is a full second mount of this
+ * entire app. Before Supabase's own detectSessionInUrl exchange finishes
+ * inside it, there's no signed-in user yet for ProfileSetupRedirect's
+ * gate to catch, so the popup briefly painted the real app (guest state,
+ * whatever page it opened to) before self-closing — a flash our gate
+ * structurally can't reach, since it only knows about a signed-in user
+ * that doesn't exist yet at that point.
+ *
+ * AuthContext.jsx already has the exact check for "this tab is the
+ * sign-in popup, not the main app" (window.opener), used there for its
+ * own popup-self-close effect. isOAuthPopup below reuses that same check
+ * at the root, so the popup renders OAuthPopupNotice instead of the real
+ * app entirely — AuthProvider (and ToastProvider, which it reads via
+ * useToast()) still mount, since the self-close effect and the native
+ * OAuth-failure toast both live inside AuthProvider, but nothing below it
+ * (Condition/Drug data, the routes, every gate) ever mounts in the popup,
+ * so there's nothing left for it to flash.
  */
 
 import { useEffect, useRef } from 'react'
@@ -207,6 +229,40 @@ function AppGateResumeListener() {
   return null
 }
 
+// signup-wizard-flash fix, part 2 (2026-09-15) — same "this tab is the
+// sign-in popup" check AuthContext.jsx uses for its own self-close
+// effect. Native never opens this popup at all (its Google flow uses the
+// system browser instead), so this is web-only, same as the popup itself.
+function isOAuthSignInPopup() {
+  if (Capacitor.isNativePlatform()) return false
+  return !!window.opener && window.opener !== window
+}
+
+// Rendered instead of the real app for the lifetime of the sign-in popup
+// (a few hundred ms at most — AuthContext.jsx's popup-self-close effect
+// closes it the moment sign-in completes). Deliberately minimal: this
+// window is never meant to be looked at, just to finish the OAuth
+// exchange and disappear.
+function OAuthPopupNotice() {
+  return (
+    <div style={{
+      position:        'fixed',
+      inset:           0,
+      display:         'flex',
+      alignItems:      'center',
+      justifyContent:  'center',
+      backgroundColor: 'var(--color-surface)',
+      color:           'var(--color-text-secondary)',
+      fontSize:        14,
+      fontFamily:      'var(--font-body)',
+      textAlign:       'center',
+      padding:         'var(--space-5)',
+    }}>
+      Signing you in…
+    </div>
+  )
+}
+
 // account-theme-sync bugfix (2026-08-22): the previous fix for App.jsx
 // calling useDarkMode() outside AuthProvider's subtree (a ThemeInit
 // component, rendered as AuthProvider's child) is now superseded —
@@ -217,6 +273,12 @@ function AppGateResumeListener() {
 // AuthProvider (it reads useAuth() internally) and outside/around
 // everything in the public branch that might read the theme.
 export default function App() {
+  // signup-wizard-flash fix, part 2 (2026-09-15) — computed once; window.opener
+  // doesn't change for the lifetime of this tab, and this needs to be known
+  // before anything below decides what to render, not discovered via an effect
+  // after a first (flash-causing) render already happened.
+  const isPopup = isOAuthSignInPopup()
+
   // Keeps --viewport-height on :root in sync with the real, live visual
   // viewport height. Called once here so every screen and every shared
   // element (body, Layout) can use that single trustworthy number instead
@@ -245,66 +307,76 @@ export default function App() {
       <BrowserRouter basename={ROUTER_BASENAME}>
         <ToastProvider>
           <AuthProvider>
-            {/* Shared by both branches — deliberately kept outside the
-                split. See "Admin crash isolation" note above for why. */}
-            <ConditionProvider>
-              <DrugProvider>
+            {isPopup ? (
+              // signup-wizard-flash fix, part 2 — this tab exists only to
+              // finish the OAuth exchange and self-close (see
+              // AuthContext.jsx). Nothing below AuthProvider ever mounts
+              // here, so there's no real app content left to flash.
+              <OAuthPopupNotice />
+            ) : (
+              <>
+                {/* Shared by both branches — deliberately kept outside the
+                    split. See "Admin crash isolation" note above for why. */}
+                <ConditionProvider>
+                  <DrugProvider>
 
-                {/* ── Admin branch ──────────────────────────────────────
-                    Only what AdminLayout/AdminRoutes actually use:
-                    AuthProvider (above) for AuthGuard/sign-out, Toast
-                    (above) for CMS form feedback, and Condition/Drug
-                    (above) for the public-cache refresh() calls. Nothing
-                    else — none of the consumer-only providers below can
-                    ever be in this branch's tree, so a crash in any of
-                    them structurally cannot reach here. */}
-                <ErrorBoundary>
-                  <AdminRoutes />
-                </ErrorBoundary>
+                  {/* ── Admin branch ──────────────────────────────────────
+                      Only what AdminLayout/AdminRoutes actually use:
+                      AuthProvider (above) for AuthGuard/sign-out, Toast
+                      (above) for CMS form feedback, and Condition/Drug
+                      (above) for the public-cache refresh() calls. Nothing
+                      else — none of the consumer-only providers below can
+                      ever be in this branch's tree, so a crash in any of
+                      them structurally cannot reach here. */}
+                  <ErrorBoundary>
+                    <AdminRoutes />
+                  </ErrorBoundary>
 
-                {/* ── Public branch ─────────────────────────────────────
-                    Everything consumer-facing, unchanged from before
-                    other than living in its own branch/boundary. */}
-                <ErrorBoundary>
-                  <OnlineStatusProvider>
-                    <ThemeProvider>
-                      <FavouritesProvider>
-                        <NotesSignInProvider>
-                          {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
-                              scoped here rather than at the top of the
-                              tree, same reasoning as PushSubscriptionProvider
-                              just below: this is public-branch-only, the
-                              admin branch has no use for it. */}
-                          <PushBannerProvider>
-                            <PushSubscriptionProvider>
-                              <AppGateProvider>
-                                <AppGateResumeListener />
-                                <AppGate />
-                                {/* signup-wizard-flash fix (2026-09-15):
-                                    ProfileSetupRedirect now wraps
-                                    OnboardingGate instead of sitting
-                                    beside it, so a first-time signup's
-                                    redirect to the wizard is decided
-                                    before OnboardingGate/PublicRoutes ever
-                                    get a chance to paint — see that
-                                    file's header for the full mechanism. */}
-                                <ProfileSetupRedirect>
-                                  <OnboardingGate>
-                                    <PublicRoutes />
-                                  </OnboardingGate>
-                                </ProfileSetupRedirect>
-                                <SignInNudge />
-                              </AppGateProvider>
-                            </PushSubscriptionProvider>
-                          </PushBannerProvider>
-                        </NotesSignInProvider>
-                      </FavouritesProvider>
-                    </ThemeProvider>
-                  </OnlineStatusProvider>
-                </ErrorBoundary>
+                  {/* ── Public branch ─────────────────────────────────────
+                      Everything consumer-facing, unchanged from before
+                      other than living in its own branch/boundary. */}
+                  <ErrorBoundary>
+                    <OnlineStatusProvider>
+                      <ThemeProvider>
+                        <FavouritesProvider>
+                          <NotesSignInProvider>
+                            {/* Bug fix, 2026-09-01 (alarms-redirect-fix) —
+                                scoped here rather than at the top of the
+                                tree, same reasoning as PushSubscriptionProvider
+                                just below: this is public-branch-only, the
+                                admin branch has no use for it. */}
+                            <PushBannerProvider>
+                              <PushSubscriptionProvider>
+                                <AppGateProvider>
+                                  <AppGateResumeListener />
+                                  <AppGate />
+                                  {/* signup-wizard-flash fix (2026-09-15):
+                                      ProfileSetupRedirect now wraps
+                                      OnboardingGate instead of sitting
+                                      beside it, so a first-time signup's
+                                      redirect to the wizard is decided
+                                      before OnboardingGate/PublicRoutes ever
+                                      get a chance to paint — see that
+                                      file's header for the full mechanism. */}
+                                  <ProfileSetupRedirect>
+                                    <OnboardingGate>
+                                      <PublicRoutes />
+                                    </OnboardingGate>
+                                  </ProfileSetupRedirect>
+                                  <SignInNudge />
+                                </AppGateProvider>
+                              </PushSubscriptionProvider>
+                            </PushBannerProvider>
+                          </NotesSignInProvider>
+                        </FavouritesProvider>
+                      </ThemeProvider>
+                    </OnlineStatusProvider>
+                  </ErrorBoundary>
 
-              </DrugProvider>
-            </ConditionProvider>
+                  </DrugProvider>
+                </ConditionProvider>
+              </>
+            )}
           </AuthProvider>
         </ToastProvider>
       </BrowserRouter>
