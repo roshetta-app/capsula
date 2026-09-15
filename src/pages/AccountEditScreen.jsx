@@ -111,6 +111,14 @@
  * all. It also now blocks editing outright while offline (pencil and
  * Delete Account both disabled with a short message) rather than letting
  * someone open the wizard, type changes, and have Save silently fail.
+ *
+ * Logo caching fix (this session) — the first-time-setup header's logo
+ * <img> was hardcoded to '/logo.svg', missing the /capsula/ base path
+ * every other logo reference in the app already applies. Switched to
+ * `${import.meta.env.BASE_URL}logo.svg`, matching layout.jsx and
+ * ConditionsScreen.jsx, so this request is now covered by sw.js's
+ * existing cache-first rule for the app logo instead of hitting the
+ * network on every visit to this screen.
  */
 
 import { useState, useEffect, useRef } from 'react'
@@ -598,7 +606,18 @@ export default function AccountEditScreen() {
             // folder root, same as favicon/icons already are. Sized to sit
             // comfortably in this same slim header bar; nudge the height if
             // it looks off once you see it on device.
-            <img src="/logo.svg" alt="Capsula" style={{ height: 24, width: 'auto' }} />
+            //
+            // Logo caching fix (this session): was hardcoded '/logo.svg',
+            // missing the site's /capsula/ base path that every other logo
+            // reference (layout.jsx, ConditionsScreen.jsx) already applies
+            // via import.meta.env.BASE_URL. That meant this one request
+            // never matched the service worker's PUBLIC_ROOT_CACHE_FIRST
+            // rule for '/capsula/logo.svg' — it fell straight through
+            // sw.js's fetch handler uncached, refetching from the network
+            // on every single visit to this first-time-setup header,
+            // instead of being served from cache like the app's other logo
+            // usages already are.
+            <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="Capsula" style={{ height: 24, width: 'auto' }} />
           ) : (
             <h1 style={{
               margin:     0,
