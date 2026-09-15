@@ -190,7 +190,6 @@ import { useNavigate } from 'react-router-dom'
 import {
   User, LogOut, ChevronRight, Bell, HelpCircle, Info, UserCog, Mail,
   Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
-  Loader2,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useDarkMode } from '../hooks/useDarkMode'
@@ -484,6 +483,95 @@ function SectionLabel({ children }) {
   )
 }
 
+// ─── Loading skeleton ───────────────────────────────────────────────────────
+// (account-loading-skeleton) — replaces the plain spinner (Loader2 +
+// capsulaAccountSpin) with the same shimmer() convention used everywhere
+// else in the app (ConditionsScreen.jsx / ConditionDetailScreen.jsx /
+// DrugsScreen.jsx / DrugDetailScreen.jsx / FavouritesScreen.jsx). Shaped to
+// this screen's real signed-in layout — sticky title bar, centered profile
+// header, then the Plan/Settings/Help & Info/Legal cards — rather than a
+// centered spinner, since a shaped placeholder reads better for a
+// full-screen loading moment. SkeletonMenuRow mirrors MenuRow's own shape
+// (32px icon circle + label line) so the card placeholders read as the
+// same rows that appear once loading finishes.
+
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
+
+function SkeletonMenuRow({ last }) {
+  return (
+    <div style={{
+      display:      'flex',
+      alignItems:   'center',
+      gap:          'var(--space-3)',
+      padding:      'var(--space-3)',
+      borderBottom: last ? 'none' : '1px solid var(--color-border)',
+    }}>
+      <div style={shimmer({ width: 32, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+      <div style={shimmer({ width: '45%', height: 14 })} />
+    </div>
+  )
+}
+
+function SkeletonCard({ rowCount }) {
+  return (
+    <div style={{
+      backgroundColor: 'var(--color-surface)',
+      borderRadius:    'var(--radius-lg)',
+      border:          '1px solid var(--color-border)',
+      overflow:        'hidden',
+      marginBottom:    'var(--space-3)',
+    }}>
+      {Array.from({ length: rowCount }, (_, i) => (
+        <SkeletonMenuRow key={i} last={i === rowCount - 1} />
+      ))}
+    </div>
+  )
+}
+
+function AccountSkeleton() {
+  return (
+    <div>
+      {/* Sticky title bar placeholder */}
+      <div style={{
+        marginLeft:      'calc(-1 * var(--space-6))',
+        marginRight:     'calc(-1 * var(--space-6))',
+        padding:         'var(--space-5) var(--space-6) var(--space-3)',
+        marginBottom:    'var(--space-5)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 680, margin: '0 auto' }}>
+          <div style={shimmer({ width: 32, height: 32, borderRadius: 'var(--radius-full)', flexShrink: 0 })} />
+          <div style={shimmer({ width: 140, height: 18 })} />
+        </div>
+      </div>
+
+      {/* Profile header placeholder — avatar, name, email, Manage Profile pill */}
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 'var(--space-4)' }}>
+        <div style={shimmer({ width: 72, height: 72, borderRadius: 'var(--radius-full)', marginBottom: 'var(--space-2)' })} />
+        <div style={shimmer({ width: 120, height: 17, marginBottom: 6 })} />
+        <div style={shimmer({ width: 160, height: 14, marginBottom: 'var(--space-2)' })} />
+        <div style={shimmer({ width: 130, height: 30, borderRadius: 'var(--radius-full)' })} />
+      </div>
+
+      {/* Plan/Upgrade card placeholder */}
+      <div style={shimmer({ width: '100%', height: 60, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
+
+      {/* Settings / Help & Info / Legal card placeholders — row counts match
+          the real cards (2, 4, 2) so the layout doesn't shift once the
+          real content swaps in. */}
+      <SkeletonCard rowCount={2} />
+      <SkeletonCard rowCount={4} />
+      <SkeletonCard rowCount={2} />
+    </div>
+  )
+}
+
 export default function AccountScreen() {
   const { user, profile, loading, signInWithGoogle, signOut } = useAuth()
   const { theme, setTheme } = useDarkMode()
@@ -570,23 +658,13 @@ export default function AccountScreen() {
   // initial session+profile check to resolve before rendering, so nothing
   // (avatar, name, email) ever flashes empty/wrong for a moment first.
   // Phase 7 (2026-09-10): previously `return null` here, which showed as
-  // a blank white flash before the real content appeared. A minimal
-  // spinner now fills that gap instead.
+  // a blank white flash before the real content appeared.
+  //
+  // (account-loading-skeleton): swapped the centered Loader2 spinner for
+  // AccountSkeleton — same shimmer() convention every other screen's
+  // loading state already uses.
   if (loading) {
-    return (
-      <div style={{
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        minHeight:      '50vh',
-        color:          'var(--color-text-tertiary)',
-      }}>
-        <style>{`
-          @keyframes capsulaAccountSpin { to { transform: rotate(360deg) } }
-        `}</style>
-        <Loader2 size={28} style={{ animation: 'capsulaAccountSpin 0.8s linear infinite' }} />
-      </div>
-    )
+    return <AccountSkeleton />
   }
 
   const fullName = profile?.fullName
