@@ -139,9 +139,12 @@
  *
  * Empty-state visual pass 4 (this session) — per feedback:
  *  - Heart icon no longer centers against the whole (possibly two-line)
- *    subtitle block — it's inline with the text now (verticalAlign:
- *    'middle' on the icon itself, no flex/align-items), so it sits
- *    against the first word's line only, not the block's overall height.
+ *    subtitle block — it's inline with the text now (display:
+ *    'inline-block' + verticalAlign: 'middle' on the icon itself, no
+ *    flex/align-items). display: 'inline-block' is needed explicitly —
+ *    lucide-react's <svg> otherwise inherits this project's global `svg
+ *    { display: block }` reset, which was forcing it onto its own line
+ *    above the text regardless of verticalAlign.
  *  - Both tabs' subtitle now forces the same two-line shape with an
  *    explicit <br /> ("...condition" / "...drug" on line 1, "to save it
  *    here" on line 2 — identical — for both), rather than trusting the
@@ -309,7 +312,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
           color="var(--color-favourite)"
           fill="var(--color-favourite)"
           strokeWidth={0}
-          style={{ verticalAlign: 'middle', marginTop: -2, marginRight: 6 }}
+          style={{ display: 'inline-block', verticalAlign: 'middle', marginTop: -2, marginRight: 6 }}
         />
         {isConditions
           ? <>Tap the heart on any condition<br />to save it here</>
