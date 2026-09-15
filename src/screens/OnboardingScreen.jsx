@@ -311,6 +311,14 @@
  * a real signal to stop iterating blind and get a screen recording or
  * test the component in a plain browser before assuming another mechanism
  * change will help.
+ *
+ * 2026-09-12 (eighteenth pass, same day): the between-slide animation is
+ * removed entirely, by explicit request, after this many attempts didn't
+ * land — SlideFade component and SLIDE_FADE_MS are gone. Slides now
+ * switch with no transition at all. The whole-screen open animation
+ * (`mounted`, OPEN_FADE_MS) and completion animation (`completing`,
+ * COMPLETE_FADE_MS) are explicitly untouched — those were confirmed
+ * working and were never part of this complaint.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -426,9 +434,6 @@ const COMPLETE_FADE_MS = 400
 // How long the whole screen takes to fade + scale in when onboarding first
 // mounts, instead of just snapping into view on open.
 const OPEN_FADE_MS = 380
-
-// How long each slide's tiny zoom-in takes on arrival — short and subtle.
-const SLIDE_FADE_MS = 400
 
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
@@ -642,49 +647,6 @@ function CategoryRow({ name, category }) {
           aria-label="Downloading"
         />
       )}
-    </div>
-  )
-}
-
-// 2026-09-12 (sixteenth pass): every previous attempt used key={current},
-// which forces React to fully unmount and recreate the slide's DOM —
-// including the hero <img> — on every change. Even with images preloaded
-// into cache, a freshly created <img> node can paint blank for a frame on
-// some Android WebViews while it re-resolves: a genuine content flash,
-// unrelated to whatever the opacity transition is doing, which is why
-// tuning the transition (three attempts) never fixed it. This version
-// does NOT remount: `current` is passed in as a prop, and the moment it
-// differs from the last-seen value, visible is reset to false DURING
-// RENDER (React's supported pattern for derived state resetting when a
-// value changes) — no key, no unmount, the DOM (images included) stays
-// exactly where it is. Paired with the double-rAF reveal from the
-// previous pass, which is what actually makes the reveal itself work.
-function SlideFade({ current, children }) {
-  const [visible, setVisible] = useState(true)
-  const lastCurrentRef = useRef(current)
-  if (current !== lastCurrentRef.current) {
-    lastCurrentRef.current = current
-    setVisible(false)
-  }
-  const frameRef = useRef(null)
-  useEffect(() => {
-    if (visible) return
-    frameRef.current = requestAnimationFrame(() => {
-      frameRef.current = requestAnimationFrame(() => setVisible(true))
-    })
-    return () => cancelAnimationFrame(frameRef.current)
-  }, [visible])
-  return (
-    <div
-      style={{
-        display:       'flex',
-        flexDirection: 'column',
-        height:        '100%',
-        opacity:       visible ? 1 : 0,
-        transition:    `opacity ${SLIDE_FADE_MS}ms ease`,
-      }}
-    >
-      {children}
     </div>
   )
 }
@@ -997,7 +959,13 @@ export default function OnboardingScreen({ onDone }) {
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
       `}</style>
-      <SlideFade current={current}>
+      <div
+        style={{
+          display:       'flex',
+          flexDirection: 'column',
+          height:        '100%',
+        }}
+      >
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
           2026-09-12: hero height is fixed and identical on every slide
           (see HERO_HEIGHT) — the sheet below has no scroll fallback, so
@@ -1320,7 +1288,7 @@ export default function OnboardingScreen({ onDone }) {
           </button>
         )}
       </div>
-      </SlideFade>
+      </div>
     </div>
   )
 }
