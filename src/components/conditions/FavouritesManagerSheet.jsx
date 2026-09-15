@@ -55,6 +55,9 @@
  *   onOpenSpecialties   () => void  — called after this sheet closes
  *   onClearSpecialty    () => void  — resets specialty to 'all'; sheet stays open
  *   onManage            () => void  — called after this sheet closes
+ *   canManage           boolean  (optional, default true) — greys out and
+ *                       disables the Select favourites row when the active
+ *                       tab has nothing saved to manage
  */
 
 import { ListFilter, ListChecks, ArrowUpDown, X } from 'lucide-react'
@@ -73,6 +76,7 @@ export default function FavouritesManagerSheet({
   onOpenSpecialties,
   onClearSpecialty,
   onManage,
+  canManage = true,
 }) {
   const isDark = useIsDark()
 
@@ -88,6 +92,7 @@ export default function FavouritesManagerSheet({
   }
 
   function handleManage() {
+    if (!canManage) return
     onClose()
     onManage()
   }
@@ -290,9 +295,12 @@ export default function FavouritesManagerSheet({
 
         <div style={{ borderTop: '0.5px solid var(--color-border-subtle)', margin: '2px 0 8px' }} />
 
-        {/* Manage */}
+        {/* Manage — greyed out and inert when the active tab has nothing
+            saved, since there's nothing to select. */}
         <button
           onClick={handleManage}
+          disabled={!canManage}
+          aria-disabled={!canManage}
           style={{
             width:                   '100%',
             display:                 'flex',
@@ -303,7 +311,8 @@ export default function FavouritesManagerSheet({
             border:                  'none',
             borderRadius:            'var(--radius-md)',
             textAlign:               'left',
-            cursor:                  'pointer',
+            cursor:                  canManage ? 'pointer' : 'not-allowed',
+            opacity:                 canManage ? 1 : 0.45,
             outline:                 'none',
             WebkitTapHighlightColor: 'transparent',
           }}
@@ -321,3 +330,4 @@ export default function FavouritesManagerSheet({
     </SheetShell>
   )
 }
+

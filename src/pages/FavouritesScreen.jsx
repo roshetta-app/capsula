@@ -1555,6 +1555,7 @@ export default function FavouritesScreen() {
         onOpenSpecialties={() => setShowSpecialtySheet(true)}
         onClearSpecialty={() => setActiveSpecialty('all')}
         onManage={toggleManage}
+        canManage={activeTab === 'conditions' ? savedConditions.length > 0 : savedDrugs.length > 0}
       />
 
       <SpecialtiesBottomSheet
