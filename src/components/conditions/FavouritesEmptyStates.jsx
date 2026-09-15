@@ -98,11 +98,30 @@
  * illustrations are plain imports too, same as this one was) — this is
  * the standard technique for warming a browser's image cache ahead of
  * when an image is actually displayed.
+ *
+ * Empty-state visual pass 2 (this session) — per feedback, all scoped to
+ * NothingSavedEmptyState (FavFilledHintButton, used only by
+ * NoSearchResultsState below, is untouched):
+ *  - Title bumped from 15/600 to 19/700 with -0.2px letterSpacing —
+ *    matches FavouritesHero.jsx's own "Favourites" h1 exactly, rather
+ *    than inventing a new size.
+ *  - Both CTAs (Browse, Google sign-in) trimmed down a step: filled
+ *    Browse text 15/700 → 14/600, the Google button's 600 → 500. Kept as
+ *    a small step, not a full restyle.
+ *  - The "or" divider's label is now "Already have favourites?" itself
+ *    (matching the rest of the app's spelling), and the separate
+ *    "Already have saved favourites?" line that used to sit below the
+ *    divider is gone — it said the same thing twice.
+ *  - Browse gets a trailing ArrowRight (lucide-react, already used
+ *    elsewhere in the app — e.g. FavouritesHero.jsx's own ArrowLeft) to
+ *    signal it navigates away, rather than acting in place.
+ *  - Both buttons: borderRadius var(--radius-md) → 999px (full pill),
+ *    per feedback to round them "to the max."
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { SearchX } from 'lucide-react'
+import { SearchX, ArrowRight } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import favouritesEmptyIllustration from '../../assets/favourites-empty-illustration.png'
 
@@ -163,16 +182,20 @@ function EmptyStatePressableButton({ onClick, filled, fullWidth, children }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
+        display:                 'flex',
+        alignItems:              'center',
+        justifyContent:          'center',
+        gap:                     'var(--space-2)',
         width:                   fullWidth ? '100%' : 'auto',
         minWidth:                fullWidth ? undefined : 160,
-        minHeight:               filled ? 42 : undefined,
+        minHeight:               filled ? 40 : undefined,
         padding:                 filled ? '10px 18px' : '9px 18px',
-        borderRadius:            'var(--radius-md)',
+        borderRadius:            999,
         border:                  filled ? 'none' : '1.5px solid var(--color-border)',
         backgroundColor:         filled ? 'var(--color-accent)' : 'transparent',
         color:                   filled ? '#fff' : 'var(--color-text-secondary)',
-        fontSize:                filled ? 15 : 13,
-        fontWeight:              filled ? 700 : 500,
+        fontSize:                filled ? 14 : 13,
+        fontWeight:              filled ? 600 : 500,
         fontFamily:              'var(--font-body)',
         lineHeight:              1,
         cursor:                  'pointer',
@@ -236,10 +259,11 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
       />
 
       <div style={{
-        fontSize:     15,
-        fontWeight:   600,
-        color:        'var(--color-text-primary)',
-        marginBottom: 'var(--space-2)',
+        fontSize:      19,
+        fontWeight:    700,
+        letterSpacing: '-0.2px',
+        color:         'var(--color-text-primary)',
+        marginBottom:  'var(--space-2)',
       }}>
         {isConditions ? 'No favourite conditions yet' : 'No favourite drugs yet'}
       </div>
@@ -274,6 +298,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
           onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
         >
           {isConditions ? 'Browse conditions' : 'Browse drugs'}
+          <ArrowRight size={16} strokeWidth={2.5} />
         </EmptyStatePressableButton>
 
         {showSignIn && (
@@ -285,8 +310,11 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
             alignItems:    'center',
             gap:           'var(--space-3)',
           }}>
-            {/* "or" divider — separates the primary Browse action above
-                from the secondary sign-in option below. */}
+            {/* Divider — separates the primary Browse action above from
+                the secondary sign-in option below. Its own label doubles
+                as the prompt ("Already have favourites?") instead of a
+                plain "or" with a separate line repeating the same
+                question underneath. */}
             <div style={{
               width:      '100%',
               display:    'flex',
@@ -294,12 +322,10 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
               gap:        'var(--space-2)',
             }}>
               <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>or</span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', whiteSpace: 'nowrap' }}>
+                Already have favourites?
+              </span>
               <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
-            </div>
-
-            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-              Already have saved favourites?
             </div>
 
             {error && (
@@ -335,18 +361,18 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
               disabled={busy}
               style={{
                 width:                   '100%',
-                minHeight:               42,
+                minHeight:               40,
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
                 gap:                     'var(--space-2)',
                 padding:                 '10px 18px',
-                borderRadius:            'var(--radius-md)',
+                borderRadius:            999,
                 border:                  '1.5px solid var(--color-border)',
                 backgroundColor:         busy ? 'var(--color-bg)' : 'var(--color-surface)',
                 color:                   busy ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
                 fontSize:                14,
-                fontWeight:              600,
+                fontWeight:              500,
                 fontFamily:              'var(--font-body)',
                 cursor:                  busy ? 'not-allowed' : 'pointer',
                 transform:               googlePressed ? 'scale(0.97)' : 'scale(1)',
