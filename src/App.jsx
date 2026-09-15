@@ -102,8 +102,9 @@
  *     └─ ErrorBoundary → OnlineStatusProvider → ThemeProvider →
  *          FavouritesProvider → NotesSignInProvider →
  *          PushSubscriptionProvider → AppGateProvider →
- *          [AppGateResumeListener, AppGate, OnboardingGate → PublicRoutes,
- *          ProfileSetupRedirect, SignInNudge]              (public branch)
+ *          [AppGateResumeListener, AppGate,
+ *          ProfileSetupRedirect → OnboardingGate → PublicRoutes,
+ *          SignInNudge]                                   (public branch)
  *
  * The outermost ErrorBoundary (Phase 3K) stays as the last-resort fallback
  * for anything above the split (BrowserRouter/ToastProvider/AuthProvider/
@@ -127,10 +128,14 @@
  * useAuth() internally, so it must stay inside AuthProvider's subtree;
  * unchanged by the crash-isolation restructure other than which branch
  * it now lives in.)
- * (ProfileSetupRedirect and SignInNudge are mounted as siblings of
- * OnboardingGate, not nested inside it. Neither is a route and neither is
- * gated by the device-level onboarding flow; both read their own
- * conditions internally via context.)
+ * (SignInNudge is mounted as a sibling of ProfileSetupRedirect/
+ * OnboardingGate. It isn't a route and isn't gated by the device-level
+ * onboarding flow; it reads its own conditions internally via context.
+ * ProfileSetupRedirect used to be this sibling too, but signup-wizard-
+ * flash fix (2026-09-15) made it a real wrapper around OnboardingGate —
+ * see that file's own header for why — so nothing under it (device
+ * onboarding or the routes themselves) can paint before it has decided
+ * whether a first-time signup needs to be sent to the wizard first.)
  * (AppGateProvider + AppGate sit outside OnboardingGate entirely, Step 4e
  * — so a maintenance/force-update block can show before onboarding even
  * does.)
@@ -275,10 +280,19 @@ export default function App() {
                               <AppGateProvider>
                                 <AppGateResumeListener />
                                 <AppGate />
-                                <OnboardingGate>
-                                  <PublicRoutes />
-                                </OnboardingGate>
-                                <ProfileSetupRedirect />
+                                {/* signup-wizard-flash fix (2026-09-15):
+                                    ProfileSetupRedirect now wraps
+                                    OnboardingGate instead of sitting
+                                    beside it, so a first-time signup's
+                                    redirect to the wizard is decided
+                                    before OnboardingGate/PublicRoutes ever
+                                    get a chance to paint — see that
+                                    file's header for the full mechanism. */}
+                                <ProfileSetupRedirect>
+                                  <OnboardingGate>
+                                    <PublicRoutes />
+                                  </OnboardingGate>
+                                </ProfileSetupRedirect>
                                 <SignInNudge />
                               </AppGateProvider>
                             </PushSubscriptionProvider>
