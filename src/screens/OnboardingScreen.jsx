@@ -298,6 +298,19 @@
  * via unmount — the DOM, images included, stays exactly where it is. The
  * double-rAF reveal from the previous pass is kept, since that part of
  * the mechanism was never actually shown to be the problem.
+ *
+ * 2026-09-12 (seventeenth pass, same day): no flash this time, but no
+ * visible transition either — reviewed the mechanism and it matches
+ * React's documented pattern for exactly this (reset derived state during
+ * render when a prop changes); no logic bug found on inspection. Leading
+ * theory instead: at 180ms, a fast opacity ramp is easy to miss entirely
+ * when it's happening at the same instant as the headline text and
+ * illustration swapping to something completely different — the eye goes
+ * to the bigger change. SLIDE_FADE_MS raised 180ms → 400ms so it's
+ * unmistakable if it's firing at all. If this still shows nothing, that's
+ * a real signal to stop iterating blind and get a screen recording or
+ * test the component in a plain browser before assuming another mechanism
+ * change will help.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -415,7 +428,7 @@ const COMPLETE_FADE_MS = 400
 const OPEN_FADE_MS = 380
 
 // How long each slide's tiny zoom-in takes on arrival — short and subtle.
-const SLIDE_FADE_MS = 180
+const SLIDE_FADE_MS = 400
 
 // Shared pill-button style — used by the slide Next/Get Started button and
 // slide 5's Failed-state Retry button, so the two stay visually identical
