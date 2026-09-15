@@ -196,7 +196,7 @@ export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
   const {
-    drugs, loading, progress, error, retry,
+    drugs, loading, error, retry,
     mode, setMode,
     activeFilters, setActiveFilters,
     sortMode, setSortMode,
@@ -565,9 +565,11 @@ export default function DrugsScreen() {
           />
         )}
 
-        {/* Loading progress ring */}
+        {/* Loading skeleton — was a progress ring; switched to the same
+            shimmer skeleton method ConditionsScreen.jsx uses for its own
+            cold-start loading state. */}
         {loading && drugs.length === 0 && (
-          <LoadingProgress progress={progress} />
+          <DrugsSkeleton />
         )}
 
         {/* 2026-08-31 bugfix: previously, if loading finished but nothing
@@ -575,9 +577,9 @@ export default function DrugsScreen() {
             fell straight through to an empty category grid with no
             message and no way to recover short of restarting the app.
             Now a real failure — surfaced by useDrugs.js — gets a plain
-            message and a Retry button instead. Same LoadingProgress
-            component above still owns the "still downloading" moment;
-            this only covers "finished trying, and it didn't work". */}
+            message and a Retry button instead. Same DrugsSkeleton above
+            still owns the "still downloading" moment; this only covers
+            "finished trying, and it didn't work". */}
         {!loading && drugs.length === 0 && error && (
           <LibraryErrorState onRetry={retry} />
         )}
@@ -906,58 +908,56 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
   )
 }
 
-// ─── LoadingProgress ──────────────────────────────────────────────────────────
-// Circular "X of Y" ring shown during the one-time cold-start load. Real
-// progress, not simulated — driven by page-by-page counts reported from
-// useDrugs as the parallel fetch completes each chunk.
+// ─── DrugsSkeleton ──────────────────────────────────────────────────────────
+// Same shimmer() convention ConditionsScreen.jsx / ConditionDetailScreen.jsx
+// already use — copied here rather than shared, matching how those two
+// files each keep their own copy too. ConditionsScreen's proportional-row
+// technique (measure remaining space, fill with identical rows) doesn't
+// transfer here as-is: this screen's cold-start content isn't a scrollable
+// list of identical rows, it's DrugsHero + search bar + a 2-column category
+// grid — so the skeleton mirrors that shape instead: header placeholders
+// followed by a grid of tile placeholders matching CategoryRow's real shape
+// (icon circle + label). A fixed tile count (8, filling 4 grid rows), not
+// computed from viewport height, for the same reason
+// SKELETON_CONTENT_BLOCK_COUNT is fixed on ConditionDetailScreen.jsx: sized
+// to read as plausible content, not to exactly fill the screen.
 
-function LoadingProgress({ progress }) {
-  const total  = progress?.total  ?? 0
-  const loaded = progress?.loaded ?? 0
-  const pct    = total > 0 ? Math.min(1, loaded / total) : 0
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
 
-  const size          = 64
-  const strokeWidth   = 6
-  const radius        = (size - strokeWidth) / 2
-  const circumference = 2 * Math.PI * radius
-  const offset        = circumference * (1 - pct)
+const SKELETON_TILE_COUNT = 8
 
+function SkeletonTile() {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 'var(--space-4)',
-      padding: 'var(--space-6) var(--space-3)',
+      display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+      border: '1px solid var(--color-border-subtle)',
+      borderRadius: 'var(--radius-lg)',
+      padding: 'var(--space-3)',
     }}>
-      <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
-        <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>
-          <circle
-            cx={size / 2} cy={size / 2} r={radius}
-            fill="none" stroke="var(--color-border)" strokeWidth={strokeWidth}
-          />
-          <circle
-            cx={size / 2} cy={size / 2} r={radius}
-            fill="none" stroke="var(--color-accent)" strokeWidth={strokeWidth}
-            strokeDasharray={circumference}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            style={{ transition: 'stroke-dashoffset 0.25s ease' }}
-          />
-        </svg>
-        <div style={{
-          position: 'absolute', inset: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 700, color: 'var(--color-text-primary)',
-        }}>
-          {total > 0 ? `${loaded} of ${total}` : '···'}
-        </div>
-      </div>
+      <div style={shimmer({ width: 32, height: 32, borderRadius: '50%' })} />
+      <div style={shimmer({ width: '70%', height: 13 })} />
+    </div>
+  )
+}
 
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-          Setting up your drug library
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', marginTop: 2 }}>
-          This only happens once
-        </div>
+function DrugsSkeleton() {
+  return (
+    <div>
+      {/* Hero + search bar placeholders */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={shimmer({ width: '100%', height: 88, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
+        <div style={shimmer({ width: '100%', height: 46, borderRadius: 'var(--radius-full)' })} />
+      </div>
+      {/* Category grid placeholder */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
+        {Array.from({ length: SKELETON_TILE_COUNT }, (_, i) => <SkeletonTile key={i} />)}
       </div>
     </div>
   )

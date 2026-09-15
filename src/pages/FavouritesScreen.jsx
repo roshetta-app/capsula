@@ -458,7 +458,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2, Loader2 } from 'lucide-react'
+import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -714,29 +714,50 @@ function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCa
   )
 }
 
-// ─── Loading placeholder: first-load guard ──────────────────────────────────
+// ─── Loading skeleton: first-load guard ─────────────────────────────────────
 // Phase 11 (Back-Button & State-Audit merged plan) — shown in place of
 // NothingSavedEmptyState while a tab's underlying context is still on its
 // very first load. Without this, a slow first load could show "Nothing
 // saved yet" for a moment before the real (non-empty) list arrives, which
-// reads as a false claim rather than a loading state. Deliberately
-// lightweight — a small centered spinner, same technique already used for
-// AccountScreen's own loading guard (Loader2 from lucide-react, plain CSS
-// keyframe rotation) — not a shaped skeleton, since this only needs to
-// cover a brief first-load window, not a large content area.
+// reads as a false claim rather than a loading state.
+//
+// (drug-fav-loading-skeletons) — swapped the plain spinner
+// (FavouritesLoadingPlaceholder, Loader2 + favLoadingSpin) for the same
+// shimmer skeleton method ConditionsScreen.jsx / ConditionDetailScreen.jsx /
+// DrugsScreen.jsx / DrugDetailScreen.jsx already use, so every loading
+// moment in the app now reads the same way. SkeletonRow mirrors
+// ConditionsScreen.jsx's own SkeletonCard exactly (icon bubble + name line)
+// since that's the same row shape both ConditionCard and SharedDrugCard
+// already render here — one shared skeleton row works for both tabs. Fixed
+// row count, not measured against available height like ConditionsScreen's
+// own skeletonRowCount, since this placeholder only needs to plausibly fill
+// a first-load moment, not exactly match a scroll container's height.
 
-function FavouritesLoadingPlaceholder() {
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
+
+const SKELETON_ROW_COUNT = 5
+
+function SkeletonRow() {
   return (
     <div style={{
-      display:        'flex',
-      justifyContent: 'center',
-      padding:        'var(--space-12) var(--space-4)',
+      display:      'flex',
+      alignItems:   'center',
+      gap:          'var(--space-3)',
+      padding:      '8px 0',
+      borderBottom: '0.5px solid var(--color-border-subtle)',
     }}>
-      <Loader2
-        size={28}
-        strokeWidth={2}
-        style={{ color: 'var(--color-text-tertiary)', animation: 'favLoadingSpin 0.8s linear infinite' }}
-      />
+      <div style={shimmer({ width: 36, height: 36, borderRadius: 'var(--radius-md)', flexShrink: 0 })} />
+      <div style={{ flex: 1 }}>
+        <div style={shimmer({ width: 60, height: 10, marginBottom: 6 })} />
+        <div style={shimmer({ width: '60%', height: 15 })} />
+      </div>
     </div>
   )
 }
@@ -1630,7 +1651,7 @@ export default function FavouritesScreen() {
   // flag resolves to false, and stays true from then on (a later refresh
   // going back to loading briefly shouldn't re-show the loading placeholder
   // over an already-known, possibly non-empty list). Read by
-  // FavouritesLoadingPlaceholder's render guard below, per tab.
+  // SkeletonRow's render guard below, per tab.
   const [conditionsEverLoaded, setConditionsEverLoaded] = useState(false)
   const [drugsEverLoaded, setDrugsEverLoaded] = useState(false)
 
@@ -2017,10 +2038,6 @@ export default function FavouritesScreen() {
           from { opacity: 0; max-height: 0; transform: translateY(-6px); }
           to   { opacity: 1; max-height: 120px; transform: translateY(0); }
         }
-        @keyframes favLoadingSpin {
-          from { transform: rotate(0deg); }
-          to   { transform: rotate(360deg); }
-        }
         .fav-search-micro input {
           padding-left: 34px !important;
           height: 40px !important;
@@ -2104,7 +2121,7 @@ export default function FavouritesScreen() {
                   />
                 )}
                 {!conditionsEverLoaded ? (
-                  <FavouritesLoadingPlaceholder />
+                  Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedConditions.length === 0
                   ? <NothingSavedEmptyState label="conditions" />
                   : conditionSearchEmpty
@@ -2206,7 +2223,7 @@ export default function FavouritesScreen() {
                   </div>
                 )}
                 {!drugsEverLoaded ? (
-                  <FavouritesLoadingPlaceholder />
+                  Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
                 : savedDrugs.map((drug, i) => (

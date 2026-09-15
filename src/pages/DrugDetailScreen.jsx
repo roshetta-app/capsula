@@ -86,6 +86,65 @@ import { resolveToken, FALLBACK_TOKEN }  from '../utils/specialtyTokens'
 import { logUsageEvent }                 from '../analytics/usageEvents'
 import { ROUTES }                        from '../router'
 
+// ─── Loading skeleton ───────────────────────────────────────────────────────
+// Same shimmer() convention ConditionsScreen.jsx / ConditionDetailScreen.jsx
+// already use — copied here rather than shared, matching how those two
+// files each keep their own copy too. No tab strip (unlike
+// ConditionDetailScreen's header skeleton): this screen has no tabs, just
+// DrugHeader followed by a stack of section components, so the skeleton
+// mirrors that shape instead — a header placeholder plus a fixed count of
+// stacked content blocks standing in for the real sections (Overview, Uses,
+// Dose, Side Effects, Pregnancy, Contraindications, Interactions,
+// Pharmacology, Sources). Fixed count, not computed from viewport height —
+// same reasoning as ConditionDetailScreen's SKELETON_CONTENT_BLOCK_COUNT:
+// sized to read as plausible content, not to exactly fill the screen.
+
+function shimmer(extra = {}) {
+  return {
+    backgroundColor: 'var(--color-border)',
+    borderRadius:    'var(--radius-sm)',
+    animation:       'shimmer 1.4s ease-in-out infinite',
+    ...extra,
+  }
+}
+
+const SKELETON_SECTION_COUNT = 6
+
+function DrugDetailSkeleton() {
+  return (
+    <div style={{
+      height:          '100dvh',
+      overflow:        'hidden',
+      display:         'flex',
+      flexDirection:   'column',
+      backgroundColor: 'var(--color-hero-bg)',
+    }}>
+      {/* Header placeholder — back button + drug name + category line,
+          matching DrugHeader's real content (no tabs on this screen). */}
+      <div style={{ padding: 'var(--space-5) var(--space-6) var(--space-4)' }}>
+        <div style={shimmer({ width: 60, height: 16, marginBottom: 'var(--space-4)' })} />
+        <div style={shimmer({ width: '65%', height: 26, marginBottom: 8 })} />
+        <div style={shimmer({ width: '35%', height: 15 })} />
+      </div>
+      {/* Section placeholders — varied widths/heights so it reads as
+          distinct sections rather than one repeating block. */}
+      <div style={{ padding: '0 var(--space-6)', flex: 1, overflow: 'hidden' }}>
+        {Array.from({ length: SKELETON_SECTION_COUNT }, (_, i) => (
+          <div
+            key={i}
+            style={shimmer({
+              width:        i % 3 === 1 ? '85%' : '100%',
+              height:       i === 0 ? 100 : 64,
+              marginBottom: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
+            })}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
@@ -150,18 +209,16 @@ export default function DrugDetailScreen() {
   const colors    = resolveToken(category?.color_token || FALLBACK_TOKEN, isDark)
 
   // ── Loading ────────────────────────────────────────────────────────────────
+  // Was plain "Loading…" text; replaced with a shimmer skeleton, matching
+  // ConditionDetailScreen.jsx's Phase 9 change — same shimmer() convention,
+  // same reasoning (a shaped placeholder reads better than bare text for a
+  // full-screen loading moment).
   if (loading && !drug) {
     return (
-      <div style={{
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        minHeight:      '60dvh',
-        color:          'var(--color-text-tertiary)',
-        fontSize:       14,
-      }}>
-        Loading…
-      </div>
+      <>
+        <DrugDetailSkeleton />
+        <BottomNav />
+      </>
     )
   }
 
