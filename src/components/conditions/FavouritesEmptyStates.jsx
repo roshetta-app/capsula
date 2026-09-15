@@ -63,6 +63,14 @@
  * FavouritesSignInContext is no longer used by this file as a result —
  * it had no other consumer, so it's been dropped from App.jsx and
  * SignInNudge.jsx too (see those files' headers).
+ *
+ * Button pass (this session, follow-up) — Browse and the Google button
+ * now share one rounded-rectangle shape (var(--radius-sm), not the
+ * earlier pill) and the same, slightly shorter height, so they read as a
+ * matched pair. The Google button is filled white with a border instead
+ * of accent-blue, keeping it visually secondary to Browse. An "or"
+ * divider now sits between the two, above "Already have saved
+ * favourites?".
  */
 
 import { useState } from 'react'
@@ -128,9 +136,9 @@ function EmptyStatePressableButton({ onClick, filled, fullWidth, children }) {
       style={{
         width:                   fullWidth ? '100%' : 'auto',
         minWidth:                fullWidth ? undefined : 160,
-        minHeight:               filled ? 50 : undefined,
-        padding:                 filled ? '14px 20px' : '9px 18px',
-        borderRadius:            'var(--radius-full)',
+        minHeight:               filled ? 46 : undefined,
+        padding:                 filled ? '12px 20px' : '9px 18px',
+        borderRadius:            'var(--radius-sm)',
         border:                  filled ? 'none' : '1.5px solid var(--color-border)',
         backgroundColor:         filled ? 'var(--color-accent)' : 'transparent',
         color:                   filled ? '#fff' : 'var(--color-text-secondary)',
@@ -241,13 +249,26 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
 
         {showSignIn && (
           <div style={{
-            marginTop:     'var(--space-2)',
+            marginTop:     'var(--space-3)',
             width:         '100%',
             display:       'flex',
             flexDirection: 'column',
             alignItems:    'center',
-            gap:           'var(--space-2)',
+            gap:           'var(--space-3)',
           }}>
+            {/* "or" divider — separates the primary Browse action above
+                from the secondary sign-in option below. */}
+            <div style={{
+              width:      '100%',
+              display:    'flex',
+              alignItems: 'center',
+              gap:        'var(--space-2)',
+            }}>
+              <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>or</span>
+              <div style={{ flex: 1, height: 1, backgroundColor: 'var(--color-border)' }} />
+            </div>
+
             <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
               Already have saved favourites?
             </div>
@@ -268,10 +289,13 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
               </div>
             )}
 
-            {/* Copied verbatim from AccountSheet.jsx's "Continue with
-                Google" button — same styling, icon, and busy label, so
-                this matches the app's one standard Google button instead
-                of a second look. */}
+            {/* Based on AccountSheet.jsx's "Continue with Google" button
+                (same icon, wording, busy label), but filled white with a
+                border instead of the accent-filled look — this is the
+                secondary action here, so it stays visually quieter than
+                the primary Browse button above rather than matching its
+                blue fill. Height/radius/padding match Browse exactly so
+                the two read as one consistent button pair. */}
             <button
               onClick={handleGoogleSignIn}
               onPointerDown={() => setGooglePressed(true)}
@@ -280,15 +304,16 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
               disabled={busy}
               style={{
                 width:                   '100%',
+                minHeight:               46,
                 display:                 'flex',
                 alignItems:              'center',
                 justifyContent:          'center',
                 gap:                     'var(--space-2)',
-                padding:                 'var(--space-2) var(--space-4)',
+                padding:                 '12px 20px',
                 borderRadius:            'var(--radius-sm)',
-                border:                  'none',
-                backgroundColor:         busy ? 'var(--color-border)' : 'var(--color-accent)',
-                color:                   busy ? 'var(--color-text-tertiary)' : '#fff',
+                border:                  '1.5px solid var(--color-border)',
+                backgroundColor:         busy ? 'var(--color-bg)' : '#fff',
+                color:                   busy ? 'var(--color-text-tertiary)' : 'var(--color-text-primary)',
                 fontSize:                14,
                 fontWeight:              600,
                 fontFamily:              'var(--font-body)',
@@ -298,16 +323,7 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              {!busy && (
-                <span style={{
-                  display:         'inline-flex',
-                  backgroundColor: '#fff',
-                  borderRadius:    'var(--radius-sm)',
-                  padding:         2,
-                }}>
-                  <GoogleIcon size={16} />
-                </span>
-              )}
+              {!busy && <GoogleIcon size={18} />}
               {busy ? 'Opening Google…' : 'Continue with Google'}
             </button>
           </div>
