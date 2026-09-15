@@ -454,21 +454,71 @@
  *  axis-lock approach SwipeToRemoveRow used, and driving the existing
  *  switchTab/tabDirection/hasSwitchedRef slide-animation machinery exactly
  *  as tap already did.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * Favourites Screen Refactor plan — this file rewritten in this pass.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Phases 1–2 (pure extraction, no behavior change): Snackbar, the three
+ *  empty-state components (NoSearchResultsState redesigned per Decision 12),
+ *  SpecialtyFilterBanner, FAVOURITES_TABS + renderTabs, FavouritesHero,
+ *  FavouritesStickyHeader, and ManageActionBar all moved to their own files
+ *  under src/components/ui/ and src/components/conditions/ — this file now
+ *  imports them instead of defining them inline. SkeletonRow/shimmer/
+ *  SKELETON_ROW_COUNT stay local — not part of the extraction list.
+ * Phase 3: FavouritesManagerSheet gained a showSpecialty prop (edited in
+ *  place, not moved); the one call site below now passes
+ *  showSpecialty={activeTab === 'conditions'}.
+ * Phase 4: Drugs tab gets its own sort — a small local sortDrugs() helper
+ *  (mirrors useConditionSearch's applySortMode, keyed on tradenameClean
+ *  instead of name) plus recentlyAddedDrugsOrder/sortedDrugs — sharing the
+ *  screen's one useSortToggle instance with Conditions, not a second one.
+ * Phase 5: Drugs tab gets manage mode — toggleSelectCondition renamed to
+ *  the now tab-generic toggleSelectId; the Drugs render loop gained the
+ *  same isManaging ternary + row-exit-animation wrapping (rowNodeRefs/
+ *  exitingRows/favRowEnter) the Conditions loop already had.
+ *  handleConfirmBulkRemove is now tab-aware (branches on activeTab for its
+ *  source array/toggle fn/restore fn) and — per the plan's flagged
+ *  correction — bulk-remove on BOTH tabs now plays the row-exit animation,
+ *  which neither tab previously had. ManageActionBar's count/allSelected/
+ *  onToggleSelectAll are tab-aware. switchTab() cancels manage mode on any
+ *  tab change (tap or swipe), matching what the Cancel button already did.
+ * Phase 6: showManagerButton is no longer gated on activeTab or item
+ *  count — the manager (sliders) icon is now always shown, on both tabs,
+ *  even with zero saved items.
+ * Phase 7: the swipe-gesture wrapper around the tab content now measures
+ *  and applies a minHeight so it spans the full remaining viewport height
+ *  (viewport height minus its own top offset minus BottomNav's fixed
+ *  height, same BOTTOM_NAV_HEIGHT=60 constant/technique ConditionsScreen's
+ *  own available-height math already uses) — so swiping over blank space
+ *  below a short/empty tab still switches tabs, not just over rows.
+ * Phase 8: Drugs tab gets real search — drugQuery (already existed as an
+ *  inert placeholder) now drives drugSearchResults, a local filter over
+ *  sortedDrugs matching on tradenameClean. The Drugs render loop maps
+ *  drugSearchResults instead of savedDrugs directly.
+ * Phase 9: NoSearchResultsState (redesigned in FavouritesEmptyStates.jsx)
+ *  is now wired to the Drugs tab too, keyed on drugQuery/setDrugQuery.
+ * Phase 11: handleConfirmRemoveDrug now plays the same row-exit animation
+ *  handleConfirmRemoveCondition already used, instead of removing instantly.
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, BookOpen, Pill, SlidersHorizontal, Circle, CheckCircle2, Search, ArrowLeft, X, Undo2 } from 'lucide-react'
+import { Circle, CheckCircle2 } from 'lucide-react'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import ConditionCard from '../components/ConditionCard'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
-import SearchBar from '../components/ui/SearchBar'
+import Snackbar from '../components/ui/Snackbar'
 import SpecialtiesBottomSheet from '../components/conditions/SpecialtiesBottomSheet'
 import FavouritesManagerSheet from '../components/conditions/FavouritesManagerSheet'
-import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN, tintedBg } from '../utils/specialtyTokens'
+import ManageActionBar from '../components/conditions/ManageActionBar'
+import SpecialtyFilterBanner from '../components/conditions/SpecialtyFilterBanner'
+import { NothingSavedEmptyState, NoSearchResultsState, SpecialtyEmptyState } from '../components/conditions/FavouritesEmptyStates'
+import { FAVOURITES_TABS, renderTabs } from '../components/conditions/FavouritesTabBar'
+import FavouritesHero from '../components/conditions/FavouritesHero'
+import FavouritesStickyHeader from '../components/conditions/FavouritesStickyHeader'
+import { useIsDark } from '../utils/specialtyIcon'
 import { useConditionContext } from '../context/ConditionContext'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
@@ -481,22 +531,6 @@ import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import ProUpsellBanner from '../components/ui/ProUpsellBanner'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
-
-// Favourites' own identity color for the heart badge/star icon. Previously
-// aliased var(--color-danger) so "favourited = red heart" shared the exact
-// destructive-action red (e.g. the Remove button below) — decoupled here:
-// favouriting is an affectionate/positive action, not a warning, so it
-// shouldn't dilute or be tied to the alarm-red used for destructive UI.
-// Now a real global token (var(--color-favourite), defined in
-// globals.css next to --color-danger, with its own dark-mode variant) so
-// BottomNav's Favourites tab and ConditionDetailScreen's heart toggle can
-// share the exact same color instead of each hardcoding their own hex.
-// Closer to Apple Health's heart-rate pink-red, softer/warmer than the iOS
-// system alarm-red. Not var(--color-accent) — that's the app's blue, used
-// throughout Home/ConditionDetail for unrelated things. Remove/destructive
-// buttons below still reference var(--color-danger) directly and are
-// unaffected.
-const FAV_ACCENT = 'var(--color-favourite)'
 
 // Row remove/restore animation durations — must match the @keyframes
 // durations declared in the local <style> block below exactly, since the
@@ -511,207 +545,44 @@ const ROW_ENTER_MS = 280
 const TAB_AXIS_LOCK_SLOP  = 6  // px of movement before we decide horizontal vs. vertical
 const TAB_SWIPE_THRESHOLD = 50 // px of horizontal drag needed to switch tabs on release
 
+// BottomNav's own fixed height — same literal Layout.jsx uses for its
+// bottom-nav clearance, and the same constant/technique
+// ConditionsScreen.jsx's skeleton-row-count effect already uses for its own
+// "how much space is actually available" math (see Phase 7 below).
+const BOTTOM_NAV_HEIGHT = 60
+
 // Sort labels for this screen's own useSortToggle instance (separate
-// storage key from ConditionsScreen — see Phase 14 note below). 'recent'
+// storage key from ConditionsScreen — see Phase 14 note above). 'recent'
 // means "recently added to favourites" here, not "recently viewed", so it
 // gets its own label rather than reusing useSortToggle's exported default.
+// Shared by both tabs (Decision 4) — Drugs' sort uses this same instance,
+// not a second one.
 const FAV_SORT_LABELS = {
   az:     'A – Z',
   recent: 'Recently added',
 }
 
-// Static tab order/labels/icons — no longer carries per-render count data, so
-// this can live outside the component. Order matters: switchTab() below uses
-// this array's index to figure out swipe/tap direction (forward vs backward).
-// Icons represent content type (open book = reference material, pill =
-// medication) rather than favourited-status, which a per-tab Star never
-// actually conveyed since both tabs used the identical icon shape.
-const FAVOURITES_TABS = [
-  {
-    key: 'conditions',
-    label: 'Conditions',
-    renderIcon: (color) => <BookOpen size={15} strokeWidth={1.8} color={color} />,
-  },
-  {
-    key: 'drugs',
-    label: 'Drugs',
-    renderIcon: (color) => <Pill size={15} strokeWidth={1.8} color={color} />,
-  },
-]
+// ─── Drugs-tab sort (Favourites Screen Refactor plan, Decision 5) ──────────
+// Mirrors useConditionSearch's existing applySortMode logic exactly (same
+// two branches: 'recent' ranks by index in a reversed-favourites-order
+// array with alphabetical fallback, 'az' is a straight alphabetical sort),
+// parameterized to read tradenameClean instead of name. A small local
+// helper, not a route through useConditionSearch — that hook hardcodes
+// `.name` and carries search/specialty-filter machinery Drugs doesn't need;
+// this keeps Conditions/ConditionsScreen behavior completely unaffected.
 
-// ─── Snackbar ─────────────────────────────────────────────────────────────────
-
-function Snackbar({ visible, message, actionLabel, onAction }) {
-  return (
-    <div
-      aria-live="polite"
-      style={{
-        position:        'fixed',
-        bottom:          80,           // above bottom nav
-        left:            '50%',
-        transform:       `translateX(-50%) translateY(${visible ? 0 : 12}px)`,
-        opacity:         visible ? 1 : 0,
-        transition:      'opacity 0.2s ease, transform 0.2s ease',
-        backgroundColor: 'var(--color-text-primary)',
-        color:           'var(--color-bg)',
-        fontSize:        13,
-        fontWeight:      500,
-        padding:         '8px 18px',
-        borderRadius:    'var(--radius-full)',
-        boxShadow:       'var(--shadow-elevated)',
-        whiteSpace:      'nowrap',
-        display:         'flex',
-        alignItems:      'center',
-        gap:             14,
-        // Only interactive (and hit-testable) while visible, and only when
-        // there's actually an action to tap — a plain message toast stays
-        // fully inert so it never blocks touches to whatever's behind it.
-        pointerEvents:   visible && onAction ? 'auto' : 'none',
-        zIndex:          9999,
-      }}
-    >
-      <span>{message}</span>
-      {actionLabel && onAction && (
-        <button
-          onClick={onAction}
-          style={{
-            background:              'none',
-            border:                  'none',
-            padding:                 0,
-            margin:                  0,
-            display:                 'flex',
-            alignItems:              'center',
-            gap:                     4,
-            color:                   'var(--color-favourite)',
-            fontSize:                13,
-            fontWeight:              700,
-            fontFamily:              'var(--font-body)',
-            cursor:                  'pointer',
-            whiteSpace:              'nowrap',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Undo2 size={14} strokeWidth={2.2} />
-          {actionLabel}
-        </button>
-      )}
-    </div>
-  )
-}
-
-// ─── Manage-mode bulk action bar ─────────────────────────────────────────────
-// Now rendered for the full duration of manage mode (not just once something
-// is selected) so there's always an inline way out — previously, entering
-// manage mode with nothing selected left no visible bar and no way to leave
-// it without reopening FavouritesManagerSheet and tapping its toggle again.
-// Cancel is an icon-button (matches the sheet's own close-X pattern) rather
-// than a text link, so it reads as a distinct dismiss action instead of
-// competing with "Select all" for attention — count and Select all are
-// grouped together with a middle dot since they're both about the current
-// selection, while Remove stays anchored on its own at the far right as the
-// one destructive action in the bar.
-
-function ManageActionBar({ count, allSelected, onToggleSelectAll, onRemove, onCancel }) {
-  return (
-    <div style={{
-      position:        'fixed',
-      left:            0,
-      right:           0,
-      bottom:          80,
-      zIndex:          60,
-      display:         'flex',
-      justifyContent:  'center',
-      pointerEvents:   'none',
-    }}>
-      <div style={{
-        pointerEvents:   'auto',
-        width:           'calc(100% - var(--space-6) * 2)',
-        maxWidth:        680 - 48,
-        backgroundColor: 'var(--color-surface)',
-        borderRadius:    'var(--radius-lg)',
-        boxShadow:       '0 8px 24px rgba(0, 0, 0, 0.14)',
-        padding:         '10px 14px',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'space-between',
-        gap:             10,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          <button
-            onClick={onCancel}
-            aria-label="Cancel selection"
-            style={{
-              display:                 'flex',
-              alignItems:              'center',
-              justifyContent:          'center',
-              flexShrink:              0,
-              width:                   28,
-              height:                  28,
-              borderRadius:            '50%',
-              border:                  'none',
-              backgroundColor:         'var(--color-border-subtle)',
-              cursor:                  'pointer',
-              outline:                 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <X size={15} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
-          </button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-            <span style={{
-              fontSize:   13,
-              fontWeight: 600,
-              color:      'var(--color-text-primary)',
-              whiteSpace: 'nowrap',
-            }}>
-              {count} selected
-            </span>
-            <span aria-hidden="true" style={{ fontSize: 13, color: 'var(--color-text-tertiary)' }}>·</span>
-            <button
-              onClick={onToggleSelectAll}
-              style={{
-                background:     'none',
-                border:         'none',
-                cursor:         'pointer',
-                fontSize:       13,
-                // Frozen at the previous FAV_ACCENT amber, deliberately not
-                // following that constant's move to red — this link's color
-                // was incidental reuse, unrelated to the favourite/heart
-                // identity color being changed here.
-                color:          '#F59E0B',
-                fontFamily:     'var(--font-body)',
-                padding:        0,
-                whiteSpace:     'nowrap',
-                textDecoration: 'underline',
-              }}
-            >
-              {allSelected ? 'Deselect all' : 'Select all'}
-            </button>
-          </div>
-        </div>
-        {count > 0 && (
-          <button
-            onClick={onRemove}
-            style={{
-              padding:         '8px 16px',
-              borderRadius:    'var(--radius-full)',
-              border:          'none',
-              backgroundColor: 'var(--color-danger)',
-              color:           '#fff',
-              fontSize:        13,
-              fontWeight:      600,
-              fontFamily:      'var(--font-body)',
-              cursor:          'pointer',
-              flexShrink:      0,
-            }}
-          >
-            Remove
-          </button>
-        )}
-      </div>
-    </div>
-  )
+function sortDrugs(items, mode, recentIds) {
+  if (mode === 'recent') {
+    return [...items].sort((a, b) => {
+      const ai = recentIds.indexOf(a.id)
+      const bi = recentIds.indexOf(b.id)
+      if (ai !== -1 && bi !== -1) return ai - bi
+      if (ai !== -1) return -1
+      if (bi !== -1) return 1
+      return a.tradenameClean.localeCompare(b.tradenameClean)
+    })
+  }
+  return [...items].sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 }
 
 // ─── Loading skeleton: first-load guard ─────────────────────────────────────
@@ -757,752 +628,6 @@ function SkeletonRow() {
       <div style={{ flex: 1 }}>
         <div style={shimmer({ width: 60, height: 10, marginBottom: 6 })} />
         <div style={shimmer({ width: '60%', height: 15 })} />
-      </div>
-    </div>
-  )
-}
-
-// ─── Empty state: nothing saved yet ─────────────────────────────────────────
-// Replaces the old generic "No saved X yet" text block. Accent-tinted
-// circular icon background, short body copy, verb-first CTA to go save
-// something. Shared between both tabs — only the label/destination differ.
-
-function NothingSavedEmptyState({ label }) {
-  const navigate = useNavigate()
-  const isConditions = label === 'conditions'
-
-  return (
-    <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      padding:       'var(--space-12) var(--space-4)',
-      gap:           'var(--space-3)',
-    }}>
-      <div style={{
-        width:           64,
-        height:          64,
-        borderRadius:    '50%',
-        // Light red tint mirroring the role var(--color-accent-light) used
-        // to play here — now var(--color-favourite-light), the dedicated
-        // tint paired with FAV_ACCENT above, matching the heart identity
-        // elsewhere on this screen rather than the old blue.
-        backgroundColor: 'var(--color-favourite-light)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-      }}>
-        <Heart size={28} strokeWidth={1.5} style={{ color: FAV_ACCENT }} />
-      </div>
-
-      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-        Nothing saved yet
-      </div>
-
-      <div style={{
-        fontSize:   13,
-        color:      'var(--color-text-tertiary)',
-        lineHeight: 1.5,
-        maxWidth:   240,
-      }}>
-        {isConditions
-          ? 'Save conditions you want to find quickly later.'
-          : 'Save drugs you want to find quickly later.'}
-      </div>
-
-      <button
-        onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
-        style={{
-          marginTop:       4,
-          padding:         '10px 20px',
-          borderRadius:    'var(--radius-full)',
-          border:          'none',
-          backgroundColor: 'var(--color-accent)',
-          color:           '#fff',
-          fontSize:        13,
-          fontWeight:      600,
-          fontFamily:      'var(--font-body)',
-          cursor:          'pointer',
-        }}
-      >
-        {isConditions ? 'Browse conditions' : 'Browse drugs'}
-      </button>
-    </div>
-  )
-}
-
-// ─── Empty state: search matched nothing ────────────────────────────────────
-// Distinct from NothingSavedEmptyState — the user DOES have favourites,
-// their search just didn't match any of them. Simpler, no browse CTA.
-
-function NoSearchResultsState({ query, onClear }) {
-  return (
-    <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      padding:       'var(--space-12) var(--space-4)',
-      gap:           'var(--space-2)',
-    }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-        No results for "{query}"
-      </div>
-      <button
-        onClick={onClear}
-        style={{
-          fontSize:       13,
-          color:          'var(--color-accent)',
-          background:     'none',
-          border:         'none',
-          cursor:         'pointer',
-          textDecoration: 'underline',
-          fontFamily:     'var(--font-body)',
-          padding:        '4px 0',
-        }}
-      >
-        Clear search
-      </button>
-    </div>
-  )
-}
-
-// ─── Empty state: specialty filter matched nothing ──────────────────────────
-// Distinct from both states above — the user has favourites and isn't
-// searching by text, but the active specialty filter (set via
-// FavouritesManagerSheet) doesn't match any of their saved conditions.
-// Previously this case fell through to an empty .map() and rendered a
-// blank list with no explanation or way out.
-
-function SpecialtyEmptyState({ specialtyName, onClear }) {
-  return (
-    <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      padding:       'var(--space-12) var(--space-4)',
-      gap:           'var(--space-2)',
-    }}>
-      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-        No saved conditions{specialtyName ? ` in ${specialtyName}` : ''}
-      </div>
-      <button
-        onClick={onClear}
-        style={{
-          fontSize:       13,
-          color:          'var(--color-accent)',
-          background:     'none',
-          border:         'none',
-          cursor:         'pointer',
-          textDecoration: 'underline',
-          fontFamily:     'var(--font-body)',
-          padding:        '4px 0',
-        }}
-      >
-        Clear filter
-      </button>
-    </div>
-  )
-}
-
-// ─── Active specialty filter banner ─────────────────────────────────────────
-// Sits between the tab bar and the results list whenever a specialty filter
-// is active on the Conditions tab — a standing reminder of what's currently
-// narrowing the list (and how many results that leaves), with its own X so
-// clearing it doesn't require reopening FavouritesManagerSheet. Distinct
-// from SpecialtyEmptyState above: this renders whenever the filter is on,
-// regardless of whether it happens to match zero, one, or many conditions.
-
-function SpecialtyFilterBanner({ specialty, count, isOpen, onOpenSpecialties, onClear }) {
-  const isDark = useIsDark()
-  if (!specialty) return null
-
-  // Same token → background-wash pattern used by SpecialtySelector's active
-  // card and ConditionCard's icon bubble elsewhere in the app — tintedBg()
-  // keeps the wash math identical instead of hand-rolling a new opacity here.
-  const tokenKey = specialty.colorToken ?? FALLBACK_TOKEN
-  const { bg, fg } = resolveToken(tokenKey, isDark)
-
-  return (
-    <div
-      onClick={onOpenSpecialties}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onOpenSpecialties()
-        }
-      }}
-      aria-label="Change specialty filter"
-      style={{
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'space-between',
-        gap:             10,
-        padding:         '8px 10px',
-        marginBottom:    10,
-        backgroundColor: tintedBg(bg, isDark),
-        borderRadius:    'var(--radius-md)',
-        cursor:          'pointer',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-        <SpecialtyIcon
-          iconType={specialty.iconType   ?? 'lucide'}
-          iconValue={specialty.iconValue ?? 'Stethoscope'}
-          size={15}
-          color={fg}
-        />
-        <span style={{
-          fontSize:     13,
-          fontWeight:   600,
-          color:        fg,
-          overflow:     'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace:   'nowrap',
-        }}>
-          {specialty.name}
-        </span>
-        <span style={{ fontSize: 13, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
-          · {count} {count === 1 ? 'result' : 'results'}
-        </span>
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-        {/* Now purely a visual indicator — the whole row (outer div above)
-            is the actual tap target that opens the specialty selector.
-            Unrotated, this path is a down-pointing chevron — that's the
-            idle state (matches the standard "opens a picker" affordance).
-            Flips to point up while SpecialtiesBottomSheet is actually
-            open, rather than staying rotated -90° to always point right
-            like FavouritesManagerSheet's own (non-toggling) drill-in row. */}
-        <span
-          aria-hidden="true"
-          style={{
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            flexShrink:     0,
-            width:          22,
-            height:         22,
-          }}
-        >
-          <svg width="13" height="13" viewBox="0 0 12 12" fill="none" aria-hidden="true"
-            style={{
-              color:      'var(--color-text-tertiary)',
-              transform:  isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.15s ease',
-            }}>
-            <path d="M2 4.5L6 8.5L10 4.5" stroke="currentColor" strokeWidth="1.6"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <button
-          onClick={(e) => {
-            // Row above also has onClick={onOpenSpecialties} — without
-            // stopping propagation here, clearing the filter would
-            // immediately re-open the specialty selector via the bubbled
-            // click, which defeats the point of a dedicated clear button.
-            e.stopPropagation()
-            onClear()
-          }}
-          aria-label="Clear specialty filter"
-          style={{
-            display:                 'flex',
-            alignItems:              'center',
-            justifyContent:          'center',
-            flexShrink:              0,
-            width:                   22,
-            height:                  22,
-            borderRadius:            '50%',
-            border:                  'none',
-            background:              'none',
-            cursor:                  'pointer',
-            outline:                 'none',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <X size={13} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Tab bar ──────────────────────────────────────────────────────────────────
-// Shared between the in-page tab row and the sticky header's copy, so the two
-// never visually diverge. Pure render function of (activeTab, onSelect).
-// Phase 3 — rebuilt to structurally match ConditionDetailScreen's
-// Treatment/Clinical tabs: full-width 50/50 cells (flex: 1, width: 100%
-// button) instead of content-sized columns, no count badge.
-// Phase 4 — content-type icons (BookOpen/Pill, via FAVOURITES_TABS.renderIcon)
-// replace the Star fill-toggle — fixed 50px tap height (within 48–52dp target,
-// vs the previous 10px-padding-derived height), larger icon/label, wider
-// icon-label gap, fully-rounded thicker underline for true "rounded ends."
-// Active: semibold + accent blue. Inactive: medium weight (500) + secondary gray.
-// Phase 10 — count badge rebuilt from de-emphasized plain text into a small
-// rounded pill (accent-filled when active, neutral track otherwise), matching
-// the treatment already used for the sticky/expanded header's own badges.
-
-function renderTabs(activeTab, onSelect, counts) {
-  return (
-    <div style={{ display: 'flex' }}>
-      {FAVOURITES_TABS.map(tab => {
-        const isActive = activeTab === tab.key
-        const fg = isActive ? 'var(--color-accent)' : 'var(--color-text-secondary)'
-        const count = counts ? counts[tab.key] : undefined
-
-        return (
-          <div
-            key={tab.key}
-            style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}
-          >
-            <button
-              onClick={() => onSelect(tab.key)}
-              style={{
-                display:        'flex',
-                flexDirection:  'row',
-                alignItems:     'center',
-                justifyContent: 'center',
-                gap:            10,
-                height:         50,
-                paddingLeft:    'var(--space-2)',
-                paddingRight:   'var(--space-2)',
-                width:          '100%',
-                border:         'none',
-                background:     'none',
-                cursor:         'pointer',
-                fontFamily:     'var(--font-body)',
-                WebkitTapHighlightColor: 'transparent',
-                outline:        'none',
-                transition:     'color 0.15s ease',
-              }}
-            >
-              {tab.renderIcon(fg)}
-              <span style={{ fontSize: 14, fontWeight: isActive ? 700 : 500, color: fg }}>
-                {tab.label}
-              </span>
-              {count !== undefined && count !== null && count !== '' && (
-                <span style={{
-                  fontSize:   11,
-                  fontWeight: 600,
-                  color:      'var(--color-text-secondary)',
-                  lineHeight: 1.4,
-                }}>
-                  {count}
-                </span>
-              )}
-            </button>
-            {/* Underline — full width of this 50% cell, exactly matching the
-                active tab's rendered width; rounded ends; visible only
-                beneath the active tab. marginTop trimmed 3→2 per request to
-                tighten the label-to-indicator gap in both headers (shared
-                via this one function). NOTE: this spec was previously kept
-                pixel-identical to ConditionDetailScreen's DetailHeader
-                underline by explicit prior decision — that file wasn't part
-                of this task's context, so it's now out of sync with this
-                2px value until/unless it's updated to match. */}
-            <span style={{
-              display:         'block',
-              height:          2,
-              width:           '100%',
-              marginTop:       2,
-              borderRadius:    'var(--radius-full)',
-              backgroundColor: isActive ? 'var(--color-accent)' : 'transparent',
-              transition:      'background-color 0.15s ease',
-            }} />
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// ─── Hero: title + subtitle ─────────────────────────────────────────────────
-// Phase 2M — logo removed (title-first hierarchy, per spec: Favourites
-// prioritizes content/page identity over branding — logo stays reserved
-// for Home).
-// Phase 3 — SearchBar moved out of the hero and now renders below the tabs
-// (see FavouritesScreen's return): tabs choose the collection, search filters
-// within it. Hero is title + subtitle only.
-// Phase 4 — small filled Star icon added beside the title as a visual
-// anchor/identity marker (distinguishes this screen from ConditionsScreen at
-// a glance, per the "header identity" requirement) — same treatment mirrored
-// in StickyFavouritesHeader below. Vertical rhythm tightened: paddingBottom
-// 8→6, subtitle marginBottom 6→5.
-// Phase 10 — panel background moved from the blue accent-light tint to
-// var(--color-surface) with a hairline boxShadow, matching the sticky
-// header's own white-shelf treatment (see file header Phase 10 note). Action
-// buttons: search-toggle grows 36→44 while searching; both buttons' idle
-// background moves from var(--color-surface) to var(--color-accent-light);
-// active search-button background moves from FAV_ACCENT to
-// var(--color-accent). Search wrapper's crossfade swapped for the new
-// favSearchExpand keyframe and given the fav-search-micro scoped class (see
-// local <style> block in FavouritesScreen below).
-
-function FavouritesHero({ heroRef, showManagerButton, hasActiveFilters, onOpenManager, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
-  return (
-    <div ref={heroRef} style={{
-      backgroundColor: 'var(--color-surface)',
-      borderRadius:    16,
-      padding:         '14px 14px 14px',
-      marginTop:       'var(--space-4)',
-      // Diffused, soft-blur shadow — previous 0 1px 2px hairline read as
-      // nearly flush with the page background and needed more definition.
-      // Larger blur radius + low spread keeps it soft rather than a hard
-      // drop shadow. Offset/opacity trimmed further (8px→4px, 0.06→0.045)
-      // so the card still lifts off the page without reading as heavy.
-      boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
-    }}>
-      {/* Single lockup: badge icon on the left, centered against the combined
-          title+subtitle stack (not against the title alone) — one cohesive
-          unit rather than icon+title as one row and subtitle as a separate
-          block underneath. Manage toggle sits on the right, filling the
-          same visual slot Home's dark-mode toggle occupies.
-          When isSearching, the title/subtitle stack is replaced in-place by
-          the SearchBar (favSearchExpand via key, see the local <style>
-          block); the badge hides (frees full width for the input,
-          keeps the placeholder legible) and manage hides too, so only the
-          search icon flips to ArrowLeft while the input is showing.
-          height: 44 (not minHeight) is a hard lock matching SearchBar's own
-          compact height exactly. minHeight alone wasn't enough — the title/
-          subtitle text had no explicit lineHeight, so it rendered at the
-          font's default line-height (taller than 44px), while the search
-          state is pinned exactly at 44px; toggling between them still
-          visibly shrank the row. Title/subtitle sizes below are trimmed and
-          given explicit lineHeight so their natural stack actually fits
-          under 44px instead of overflowing it, and so their visual weight
-          better matches the 38px badge / 36px buttons beside them. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 44 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
-          {!isSearching && (
-            <div style={{
-              width:           38,
-              height:          38,
-              borderRadius:    '50%',
-              backgroundColor: FAV_ACCENT,
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-            }}>
-              <Heart size={18} fill="#fff" color="#fff" strokeWidth={0} />
-            </div>
-          )}
-          {isSearching
-            ? (
-                <div
-                  key="search"
-                  className="fav-search-micro"
-                  style={{
-                    flex:            1,
-                    minWidth:        0,
-                    animation:       'favSearchExpand 0.2s ease',
-                    transformOrigin: 'left center',
-                  }}
-                >
-                  <SearchBar
-                    value={searchValue}
-                    onChange={onSearchChange}
-                    placeholder={searchPlaceholder}
-                    icon={Heart}
-                    compact
-                  />
-                </div>
-              )
-            : (
-                <div key="title" style={{ minWidth: 0, animation: 'favHeaderCrossfade 0.2s ease' }}>
-                  <h1 style={{
-                    fontSize:      19,
-                    lineHeight:    1.15,
-                    fontWeight:    700,
-                    color:         'var(--color-text-primary)',
-                    margin:        0,
-                    letterSpacing: '-0.2px',
-                  }}>
-                    Favourites
-                  </h1>
-                  <div style={{
-                    fontSize:   12,
-                    lineHeight: 1.2,
-                    color:      'var(--color-text-tertiary)',
-                    marginTop:  1,
-                  }}>
-                    Your saved references
-                  </div>
-                </div>
-              )}
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <button
-            onClick={onToggleSearch}
-            aria-label={isSearching ? 'Close search' : 'Search favourites'}
-            style={{
-              width:                   isSearching ? 40 : 36,
-              height:                  isSearching ? 40 : 36,
-              borderRadius:            '50%',
-              border:                  'none',
-              backgroundColor:         isSearching ? 'var(--color-accent)' : 'transparent',
-              display:                 'flex',
-              alignItems:              'center',
-              justifyContent:          'center',
-              flexShrink:              0,
-              cursor:                  'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              outline:                 'none',
-              transition:              'width 0.2s ease, height 0.2s ease, background-color 0.15s ease',
-            }}
-          >
-            {isSearching
-              ? <ArrowLeft size={17} color="#fff" strokeWidth={2} />
-              : <Search size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />}
-          </button>
-
-          {showManagerButton && !isSearching && (
-            <button
-              onClick={onOpenManager}
-              aria-label="Sort, filter, and manage favourites"
-              style={{
-                position:                'relative',
-                width:                   36,
-                height:                  36,
-                borderRadius:            '50%',
-                border:                  'none',
-                backgroundColor:         'transparent',
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                flexShrink:              0,
-                cursor:                  'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                outline:                 'none',
-              }}
-            >
-              <SlidersHorizontal size={17} color="var(--color-text-secondary)" strokeWidth={2.2} />
-              {hasActiveFilters && (
-                <span aria-hidden="true" style={{
-                  position:        'absolute',
-                  top:             6,
-                  right:           6,
-                  width:           7,
-                  height:          7,
-                  borderRadius:    '50%',
-                  backgroundColor: 'var(--color-accent)',
-                }} />
-              )}
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Sliding sticky header ──────────────────────────────────────────────────
-// Appears once FavouritesHero scrolls out of view. Visual shell
-// (position/zIndex/shadow/border-radius/transition) matches ConditionsScreen's
-// StickyLogoHeader; Phase 2M replaces the logo row with a plain "Favourites"
-// text label (no logo, no back arrow — Favourites is a bottom-nav tab, there's
-// no "back" destination that makes sense here). Internal padding tightened.
-// Phase 4 — carries the same leading Star icon as the expanded hero (scaled
-// down) so the collapsed state reads as an intentionally-designed compact
-// header, not a cropped one. Still icon + title + tabs only — no subtitle,
-// no search, per spec.
-// Phase 10 — panel given an explicit white backgroundColor + hairline
-// boxShadow (was the heavier 0 4px 12px shadow). Title row grown 44→48
-// (padding-top 14→16) for breathing room around the badge/buttons, clawed
-// back partially via the tab-row's bottom padding (10→9) and a 1px badge
-// trim (26→25) so the panel doesn't grow by the full 4px. Search-toggle
-// button stays 28px idle and only grows to 32px while isSearching, wrapped
-// together with the compact SearchBar in the fav-search-micro /
-// fav-sticky-search-height scoped classes (see FavouritesScreen's local
-// <style> block) so the input's own height matches the expanded button.
-
-function StickyFavouritesHeader({ visible, activeTab, onSelectTab, showManagerButton, hasActiveFilters, onOpenManager, counts, isSearching, onToggleSearch, searchValue, onSearchChange, searchPlaceholder }) {
-  return (
-    <div
-      aria-hidden="true"
-      className="fav-sticky-header"
-      style={{
-        position:                'fixed',
-        top:                     0,
-        left:                    0,
-        right:                   0,
-        zIndex:                  50,
-        backgroundColor:         'var(--color-surface)',
-        borderBottomLeftRadius:  18,
-        borderBottomRightRadius: 18,
-        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
-        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
-        pointerEvents:           visible ? 'auto' : 'none',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
-
-        {/* Title row — badge icon + text on the left, manage toggle on the
-            right, same lockup as the expanded hero at a smaller scale.
-            When isSearching, the title text is replaced in-place by the
-            SearchBar (favSearchExpand via key); the badge hides and manage
-            hides too, same treatment as the hero.
-            boxSizing: 'border-box' + height: 44 (not minHeight) hard-locks
-            this row to a fixed, PADDING-INCLUSIVE size. Previous version set
-            height:48 alongside paddingTop:16 with no boxSizing — content-box
-            default meant those stacked (48 + 16 = 64px actual rendered
-            height), which was the real source of the "too much whitespace /
-            header too tall" report, on top of the tabs row's own generous
-            margins below. 44px border-box, 8px top padding, gives a 36px
-            content area — exactly enough for the searching-state back
-            button / SearchBar (36px, see fav-sticky-search-height) with no
-            clipping, while idle content (28px badge, 32px buttons) sits
-            centered within it. */}
-        <div style={{
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'space-between',
-          gap:            8,
-          padding:        '8px var(--space-6) 0',
-          height:         44,
-          boxSizing:      'border-box',
-          marginTop:      5,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
-            {!isSearching && (
-              <div style={{
-                width:           28,
-                height:          28,
-                borderRadius:    '50%',
-                backgroundColor: FAV_ACCENT,
-                display:         'flex',
-                alignItems:      'center',
-                justifyContent:  'center',
-                flexShrink:      0,
-              }}>
-                <Heart size={15} fill="#fff" color="#fff" strokeWidth={0} />
-              </div>
-            )}
-            {isSearching
-              ? (
-                  <div
-                    key="search"
-                    className="fav-search-micro fav-sticky-search-height"
-                    style={{
-                      flex:            1,
-                      minWidth:        0,
-                      animation:       'favSearchExpand 0.2s ease',
-                      transformOrigin: 'left center',
-                    }}
-                  >
-                    <SearchBar
-                      value={searchValue}
-                      onChange={onSearchChange}
-                      placeholder={searchPlaceholder}
-                      icon={Heart}
-                      compact
-                    />
-                  </div>
-                )
-              : (
-                  <div
-                    key="title"
-                    style={{
-                      fontSize:      18,
-                      fontWeight:    700,
-                      color:         'var(--color-text-primary)',
-                      letterSpacing: '-0.2px',
-                      minWidth:      0,
-                      animation:     'favHeaderCrossfade 0.2s ease',
-                    }}
-                  >
-                    Favourites
-                  </div>
-                )}
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-            <button
-              onClick={onToggleSearch}
-              aria-label={isSearching ? 'Close search' : 'Search favourites'}
-              style={{
-                width:                   isSearching ? 36 : 32,
-                height:                  isSearching ? 36 : 32,
-                borderRadius:            '50%',
-                border:                  'none',
-                backgroundColor:         isSearching ? 'var(--color-accent)' : 'var(--color-surface)',
-                display:                 'flex',
-                alignItems:              'center',
-                justifyContent:          'center',
-                flexShrink:              0,
-                cursor:                  'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                outline:                 'none',
-                transition:              'width 0.2s ease, height 0.2s ease',
-              }}
-            >
-              {isSearching
-                ? <ArrowLeft size={17} color="#fff" strokeWidth={2.2} />
-                : <Search size={17} color="var(--color-text-primary)" strokeWidth={2.2} />}
-            </button>
-
-            {showManagerButton && !isSearching && (
-              <button
-                onClick={onOpenManager}
-                aria-label="Sort, filter, and manage favourites"
-                style={{
-                  position:                'relative',
-                  width:                   32,
-                  height:                  32,
-                  borderRadius:            '50%',
-                  border:                  'none',
-                  backgroundColor:         'var(--color-surface)',
-                  display:                 'flex',
-                  alignItems:              'center',
-                  justifyContent:          'center',
-                  flexShrink:              0,
-                  cursor:                  'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline:                 'none',
-                }}
-              >
-                <SlidersHorizontal size={17} color="var(--color-text-primary)" strokeWidth={2.2} />
-                {hasActiveFilters && (
-                  <span aria-hidden="true" style={{
-                    position:        'absolute',
-                    top:             5,
-                    right:           5,
-                    width:           7,
-                    height:          7,
-                    borderRadius:    '50%',
-                    backgroundColor: 'var(--color-accent)',
-                  }} />
-                )}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tabs — same content as the in-page row, kept in sync via renderTabs.
-            No longer needs position: relative — the search input now swaps
-            in-place with the title above instead of overlaying below the
-            tabs. Spacing redistributed (not just trimmed) per request to add
-            breathing room above the title row without growing the panel:
-            marginTop 3→0 and bottom padding 5→3 here exactly offset the
-            +5px marginTop added to the title row above, so total sticky-
-            header height is unchanged. The 50px tab button height itself
-            (inside renderTabs) is untouched — it's intentionally kept
-            pixel-identical to ConditionDetailScreen's DetailHeader tabs (see
-            renderTabs comment), so the wrapper's own margin/padding are the
-            only levers available here. */}
-        <div style={{
-          marginTop: 0,
-          padding:   '0 var(--space-6) 3px',
-        }}>
-          {renderTabs(activeTab, onSelectTab, counts)}
-        </div>
-
       </div>
     </div>
   )
@@ -1568,8 +693,8 @@ export default function FavouritesScreen() {
   // hook already used below for manage mode.
   useBackClose(isSearching, toggleSearch)
 
-  // ── Manage mode (Conditions tab only — Drugs is deferred, see file header
-  // Phase 6 note below) ───────────────────────────────────────────────────
+  // ── Manage mode (Favourites Screen Refactor plan, Phase 5 — now covers
+  // both tabs; was Conditions-only) ───────────────────────────────────────
   const [isManaging, setIsManaging] = useState(false)
   const [selectedIds, setSelectedIds] = useState(() => new Set())
 
@@ -1598,7 +723,10 @@ export default function FavouritesScreen() {
     }
   }
 
-  function toggleSelectCondition(id) {
+  // Renamed from toggleSelectCondition (Favourites Screen Refactor plan,
+  // Phase 5a) — body unchanged, already just Set add/remove; the new name
+  // reflects that both tabs' rows call this now, not just Conditions'.
+  function toggleSelectId(id) {
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
@@ -1607,38 +735,16 @@ export default function FavouritesScreen() {
     })
   }
 
-  // ── Manager sheet (sort + specialty + manage entry point) — Conditions
-  // tab only, same scope as manage mode above. The specialty sheet is a
-  // separate piece of state so the two never render stacked/simultaneously —
-  // opening one always closes the other first (see handlers below).
+  // ── Manager sheet (sort + specialty + manage entry point). Sort and
+  // Manage are shared across both tabs; Specialty stays Conditions-only via
+  // FavouritesManagerSheet's showSpecialty prop (Phase 3). The specialty
+  // sheet is a separate piece of state so the two never render stacked/
+  // simultaneously — opening one always closes the other first (see
+  // handlers below).
   const [showManagerSheet, setShowManagerSheet] = useState(false)
   const [showSpecialtySheet, setShowSpecialtySheet] = useState(false)
 
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
-
-  // Bulk removal (manage mode) — mirrors the single-item removal paths'
-  // undo shape: capture each id's original index in favourites.conditions
-  // before removing any of them, then Undo restores every id at its
-  // original index. Order matters here: indices are captured against the
-  // pre-removal array, so restoring must happen lowest-index-first — each
-  // restoreConditionAt splices into the array as it stands after the prior
-  // restores in this same batch, and only ascending order reconstructs the
-  // original array correctly (a descending or unsorted order would insert
-  // into positions that have already shifted from earlier restores).
-  function handleConfirmBulkRemove() {
-    const ids = Array.from(selectedIds)
-    const restoreEntries = ids
-      .map(id => ({ id, index: favourites.conditions.indexOf(id) }))
-      .sort((a, b) => a.index - b.index)
-    ids.forEach(id => toggleCondition(id, { silent: true }))
-    showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`, {
-      label: 'Undo',
-      onAction: () => {
-        restoreEntries.forEach(({ id, index }) => restoreConditionAt(id, index))
-      },
-    })
-    toggleManage()
-  }
 
   const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt } = useFavouritesContext()
   const { conditions, specialties, loading: conditionsLoading } = useConditionContext()
@@ -1694,6 +800,8 @@ export default function FavouritesScreen() {
   // from ConditionsScreen's 'capsula_conditions_sort' key, since 'recent'
   // means a different thing on each screen (viewed vs added). Defaults to
   // 'recent' here per explicit product decision, vs ConditionsScreen's 'az'.
+  // Shared by both tabs (Decision 4) — Drugs' sortedDrugs below reads this
+  // same sortMode, not a second per-tab instance.
   const { sortMode, setSortMode } = useSortToggle('capsula_favourites_sort', FAV_SORT_LABELS, 'recent')
 
   // favourites.conditions is append-only (toggleCondition always appends the
@@ -1707,13 +815,25 @@ export default function FavouritesScreen() {
     [favourites.conditions]
   )
 
+  // Same "recently added first" shape as recentlyAddedOrder above, for
+  // Drugs (Favourites Screen Refactor plan, Phase 4). favourites.drugs is
+  // append-only the same way favourites.conditions is.
+  const recentlyAddedDrugsOrder = useMemo(
+    () => [...favourites.drugs].reverse(),
+    [favourites.drugs]
+  )
+
+  const sortedDrugs = useMemo(
+    () => sortDrugs(savedDrugs, sortMode, recentlyAddedDrugsOrder),
+    [savedDrugs, sortMode, recentlyAddedDrugsOrder]
+  )
+
   // Conditions-tab search — scoped to the user's saved conditions only (not
   // the full catalog). Own query state, independent of any other search on
-  // the app. Drugs-tab search is deferred this session (see file header).
-  // sortMode/recentlyAddedOrder (Phase 14) feed the hook's existing sort
-  // step; activeSpecialty/setActiveSpecialty feed its existing specialty
-  // filter step — both were already built into useConditionSearch, just
-  // unused by this screen until now.
+  // the app. sortMode/recentlyAddedOrder (Phase 14) feed the hook's
+  // existing sort step; activeSpecialty/setActiveSpecialty feed its
+  // existing specialty filter step — both were already built into
+  // useConditionSearch, just unused by this screen until now.
   const {
     query:   conditionQuery,
     setQuery: setConditionQuery,
@@ -1736,12 +856,22 @@ export default function FavouritesScreen() {
   // (a genuine narrowing of what's shown) counts as a filter here.
   const hasActiveFilters = activeSpecialty !== 'all'
 
-  // Drugs-tab search box — placeholder only (Phase 2N). Local, unwired state
-  // just so the input is controlled/typeable. Do NOT connect this to
-  // filtering, a search hook, or ConditionCard/DrugCard's highlight prop —
-  // that wiring is deferred to a future session (see file header, decision
-  // #19 follow-up).
+  // Drugs-tab search (Favourites Screen Refactor plan, Phase 8) — a small
+  // local filter over sortedDrugs, matching on tradenameClean, NOT
+  // DrugsScreen's full useDrugSearch engine (typo suggestions, brand/
+  // generic mode, 100-result narrowing — built for the whole catalog, not
+  // a short personal saved list). Sort is applied before filtering, same
+  // order Conditions already uses.
   const [drugQuery, setDrugQuery] = useState('')
+
+  const drugSearchResults = useMemo(() => {
+    if (!drugQuery.trim()) return sortedDrugs
+    const q = drugQuery.trim().toLowerCase()
+    return sortedDrugs.filter(d => d.tradenameClean.toLowerCase().includes(q))
+  }, [sortedDrugs, drugQuery])
+
+  const isSearchingDrugs = drugQuery.trim().length > 0
+  const drugSearchEmpty  = isSearchingDrugs && drugSearchResults.length === 0
 
   // Hero search box swaps value/handler/placeholder based on the active tab.
   const heroSearchValue = activeTab === 'conditions' ? conditionQuery : drugQuery
@@ -1753,15 +883,18 @@ export default function FavouritesScreen() {
   // Condition removal confirms first — see ConfirmSheet below.
   const [confirmingCondition, setConfirmingCondition] = useState(null)
 
-  // Drug removal (step 1d.6, decision 4.16 second half): also confirms
-  // first, then Undo — mirrors the condition flow above exactly, not the
-  // old direct-toggle stub this replaces. See handleConfirmRemoveDrug below.
+  // Drug removal: also confirms first, then Undo — mirrors the condition
+  // flow below exactly.
   const [confirmingDrug, setConfirmingDrug] = useState(null)
 
   // Row exit animation tracking — id -> { height, collapsed }. 'height' is
   // the row's own measured height (via rowNodeRefs), captured the instant
   // removal starts; 'collapsed' flips to true one frame later so max-height
-  // actually transitions from that exact measured value down to 0.
+  // actually transitions from that exact measured value down to 0. Shared
+  // by both tabs' rows — condition and drug ids never collide in the same
+  // Map/Set, and this infrastructure was already generic per-id before the
+  // Drugs-tab work (Favourites Screen Refactor plan, Phase 5a) started
+  // registering drug rows into it too.
   //
   // This used to animate max-height from a fixed guessed value instead of
   // a measurement. A guess doesn't match every row's real height, so the
@@ -1878,32 +1011,80 @@ export default function FavouritesScreen() {
     })
   }
 
-  // Drug removal (step 1d.6, decision 4.16 second half): mirrors
-  // handleConfirmRemoveCondition's confirm → remove → Undo-to-position
-  // shape exactly, using restoreDrugAt (step 1d.7) instead of
-  // restoreConditionAt. No row-exit animation here — decision 4.16 only
-  // calls for the confirm/undo behavior, and the animation's row
-  // measuring (rowNodeRefs) is set up on the row JSX itself, which this
-  // step doesn't touch (see SharedDrugCard note above — nothing renders
-  // this yet until step 1d.8 wires it to the trailing slot).
-  //
-  // Phase 11 (Back-Button & State-Audit merged plan, 11.3) — same promise
-  // wiring as handleConfirmRemoveCondition above, minus the exit-animation
-  // wait (there isn't one here): returns toggleDrug's own promise directly,
-  // so ConfirmSheet reflects the real outcome.
+  // Drug removal — mirrors handleConfirmRemoveCondition's confirm → exit
+  // animation → remove → Undo-to-position shape exactly (Favourites Screen
+  // Refactor plan, Phase 11 / Decision 14): single-item drug removal used
+  // to remove instantly with no animation; it now shares the same
+  // beginRowExit/endRowExit infrastructure Conditions' single-item removal
+  // already used, relying on the same rowNodeRefs registration the Drugs
+  // render loop now does (Phase 5a) for bulk-remove.
   function handleConfirmRemoveDrug() {
     if (!confirmingDrug) return Promise.resolve()
     const id = confirmingDrug.id
     const index = favourites.drugs.indexOf(id)
-    // Bug fix (post-11.3): snackbar moved into the success branch, same
-    // reasoning as handleConfirmRemoveCondition above — only show it once
-    // the removal has actually resolved, not the moment Confirm was tapped.
-    return toggleDrug(id, { silent: true }).then(() => {
-      showSnack('Removed from favourites', {
-        label: 'Undo',
-        onAction: () => restoreDrugAt(id, index),
-      })
+    beginRowExit(id)
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        toggleDrug(id, { silent: true }).then(
+          () => {
+            endRowExit(id)
+            showSnack('Removed from favourites', {
+              label: 'Undo',
+              onAction: () => {
+                restoreDrugAt(id, index)
+                beginRowRestore(id)
+              },
+            })
+            resolve()
+          },
+          (err) => { endRowExit(id); reject(err) }
+        )
+      }, ROW_EXIT_MS)
     })
+  }
+
+  // Bulk removal (manage mode) — mirrors the single-item removal paths'
+  // undo shape: capture each id's original index in the relevant source
+  // array before removing any of them, then Undo restores every id at its
+  // original index. Order matters here: indices are captured against the
+  // pre-removal array, so restoring must happen lowest-index-first — each
+  // restore splices into the array as it stands after the prior restores in
+  // this same batch, and only ascending order reconstructs the original
+  // array correctly (a descending or unsorted order would insert into
+  // positions that have already shifted from earlier restores).
+  //
+  // Favourites Screen Refactor plan, Phase 5b — now branches on activeTab
+  // (was Conditions-only) and plays the row-exit animation neither tab
+  // previously had on bulk-remove (flagged correction, not silent scope
+  // creep — see the plan's Decision 7). { silent: true } is kept on the
+  // per-id toggle call below even though the plan's own snippet omitted
+  // it — without it, the generic app-wide "Removed from Favourites" toast
+  // would fire alongside this screen's own Snackbar+Undo, which is exactly
+  // what handleConfirmRemoveCondition/handleConfirmRemoveDrug above already
+  // avoid the same way.
+  function handleConfirmBulkRemove() {
+    const ids = Array.from(selectedIds)
+    const isConditions = activeTab === 'conditions'
+    const sourceIds  = isConditions ? favourites.conditions : favourites.drugs
+    const toggleFn   = isConditions ? toggleCondition : toggleDrug
+    const restoreFn  = isConditions ? restoreConditionAt : restoreDrugAt
+    const restoreEntries = ids
+      .map(id => ({ id, index: sourceIds.indexOf(id) }))
+      .sort((a, b) => a.index - b.index)
+    ids.forEach(id => beginRowExit(id))
+    setTimeout(() => {
+      ids.forEach(id => {
+        toggleFn(id, { silent: true })
+        endRowExit(id)
+      })
+    }, ROW_EXIT_MS)
+    showSnack(`Removed ${ids.length} favourite${ids.length === 1 ? '' : 's'}`, {
+      label: 'Undo',
+      onAction: () => {
+        restoreEntries.forEach(({ id, index }) => restoreFn(id, index))
+      },
+    })
+    toggleManage()
   }
 
   // ── Tab switching (swipe restored) ──────────────────────────────────────────
@@ -1916,6 +1097,14 @@ export default function FavouritesScreen() {
 
   function switchTab(key) {
     if (key === activeTab) return
+    // Favourites Screen Refactor plan, Decision 2 / Phase 5d — switching
+    // tabs (tap OR swipe) cancels manage mode and clears selection, same
+    // cleanup toggleManage's own exit branch already does for the Cancel
+    // button, so both exit paths behave identically.
+    if (isManaging) {
+      setIsManaging(false)
+      setSelectedIds(new Set())
+    }
     const fromIndex = FAVOURITES_TABS.findIndex(t => t.key === activeTab)
     const toIndex   = FAVOURITES_TABS.findIndex(t => t.key === key)
     tabDirection.current = toIndex > fromIndex ? 1 : -1
@@ -1968,6 +1157,30 @@ export default function FavouritesScreen() {
     tabAxisLocked.current  = null
   }
 
+  // Favourites Screen Refactor plan, Phase 7 / Decision 13 — the swipe
+  // wrapper below only spans its own rendered content, so a short/empty tab
+  // leaves no swipeable area over the blank space beneath it. Measures the
+  // wrapper's top offset against the visual viewport height, minus
+  // BottomNav's fixed height, and applies that as a minHeight so the
+  // swipeable area always fills down to the bottom-nav regardless of how
+  // much content the active tab has. Recomputed on mount and on resize —
+  // same window.visualViewport source ConditionsScreen's own
+  // available-height math already uses, for consistency.
+  const tabContentRef = useRef(null)
+  const [tabContentMinHeight, setTabContentMinHeight] = useState(0)
+
+  useEffect(() => {
+    function computeMinHeight() {
+      if (!tabContentRef.current) return
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight
+      const top = tabContentRef.current.getBoundingClientRect().top
+      setTabContentMinHeight(Math.max(0, viewportHeight - top - BOTTOM_NAV_HEIGHT))
+    }
+    computeMinHeight()
+    window.addEventListener('resize', computeMinHeight)
+    return () => window.removeEventListener('resize', computeMinHeight)
+  }, [])
+
   // ── Sliding sticky header: visible once the hero leaves viewport ───────────
   // Same IntersectionObserver approach as ConditionsScreen's brandRowRef watch.
   const [showStickyHeader, setShowStickyHeader] = useState(false)
@@ -1992,11 +1205,11 @@ export default function FavouritesScreen() {
     <>
 
       {/* Sliding sticky header — appears once FavouritesHero scrolls out of view */}
-      <StickyFavouritesHeader
+      <FavouritesStickyHeader
         visible={showStickyHeader}
         activeTab={activeTab}
         onSelectTab={switchTab}
-        showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
+        showManagerButton={true}
         hasActiveFilters={hasActiveFilters}
         onOpenManager={() => setShowManagerSheet(true)}
         counts={tabCounts}
@@ -2069,7 +1282,7 @@ export default function FavouritesScreen() {
 
         <FavouritesHero
           heroRef={heroRef}
-          showManagerButton={activeTab === 'conditions' && savedConditions.length > 0}
+          showManagerButton={true}
           hasActiveFilters={hasActiveFilters}
           onOpenManager={() => setShowManagerSheet(true)}
           isSearching={isSearching}
@@ -2081,19 +1294,22 @@ export default function FavouritesScreen() {
 
         {/* Tab bar — chooses which collection (Conditions/Drugs) is being
             browsed. Search is icon-triggered from the header (see
-            FavouritesHero/StickyFavouritesHeader) and now swaps in-place
+            FavouritesHero/FavouritesStickyHeader) and now swaps in-place
             with the header title itself — no overlay panel here anymore. */}
         <div style={{ marginBottom: 8 }}>
           {renderTabs(activeTab, switchTab, tabCounts)}
         </div>
 
         {/* Tab content area — swipeable again (see handleTabTouch* above),
-            plus tap via the tab bar. Keyed by activeTab so the slide
-            animation replays on every real switch. */}
+            plus tap via the tab bar. minHeight (Phase 7) keeps this
+            swipeable over blank space on a short/empty tab. Keyed by
+            activeTab so the slide animation replays on every real switch. */}
         <div
+          ref={tabContentRef}
           onTouchStart={handleTabTouchStart}
           onTouchMove={handleTabTouchMove}
           onTouchEnd={handleTabTouchEnd}
+          style={{ minHeight: tabContentMinHeight || undefined }}
         >
           <div
             key={activeTab}
@@ -2137,7 +1353,7 @@ export default function FavouritesScreen() {
                             highlight={conditionQuery}
                             onTap={
                               isManaging
-                                ? () => toggleSelectCondition(condition.id)
+                                ? () => toggleSelectId(condition.id)
                                 : () => navigate(`/conditions/${condition.slug}`)
                             }
                             trailing={
@@ -2209,12 +1425,13 @@ export default function FavouritesScreen() {
             )}
 
             {/* ── Drugs tab ── */}
-            {/* Phase 6 — manage mode is Conditions-only this session (explicit
-                decision, deferred): this screen's Drugs tab has no per-row
-                remove control via manage mode, only the bookmark's own
-                confirm-then-undo flow (1d.6). Rows here render exactly as
-                before regardless of isManaging — no checkboxes, no
-                selection. Revisit if manage mode is ever extended to Drugs. */}
+            {/* Favourites Screen Refactor plan, Phase 5/8/9/11 — brought up
+                to the same level as Conditions: manage mode (bulk-select +
+                remove, same row-exit animation), sort, search, and the
+                redesigned empty states. Specialty filtering stays
+                Conditions-only (out of scope, see FavouritesManagerSheet's
+                showSpecialty prop) — that's the one deliberate asymmetry
+                left between the two tabs. */}
             {activeTab === 'drugs' && (
               <>
                 {drugsAtCap && (
@@ -2226,22 +1443,76 @@ export default function FavouritesScreen() {
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
                 ) : savedDrugs.length === 0
                 ? <NothingSavedEmptyState label="drugs" />
-                : savedDrugs.map((drug, i) => (
-                    <SharedDrugCard
-                      key={drug.id}
-                      drug={drug}
-                      categories={categories}
-                      isDark={isDark}
-                      isLast={i === savedDrugs.length - 1}
-                      onTap={() => navigate(`/drugs/${drug.slug}`)}
-                      trailing={
-                        <RowStarButton
-                          isFavourited
-                          onPress={() => setConfirmingDrug(drug)}
+                : drugSearchEmpty
+                  ? <NoSearchResultsState query={drugQuery} onClear={() => setDrugQuery('')} />
+                  : drugSearchResults.map((drug, i) => {
+                      const card = (
+                        <SharedDrugCard
+                          key={drug.id}
+                          drug={drug}
+                          categories={categories}
+                          isDark={isDark}
+                          isLast={i === drugSearchResults.length - 1}
+                          onTap={
+                            isManaging
+                              ? () => toggleSelectId(drug.id)
+                              : () => navigate(`/drugs/${drug.slug}`)
+                          }
+                          trailing={
+                            isManaging
+                              ? (
+                                  <span style={{
+                                    padding:        '10.5px 8px',
+                                    display:        'flex',
+                                    alignItems:     'center',
+                                    justifyContent: 'center',
+                                  }}>
+                                    {selectedIds.has(drug.id)
+                                      ? <CheckCircle2 size={20} color="#fff" fill="var(--color-accent)" strokeWidth={2} />
+                                      : <Circle size={20} color="var(--color-border)" strokeWidth={1.8} />}
+                                  </span>
+                                )
+                              : (
+                                  <RowStarButton
+                                    isFavourited
+                                    onPress={() => setConfirmingDrug(drug)}
+                                  />
+                                )
+                          }
                         />
-                      }
-                    />
-                  ))}
+                      )
+                      if (isManaging) return card
+
+                      const exitState  = exitingRows.get(drug.id)
+                      const isEntering = restoredConditionIds.has(drug.id)
+
+                      return (
+                        <div
+                          key={drug.id}
+                          ref={el => {
+                            if (el) rowNodeRefs.current.set(drug.id, el)
+                            else rowNodeRefs.current.delete(drug.id)
+                          }}
+                          style={exitState
+                            ? {
+                                overflow:   'hidden',
+                                maxHeight:  exitState.collapsed ? 0 : exitState.height,
+                                opacity:    exitState.collapsed ? 0 : 1,
+                                transform:  exitState.collapsed ? 'scale(0.96)' : 'scale(1)',
+                                transition: `max-height ${ROW_EXIT_MS}ms cubic-bezier(0.4, 0, 1, 1), opacity ${ROW_EXIT_MS}ms ease, transform ${ROW_EXIT_MS}ms ease`,
+                              }
+                            : {
+                                overflow: 'hidden',
+                                animation: isEntering
+                                  ? `favRowEnter ${ROW_ENTER_MS}ms cubic-bezier(0.25, 0.1, 0.25, 1)`
+                                  : undefined,
+                              }
+                          }
+                        >
+                          {card}
+                        </div>
+                      )
+                    })}
               </>
             )}
           </div>
@@ -2255,12 +1526,17 @@ export default function FavouritesScreen() {
       {isManaging && (
         <ManageActionBar
           count={selectedIds.size}
-          allSelected={selectedIds.size === conditionResults.length}
+          allSelected={
+            activeTab === 'conditions'
+              ? selectedIds.size === conditionResults.length
+              : selectedIds.size === drugSearchResults.length
+          }
           onToggleSelectAll={() => {
+            const list = activeTab === 'conditions' ? conditionResults : drugSearchResults
             setSelectedIds(prev =>
-              prev.size === conditionResults.length
+              prev.size === list.length
                 ? new Set()
-                : new Set(conditionResults.map(c => c.id))
+                : new Set(list.map(x => x.id))
             )
           }}
           onRemove={() => setShowBulkConfirm(true)}
@@ -2274,6 +1550,7 @@ export default function FavouritesScreen() {
         sortMode={sortMode}
         sortLabels={FAV_SORT_LABELS}
         onSetSortMode={setSortMode}
+        showSpecialty={activeTab === 'conditions'}
         activeSpecialtyObj={activeSpecialtyObj}
         onOpenSpecialties={() => setShowSpecialtySheet(true)}
         onClearSpecialty={() => setActiveSpecialty('all')}
@@ -2313,7 +1590,7 @@ export default function FavouritesScreen() {
         onClose={() => setShowBulkConfirm(false)}
         onConfirm={handleConfirmBulkRemove}
         title="Remove favourites?"
-        message={`${selectedIds.size} favourite${selectedIds.size === 1 ? '' : 's'} will be removed from your saved conditions.`}
+        message={`${selectedIds.size} favourite${selectedIds.size === 1 ? '' : 's'} will be removed from your saved ${activeTab === 'conditions' ? 'conditions' : 'drugs'}.`}
         confirmLabel="Remove"
         destructive
       />
