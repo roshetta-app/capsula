@@ -285,6 +285,12 @@
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+  /* (remove-tap-highlight): the gray/blue flash Android/Chrome shows on tap
+     reads as "this is a webpage," not a native app. Previously set ad hoc
+     via inline WebkitTapHighlightColor on individual buttons in several
+     components — consolidated here so every tappable element is covered
+     automatically, including ones added later. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 input,
@@ -314,6 +320,16 @@ textarea,
 
 *::-webkit-scrollbar {
   display: none;               /* Chrome, Safari, current Edge */
+}
+
+/* ─── Prevent image/icon drag ─────────────────────────────────────────────────
+   (prevent-image-drag) — a long-press-and-drag on an image or icon normally
+   shows a "ghost image" the browser lets you drag around the page. Real
+   native apps don't have this; it only happens on the web. Covers <img>
+   tags and inline <svg> icons app-wide. */
+img, svg {
+  -webkit-user-drag: none;
+  user-drag: none;
 }
 
 html {
