@@ -269,10 +269,30 @@
 }
 
 /* ─── Base styles ────────────────────────────────────────────────────────────── */
+/* (prevent-text-selection): user-select/-webkit-touch-callout added here —
+   this is a mobile app (Capacitor + installed PWA), not a text-heavy
+   reading site, so an accidental text selection from a stray touch/drag
+   reads as a glitch rather than a useful action. -webkit-touch-callout: none
+   also suppresses iOS's long-press "Copy/Select" bubble, which would
+   otherwise still appear even with selection itself disabled. Re-enabled
+   just below on inputs/textareas/contenteditable elements, which still need
+   normal text selection to stay usable (search bars, text fields, the admin
+   CMS's editable fields). */
 *, *::before, *::after {
   box-sizing: border-box;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
 }
 
 html {
