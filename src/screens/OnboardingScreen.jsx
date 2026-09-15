@@ -269,6 +269,35 @@
  * whole-screen open animation already uses successfully (`mounted`
  * below) — unifying on the mechanism that's actually proven to work
  * reliably in this file, instead of the animation-based one that wasn't.
+ *
+ * 2026-09-12 (fifteenth pass, same day): the flash was still visible even
+ * with SlideFade's transition-based approach. Cause: a single rAF isn't
+ * always enough of a gap — if the hidden style and the visible style both
+ * land in the same paint cycle, the browser has nothing to transition
+ * from and just pops straight to visible. Switched to a double rAF
+ * (schedule the reveal from inside the first rAF's callback, not
+ * alongside it), which guarantees one full paint happens with the hidden
+ * state before the visible state is ever applied — the standard fix for
+ * this exact class of bug. Also reduced the setup states' (Downloading/
+ * Success/Failed) top white space: card padding-top 20px → 8px when
+ * setupStarted, and the spacer above the title shrunk further (was 8/12,
+ * now 0/8, 4 for Failed) — noticeably less empty space above the title on
+ * the Downloading screen specifically, without touching slides 1-4 (their
+ * padding-top is unchanged).
+ *
+ * 2026-09-12 (sixteenth pass, same day): the flash was still there despite
+ * the double-rAF fix — a real sign the problem wasn't transition timing at
+ * all. Every attempt so far (keyframe, single-rAF transition, double-rAF
+ * transition) shared one thing: key={current}, forcing a full DOM
+ * unmount/remount — including the hero <img> — on every slide change.
+ * That's the actual suspect: a freshly created <img> node can paint blank
+ * for a frame on some Android WebViews even with the src cached, which is
+ * a content flash no amount of opacity-transition tuning could ever fix.
+ * SlideFade no longer remounts: `current` is now a prop, not a key, and
+ * the reset happens during render (comparing against a ref) instead of
+ * via unmount — the DOM, images included, stays exactly where it is. The
+ * double-rAF reveal from the previous pass is kept, since that part of
+ * the mechanism was never actually shown to be the problem.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -604,24 +633,34 @@ function CategoryRow({ name, category }) {
   )
 }
 
-// 2026-09-12 (fourteenth pass): wraps each slide's content, used with
-// key={current} in the render below so React gives every slide change a
-// genuinely fresh component instance — a fresh useState(false) every time,
-// no carried-over value from the previous slide. That's what actually
-// makes this reliable: it's the same "mount hidden, reveal one frame
-// later via a plain CSS transition" pattern the whole-screen open/close
-// animation already uses successfully (see `mounted` below), instead of
-// applying a CSS @keyframes animation at insertion time — some WebView
-// engines paint one frame at the element's normal end state before
-// picking up an animation's `from` keyframe, which reads as a flash
-// followed by the animation, regardless of what the animation itself
-// does. A transition state-change doesn't have that failure mode.
-function SlideFade({ children }) {
-  const [visible, setVisible] = useState(false)
+// 2026-09-12 (sixteenth pass): every previous attempt used key={current},
+// which forces React to fully unmount and recreate the slide's DOM —
+// including the hero <img> — on every change. Even with images preloaded
+// into cache, a freshly created <img> node can paint blank for a frame on
+// some Android WebViews while it re-resolves: a genuine content flash,
+// unrelated to whatever the opacity transition is doing, which is why
+// tuning the transition (three attempts) never fixed it. This version
+// does NOT remount: `current` is passed in as a prop, and the moment it
+// differs from the last-seen value, visible is reset to false DURING
+// RENDER (React's supported pattern for derived state resetting when a
+// value changes) — no key, no unmount, the DOM (images included) stays
+// exactly where it is. Paired with the double-rAF reveal from the
+// previous pass, which is what actually makes the reveal itself work.
+function SlideFade({ current, children }) {
+  const [visible, setVisible] = useState(true)
+  const lastCurrentRef = useRef(current)
+  if (current !== lastCurrentRef.current) {
+    lastCurrentRef.current = current
+    setVisible(false)
+  }
+  const frameRef = useRef(null)
   useEffect(() => {
-    const frame = requestAnimationFrame(() => setVisible(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
+    if (visible) return
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = requestAnimationFrame(() => setVisible(true))
+    })
+    return () => cancelAnimationFrame(frameRef.current)
+  }, [visible])
   return (
     <div
       style={{
@@ -945,7 +984,7 @@ export default function OnboardingScreen({ onDone }) {
         @keyframes capsula-onboarding-spin { to { transform: rotate(360deg); } }
         .capsula-onboarding-spinner { animation: capsula-onboarding-spin 0.8s linear infinite; }
       `}</style>
-      <SlideFade key={current}>
+      <SlideFade current={current}>
       {/* ── Hero area (photo on slide 1, blue-bg illustration on 2–5) ──
           2026-09-12: hero height is fixed and identical on every slide
           (see HERO_HEIGHT) — the sheet below has no scroll fallback, so
@@ -1061,7 +1100,7 @@ export default function OnboardingScreen({ onDone }) {
           borderTopLeftRadius:  28,
           borderTopRightRadius: 28,
           marginTop:       -20,
-          padding:         '20px 32px 28px',
+          padding:         setupStarted ? '8px 32px 28px' : '20px 32px 28px',
           position:        'relative',
           zIndex:          1,
           boxShadow:       '0 -4px 20px rgba(0,0,0,0.04)',
@@ -1090,7 +1129,7 @@ export default function OnboardingScreen({ onDone }) {
         )}
 
         {setupStarted && (
-          <div style={{ height: failed ? 2 : 8, marginBottom: failed ? 4 : 12 }} />
+          <div style={{ height: 0, marginBottom: failed ? 4 : 8 }} />
         )}
 
         {/* minHeight: 0 lets this flex item actually shrink if the action
