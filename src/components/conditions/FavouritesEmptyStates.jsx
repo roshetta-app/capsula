@@ -83,6 +83,21 @@
  * var(--color-surface), the same token AccountSheet.jsx's own idle-state
  * surface color resolves to, so it now darkens correctly with the rest of
  * the app.
+ *
+ * Illustration pop-in fix (this session) — the <img> below only ever
+ * requested favouritesEmptyIllustration's bytes the moment
+ * NothingSavedEmptyState itself first mounted (i.e. the first time
+ * someone actually landed on an empty Favourites/search-empty tab), so it
+ * visibly popped in rather than just being there. FavouritesScreen.jsx
+ * imports this module directly (not React.lazy), so it's already
+ * evaluated at app startup regardless of whether Favourites is even
+ * visited yet — the two lines below just use that same head start to ask
+ * the browser to fetch/decode the image right away, instead of waiting
+ * for the component that displays it to mount. No existing preload
+ * precedent elsewhere in the app to match (hero.png and the onboarding
+ * illustrations are plain imports too, same as this one was) — this is
+ * the standard technique for warming a browser's image cache ahead of
+ * when an image is actually displayed.
  */
 
 import { useState } from 'react'
@@ -91,6 +106,8 @@ import { SearchX } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import favouritesEmptyIllustration from '../../assets/favourites-empty-illustration.png'
 
+const preloadFavouritesEmptyIllustration = new Image()
+preloadFavouritesEmptyIllustration.src = favouritesEmptyIllustration
 
 // ─── Shared small button for the redesigned empty states ───────────────────
 
