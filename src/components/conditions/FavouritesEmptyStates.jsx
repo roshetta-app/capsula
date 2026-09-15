@@ -28,17 +28,21 @@
  * from FavouritesSignInContext, the same way PersonalNotes.jsx already
  * calls requestNoteSignIn() — SignInNudge.jsx opens the shared account
  * sheet with its generic copy in response.
+ *
+ * Favourites empty-state graphic (this session) — NothingSavedEmptyState's
+ * placeholder Heart-in-circle icon is replaced with the provided PNG
+ * illustration (src/assets/favourites-empty-illustration.png), imported
+ * the same way src/assets/hero.png and the onboarding illustrations
+ * already are elsewhere in this project. Heart is no longer imported from
+ * lucide-react and the now-unused FAV_ACCENT constant was removed.
  */
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, SearchX } from 'lucide-react'
+import { SearchX } from 'lucide-react'
 import { useFavouritesSignInContext } from '../../context/FavouritesSignInContext'
+import favouritesEmptyIllustration from '../../assets/favourites-empty-illustration.png'
 
-// Favourites' own identity color — same token used across this screen's
-// extracted pieces (RowStarButton.jsx already keeps its own local copy of
-// this same one-line alias, same convention followed here).
-const FAV_ACCENT = 'var(--color-favourite)'
 
 // ─── Shared small button for the redesigned empty states ───────────────────
 
@@ -96,17 +100,11 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
       padding:       'var(--space-12) var(--space-4)',
       gap:           'var(--space-3)',
     }}>
-      <div style={{
-        width:           64,
-        height:          64,
-        borderRadius:    '50%',
-        backgroundColor: 'var(--color-favourite-light)',
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'center',
-      }}>
-        <Heart size={28} strokeWidth={1.5} style={{ color: FAV_ACCENT }} />
-      </div>
+      <img
+        src={favouritesEmptyIllustration}
+        alt=""
+        style={{ width: 120, height: 'auto' }}
+      />
 
       <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
         Nothing saved yet
