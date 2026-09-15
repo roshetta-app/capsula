@@ -35,6 +35,26 @@
  * the same way src/assets/hero.png and the onboarding illustrations
  * already are elsewhere in this project. Heart is no longer imported from
  * lucide-react and the now-unused FAV_ACCENT constant was removed.
+ *
+ * Empty-state layout/copy pass (this session) — reworked per feedback:
+ *  - No longer vertically centered in the tab; sits at a fixed position
+ *    near the top instead, so Conditions/Drugs line up identically
+ *    regardless of their (slightly different-length) copy.
+ *  - Illustration/title/description are now one tight top group; a
+ *    single larger gap separates that group from the buttons below,
+ *    instead of even spacing between every element.
+ *  - Title copy: "No favourite conditions/drugs yet" (states what's
+ *    empty, rather than the generic "Nothing saved yet").
+ *  - Description copy: "Save conditions/drugs for quick access whenever
+ *    you need them."
+ *  - Description block has a fixed min-height so both tabs' button
+ *    position lines up even though the two sentences aren't quite the
+ *    same length.
+ *  - "Browse conditions/drugs" is now the clearly primary action: full
+ *    width, ~50px tall, bold.
+ *  - Sign-in copy simplified to "Already have saved favourites?"; the
+ *    Sign in button itself stays a small outlined secondary action so it
+ *    doesn't compete with Browse.
  */
 
 import { useState } from 'react'
@@ -88,7 +108,7 @@ function FavFilledHintButton({ onClick, children }) {
 // treatment, kept as its own local copy since the two buttons differ in
 // fill/border rather than sharing FavFilledHintButton's fixed filled look).
 
-function EmptyStatePressableButton({ onClick, filled, children }) {
+function EmptyStatePressableButton({ onClick, filled, fullWidth, children }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -98,15 +118,16 @@ function EmptyStatePressableButton({ onClick, filled, children }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        width:                   '100%',
-        maxWidth:                240,
-        padding:                 '11px 20px',
+        width:                   fullWidth ? '100%' : 'auto',
+        minWidth:                fullWidth ? undefined : 160,
+        minHeight:               filled ? 50 : undefined,
+        padding:                 filled ? '14px 20px' : '9px 18px',
         borderRadius:            'var(--radius-full)',
         border:                  filled ? 'none' : '1.5px solid var(--color-border)',
         backgroundColor:         filled ? 'var(--color-accent)' : 'transparent',
         color:                   filled ? '#fff' : 'var(--color-text-secondary)',
-        fontSize:                13,
-        fontWeight:              600,
+        fontSize:                filled ? 15 : 13,
+        fontWeight:              filled ? 700 : 500,
         fontFamily:              'var(--font-body)',
         lineHeight:              1,
         cursor:                  'pointer',
@@ -121,9 +142,11 @@ function EmptyStatePressableButton({ onClick, filled, children }) {
 }
 
 // ─── Empty state: nothing saved yet ─────────────────────────────────────────
-// Replaces the old generic "No saved X yet" text block. Accent-tinted
-// circular icon background, short body copy, verb-first CTA to go save
-// something. Shared between both tabs — only the label/destination differ.
+// Fixed-position layout (not vertically centered): illustration + title +
+// description form one tight top group, a single larger gap separates that
+// from the action buttons below. Shared between both tabs — only the
+// label/destination/copy differ, everything else (spacing, positions,
+// sizes) is identical so the two tabs line up.
 
 export function NothingSavedEmptyState({ label, showSignIn }) {
   const navigate = useNavigate()
@@ -135,73 +158,78 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
       display:        'flex',
       flexDirection:  'column',
       alignItems:     'center',
-      justifyContent: 'center',
       textAlign:      'center',
-      // Vertical-centering pass (this session) — this empty state used to
-      // just sit at the top of the tab under its own top padding. A
-      // generous min-height plus the flex centering above now lets it sit
-      // in the middle of the available tab space instead. 55vh rather
-      // than an exact "viewport minus header/tab-bar/bottom-nav" figure —
-      // simpler, and close enough visually on any device without being
-      // brittle to header height changes elsewhere.
-      minHeight:      '55vh',
-      padding:        'var(--space-4)',
-      gap:            'var(--space-3)',
+      paddingTop:     'var(--space-6)',
+      paddingBottom:  'var(--space-6)',
+      paddingLeft:    'var(--space-4)',
+      paddingRight:   'var(--space-4)',
     }}>
+      {/* Top group — illustration, title, description kept close together
+          as one visual unit. */}
       <img
         src={favouritesEmptyIllustration}
         alt=""
-        style={{ width: 120, height: 'auto' }}
+        style={{ width: 120, height: 'auto', marginBottom: 'var(--space-3)' }}
       />
 
-      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
-        Nothing saved yet
+      <div style={{
+        fontSize:     15,
+        fontWeight:   600,
+        color:        'var(--color-text-primary)',
+        marginBottom: 'var(--space-2)',
+      }}>
+        {isConditions ? 'No favourite conditions yet' : 'No favourite drugs yet'}
       </div>
 
-      {/* Title/subtitle-parity pass (this session) — both tabs already
-          shared this exact sentence template ("Save {label} you want to
-          find quickly later."); only "conditions"/"drugs" differ, which is
-          unavoidable since the words themselves aren't the same length. */}
       <div style={{
         fontSize:   13,
         color:      'var(--color-text-tertiary)',
         lineHeight: 1.5,
-        maxWidth:   240,
+        maxWidth:   260,
+        // Fixed min-height so both tabs' buttons line up in the same
+        // place even though the two sentences aren't quite the same length.
+        minHeight:  40,
       }}>
         {isConditions
-          ? 'Save conditions you want to find quickly later.'
-          : 'Save drugs you want to find quickly later.'}
+          ? 'Save conditions for quick access whenever you need them.'
+          : 'Save drugs for quick access whenever you need them.'}
       </div>
 
-      <EmptyStatePressableButton
-        filled
-        onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
-      >
-        {isConditions ? 'Browse conditions' : 'Browse drugs'}
-      </EmptyStatePressableButton>
+      {/* Gap between the top group and the action buttons below. */}
+      <div style={{
+        width:         '100%',
+        maxWidth:      320,
+        marginTop:     'var(--space-6)',
+        display:       'flex',
+        flexDirection: 'column',
+        alignItems:    'center',
+        gap:           'var(--space-3)',
+      }}>
+        <EmptyStatePressableButton
+          filled
+          fullWidth
+          onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
+        >
+          {isConditions ? 'Browse conditions' : 'Browse drugs'}
+        </EmptyStatePressableButton>
 
-      {showSignIn && (
-        <div style={{
-          marginTop:     'var(--space-3)',
-          display:       'flex',
-          flexDirection: 'column',
-          alignItems:    'center',
-          gap:           'var(--space-2)',
-        }}>
+        {showSignIn && (
           <div style={{
-            fontSize: 12,
-            color:    'var(--color-text-tertiary)',
-            maxWidth: 240,
+            marginTop:     'var(--space-2)',
+            display:       'flex',
+            flexDirection: 'column',
+            alignItems:    'center',
+            gap:           'var(--space-2)',
           }}>
-            {isConditions
-              ? 'Already saved conditions on another device?'
-              : 'Already saved drugs on another device?'}
+            <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
+              Already have saved favourites?
+            </div>
+            <EmptyStatePressableButton onClick={requestSignIn}>
+              Sign in
+            </EmptyStatePressableButton>
           </div>
-          <EmptyStatePressableButton onClick={requestSignIn}>
-            Sign in
-          </EmptyStatePressableButton>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
