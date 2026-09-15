@@ -81,6 +81,45 @@ function FavFilledHintButton({ onClick, children }) {
   )
 }
 
+// ─── Small pressable button shared by NothingSavedEmptyState's two CTAs ────
+// Refined-buttons pass (this session) — both the primary "Browse X" button
+// and the "Sign in" banner button now share this, so they match on width,
+// radius, and press feedback (mirrors FavFilledHintButton's press-scale
+// treatment, kept as its own local copy since the two buttons differ in
+// fill/border rather than sharing FavFilledHintButton's fixed filled look).
+
+function EmptyStatePressableButton({ onClick, filled, children }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        width:                   '100%',
+        maxWidth:                240,
+        padding:                 '11px 20px',
+        borderRadius:            'var(--radius-full)',
+        border:                  filled ? 'none' : '1.5px solid var(--color-border)',
+        backgroundColor:         filled ? 'var(--color-accent)' : 'transparent',
+        color:                   filled ? '#fff' : 'var(--color-text-secondary)',
+        fontSize:                13,
+        fontWeight:              600,
+        fontFamily:              'var(--font-body)',
+        lineHeight:              1,
+        cursor:                  'pointer',
+        transform:               pressed ? 'scale(0.96)' : 'scale(1)',
+        transition:              'transform 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
 // ─── Empty state: nothing saved yet ─────────────────────────────────────────
 // Replaces the old generic "No saved X yet" text block. Accent-tinted
 // circular icon background, short body copy, verb-first CTA to go save
@@ -93,12 +132,21 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
 
   return (
     <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      padding:       'var(--space-12) var(--space-4)',
-      gap:           'var(--space-3)',
+      display:        'flex',
+      flexDirection:  'column',
+      alignItems:     'center',
+      justifyContent: 'center',
+      textAlign:      'center',
+      // Vertical-centering pass (this session) — this empty state used to
+      // just sit at the top of the tab under its own top padding. A
+      // generous min-height plus the flex centering above now lets it sit
+      // in the middle of the available tab space instead. 55vh rather
+      // than an exact "viewport minus header/tab-bar/bottom-nav" figure —
+      // simpler, and close enough visually on any device without being
+      // brittle to header height changes elsewhere.
+      minHeight:      '55vh',
+      padding:        'var(--space-4)',
+      gap:            'var(--space-3)',
     }}>
       <img
         src={favouritesEmptyIllustration}
@@ -110,6 +158,10 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
         Nothing saved yet
       </div>
 
+      {/* Title/subtitle-parity pass (this session) — both tabs already
+          shared this exact sentence template ("Save {label} you want to
+          find quickly later."); only "conditions"/"drugs" differ, which is
+          unavoidable since the words themselves aren't the same length. */}
       <div style={{
         fontSize:   13,
         color:      'var(--color-text-tertiary)',
@@ -121,44 +173,34 @@ export function NothingSavedEmptyState({ label, showSignIn }) {
           : 'Save drugs you want to find quickly later.'}
       </div>
 
-      <button
+      <EmptyStatePressableButton
+        filled
         onClick={() => navigate(isConditions ? '/conditions' : '/drugs')}
-        style={{
-          marginTop:       4,
-          padding:         '10px 20px',
-          borderRadius:    'var(--radius-full)',
-          border:          'none',
-          backgroundColor: 'var(--color-accent)',
-          color:           '#fff',
-          fontSize:        13,
-          fontWeight:      600,
-          fontFamily:      'var(--font-body)',
-          cursor:          'pointer',
-        }}
       >
         {isConditions ? 'Browse conditions' : 'Browse drugs'}
-      </button>
+      </EmptyStatePressableButton>
 
       {showSignIn && (
-        <button
-          onClick={requestSignIn}
-          style={{
-            marginTop:       'var(--space-2)',
-            width:           '100%',
-            maxWidth:        240,
-            padding:         '9px 16px',
-            borderRadius:    'var(--radius-md)',
-            border:          '1px solid var(--color-border)',
-            backgroundColor: 'transparent',
-            color:           'var(--color-text-secondary)',
-            fontSize:        13,
-            fontWeight:      500,
-            fontFamily:      'var(--font-body)',
-            cursor:          'pointer',
-          }}
-        >
-          Sign in
-        </button>
+        <div style={{
+          marginTop:     'var(--space-3)',
+          display:       'flex',
+          flexDirection: 'column',
+          alignItems:    'center',
+          gap:           'var(--space-2)',
+        }}>
+          <div style={{
+            fontSize: 12,
+            color:    'var(--color-text-tertiary)',
+            maxWidth: 240,
+          }}>
+            {isConditions
+              ? 'Already saved conditions on another device?'
+              : 'Already saved drugs on another device?'}
+          </div>
+          <EmptyStatePressableButton onClick={requestSignIn}>
+            Sign in
+          </EmptyStatePressableButton>
+        </div>
       )}
     </div>
   )
