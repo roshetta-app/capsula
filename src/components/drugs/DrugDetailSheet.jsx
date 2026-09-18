@@ -70,7 +70,7 @@ import { forwardRef } from 'react'
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
-const STRIP_HEIGHT = 40 // px — height of the fading buffer strip
+const STRIP_HEIGHT = 20 // px — height of the buffer strip (was 40 — reduced this session, per feedback it read too tall now that it's a solid cap rather than a fade)
 
 const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
   return (
