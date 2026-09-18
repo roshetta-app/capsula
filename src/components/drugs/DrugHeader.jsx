@@ -131,6 +131,12 @@
  * below) now plays on every tap, and the search icon (ScanSearch) grows
  * 16px → 20px to match Share/Heart's size.
  *
+ * 2026-09-18 (this session, second follow-up): suffix line, Share icon,
+ * and search icon move again — var(--color-text-secondary) (this
+ * session's earlier fix, above) to var(--color-text-primary) — per
+ * feedback, wanted straight black-in-light/white-in-dark rather than the
+ * softer muted tone. Same token the brand name on row 2 already uses.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -365,7 +371,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
               aria-label="Share"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: 'var(--color-text-secondary)',
+                color: 'var(--color-text-primary)',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
@@ -433,7 +439,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             style={{
               background: 'none', border: 'none', padding: 2,
               cursor: 'pointer', flexShrink: 0,
-              color: 'var(--color-text-secondary)',
+              color: 'var(--color-text-primary)',
               display: 'flex', alignItems: 'center',
               lineHeight: 1,
             }}
@@ -454,7 +460,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             style={{
               fontSize:                14,
               fontWeight:              500,
-              color:                   'var(--color-text-secondary)',
+              color:                   'var(--color-text-primary)',
               overflowX:               'auto',
               whiteSpace:              'nowrap',
               scrollbarWidth:          'none',
