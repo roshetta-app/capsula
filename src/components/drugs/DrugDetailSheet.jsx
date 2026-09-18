@@ -60,6 +60,13 @@ import { forwardRef } from 'react'
  * same session** — didn't like the new tone, back to --color-surface.
  * Header/root still use --color-hero-bg (FAFAFA/29323F — session 17).
  *
+ * 2026-09-18 (this session): per feedback, the strip's mask-image fade
+ * (sessions 16–18 above) is gone — it's a plain solid --color-surface
+ * rectangle now, fully opaque for its whole height, same as the sheet
+ * behind it. Content still disappears underneath it as it scrolls up
+ * (same sticky + negative-margin mechanic as before); it just does so
+ * with a hard edge instead of a gradual fade.
+ *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
@@ -80,9 +87,9 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
       }}
     >
-      {/* Sticky fade strip — see the dated note above. Purely decorative,
-          so it's aria-hidden and never intercepts scroll/tap. Its own
-          opacity fades via mask-image (a true fade), not its color. */}
+      {/* Sticky buffer strip — see the dated note above. Purely
+          decorative, so it's aria-hidden and never intercepts scroll/tap.
+          Solid --color-surface for its full height — no fade. */}
       <div
         aria-hidden="true"
         style={{
@@ -92,13 +99,6 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
           height: `${STRIP_HEIGHT}px`,
           marginBottom: `-${STRIP_HEIGHT}px`,
           backgroundColor: 'var(--color-surface)',
-          // Fully opaque for the first half (a real cap — nothing shows
-          // through at all right at the sheet's own top edge), then a
-          // smooth, continuous fade to transparent for the second half.
-          // The earlier version faded from the very first pixel, so text
-          // could still peek through faintly right at the top.
-          WebkitMaskImage: 'linear-gradient(to bottom, black 50%, transparent 100%)',
-          maskImage:       'linear-gradient(to bottom, black 50%, transparent 100%)',
           pointerEvents: 'none',
         }}
       />
@@ -116,3 +116,4 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
 })
 
 export default DrugDetailSheet
+
