@@ -67,6 +67,17 @@ import { forwardRef } from 'react'
  * (same sticky + negative-margin mechanic as before); it just does so
  * with a hard edge instead of a gradual fade.
  *
+ * 2026-09-18 (this session, follow-up): sheet background (and the strip's,
+ * to keep matching it) switched again, this time to var(--color-bg) —
+ * per feedback, to match ConditionsScreen.jsx's own header/panel token
+ * pair exactly (checked directly: its base layer uses --color-hero-bg,
+ * its panel uses --color-bg). Session 19 above tried this same token here
+ * once already and reverted same-session over the tone alone; this pass
+ * is explicitly about token parity with ConditionsScreen, not a repeat of
+ * that earlier undirected attempt, so it stays. Header/root already use
+ * --color-hero-bg (session 17) — that pairing already matched
+ * ConditionsScreen's; only this sheet's own token was still off from it.
+ *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
  */
@@ -82,14 +93,14 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
         overflowY: 'auto',
         WebkitOverflowScrolling: 'touch',
         touchAction: 'pan-y',
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: 'var(--color-bg)',
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
       }}
     >
       {/* Sticky buffer strip — see the dated note above. Purely
           decorative, so it's aria-hidden and never intercepts scroll/tap.
-          Solid --color-surface for its full height — no fade. */}
+          Solid, matching the sheet's own background — no fade. */}
       <div
         aria-hidden="true"
         style={{
@@ -98,7 +109,7 @@ const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
           zIndex: 1,
           height: `${STRIP_HEIGHT}px`,
           marginBottom: `-${STRIP_HEIGHT}px`,
-          backgroundColor: 'var(--color-surface)',
+          backgroundColor: 'var(--color-bg)',
           pointerEvents: 'none',
         }}
       />
