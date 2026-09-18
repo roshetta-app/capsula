@@ -111,6 +111,18 @@
  *     resolved token's own `fg` color, which is designed to stay readable
  *     against that same token's `bg`.
  *
+ * 2026-09-18 (this session): per feedback, the header's background is
+ * neutral again (see the 2026-07-25 "header/root color fix" note above),
+ * so colors.fg's original justification — staying readable against a
+ * colored panel — no longer applies to everything it was left on. Three
+ * of the five items it's still driving didn't need it: the suffix line,
+ * Share icon, and search icon switch to var(--color-text-secondary), the
+ * app's normal muted token, matching how a plain neutral header would
+ * treat them anywhere else. Category label/icon and the non-favourited
+ * Heart icon are untouched — kept on colors.fg deliberately (the category
+ * label identifies the category itself, and the heart's idle state stays
+ * tied to it too), per this session's explicit scope.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -310,7 +322,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
               aria-label="Share"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: colors.fg,
+                color: 'var(--color-text-secondary)',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
@@ -370,7 +382,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             style={{
               background: 'none', border: 'none', padding: 2,
               cursor: 'pointer', flexShrink: 0,
-              color: colors.fg,
+              color: 'var(--color-text-secondary)',
               display: 'flex', alignItems: 'center',
               lineHeight: 1,
             }}
@@ -391,7 +403,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             style={{
               fontSize:                14,
               fontWeight:              500,
-              color:                   colors.fg,
+              color:                   'var(--color-text-secondary)',
               overflowX:               'auto',
               whiteSpace:              'nowrap',
               scrollbarWidth:          'none',
