@@ -45,10 +45,23 @@
  * sub-block's empty state changed from an inline NotYetAdded fallback to
  * rendering nothing at all — matches every other section's hide-when-empty
  * rule. The rest of this section (name, ingredients, tags) is unaffected.
+ *
+ * 2026-09-18 (this session): fixed a capitalization gap on the plain
+ * (non-combo) path — it rendered `genericName` straight from the DB with
+ * no formatting, so any generic stored lowercase showed lowercase. The
+ * combo path already ran each ingredient through toTitleCase (see
+ * `ingredients.map(toTitleCase)` below); the plain path just never got
+ * the same treatment. Now wrapped in toTitleCase() too, matching the
+ * combo path.
+ *
+ * 2026-09-18 (this session, follow-up): name-row icon switched from Atom
+ * to FlaskConical (per feedback, after reviewing a few options) and sized
+ * down 22px → 18px, matching SourcesSection.jsx's own decorative-icon
+ * size for a similar role.
  */
 
 import { useState } from 'react'
-import { Atom, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { FlaskConical, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
 import { InlineTruncatedList } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
@@ -134,11 +147,11 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         gap:          'var(--space-3)',
         marginBottom: 'var(--space-3)',
       }}>
-        <Atom size={22} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
+        <FlaskConical size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
         <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
           {isCombo
             ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={3} />
-            : genericName
+            : toTitleCase(genericName)
           }
         </div>
       </div>
@@ -205,3 +218,4 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     </div>
   )
 }
+
