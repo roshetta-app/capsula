@@ -139,6 +139,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { Browser } from '@capacitor/browser'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
@@ -233,16 +234,28 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   }
 
   // Image-search icon — opens Google Images for this drug in Egypt.
-  // Exact same pattern as PrescriptionSheetBlock.jsx's DrugMainLine
-  // (handleSearchClick): same query shape, same tbm=isch search, same
-  // new-tab behavior. drug.concentration/drug.form confirmed real fields
-  // on this flat drug object via src/lib/queries.js.
+  // Query shape (same as PrescriptionSheetBlock.jsx's DrugMainLine
+  // handleSearchClick) unchanged. drug.concentration/drug.form confirmed
+  // real fields on this flat drug object via src/lib/queries.js.
+  //
+  // 2026-09-18 (this session): switched from window.open(..., '_blank')
+  // to @capacitor/browser's Browser.open() — per feedback, this should
+  // open without leaving the app on both native and web. @capacitor/browser
+  // is already a dependency (confirmed in package.json). On native it
+  // opens an in-app Custom Tabs/SFSafariViewController overlay instead of
+  // switching to a separate browser app; on web it falls back to a normal
+  // new-tab open — same limitation as before there, since Google's search
+  // pages block iframe embedding regardless of tooling, so a true
+  // embedded view isn't achievable on web either way. PrescriptionSheetBlock.jsx's
+  // own copy of this same handler still uses window.open — not touched
+  // here, out of this session's scope, so the two now differ until that
+  // one's updated too.
   const handleSearchClick = (e) => {
     e.stopPropagation()
     const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
       .filter(Boolean)
       .join(' ')
-    window.open(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`, '_blank', 'noopener,noreferrer')
+    Browser.open({ url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}` })
   }
 
   return (
