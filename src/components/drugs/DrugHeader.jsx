@@ -123,6 +123,14 @@
  * label identifies the category itself, and the heart's idle state stays
  * tied to it too), per this session's explicit scope.
  *
+ * 2026-09-18 (this session, follow-up): the Heart icon's idle color
+ * switches from colors.fg to var(--color-favourite) (the same red as its
+ * filled state) — both states are red now, outline vs filled is the only
+ * difference, rather than idle being tinted by category and only turning
+ * red once favourited. A brief scale pop (see handleToggleFav/`popped`
+ * below) now plays on every tap, and the search icon (ScanSearch) grows
+ * 16px → 20px to match Share/Heart's size.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -201,6 +209,28 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // Brand name + strength + form suffix — same shared logic SharedDrugCard
   // uses for its title line (see utils/drugTitleFormat.js).
   const titleSuffix = getDrugTitleSuffix(drug)
+
+  // Favourite-toggle pop animation (this session) — no existing precedent
+  // in the codebase to match (checked RowStarButton.jsx and
+  // InlineStarButton.jsx; neither animates, just switches color). Built
+  // fresh: a brief transform scale on the icon itself, timed with a
+  // `popped` state flag rather than CSS keyframes, so no new @keyframes
+  // rule needs adding to globals.css for one icon. The overshoot-then-
+  // settle feel comes entirely from the transition's own easing curve
+  // (a standard "back out" cubic-bezier), not from the scale value
+  // itself overshooting 1 — scale target is just 1, the curve does the
+  // bounce on the way there.
+  const [popped, setPopped] = useState(false)
+  const popTimeoutRef = useRef(null)
+
+  useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
+
+  function handleToggleFav() {
+    onToggleFav()
+    setPopped(true)
+    clearTimeout(popTimeoutRef.current)
+    popTimeoutRef.current = setTimeout(() => setPopped(false), 220)
+  }
 
   // Image-search icon — opens Google Images for this drug in Egypt.
   // Exact same pattern as PrescriptionSheetBlock.jsx's DrugMainLine
@@ -330,16 +360,24 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             </button>
 
             <button
-              onClick={onToggleFav}
+              onClick={handleToggleFav}
               aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: isFavourited ? 'var(--color-favourite)' : colors.fg,
-                transition: 'color 0.15s ease',
+                display: 'flex', alignItems: 'center',
+                color: 'var(--color-favourite)',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
               }}
             >
-              <Heart size={20} strokeWidth={2} fill={isFavourited ? 'currentColor' : 'none'} />
+              <Heart
+                size={20}
+                strokeWidth={2}
+                fill={isFavourited ? 'currentColor' : 'none'}
+                style={{
+                  transform:  popped ? 'scale(1.2)' : 'scale(1)',
+                  transition: 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                }}
+              />
             </button>
           </div>
         </div>
@@ -387,7 +425,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
               lineHeight: 1,
             }}
           >
-            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
+            <ScanSearch size={20} strokeWidth={1.8} color="currentColor" />
           </button>
         </div>
 
