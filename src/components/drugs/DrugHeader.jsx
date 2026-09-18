@@ -137,6 +137,16 @@
  * feedback, wanted straight black-in-light/white-in-dark rather than the
  * softer muted tone. Same token the brand name on row 2 already uses.
  *
+ * 2026-09-18 (this session, third follow-up): category label TEXT (not
+ * its icon) switches from colors.fg to var(--color-text-secondary) —
+ * per feedback, to match ConditionDetailScreen.jsx's own DetailHeader
+ * exactly (checked directly: its specialty icon stays on colors.fg, only
+ * its label text uses --color-text-secondary). Supersedes this file's
+ * earlier "category label ... kept on colors.fg deliberately" note
+ * above — that was true when written, isn't anymore for the text half of
+ * it. The icon itself is still colors.fg, unchanged, same as
+ * DetailHeader's.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -353,7 +363,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
                   <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={11} color={colors.fg} />
                   <span style={{
                     fontSize: 12, fontWeight: 400, letterSpacing: '0.03em',
-                    color: colors.fg, lineHeight: 1,
+                    color: 'var(--color-text-secondary)', lineHeight: 1,
                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   }}>
                     {category.name_en}
