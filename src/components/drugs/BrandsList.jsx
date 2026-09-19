@@ -66,25 +66,50 @@
  * both new optional props on SharedDrugCard that default to the old
  * behavior everywhere else. `onTap` is still accepted as a prop here so
  * this file's own API doesn't change, but it's no longer passed down to
- * the row. The row's `trailing` slot now shows RowStarButton.jsx (the same
+ * the row. The row's `trailing` slot shows RowStarButton.jsx (the same
  * heart button ConditionCard/Favourites rows already use) when the
  * sibling is one of the user's favourite drugs; hidden entirely otherwise,
- * per RowStarButton's own existing show/hide rule. Favourite state and the
- * toggle action both come from FavouritesContext, same source every other
- * screen already reads/writes through.
+ * per RowStarButton's own existing show/hide rule.
+ *
+ * 2026-09-19 (this session, follow-up): three more changes per feedback —
+ *  - Sort option relabeled "Lowest cost first" → "Cheapest first".
+ *  - Form filter now groups forms the same way the Drugs screen's own
+ *    filter sheet does (e.g. "Tab / Cap.", "Syrup/Susp.") instead of
+ *    listing every raw form value as its own option. Reuses
+ *    DrugFilterPanel.jsx's exported `FORM_OPTIONS` directly — same
+ *    grouping data, not a second copy that could drift out of sync — via
+ *    `resolveFormGroup` below, which maps a sibling's raw `form` value to
+ *    the group it belongs to. The filter pill itself only appears when
+ *    siblings span more than one distinct *group* (was: more than one
+ *    distinct raw form) — a single drug, or several drugs that all land
+ *    in the same group (e.g. all tablets/capsules), still hides the pill,
+ *    same "nothing to filter" rule as before.
+ *  - Heart icon is now display-only here: RowStarButton's new `readOnly`
+ *    prop (see that file) is passed instead of `onPress`, so tapping the
+ *    heart in this list no longer removes a drug from favourites —
+ *    un-favouriting from this screen isn't offered, only the status is
+ *    shown. `toggleDrug` is no longer read from FavouritesContext here.
  */
 
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ListFilter, ArrowUpDown } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
+import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 
-function capitalize(str) {
-  if (!str) return str
-  return str.charAt(0).toUpperCase() + str.slice(1)
+// Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
+// grouped filter option it belongs to (e.g. the 'Tab / Cap.' group) —
+// same grouping DrugFilterPanel.jsx's Form/Route section already uses,
+// via its exported FORM_OPTIONS. Every real raw form value in
+// config/forms.js is covered by exactly one group's `matches` list; a
+// value with no match (unexpected/legacy data) resolves to null and is
+// simply left out of the filter rather than guessed into a group.
+function resolveFormGroup(rawForm) {
+  if (!rawForm) return null
+  return FORM_OPTIONS.find(opt => opt.value !== 'all' && opt.matches.includes(rawForm)) || null
 }
 
 export default function BrandsList({ siblings = [], onTap }) {
@@ -92,18 +117,24 @@ export default function BrandsList({ siblings = [], onTap }) {
   const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
   const { categories } = useCategories()
   const isDark = useIsDark()
-  const { isDrugFavourited, toggleDrug } = useFavouritesContext()
+  const { isDrugFavourited } = useFavouritesContext()
 
   // No real siblings — section disappears entirely, same as today's behavior
   // when the list is empty.
   if (siblings.length === 0) return null
 
-  const forms = [...new Set(siblings.map(s => s.form).filter(Boolean))]
-  const showFormFilter = forms.length > 1
+  // Distinct grouped form options actually present among the siblings —
+  // e.g. two capsule brands and one tablet brand both land in the same
+  // 'Tab / Cap.' group, so that counts as one group, not two.
+  const presentGroups = FORM_OPTIONS.filter(opt =>
+    opt.value !== 'all' &&
+    siblings.some(s => resolveFormGroup(s.form)?.value === opt.value)
+  )
+  const showFormFilter = presentGroups.length > 1
 
   const filtered = formFilter === 'all'
     ? siblings
-    : siblings.filter(s => s.form === formFilter)
+    : siblings.filter(s => resolveFormGroup(s.form)?.value === formFilter)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === 'price') {
@@ -130,9 +161,9 @@ export default function BrandsList({ siblings = [], onTap }) {
           (DropdownPill below) — button + absolutely-positioned option
           list, click-outside-to-close. Replaces an earlier native-<select>
           version (see dated notes above) that opened the browser/OS's own
-          picker UI instead of matching the app. Sort option 'price'
-          relabeled "Lowest cost first" now that price itself isn't shown
-          on the rows anymore. */}
+          picker UI instead of matching the app. Form options are grouped
+          the same way DrugFilterPanel.jsx's Form/Route section groups them
+          (see resolveFormGroup above). */}
       <div style={{
         display:      'flex',
         gap:          'var(--space-2)',
@@ -145,8 +176,8 @@ export default function BrandsList({ siblings = [], onTap }) {
             value={formFilter}
             onChange={setFormFilter}
             options={[
-              { value: 'all', label: 'All forms' },
-              ...forms.map(f => ({ value: f, label: capitalize(f) })),
+              { value: 'all', label: 'All Forms' },
+              ...presentGroups.map(g => ({ value: g.value, label: g.label })),
             ]}
           />
         )}
@@ -157,7 +188,7 @@ export default function BrandsList({ siblings = [], onTap }) {
           onChange={setSortMode}
           options={[
             { value: 'name',  label: 'Name (A–Z)' },
-            { value: 'price', label: 'Lowest cost first' },
+            { value: 'price', label: 'Cheapest first' },
           ]}
         />
       </div>
@@ -167,7 +198,8 @@ export default function BrandsList({ siblings = [], onTap }) {
           suppresses it on the final one), so no wrapping gap/box styling
           is needed here anymore. Not tappable and no chevron (2026-09-19)
           — a sibling row here is informational, not a navigation target.
-          Trailing slot shows the heart icon only for favourited drugs. */}
+          Trailing slot shows the heart icon (display-only, see
+          RowStarButton's readOnly prop) only for favourited drugs. */}
       <div>
         {sorted.map((item, i) => (
           <SharedDrugCard
@@ -181,7 +213,7 @@ export default function BrandsList({ siblings = [], onTap }) {
             trailing={
               <RowStarButton
                 isFavourited={isDrugFavourited(item.id)}
-                onPress={() => toggleDrug(item.id)}
+                readOnly
               />
             }
           />

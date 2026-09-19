@@ -21,20 +21,53 @@
  * the conditions tab are unaffected — they pass `isFavourited={true}`,
  * matching the always-shown behavior they already had.
  *
+ * 2026-09-19 (this session): added `readOnly` — optional, defaults to
+ * false, so every existing caller (conditions tab, Drugs/Favourites
+ * screens) is unaffected. When true, the heart still shows/hides on the
+ * same isFavourited rule, but renders as a plain, non-interactive icon —
+ * no button semantics, no tap handler, no onPress call. Added for
+ * BrandsList.jsx's "Similar Drugs" list, where the heart is meant to show
+ * favourite status only, not offer a way to un-favourite from that list.
+ *
  * Props:
  *   isFavourited  boolean    — whether this row is currently saved. When
  *                               false, renders nothing at all.
  *   onPress       () => void — called on tap, after stopPropagation so the
  *                               row's own tap (navigate to detail) doesn't
- *                               also fire.
+ *                               also fire. Not required (and never called)
+ *                               when readOnly is true.
+ *   readOnly      boolean    — optional, default false. Renders a plain
+ *                               non-interactive icon instead of a button
+ *                               when true.
  */
 
 import { Heart } from 'lucide-react'
 
 const FAV_ACCENT = 'var(--color-favourite)'
 
-export default function RowStarButton({ isFavourited, onPress }) {
+export default function RowStarButton({ isFavourited, onPress, readOnly = false }) {
   if (!isFavourited) return null
+
+  // readOnly — display-only: same icon, same sizing/hit-area footprint as
+  // the interactive version (so it lines up identically in a trailing
+  // slot), but a plain <span> with no button semantics or tap handler.
+  if (readOnly) {
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          padding:        '14px 8px',
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          flexShrink:     0,
+          color:          FAV_ACCENT,
+        }}
+      >
+        <Heart size={13} fill={FAV_ACCENT} strokeWidth={1.8} />
+      </span>
+    )
+  }
 
   function handleTap(e) {
     e.stopPropagation()
