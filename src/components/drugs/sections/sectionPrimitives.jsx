@@ -13,7 +13,7 @@
  * via EmptySection below.
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 
 // --- Section header -----------------------------------------------------
@@ -79,54 +79,125 @@ export function Collapsible({ title, children }) {
 
 // --- Inline truncated list ---------------------------------------------------
 //
-// A comma-joined line of items that truncates after `max` entries once there
-// are more, revealing a small chevron at the end of the line that
-// expands/collapses the rest in place.
+// A chip-based list of items that truncates after `max` entries once there
+// are more, revealing a "Show N more" toggle that expands/collapses the rest
+// with an animated reveal.
 //
 // Deliberately separate from Collapsible above: Collapsible toggles a whole
 // content block under its own section header (title + chevron, content
-// appears below). This instead stays inline within a single line of text —
-// e.g. a combo drug's comma-joined ingredient names — with no title and no
-// block appearing underneath. (drug_detail_rebuild, step 1.1, decision 4.7 /
+// appears below). This instead stays inline within a single content area —
+// e.g. a combo drug's ingredient names — with no title and no block
+// appearing underneath. (drug_detail_rebuild, step 1.1, decision 4.7 /
 // §11.6 — confirmed Collapsible doesn't fit this shape, built as its own
 // small shared primitive instead of forcing Collapsible to do both jobs.)
 //
 // Items are expected pre-formatted (already capitalized etc.) by the caller —
 // this primitive only handles truncation/expand display, no text
 // transformation of its own.
+//
+// 2026-09-18 (this session): redesigned per feedback on its only known
+// current consumer (GenericOverviewSection.jsx's ingredient list — the four
+// files this whole module's header comment lists as sharing these
+// primitives, ClinicalOverview/DosingSection/SafetySection/
+// PrescribingSection, are retired per DrugDetailScreen.jsx's own dated
+// notes, so that comment is stale; noted here rather than rewritten there,
+// same as this file's other dated corrections). Three real complaints:
+//  1. Plain comma-joined text read poorly once items had commas of their
+//     own to compete with visually — each item is its own bordered chip now.
+//  2. No animation — hidden items now grow in via a max-height/opacity
+//     transition (measured against the hidden wrapper's own scrollHeight),
+//     instead of popping in/out instantly.
+//  3. The old bare chevron sat right after the comma-joined text, so its
+//     position shifted horizontally every time the text's own length
+//     changed on toggle. The toggle is now its own row below the chip
+//     list — a fixed location regardless of state — with a "Show N more" /
+//     "Show less" label and a single chevron that rotates 180° rather than
+//     swapping between Up/Down icons.
 export function InlineTruncatedList({ items = [], max = 3 }) {
   const [open, setOpen] = useState(false)
+  const extraRef = useRef(null)
+
+  const hasMore = items.length > max
+  const shown = items.slice(0, max)
+  const extra = items.slice(max)
+
+  // Animate to the hidden wrapper's own measured height rather than a
+  // guessed fixed value, so this works regardless of how many extra items
+  // there are or how they wrap.
+  useEffect(() => {
+    const el = extraRef.current
+    if (!el) return
+    el.style.maxHeight = open ? `${el.scrollHeight}px` : '0px'
+  }, [open, extra.length])
 
   if (!items || items.length === 0) return null
 
-  const hasMore = items.length > max
-  const shown = open ? items : items.slice(0, max)
+  const chipStyle = {
+    fontSize:        13,
+    fontWeight:       500,
+    color:            'var(--color-text-primary)',
+    backgroundColor:  'var(--color-surface)',
+    border:           '0.5px solid var(--color-border)',
+    borderRadius:     'var(--radius-sm)',
+    padding:          '4px 10px',
+  }
 
   return (
-    <span>
-      {shown.join(', ')}
+    <div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {shown.map((item, i) => (
+          <span key={i} style={chipStyle}>{item}</span>
+        ))}
+        {hasMore && (
+          <div
+            ref={extraRef}
+            style={{
+              display:    'flex',
+              flexWrap:   'wrap',
+              gap:        6,
+              maxHeight:  0,
+              opacity:    open ? 1 : 0,
+              overflow:   'hidden',
+              transition: 'max-height 0.25s ease, opacity 0.2s ease',
+            }}
+          >
+            {extra.map((item, i) => (
+              <span key={i} style={chipStyle}>{item}</span>
+            ))}
+          </div>
+        )}
+      </div>
       {hasMore && (
         <button
           onClick={() => setOpen(o => !o)}
           aria-label={open ? 'Show fewer' : 'Show more'}
           style={{
-            display:        'inline-flex',
+            display:        'flex',
             alignItems:     'center',
-            verticalAlign:  'middle',
+            gap:            4,
             background:     'none',
             border:         'none',
-            cursor:         'pointer',
             padding:        0,
-            marginLeft:     4,
+            marginTop:      'var(--space-2)',
+            cursor:         'pointer',
+            fontSize:       13,
+            color:          'var(--color-text-secondary)',
+            fontFamily:     'var(--font-body)',
+            WebkitTapHighlightColor: 'transparent',
           }}
         >
-          {open
-            ? <ChevronUp size={14} color="var(--color-text-tertiary)" />
-            : <ChevronDown size={14} color="var(--color-text-tertiary)" />
-          }
+          {open ? 'Show less' : `Show ${extra.length} more`}
+          <ChevronDown
+            size={14}
+            color="var(--color-text-tertiary)"
+            style={{
+              transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
         </button>
       )}
-    </span>
+    </div>
   )
 }
 
@@ -267,3 +338,4 @@ export function SeverityBadge({ severity }) {
     </span>
   )
 }
+
