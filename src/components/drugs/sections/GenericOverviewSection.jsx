@@ -100,31 +100,51 @@
  * also animates now (its box grows/shrinks in height instead of jumping).
  * Wording is unchanged ('See more' / 'See less'). UsesSection.jsx was not
  * touched and may still use the old centered full-width toggle — flagged.
+ *
+ * 2026-09-19 (this session, eleventh follow-up — Generic Overview
+ * refinement): full redesign per feedback, four changes:
+ *  1. The ingredient list and MOA text no longer share one toggle look.
+ *     Ingredients now use ChipToggle (a "+N more" / "Show less" chip,
+ *     tinted blue, sitting inline as the last chip in the wrapped row —
+ *     see InlineTruncatedList in sectionPrimitives.jsx). MOA now uses
+ *     TextToggle (plain bold blue "More"/"Less" text, no chevron, directly
+ *     under the paragraph) so it reads as subordinate to the content
+ *     instead of a separate navigation row.
+ *  2. MOA truncation switched from a 30-word cutoff to a real ~3-line
+ *     visual clamp (CSS -webkit-line-clamp), so the cutoff always matches
+ *     what's visually shown regardless of word length. Whether the toggle
+ *     renders at all is now decided by measuring the clamped paragraph's
+ *     scrollHeight vs. clientHeight after render, not a word count.
+ *  3. Section restructured into three explicit blocks — Active Ingredients,
+ *     Mechanism of Action, Classification — each its own <div> with
+ *     consistent var(--space-4) spacing between them, giving the three
+ *     groups distinct visual identity instead of a single flowing block.
+ *     A small "Classification" label was added above the card to match
+ *     the "Active ingredient(s)" label's treatment.
+ *  4. The Class/Subclass placeholder pills are now a single bordered
+ *     ClassificationCard (sectionPrimitives.jsx) instead of two floating
+ *     pill tags — same placeholder values, purely visual, no data change
+ *     (subclass still isn't real data yet, plan §11.5).
+ * Blue tokens used throughout (var(--color-accent) / var(--color-accent-
+ * light)) come from globals.css and are already dark-mode aware — no
+ * hardcoded colors needed.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { FlaskConical, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { InlineTruncatedList, IngredientChip, ShowMoreToggle } from './sectionPrimitives.jsx'
+import { InlineTruncatedList, IngredientChip, TextToggle, ClassificationCard } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
-const pillStyle = {
-  fontSize:        11,
-  fontWeight:      600,
-  backgroundColor: '#F3F4F6',
-  color:           '#6B7280',
-  padding:         '2px 10px',
-  borderRadius:    'var(--radius-full)',
-}
-
-// Mechanism of Action app-side truncation (decision 5) — 30 words, same
-// "See more"/"See less" wording UsesSection.jsx uses; the toggle's look now
-// matches the ingredient list's (see the tenth follow-up note above).
-const MOA_TRUNCATE_AT = 30
+// Mechanism of Action visual clamp (Generic Overview refinement, decision 2
+// above) — ~3 lines at this block's font-size/line-height, replacing the old
+// 30-word cutoff so the truncation always matches what's actually shown.
+const MOA_CLAMP_LINES = 3
 
 export default function GenericOverviewSection({ drug, siblings = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
   const [moaOpen,    setMoaOpen]    = useState(false)
+  const [moaHasMore, setMoaHasMore] = useState(false)
 
   // Animated MOA reveal: the text sits in a clipped box whose height is
   // frozen at its current value on click, then moved to the new text's
@@ -139,12 +159,22 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     cancelAnimationFrame(moaRafRef.current)
   }, [])
 
+  // Detect whether the clamped MOA paragraph actually overflows its 3-line
+  // box — this, not a word count, decides whether the "More" toggle renders
+  // at all. Re-checked whenever the drug (and therefore the MOA text)
+  // changes.
+  useLayoutEffect(() => {
+    const text = moaTextRef.current
+    if (!text) return
+    setMoaHasMore(text.scrollHeight > text.clientHeight + 1)
+  }, [drug?.mechanismOfAction])
+
   useLayoutEffect(() => {
     const box  = moaBoxRef.current
     const text = moaTextRef.current
     // Nothing frozen means this is the first render, not a toggle.
     if (!box || !text || box.style.height === '') return
-    const target = text.offsetHeight
+    const target = text.scrollHeight
     moaRafRef.current = requestAnimationFrame(() => {
       box.style.height = `${target}px`
     })
@@ -167,12 +197,6 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     mechanismOfAction,
   } = drug
 
-  const moaWords   = mechanismOfAction ? mechanismOfAction.trim().split(/\s+/).filter(Boolean) : []
-  const moaHasMore = moaWords.length > MOA_TRUNCATE_AT
-  const moaText     = moaOpen || !moaHasMore
-    ? mechanismOfAction
-    : moaWords.slice(0, MOA_TRUNCATE_AT).join(' ') + '…'
-
   // Combo generics (2+ active ingredients) — ingredients is now populated
   // for single-ingredient generics too (a 1-element array), so the combo
   // check needs more than one element, not just a non-empty array (CMS
@@ -182,70 +206,66 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
 
-      {/* -- Top row: flask icon + "Active ingredient(s)" label + Available
+      {/* ── Block 1: Active Ingredients ─────────────────────────────────── */}
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+
+        {/* Top row: flask icon + "Active ingredient(s)" label + Available
             Brands link (label moved from DosingSection.jsx, 4.5; restyled
             to match mockup). 2026-09-18 (this session): FlaskConical moved
             here from the name row below, per feedback — now sits right
-            before the label instead of next to the chip(s). -- */}
-      <div style={{
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        marginBottom:   'var(--space-3)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FlaskConical size={12} color="var(--color-text-secondary)" />
-          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-            Active ingredient{isCombo ? 's' : ''}
-          </span>
+            before the label instead of next to the chip(s). */}
+        <div style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          marginBottom:   'var(--space-2)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FlaskConical size={12} color="var(--color-text-secondary)" />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+              Active ingredient{isCombo ? 's' : ''}
+            </span>
+          </div>
+
+          {siblings.length > 0 && (
+            <button
+              onClick={() => setBrandsOpen(true)}
+              style={{
+                display:    'flex',
+                alignItems: 'center',
+                gap:        2,
+                background: 'none',
+                border:     'none',
+                cursor:     'pointer',
+                padding:    0,
+                fontFamily: 'var(--font-body)',
+                fontSize:   13,
+                fontWeight: 600,
+                color:      'var(--color-text-primary)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Similar Brands
+              <ChevronRight size={14} />
+            </button>
+          )}
         </div>
 
-        {siblings.length > 0 && (
-          <button
-            onClick={() => setBrandsOpen(true)}
-            style={{
-              display:    'flex',
-              alignItems: 'center',
-              gap:        2,
-              background: 'none',
-              border:     'none',
-              cursor:     'pointer',
-              padding:    0,
-              fontFamily: 'var(--font-body)',
-              fontSize:   13,
-              fontWeight: 600,
-              color:      'var(--color-text-primary)',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            Similar Brands
-            <ChevronRight size={14} />
-          </button>
-        )}
+        {/* Ingredient chip(s) — combo path truncates past 5 with the
+            inline ChipToggle ("+N more" / "Show less"); single-ingredient
+            path renders one chip, no toggle needed. */}
+        {isCombo
+          ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={5} />
+          : <IngredientChip>{toTitleCase(genericName)}</IngredientChip>
+        }
       </div>
 
-      {/* -- Name row: generic/combo name, chip-styled either way (see
-          2026-09-18 notes above) -- */}
-      <div style={{
-        display:      'flex',
-        alignItems:   'flex-start',
-        gap:          'var(--space-3)',
-        marginBottom: 'var(--space-3)',
-      }}>
-        <div>
-          {isCombo
-            ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={5} />
-            : <IngredientChip>{toTitleCase(genericName)}</IngredientChip>
-          }
-        </div>
-      </div>
-
-      {/* -- Mechanism of Action — directly under the name, no label.
-            App-side truncation at 30 words (decision 5) — button omitted
-            entirely (not just inert) when already under the limit, same
-            convention UsesSection.jsx uses. -- */}
+      {/* ── Block 2: Mechanism of Action ────────────────────────────────── */}
+      {/* Directly under the ingredients block, no label — clamped to ~3
+          lines visually; TextToggle (plain bold blue text, no chevron)
+          appears only when the text actually overflows that clamp. */}
       {mechanismOfAction && (
-        <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={{ marginBottom: 'var(--space-4)' }}>
           <div
             ref={moaBoxRef}
             style={{ overflow: 'hidden', transition: 'height 0.25s ease' }}
@@ -257,26 +277,40 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
                 color:      'var(--color-text-primary)',
                 lineHeight: 1.6,
                 margin:     0,
+                ...(moaOpen ? {} : {
+                  display:         '-webkit-box',
+                  WebkitBoxOrient: 'vertical',
+                  WebkitLineClamp: MOA_CLAMP_LINES,
+                  overflow:        'hidden',
+                }),
               }}
             >
-              {moaText}
+              {mechanismOfAction}
             </p>
           </div>
           {moaHasMore && (
-            <ShowMoreToggle
+            <TextToggle
               open={moaOpen}
-              label={moaOpen ? 'See less' : 'See more'}
               onClick={handleMoaToggle}
             />
           )}
         </div>
       )}
 
-      {/* -- Placeholder Class/Subclass tags (4.8) — static labels, not
-            real data yet; subclass column deferred, plan §11.5 -- */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-        <span style={pillStyle}>Class</span>
-        <span style={pillStyle}>Subclass</span>
+      {/* ── Block 3: Classification ─────────────────────────────────────── */}
+      {/* Compact bordered card (4.8) — static placeholder labels, not real
+          data yet; subclass column deferred, plan §11.5. Small label above
+          matches the Active Ingredients block's own label treatment. */}
+      <div>
+        <div style={{
+          fontSize:     13,
+          fontWeight:   600,
+          color:        'var(--color-text-secondary)',
+          marginBottom: 'var(--space-2)',
+        }}>
+          Classification
+        </div>
+        <ClassificationCard labels={['Class', 'Subclass']} />
       </div>
 
       <BrandsBottomSheet

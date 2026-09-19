@@ -11,6 +11,13 @@
  * "zero clinical content anywhere" single fallback message has been dropped —
  * each grouped section now shows its own independent "Not yet added" state
  * via EmptySection below.
+ *
+ * 2026-09-19 (this session, Generic Overview refinement): added three new
+ * primitives — ChipToggle, TextToggle, ClassificationCard — for
+ * GenericOverviewSection.jsx's redesign (chip vs. text interaction patterns,
+ * compact classification card). The existing ShowMoreToggle below is left in
+ * place — it becomes unused by GenericOverviewSection.jsx after this change,
+ * but UsesSection.jsx may still reference it, so it isn't removed.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -109,6 +116,13 @@ export function IngredientChip({ children, style }) {
 // section (ingredient chips and Mechanism of Action text): left-aligned right
 // under its content, small muted label, one chevron that rotates 180 degrees
 // when open. The caller owns the open state and the label wording.
+//
+// 2026-09-19 (this session): GenericOverviewSection.jsx no longer uses this
+// for either the ingredient list or the MOA text (see ChipToggle and
+// TextToggle below) — the two patterns needed to look fundamentally
+// different from each other, so a single shared toggle no longer fit either
+// one well. Left in place in case UsesSection.jsx or another consumer still
+// relies on it.
 export function ShowMoreToggle({ open, label, onClick, ariaLabel }) {
   return (
     <button
@@ -139,6 +153,109 @@ export function ShowMoreToggle({ open, label, onClick, ariaLabel }) {
         }}
       />
     </button>
+  )
+}
+
+// --- Chip-style "+N more" / "Show less" toggle -------------------------------
+//
+// 2026-09-19 (this session, Generic Overview refinement): built as its own
+// primitive rather than reusing ShowMoreToggle — this one is a chip, sized
+// and colored to sit inline as the last item in a wrapped row of
+// IngredientChip elements (not a separate row underneath, unlike
+// ShowMoreToggle above). Blue text on a tinted blue background, using the
+// app's existing accent tokens (--color-accent / --color-accent-light),
+// which are already dark-mode aware via globals.css's .dark overrides — no
+// hardcoded color needed. When open, renders "Show less" instead of a count,
+// so it doubles as the trailing "Show less" chip the expanded state needs.
+export function ChipToggle({ open, moreCount, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={open ? 'Show fewer ingredients' : `Show ${moreCount} more ingredients`}
+      style={{
+        fontSize:        13,
+        fontWeight:      600,
+        color:           'var(--color-accent)',
+        backgroundColor: 'var(--color-accent-light)',
+        border:          'none',
+        borderRadius:    'var(--radius-sm)',
+        padding:         '4px 10px',
+        cursor:          'pointer',
+        fontFamily:      'var(--font-body)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {open ? 'Show less' : `+${moreCount} more`}
+    </button>
+  )
+}
+
+// --- Plain text "More" / "Less" toggle ---------------------------------------
+//
+// 2026-09-19 (this session, Generic Overview refinement): the Mechanism of
+// Action control needed to read as subordinate to its paragraph, not as a
+// separate section/navigation row — so this is bold blue text only, no
+// border, background, or chevron, sitting directly under the clamped text.
+// Deliberately not ChipToggle or ShowMoreToggle: those both read as their
+// own little control surface, which is exactly what MOA's control should
+// avoid looking like.
+export function TextToggle({ open, onClick, moreLabel = 'More', lessLabel = 'Less' }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={open ? 'Show less' : 'Show more'}
+      style={{
+        display:    'inline-block',
+        background: 'none',
+        border:     'none',
+        padding:    0,
+        marginTop:  'var(--space-2)',
+        cursor:     'pointer',
+        fontSize:   13,
+        fontWeight: 700,
+        color:      'var(--color-accent)',
+        fontFamily: 'var(--font-body)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {open ? lessLabel : moreLabel}
+    </button>
+  )
+}
+
+// --- Compact classification card ---------------------------------------------
+//
+// 2026-09-19 (this session, Generic Overview refinement): replaces the old
+// pair of floating Class/Subclass pill tags with a single bordered card, so
+// the two read as one grouped fact instead of two independent tags floating
+// in a row. Still just static placeholder labels, not real data — the real
+// `subclass` column is a separate, deferred migration (plan §11.5); this
+// change is purely visual, same as before.
+export function ClassificationCard({ labels }) {
+  return (
+    <div style={{
+      display:      'flex',
+      border:       '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-md)',
+      overflow:     'hidden',
+    }}>
+      {labels.map((label, i) => (
+        <div
+          key={label}
+          style={{
+            flex:       1,
+            padding:    '8px 12px',
+            borderLeft: i > 0 ? '1px solid var(--color-border)' : 'none',
+            fontSize:   13,
+            fontWeight: 500,
+            color:      'var(--color-text-primary)',
+            textAlign:  'center',
+          }}
+        >
+          {label}
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -187,6 +304,14 @@ export function ShowMoreToggle({ open, label, onClick, ariaLabel }) {
 //     expanded, and fade in/out (opacity) rather than growing in by height.
 //  2. The toggle row moved into the shared ShowMoreToggle above, so this
 //     list and the Mechanism of Action text share one toggle look.
+//
+// 2026-09-19 (this session, follow-up — Generic Overview refinement): per
+// feedback, the toggle is no longer its own row underneath the chips — it's
+// now a ChipToggle (see above) rendered as the last item inside the same
+// wrapped flex row as the chips themselves, so "+N more" reads as one of the
+// chips rather than a separate control below the list. Expanding appends
+// the extra chips before the toggle, which then re-labels itself
+// "Show less" and stays in place as the trailing chip.
 export function InlineTruncatedList({ items = [], max = 3 }) {
   const [open, setOpen] = useState(false)
   // showExtra: extra chips are in the layout at all. extraVisible: they are
@@ -225,28 +350,25 @@ export function InlineTruncatedList({ items = [], max = 3 }) {
   if (!items || items.length === 0) return null
 
   return (
-    <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {shown.map((item, i) => (
-          <IngredientChip key={i}>{item}</IngredientChip>
-        ))}
-        {hasMore && showExtra && extra.map((item, i) => (
-          <IngredientChip
-            key={i}
-            style={{
-              opacity:    extraVisible ? 1 : 0,
-              transition: 'opacity 0.2s ease',
-            }}
-          >
-            {item}
-          </IngredientChip>
-        ))}
-      </div>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+      {shown.map((item, i) => (
+        <IngredientChip key={i}>{item}</IngredientChip>
+      ))}
+      {hasMore && showExtra && extra.map((item, i) => (
+        <IngredientChip
+          key={i}
+          style={{
+            opacity:    extraVisible ? 1 : 0,
+            transition: 'opacity 0.2s ease',
+          }}
+        >
+          {item}
+        </IngredientChip>
+      ))}
       {hasMore && (
-        <ShowMoreToggle
+        <ChipToggle
           open={open}
-          ariaLabel={open ? 'Show fewer' : 'Show more'}
-          label={open ? 'Show less' : `Show ${extra.length} more`}
+          moreCount={extra.length}
           onClick={handleToggle}
         />
       )}
@@ -391,4 +513,3 @@ export function SeverityBadge({ severity }) {
     </span>
   )
 }
-
