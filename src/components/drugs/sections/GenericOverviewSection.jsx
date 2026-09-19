@@ -86,6 +86,12 @@
  * trigger button's label renamed to "Other Brands", matching
  * BrandsList.jsx's own section-header rename in the sheet it opens (same
  * session, separate file) — button and sheet now say the same thing.
+ *
+ * 2026-09-19 (this session, ninth follow-up): trigger button's label
+ * renamed again, "Other Brands" → "Similar Brands", per feedback. This
+ * now diverges from BrandsList.jsx's own in-sheet section header, which
+ * still reads "Other Brands" (see that file) — flagged, not changed,
+ * since it wasn't part of this request.
  */
 
 import { useState } from 'react'
@@ -168,7 +174,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            Other Brands
+            Similar Brands
             <ChevronRight size={14} />
           </button>
         )}
@@ -252,4 +258,3 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     </div>
   )
 }
-

@@ -12,9 +12,8 @@
  * Like SpecialtiesBottomSheet.jsx (a single list, not several grouped
  * controls), this sheet relies on backdrop-tap/Escape alone to dismiss —
  * no separate close button. BrandsList.jsx is mounted unchanged as the
- * body, including its own "Available Brands (Egypt)" section header, so
- * the sheet shell itself carries only the drag handle, not a duplicate
- * title.
+ * body, including its own "Other Brands" section header, so the sheet
+ * shell itself carries only the drag handle, not a duplicate title.
  *
  * Phase 3 (Back-Button & State-Audit merged plan) — wired into
  * useBackClose so back closes this sheet instead of changing the route;
@@ -29,6 +28,15 @@
  *            SheetShell, so this sheet no longer needs its own
  *            handle-only fixed header. BrandsList's own section header +
  *            scrollable body is unchanged.
+ *
+ * 2026-09-19 (this session): SheetShell's `ariaLabel` — the closest thing
+ * this sheet has to a "title", since it carries only the drag handle and
+ * BrandsList's own in-body section header, no separate visible title of
+ * its own — renamed "Available brands" → "Similar drugs". Note this only
+ * changes the sheet's accessible (screen-reader) name; there's no visible
+ * title text here to rename, since BrandsList's own in-body header
+ * ("Other Brands") is the only visible heading and wasn't part of this
+ * request.
  *
  * Props:
  *   isOpen        boolean
@@ -52,11 +60,11 @@ export default function BrandsBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Available brands" maxHeight="70dvh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Similar drugs" maxHeight="70dvh">
       {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
           sibling-list internals, unchanged. BrandsList renders its own
-          "Available Brands (Egypt)" section header, so this sheet doesn't
-          duplicate a title. */}
+          "Other Brands" section header, so this sheet doesn't duplicate
+          a title. */}
       <div style={{
         flex:      1,
         overflowY: 'auto',
