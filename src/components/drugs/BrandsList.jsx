@@ -89,6 +89,11 @@
  *    heart in this list no longer removes a drug from favourites —
  *    un-favouriting from this screen isn't offered, only the status is
  *    shown. `toggleDrug` is no longer read from FavouritesContext here.
+ *
+ * 2026-09-19 (this session, second follow-up): section header renamed
+ * "Other Brands" → "Similar Brands", per feedback — now matches
+ * GenericOverviewSection.jsx's trigger button, which was renamed to the
+ * same text in a separate file/session (see that file's own changelog).
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -154,7 +159,7 @@ export default function BrandsList({ siblings = [], onTap }) {
         color:        'var(--color-text-primary)',
         marginBottom: 'var(--space-3)',
       }}>
-        Other Brands
+        Similar Brands
       </div>
 
       {/* Controls: form filter + sort, as two in-app popover dropdown pills
