@@ -92,12 +92,20 @@
  * now diverges from BrandsList.jsx's own in-sheet section header, which
  * still reads "Other Brands" (see that file) — flagged, not changed,
  * since it wasn't part of this request.
+ *
+ * 2026-09-19 (this session, tenth follow-up): the Mechanism of Action
+ * toggle now looks and sits like the ingredient list's toggle — both use
+ * the shared ShowMoreToggle from sectionPrimitives.jsx (left-aligned under
+ * the content, small muted label, one chevron that rotates). The MOA reveal
+ * also animates now (its box grows/shrinks in height instead of jumping).
+ * Wording is unchanged ('See more' / 'See less'). UsesSection.jsx was not
+ * touched and may still use the old centered full-width toggle — flagged.
  */
 
-import { useState } from 'react'
-import { FlaskConical, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { FlaskConical, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { InlineTruncatedList, IngredientChip } from './sectionPrimitives.jsx'
+import { InlineTruncatedList, IngredientChip, ShowMoreToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 const pillStyle = {
@@ -110,12 +118,48 @@ const pillStyle = {
 }
 
 // Mechanism of Action app-side truncation (decision 5) — 30 words, same
-// "See more"/"See less" toggle pattern UsesSection.jsx already uses.
+// "See more"/"See less" wording UsesSection.jsx uses; the toggle's look now
+// matches the ingredient list's (see the tenth follow-up note above).
 const MOA_TRUNCATE_AT = 30
 
 export default function GenericOverviewSection({ drug, siblings = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
   const [moaOpen,    setMoaOpen]    = useState(false)
+
+  // Animated MOA reveal: the text sits in a clipped box whose height is
+  // frozen at its current value on click, then moved to the new text's
+  // height one frame later so the browser transitions between the two.
+  const moaBoxRef   = useRef(null)
+  const moaTextRef  = useRef(null)
+  const moaTimerRef = useRef(null)
+  const moaRafRef   = useRef(null)
+
+  useEffect(() => () => {
+    clearTimeout(moaTimerRef.current)
+    cancelAnimationFrame(moaRafRef.current)
+  }, [])
+
+  useLayoutEffect(() => {
+    const box  = moaBoxRef.current
+    const text = moaTextRef.current
+    // Nothing frozen means this is the first render, not a toggle.
+    if (!box || !text || box.style.height === '') return
+    const target = text.offsetHeight
+    moaRafRef.current = requestAnimationFrame(() => {
+      box.style.height = `${target}px`
+    })
+    moaTimerRef.current = setTimeout(() => {
+      box.style.height = ''
+    }, 280)
+  }, [moaOpen])
+
+  function handleMoaToggle() {
+    const box = moaBoxRef.current
+    clearTimeout(moaTimerRef.current)
+    cancelAnimationFrame(moaRafRef.current)
+    if (box) box.style.height = `${box.offsetHeight}px`
+    setMoaOpen(o => !o)
+  }
 
   const {
     genericName,
@@ -202,41 +246,28 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
             convention UsesSection.jsx uses. -- */}
       {mechanismOfAction && (
         <div style={{ marginBottom: 'var(--space-3)' }}>
-          <p style={{
-            fontSize:   14,
-            color:      'var(--color-text-primary)',
-            lineHeight: 1.6,
-            margin:     0,
-          }}>
-            {moaText}
-          </p>
-          {moaHasMore && (
-            <button
-              onClick={() => setMoaOpen(o => !o)}
+          <div
+            ref={moaBoxRef}
+            style={{ overflow: 'hidden', transition: 'height 0.25s ease' }}
+          >
+            <p
+              ref={moaTextRef}
               style={{
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                gap:            4,
-                width:          '100%',
-                marginTop:      'var(--space-2)',
-                background:     'none',
-                border:         'none',
-                cursor:         'pointer',
-                padding:        0,
-                fontFamily:     'var(--font-body)',
-                fontSize:       13,
-                fontWeight:     600,
-                color:          'var(--color-text-secondary)',
-                WebkitTapHighlightColor: 'transparent',
+                fontSize:   14,
+                color:      'var(--color-text-primary)',
+                lineHeight: 1.6,
+                margin:     0,
               }}
             >
-              {moaOpen ? 'See less' : 'See more'}
-              {moaOpen
-                ? <ChevronUp size={14} />
-                : <ChevronDown size={14} />
-              }
-            </button>
+              {moaText}
+            </p>
+          </div>
+          {moaHasMore && (
+            <ShowMoreToggle
+              open={moaOpen}
+              label={moaOpen ? 'See less' : 'See more'}
+              onClick={handleMoaToggle}
+            />
           )}
         </div>
       )}

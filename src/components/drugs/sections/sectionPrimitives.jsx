@@ -82,7 +82,11 @@ export function Collapsible({ title, children }) {
 // Extracted this session so GenericOverviewSection.jsx's single-ingredient
 // path can use the exact same chip treatment InlineTruncatedList's items now
 // use, instead of only the combo (multi-ingredient) path looking this way.
-export function IngredientChip({ children }) {
+//
+// 2026-09-19 (this session): accepts an optional style prop, merged after the
+// base chip style — used by InlineTruncatedList to fade the extra chips in
+// and out. Callers that pass nothing render exactly as before.
+export function IngredientChip({ children, style }) {
   return (
     <span style={{
       fontSize:        13,
@@ -92,9 +96,49 @@ export function IngredientChip({ children }) {
       border:          '0.5px solid var(--color-border)',
       borderRadius:    'var(--radius-sm)',
       padding:         '4px 10px',
+      ...style,
     }}>
       {children}
     </span>
+  )
+}
+
+// --- Show more / show less toggle ------------------------------------------
+//
+// One shared toggle look for every truncated block in the Generic Overview
+// section (ingredient chips and Mechanism of Action text): left-aligned right
+// under its content, small muted label, one chevron that rotates 180 degrees
+// when open. The caller owns the open state and the label wording.
+export function ShowMoreToggle({ open, label, onClick, ariaLabel }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={ariaLabel}
+      style={{
+        display:        'flex',
+        alignItems:     'center',
+        gap:            4,
+        background:     'none',
+        border:         'none',
+        padding:        0,
+        marginTop:      'var(--space-2)',
+        cursor:         'pointer',
+        fontSize:       13,
+        color:          'var(--color-text-secondary)',
+        fontFamily:     'var(--font-body)',
+        WebkitTapHighlightColor: 'transparent',
+      }}
+    >
+      {label}
+      <ChevronDown
+        size={14}
+        color="var(--color-text-tertiary)"
+        style={{
+          transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.2s ease',
+        }}
+      />
+    </button>
   )
 }
 
@@ -134,22 +178,49 @@ export function IngredientChip({ children }) {
 //     list — a fixed location regardless of state — with a "Show N more" /
 //     "Show less" label and a single chevron that rotates 180° rather than
 //     swapping between Up/Down icons.
+//
+// 2026-09-19 (this session): two changes per feedback.
+//  1. The extra chips used to live in one hidden wrapper group, so once
+//     expanded they could drop onto a new line instead of continuing right
+//     after the last visible chip. They are now ordinary chips in the same
+//     wrapping row as the first ones — they only exist in the layout while
+//     expanded, and fade in/out (opacity) rather than growing in by height.
+//  2. The toggle row moved into the shared ShowMoreToggle above, so this
+//     list and the Mechanism of Action text share one toggle look.
 export function InlineTruncatedList({ items = [], max = 3 }) {
   const [open, setOpen] = useState(false)
-  const extraRef = useRef(null)
+  // showExtra: extra chips are in the layout at all. extraVisible: they are
+  // opaque. Kept separate so a fade-out can finish before they leave the row.
+  const [showExtra, setShowExtra]       = useState(false)
+  const [extraVisible, setExtraVisible] = useState(false)
+  const timerRef = useRef(null)
+  const rafRef   = useRef(null)
+
+  useEffect(() => () => {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+  }, [])
 
   const hasMore = items.length > max
   const shown = items.slice(0, max)
   const extra = items.slice(max)
 
-  // Animate to the hidden wrapper's own measured height rather than a
-  // guessed fixed value, so this works regardless of how many extra items
-  // there are or how they wrap.
-  useEffect(() => {
-    const el = extraRef.current
-    if (!el) return
-    el.style.maxHeight = open ? `${el.scrollHeight}px` : '0px'
-  }, [open, extra.length])
+  function handleToggle() {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+    if (!open) {
+      setOpen(true)
+      setShowExtra(true)
+      // Two frames so the chips paint once at opacity 0 before fading in.
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => setExtraVisible(true))
+      })
+    } else {
+      setOpen(false)
+      setExtraVisible(false)
+      timerRef.current = setTimeout(() => setShowExtra(false), 200)
+    }
+  }
 
   if (!items || items.length === 0) return null
 
@@ -159,54 +230,25 @@ export function InlineTruncatedList({ items = [], max = 3 }) {
         {shown.map((item, i) => (
           <IngredientChip key={i}>{item}</IngredientChip>
         ))}
-        {hasMore && (
-          <div
-            ref={extraRef}
+        {hasMore && showExtra && extra.map((item, i) => (
+          <IngredientChip
+            key={i}
             style={{
-              display:    'flex',
-              flexWrap:   'wrap',
-              gap:        6,
-              maxHeight:  0,
-              opacity:    open ? 1 : 0,
-              overflow:   'hidden',
-              transition: 'max-height 0.25s ease, opacity 0.2s ease',
+              opacity:    extraVisible ? 1 : 0,
+              transition: 'opacity 0.2s ease',
             }}
           >
-            {extra.map((item, i) => (
-              <IngredientChip key={i}>{item}</IngredientChip>
-            ))}
-          </div>
-        )}
+            {item}
+          </IngredientChip>
+        ))}
       </div>
       {hasMore && (
-        <button
-          onClick={() => setOpen(o => !o)}
-          aria-label={open ? 'Show fewer' : 'Show more'}
-          style={{
-            display:        'flex',
-            alignItems:     'center',
-            gap:            4,
-            background:     'none',
-            border:         'none',
-            padding:        0,
-            marginTop:      'var(--space-2)',
-            cursor:         'pointer',
-            fontSize:       13,
-            color:          'var(--color-text-secondary)',
-            fontFamily:     'var(--font-body)',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          {open ? 'Show less' : `Show ${extra.length} more`}
-          <ChevronDown
-            size={14}
-            color="var(--color-text-tertiary)"
-            style={{
-              transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.2s ease',
-            }}
-          />
-        </button>
+        <ShowMoreToggle
+          open={open}
+          ariaLabel={open ? 'Show fewer' : 'Show more'}
+          label={open ? 'Show less' : `Show ${extra.length} more`}
+          onClick={handleToggle}
+        />
       )}
     </div>
   )
