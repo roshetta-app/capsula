@@ -64,6 +64,10 @@
  * the combo path's chip treatment instead of plain bold text — per
  * feedback, to make both paths look consistent. FlaskConical sized down
  * again, 18px → 16px.
+ *
+ * 2026-09-18 (this session, fourth follow-up): FlaskConical moved from
+ * the name row to the top row, right before the "Active ingredient(s)"
+ * label — per feedback. Same icon/size, different position only.
  */
 
 import { useState } from 'react'
@@ -110,17 +114,23 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
 
-      {/* -- Top row: "Active ingredient(s)" label + Available Brands link
-            (moved from DosingSection.jsx, 4.5; restyled to match mockup) -- */}
+      {/* -- Top row: flask icon + "Active ingredient(s)" label + Available
+            Brands link (label moved from DosingSection.jsx, 4.5; restyled
+            to match mockup). 2026-09-18 (this session): FlaskConical moved
+            here from the name row below, per feedback — now sits right
+            before the label instead of next to the chip(s). -- */}
       <div style={{
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'space-between',
         marginBottom:   'var(--space-3)',
       }}>
-        <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-          Active ingredient{isCombo ? 's' : ''}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <FlaskConical size={16} color="var(--color-text-secondary)" />
+          <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
+            Active ingredient{isCombo ? 's' : ''}
+          </span>
+        </div>
 
         {siblings.length > 0 && (
           <button
@@ -146,20 +156,14 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         )}
       </div>
 
-      {/* -- Name row: fixed decorative icon (4.9) + generic/combo name --
-          2026-09-18 (this session): both paths now render via the same
-          chip treatment (IngredientChip / InlineTruncatedList, both from
-          sectionPrimitives.jsx) — previously only the combo path did,
-          single-ingredient generics just showed plain bold text. This
-          wrapper's own fontSize/fontWeight are gone since both children
-          set their own (IngredientChip's), which overrode them anyway. */}
+      {/* -- Name row: generic/combo name, chip-styled either way (see
+          2026-09-18 notes above) -- */}
       <div style={{
         display:      'flex',
         alignItems:   'flex-start',
         gap:          'var(--space-3)',
         marginBottom: 'var(--space-3)',
       }}>
-        <FlaskConical size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
         <div>
           {isCombo
             ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={3} />
