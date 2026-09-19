@@ -85,8 +85,8 @@
  *
  * 2026-09-19 (this session, follow-up): added `showImageSearch` — optional,
  * defaults to false, so every current caller is unaffected. Renders a
- * ScanSearch icon button in the trailing group (left of `trailing`/the
- * chevron) that opens Google Images for this drug. Query is built from
+ * ScanSearch icon button in the trailing group (always the rightmost item
+ * since the follow-up below) that opens Google Images for this drug. Query is built from
  * exactly what the title line already shows — `toTitleCase(drug.tradenameClean)`
  * + `titleSuffix` (the same `getDrugTitleSuffix` value rendered next to the
  * name) — rather than the concentration+form combo DrugHeader.jsx's and
@@ -96,6 +96,13 @@
  * pattern (in-app overlay on native, new tab on web) rather than
  * PrescriptionSheetBlock.jsx's older `window.open()`, since this is the
  * newest of the three call sites. Turned on only by BrandsList.jsx today.
+ *
+ * 2026-09-19 (this session, second follow-up): the image-search icon is now
+ * always the rightmost item in the trailing group, and the 'trailing'
+ * content (e.g. the favourite heart) sits before it, per feedback. Before
+ * this, the icon sat left of 'trailing', so the heart was at the far right
+ * and the search icon moved left whenever a heart appeared. Order is now:
+ * trailing, chevron (if shown), image-search. Only the render order changed.
  *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
  * and isLast were already in place from 1d.1):
@@ -297,29 +304,15 @@ export default function SharedDrugCard({
       </div>
 
       {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 —
-          + optional image-search icon + chevron (hidden when showChevron is false),
-          same trailing-group pattern as ConditionCard.jsx */}
+          + chevron (hidden when showChevron is false) + optional image-search
+          icon, which is always the last (rightmost) item. Same trailing-group
+          pattern as ConditionCard.jsx */}
       <div style={{
         display:    'flex',
         alignItems: 'center',
         gap:        'var(--space-1)',
         flexShrink: 0,
       }}>
-        {showImageSearch && (
-          <button
-            onClick={handleSearchClick}
-            aria-label={`Search images for ${toTitleCase(drug.tradenameClean)}`}
-            style={{
-              background: 'none', border: 'none', padding: 2,
-              cursor: 'pointer', flexShrink: 0,
-              color: 'var(--color-text-secondary)',
-              display: 'flex', alignItems: 'center',
-              lineHeight: 1,
-            }}
-          >
-            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
-          </button>
-        )}
         {trailing}
         {showChevron && (
           <svg
@@ -334,6 +327,21 @@ export default function SharedDrugCard({
           >
             <polyline points="9 18 15 12 9 6" />
           </svg>
+        )}
+        {showImageSearch && (
+          <button
+            onClick={handleSearchClick}
+            aria-label={`Search images for ${toTitleCase(drug.tradenameClean)}`}
+            style={{
+              background: 'none', border: 'none', padding: 2,
+              cursor: 'pointer', flexShrink: 0,
+              color: 'var(--color-text-secondary)',
+              display: 'flex', alignItems: 'center',
+              lineHeight: 1,
+            }}
+          >
+            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
+          </button>
         )}
       </div>
     </div>
