@@ -81,6 +81,11 @@
  * 2026-09-18 (this session, seventh follow-up): FlaskConical sized down
  * once more, 14px → 12px — per feedback, was still reading larger than
  * the 13px label's own visual weight next to it.
+ *
+ * 2026-09-18 (this session, eighth follow-up): the "See Available Brands"
+ * trigger button's label renamed to "Other Brands", matching
+ * BrandsList.jsx's own section-header rename in the sheet it opens (same
+ * session, separate file) — button and sheet now say the same thing.
  */
 
 import { useState } from 'react'
@@ -163,7 +168,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
               WebkitTapHighlightColor: 'transparent',
             }}
           >
-            See Available Brands
+            Other Brands
             <ChevronRight size={14} />
           </button>
         )}
