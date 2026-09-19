@@ -8,9 +8,12 @@
  *
  * Exports:
  *   toTitleCase(str)         — cosmetic-only title-casing for display
- *   getDrugTitleSuffix(drug) — concentration + pack_size/fill_volume +
+ *   getDrugTitleSuffix(drug, options) — concentration + pack_size/fill_volume +
  *                               form + modifier/route abbreviations, e.g.
- *                               "200mg 2 FC Tab." or "200mg / 5ml Susp. 30ml"
+ *                               "200mg 2 FC Tab." or "200mg / 5ml Susp. 30ml".
+ *                               options.omitModifierTags (optional array of
+ *                               form_modifier tags, e.g. ['chewable']) leaves
+ *                               those tags out of the suffix for this one call.
  */
 
 import { DRUG_FORM_SUFFIXES } from '../config/forms'
@@ -159,7 +162,11 @@ export function toTitleCase(str) {
 // pack_size + form_modifier abbreviations; liquid/topical forms show
 // fill_volume instead. Any field missing on this particular drug drops
 // out silently (4.39) — never a blank gap or stray separator.
-export function getDrugTitleSuffix(drug) {
+// omitModifierTags (2026-09-19): optional, defaults to none, so every
+// existing caller is unaffected. Lets one caller leave specific
+// form_modifier tags out of its own suffix (SharedDrugCard.jsx uses it to
+// hide 'chewable') without changing what any other caller shows.
+export function getDrugTitleSuffix(drug, { omitModifierTags = [] } = {}) {
   const normalizedConcentration = normalizeSpacing(drug.concentration)
   const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
 
@@ -169,7 +176,7 @@ export function getDrugTitleSuffix(drug) {
   // in full, same as before — only the release-mechanism synonym pile-up
   // was the actual problem.
   const nonReleaseModifiers = (drug.formModifier || []).filter(
-    tag => !RELEASE_MECHANISM_TAGS.includes(tag)
+    tag => !RELEASE_MECHANISM_TAGS.includes(tag) && !omitModifierTags.includes(tag)
   )
   const releaseAbbrev = getReleaseModifierAbbrev(drug.formModifier, drug.tradenameClean)
   const nonReleaseAbbrev = abbreviateFormModifiers(nonReleaseModifiers, drug.form)

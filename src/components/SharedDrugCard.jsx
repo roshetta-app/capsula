@@ -104,6 +104,12 @@
  * and the search icon moved left whenever a heart appeared. Order is now:
  * trailing, chevron (if shown), image-search. Only the render order changed.
  *
+ * 2026-09-19 (this session, third follow-up): the 'chewable' modifier
+ * ('Chew') is no longer shown in this card's title suffix, per feedback.
+ * Done via getDrugTitleSuffix's new optional omitModifierTags argument, so
+ * DrugHeader.jsx and any other caller still show it as before. This also
+ * applies to the image-search query, which is built from the same suffix.
+ *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
  * and isLast were already in place from 1d.1):
  *   drug        FlatDrug
@@ -146,6 +152,11 @@ import { toTitleCase, getDrugTitleSuffix } from '../utils/drugTitleFormat'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
+// form_modifier tags this card leaves out of its title suffix (2026-09-19,
+// per feedback: no 'Chew' on the card). Card-only — DrugHeader.jsx calls the
+// same suffix helper without this, so it is unchanged there.
+const HIDDEN_MODIFIER_TAGS = ['chewable']
+
 export default function SharedDrugCard({
   drug,
   categories,
@@ -181,7 +192,7 @@ export default function SharedDrugCard({
   // 2026-07-20) — shared with DrugHeader.jsx via utils/drugTitleFormat.js
   // (extracted 2026-07-20, plan §7 step 2b) so both call sites stay in
   // sync on the next correction instead of drifting apart.
-  const titleSuffix = getDrugTitleSuffix(drug)
+  const titleSuffix = getDrugTitleSuffix(drug, { omitModifierTags: HIDDEN_MODIFIER_TAGS })
 
   // Image-search icon (2026-09-19, this session, follow-up) — opens Google
   // Images for exactly what the title line shows: tradename + title
