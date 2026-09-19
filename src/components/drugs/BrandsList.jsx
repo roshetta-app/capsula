@@ -49,10 +49,19 @@
  * 10px/700/uppercase/tertiary-color "eyebrow" label → 15px/700/normal-
  * case/primary-color, reading as a real title instead of a small caps
  * label. Per feedback.
+ *
+ * 2026-09-18 (this session, fourth follow-up): DropdownPill rebuilt as a
+ * real in-app popover (button + absolutely-positioned option list, click-
+ * outside-to-close via a document listener) instead of a styled native
+ * <select> — per feedback, the native option opened the browser/OS's own
+ * picker UI, which reads as out-of-place against the rest of the app.
+ * Each pill also gets a leading icon now: ListFilter for Form, ArrowUpDown
+ * for Sort — both standard lucide-react icons already used for this exact
+ * meaning elsewhere in the wild, no new icon language invented.
  */
 
-import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown, ListFilter, ArrowUpDown } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
@@ -100,16 +109,13 @@ export default function BrandsList({ siblings = [], onTap }) {
         Other Brands
       </div>
 
-      {/* Controls: form filter + sort, as two native-select dropdown pills
-          — no existing custom-dropdown pattern elsewhere in the app to
-          match (checked DrugFilterPanel.jsx: it uses a segmented PillToggle
-          for sort and a chip grid in its own full bottom sheet for form
-          filtering — too heavy for two choices already inside an open
-          sheet here). A styled native <select> gets full accessibility and
-          the platform's own picker UI for free, so that's what
-          DropdownPill below wraps, rather than a custom popover/menu. Sort
-          option 'price' relabeled "Lowest cost first" now that price
-          itself isn't shown on the rows anymore. */}
+      {/* Controls: form filter + sort, as two in-app popover dropdown pills
+          (DropdownPill below) — button + absolutely-positioned option
+          list, click-outside-to-close. Replaces an earlier native-<select>
+          version (see dated notes above) that opened the browser/OS's own
+          picker UI instead of matching the app. Sort option 'price'
+          relabeled "Lowest cost first" now that price itself isn't shown
+          on the rows anymore. */}
       <div style={{
         display:      'flex',
         gap:          'var(--space-2)',
@@ -118,6 +124,7 @@ export default function BrandsList({ siblings = [], onTap }) {
       }}>
         {showFormFilter && (
           <DropdownPill
+            icon={ListFilter}
             value={formFilter}
             onChange={setFormFilter}
             options={[
@@ -128,6 +135,7 @@ export default function BrandsList({ siblings = [], onTap }) {
         )}
 
         <DropdownPill
+          icon={ArrowUpDown}
           value={sortMode}
           onChange={setSortMode}
           options={[
@@ -165,36 +173,97 @@ export default function BrandsList({ siblings = [], onTap }) {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function DropdownPill({ value, onChange, options }) {
+function DropdownPill({ icon: Icon, value, onChange, options }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const current = options.find(opt => opt.value === value)
+
+  // Click/tap outside closes the menu — same idea SpecialtiesBottomSheet.jsx's
+  // own backdrop-tap-to-dismiss uses, just scoped to this one small popover
+  // instead of the whole sheet.
+  useEffect(() => {
+    if (!open) return
+    function handleOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [open])
+
   return (
-    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
         style={{
-          appearance:       'none',
-          WebkitAppearance: 'none',
-          backgroundColor:  'var(--color-surface)',
-          border:           '1px solid var(--color-border)',
-          borderRadius:     'var(--radius-full)',
-          padding:          '6px 28px 6px 14px',
-          fontSize:         13,
-          fontWeight:       500,
-          color:            'var(--color-text-primary)',
-          fontFamily:       'var(--font-body)',
-          cursor:           'pointer',
-          outline:          'none',
+          display:                 'flex',
+          alignItems:              'center',
+          gap:                     6,
+          backgroundColor:         'var(--color-surface)',
+          border:                  '1px solid var(--color-border)',
+          borderRadius:            'var(--radius-full)',
+          padding:                 '6px 12px',
+          fontSize:                13,
+          fontWeight:              500,
+          color:                   'var(--color-text-primary)',
+          fontFamily:              'var(--font-body)',
+          cursor:                  'pointer',
+          WebkitTapHighlightColor: 'transparent',
+          outline:                 'none',
         }}
       >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-      <ChevronDown
-        size={14}
-        color="var(--color-text-secondary)"
-        style={{ position: 'absolute', right: 10, pointerEvents: 'none' }}
-      />
+        <Icon size={14} color="var(--color-text-secondary)" />
+        {current?.label}
+        <ChevronDown
+          size={14}
+          color="var(--color-text-secondary)"
+          style={{
+            transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.15s ease',
+          }}
+        />
+      </button>
+
+      {open && (
+        <div style={{
+          position:        'absolute',
+          top:             'calc(100% + 4px)',
+          left:            0,
+          zIndex:          20,
+          minWidth:        170,
+          backgroundColor: 'var(--color-surface)',
+          border:          '1px solid var(--color-border)',
+          borderRadius:    'var(--radius-md)',
+          boxShadow:       '0 4px 16px rgba(0,0,0,0.12)',
+          overflow:        'hidden',
+        }}>
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              onClick={() => { onChange(opt.value); setOpen(false) }}
+              style={{
+                display:                 'block',
+                width:                   '100%',
+                textAlign:               'left',
+                padding:                 '10px 14px',
+                border:                  'none',
+                background:              'none',
+                fontSize:                13,
+                fontFamily:              'var(--font-body)',
+                fontWeight:              opt.value === value ? 600 : 400,
+                color:                   opt.value === value ? 'var(--color-accent)' : 'var(--color-text-primary)',
+                cursor:                  'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
