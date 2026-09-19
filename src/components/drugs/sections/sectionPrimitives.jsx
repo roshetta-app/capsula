@@ -98,10 +98,12 @@ export function Collapsible({ title, children }) {
 // 2026-09-19 (this session): accepts an optional style prop, merged after the
 // base chip style — used by InlineTruncatedList to fade the extra chips in
 // and out. Callers that pass nothing render exactly as before.
+// 2026-09-19 (this session): font size bumped 13 -> 14px, per feedback —
+// chips read a little cramped at 13.
 export function IngredientChip({ children, style }) {
   return (
     <span style={{
-      fontSize:        13,
+      fontSize:        14,
       fontWeight:      500,
       color:           'var(--color-text-primary)',
       backgroundColor: 'var(--color-surface)',
