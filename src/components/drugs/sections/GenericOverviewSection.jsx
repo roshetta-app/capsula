@@ -148,6 +148,13 @@
  *     the clamp only re-applies once that animation finishes. Opening is
  *     unaffected (it already unclamped immediately, which was already
  *     smooth).
+ *
+ * 2026-09-19 (this session, fourteenth follow-up): "Similar Brands" now has
+ * tap feedback matching SharedDrugCard.jsx's existing pressed-state pattern
+ * (muted background tint + scale(0.99) on press, same shared motion
+ * tokens), instead of no visual feedback at all on tap. Padding/negative-
+ * margin added so the tint has room without shifting the button's visual
+ * position in the row.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -174,6 +181,11 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   const [brandsOpen, setBrandsOpen] = useState(false)
   const [moaOpen,    setMoaOpen]    = useState(false)
   const [moaHasMore, setMoaHasMore] = useState(false)
+  // Tap feedback for the "Similar Brands" button — same pressed/pointer-
+  // event pattern SharedDrugCard.jsx uses (muted background tint + a
+  // subtle scale(0.99), same shared motion tokens), matched here so this
+  // button feels consistent with the rest of the app's tappable rows.
+  const [similarBrandsPressed, setSimilarBrandsPressed] = useState(false)
   // Decoupled from moaOpen (see handleMoaToggle below) — lets the collapse
   // animation shrink the box around the still-full text instead of the text
   // itself snapping to 3 lines the instant the toggle is clicked.
@@ -280,19 +292,28 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
           {siblings.length > 0 && (
             <button
               onClick={() => setBrandsOpen(true)}
+              onPointerDown={() => setSimilarBrandsPressed(true)}
+              onPointerUp={() => setSimilarBrandsPressed(false)}
+              onPointerLeave={() => setSimilarBrandsPressed(false)}
+              onPointerCancel={() => setSimilarBrandsPressed(false)}
               style={{
-                display:    'flex',
-                alignItems: 'center',
-                gap:        2,
-                background: 'none',
-                border:     'none',
-                cursor:     'pointer',
-                padding:    0,
-                fontFamily: 'var(--font-body)',
-                fontSize:   13,
-                fontWeight: 600,
-                color:      'var(--color-text-primary)',
+                display:      'flex',
+                alignItems:   'center',
+                gap:          2,
+                background:   'none',
+                border:       'none',
+                cursor:       'pointer',
+                padding:      '4px 6px',
+                margin:       '-4px -6px',
+                borderRadius: 'var(--radius-sm)',
+                fontFamily:   'var(--font-body)',
+                fontSize:     13,
+                fontWeight:   600,
+                color:        'var(--color-text-primary)',
                 WebkitTapHighlightColor: 'transparent',
+                backgroundColor: similarBrandsPressed ? 'var(--color-surface-muted)' : 'transparent',
+                transform:       similarBrandsPressed ? 'scale(0.99)' : 'scale(1)',
+                transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
               }}
             >
               Similar Brands
