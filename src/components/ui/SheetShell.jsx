@@ -60,7 +60,7 @@
  *   the `<html>` lock above be the only one running.
  */
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
 
@@ -111,10 +111,77 @@ export default function SheetShell({
     }
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // TEMPORARY DIAGNOSTIC (brands-sheet resume flicker) - REMOVE once the
+  // cause is confirmed. Records what the page and the sheet do while the
+  // sheet is open, so the dip-and-snap can be lined up against page events
+  // (leaving the app, coming back, screen size changes) in the console.
+  const [contentEl, setContentEl] = useState(null)
+  useEffect(() => {
+    if (!isOpen) return
+    const log = (msg) => {
+      const vv = window.visualViewport
+      console.log(
+        '[SheetShell diag] t=' + (performance.now() / 1000).toFixed(2) + 's ' + msg,
+        '| innerH=' + window.innerHeight,
+        'vvH=' + (vv ? Math.round(vv.height) : 'n/a'),
+        'vvTop=' + (vv ? Math.round(vv.offsetTop) : 'n/a'),
+        'vis=' + document.visibilityState
+      )
+    }
+    const onVis = () => log('visibilitychange')
+    const onBlur = () => log('window blur')
+    const onFocus = () => log('window focus')
+    const onResize = () => log('window resize')
+    const onVvResize = () => log('visualViewport resize')
+    document.addEventListener('visibilitychange', onVis)
+    window.addEventListener('blur', onBlur)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('resize', onResize)
+    const vv = window.visualViewport
+    if (vv) vv.addEventListener('resize', onVvResize)
+
+    let mo = null
+    let ro = null
+    if (contentEl) {
+      const describe = () => {
+        const r = contentEl.getBoundingClientRect()
+        return (
+          'top=' + Math.round(r.top) +
+          ' height=' + Math.round(r.height) +
+          ' transform=' + (contentEl.style.transform || 'none') +
+          ' state=' + contentEl.getAttribute('data-state')
+        )
+      }
+      mo = new MutationObserver(() => log('sheet style/attr changed: ' + describe()))
+      mo.observe(contentEl, {
+        attributes: true,
+        attributeFilter: ['style', 'data-state', 'data-vaul-drawer-visible'],
+      })
+      ro = new ResizeObserver(() => log('sheet resized: ' + describe()))
+      ro.observe(contentEl)
+      log('watching sheet: ' + describe())
+    } else {
+      log('sheet open, not mounted yet')
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      window.removeEventListener('blur', onBlur)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('resize', onResize)
+      if (vv) vv.removeEventListener('resize', onVvResize)
+      if (mo) mo.disconnect()
+      if (ro) ro.disconnect()
+    }
+  }, [isOpen, contentEl])
+
   return (
     <Drawer.Root
       open={isOpen}
-      onOpenChange={(open) => { if (!open) onClose() }}
+      onOpenChange={(open) => {
+        console.log('[SheetShell] vaul onOpenChange', { open })
+        if (!open) onClose()
+      }}
       closeThreshold={closeThreshold}
       disablePreventScroll
     >
@@ -128,6 +195,7 @@ export default function SheetShell({
           }}
         />
         <Drawer.Content
+          ref={setContentEl}
           aria-describedby={undefined}
           style={{
             position:        'fixed',
