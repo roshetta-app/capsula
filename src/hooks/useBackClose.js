@@ -41,6 +41,24 @@
  * this and step aside whenever a sheet is already claiming the back
  * press, instead of both reacting to the same press at once. Purely
  * additive: existing useBackClose callers are unaffected.
+ *
+ * 2026-09-19 (this session — spurious-resume-backButton fix): reported
+ * symptom — a sheet open behind the new image-search icon (see
+ * SharedDrugCard.jsx/BrandsList.jsx) dips closed and snaps back open the
+ * instant the native in-app browser (@capacitor/browser's Browser.open(),
+ * a Chrome Custom Tab on Android) is closed. Root-cause hypothesis:
+ * closing a Custom Tab and handing control back to the host app can fire
+ * a spurious 'backButton' event on the way — distinct from a real user
+ * back-press, but this listener couldn't previously tell the two apart,
+ * so it called onClose() and started the sheet closing before `isOpen`
+ * (unrelated to this fire) put it right back. Fix: track the moment the
+ * app last came back to the foreground (via the same App plugin's
+ * 'appStateChange' event) and ignore a 'backButton' firing within
+ * RESUME_GUARD_MS of that — a genuine back-press only ever happens once
+ * the app is already stable in the foreground, never in the same instant
+ * it resumes. Scoped to the native branch only; the web/PWA popstate path
+ * (a completely separate mechanism, not involved in this bug) is
+ * untouched.
  */
 
 import { useEffect, useRef } from 'react'
@@ -48,6 +66,11 @@ import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 
 let openBackCloseCount = 0
+
+// A 'backButton' event firing this soon after the app resumes from the
+// background is treated as spurious (see 2026-09-19 note above) rather
+// than a real user back-press.
+const RESUME_GUARD_MS = 500
 
 export function isAnyBackCloseOpen() {
   return openBackCloseCount > 0
@@ -66,14 +89,22 @@ export function useBackClose(isOpen, onClose) {
     if (!isOpen) return
     if (!Capacitor.isNativePlatform()) return
 
-    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+    let lastResumedAt = 0
+
+    const stateListenerPromise = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) lastResumedAt = Date.now()
+    })
+
+    const backListenerPromise = CapacitorApp.addListener('backButton', () => {
+      if (Date.now() - lastResumedAt < RESUME_GUARD_MS) return
       onCloseRef.current()
     })
     openBackCloseCount++
 
     return () => {
       openBackCloseCount--
-      listenerPromise.then((handle) => handle.remove())
+      stateListenerPromise.then((handle) => handle.remove())
+      backListenerPromise.then((handle) => handle.remove())
     }
   }, [isOpen])
 
