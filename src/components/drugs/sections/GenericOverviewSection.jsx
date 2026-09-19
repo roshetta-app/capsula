@@ -58,12 +58,18 @@
  * to FlaskConical (per feedback, after reviewing a few options) and sized
  * down 22px → 18px, matching SourcesSection.jsx's own decorative-icon
  * size for a similar role.
+ *
+ * 2026-09-18 (this session, third follow-up): single-ingredient path now
+ * renders via IngredientChip too (see sectionPrimitives.jsx), matching
+ * the combo path's chip treatment instead of plain bold text — per
+ * feedback, to make both paths look consistent. FlaskConical sized down
+ * again, 18px → 16px.
  */
 
 import { useState } from 'react'
 import { FlaskConical, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { InlineTruncatedList } from './sectionPrimitives.jsx'
+import { InlineTruncatedList, IngredientChip } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 const pillStyle = {
@@ -140,18 +146,24 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         )}
       </div>
 
-      {/* -- Name row: fixed decorative icon (4.9) + generic/combo name -- */}
+      {/* -- Name row: fixed decorative icon (4.9) + generic/combo name --
+          2026-09-18 (this session): both paths now render via the same
+          chip treatment (IngredientChip / InlineTruncatedList, both from
+          sectionPrimitives.jsx) — previously only the combo path did,
+          single-ingredient generics just showed plain bold text. This
+          wrapper's own fontSize/fontWeight are gone since both children
+          set their own (IngredientChip's), which overrode them anyway. */}
       <div style={{
         display:      'flex',
         alignItems:   'flex-start',
         gap:          'var(--space-3)',
         marginBottom: 'var(--space-3)',
       }}>
-        <FlaskConical size={18} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>
+        <FlaskConical size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0, marginTop: 2 }} />
+        <div>
           {isCombo
             ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={3} />
-            : toTitleCase(genericName)
+            : <IngredientChip>{toTitleCase(genericName)}</IngredientChip>
           }
         </div>
       </div>
