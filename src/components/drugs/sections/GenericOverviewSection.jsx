@@ -77,6 +77,10 @@
  * (InlineTruncatedList's `max` prop) raised 3 → 5 — combo drugs with up
  * to 5 ingredients now show them all with no "Show more" toggle at all;
  * truncation only kicks in past 5.
+ *
+ * 2026-09-18 (this session, seventh follow-up): FlaskConical sized down
+ * once more, 14px → 12px — per feedback, was still reading larger than
+ * the 13px label's own visual weight next to it.
  */
 
 import { useState } from 'react'
@@ -135,7 +139,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         marginBottom:   'var(--space-3)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FlaskConical size={14} color="var(--color-text-secondary)" />
+          <FlaskConical size={12} color="var(--color-text-secondary)" />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             Active ingredient{isCombo ? 's' : ''}
           </span>
