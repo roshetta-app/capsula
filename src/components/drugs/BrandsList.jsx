@@ -94,6 +94,12 @@
  * "Other Brands" → "Similar Brands", per feedback — now matches
  * GenericOverviewSection.jsx's trigger button, which was renamed to the
  * same text in a separate file/session (see that file's own changelog).
+ *
+ * 2026-09-19 (this session, third follow-up): rows now pass
+ * `showImageSearch` to SharedDrugCard, turning on its new image-search
+ * icon (see that file's own changelog) for this list only — Drugs and
+ * Favourites screens, which also render SharedDrugCard, are unaffected
+ * since they don't pass this prop.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -204,7 +210,9 @@ export default function BrandsList({ siblings = [], onTap }) {
           is needed here anymore. Not tappable and no chevron (2026-09-19)
           — a sibling row here is informational, not a navigation target.
           Trailing slot shows the heart icon (display-only, see
-          RowStarButton's readOnly prop) only for favourited drugs. */}
+          RowStarButton's readOnly prop) only for favourited drugs.
+          showImageSearch (2026-09-19, third follow-up) turns on the
+          image-search icon for this list only. */}
       <div>
         {sorted.map((item, i) => (
           <SharedDrugCard
@@ -215,6 +223,7 @@ export default function BrandsList({ siblings = [], onTap }) {
             isLast={i === sorted.length - 1}
             disableTap
             showChevron={false}
+            showImageSearch
             trailing={
               <RowStarButton
                 isFavourited={isDrugFavourited(item.id)}

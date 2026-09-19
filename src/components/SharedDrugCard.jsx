@@ -83,6 +83,20 @@
  * just no-op'ing onTap, so the row reads as inert, not as a button that
  * silently does nothing.
  *
+ * 2026-09-19 (this session, follow-up): added `showImageSearch` — optional,
+ * defaults to false, so every current caller is unaffected. Renders a
+ * ScanSearch icon button in the trailing group (left of `trailing`/the
+ * chevron) that opens Google Images for this drug. Query is built from
+ * exactly what the title line already shows — `toTitleCase(drug.tradenameClean)`
+ * + `titleSuffix` (the same `getDrugTitleSuffix` value rendered next to the
+ * name) — rather than the concentration+form combo DrugHeader.jsx's and
+ * PrescriptionSheetBlock.jsx's own copies of this button use, per feedback
+ * that this card should search on what it actually displays. Opens via
+ * `@capacitor/browser`'s `Browser.open()`, matching DrugHeader.jsx's current
+ * pattern (in-app overlay on native, new tab on web) rather than
+ * PrescriptionSheetBlock.jsx's older `window.open()`, since this is the
+ * newest of the three call sites. Turned on only by BrandsList.jsx today.
+ *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
  * and isLast were already in place from 1d.1):
  *   drug        FlatDrug
@@ -109,9 +123,15 @@
  *                                     never called while this is true.
  *   showChevron boolean (optional, default true) — hides the trailing
  *                                     chevron when false.
+ *   showImageSearch boolean (optional, default false) — shows a ScanSearch
+ *                                     icon button in the trailing group that
+ *                                     opens Google Images for this drug's
+ *                                     tradename + title suffix.
  */
 
 import { useState } from 'react'
+import { ScanSearch } from 'lucide-react'
+import { Browser } from '@capacitor/browser'
 import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
@@ -130,6 +150,7 @@ export default function SharedDrugCard({
   searchMode = 'brand',
   disableTap = false,
   showChevron = true,
+  showImageSearch = false,
 }) {
   const [pressed, setPressed] = useState(false)
 
@@ -154,6 +175,20 @@ export default function SharedDrugCard({
   // (extracted 2026-07-20, plan §7 step 2b) so both call sites stay in
   // sync on the next correction instead of drifting apart.
   const titleSuffix = getDrugTitleSuffix(drug)
+
+  // Image-search icon (2026-09-19, this session, follow-up) — opens Google
+  // Images for exactly what the title line shows: tradename + title
+  // suffix, not the concentration+form combo the other two search buttons
+  // (DrugHeader.jsx, PrescriptionSheetBlock.jsx) use. Uses Browser.open()
+  // (@capacitor/browser) rather than window.open(), matching DrugHeader.jsx's
+  // current pattern.
+  const handleSearchClick = (e) => {
+    e.stopPropagation()
+    const query = [toTitleCase(drug.tradenameClean), titleSuffix, 'Egypt']
+      .filter(Boolean)
+      .join(' ')
+    Browser.open({ url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}` })
+  }
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients
   // + a "+N" count; single-ingredient generics show that one ingredient.
@@ -262,13 +297,29 @@ export default function SharedDrugCard({
       </div>
 
       {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 —
-          + chevron (hidden when showChevron is false), same trailing-group pattern as ConditionCard.jsx */}
+          + optional image-search icon + chevron (hidden when showChevron is false),
+          same trailing-group pattern as ConditionCard.jsx */}
       <div style={{
         display:    'flex',
         alignItems: 'center',
         gap:        'var(--space-1)',
         flexShrink: 0,
       }}>
+        {showImageSearch && (
+          <button
+            onClick={handleSearchClick}
+            aria-label={`Search images for ${toTitleCase(drug.tradenameClean)}`}
+            style={{
+              background: 'none', border: 'none', padding: 2,
+              cursor: 'pointer', flexShrink: 0,
+              color: 'var(--color-text-secondary)',
+              display: 'flex', alignItems: 'center',
+              lineHeight: 1,
+            }}
+          >
+            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
+          </button>
+        )}
         {trailing}
         {showChevron && (
           <svg
