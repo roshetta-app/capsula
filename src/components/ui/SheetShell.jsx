@@ -111,78 +111,18 @@ export default function SheetShell({
     }
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // TEMPORARY DIAGNOSTIC (brands-sheet resume flicker) - REMOVE once the
-  // cause is confirmed. Records what the page and the sheet do while the
-  // sheet is open, so the dip-and-snap can be lined up against page events
-  // (leaving the app, coming back, screen size changes) in the console.
   const [contentEl, setContentEl] = useState(null)
-  useEffect(() => {
-    if (!isOpen) return
-    const log = (msg) => {
-      const vv = window.visualViewport
-      console.log(
-        '[SheetShell diag] t=' + (performance.now() / 1000).toFixed(2) + 's ' + msg,
-        '| innerH=' + window.innerHeight,
-        'vvH=' + (vv ? Math.round(vv.height) : 'n/a'),
-        'vvTop=' + (vv ? Math.round(vv.offsetTop) : 'n/a'),
-        'vis=' + document.visibilityState
-      )
-    }
-    const onVis = () => log('visibilitychange')
-    const onBlur = () => log('window blur')
-    const onFocus = () => log('window focus')
-    const onResize = () => log('window resize')
-    const onVvResize = () => log('visualViewport resize')
-    document.addEventListener('visibilitychange', onVis)
-    window.addEventListener('blur', onBlur)
-    window.addEventListener('focus', onFocus)
-    window.addEventListener('resize', onResize)
-    const vv = window.visualViewport
-    if (vv) vv.addEventListener('resize', onVvResize)
 
-    let mo = null
-    let ro = null
-    if (contentEl) {
-      const describe = () => {
-        const r = contentEl.getBoundingClientRect()
-        return (
-          'top=' + Math.round(r.top) +
-          ' height=' + Math.round(r.height) +
-          ' transform=' + (contentEl.style.transform || 'none') +
-          ' state=' + contentEl.getAttribute('data-state')
-        )
-      }
-      mo = new MutationObserver(() => log('sheet style/attr changed: ' + describe()))
-      mo.observe(contentEl, {
-        attributes: true,
-        attributeFilter: ['style', 'data-state', 'data-vaul-drawer-visible'],
-      })
-      ro = new ResizeObserver(() => log('sheet resized: ' + describe()))
-      ro.observe(contentEl)
-      log('watching sheet: ' + describe())
-    } else {
-      log('sheet open, not mounted yet')
-    }
-
-    return () => {
-      document.removeEventListener('visibilitychange', onVis)
-      window.removeEventListener('blur', onBlur)
-      window.removeEventListener('focus', onFocus)
-      window.removeEventListener('resize', onResize)
-      if (vv) vv.removeEventListener('resize', onVvResize)
-      if (mo) mo.disconnect()
-      if (ro) ro.disconnect()
-    }
-  }, [isOpen, contentEl])
-
-  // TEMPORARY EXPERIMENT (brands-sheet resume flicker) - the diagnostic above
-  // showed that for about 0.2s after coming back from the search tab, the page
-  // window reports itself 56px shorter, then returns to normal. The sheet is
-  // pinned to the bottom of the window and sized as a percentage of its
-  // height, so it briefly shrinks and lifts, then snaps back. To stop that,
-  // note where the sheet sits when the page is hidden, and for a short time
-  // after the page is visible again, pin it to exactly that spot and size.
-  // Nothing else changes, and all original values are put back afterwards.
+  // Hold the open sheet steady while the page resizes on return from another
+  // tab (2026-09-19). In the installed PWA, for about 0.2s after coming back
+  // from the image-search tab, the window reports itself 56px shorter, then
+  // returns to normal. The sheet is pinned to the bottom of the window and
+  // sized as a percentage of its height, so it briefly shrank and lifted,
+  // then snapped back. Confirmed on-device with logging; not a close signal
+  // (vaul never reported one), and the earlier dvh-to-svh and back-button
+  // guards did not affect it. Fix: note where the sheet sits when the page is
+  // hidden, and for 0.8s after it is visible again pin the sheet to exactly
+  // that spot and size, then put every original style value back.
   useEffect(() => {
     if (!isOpen || !contentEl) return
     let frozen = null
@@ -224,14 +164,7 @@ export default function SheetShell({
         s.maxHeight = prev.maxHeight
         s.boxSizing = prev.boxSizing
       }
-      console.log(
-        '[SheetShell diag] holding sheet steady after return: top=' +
-          Math.round(frozen.top) + ' height=' + Math.round(frozen.height)
-      )
-      timer = setTimeout(() => {
-        stopHold()
-        console.log('[SheetShell diag] hold released')
-      }, 800)
+      timer = setTimeout(stopHold, 800)
     }
     document.addEventListener('visibilitychange', onVis)
     return () => {
@@ -243,10 +176,7 @@ export default function SheetShell({
   return (
     <Drawer.Root
       open={isOpen}
-      onOpenChange={(open) => {
-        console.log('[SheetShell] vaul onOpenChange', { open })
-        if (!open) onClose()
-      }}
+      onOpenChange={(open) => { if (!open) onClose() }}
       closeThreshold={closeThreshold}
       disablePreventScroll
     >
