@@ -133,6 +133,21 @@
  * back to the original two floating Class/Subclass pills, per feedback.
  * ClassificationCard is left defined in sectionPrimitives.jsx (unused by
  * this file now) rather than removed, since removing it wasn't asked for.
+ *
+ * 2026-09-19 (this session, thirteenth follow-up): two MOA changes per
+ * feedback:
+ *  1. The MOA text itself is now tappable — a single tap expands it, a
+ *     second tap collapses it — same handler as the "More"/"Less"
+ *     TextToggle below the text, which still works as its own separate
+ *     tap target too.
+ *  2. The collapse motion is smoother: clamping used to re-apply to the
+ *     text the instant the toggle was clicked, so the text itself snapped
+ *     to 3 lines before the box had shrunk to match. A new `moaClamped`
+ *     state now decouples the two — closing keeps the text fully laid out
+ *     (unclamped) while the box animates its height down around it, and
+ *     the clamp only re-applies once that animation finishes. Opening is
+ *     unaffected (it already unclamped immediately, which was already
+ *     smooth).
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -159,27 +174,33 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   const [brandsOpen, setBrandsOpen] = useState(false)
   const [moaOpen,    setMoaOpen]    = useState(false)
   const [moaHasMore, setMoaHasMore] = useState(false)
+  // Decoupled from moaOpen (see handleMoaToggle below) — lets the collapse
+  // animation shrink the box around the still-full text instead of the text
+  // itself snapping to 3 lines the instant the toggle is clicked.
+  const [moaClamped, setMoaClamped] = useState(true)
 
   // Animated MOA reveal: the text sits in a clipped box whose height is
   // frozen at its current value on click, then moved to the new text's
   // height one frame later so the browser transitions between the two.
-  const moaBoxRef   = useRef(null)
-  const moaTextRef  = useRef(null)
-  const moaTimerRef = useRef(null)
-  const moaRafRef   = useRef(null)
+  const moaBoxRef          = useRef(null)
+  const moaTextRef         = useRef(null)
+  const moaTimerRef        = useRef(null)
+  const moaRafRef          = useRef(null)
+  const moaClosedHeightRef = useRef(0)
 
   useEffect(() => () => {
     clearTimeout(moaTimerRef.current)
     cancelAnimationFrame(moaRafRef.current)
   }, [])
 
-  // Detect whether the clamped MOA paragraph actually overflows its 3-line
-  // box — this, not a word count, decides whether the "More" toggle renders
-  // at all. Re-checked whenever the drug (and therefore the MOA text)
-  // changes.
+  // Measured once per drug, while the text is in its natural closed
+  // (clamped) state: the 3-line height to collapse back to, and whether the
+  // text actually overflows that clamp at all — this, not a word count,
+  // decides whether the toggle renders.
   useLayoutEffect(() => {
     const text = moaTextRef.current
     if (!text) return
+    moaClosedHeightRef.current = text.clientHeight
     setMoaHasMore(text.scrollHeight > text.clientHeight + 1)
   }, [drug?.mechanismOfAction])
 
@@ -188,12 +209,17 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     const text = moaTextRef.current
     // Nothing frozen means this is the first render, not a toggle.
     if (!box || !text || box.style.height === '') return
-    const target = text.scrollHeight
+    const target = moaOpen ? text.scrollHeight : moaClosedHeightRef.current
     moaRafRef.current = requestAnimationFrame(() => {
       box.style.height = `${target}px`
     })
     moaTimerRef.current = setTimeout(() => {
       box.style.height = ''
+      // Only re-clamp once the collapse animation has actually finished —
+      // clamping the instant the toggle is clicked would snap the text to
+      // 3 lines before the box has visually shrunk to match, which is what
+      // made the old collapse feel abrupt.
+      if (!moaOpen) setMoaClamped(true)
     }, 280)
   }, [moaOpen])
 
@@ -202,7 +228,17 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     clearTimeout(moaTimerRef.current)
     cancelAnimationFrame(moaRafRef.current)
     if (box) box.style.height = `${box.offsetHeight}px`
-    setMoaOpen(o => !o)
+    if (moaOpen) {
+      // Closing: leave the text unclamped through the shrink animation —
+      // moaClamped flips back to true only after it finishes, above — so
+      // it's the box, not the text, that visibly collapses.
+      setMoaOpen(false)
+    } else {
+      // Opening: unclamp immediately so the full text is laid out and
+      // ready to be revealed as the box grows.
+      setMoaClamped(false)
+      setMoaOpen(true)
+    }
   }
 
   const {
@@ -286,17 +322,20 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
           >
             <p
               ref={moaTextRef}
+              onClick={moaHasMore ? handleMoaToggle : undefined}
               style={{
                 fontSize:   14,
                 color:      'var(--color-text-primary)',
                 lineHeight: 1.6,
                 margin:     0,
-                ...(moaOpen ? {} : {
+                cursor:     moaHasMore ? 'pointer' : 'default',
+                WebkitTapHighlightColor: 'transparent',
+                ...(moaClamped ? {
                   display:         '-webkit-box',
                   WebkitBoxOrient: 'vertical',
                   WebkitLineClamp: MOA_CLAMP_LINES,
                   overflow:        'hidden',
-                }),
+                } : {}),
               }}
             >
               {mechanismOfAction}
