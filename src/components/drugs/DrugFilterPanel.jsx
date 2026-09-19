@@ -103,15 +103,27 @@ import SheetShell from '../ui/SheetShell'
  *            handle (Search By / Sort By / Form-Route sections, Clear All)
  *            is unchanged.
  *
+ * 2026-09-19 — fixed the Drugs screen's 'Clear filter' button appearing not
+ * to work. The screen's own clear (which empties the applied filters) worked,
+ * but this sheet kept a separate private copy of the selected chips that was
+ * only read once when the sheet was first created. The re-sync on open that
+ * the 'drugs-filter-sheet-discard-unsaved' note above describes was lost in
+ * the Phase 5 rebuild (nothing re-syncs it now), so after the screen cleared
+ * the filters, the sheet still showed the old chips as selected, still
+ * offered Clear All, and the next chip tap rebuilt the old selection
+ * on top of it. Fix: no private copy any more — the chips and toggle logic
+ * read straight from 'activeFilters', so the sheet always matches what is
+ * actually applied. Behavior is otherwise unchanged.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
  *   onApply          (filters) => void   filters: { forms } — called
  *                    immediately on every Form/Route chip toggle and on
  *                    Clear All, not buffered behind an Apply action
- *   activeFilters    { forms } | null    — the currently-applied filters; local
- *                    selections reset to this (or EMPTY if null) each time the
- *                    sheet opens
+ *   activeFilters    { forms } | null    — the currently-applied filters; the chips
+ *                    read straight from this (EMPTY if null), so the sheet
+ *                    always matches what the screen has actually applied
  *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
  *   hasSearchResults boolean | undefined — true as soon as a search query is typed, regardless
@@ -154,13 +166,17 @@ const EMPTY = {
 }
 
 export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange, hasSearchResults, sortMode, onSortChange }) {
-  const [filters, setFilters] = useState(activeFilters || EMPTY)
+  // The chips read straight from 'activeFilters' (the screen's applied
+  // filters) instead of a private copy of them — see the 2026-09-19 note in
+  // the file header for why. With instant-apply there is nothing left to
+  // buffer, so the copy added nothing and could only go out of date.
+  const filters = activeFilters || EMPTY
   const { toast } = useToast()
 
   // Instant-apply: compute the next forms list and immediately push it out
-  // via onApply, instead of buffering in local state until a separate
-  // Apply Filters action. Local 'filters' state stays in sync purely so
-  // the chips render their active state correctly.
+  // via onApply, instead of buffering until a separate Apply Filters
+  // action. The chips re-render from 'activeFilters' once the screen has
+  // applied it.
   function toggleForm(val) {
     const nextForms = val === 'all'
       ? ['all']
@@ -170,12 +186,10 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           return next.length ? next : ['all']
         })()
     const nextFilters = { ...filters, forms: nextForms }
-    setFilters(nextFilters)
     onApply(nextFilters)
   }
 
   function handleClear() {
-    setFilters(EMPTY)
     onApply(EMPTY)
     onClose()
   }
