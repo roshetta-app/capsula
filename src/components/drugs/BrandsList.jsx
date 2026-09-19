@@ -32,9 +32,27 @@
  *    comment explains this was the old, no-longer-used pre-composed name
  *    field DrugCard.jsx used to double-render) to `item.tradenameClean`,
  *    matching what SharedDrugCard itself actually displays.
+ *
+ * 2026-09-18 (this session, follow-up): price dropped from the row
+ * entirely (was in SharedDrugCard's `trailing` slot) — not shown anymore,
+ * per feedback.
+ *
+ * 2026-09-18 (this session, second follow-up): form-filter chips + the
+ * name/price SortToggle segmented control replaced with two native-select
+ * dropdown pills (DropdownPill below) — see its own comment for why a
+ * plain styled <select> was chosen over a custom popover. Sort's price
+ * option relabeled "Lowest cost first" since price itself is hidden now
+ * (an unlabeled "Price" sort option would have been sorting by something
+ * the person can no longer see).
+ *
+ * 2026-09-18 (this session, third follow-up): section header restyled —
+ * 10px/700/uppercase/tertiary-color "eyebrow" label → 15px/700/normal-
+ * case/primary-color, reading as a real title instead of a small caps
+ * label. Per feedback.
  */
 
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
@@ -74,35 +92,49 @@ export default function BrandsList({ siblings = [], onTap }) {
     <div style={{ marginBottom: 'var(--space-5)' }}>
       {/* Section header */}
       <div style={{
-        fontSize:      10,
-        fontWeight:    700,
-        letterSpacing: '0.1em',
-        textTransform: 'uppercase',
-        color:         'var(--color-text-tertiary)',
-        marginBottom:  'var(--space-3)',
+        fontSize:     15,
+        fontWeight:   700,
+        color:        'var(--color-text-primary)',
+        marginBottom: 'var(--space-3)',
       }}>
         Other Brands
       </div>
 
-      {/* Controls: form filter chips + name/price sort toggle */}
+      {/* Controls: form filter + sort, as two native-select dropdown pills
+          — no existing custom-dropdown pattern elsewhere in the app to
+          match (checked DrugFilterPanel.jsx: it uses a segmented PillToggle
+          for sort and a chip grid in its own full bottom sheet for form
+          filtering — too heavy for two choices already inside an open
+          sheet here). A styled native <select> gets full accessibility and
+          the platform's own picker UI for free, so that's what
+          DropdownPill below wraps, rather than a custom popover/menu. Sort
+          option 'price' relabeled "Lowest cost first" now that price
+          itself isn't shown on the rows anymore. */}
       <div style={{
         display:      'flex',
-        alignItems:   'center',
-        justifyContent: 'space-between',
         gap:          'var(--space-2)',
         marginBottom: 'var(--space-3)',
         flexWrap:     'wrap',
       }}>
-        {showFormFilter ? (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', overflowX: 'auto' }}>
-            <FormChip label="All" active={formFilter === 'all'} onClick={() => setFormFilter('all')} />
-            {forms.map(f => (
-              <FormChip key={f} label={capitalize(f)} active={formFilter === f} onClick={() => setFormFilter(f)} />
-            ))}
-          </div>
-        ) : <div />}
+        {showFormFilter && (
+          <DropdownPill
+            value={formFilter}
+            onChange={setFormFilter}
+            options={[
+              { value: 'all', label: 'All forms' },
+              ...forms.map(f => ({ value: f, label: capitalize(f) })),
+            ]}
+          />
+        )}
 
-        <SortToggle mode={sortMode} onChange={setSortMode} />
+        <DropdownPill
+          value={sortMode}
+          onChange={setSortMode}
+          options={[
+            { value: 'name',  label: 'Name (A–Z)' },
+            { value: 'price', label: 'Lowest cost first' },
+          ]}
+        />
       </div>
 
       {/* Rows — SharedDrugCard.jsx, same component Drugs/Favourites screens
@@ -118,11 +150,6 @@ export default function BrandsList({ siblings = [], onTap }) {
             isDark={isDark}
             onTap={onTap}
             isLast={i === sorted.length - 1}
-            trailing={item.price != null ? (
-              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
-                {item.price}
-              </span>
-            ) : null}
           />
         ))}
       </div>
@@ -138,63 +165,36 @@ export default function BrandsList({ siblings = [], onTap }) {
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function FormChip({ label, active, onClick }) {
+function DropdownPill({ value, onChange, options }) {
   return (
-    <button
-      onClick={onClick}
-      style={{
-        flexShrink:   0,
-        padding:      '4px 10px',
-        borderRadius: 'var(--radius-full)',
-        fontSize:     12,
-        fontWeight:   active ? 600 : 400,
-        cursor:       'pointer',
-        border:       active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
-        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
-        color:        active ? '#fff' : 'var(--color-text-secondary)',
-        fontFamily:   'var(--font-body)',
-        whiteSpace:   'nowrap',
-        WebkitTapHighlightColor: 'transparent',
-        outline:      'none',
-      }}
-    >
-      {label}
-    </button>
-  )
-}
-
-function SortToggle({ mode, onChange }) {
-  return (
-    <div style={{
-      display:      'flex',
-      flexShrink:   0,
-      border:       '1.5px solid var(--color-border)',
-      borderRadius: 'var(--radius-full)',
-      padding:      2,
-      backgroundColor: 'var(--color-surface)',
-    }}>
-      {['name', 'price'].map(m => (
-        <button
-          key={m}
-          type="button"
-          onClick={() => onChange(m)}
-          style={{
-            padding:      '4px 10px',
-            borderRadius: 'var(--radius-full)',
-            border:       'none',
-            cursor:       'pointer',
-            fontSize:     12,
-            fontWeight:   600,
-            fontFamily:   'var(--font-body)',
-            backgroundColor: mode === m ? 'var(--color-accent)' : 'transparent',
-            color:        mode === m ? '#fff' : 'var(--color-text-secondary)',
-            WebkitTapHighlightColor: 'transparent',
-            outline:      'none',
-          }}
-        >
-          {m === 'name' ? 'Name' : 'Price'}
-        </button>
-      ))}
+    <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          appearance:       'none',
+          WebkitAppearance: 'none',
+          backgroundColor:  'var(--color-surface)',
+          border:           '1px solid var(--color-border)',
+          borderRadius:     'var(--radius-full)',
+          padding:          '6px 28px 6px 14px',
+          fontSize:         13,
+          fontWeight:       500,
+          color:            'var(--color-text-primary)',
+          fontFamily:       'var(--font-body)',
+          cursor:           'pointer',
+          outline:          'none',
+        }}
+      >
+        {options.map(opt => (
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
+        ))}
+      </select>
+      <ChevronDown
+        size={14}
+        color="var(--color-text-secondary)"
+        style={{ position: 'absolute', right: 10, pointerEvents: 'none' }}
+      />
     </div>
   )
 }
