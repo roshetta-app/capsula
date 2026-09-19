@@ -128,13 +128,27 @@
  * Blue tokens used throughout (var(--color-accent) / var(--color-accent-
  * light)) come from globals.css and are already dark-mode aware — no
  * hardcoded colors needed.
+ *
+ * 2026-09-19 (this session, twelfth follow-up): reverted point 4 above —
+ * back to the original two floating Class/Subclass pills, per feedback.
+ * ClassificationCard is left defined in sectionPrimitives.jsx (unused by
+ * this file now) rather than removed, since removing it wasn't asked for.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { FlaskConical, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import { InlineTruncatedList, IngredientChip, TextToggle, ClassificationCard } from './sectionPrimitives.jsx'
+import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
+
+const pillStyle = {
+  fontSize:        11,
+  fontWeight:      600,
+  backgroundColor: '#F3F4F6',
+  color:           '#6B7280',
+  padding:         '2px 10px',
+  borderRadius:    'var(--radius-full)',
+}
 
 // Mechanism of Action visual clamp (Generic Overview refinement, decision 2
 // above) — ~3 lines at this block's font-size/line-height, replacing the old
@@ -297,20 +311,13 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         </div>
       )}
 
-      {/* ── Block 3: Classification ─────────────────────────────────────── */}
-      {/* Compact bordered card (4.8) — static placeholder labels, not real
-          data yet; subclass column deferred, plan §11.5. Small label above
-          matches the Active Ingredients block's own label treatment. */}
-      <div>
-        <div style={{
-          fontSize:     13,
-          fontWeight:   600,
-          color:        'var(--color-text-secondary)',
-          marginBottom: 'var(--space-2)',
-        }}>
-          Classification
-        </div>
-        <ClassificationCard labels={['Class', 'Subclass']} />
+      {/* -- Placeholder Class/Subclass tags (4.8) — reverted back to the
+            original floating pills per feedback (the compact card version
+            didn't land). Static labels, not real data yet; subclass column
+            deferred, plan §11.5. -- */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        <span style={pillStyle}>Class</span>
+        <span style={pillStyle}>Subclass</span>
       </div>
 
       <BrandsBottomSheet

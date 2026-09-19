@@ -18,6 +18,11 @@
  * compact classification card). The existing ShowMoreToggle below is left in
  * place — it becomes unused by GenericOverviewSection.jsx after this change,
  * but UsesSection.jsx may still reference it, so it isn't removed.
+ *
+ * 2026-09-19 (this session, follow-up): GenericOverviewSection.jsx reverted
+ * its Classification block back to the original floating pills, so
+ * ClassificationCard below is now unused by any known consumer. Left in
+ * place — removing it wasn't asked for.
  */
 
 import { useState, useRef, useEffect } from 'react'
