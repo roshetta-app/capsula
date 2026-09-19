@@ -68,6 +68,15 @@
  * 2026-09-18 (this session, fourth follow-up): FlaskConical moved from
  * the name row to the top row, right before the "Active ingredient(s)"
  * label — per feedback. Same icon/size, different position only.
+ *
+ * 2026-09-18 (this session, fifth follow-up): FlaskConical sized down
+ * again, 16px → 14px, now matching the 13px label text next to it more
+ * closely.
+ *
+ * 2026-09-18 (this session, sixth follow-up): truncation threshold
+ * (InlineTruncatedList's `max` prop) raised 3 → 5 — combo drugs with up
+ * to 5 ingredients now show them all with no "Show more" toggle at all;
+ * truncation only kicks in past 5.
  */
 
 import { useState } from 'react'
@@ -126,7 +135,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         marginBottom:   'var(--space-3)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <FlaskConical size={16} color="var(--color-text-secondary)" />
+          <FlaskConical size={14} color="var(--color-text-secondary)" />
           <span style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
             Active ingredient{isCombo ? 's' : ''}
           </span>
@@ -166,7 +175,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
       }}>
         <div>
           {isCombo
-            ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={3} />
+            ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={5} />
             : <IngredientChip>{toTitleCase(genericName)}</IngredientChip>
           }
         </div>
