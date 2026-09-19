@@ -277,17 +277,25 @@ export function useConditions() {
     try {
       const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
 
-      if (changes.length === 0) {
-        await writeConditionsCache(cachedRecord.data, conditionsUpdatedAt, cachedRecord.auditCursor)
-        return
-      }
-
       if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
         await fetchAndCache()
         return
       }
 
       if (changes.some(c => c.table_name === 'specialties')) {
+        await fetchAndCache()
+        return
+      }
+
+      // 2026-09-19 (this session, silent-stale-cache fix): mirrors the same
+      // fix in useDrugs.js's applyDrugsDelta. The version stamp moved, but
+      // the change log has nothing about conditions, condition blocks or
+      // specialties (it is empty, or only holds drug changes) — so the edit
+      // did not go through the admin CMS. This used to re-stamp the saved
+      // copy as up to date without fetching anything, losing the edit and
+      // restarting the 7-day refresh clock. Do a full download instead.
+      const conditionTables = ['conditions', 'condition_blocks', 'specialties']
+      if (!changes.some(c => conditionTables.includes(c.table_name))) {
         await fetchAndCache()
         return
       }

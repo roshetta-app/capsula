@@ -162,14 +162,6 @@ export function useDrugs() {
     try {
       const changes = await fetchAuditLogSince(supabase, cachedRecord.auditCursor)
 
-      if (changes.length === 0) {
-        // Metadata timestamp moved but nothing in the watched tables did —
-        // shouldn't normally happen, but re-stamp version/cursor either way
-        // so this check doesn't keep re-firing every background poll.
-        await writeDrugsCache(cachedRecord.data, drugsUpdatedAt, cachedRecord.auditCursor)
-        return
-      }
-
       if (changes.length > DELTA_FALLBACK_CHANGE_COUNT) {
         await fetchAndCache()
         return
@@ -189,6 +181,21 @@ export function useDrugs() {
         if (change.table_name === 'generics')     genericIds.add(change.record_id)
         if (change.table_name === 'formulations') formulationIds.add(change.record_id)
         if (change.table_name === 'brands')       brandIds.add(change.record_id)
+      }
+
+      // 2026-09-19 (this session, silent-stale-cache fix): the version stamp
+      // moved, but the change log has nothing about generics, formulations or
+      // brands. That means the edit did not go through the admin CMS (a
+      // direct database edit or migration writes no audit_log row). This
+      // used to re-stamp the saved copy with the new version and return,
+      // which marked the device up to date without fetching anything — the
+      // edit was then lost for good, since the version check never fires
+      // again for it, and the re-stamp also restarted the 7-day refresh
+      // clock. With no way to know what changed, do a full download instead.
+      // This also covers a log that only has condition changes in it.
+      if (genericIds.size === 0 && formulationIds.size === 0 && brandIds.size === 0) {
+        await fetchAndCache()
+        return
       }
 
       let nextDrugs = [...cachedRecord.data]
