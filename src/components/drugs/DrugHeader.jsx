@@ -147,6 +147,13 @@
  * it. The icon itself is still colors.fg, unchanged, same as
  * DetailHeader's.
  *
+ * 2026-09-19 (this session): the strength/form suffix line no longer shows
+ * the 'chewable' modifier ('Chew'), per feedback — same as SharedDrugCard.jsx's
+ * card. Both pass the shared TITLE_HIDDEN_MODIFIER_TAGS list from
+ * utils/drugTitleFormat.js to getDrugTitleSuffix, so the two stay in sync.
+ * The image-search query (built from raw concentration and form) never
+ * included modifiers, so it is unchanged.
+ *
  * Props:
  *   drug          — flat drug object from DrugContext
  *   isFavourited  — boolean
@@ -158,7 +165,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Browser } from '@capacitor/browser'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
-import { toTitleCase, getDrugTitleSuffix } from '../../utils/drugTitleFormat'
+import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
 
@@ -224,8 +231,9 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   const iconValue = iconType === 'custom' ? (category?.icon_url || '') : (category?.icon_name || 'Pill')
 
   // Brand name + strength + form suffix — same shared logic SharedDrugCard
-  // uses for its title line (see utils/drugTitleFormat.js).
-  const titleSuffix = getDrugTitleSuffix(drug)
+  // uses for its title line (see utils/drugTitleFormat.js), including the
+  // shared list of modifier tags left out of the suffix (2026-09-19).
+  const titleSuffix = getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
 
   // Favourite-toggle pop animation (this session) — no existing precedent
   // in the codebase to match (checked RowStarButton.jsx and

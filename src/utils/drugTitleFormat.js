@@ -14,6 +14,8 @@
  *                               options.omitModifierTags (optional array of
  *                               form_modifier tags, e.g. ['chewable']) leaves
  *                               those tags out of the suffix for this one call.
+ *   TITLE_HIDDEN_MODIFIER_TAGS — the tags the card and the header both leave
+ *                               out of their suffix (currently 'chewable').
  */
 
 import { DRUG_FORM_SUFFIXES } from '../config/forms'
@@ -162,10 +164,13 @@ export function toTitleCase(str) {
 // pack_size + form_modifier abbreviations; liquid/topical forms show
 // fill_volume instead. Any field missing on this particular drug drops
 // out silently (4.39) — never a blank gap or stray separator.
-// omitModifierTags (2026-09-19): optional, defaults to none, so every
-// existing caller is unaffected. Lets one caller leave specific
-// form_modifier tags out of its own suffix (SharedDrugCard.jsx uses it to
-// hide 'chewable') without changing what any other caller shows.
+// omitModifierTags (2026-09-19): optional, defaults to none, so a caller
+// that doesn't pass it is unaffected. Lets a caller leave specific
+// form_modifier tags out of its suffix. SharedDrugCard.jsx and
+// DrugHeader.jsx both pass TITLE_HIDDEN_MODIFIER_TAGS (below), so the list
+// of hidden tags lives in exactly one place.
+export const TITLE_HIDDEN_MODIFIER_TAGS = ['chewable']
+
 export function getDrugTitleSuffix(drug, { omitModifierTags = [] } = {}) {
   const normalizedConcentration = normalizeSpacing(drug.concentration)
   const formAbbrev = DRUG_FORM_SUFFIXES[drug.form] || drug.form
