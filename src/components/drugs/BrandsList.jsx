@@ -9,11 +9,35 @@
  *   siblings — array of other flat drug (item) objects sharing the same
  *              generic as the item currently being viewed. The current item
  *              itself should NOT be included — it's already shown above in
- *              the header.
+ *              the header. Confirmed full FlatDrug shape (not a trimmed
+ *              projection) via DrugDetailScreen.jsx: `drugs.filter(d =>
+ *              d.genericId === drug.genericId && d.id !== drug.id)`, same
+ *              array `drugs` (the full drug list) comes from.
  *   onTap    — (item) => void — called when a sibling row is tapped
+ *
+ * 2026-09-18 (this session): per feedback —
+ *  - Section header: "Available Brands (Egypt)" → "Other Brands".
+ *  - Rows now render via SharedDrugCard.jsx (the same row component
+ *    Drugs/Favourites screens use) instead of this file's own bordered-box
+ *    markup, so a sibling brand looks identical to how it'd look on those
+ *    screens. SharedDrugCard needs `categories` and `isDark`, which this
+ *    file didn't have — both are self-contained hooks (confirmed:
+ *    useCategories.js does its own Supabase fetch + cache, not seeded by a
+ *    parent; useIsDark follows SourcesSection.jsx's own established
+ *    direct-call precedent), so both are called directly here rather than
+ *    threading two new props down through BrandsBottomSheet.jsx and
+ *    GenericOverviewSection.jsx. Price (SharedDrugCard has no dedicated
+ *    price slot) now rides in its `trailing` slot instead. Sort-by-name
+ *    switched from the old row's `item.name` (SharedDrugCard's own header
+ *    comment explains this was the old, no-longer-used pre-composed name
+ *    field DrugCard.jsx used to double-render) to `item.tradenameClean`,
+ *    matching what SharedDrugCard itself actually displays.
  */
 
 import { useState } from 'react'
+import SharedDrugCard from '../SharedDrugCard.jsx'
+import { useCategories } from '../../hooks/useCategories'
+import { useIsDark } from '../../utils/specialtyIcon'
 
 function capitalize(str) {
   if (!str) return str
@@ -23,6 +47,8 @@ function capitalize(str) {
 export default function BrandsList({ siblings = [], onTap }) {
   const [formFilter, setFormFilter] = useState('all')
   const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
+  const { categories } = useCategories()
+  const isDark = useIsDark()
 
   // No real siblings — section disappears entirely, same as today's behavior
   // when the list is empty.
@@ -41,7 +67,7 @@ export default function BrandsList({ siblings = [], onTap }) {
       const priceB = b.price ?? Infinity
       if (priceA !== priceB) return priceA - priceB
     }
-    return (a.name ?? '').localeCompare(b.name ?? '')
+    return (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? '')
   })
 
   return (
@@ -55,7 +81,7 @@ export default function BrandsList({ siblings = [], onTap }) {
         color:         'var(--color-text-tertiary)',
         marginBottom:  'var(--space-3)',
       }}>
-        Available Brands (Egypt)
+        Other Brands
       </div>
 
       {/* Controls: form filter chips + name/price sort toggle */}
@@ -79,60 +105,26 @@ export default function BrandsList({ siblings = [], onTap }) {
         <SortToggle mode={sortMode} onChange={setSortMode} />
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {sorted.map(item => {
-          const subtitle = [item.concentration, item.form].filter(Boolean).join(' · ')
-          return (
-            <div
-              key={item.id}
-              onClick={() => onTap?.(item)}
-              style={{
-                display:         'flex',
-                alignItems:      'center',
-                justifyContent:  'space-between',
-                gap:             'var(--space-3)',
-                backgroundColor: 'var(--color-bg)',
-                border:          '1px solid var(--color-border-subtle)',
-                borderRadius:    'var(--radius-sm)',
-                padding:         'var(--space-3) var(--space-4)',
-                cursor:          onTap ? 'pointer' : 'default',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {/* Item info */}
-              <div style={{ minWidth: 0 }}>
-                <span style={{
-                  fontSize:   14,
-                  fontWeight: 600,
-                  color:      'var(--color-text-primary)',
-                }}>
-                  {item.name}
-                </span>
-                {subtitle && (
-                  <span style={{
-                    fontSize:   12,
-                    color:      'var(--color-text-tertiary)',
-                    marginLeft: 'var(--space-2)',
-                  }}>
-                    {subtitle}
-                  </span>
-                )}
-              </div>
-
-              {/* Price — display-only, relative-ranking value, may be outdated */}
-              {item.price != null && (
-                <span style={{
-                  fontSize:   13,
-                  fontWeight: 500,
-                  color:      'var(--color-text-secondary)',
-                  flexShrink: 0,
-                }}>
-                  {item.price}
-                </span>
-              )}
-            </div>
-          )
-        })}
+      {/* Rows — SharedDrugCard.jsx, same component Drugs/Favourites screens
+          use. It renders its own hairline divider between rows (isLast
+          suppresses it on the final one), so no wrapping gap/box styling
+          is needed here anymore. */}
+      <div>
+        {sorted.map((item, i) => (
+          <SharedDrugCard
+            key={item.id}
+            drug={item}
+            categories={categories}
+            isDark={isDark}
+            onTap={onTap}
+            isLast={i === sorted.length - 1}
+            trailing={item.price != null ? (
+              <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+                {item.price}
+              </span>
+            ) : null}
+          />
+        ))}
       </div>
 
       <div style={{
