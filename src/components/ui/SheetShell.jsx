@@ -58,26 +58,6 @@
  *   likely real explanation for why every earlier attempt at the `<html>`
  *   lock alone (see history above) never fully settled — this flag lets
  *   the `<html>` lock above be the only one running.
- *
- * 2026-09-19 (this session, diagnostic-only, TEMPORARY): a sibling row's
- * new image-search icon (see SharedDrugCard.jsx/BrandsList.jsx) opens the
- * native in-app browser (@capacitor/browser's Browser.open()), which
- * backgrounds/foregrounds this WebView without ever changing `isOpen` —
- * a case the `<html>` lock effect above was never checked against (see
- * its own comment history). Reported symptom: the sheet flickers/isn't
- * stable in place after closing the browser and returning. Added
- * console.log instrumentation at three boundaries to isolate which one
- * actually fires when this happens, rather than guessing:
- *   [SheetShell] lock effect run/cleanup  — did the html-lock effect
- *     itself unexpectedly re-run (would mean something upstream is
- *     remounting this sheet, not just the browser covering it)
- *   [SheetShell] visibilitychange          — did the WebView report a
- *     visibility change on browser open/close
- *   [SheetShell] resize                    — did opening/closing the
- *     native browser fire a resize event vaul might react to
- *   [SheetShell] vaul onOpenChange         — did vaul itself think the
- *     drawer's open state changed
- * REMOVE all of this once the cause is confirmed — not meant to ship.
  */
 
 import { useEffect } from 'react'
@@ -117,17 +97,12 @@ export default function SheetShell({
     const prevWidth = html.style.width
     const prevOverflow = html.style.overflow
 
-    // eslint-disable-next-line no-console
-    console.log('[SheetShell] lock effect: applying', { ariaLabel, scrollY })
-
     html.style.position = 'fixed'
     html.style.top = `-${scrollY}px`
     html.style.width = '100%'
     html.style.overflow = 'hidden'
 
     return () => {
-      // eslint-disable-next-line no-console
-      console.log('[SheetShell] lock effect: cleanup/removing', { ariaLabel })
       html.style.position = prevPosition
       html.style.top = prevTop
       html.style.width = prevWidth
@@ -136,44 +111,10 @@ export default function SheetShell({
     }
   }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // DIAGNOSTIC ONLY (temporary) — logs while this sheet is open so we can
-  // see whether opening/closing the native in-app browser fires a resize
-  // or visibility event this sheet (or vaul) reacts to.
-  useEffect(() => {
-    if (!isOpen) return
-
-    function handleResize() {
-      // eslint-disable-next-line no-console
-      console.log('[SheetShell] resize', {
-        ariaLabel,
-        innerWidth: window.innerWidth,
-        innerHeight: window.innerHeight,
-      })
-    }
-    function handleVisibility() {
-      // eslint-disable-next-line no-console
-      console.log('[SheetShell] visibilitychange', {
-        ariaLabel,
-        state: document.visibilityState,
-      })
-    }
-
-    window.addEventListener('resize', handleResize)
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      document.removeEventListener('visibilitychange', handleVisibility)
-    }
-  }, [isOpen, ariaLabel])
-
   return (
     <Drawer.Root
       open={isOpen}
-      onOpenChange={(open) => {
-        // eslint-disable-next-line no-console
-        console.log('[SheetShell] vaul onOpenChange', { ariaLabel, open })
-        if (!open) onClose()
-      }}
+      onOpenChange={(open) => { if (!open) onClose() }}
       closeThreshold={closeThreshold}
       disablePreventScroll
     >

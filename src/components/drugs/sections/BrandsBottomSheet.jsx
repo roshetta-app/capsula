@@ -38,6 +38,23 @@
  * ("Other Brands") is the only visible heading and wasn't part of this
  * request.
  *
+ * 2026-09-19 (this session, follow-up — flicker fix attempt): reported
+ * symptom — this sheet flickers/isn't stable in place after tapping a
+ * sibling row's new image-search icon (opens the native in-app browser)
+ * and closing that tab to return. `maxHeight` switched from `70dvh` to
+ * `70svh`. Root cause hypothesis: `dvh` (dynamic viewport height)
+ * recalculates live as system/browser chrome changes, and Android WebViews
+ * are known to briefly recompute it right as the app returns to the
+ * foreground — which the native browser open/close is. `svh` (stable
+ * viewport height) doesn't track that kind of transient chrome change, so
+ * it shouldn't re-settle when the browser tab closes. Scoped to this sheet
+ * only, not SheetShell's shared default — other sheets may have a search
+ * input and actually want `dvh`'s shrink-for-keyboard behavior, which
+ * `svh` would remove. If this doesn't fully resolve it on-device, the
+ * `<html>` position-lock effect in SheetShell.jsx (see that file's own
+ * comment history) is the next thing to test, since it's the other
+ * documented unknown for this exact class of bug.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -60,7 +77,7 @@ export default function BrandsBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Similar drugs" maxHeight="70dvh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Similar drugs" maxHeight="70svh">
       {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
           sibling-list internals, unchanged. BrandsList renders its own
           "Other Brands" section header, so this sheet doesn't duplicate
