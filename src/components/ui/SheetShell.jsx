@@ -175,6 +175,71 @@ export default function SheetShell({
     }
   }, [isOpen, contentEl])
 
+  // TEMPORARY EXPERIMENT (brands-sheet resume flicker) - the diagnostic above
+  // showed that for about 0.2s after coming back from the search tab, the page
+  // window reports itself 56px shorter, then returns to normal. The sheet is
+  // pinned to the bottom of the window and sized as a percentage of its
+  // height, so it briefly shrinks and lifts, then snaps back. To stop that,
+  // note where the sheet sits when the page is hidden, and for a short time
+  // after the page is visible again, pin it to exactly that spot and size.
+  // Nothing else changes, and all original values are put back afterwards.
+  useEffect(() => {
+    if (!isOpen || !contentEl) return
+    let frozen = null
+    let release = null
+    let timer = null
+    const stopHold = () => {
+      clearTimeout(timer)
+      if (release) {
+        release()
+        release = null
+      }
+    }
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') {
+        stopHold()
+        const r = contentEl.getBoundingClientRect()
+        frozen = { top: r.top, height: r.height }
+        return
+      }
+      if (!frozen) return
+      stopHold()
+      const s = contentEl.style
+      const prev = {
+        top: s.top,
+        bottom: s.bottom,
+        height: s.height,
+        maxHeight: s.maxHeight,
+        boxSizing: s.boxSizing,
+      }
+      s.boxSizing = 'border-box'
+      s.top = frozen.top + 'px'
+      s.bottom = 'auto'
+      s.height = frozen.height + 'px'
+      s.maxHeight = frozen.height + 'px'
+      release = () => {
+        s.top = prev.top
+        s.bottom = prev.bottom
+        s.height = prev.height
+        s.maxHeight = prev.maxHeight
+        s.boxSizing = prev.boxSizing
+      }
+      console.log(
+        '[SheetShell diag] holding sheet steady after return: top=' +
+          Math.round(frozen.top) + ' height=' + Math.round(frozen.height)
+      )
+      timer = setTimeout(() => {
+        stopHold()
+        console.log('[SheetShell diag] hold released')
+      }, 800)
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      stopHold()
+    }
+  }, [isOpen, contentEl])
+
   return (
     <Drawer.Root
       open={isOpen}
