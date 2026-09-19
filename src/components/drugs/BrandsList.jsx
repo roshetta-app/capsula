@@ -13,7 +13,9 @@
  *              projection) via DrugDetailScreen.jsx: `drugs.filter(d =>
  *              d.genericId === drug.genericId && d.id !== drug.id)`, same
  *              array `drugs` (the full drug list) comes from.
- *   onTap    — (item) => void — called when a sibling row is tapped
+ *   onTap    — (item) => void — no longer called (see 2026-09-19 note
+ *              below); kept in the prop list so this file's own public API
+ *              doesn't change for whatever screen still passes it in.
  *
  * 2026-09-18 (this session): per feedback —
  *  - Section header: "Available Brands (Egypt)" → "Other Brands".
@@ -58,13 +60,27 @@
  * Each pill also gets a leading icon now: ListFilter for Form, ArrowUpDown
  * for Sort — both standard lucide-react icons already used for this exact
  * meaning elsewhere in the wild, no new icon language invented.
+ *
+ * 2026-09-19 (this session): per feedback — a sibling row is no longer
+ * tappable (`disableTap`) and no longer shows the chevron (`showChevron={false}`),
+ * both new optional props on SharedDrugCard that default to the old
+ * behavior everywhere else. `onTap` is still accepted as a prop here so
+ * this file's own API doesn't change, but it's no longer passed down to
+ * the row. The row's `trailing` slot now shows RowStarButton.jsx (the same
+ * heart button ConditionCard/Favourites rows already use) when the
+ * sibling is one of the user's favourite drugs; hidden entirely otherwise,
+ * per RowStarButton's own existing show/hide rule. Favourite state and the
+ * toggle action both come from FavouritesContext, same source every other
+ * screen already reads/writes through.
  */
 
 import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ListFilter, ArrowUpDown } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
+import RowStarButton from '../ui/RowStarButton.jsx'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
+import { useFavouritesContext } from '../../context/FavouritesContext'
 
 function capitalize(str) {
   if (!str) return str
@@ -76,6 +92,7 @@ export default function BrandsList({ siblings = [], onTap }) {
   const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
   const { categories } = useCategories()
   const isDark = useIsDark()
+  const { isDrugFavourited, toggleDrug } = useFavouritesContext()
 
   // No real siblings — section disappears entirely, same as today's behavior
   // when the list is empty.
@@ -148,7 +165,9 @@ export default function BrandsList({ siblings = [], onTap }) {
       {/* Rows — SharedDrugCard.jsx, same component Drugs/Favourites screens
           use. It renders its own hairline divider between rows (isLast
           suppresses it on the final one), so no wrapping gap/box styling
-          is needed here anymore. */}
+          is needed here anymore. Not tappable and no chevron (2026-09-19)
+          — a sibling row here is informational, not a navigation target.
+          Trailing slot shows the heart icon only for favourited drugs. */}
       <div>
         {sorted.map((item, i) => (
           <SharedDrugCard
@@ -156,8 +175,15 @@ export default function BrandsList({ siblings = [], onTap }) {
             drug={item}
             categories={categories}
             isDark={isDark}
-            onTap={onTap}
             isLast={i === sorted.length - 1}
+            disableTap
+            showChevron={false}
+            trailing={
+              <RowStarButton
+                isFavourited={isDrugFavourited(item.id)}
+                onPress={() => toggleDrug(item.id)}
+              />
+            }
           />
         ))}
       </div>

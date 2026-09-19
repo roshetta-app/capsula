@@ -73,13 +73,24 @@
  * already derives the icon's foreground shade from the same token, so no
  * new derivation logic was needed here.
  *
+ * 2026-09-19 (this session): added `disableTap` / `showChevron` — both
+ * optional, both default to the existing behavior, so every current
+ * caller (Drugs screen, Favourites screen) is unaffected. Added for
+ * BrandsList.jsx's "Other Brands" list, where a sibling row shouldn't
+ * navigate on tap and shouldn't show the chevron affordance for a tap
+ * that no longer happens. `disableTap` strips the click/keyboard handler,
+ * the pointer press state, and the pointer cursor entirely rather than
+ * just no-op'ing onTap, so the row reads as inert, not as a button that
+ * silently does nothing.
+ *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
  * and isLast were already in place from 1d.1):
  *   drug        FlatDrug
  *   categories  Category[]  — from useCategories(), passed down by the screen
  *   isDark      boolean     — from useIsDark(), for resolveToken's dark-mode variant
- *   onTap       (drug) => void   — required, matches old DrugCard.jsx's
- *                                  convention (no navigate fallback guessed)
+ *   onTap       (drug) => void   — required unless disableTap is true, matches
+ *                                  old DrugCard.jsx's convention (no navigate
+ *                                  fallback guessed)
  *   isLast      boolean          — suppresses the bottom divider on the last row
  *   trailing    ReactNode (optional) — rendered in the right-hand slot
  *   highlight   string  (optional) — current search query; empty string when not
@@ -92,6 +103,12 @@
  *                                     never both, to avoid bolding a coincidental
  *                                     substring in a field that had nothing to do
  *                                     with why the row actually matched.
+ *   disableTap  boolean (optional, default false) — makes the row fully
+ *                                     inert: no click/keyboard handler, no
+ *                                     press state, default cursor. onTap is
+ *                                     never called while this is true.
+ *   showChevron boolean (optional, default true) — hides the trailing
+ *                                     chevron when false.
  */
 
 import { useState } from 'react'
@@ -111,10 +128,13 @@ export default function SharedDrugCard({
   trailing = null,
   highlight = '',
   searchMode = 'brand',
+  disableTap = false,
+  showChevron = true,
 }) {
   const [pressed, setPressed] = useState(false)
 
   function handleTap() {
+    if (disableTap) return
     onTap(drug)
   }
 
@@ -157,25 +177,25 @@ export default function SharedDrugCard({
 
   return (
     <div
-      onClick={handleTap}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && handleTap()}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
+      onClick={disableTap ? undefined : handleTap}
+      role={disableTap ? undefined : 'button'}
+      tabIndex={disableTap ? undefined : 0}
+      onKeyDown={disableTap ? undefined : (e => e.key === 'Enter' && handleTap())}
+      onPointerDown={disableTap ? undefined : () => setPressed(true)}
+      onPointerUp={disableTap ? undefined : () => setPressed(false)}
+      onPointerLeave={disableTap ? undefined : () => setPressed(false)}
+      onPointerCancel={disableTap ? undefined : () => setPressed(false)}
       style={{
         display:                 'flex',
         alignItems:              'center',
         height:                  ROW_HEIGHT,
         gap:                     'var(--space-3)',
         borderBottom:            isLast ? 'none' : '1px solid var(--color-border-subtle)',
-        cursor:                  'pointer',
+        cursor:                  disableTap ? 'default' : 'pointer',
         outline:                 'none',
         WebkitTapHighlightColor: 'transparent',
-        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
-        transform:               pressed ? 'scale(0.99)' : 'scale(1)',
+        backgroundColor:         !disableTap && pressed ? 'var(--color-surface-muted)' : 'transparent',
+        transform:               !disableTap && pressed ? 'scale(0.99)' : 'scale(1)',
         transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
@@ -242,7 +262,7 @@ export default function SharedDrugCard({
       </div>
 
       {/* Right: trailing slot — bookmark control wired in 1d.5/1d.6, screen-owned per decision 4.16 —
-          + chevron, same trailing-group pattern as ConditionCard.jsx */}
+          + chevron (hidden when showChevron is false), same trailing-group pattern as ConditionCard.jsx */}
       <div style={{
         display:    'flex',
         alignItems: 'center',
@@ -250,18 +270,20 @@ export default function SharedDrugCard({
         flexShrink: 0,
       }}>
         {trailing}
-        <svg
-          width="12" height="12" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" strokeWidth="2.5"
-          strokeLinecap="round" strokeLinejoin="round"
-          style={{
-            color:      'var(--color-text-tertiary)',
-            opacity:    0.5,
-            flexShrink: 0,
-          }}
-        >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
+        {showChevron && (
+          <svg
+            width="12" height="12" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round"
+            style={{
+              color:      'var(--color-text-tertiary)',
+              opacity:    0.5,
+              flexShrink: 0,
+            }}
+          >
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        )}
       </div>
     </div>
   )
