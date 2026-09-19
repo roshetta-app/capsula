@@ -77,6 +77,27 @@ export function Collapsible({ title, children }) {
   )
 }
 
+// --- Ingredient chip ---------------------------------------------------------
+//
+// Extracted this session so GenericOverviewSection.jsx's single-ingredient
+// path can use the exact same chip treatment InlineTruncatedList's items now
+// use, instead of only the combo (multi-ingredient) path looking this way.
+export function IngredientChip({ children }) {
+  return (
+    <span style={{
+      fontSize:        13,
+      fontWeight:      500,
+      color:           'var(--color-text-primary)',
+      backgroundColor: 'var(--color-surface)',
+      border:          '0.5px solid var(--color-border)',
+      borderRadius:    'var(--radius-sm)',
+      padding:         '4px 10px',
+    }}>
+      {children}
+    </span>
+  )
+}
+
 // --- Inline truncated list ---------------------------------------------------
 //
 // A chip-based list of items that truncates after `max` entries once there
@@ -132,21 +153,11 @@ export function InlineTruncatedList({ items = [], max = 3 }) {
 
   if (!items || items.length === 0) return null
 
-  const chipStyle = {
-    fontSize:        13,
-    fontWeight:       500,
-    color:            'var(--color-text-primary)',
-    backgroundColor:  'var(--color-surface)',
-    border:           '0.5px solid var(--color-border)',
-    borderRadius:     'var(--radius-sm)',
-    padding:          '4px 10px',
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {shown.map((item, i) => (
-          <span key={i} style={chipStyle}>{item}</span>
+          <IngredientChip key={i}>{item}</IngredientChip>
         ))}
         {hasMore && (
           <div
@@ -162,7 +173,7 @@ export function InlineTruncatedList({ items = [], max = 3 }) {
             }}
           >
             {extra.map((item, i) => (
-              <span key={i} style={chipStyle}>{item}</span>
+              <IngredientChip key={i}>{item}</IngredientChip>
             ))}
           </div>
         )}
