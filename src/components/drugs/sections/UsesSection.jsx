@@ -37,6 +37,13 @@
  * same transform+transition treatment ShowMoreToggle already uses in
  * sectionPrimitives.jsx, so the toggle animates instead of snapping.
  *
+ * 2026-09-23 (follow-up): the `context` sub-line under each use was
+ * reading as muted/de-emphasized (italic, `--color-text-tertiary`) and
+ * source data is stored all-lowercase, so it displayed lowercase too. Now
+ * upright, a darker `--color-text-secondary`, and sentence-cased on
+ * display only (first letter capitalized) via `toSentenceCase` below —
+ * the stored `context` string itself is untouched.
+ *
  * Props:
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
@@ -50,6 +57,14 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 const TRUNCATE_AT = 3
+
+// Display-only: stored `context` strings are all-lowercase, so this
+// capitalizes just the first letter for sentence case on screen without
+// touching the underlying data.
+function toSentenceCase(text) {
+  if (!text) return text
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
 
 export default function UsesSection({ drug, colors, isDark }) {
   const [open, setOpen] = useState(false)
@@ -110,12 +125,11 @@ export default function UsesSection({ drug, colors, isDark }) {
               {context && (
                 <div style={{
                   fontSize:   13,
-                  fontStyle:  'italic',
-                  color:      'var(--color-text-tertiary)',
+                  color:      'var(--color-text-secondary)',
                   marginTop:  1,
                   paddingLeft: 'calc(5px + var(--space-2))',
                 }}>
-                  {context}
+                  {toSentenceCase(context)}
                 </div>
               )}
             </li>
