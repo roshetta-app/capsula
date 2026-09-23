@@ -36,15 +36,36 @@
  * now matches every other section's hide-when-empty rule. See DoseSection.jsx
  * for the fuller note on why the three-status loading model is no longer
  * needed (Phase 1's 1.18 single-unified-download change).
+ *
+ * 2026-09-23: neither the "See all"/"See less" toggle nor the truncated
+ * items themselves animated — the button swapped ChevronUp/ChevronDown
+ * icons instantly and the extra items past TRUNCATE_AT just appeared or
+ * vanished. Brought in line with UsesSection.jsx's already-established
+ * pattern: a single chevron that rotates 180° (transform+transition) on
+ * the button, and the extra items fade in/out (two-frame opacity
+ * transition, same as UsesSection.jsx/InlineTruncatedList in
+ * sectionPrimitives.jsx) instead of popping instantly.
  */
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 const TRUNCATE_AT = 3
 
 export default function SideEffectsSection({ drug }) {
   const [expanded, setExpanded] = useState(false)
+  // showExtra: the past-3 items are in the layout at all. extraVisible:
+  // they're opaque. Kept separate (same pattern as UsesSection.jsx) so a
+  // fade-out can finish before the items are removed.
+  const [showExtra, setShowExtra]       = useState(false)
+  const [extraVisible, setExtraVisible] = useState(false)
+  const timerRef = useRef(null)
+  const rafRef   = useRef(null)
+
+  useEffect(() => () => {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+  }, [])
 
   const { sideEffects = [] } = drug
 
@@ -53,7 +74,26 @@ export default function SideEffectsSection({ drug }) {
   }
 
   const hasMore = sideEffects.length > TRUNCATE_AT
-  const shown = expanded ? sideEffects : sideEffects.slice(0, TRUNCATE_AT)
+  const visible = sideEffects.slice(0, TRUNCATE_AT)
+  const extra   = sideEffects.slice(TRUNCATE_AT)
+
+  function handleToggle() {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+    if (!expanded) {
+      setExpanded(true)
+      setShowExtra(true)
+      // Two frames so the extra items paint once at opacity 0 before
+      // fading in, instead of popping straight to opacity 1.
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => setExtraVisible(true))
+      })
+    } else {
+      setExpanded(false)
+      setExtraVisible(false)
+      timerRef.current = setTimeout(() => setShowExtra(false), 200)
+    }
+  }
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -73,7 +113,8 @@ export default function SideEffectsSection({ drug }) {
 
         {hasMore && (
           <button
-            onClick={() => setExpanded(e => !e)}
+            onClick={handleToggle}
+            aria-label={expanded ? 'See less' : 'See all'}
             style={{
               display:    'flex',
               alignItems: 'center',
@@ -90,22 +131,40 @@ export default function SideEffectsSection({ drug }) {
             }}
           >
             {expanded ? 'See less' : 'See all'}
-            {expanded
-              ? <ChevronUp size={14} />
-              : <ChevronDown size={14} />
-            }
+            <ChevronDown
+              size={14}
+              style={{
+                transform:  expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                transition: 'transform 0.2s ease',
+              }}
+            />
           </button>
         )}
       </div>
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'disc', paddingLeft: 'var(--space-4)' }}>
-        {shown.map((se, i) => (
-          <li key={i} style={{
+        {visible.map((se, i) => (
+          <li key={`v${i}`} style={{
             fontSize:     14,
             color:        'var(--color-text-primary)',
             lineHeight:   1.6,
             marginBottom: 'var(--space-2)',
           }}>
+            {se}
+          </li>
+        ))}
+        {hasMore && showExtra && extra.map((se, i) => (
+          <li
+            key={`x${i}`}
+            style={{
+              fontSize:     14,
+              color:        'var(--color-text-primary)',
+              lineHeight:   1.6,
+              marginBottom: 'var(--space-2)',
+              opacity:      extraVisible ? 1 : 0,
+              transition:   'opacity 0.2s ease',
+            }}
+          >
             {se}
           </li>
         ))}

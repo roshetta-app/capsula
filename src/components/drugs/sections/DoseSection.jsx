@@ -96,6 +96,12 @@
  * separate brackets/max-dose/the tab-level note (distinct items),
  * `--space-2`/`--space-1` for a sub-element nested under one bracket
  * (its own note, its own title-to-instruction gap).
+ *
+ * 2026-09-23 (follow-up 3): removed the last of the max-dose "box" look —
+ * dropped `display: inline-block`, its padding, and its border radius, so
+ * it's plain text flush against the same left edge as the bracket text
+ * above it and the "Dosage"/tab row above that, instead of reading as an
+ * indented pill.
  */
 
 import { useState } from 'react'
@@ -242,11 +248,8 @@ export default function DoseSection({ drug }) {
 
         {currentTab.max_dose && (
           <div style={{
-            display:      'inline-block',
-            fontSize:     11,
-            color:        'var(--color-danger)',
-            padding:      'var(--space-1) var(--space-2)',
-            borderRadius: 'var(--radius-sm)',
+            fontSize: 11,
+            color:    'var(--color-danger)',
           }}>
             <strong>Max:</strong> {currentTab.max_dose}
           </div>
