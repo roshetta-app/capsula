@@ -71,7 +71,13 @@
  *     re-render. Keys are now prefixed per list (`v0`, `v1`… / `x0`,
  *     `x1`…) so every rendered entry has a unique key.
  *
- * Props:
+ * 2026-09-23 (follow-up 5): the bullet dot was vertically centered against
+ * the whole name block (`alignItems: 'center'` on the dot+name row), which
+ * only looked right while every `use_name` fit on one line. Once a longer
+ * name wrapped to two lines, the dot centered against the full wrapped
+ * block instead of sitting beside the first line/first word. Switched to
+ * `alignItems: 'flex-start'` with a small top offset on the dot itself so
+ * it aligns with the first line specifically, wrap or no wrap.
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
  *            object DrugHeader already receives from DrugDetailScreen
@@ -112,11 +118,16 @@ function UseEntry({ use, colors, isLast, style, onToggle }) {
           against that one line regardless of whether a context sub-line
           follows below (2026-07-25 alignment fix — previously top-aligned
           against the whole li block, which put the dot visibly above
-          center once a sub-line existed). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          center once a sub-line existed). flex-start + a small top offset
+          on the dot (2026-09-23 fix) instead of `alignItems: 'center'`,
+          so it lines up with the first line/word even when `name` wraps
+          to two lines, instead of centering against the whole wrapped
+          block. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-2)' }}>
         <span style={{
           width:           5,
           height:          5,
+          marginTop:       7,
           borderRadius:    '50%',
           backgroundColor: colors.fg,
           flexShrink:      0,
