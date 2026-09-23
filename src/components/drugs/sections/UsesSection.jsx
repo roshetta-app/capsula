@@ -4,15 +4,15 @@
  * (plan decision 4.10 — see STEPS_DRUG_DETAIL.md §1.2, plan §10 Section 9)
  *
  * Renders the Uses and Indications section for a drug: a bulleted list of
- * uses inside a category-color-tinted box, each entry a bold name with an
- * italic sub-line underneath only when that entry's `context` is present.
- * Past 3 entries the list truncates — a centered "See more"/"See less"
- * text button reveals or re-hides the rest in place, its chevron flipping
- * between the two states. The button is omitted entirely (not just inert)
- * when the count is at or under 3 (4.10, clarified 4.14). If `uses` is
- * empty, the whole section is omitted — no header, no "Not yet added"
- * placeholder — a deliberate exception to the EmptySection convention
- * every other section on this page still uses.
+ * uses inside a boxed panel, each entry a bold name with an italic sub-line
+ * underneath only when that entry's `context` is present. Past 3 entries
+ * the list truncates — a centered "See more"/"See less" text button reveals
+ * or re-hides the rest in place, its chevron rotating between the two
+ * states. The button is omitted entirely (not just inert) when the count
+ * is at or under 3 (4.10, clarified 4.14). If `uses` is empty, the whole
+ * section is omitted — no header, no "Not yet added" placeholder — a
+ * deliberate exception to the EmptySection convention every other section
+ * on this page still uses.
  *
  * Corrected 2026-07-25, session 20, against the real mockup image: the
  * "Uses and indications" label and the See more/See less toggle both live
@@ -21,20 +21,33 @@
  * Divider() is also dropped — see the page-wide correction note below.
  *
  * Built as its own one-off component per 4.10 — no shared primitive was
- * extracted, since no second consumer needs this shape yet. The tint
- * reuses SpecialtySelector's existing ambient-wash treatment
- * (`tintedBg`, specialtyTokens.js), not a new box style invented here.
+ * extracted, since no second consumer needs this shape yet.
+ *
+ * 2026-09-23: swapped the panel's background from the category-color
+ * ambient wash (`tintedBg`, specialtyTokens.js) to the app's neutral
+ * `--color-surface` token, matching the same card-surface treatment
+ * IngredientChip already uses elsewhere in sectionPrimitives.jsx. That
+ * token is already dark/light-mode aware via globals.css's `.dark`
+ * overrides, so no per-mode branching is needed here — `isDark` is no
+ * longer read by this component (kept in the prop signature since
+ * DrugDetailScreen still passes it). Added a matching neutral border so
+ * the panel keeps a defined edge now that it no longer reads as a colored
+ * card. Also replaced the ChevronUp/ChevronDown icon-swap on the "See
+ * more"/"See less" button with a single chevron that rotates 180°, the
+ * same transform+transition treatment ShowMoreToggle already uses in
+ * sectionPrimitives.jsx, so the toggle animates instead of snapping.
  *
  * Props:
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
  *            object DrugHeader already receives from DrugDetailScreen
- *   isDark — current dark-mode state, needed to build the tinted wash
+ *   isDark — current dark-mode state; no longer used by this component now
+ *            that the panel background is a mode-aware neutral token, but
+ *            kept in the signature for caller compatibility
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { tintedBg } from '../../../utils/specialtyTokens.js'
+import { ChevronDown } from 'lucide-react'
 
 const TRUNCATE_AT = 3
 
@@ -53,7 +66,8 @@ export default function UsesSection({ drug, colors, isDark }) {
       marginBottom:    'var(--space-5)',
       padding:         'var(--space-4)',
       borderRadius:    'var(--radius-sm)',
-      backgroundColor: tintedBg(colors.bg, isDark),
+      backgroundColor: 'var(--color-surface)',
+      border:          '1px solid var(--color-border)',
     }}>
       <div style={{
         fontSize:     15,
@@ -112,6 +126,7 @@ export default function UsesSection({ drug, colors, isDark }) {
       {hasMore && (
         <button
           onClick={() => setOpen(o => !o)}
+          aria-label={open ? 'See less' : 'See more'}
           style={{
             display:        'flex',
             alignItems:     'center',
@@ -131,10 +146,13 @@ export default function UsesSection({ drug, colors, isDark }) {
           }}
         >
           {open ? 'See less' : 'See more'}
-          {open
-            ? <ChevronUp size={14} />
-            : <ChevronDown size={14} />
-          }
+          <ChevronDown
+            size={14}
+            style={{
+              transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
         </button>
       )}
     </div>
