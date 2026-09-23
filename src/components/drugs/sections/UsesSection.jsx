@@ -44,6 +44,16 @@
  * display only (first letter capitalized) via `toSentenceCase` below —
  * the stored `context` string itself is untouched.
  *
+ * 2026-09-23 (follow-up 2): reverted the panel border added above — flat
+ * neutral fill only, no outline. Bumped the corner radius from
+ * `--radius-sm` to `--radius-md` for a rounder box, and the use-name font
+ * from 600 to 500 so entries read less bold. The reveal of the "See more"
+ * items also had no animation of its own (only the button's chevron
+ * animated) — the extra entries past the first 3 now fade in/out the same
+ * two-frame opacity-transition way InlineTruncatedList's extra chips
+ * already do in sectionPrimitives.jsx, instead of appearing/disappearing
+ * instantly.
+ *
  * Props:
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
@@ -53,7 +63,7 @@
  *            kept in the signature for caller compatibility
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 const TRUNCATE_AT = 3
@@ -66,23 +76,95 @@ function toSentenceCase(text) {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+// One use entry (dot + name + optional context sub-line). Pulled out of the
+// main render so the fading "extra" entries past TRUNCATE_AT and the always-
+// visible first 3 can share exactly the same markup/styling.
+function UseEntry({ use, colors, isLast, style }) {
+  const { use_name: name, context } = use
+  return (
+    <li style={{ marginBottom: isLast ? 0 : 'var(--space-2)', ...style }}>
+      {/* Dot sits in its own flex row with just the name, so it centers
+          against that one line regardless of whether a context sub-line
+          follows below (2026-07-25 alignment fix — previously top-aligned
+          against the whole li block, which put the dot visibly above
+          center once a sub-line existed). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <span style={{
+          width:           5,
+          height:          5,
+          borderRadius:    '50%',
+          backgroundColor: colors.fg,
+          flexShrink:      0,
+        }} />
+        <span style={{
+          fontSize:   14,
+          fontWeight: 500,
+          color:      'var(--color-text-primary)',
+        }}>
+          {name}
+        </span>
+      </div>
+      {context && (
+        <div style={{
+          fontSize:   13,
+          color:      'var(--color-text-secondary)',
+          marginTop:  1,
+          paddingLeft: 'calc(5px + var(--space-2))',
+        }}>
+          {toSentenceCase(context)}
+        </div>
+      )}
+    </li>
+  )
+}
+
 export default function UsesSection({ drug, colors, isDark }) {
   const [open, setOpen] = useState(false)
+  // showExtra: the past-3 entries are in the layout at all. extraVisible:
+  // they're opaque. Kept separate (same pattern as InlineTruncatedList in
+  // sectionPrimitives.jsx) so a fade-out can finish before they're removed.
+  const [showExtra, setShowExtra]       = useState(false)
+  const [extraVisible, setExtraVisible] = useState(false)
+  const timerRef = useRef(null)
+  const rafRef   = useRef(null)
+
+  useEffect(() => () => {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+  }, [])
 
   const { uses = [] } = drug
 
   if (uses.length === 0) return null
 
   const hasMore = uses.length > TRUNCATE_AT
-  const shown = open ? uses : uses.slice(0, TRUNCATE_AT)
+  const visible = uses.slice(0, TRUNCATE_AT)
+  const extra   = uses.slice(TRUNCATE_AT)
+
+  function handleToggle() {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+    if (!open) {
+      setOpen(true)
+      setShowExtra(true)
+      // Two frames so the extra entries paint once at opacity 0 before
+      // fading in, instead of popping straight to opacity 1.
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => setExtraVisible(true))
+      })
+    } else {
+      setOpen(false)
+      setExtraVisible(false)
+      timerRef.current = setTimeout(() => setShowExtra(false), 200)
+    }
+  }
 
   return (
     <div style={{
       marginBottom:    'var(--space-5)',
       padding:         'var(--space-4)',
-      borderRadius:    'var(--radius-sm)',
+      borderRadius:    'var(--radius-md)',
       backgroundColor: 'var(--color-surface)',
-      border:          '1px solid var(--color-border)',
     }}>
       <div style={{
         fontSize:     15,
@@ -94,52 +176,31 @@ export default function UsesSection({ drug, colors, isDark }) {
       </div>
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
-        {shown.map((use, i) => {
-          const { use_name: name, context } = use
-          return (
-            <li
-              key={i}
-              style={{ marginBottom: i === shown.length - 1 ? 0 : 'var(--space-2)' }}
-            >
-              {/* Dot sits in its own flex row with just the name, so it
-                  centers against that one line regardless of whether a
-                  context sub-line follows below (2026-07-25 alignment fix —
-                  previously top-aligned against the whole li block, which
-                  put the dot visibly above center once a sub-line existed). */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                <span style={{
-                  width:           5,
-                  height:          5,
-                  borderRadius:    '50%',
-                  backgroundColor: colors.fg,
-                  flexShrink:      0,
-                }} />
-                <span style={{
-                  fontSize:   14,
-                  fontWeight: 600,
-                  color:      'var(--color-text-primary)',
-                }}>
-                  {name}
-                </span>
-              </div>
-              {context && (
-                <div style={{
-                  fontSize:   13,
-                  color:      'var(--color-text-secondary)',
-                  marginTop:  1,
-                  paddingLeft: 'calc(5px + var(--space-2))',
-                }}>
-                  {toSentenceCase(context)}
-                </div>
-              )}
-            </li>
-          )
-        })}
+        {visible.map((use, i) => (
+          <UseEntry
+            key={i}
+            use={use}
+            colors={colors}
+            isLast={!hasMore && !showExtra && i === visible.length - 1}
+          />
+        ))}
+        {hasMore && showExtra && extra.map((use, i) => (
+          <UseEntry
+            key={i}
+            use={use}
+            colors={colors}
+            isLast={i === extra.length - 1}
+            style={{
+              opacity:    extraVisible ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+            }}
+          />
+        ))}
       </ul>
 
       {hasMore && (
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={handleToggle}
           aria-label={open ? 'See less' : 'See more'}
           style={{
             display:        'flex',
