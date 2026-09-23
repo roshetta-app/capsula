@@ -54,6 +54,12 @@
  * already do in sectionPrimitives.jsx, instead of appearing/disappearing
  * instantly.
  *
+ * 2026-09-23 (follow-up 3): the toggle was only reachable via the "See
+ * more"/"See less" button — the entries themselves did nothing when
+ * tapped. Each point now also triggers the same expand/collapse
+ * (`handleToggle`) on click/tap, only while `hasMore` is true, so users
+ * don't have to aim for the small button specifically.
+ *
  * Props:
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
@@ -79,10 +85,18 @@ function toSentenceCase(text) {
 // One use entry (dot + name + optional context sub-line). Pulled out of the
 // main render so the fading "extra" entries past TRUNCATE_AT and the always-
 // visible first 3 can share exactly the same markup/styling.
-function UseEntry({ use, colors, isLast, style }) {
+function UseEntry({ use, colors, isLast, style, onToggle }) {
   const { use_name: name, context } = use
   return (
-    <li style={{ marginBottom: isLast ? 0 : 'var(--space-2)', ...style }}>
+    <li
+      onClick={onToggle}
+      style={{
+        marginBottom: isLast ? 0 : 'var(--space-2)',
+        cursor:       onToggle ? 'pointer' : 'default',
+        WebkitTapHighlightColor: 'transparent',
+        ...style,
+      }}
+    >
       {/* Dot sits in its own flex row with just the name, so it centers
           against that one line regardless of whether a context sub-line
           follows below (2026-07-25 alignment fix — previously top-aligned
