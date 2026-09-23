@@ -73,9 +73,29 @@
  * hardcoded light-mode-only background (`#F9FAFB` on the cards, `#FEE2E2`
  * on the callout) that never switched for dark mode. Both backgrounds are
  * removed entirely — the cards now sit flat against the section's own
- * surface. The max-dose callout keeps its red text (`#991B1B`) so the
- * warning still reads clearly, just at a smaller font size (13 → 11) now
- * that it's plain text rather than a filled pill.
+ * surface. The max-dose callout's text color is now the app's
+ * `--color-danger` token (globals.css) instead of the hardcoded
+ * `#991B1B` — already dark/light-mode aware via the `.dark` overrides —
+ * at a smaller font size (13 → 11) now that it's plain text rather than
+ * a filled pill. It's also folded into the same gap-based flex stack as
+ * the bracket cards (instead of a separately-set `marginTop`), so the
+ * space above it matches the gap between the bracket cards exactly
+ * rather than stacking on top of the last card's own padding.
+ *
+ * 2026-09-23 (follow-up — spacing pass): with the card backgrounds gone,
+ * each bracket's own `var(--space-3)` internal padding no longer had a
+ * visible box to justify it — it just read as extra blank space and an
+ * unexplained left indent versus the "Dosage" title and tabs above.
+ * Dropped entirely; brackets now sit flush left, separated purely by the
+ * container's own `--space-3` gap (matches UsesSection.jsx's points,
+ * which are likewise flush with no per-item padding). The bracket
+ * title's `marginBottom` (a bare `4`) and the max-dose callout's padding
+ * (a bare `'4px 10px'`) are now expressed as `--space-1`/`--space-2`
+ * tokens instead of magic numbers, so every gap in the section comes
+ * from the same scale. Tier stays as before: `--space-3` between
+ * separate brackets/max-dose/the tab-level note (distinct items),
+ * `--space-2`/`--space-1` for a sub-element nested under one bracket
+ * (its own note, its own title-to-instruction gap).
  */
 
 import { useState } from 'react'
@@ -173,22 +193,19 @@ export default function DoseSection({ drug }) {
         </div>
       )}
 
-      {/* -- Bracket cards for the active tab -- */}
+      {/* -- Bracket cards for the active tab, plus the max-dose callout as
+            the last item in the same gap-based stack — so its spacing
+            above matches the gap between the bracket cards exactly,
+            instead of a separately-set margin stacking on top of it. -- */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
         {brackets.map((entry, idx) => (
-          <div
-            key={idx}
-            style={{
-              padding:      'var(--space-3)',
-              borderRadius: 'var(--radius-md)',
-            }}
-          >
+          <div key={idx}>
             {entry.bracket && (
               <div style={{
                 fontSize:     13,
-                fontWeight:   600,
+                fontWeight:   500,
                 color:        'var(--color-text-primary)',
-                marginBottom: 4,
+                marginBottom: 'var(--space-1)',
               }}>
                 {entry.bracket}
               </div>
@@ -222,21 +239,19 @@ export default function DoseSection({ drug }) {
             )}
           </div>
         ))}
-      </div>
 
-      {/* -- Max dose: once per tab, under all of this tab's bracket cards -- */}
-      {currentTab.max_dose && (
-        <div style={{
-          display:      'inline-block',
-          fontSize:     11,
-          color:        '#991B1B',
-          padding:      '4px 10px',
-          borderRadius: 'var(--radius-sm)',
-          marginTop:    'var(--space-3)',
-        }}>
-          <strong>Max:</strong> {currentTab.max_dose}
-        </div>
-      )}
+        {currentTab.max_dose && (
+          <div style={{
+            display:      'inline-block',
+            fontSize:     11,
+            color:        'var(--color-danger)',
+            padding:      'var(--space-1) var(--space-2)',
+            borderRadius: 'var(--radius-sm)',
+          }}>
+            <strong>Max:</strong> {currentTab.max_dose}
+          </div>
+        )}
+      </div>
 
       {/* -- General note: single field per generic (textbook_dose_notes),
             can't vary by population/bracket. Positioned at the very end of
