@@ -60,6 +60,17 @@
  * (`handleToggle`) on click/tap, only while `hasMore` is true, so users
  * don't have to aim for the small button specifically.
  *
+ * 2026-09-23 (follow-up 4): two bugs fixed.
+ *   - Title font bumped 15 → 17 to match DoseSection.jsx's "Dosage" title
+ *     exactly, so the two section headers read at the same size.
+ *   - The point-tap toggle from follow-up 3 wasn't actually working: the
+ *     `visible` and `extra` arrays were rendered as two separate .map()
+ *     calls under the same <ul>, each keyed 0, 1, 2… — duplicate React
+ *     keys across sibling elements, which lets React reuse/mismatch DOM
+ *     nodes (and their click handlers) between the two lists on
+ *     re-render. Keys are now prefixed per list (`v0`, `v1`… / `x0`,
+ *     `x1`…) so every rendered entry has a unique key.
+ *
  * Props:
  *   drug   — flat drug object from DrugContext
  *   colors — resolved category color token ({ bg, fg, pill }), the same
@@ -181,7 +192,7 @@ export default function UsesSection({ drug, colors, isDark }) {
       backgroundColor: 'var(--color-surface)',
     }}>
       <div style={{
-        fontSize:     15,
+        fontSize:     17,
         fontWeight:   700,
         color:        'var(--color-text-primary)',
         marginBottom: 'var(--space-3)',
@@ -192,18 +203,20 @@ export default function UsesSection({ drug, colors, isDark }) {
       <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
         {visible.map((use, i) => (
           <UseEntry
-            key={i}
+            key={`v${i}`}
             use={use}
             colors={colors}
             isLast={!hasMore && !showExtra && i === visible.length - 1}
+            onToggle={hasMore ? handleToggle : undefined}
           />
         ))}
         {hasMore && showExtra && extra.map((use, i) => (
           <UseEntry
-            key={i}
+            key={`x${i}`}
             use={use}
             colors={colors}
             isLast={i === extra.length - 1}
+            onToggle={handleToggle}
             style={{
               opacity:    extraVisible ? 1 : 0,
               transition: 'opacity 0.2s ease',

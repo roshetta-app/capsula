@@ -68,6 +68,14 @@
  * 1.18 single-unified-download change means a drug's data always arrives
  * complete in one shot, so there's no point where a section is "still
  * loading" versus genuinely empty.
+ *
+ * 2026-09-23: the bracket cards and the max-dose callout both used a
+ * hardcoded light-mode-only background (`#F9FAFB` on the cards, `#FEE2E2`
+ * on the callout) that never switched for dark mode. Both backgrounds are
+ * removed entirely — the cards now sit flat against the section's own
+ * surface. The max-dose callout keeps its red text (`#991B1B`) so the
+ * warning still reads clearly, just at a smaller font size (13 → 11) now
+ * that it's plain text rather than a filled pill.
  */
 
 import { useState } from 'react'
@@ -171,9 +179,8 @@ export default function DoseSection({ drug }) {
           <div
             key={idx}
             style={{
-              padding:         'var(--space-3)',
-              borderRadius:    'var(--radius-md)',
-              backgroundColor: '#F9FAFB',
+              padding:      'var(--space-3)',
+              borderRadius: 'var(--radius-md)',
             }}
           >
             {entry.bracket && (
@@ -220,13 +227,12 @@ export default function DoseSection({ drug }) {
       {/* -- Max dose: once per tab, under all of this tab's bracket cards -- */}
       {currentTab.max_dose && (
         <div style={{
-          display:         'inline-block',
-          fontSize:        13,
-          color:           '#991B1B',
-          backgroundColor: '#FEE2E2',
-          padding:         '4px 10px',
-          borderRadius:    'var(--radius-sm)',
-          marginTop:       'var(--space-3)',
+          display:      'inline-block',
+          fontSize:     11,
+          color:        '#991B1B',
+          padding:      '4px 10px',
+          borderRadius: 'var(--radius-sm)',
+          marginTop:    'var(--space-3)',
         }}>
           <strong>Max:</strong> {currentTab.max_dose}
         </div>
