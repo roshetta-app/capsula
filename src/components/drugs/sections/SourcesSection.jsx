@@ -44,8 +44,9 @@
  * its background/shadow treatment with — the hardcoded corner radius (`16`)
  * is now `--radius-lg` (globals.css), and the hardcoded drop shadow
  * (`0 2px 12px rgba(0,0,0,0.06)`, which stayed the same faint black in
- * dark mode) is now `--shadow-elevated`, which has its own dark-mode
- * override.
+ * dark mode) is now `--shadow-ambient-panel-full` — globals.css's own
+ * wide-blur, very-low-opacity "gently lifted" shadow, picked (over
+ * `--shadow-elevated`, tried first) for reading noticeably fainter.
  */
 
 import { ExternalLink, FileText } from 'lucide-react'
@@ -68,7 +69,7 @@ export default function SourcesSection({ drug }) {
       marginBottom:    'var(--space-5)',
       backgroundColor: 'var(--color-surface)',
       borderRadius:    'var(--radius-lg)',
-      boxShadow:       'var(--shadow-elevated)',
+      boxShadow:       'var(--shadow-ambient-panel-full)',
       padding:         'var(--space-4)',
     }}>
       <div style={{

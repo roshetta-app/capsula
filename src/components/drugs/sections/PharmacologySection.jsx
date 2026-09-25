@@ -34,6 +34,11 @@
  * chevron also swapped its ChevronUp/ChevronDown icon-swap for a single
  * chevron that rotates 180° (transform+transition), matching the toggle
  * animation already established on Uses/Side Effects/Contraindications.
+ *
+ * 2026-09-23 (follow-up): `--shadow-elevated` still read as too strong.
+ * Switched to `--shadow-ambient-panel-full` — globals.css's own "gently
+ * lifted rather than obviously [boxed]" ambient shadow (wide blur, very
+ * low opacity), built for exactly this "much fainter" floating-card look.
  */
 
 import { useState } from 'react'
@@ -58,7 +63,7 @@ export default function PharmacologySection({ drug }) {
       marginBottom:    'var(--space-5)',
       backgroundColor: 'var(--color-surface)',
       borderRadius:    'var(--radius-lg)',
-      boxShadow:       'var(--shadow-elevated)',
+      boxShadow:       'var(--shadow-ambient-panel-full)',
       padding:         'var(--space-4)',
     }}>
       <button
