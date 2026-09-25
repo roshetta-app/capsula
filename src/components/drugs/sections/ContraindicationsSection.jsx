@@ -24,10 +24,20 @@
  * matches this shape (step 2.1, resolved as a no-op).
  *
  * Props: drug — flat drug object from DrugContext
+ *
+ * 2026-09-23: neither the "See more"/"See less" toggle nor the truncated
+ * entries animated — the button swapped ChevronUp/ChevronDown icons
+ * instantly and the extra entries past TRUNCATE_AT just appeared or
+ * vanished. Brought in line with the pattern already established in
+ * UsesSection.jsx/SideEffectsSection.jsx: a single chevron that rotates
+ * 180° (transform+transition) on the button, and the extra entries fade
+ * in/out (two-frame opacity transition) instead of popping instantly.
+ * Each entry is also now clickable (same `handleToggle`, only while
+ * `hasMore`), matching UsesSection.jsx's points — not just the button.
  */
 
-import { useState } from 'react'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { SPECIALTY_TOKENS, hexToRgb } from '../../../utils/specialtyTokens.js'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
@@ -44,17 +54,48 @@ const DANGER_ALPHA = { light: 0.14, dark: 0.22 }
 
 export default function ContraindicationsSection({ drug }) {
   const [open, setOpen] = useState(false)
+  // showExtra: the past-3 entries are in the layout at all. extraVisible:
+  // they're opaque. Kept separate (same pattern as UsesSection.jsx) so a
+  // fade-out can finish before the entries are removed.
+  const [showExtra, setShowExtra]       = useState(false)
+  const [extraVisible, setExtraVisible] = useState(false)
+  const timerRef = useRef(null)
+  const rafRef   = useRef(null)
   const isDark = useIsDark()
+
+  useEffect(() => () => {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+  }, [])
 
   const { contraindications = [] } = drug
 
   if (contraindications.length === 0) return null
 
   const hasMore = contraindications.length > TRUNCATE_AT
-  const shown = open ? contraindications : contraindications.slice(0, TRUNCATE_AT)
+  const visible = contraindications.slice(0, TRUNCATE_AT)
+  const extra   = contraindications.slice(TRUNCATE_AT)
 
   const [r, g, b] = hexToRgb(SPECIALTY_TOKENS.red.light.pill)
   const dangerBg = `rgba(${r}, ${g}, ${b}, ${isDark ? DANGER_ALPHA.dark : DANGER_ALPHA.light})`
+
+  function handleToggle() {
+    clearTimeout(timerRef.current)
+    cancelAnimationFrame(rafRef.current)
+    if (!open) {
+      setOpen(true)
+      setShowExtra(true)
+      // Two frames so the extra entries paint once at opacity 0 before
+      // fading in, instead of popping straight to opacity 1.
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = requestAnimationFrame(() => setExtraVisible(true))
+      })
+    } else {
+      setOpen(false)
+      setExtraVisible(false)
+      timerRef.current = setTimeout(() => setShowExtra(false), 200)
+    }
+  }
 
   return (
     <div style={{
@@ -73,13 +114,37 @@ export default function ContraindicationsSection({ drug }) {
       </div>
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'disc', paddingLeft: 'var(--space-4)' }}>
-        {shown.map((ci, i) => (
-          <li key={i} style={{
-            fontSize:     14,
-            color:        'var(--color-text-primary)',
-            lineHeight:   1.6,
-            marginBottom: i === shown.length - 1 ? 0 : 'var(--space-2)',
-          }}>
+        {visible.map((ci, i) => (
+          <li
+            key={`v${i}`}
+            onClick={hasMore ? handleToggle : undefined}
+            style={{
+              fontSize:     14,
+              color:        'var(--color-text-primary)',
+              lineHeight:   1.6,
+              marginBottom: (!hasMore && !showExtra && i === visible.length - 1) ? 0 : 'var(--space-2)',
+              cursor:       hasMore ? 'pointer' : 'default',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {ci}
+          </li>
+        ))}
+        {hasMore && showExtra && extra.map((ci, i) => (
+          <li
+            key={`x${i}`}
+            onClick={handleToggle}
+            style={{
+              fontSize:     14,
+              color:        'var(--color-text-primary)',
+              lineHeight:   1.6,
+              marginBottom: i === extra.length - 1 ? 0 : 'var(--space-2)',
+              opacity:      extraVisible ? 1 : 0,
+              transition:   'opacity 0.2s ease',
+              cursor:       'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
             {ci}
           </li>
         ))}
@@ -87,7 +152,8 @@ export default function ContraindicationsSection({ drug }) {
 
       {hasMore && (
         <button
-          onClick={() => setOpen(o => !o)}
+          onClick={handleToggle}
+          aria-label={open ? 'See less' : 'See more'}
           style={{
             display:        'flex',
             alignItems:     'center',
@@ -107,10 +173,13 @@ export default function ContraindicationsSection({ drug }) {
           }}
         >
           {open ? 'See less' : 'See more'}
-          {open
-            ? <ChevronUp size={14} />
-            : <ChevronDown size={14} />
-          }
+          <ChevronDown
+            size={14}
+            style={{
+              transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
         </button>
       )}
     </div>
