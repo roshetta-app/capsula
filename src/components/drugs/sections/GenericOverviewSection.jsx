@@ -186,6 +186,20 @@
  * changing `WebkitLineClamp`'s value (the line count, or `'unset'` when
  * expanded) — now only `opacity` ever changes when toggling, so the
  * transition isn't interrupted.
+ *
+ * 2026-09-23 (follow-up 2): still flashed after the fix above. Real cause:
+ * the double-`requestAnimationFrame` used to delay the fade-in a frame
+ * wasn't actually guaranteeing the browser had painted the just-flipped
+ * clamp state first — removing the line-clamp is a real reflow, and on a
+ * loaded frame that reflow can still be pending when the second rAF
+ * fires, so the browser collapses the opacity-0 "before" frame and the
+ * opacity-1 "after" frame into one paint, skipping the transition
+ * entirely. Replaced the second rAF with a forced synchronous reflow
+ * (`moaTextRef.current.offsetHeight`, read then discarded) inside the
+ * first rAF, immediately before setting the opacity back to 1 — the read
+ * forces the browser to finish computing the new layout right then,
+ * before the opacity change, so there's now a real "before" frame for it
+ * to fade from. Same fix applies to the collapse direction.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -253,7 +267,14 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     moaTimerRef.current = setTimeout(() => {
       setMoaOpen(o => !o)
       moaRafRef.current = requestAnimationFrame(() => {
-        moaRafRef.current = requestAnimationFrame(() => setMoaVisible(true))
+        // Force the browser to actually compute/paint the just-flipped
+        // clamp state (a real reflow — the line count just changed)
+        // before starting the opacity transition. Without this read, the
+        // reflow and the opacity flip can land in the same paint, and the
+        // browser skips straight to the end state instead of animating
+        // between them — seen as a flash/pop rather than a fade.
+        if (moaTextRef.current) void moaTextRef.current.offsetHeight
+        setMoaVisible(true)
       })
     }, 200)
   }
