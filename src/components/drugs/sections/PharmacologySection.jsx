@@ -24,10 +24,20 @@
  * fixed 5-field object per decision 4.16.
  *
  * Props: drug — flat drug object from DrugContext
+ *
+ * 2026-09-23: the card's corner radius (`16`) and drop shadow
+ * (`0 2px 12px rgba(0,0,0,0.06)`) were both hardcoded — the radius happens
+ * to match globals.css's `--radius-lg` exactly, so swapped straight to the
+ * token, and the shadow is now `--shadow-elevated`, which (unlike the
+ * hardcoded value) has its own explicit dark-mode override in globals.css
+ * instead of staying the same faint black in both themes. The collapse
+ * chevron also swapped its ChevronUp/ChevronDown icon-swap for a single
+ * chevron that rotates 180° (transform+transition), matching the toggle
+ * animation already established on Uses/Side Effects/Contraindications.
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, FlaskConical } from 'lucide-react'
+import { ChevronDown, FlaskConical } from 'lucide-react'
 
 export default function PharmacologySection({ drug }) {
   const [open, setOpen] = useState(false)
@@ -47,8 +57,8 @@ export default function PharmacologySection({ drug }) {
     <div style={{
       marginBottom:    'var(--space-5)',
       backgroundColor: 'var(--color-surface)',
-      borderRadius:    16,
-      boxShadow:       '0 2px 12px rgba(0,0,0,0.06)',
+      borderRadius:    'var(--radius-lg)',
+      boxShadow:       'var(--shadow-elevated)',
       padding:         'var(--space-4)',
     }}>
       <button
@@ -85,10 +95,15 @@ export default function PharmacologySection({ drug }) {
           </div>
         </div>
 
-        {open
-          ? <ChevronUp size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-          : <ChevronDown size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-        }
+        <ChevronDown
+          size={16}
+          color="var(--color-text-tertiary)"
+          style={{
+            flexShrink: 0,
+            transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s ease',
+          }}
+        />
       </button>
 
       {open && (

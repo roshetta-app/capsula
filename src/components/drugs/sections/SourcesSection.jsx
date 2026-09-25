@@ -39,6 +39,13 @@
  *     present
  *
  * Props: drug — flat drug object from DrugContext
+ *
+ * 2026-09-23: same fix as PharmacologySection.jsx, which this card shares
+ * its background/shadow treatment with — the hardcoded corner radius (`16`)
+ * is now `--radius-lg` (globals.css), and the hardcoded drop shadow
+ * (`0 2px 12px rgba(0,0,0,0.06)`, which stayed the same faint black in
+ * dark mode) is now `--shadow-elevated`, which has its own dark-mode
+ * override.
  */
 
 import { ExternalLink, FileText } from 'lucide-react'
@@ -60,8 +67,8 @@ export default function SourcesSection({ drug }) {
     <div style={{
       marginBottom:    'var(--space-5)',
       backgroundColor: 'var(--color-surface)',
-      borderRadius:    16,
-      boxShadow:       '0 2px 12px rgba(0,0,0,0.06)',
+      borderRadius:    'var(--radius-lg)',
+      boxShadow:       'var(--shadow-elevated)',
       padding:         'var(--space-4)',
     }}>
       <div style={{
