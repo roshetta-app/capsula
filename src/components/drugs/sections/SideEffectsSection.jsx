@@ -47,6 +47,13 @@
  * sectionPrimitives.jsx) instead of popping instantly. Each item is also
  * now clickable (same `handleToggle`, only while `hasMore`), matching
  * Uses/Contraindications — not just the button.
+ *
+ * 2026-09-23 (follow-up): while collapsed, added a plain "···" placeholder
+ * as the 4th bullet (same list-item styling, so it picks up the same disc
+ * marker as the real items) whenever `hasMore` is true — a visual cue that
+ * more items are hidden below, beyond just the "See all" button. Clicking
+ * it expands, same as any other item. It's swapped out for the real
+ * (fading-in) extra items the moment `expanded` flips true.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -161,6 +168,22 @@ export default function SideEffectsSection({ drug }) {
             {se}
           </li>
         ))}
+        {hasMore && !expanded && (
+          <li
+            onClick={handleToggle}
+            aria-hidden="true"
+            style={{
+              fontSize:     14,
+              color:        'var(--color-text-secondary)',
+              lineHeight:   1.6,
+              marginBottom: 0,
+              cursor:       'pointer',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            ···
+          </li>
+        )}
         {hasMore && showExtra && extra.map((se, i) => (
           <li
             key={`x${i}`}
