@@ -44,7 +44,9 @@
  * pattern: a single chevron that rotates 180° (transform+transition) on
  * the button, and the extra items fade in/out (two-frame opacity
  * transition, same as UsesSection.jsx/InlineTruncatedList in
- * sectionPrimitives.jsx) instead of popping instantly.
+ * sectionPrimitives.jsx) instead of popping instantly. Each item is also
+ * now clickable (same `handleToggle`, only while `hasMore`), matching
+ * Uses/Contraindications — not just the button.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -144,18 +146,25 @@ export default function SideEffectsSection({ drug }) {
 
       <ul style={{ margin: 0, padding: 0, listStyle: 'disc', paddingLeft: 'var(--space-4)' }}>
         {visible.map((se, i) => (
-          <li key={`v${i}`} style={{
-            fontSize:     14,
-            color:        'var(--color-text-primary)',
-            lineHeight:   1.6,
-            marginBottom: 'var(--space-2)',
-          }}>
+          <li
+            key={`v${i}`}
+            onClick={hasMore ? handleToggle : undefined}
+            style={{
+              fontSize:     14,
+              color:        'var(--color-text-primary)',
+              lineHeight:   1.6,
+              marginBottom: 'var(--space-2)',
+              cursor:       hasMore ? 'pointer' : 'default',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
             {se}
           </li>
         ))}
         {hasMore && showExtra && extra.map((se, i) => (
           <li
             key={`x${i}`}
+            onClick={handleToggle}
             style={{
               fontSize:     14,
               color:        'var(--color-text-primary)',
@@ -163,6 +172,8 @@ export default function SideEffectsSection({ drug }) {
               marginBottom: 'var(--space-2)',
               opacity:      extraVisible ? 1 : 0,
               transition:   'opacity 0.2s ease',
+              cursor:       'pointer',
+              WebkitTapHighlightColor: 'transparent',
             }}
           >
             {se}
