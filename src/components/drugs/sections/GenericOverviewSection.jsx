@@ -155,6 +155,25 @@
  * tokens), instead of no visual feedback at all on tap. Padding/negative-
  * margin added so the tint has room without shifting the button's visual
  * position in the row.
+ *
+ * 2026-09-23: MOA's reveal used its own bespoke animation (a box whose
+ * `height` grows/shrinks via a frozen-then-retargeted inline style, timed
+ * with a setTimeout to re-clamp the text after) — a different mechanism
+ * from every truncating list elsewhere in the app (Uses/Side Effects/
+ * Contraindications), which fade the revealed content in/out via opacity
+ * (two-frame `requestAnimationFrame`, 0.2s ease), gated by a `showX`/
+ * `xVisible` state pair. MOA has continuous text rather than discrete
+ * items, so there's nothing to individually fade in the same shape — the
+ * closest equivalent, and what's now built, is a cross-fade of the whole
+ * paragraph: on toggle, fade out, swap the clamp state once the fade
+ * finishes, then fade the (now expanded or re-clamped) text back in — same
+ * `--space`-independent 0.2s ease opacity transition and two-frame RAF
+ * used everywhere else. `moaBoxRef`/`moaClosedHeightRef`/the height
+ * `useLayoutEffect` are gone with the box-height approach; the clamped-vs-
+ * expanded `hasMore` measurement (decision 2, 2026-09-19) is unchanged —
+ * still measured off the rendered clamp, not a word count. TextToggle's
+ * own look (plain bold blue "More"/"Less", no chevron) is unchanged; this
+ * only touches how the reveal itself animates.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -179,26 +198,22 @@ const MOA_CLAMP_LINES = 3
 
 export default function GenericOverviewSection({ drug, siblings = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
+  // moaOpen: expanded (true) or clamped-to-3-lines (false) — this directly
+  // drives which style the paragraph renders with. moaVisible: the
+  // cross-fade opacity, same showX/xVisible shape used by every other
+  // truncating list on this page.
   const [moaOpen,    setMoaOpen]    = useState(false)
+  const [moaVisible, setMoaVisible] = useState(true)
   const [moaHasMore, setMoaHasMore] = useState(false)
   // Tap feedback for the "Similar Brands" button — same pressed/pointer-
   // event pattern SharedDrugCard.jsx uses (muted background tint + a
   // subtle scale(0.99), same shared motion tokens), matched here so this
   // button feels consistent with the rest of the app's tappable rows.
   const [similarBrandsPressed, setSimilarBrandsPressed] = useState(false)
-  // Decoupled from moaOpen (see handleMoaToggle below) — lets the collapse
-  // animation shrink the box around the still-full text instead of the text
-  // itself snapping to 3 lines the instant the toggle is clicked.
-  const [moaClamped, setMoaClamped] = useState(true)
 
-  // Animated MOA reveal: the text sits in a clipped box whose height is
-  // frozen at its current value on click, then moved to the new text's
-  // height one frame later so the browser transitions between the two.
-  const moaBoxRef          = useRef(null)
-  const moaTextRef         = useRef(null)
-  const moaTimerRef        = useRef(null)
-  const moaRafRef          = useRef(null)
-  const moaClosedHeightRef = useRef(0)
+  const moaTextRef  = useRef(null)
+  const moaTimerRef = useRef(null)
+  const moaRafRef   = useRef(null)
 
   useEffect(() => () => {
     clearTimeout(moaTimerRef.current)
@@ -206,51 +221,29 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   }, [])
 
   // Measured once per drug, while the text is in its natural closed
-  // (clamped) state: the 3-line height to collapse back to, and whether the
-  // text actually overflows that clamp at all — this, not a word count,
-  // decides whether the toggle renders.
+  // (clamped) state: whether it actually overflows that clamp at all —
+  // this, not a word count, decides whether the toggle renders.
   useLayoutEffect(() => {
     const text = moaTextRef.current
     if (!text) return
-    moaClosedHeightRef.current = text.clientHeight
     setMoaHasMore(text.scrollHeight > text.clientHeight + 1)
   }, [drug?.mechanismOfAction])
 
-  useLayoutEffect(() => {
-    const box  = moaBoxRef.current
-    const text = moaTextRef.current
-    // Nothing frozen means this is the first render, not a toggle.
-    if (!box || !text || box.style.height === '') return
-    const target = moaOpen ? text.scrollHeight : moaClosedHeightRef.current
-    moaRafRef.current = requestAnimationFrame(() => {
-      box.style.height = `${target}px`
-    })
-    moaTimerRef.current = setTimeout(() => {
-      box.style.height = ''
-      // Only re-clamp once the collapse animation has actually finished —
-      // clamping the instant the toggle is clicked would snap the text to
-      // 3 lines before the box has visually shrunk to match, which is what
-      // made the old collapse feel abrupt.
-      if (!moaOpen) setMoaClamped(true)
-    }, 280)
-  }, [moaOpen])
-
   function handleMoaToggle() {
-    const box = moaBoxRef.current
     clearTimeout(moaTimerRef.current)
     cancelAnimationFrame(moaRafRef.current)
-    if (box) box.style.height = `${box.offsetHeight}px`
-    if (moaOpen) {
-      // Closing: leave the text unclamped through the shrink animation —
-      // moaClamped flips back to true only after it finishes, above — so
-      // it's the box, not the text, that visibly collapses.
-      setMoaOpen(false)
-    } else {
-      // Opening: unclamp immediately so the full text is laid out and
-      // ready to be revealed as the box grows.
-      setMoaClamped(false)
-      setMoaOpen(true)
-    }
+    // Fade the current (clamped or expanded) text out, swap the clamp
+    // state once that finishes, then fade the new state back in — the
+    // same cross-fade shape as the extra-items reveal in Uses/Side
+    // Effects/Contraindications, just applied to one paragraph instead of
+    // a list of rows.
+    setMoaVisible(false)
+    moaTimerRef.current = setTimeout(() => {
+      setMoaOpen(o => !o)
+      moaRafRef.current = requestAnimationFrame(() => {
+        moaRafRef.current = requestAnimationFrame(() => setMoaVisible(true))
+      })
+    }, 200)
   }
 
   const {
@@ -334,34 +327,33 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
       {/* ── Block 2: Mechanism of Action ────────────────────────────────── */}
       {/* Directly under the ingredients block, no label — clamped to ~3
           lines visually; TextToggle (plain bold blue text, no chevron)
-          appears only when the text actually overflows that clamp. */}
+          appears only when the text actually overflows that clamp. Reveal
+          is a cross-fade (opacity, 0.2s ease) — same animation style as
+          the extra-items reveal in Uses/Side Effects/Contraindications. */}
       {mechanismOfAction && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <div
-            ref={moaBoxRef}
-            style={{ overflow: 'hidden', transition: 'height 0.25s ease' }}
+          <p
+            ref={moaTextRef}
+            onClick={moaHasMore ? handleMoaToggle : undefined}
+            style={{
+              fontSize:   14,
+              color:      'var(--color-text-primary)',
+              lineHeight: 1.6,
+              margin:     0,
+              cursor:     moaHasMore ? 'pointer' : 'default',
+              opacity:    moaVisible ? 1 : 0,
+              transition: 'opacity 0.2s ease',
+              WebkitTapHighlightColor: 'transparent',
+              ...(!moaOpen ? {
+                display:         '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: MOA_CLAMP_LINES,
+                overflow:        'hidden',
+              } : {}),
+            }}
           >
-            <p
-              ref={moaTextRef}
-              onClick={moaHasMore ? handleMoaToggle : undefined}
-              style={{
-                fontSize:   14,
-                color:      'var(--color-text-primary)',
-                lineHeight: 1.6,
-                margin:     0,
-                cursor:     moaHasMore ? 'pointer' : 'default',
-                WebkitTapHighlightColor: 'transparent',
-                ...(moaClamped ? {
-                  display:         '-webkit-box',
-                  WebkitBoxOrient: 'vertical',
-                  WebkitLineClamp: MOA_CLAMP_LINES,
-                  overflow:        'hidden',
-                } : {}),
-              }}
-            >
-              {mechanismOfAction}
-            </p>
-          </div>
+            {mechanismOfAction}
+          </p>
           {moaHasMore && (
             <TextToggle
               open={moaOpen}
