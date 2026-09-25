@@ -174,6 +174,18 @@
  * still measured off the rendered clamp, not a word count. TextToggle's
  * own look (plain bold blue "More"/"Less", no chevron) is unchanged; this
  * only touches how the reveal itself animates.
+ *
+ * 2026-09-23 (follow-up): the fade-in on expand wasn't actually smooth —
+ * the full text popped in at full opacity instead of fading. Cause: the
+ * clamp styles (`display: '-webkit-box'`, etc.) were only applied while
+ * collapsed, spread in conditionally — so expanding also toggled
+ * `display` itself (`-webkit-box` → the paragraph's default `block`) at
+ * the exact moment the opacity fade-in should have started, which reset
+ * the in-flight CSS transition in testing. Fixed by keeping
+ * `display`/`WebkitBoxOrient`/`overflow` constant in both states and only
+ * changing `WebkitLineClamp`'s value (the line count, or `'unset'` when
+ * expanded) — now only `opacity` ever changes when toggling, so the
+ * transition isn't interrupted.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -336,20 +348,26 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
             ref={moaTextRef}
             onClick={moaHasMore ? handleMoaToggle : undefined}
             style={{
-              fontSize:   14,
-              color:      'var(--color-text-primary)',
-              lineHeight: 1.6,
-              margin:     0,
-              cursor:     moaHasMore ? 'pointer' : 'default',
-              opacity:    moaVisible ? 1 : 0,
-              transition: 'opacity 0.2s ease',
+              fontSize:        14,
+              color:           'var(--color-text-primary)',
+              lineHeight:      1.6,
+              margin:          0,
+              cursor:          moaHasMore ? 'pointer' : 'default',
+              opacity:         moaVisible ? 1 : 0,
+              transition:      'opacity 0.2s ease',
               WebkitTapHighlightColor: 'transparent',
-              ...(!moaOpen ? {
-                display:         '-webkit-box',
-                WebkitBoxOrient: 'vertical',
-                WebkitLineClamp: MOA_CLAMP_LINES,
-                overflow:        'hidden',
-              } : {}),
+              // display/WebkitBoxOrient/overflow stay constant across the
+              // toggle — only WebkitLineClamp's value changes. Switching
+              // `display` itself (as the previous version did, adding it
+              // only while clamped) reset the in-flight opacity
+              // transition in some WebKit builds, so the expanded text
+              // popped straight to full opacity instead of fading in —
+              // this keeps the box model identical in both states so only
+              // opacity is ever what's animating.
+              display:         '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: moaOpen ? 'unset' : MOA_CLAMP_LINES,
+              overflow:        'hidden',
             }}
           >
             {mechanismOfAction}
