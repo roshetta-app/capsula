@@ -85,6 +85,12 @@
  *     later open. This closes a blind spot where the light list could land
  *     successfully while the fuller background fetch silently failed,
  *     leaving onboarding reporting success with nothing actually saved.
+ *   - 2026-09-27 (class/subclass wiring): added subclass (generics) to
+ *     FULL_BRAND_SELECT and mapFlatDrugRows, right alongside the existing
+ *     class field — GenericOverviewSection.jsx's Classification block was
+ *     built earlier with two static placeholder pills, never reading real
+ *     data. class/subclass are still being populated (drug_group_categorization
+ *     project); most generics have neither value yet, some only class.
  *   - 2026-08-31 (download-timeout-fix): fetchAllBrandRows no longer sorts
  *     the deep, two-tables-away 'formulations.generics.name_en' column
  *     while paging, and no longer fires all ~20 pages at once. Root cause,
@@ -124,7 +130,7 @@ const FULL_BRAND_SELECT = `
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
     generics (
-      id, slug, name_en, category, class,
+      id, slug, name_en, category, class, subclass,
       uses_structured, warnings_legacy,
       side_effects,
       pregnancy_category, breastfeeding_safety,
@@ -361,6 +367,7 @@ function mapFlatDrugRows(rows) {
         ingredients:          g.ingredients ?? null,
         category:             g.category,
         class:                g.class,
+        subclass:             g.subclass,
         mechanismOfAction:    g.mechanism_of_action,
         uses:                 g.uses_structured ?? [],
         warnings:             g.warnings_legacy ?? [],

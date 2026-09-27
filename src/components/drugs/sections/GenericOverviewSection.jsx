@@ -200,6 +200,16 @@
  * forces the browser to finish computing the new layout right then,
  * before the opacity change, so there's now a real "before" frame for it
  * to fade from. Same fix applies to the collapse direction.
+ *
+ * 2026-09-27 (class/subclass wiring): the Class/Subclass pills below are no
+ * longer static placeholders — they now read the real `class`/`subclass`
+ * fields off the drug object (queries.js added `subclass` to the select and
+ * mapper this same session; `class` was already wired). Both columns are
+ * still being populated (drug_group_categorization project, in progress),
+ * so each pill only renders when its own field has a value, and the whole
+ * block hides when neither does — same hide-when-empty convention as the
+ * Mechanism of Action block above. Visual layout (floating pills, pillStyle)
+ * is unchanged.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -283,6 +293,8 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
     genericName,
     ingredients,
     mechanismOfAction,
+    class: drugClass,
+    subclass,
   } = drug
 
   // Combo generics (2+ active ingredients) — ingredients is now populated
@@ -402,14 +414,19 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         </div>
       )}
 
-      {/* -- Placeholder Class/Subclass tags (4.8) — reverted back to the
-            original floating pills per feedback (the compact card version
-            didn't land). Static labels, not real data yet; subclass column
-            deferred, plan §11.5. -- */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-        <span style={pillStyle}>Class</span>
-        <span style={pillStyle}>Subclass</span>
-      </div>
+      {/* -- Class/Subclass tags (4.8) — wired to real data 2026-09-27
+            (floating-pill layout unchanged from the placeholder version).
+            class/subclass are still mid-backfill (drug_group_categorization
+            project) — most generics have neither yet, some only class — so
+            each pill only renders when its own field has a value, and the
+            whole block hides when neither does, matching the Mechanism of
+            Action block's hide-when-empty pattern above. -- */}
+      {(drugClass || subclass) && (
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+          {drugClass && <span style={pillStyle}>{drugClass}</span>}
+          {subclass && <span style={pillStyle}>{subclass}</span>}
+        </div>
+      )}
 
       <BrandsBottomSheet
         isOpen={brandsOpen}
