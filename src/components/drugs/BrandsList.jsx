@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-ups in the sheet's own layer): BrandsBottomSheet now swipes
+ * between its two lists, and anything drawn inside a sliding list gets
+ * trapped inside that one list. So the sheet passes popupLayer (an empty
+ * full-sheet layer) and the filter pop-ups are drawn into it, which keeps the
+ * dim covering the tabs and drag handle too. Without popupLayer the pop-up is
+ * drawn in place, as before.
+ *
  * 2026-10-03 (generic pop-up order and quieter buttons): the Filter by
  * generic pop-up lists generics with the most brands first (same-count ones
  * A-Z). The pop-up's Clear filter and Done buttons are smaller and sit at the
@@ -210,6 +217,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -248,7 +256,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], onTap, mode = 'similar', familyName, saved = null, onSave }) {
+export default function BrandsList({ siblings = [], onTap, mode = 'similar', familyName, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -457,8 +465,12 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
         marginTop:       'var(--space-5)',
       }} />
 
-      {activeControl && (
-        <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />
+      {activeControl && (popupLayer
+        ? createPortal(
+            <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />,
+            popupLayer
+          )
+        : <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />
       )}
     </div>
   )
@@ -575,6 +587,7 @@ function FilterModal({ title, columns, wrap = false, single = false, showCounts 
         position:        'absolute',
         inset:           0,
         zIndex:          5,
+        pointerEvents:   'auto',
         backgroundColor: 'rgba(0,0,0,0.45)',
         display:         'flex',
         alignItems:      'center',

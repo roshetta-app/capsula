@@ -80,6 +80,17 @@
  * drug page, which is rebuilt per drug, so browsing to another drug or
  * leaving the page starts fresh.
  *
+ * 2026-10-03 (swipe between tabs): the Similar and Alternatives lists now sit
+ * side by side in a swipeable area (Embla, the carousel library the app already
+ * uses for ImageCarousel.jsx). Swiping sideways changes tab and tapping a tab
+ * slides to it. The tab bar stays fixed at the top; only the lists move. Each
+ * list keeps its own scroll position while the sheet is open. The filter
+ * pop-ups are drawn into a full-sheet layer that sits next to the tab bar and
+ * lists (not inside the sliding area, which would trap them inside one slide),
+ * so they still dim the whole sheet, tabs and drag handle included, and a
+ * sideways swipe cannot start while one is open. With no Alternatives there is
+ * no swipe area: one plain list, exactly as before.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -90,6 +101,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
+import useEmblaCarousel from 'embla-carousel-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 
@@ -152,6 +164,35 @@ export default function BrandsBottomSheet({
   const showTabs = alternatives.length > 0
   // No Alternatives: single Similar list. No Similar: Alternatives only.
   const activeTab = !showTabs ? 'similar' : siblings.length === 0 ? 'alternatives' : tab
+  // Two lists to swipe between only when both have brands.
+  const canSwipe = showTabs && siblings.length > 0
+
+  // Where the filter pop-ups are drawn (see the layer at the end of the sheet).
+  const [popupLayer, setPopupLayer] = useState(null)
+
+  // The swipe itself is Embla's: this sheet only tells it where to start and
+  // listens for which list it landed on. The Embla area is only rendered while
+  // tabs show; the hook is always called.
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    align:      'start',
+    loop:       false,
+    watchDrag:  canSwipe,
+    startIndex: initialTab === 'alternatives' ? 1 : 0,
+  })
+
+  // Swiping to the other list updates the highlighted tab.
+  useEffect(() => {
+    if (!emblaApi || !canSwipe) return
+    const onSelect = () => setTab(emblaApi.selectedScrollSnap() === 0 ? 'similar' : 'alternatives')
+    emblaApi.on('select', onSelect)
+    return () => emblaApi.off('select', onSelect)
+  }, [emblaApi, canSwipe])
+
+  // Tapping a tab: highlight it right away and slide to its list.
+  function goToTab(name) {
+    setTab(name)
+    if (canSwipe) emblaApi?.scrollTo(name === 'similar' ? 0 : 1)
+  }
 
   function handleTap(item) {
     onClose()
@@ -180,34 +221,76 @@ export default function BrandsBottomSheet({
             label="Similar"
             count={siblings.length}
             active={activeTab === 'similar'}
-            onClick={() => setTab('similar')}
+            onClick={() => goToTab('similar')}
           />
           <TabButton
             label="Alternatives"
             count={alternatives.length}
             active={activeTab === 'alternatives'}
-            onClick={() => setTab('alternatives')}
+            onClick={() => goToTab('alternatives')}
           />
         </div>
       )}
 
-      <div style={{
-        flex:      1,
-        minHeight: 0,
-        overflowY: 'auto',
-        padding:   `${showTabs ? 'var(--space-5)' : '0'} var(--space-4) var(--space-6)`,
-      }}>
-        <BrandsList
-          key={activeTab}
-          siblings={activeTab === 'alternatives' ? alternatives : siblings}
-          onTap={handleTap}
-          mode={activeTab}
-          saved={savedFilters.current[activeTab]}
-          onSave={picks => { savedFilters.current[activeTab] = picks }}
-          familyName={alternatives[0]?.subclass}
-        />
+      {showTabs ? (
+        // Swipeable area: both lists side by side. touchAction 'pan-y' leaves
+        // up/down scrolling to each list and gives sideways drags to Embla.
+        <div
+          ref={emblaRef}
+          style={{ flex: 1, minHeight: 0, overflow: 'hidden', touchAction: 'pan-y' }}
+        >
+          <div style={{ display: 'flex', height: '100%' }}>
+            {(canSwipe ? ['similar', 'alternatives'] : ['alternatives']).map(name => (
+              <div
+                key={name}
+                style={{
+                  flex:      '0 0 100%',
+                  minWidth:  0,
+                  height:    '100%',
+                  overflowY: 'auto',
+                  boxSizing: 'border-box',
+                  padding:   'var(--space-5) var(--space-4) var(--space-6)',
+                }}
+              >
+                <BrandsList
+                  siblings={name === 'alternatives' ? alternatives : siblings}
+                  onTap={handleTap}
+                  mode={name}
+                  saved={savedFilters.current[name]}
+                  onSave={picks => { savedFilters.current[name] = picks }}
+                  familyName={alternatives[0]?.subclass}
+                  popupLayer={popupLayer}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          flex:      1,
+          minHeight: 0,
+          overflowY: 'auto',
+          padding:   '0 var(--space-4) var(--space-6)',
+        }}>
+          <BrandsList
+            key="similar"
+            siblings={siblings}
+            onTap={handleTap}
+            mode="similar"
+            saved={savedFilters.current.similar}
+            onSave={picks => { savedFilters.current.similar = picks }}
+            popupLayer={popupLayer}
+          />
+        </div>
+      )}
       </div>
-      </div>
+      {/* Pop-up layer: covers the whole sheet (tabs and drag handle included)
+          and lets touches through until a pop-up is drawn into it. It sits
+          beside the frame above, not inside the sliding area. */}
+      <div
+        ref={setPopupLayer}
+        style={{ position: 'absolute', inset: 0, zIndex: 5, pointerEvents: 'none' }}
+      />
     </SheetShell>
   )
 }
