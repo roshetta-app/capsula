@@ -1,6 +1,20 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (filter controls redesign): Sort is no longer a pill. The two
+ * filter pills (Generic, Form) sit alone in one row; Sort is a quiet text
+ * control on the result-count line under them, which also shows 'Clear
+ * filters' while anything is picked. The Generic and Form filters no longer
+ * follow each other: a pick in one never changes the other (rules and their
+ * tests live in brandsFilterLogic.js). Each pop-up option shows how many
+ * brands it gives with the other filter applied; options giving none are
+ * dimmed and cannot be added (a picked option can always be removed).
+ * Alternatives always shows both pills (a pill with only one choice is greyed
+ * out and shows that choice, so the row never changes shape). Similar shows
+ * only the Form pill, and no pill row at all when there is a single form.
+ * If removing a pick leaves picks with nothing in common, the list shows
+ * 'No brands match' with a Clear filters button.
+ *
  * 2026-10-03 (titles and generic filter): both tabs share one larger heading,
  * 'Other <name> drugs' (generic name on Similar, subclass on Alternatives).
  * The Medicine filter is now 'Filter by generic' / 'N generics selected' /
@@ -164,7 +178,8 @@
  * accent pill (with the choice or a count) when a filter is applied; Sort
  * counts as applied once it is not the default A-Z.
  *
- * 2026-10-02 (Form and Medicine filters now depend on each other, so a pick
+ * [REPLACED 2026-10-03, see the filter-controls note near the top] 2026-10-02
+ * (Form and Medicine filters now depend on each other, so a pick
  * never leads to an empty list): the Form pop-up only offers forms that
  * exist among the currently chosen medicines (all medicines when none is
  * chosen), and the Medicine pop-up only offers medicines that have a brand
@@ -181,6 +196,7 @@ import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
+import { applyFilters, countByForm, countByGeneric, sortItems, isOptionLocked } from './brandsFilterLogic.js'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
@@ -218,10 +234,10 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
-  const [formSel,     setFormSel]     = useState(saved?.formSel     ?? [])     // picked form groups; [] = all
-  const [medicineSel, setMedicineSel] = useState(saved?.medicineSel ?? [])     // picked genericIds; [] = all
-  const [sortMode,    setSortMode]    = useState(saved?.sortMode    ?? 'name') // 'name' | 'price'
-  const [openMenu,    setOpenMenu]    = useState(null)   // 'form' | 'medicine' | 'sort' | null
+  const [formSel,    setFormSel]    = useState(saved?.formSel    ?? [])     // picked form groups; [] = all
+  const [genericSel, setGenericSel] = useState(saved?.genericSel ?? [])     // picked genericIds; [] = all
+  const [sortMode,   setSortMode]   = useState(saved?.sortMode   ?? 'name') // 'name' | 'price'
+  const [openMenu,   setOpenMenu]   = useState(null)   // 'form' | 'generic' | 'sort' | null
   const { categories } = useCategories()
   const isDark = useIsDark()
   const { isDrugFavourited } = useFavouritesContext()
@@ -229,121 +245,91 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   // Hand every change to the sheet so it can remember the picks while the
   // person stays on this drug's page.
   useEffect(() => {
-    onSave?.({ formSel, medicineSel, sortMode })
-  }, [formSel, medicineSel, sortMode]) // eslint-disable-line react-hooks/exhaustive-deps
+    onSave?.({ formSel, genericSel, sortMode })
+  }, [formSel, genericSel, sortMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // No real siblings — section disappears entirely.
   if (siblings.length === 0) return null
 
-  // Whole-list facts (decide whether each filter exists at all, so the
-  // buttons don't appear and disappear while picking).
-  const groupsInList = FORM_OPTIONS.filter(opt =>
-    opt.value !== 'all' &&
-    siblings.some(s => resolveFormGroup(s.form)?.value === opt.value)
-  )
-  const showFormFilter = groupsInList.length > 1
+  const groupOf = s => resolveFormGroup(s.form)?.value ?? null
 
+  // Whole-list facts: which forms and generics exist at all (decides which
+  // pills show, so they don't appear and disappear while picking).
+  const formGroupsInList = FORM_OPTIONS.filter(opt =>
+    opt.value !== 'all' && siblings.some(s => groupOf(s) === opt.value)
+  )
   const nameById = new Map(siblings.map(s => [s.genericId, s.genericName]))
-  const showMedicineFilter = isAlternatives && nameById.size > 1
 
-  // Form options: only forms that exist among the chosen medicines.
-  const formsFor = ids => FORM_OPTIONS
-    .filter(opt =>
-      opt.value !== 'all' &&
-      siblings.some(s =>
-        (ids.length === 0 || ids.includes(s.genericId)) &&
-        resolveFormGroup(s.form)?.value === opt.value
-      )
-    )
-    .map(g => ({ value: g.value, label: g.label }))
-  const formOptions = formsFor(medicineSel)
+  // The two filters never change each other. Each option only shows how many
+  // brands it would give with the OTHER filter's picks applied.
+  const activeGenerics = isAlternatives ? genericSel : []
+  const formCounts     = countByForm(siblings, activeGenerics, groupOf)
+  const genericCounts  = countByGeneric(siblings, formSel, groupOf)
 
-  // Medicine options: only medicines with a brand in the chosen forms, plus
-  // anything already chosen (so a chosen medicine never vanishes from view).
-  const idsInChosenForms = new Set(
-    siblings
-      .filter(s => formSel.length === 0 || formSel.includes(resolveFormGroup(s.form)?.value))
-      .map(s => s.genericId)
-  )
-  const medicineOptions = showMedicineFilter
-    ? [...nameById.entries()]
-        .filter(([id]) => idsInChosenForms.has(id) || medicineSel.includes(id))
-        .map(([value, label]) => ({ value, label: sentenceCase(label) }))
-        .sort((a, b) => a.label.localeCompare(b.label))
-    : []
-
-  // Name shown in the heading above the filters.
-  const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
+  const formOptions = formGroupsInList.map(g => ({
+    value: g.value, label: g.label, count: formCounts.get(g.value) ?? 0,
+  }))
+  const genericOptions = [...nameById.entries()]
+    .map(([value, label]) => ({ value, label: sentenceCase(label), count: genericCounts.get(value) ?? 0 }))
+    .sort((a, b) => a.label.localeCompare(b.label))
 
   const sortOptions = [
     { value: 'name',  label: 'Name (A–Z)' },
     { value: 'price', label: 'Cheapest first' },
   ]
 
-  const byForm = formSel.length === 0
-    ? siblings
-    : siblings.filter(s => formSel.includes(resolveFormGroup(s.form)?.value))
-  const filtered = !showMedicineFilter || medicineSel.length === 0
-    ? byForm
-    : byForm.filter(s => medicineSel.includes(s.genericId))
-
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortMode === 'price') {
-      const priceA = a.price ?? Infinity
-      const priceB = b.price ?? Infinity
-      if (priceA !== priceB) return priceA - priceB
-    }
-    return (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? '')
-  })
+  const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
+  const sorted   = sortItems(filtered, sortMode)
+  const filtersActive = formSel.length > 0 || activeGenerics.length > 0
 
   function toggleIn(list, setList, value) {
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
-
-  // Changing the chosen medicines keeps the chosen forms that are still
-  // available for the new set and drops the others (never clears them all).
-  function changeMedicines(next) {
-    setMedicineSel(next)
-    const stillThere = new Set(formsFor(next).map(o => o.value))
-    setFormSel(prev => prev.filter(v => stillThere.has(v)))
+  function clearFilters() {
+    setFormSel([])
+    setGenericSel([])
   }
 
-  // Every dropdown: its pill, and the menu it opens. Row 1 = sort + form
-  // (split evenly), row 2 = medicine (full width).
-  const sortControl = {
-    key: 'sort', icon: ArrowUpDown,
-    pillLabel: sortOptions.find(o => o.value === sortMode)?.label,
-    active: sortMode !== 'name',
-    menu: { title: 'Sort By', columns: 2, single: true, options: sortOptions, selected: [sortMode],
-            onPick: v => { setSortMode(v); setOpenMenu(null) } },
+  // Name shown in the heading above the filters.
+  const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
+
+  // The two filter pills. Alternatives: both always (greyed out when there is
+  // only one choice, showing that choice). Similar: Form only, and only when
+  // there is more than one form.
+  const genericControl = isAlternatives && nameById.size > 0 && {
+    key: 'generic', icon: Pill,
+    pillLabel: nameById.size === 1
+      ? sentenceCase([...nameById.values()][0])
+      : genericLabel(genericSel),
+    active: genericSel.length > 0,
+    disabled: nameById.size <= 1,
+    menu: { title: 'Filter by generic', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
+            options: genericOptions, selected: genericSel,
+            allLabel: 'All Generics', onAll: () => setGenericSel([]),
+            onPick: v => toggleIn(genericSel, setGenericSel, v),
+            onClear: () => setGenericSel([]) },
   }
-  const formControl = showFormFilter && {
+  const showFormPill = formGroupsInList.length > 0 && (isAlternatives || formGroupsInList.length > 1)
+  const formControl = showFormPill && {
     key: 'form', icon: ListFilter,
-    pillLabel: multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
+    pillLabel: formOptions.length === 1
+      ? formOptions[0].label
+      : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
-    disabled: formOptions.length <= 1 && formSel.length === 0,
+    disabled: formOptions.length <= 1,
     menu: { title: 'Form / Route', columns: 2, options: formOptions, selected: formSel,
             allLabel: 'All Forms', onAll: () => setFormSel([]),
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
-  const medicineControl = showMedicineFilter && {
-    key: 'medicine', icon: Pill,
-    pillLabel: genericLabel(medicineSel),
-    active: medicineSel.length > 0,
-    menu: { title: 'Filter by generic', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
-            options: medicineOptions, selected: medicineSel,
-            allLabel: 'All Generics', onAll: () => changeMedicines([]),
-            onPick: v => changeMedicines(
-              medicineSel.includes(v) ? medicineSel.filter(x => x !== v) : [...medicineSel, v]
-            ),
-            onClear: () => changeMedicines([]) },
+  // Sort is not a filter: it lives on the count line, never in the pill row.
+  const sortMenu = {
+    key: 'sort',
+    menu: { title: 'Sort By', columns: 2, single: true, options: sortOptions, selected: [sortMode],
+            onPick: v => { setSortMode(v); setOpenMenu(null) } },
   }
-  const rows = [
-    [sortControl, formControl].filter(Boolean),
-    [medicineControl].filter(Boolean),
-  ].filter(r => r.length > 0)
-  const activeControl = rows.flat().find(c => c.key === openMenu) || null
+  const pills = [genericControl, formControl].filter(Boolean)
+  const activeControl = [...pills, sortMenu].find(c => c.key === openMenu) || null
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -360,11 +346,11 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
         </p>
       )}
 
-      {/* Controls: each row of pills. Tapping one opens its pop-up
-          (FilterModal, rendered at the end of this component). */}
-      {rows.map((row, ri) => (
-        <div key={ri} style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-          {row.map(c => (
+      {/* Filter pills — the only buttons in this row. Tapping one opens its
+          pop-up (FilterModal, rendered at the end of this component). */}
+      {pills.length > 0 && (
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          {pills.map(c => (
             <PillButton
               key={c.key}
               icon={c.icon}
@@ -375,7 +361,42 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
             />
           ))}
         </div>
-      ))}
+      )}
+
+      {/* Count line: how many brands are showing (plus Clear filters while
+          anything is picked) on the left, Sort as a quiet text control on the right. */}
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        gap:            'var(--space-2)',
+        marginTop:      pills.length > 0 ? 'var(--space-3)' : 0,
+        fontSize:       13,
+        color:          'var(--color-text-secondary)',
+      }}>
+        <div style={{ minWidth: 0 }}>
+          {sorted.length} {sorted.length === 1 ? 'brand' : 'brands'}
+          {filtersActive && (
+            <>
+              {' · '}
+              <button
+                onClick={clearFilters}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  color: '#DC2626', WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                Clear filters
+              </button>
+            </>
+          )}
+        </div>
+        <SortButton
+          label={sortOptions.find(o => o.value === sortMode)?.label}
+          onPress={() => setOpenMenu('sort')}
+        />
+      </div>
 
       <div style={{ height: 'var(--space-2)' }} />
 
@@ -427,7 +448,38 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-// The three filter buttons. Inactive: plain outline. Active (a filter is
+// Sort control: plain text with a small icon and chevron, no outline or fill,
+// so it never reads as a filter. Same look whatever is chosen.
+function SortButton({ label, onPress }) {
+  return (
+    <button
+      onClick={onPress}
+      aria-haspopup="dialog"
+      style={{
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     4,
+        flexShrink:              0,
+        background:              'none',
+        border:                  'none',
+        padding:                 '6px 0 6px 8px',
+        fontSize:                13,
+        fontWeight:              500,
+        color:                   'var(--color-text-secondary)',
+        fontFamily:              'var(--font-body)',
+        cursor:                  'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+      }}
+    >
+      <ArrowUpDown size={14} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+      <span>{label}</span>
+      <ChevronDown size={13} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+    </button>
+  )
+}
+
+// The filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
 function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
   const [pressed, setPressed] = useState(false)
@@ -560,6 +612,8 @@ function FilterModal({ title, columns, wrap = false, single = false, listMaxHeig
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
                 showCheckbox={!single}
+                count={opt.count}
+                locked={isOptionLocked(opt.count, selected.includes(opt.value))}
               />
             ))}
           </div>
@@ -681,12 +735,13 @@ function ClearFilterButton({ onClick, disabled }) {
 
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus `wrap`
 // for long labels (several lines, softer corners) instead of one clipped line.
-function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false }) {
+function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, locked = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
-      onClick={onToggle}
-      onPointerDown={() => setPressed(true)}
+      onClick={locked ? undefined : onToggle}
+      aria-disabled={locked || undefined}
+      onPointerDown={() => !locked && setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
@@ -696,8 +751,9 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
         padding: '8px 14px',
         borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
         fontSize: 13, fontWeight: 500, textAlign: 'left',
-        cursor: 'pointer',
-        border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+        cursor: locked ? 'default' : 'pointer',
+        opacity: locked ? 0.45 : 1,
+        border: active ? '1.5px solid var(--color-accent)' : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
         backgroundColor: active ? 'var(--color-accent)' : 'transparent',
         color: active ? '#fff' : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
@@ -728,6 +784,14 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
         {label}
       </span>
+      {count !== undefined && (
+        <span style={{
+          marginLeft: 'auto', paddingLeft: 8, flexShrink: 0,
+          fontSize: 12, fontVariantNumeric: 'tabular-nums',
+        }}>
+          {count}
+        </span>
+      )}
     </button>
   )
 }
