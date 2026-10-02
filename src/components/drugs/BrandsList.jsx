@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (titles and generic filter): both tabs share one larger heading,
+ * 'Other <name> drugs' (generic name on Similar, subclass on Alternatives).
+ * The Medicine filter is now 'Filter by generic' / 'N generics selected' /
+ * 'All Generics', with a shorter pop-up list. The Sort pop-up has no round
+ * tick marks (pick one of two).
+ *
  * 2026-10-03 (remembered filters): Sort / Form / Medicine picks are reported
  * up through onSave and restored from the saved prop, so the sheet closing
  * (or switching tabs) no longer wipes them.
@@ -109,10 +115,9 @@
  * 2026-10-02 (Related drugs, Alternatives lookup): this list now serves two
  * tabs of the brands sheet. New props:
  *  - mode: 'similar' (default, same as before) or 'alternatives'.
- *  - showTitle: false hides the 'Similar Brands' section header when the
- *    sheet's tab bar already names the list (default true, so a sheet
- *    with no tabs looks the same as before).
- *  - familyName: the subclass name shown in the Alternatives note.
+ *  - familyName: the subclass name shown in the Alternatives heading.
+ *  (The old showTitle prop and 'Similar Brands' header were removed on
+ *  2026-10-03; both tabs now use the 'Other <name> drugs' heading.)
  * Alternatives mode adds a short note ('options for a professional to
  * consider, not direct substitutes') and a third dropdown pill, a
  * medicine filter, that narrows a big subclass to one generic. That pill
@@ -196,6 +201,12 @@ function sentenceCase(text) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : ''
 }
 
+// Pill text for the generic filter: a prompt when nothing is picked, else a count.
+function genericLabel(selected) {
+  if (selected.length === 0) return 'Filter by generic'
+  return `${selected.length} ${selected.length === 1 ? 'generic' : 'generics'} selected`
+}
+
 // Pill text for a multi-select filter: nothing picked, one picked, or a count.
 function multiLabel(selected, options, allLabel, plural) {
   if (selected.length === 0) return allLabel
@@ -203,7 +214,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], onTap, mode = 'similar', showTitle = true, familyName, saved = null, onSave }) {
+export default function BrandsList({ siblings = [], onTap, mode = 'similar', familyName, saved = null, onSave }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -261,6 +272,9 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
         .sort((a, b) => a.label.localeCompare(b.label))
     : []
 
+  // Name shown in the heading above the filters.
+  const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
+
   const sortOptions = [
     { value: 'name',  label: 'Name (A–Z)' },
     { value: 'price', label: 'Cheapest first' },
@@ -300,7 +314,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     key: 'sort', icon: ArrowUpDown,
     pillLabel: sortOptions.find(o => o.value === sortMode)?.label,
     active: sortMode !== 'name',
-    menu: { title: 'Sort By', columns: 2, options: sortOptions, selected: [sortMode],
+    menu: { title: 'Sort By', columns: 2, single: true, options: sortOptions, selected: [sortMode],
             onPick: v => { setSortMode(v); setOpenMenu(null) } },
   }
   const formControl = showFormFilter && {
@@ -315,10 +329,11 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
   }
   const medicineControl = showMedicineFilter && {
     key: 'medicine', icon: Pill,
-    pillLabel: multiLabel(medicineSel, medicineOptions, 'All Medicines', 'Medicines'),
+    pillLabel: genericLabel(medicineSel),
     active: medicineSel.length > 0,
-    menu: { title: 'Medicine', columns: 1, wrap: true, options: medicineOptions, selected: medicineSel,
-            allLabel: 'All Medicines', onAll: () => changeMedicines([]),
+    menu: { title: 'Filter by generic', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
+            options: medicineOptions, selected: medicineSel,
+            allLabel: 'All Generics', onAll: () => changeMedicines([]),
             onPick: v => changeMedicines(
               medicineSel.includes(v) ? medicineSel.filter(x => x !== v) : [...medicineSel, v]
             ),
@@ -332,27 +347,16 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
-      {showTitle && (
-        <div style={{
-          fontSize:     15,
-          fontWeight:   700,
-          color:        'var(--color-text-primary)',
-          marginBottom: 'var(--space-3)',
-        }}>
-          Similar Brands
-        </div>
-      )}
-
-      {/* Alternatives note: a shared subclass means 'same family', not 'safe
-          to swap' — kept short, subclass name in bold. */}
-      {isAlternatives && (
+      {/* Heading for both tabs: 'Other <name> drugs'. Similar uses the viewed
+          drug's generic name, Alternatives uses the subclass name. Name in bold. */}
+      {headingName && (
         <p style={{
-          fontSize:   13,
-          lineHeight: 1.5,
+          fontSize:   16,
+          lineHeight: 1.4,
           color:      'var(--color-text-secondary)',
           margin:     '0 0 var(--space-3)',
         }}>
-          Other{familyName ? <> <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{familyName}</strong></> : ''} drugs
+          Other <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong> drugs
         </p>
       )}
 
@@ -482,7 +486,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, columns, wrap = false, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, columns, wrap = false, single = false, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -542,7 +546,7 @@ function FilterModal({ title, columns, wrap = false, options, selected, allLabel
           )}
         </div>
 
-        <ScrollMenu maxHeight="min(320px, 45svh)">
+        <ScrollMenu maxHeight={listMaxHeight}>
           <div style={{
             display:             'grid',
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -555,6 +559,7 @@ function FilterModal({ title, columns, wrap = false, options, selected, allLabel
                 active={selected.includes(opt.value)}
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
+                showCheckbox={!single}
               />
             ))}
           </div>

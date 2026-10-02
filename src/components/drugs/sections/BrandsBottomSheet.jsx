@@ -202,7 +202,6 @@ export default function BrandsBottomSheet({
           mode={activeTab}
           saved={savedFilters.current[activeTab]}
           onSave={picks => { savedFilters.current[activeTab] = picks }}
-          showTitle={!showTabs}
           familyName={alternatives[0]?.subclass}
         />
       </div>
