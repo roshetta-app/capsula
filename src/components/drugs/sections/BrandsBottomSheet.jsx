@@ -65,6 +65,9 @@
  * underline under the active tab). Accessible name renamed 'Similar
  * drugs' -> 'Related drugs'.
  *
+ * 2026-10-02 (spacing): when the tab bar shows, the list area gets a roomier
+ * top padding so the note and filters don't sit tight under the tabs.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -166,7 +169,7 @@ export default function BrandsBottomSheet({
       <div style={{
         flex:      1,
         overflowY: 'auto',
-        padding:   '0 var(--space-4) var(--space-6)',
+        padding:   `${showTabs ? 'var(--space-5)' : '0'} var(--space-4) var(--space-6)`,
       }}>
         <BrandsList
           key={activeTab}

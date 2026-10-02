@@ -128,9 +128,22 @@
  * that drug's page when tapped (onTap, with a chevron) — those are different
  * medicines worth looking at. Rows on the Similar tab stay inert, as before.
  * onTap is only called from Alternatives rows.
+ *
+ * 2026-10-02 (filter redesign): the three dropdowns are now laid out as two
+ * rows — Sort and Form split 50/50 on the first row, and (Alternatives
+ * only) the Medicine filter full width under them. Each menu opens right
+ * under its own row in the same look as the Drugs filter panel: pill chips
+ * with the round tick indicator, an 'All ...' chip beside the section label,
+ * and a red 'Clear filter' button. Form and Medicine are multi-select (pick
+ * any number; none picked = everything); Sort is pick-one and closes on
+ * choice. Form and Sort menus use 2 columns; the Medicine menu is one
+ * column because the combo names are long. The app hides every native
+ * scrollbar (globals.css), so long menus draw their own thin scroll
+ * indicator (ScrollMenu below). Medicine names show in sentence case.
+ * The Alternatives note is now just 'Other [subclass] drugs'.
  */
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -142,54 +155,66 @@ import { useFavouritesContext } from '../../context/FavouritesContext'
 // Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
 // grouped filter option it belongs to (e.g. the 'Tab / Cap.' group) —
 // same grouping DrugFilterPanel.jsx's Form/Route section already uses,
-// via its exported FORM_OPTIONS. Every real raw form value in
-// config/forms.js is covered by exactly one group's `matches` list; a
-// value with no match (unexpected/legacy data) resolves to null and is
-// simply left out of the filter rather than guessed into a group.
+// via its exported FORM_OPTIONS. A value with no match resolves to null
+// and is simply left out of the filter rather than guessed into a group.
 function resolveFormGroup(rawForm) {
   if (!rawForm) return null
   return FORM_OPTIONS.find(opt => opt.value !== 'all' && opt.matches.includes(rawForm)) || null
 }
 
+// 'brompheniramine + paracetamol' -> 'Brompheniramine + paracetamol'
+function sentenceCase(text) {
+  const t = (text ?? '').trim().toLowerCase()
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : ''
+}
+
+// Pill text for a multi-select filter: nothing picked, one picked, or a count.
+function multiLabel(selected, options, allLabel, plural) {
+  if (selected.length === 0) return allLabel
+  if (selected.length === 1) return options.find(o => o.value === selected[0])?.label ?? allLabel
+  return `${selected.length} ${plural}`
+}
+
 export default function BrandsList({ siblings = [], onTap, mode = 'similar', showTitle = true, familyName }) {
   const isAlternatives = mode === 'alternatives'
-  const [formFilter, setFormFilter] = useState('all')
-  const [medicineFilter, setMedicineFilter] = useState('all')
-  const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
-  const [openMenu,   setOpenMenu]   = useState(null)   // 'form' | 'medicine' | 'sort' | null
+  const [formSel,     setFormSel]     = useState([])   // picked form groups; [] = all
+  const [medicineSel, setMedicineSel] = useState([])   // picked genericIds; [] = all
+  const [sortMode,    setSortMode]    = useState('name') // 'name' | 'price'
+  const [openMenu,    setOpenMenu]    = useState(null)   // 'form' | 'medicine' | 'sort' | null
   const { categories } = useCategories()
   const isDark = useIsDark()
   const { isDrugFavourited } = useFavouritesContext()
 
-  // No real siblings — section disappears entirely, same as today's behavior
-  // when the list is empty.
+  // No real siblings — section disappears entirely.
   if (siblings.length === 0) return null
 
-  // Distinct grouped form options actually present among the siblings —
-  // e.g. two capsule brands and one tablet brand both land in the same
-  // 'Tab / Cap.' group, so that counts as one group, not two.
+  // Distinct grouped form options actually present among the siblings.
   const presentGroups = FORM_OPTIONS.filter(opt =>
     opt.value !== 'all' &&
     siblings.some(s => resolveFormGroup(s.form)?.value === opt.value)
   )
   const showFormFilter = presentGroups.length > 1
+  const formOptions = presentGroups.map(g => ({ value: g.value, label: g.label }))
 
-  // Alternatives only: the distinct generics present in the list, for the
-  // medicine filter. Keyed by genericId, labelled by the generic's name,
-  // alphabetical. Spanning only one generic means nothing to narrow.
+  // Alternatives only: the distinct generics present in the list.
   const medicineOptions = isAlternatives
     ? [...new Map(siblings.map(s => [s.genericId, s.genericName])).entries()]
-        .map(([value, label]) => ({ value, label: label ?? '' }))
+        .map(([value, label]) => ({ value, label: sentenceCase(label) }))
         .sort((a, b) => a.label.localeCompare(b.label))
     : []
   const showMedicineFilter = medicineOptions.length > 1
 
-  const byForm = formFilter === 'all'
+  const sortOptions = [
+    { value: 'name',  label: 'Name (A–Z)' },
+    { value: 'price', label: 'Cheapest first' },
+  ]
+
+  const byForm = formSel.length === 0
     ? siblings
-    : siblings.filter(s => resolveFormGroup(s.form)?.value === formFilter)
-  const filtered = !showMedicineFilter || medicineFilter === 'all'
+    : siblings.filter(s => formSel.includes(resolveFormGroup(s.form)?.value))
+  const filtered = !showMedicineFilter || medicineSel.length === 0
     ? byForm
-    : byForm.filter(s => s.genericId === medicineFilter)
+    : byForm.filter(s => medicineSel.includes(s.genericId))
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === 'price') {
@@ -200,34 +225,44 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     return (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? '')
   })
 
-  // The dropdowns present for this list, in display order. Each one is a pill
-  // plus the options its menu shows.
-  const controls = [
-    showFormFilter && {
-      key: 'form', icon: ListFilter, value: formFilter, onChange: setFormFilter,
-      options: [
-        { value: 'all', label: 'All Forms' },
-        ...presentGroups.map(g => ({ value: g.value, label: g.label })),
-      ],
-    },
-    showMedicineFilter && {
-      key: 'medicine', icon: Pill, value: medicineFilter, onChange: setMedicineFilter,
-      options: [{ value: 'all', label: 'All Medicines' }, ...medicineOptions],
-    },
-    {
-      key: 'sort', icon: ArrowUpDown, value: sortMode, onChange: setSortMode,
-      options: [
-        { value: 'name',  label: 'Name (A–Z)' },
-        { value: 'price', label: 'Cheapest first' },
-      ],
-    },
-  ].filter(Boolean)
-  const activeControl = controls.find(c => c.key === openMenu) || null
+  function toggleIn(list, setList, value) {
+    setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
+  }
+
+  // Every dropdown: its pill, and the menu it opens. Row 1 = sort + form
+  // (split evenly), row 2 = medicine (full width).
+  const sortControl = {
+    key: 'sort', icon: ArrowUpDown,
+    pillLabel: sortOptions.find(o => o.value === sortMode)?.label,
+    active: false,
+    menu: { title: 'Sort By', columns: 2, options: sortOptions, selected: [sortMode],
+            onPick: v => { setSortMode(v); setOpenMenu(null) } },
+  }
+  const formControl = showFormFilter && {
+    key: 'form', icon: ListFilter,
+    pillLabel: multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
+    active: formSel.length > 0,
+    menu: { title: 'Form / Route', columns: 2, options: formOptions, selected: formSel,
+            allLabel: 'All Forms', onAll: () => setFormSel([]),
+            onPick: v => toggleIn(formSel, setFormSel, v),
+            onClear: () => setFormSel([]) },
+  }
+  const medicineControl = showMedicineFilter && {
+    key: 'medicine', icon: Pill,
+    pillLabel: multiLabel(medicineSel, medicineOptions, 'All Medicines', 'Medicines'),
+    active: medicineSel.length > 0,
+    menu: { title: 'Medicine', columns: 1, wrap: true, options: medicineOptions, selected: medicineSel,
+            allLabel: 'All Medicines', onAll: () => setMedicineSel([]),
+            onPick: v => toggleIn(medicineSel, setMedicineSel, v),
+            onClear: () => setMedicineSel([]) },
+  }
+  const rows = [
+    [sortControl, formControl].filter(Boolean),
+    [medicineControl].filter(Boolean),
+  ].filter(r => r.length > 0)
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
-      {/* Section header — hidden when the sheet's tab bar already names
-          the list (showTitle false). */}
       {showTitle && (
         <div style={{
           fontSize:     15,
@@ -239,9 +274,8 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
         </div>
       )}
 
-      {/* Alternatives note (2026-10-02): a shared subclass means 'same
-          family', not 'safe to swap', so the list is framed as options for
-          a professional to consider. */}
+      {/* Alternatives note: a shared subclass means 'same family', not 'safe
+          to swap' — kept short, subclass name in bold. */}
       {isAlternatives && (
         <p style={{
           fontSize:   13,
@@ -249,54 +283,35 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
           color:      'var(--color-text-secondary)',
           margin:     '0 0 var(--space-3)',
         }}>
-          Other medicines in the same family{familyName ? ` as ${familyName}` : ''}.
-          {' '}Options for a professional to consider, not direct substitutes.
+          Other{familyName ? <> <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{familyName}</strong></> : ''} drugs
         </p>
       )}
 
-      {/* Controls: form filter + sort, as two in-app popover dropdown pills
-          (DropdownPill below) — button + absolutely-positioned option
-          list, click-outside-to-close. Replaces an earlier native-<select>
-          version (see dated notes above) that opened the browser/OS's own
-          picker UI instead of matching the app. Form options are grouped
-          the same way DrugFilterPanel.jsx's Form/Route section groups them
-          (see resolveFormGroup above). */}
-      <div style={{
-        display:      'flex',
-        gap:          'var(--space-2)',
-        marginBottom: openMenu ? 'var(--space-2)' : 'var(--space-3)',
-        flexWrap:     'wrap',
-      }}>
-        {controls.map(c => (
-          <PillButton
-            key={c.key}
-            icon={c.icon}
-            label={c.options.find(o => o.value === c.value)?.label}
-            open={openMenu === c.key}
-            onPress={() => setOpenMenu(m => (m === c.key ? null : c.key))}
-          />
-        ))}
-      </div>
+      {/* Controls: each row of pills, with the open menu right under the row
+          it belongs to (in normal flow, so the sheet never clips it). */}
+      {rows.map((row, ri) => {
+        const open = row.find(c => c.key === openMenu)
+        return (
+          <div key={ri}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+              {row.map(c => (
+                <PillButton
+                  key={c.key}
+                  icon={c.icon}
+                  label={c.pillLabel}
+                  open={openMenu === c.key}
+                  active={c.active}
+                  onPress={() => setOpenMenu(m => (m === c.key ? null : c.key))}
+                />
+              ))}
+            </div>
+            {open && <MenuPanel {...open.menu} />}
+          </div>
+        )
+      })}
 
-      {/* Open menu — rendered in normal flow under the pills (not a floating
-          popover), so the sheet's scroll area never clips it. */}
-      {activeControl && (
-        <OptionsPanel
-          options={activeControl.options}
-          value={activeControl.value}
-          onChange={v => { activeControl.onChange(v); setOpenMenu(null) }}
-        />
-      )}
+      <div style={{ height: 'var(--space-2)' }} />
 
-      {/* Rows — SharedDrugCard.jsx, same component Drugs/Favourites screens
-          use. It renders its own hairline divider between rows (isLast
-          suppresses it on the final one), so no wrapping gap/box styling
-          is needed here anymore. Not tappable and no chevron (2026-09-19)
-          — a sibling row here is informational, not a navigation target.
-          Trailing slot shows the heart icon (display-only, see
-          RowStarButton's readOnly prop) only for favourited drugs.
-          showImageSearch (2026-09-19, third follow-up) turns on the
-          image-search icon for this list only. */}
       <div>
         {sorted.map((item, i) => (
           <SharedDrugCard
@@ -330,19 +345,21 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function PillButton({ icon: Icon, label, open, onPress }) {
+function PillButton({ icon: Icon, label, open, active, onPress }) {
   return (
     <button
       onClick={onPress}
       aria-expanded={open}
       style={{
+        flex:                    1,
+        minWidth:                0,
         display:                 'flex',
         alignItems:              'center',
         gap:                     6,
         backgroundColor:         'var(--color-surface)',
-        border:                  `1px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        border:                  `1px solid ${open || active ? 'var(--color-accent)' : 'var(--color-border)'}`,
         borderRadius:            'var(--radius-full)',
-        padding:                 '6px 12px',
+        padding:                 '8px 12px',
         fontSize:                13,
         fontWeight:              500,
         color:                   'var(--color-text-primary)',
@@ -350,11 +367,15 @@ function PillButton({ icon: Icon, label, open, onPress }) {
         cursor:                  'pointer',
         WebkitTapHighlightColor: 'transparent',
         outline:                 'none',
-        maxWidth:                '100%',
       }}
     >
-      <Icon size={14} color="var(--color-text-secondary)" />
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <Icon size={14} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+      <span style={{
+        flex: 1, minWidth: 0, textAlign: 'left',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
+        {label}
+      </span>
       <ChevronDown
         size={14}
         color="var(--color-text-secondary)"
@@ -368,38 +389,195 @@ function PillButton({ icon: Icon, label, open, onPress }) {
   )
 }
 
-function OptionsPanel({ options, value, onChange }) {
+// Same look as DrugFilterPanel.jsx's Form / Route section: small grey title
+// with an 'All' chip beside it, a grid of tick chips, and a red 'Clear
+// filter' button. `columns` 1 or 2; `wrap` lets long labels wrap to several
+// lines instead of being clipped.
+function MenuPanel({ title, columns, wrap = false, options, selected, allLabel, onAll, onPick, onClear }) {
+  const hasSelection = selected.length > 0
   return (
     <div style={{
       marginBottom:    'var(--space-3)',
       backgroundColor: 'var(--color-surface)',
       border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-md)',
-      maxHeight:       240,
-      overflowY:       'auto',
+      padding:         'var(--space-3)',
     }}>
-      {options.map(opt => (
-        <button
-          key={opt.value}
-          onClick={() => onChange(opt.value)}
-          style={{
-            display:                 'block',
-            width:                   '100%',
-            textAlign:               'left',
-            padding:                 '10px 14px',
-            border:                  'none',
-            background:              'none',
-            fontSize:                13,
-            fontFamily:              'var(--font-body)',
-            fontWeight:              opt.value === value ? 600 : 400,
-            color:                   opt.value === value ? 'var(--color-accent)' : 'var(--color-text-primary)',
-            cursor:                  'pointer',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          {opt.label}
-        </button>
-      ))}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 'var(--space-2)', marginBottom: 'var(--space-2)',
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+          {title}
+        </div>
+        {onAll && (
+          <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
+        )}
+      </div>
+
+      <ScrollMenu maxHeight={220}>
+        <div style={{
+          display:             'grid',
+          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          gap:                 'var(--space-2)',
+        }}>
+          {options.map(opt => (
+            <ToggleChip
+              key={opt.value}
+              label={opt.label}
+              active={selected.includes(opt.value)}
+              onToggle={() => onPick(opt.value)}
+              wrap={wrap}
+            />
+          ))}
+        </div>
+      </ScrollMenu>
+
+      {onClear && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <ClearFilterButton onClick={onClear} disabled={!hasSelection} />
+        </div>
+      )}
     </div>
+  )
+}
+
+// Scroll box with a visible thin scroll indicator. The app hides every native
+// scrollbar (globals.css), so without this a long menu gives no hint that it
+// scrolls. The indicator only appears when the content is taller than the box.
+function ScrollMenu({ maxHeight, children }) {
+  const boxRef = useRef(null)
+  const [bar, setBar] = useState(null) // { top, height } in px, or null when nothing to scroll
+
+  function measure() {
+    const el = boxRef.current
+    if (!el || el.scrollHeight <= el.clientHeight + 1) { setBar(null); return }
+    const ratio  = el.clientHeight / el.scrollHeight
+    const height = Math.max(24, el.clientHeight * ratio)
+    const top    = (el.scrollTop / (el.scrollHeight - el.clientHeight)) * (el.clientHeight - height)
+    setBar({ top, height })
+  }
+
+  useEffect(() => {
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }) // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={boxRef}
+        onScroll={measure}
+        style={{
+          maxHeight,
+          overflowY:    'auto',
+          paddingRight: bar ? 10 : 0,
+        }}
+      >
+        {children}
+      </div>
+      {bar && (
+        <span
+          aria-hidden="true"
+          style={{
+            position:        'absolute',
+            right:           1,
+            top:             bar.top,
+            width:           4,
+            height:          bar.height,
+            borderRadius:    'var(--radius-full)',
+            backgroundColor: 'var(--color-text-tertiary)',
+            opacity:         0.6,
+            pointerEvents:   'none',
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// Copy of DrugFilterPanel.jsx's red Clear All button (not exported there),
+// relabelled for a single filter.
+function ClearFilterButton({ onClick, disabled }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onPointerDown={() => !disabled && setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        width: '100%', padding: '10px',
+        borderRadius: 'var(--radius-md)',
+        fontSize: 14, fontWeight: 600,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        border: disabled ? '1.5px solid var(--color-border)' : '1.5px solid #DC2626',
+        backgroundColor: disabled ? 'transparent' : '#DC2626',
+        color: disabled ? 'var(--color-text-tertiary)' : '#fff',
+        fontFamily: 'var(--font-body)',
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+        outline: 'none',
+      }}
+    >
+      Clear filter
+    </button>
+  )
+}
+
+// Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus `wrap`
+// for long labels (several lines, softer corners) instead of one clipped line.
+function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onToggle}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8,
+        width: fitContent ? 'auto' : '100%', minWidth: 0, boxSizing: 'border-box',
+        padding: '8px 14px',
+        borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
+        fontSize: 13, fontWeight: 500, textAlign: 'left',
+        cursor: 'pointer',
+        border: active ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+        color: active ? '#fff' : 'var(--color-text-secondary)',
+        fontFamily: 'var(--font-body)',
+        transform: pressed ? 'scale(0.96)' : 'scale(1)',
+        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+        WebkitTapHighlightColor: 'transparent',
+        outline: 'none',
+      }}
+    >
+      {showCheckbox && (
+        <span style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 15, height: 15, flexShrink: 0,
+          borderRadius: '50%',
+          border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
+          backgroundColor: active ? '#fff' : 'transparent',
+          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+        }}>
+          {active && (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          )}
+        </span>
+      )}
+      <span style={wrap
+        ? { minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }
+        : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+        {label}
+      </span>
+    </button>
   )
 }
