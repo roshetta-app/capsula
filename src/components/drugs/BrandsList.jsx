@@ -1,5 +1,10 @@
 /**
  * src/components/drugs/BrandsList.jsx
+ *
+ * 2026-10-03 (remembered filters): Sort / Form / Medicine picks are reported
+ * up through onSave and restored from the saved prop, so the sheet closing
+ * (or switching tabs) no longer wipes them.
+ *
  * Phase 2G — Drug Detail Screen
  * Step 3.11 (2026-07-16) — rebuilt per ADR-034: siblings now span the whole
  * generic across every form, not just the exact item's own formulation.
@@ -198,15 +203,23 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], onTap, mode = 'similar', showTitle = true, familyName }) {
+export default function BrandsList({ siblings = [], onTap, mode = 'similar', showTitle = true, familyName, saved = null, onSave }) {
   const isAlternatives = mode === 'alternatives'
-  const [formSel,     setFormSel]     = useState([])   // picked form groups; [] = all
-  const [medicineSel, setMedicineSel] = useState([])   // picked genericIds; [] = all
-  const [sortMode,    setSortMode]    = useState('name') // 'name' | 'price'
+  // Start from the picks the sheet remembered for this drug (if any), so
+  // closing and reopening the sheet keeps the filters.
+  const [formSel,     setFormSel]     = useState(saved?.formSel     ?? [])     // picked form groups; [] = all
+  const [medicineSel, setMedicineSel] = useState(saved?.medicineSel ?? [])     // picked genericIds; [] = all
+  const [sortMode,    setSortMode]    = useState(saved?.sortMode    ?? 'name') // 'name' | 'price'
   const [openMenu,    setOpenMenu]    = useState(null)   // 'form' | 'medicine' | 'sort' | null
   const { categories } = useCategories()
   const isDark = useIsDark()
   const { isDrugFavourited } = useFavouritesContext()
+
+  // Hand every change to the sheet so it can remember the picks while the
+  // person stays on this drug's page.
+  useEffect(() => {
+    onSave?.({ formSel, medicineSel, sortMode })
+  }, [formSel, medicineSel, sortMode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // No real siblings — section disappears entirely.
   if (siblings.length === 0) return null

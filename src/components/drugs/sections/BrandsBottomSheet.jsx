@@ -72,6 +72,12 @@
  * (70svh) instead of shrinking to fit a short list, so the tabs, filters and
  * pop-ups no longer jump around as filters change the list.
  *
+ * 2026-10-03 (remembered filters): each tab's Sort / Form / Medicine picks are
+ * kept here while the person stays on the same drug page, so closing the
+ * sheet or switching tabs doesn't clear them. This sheet lives inside the
+ * drug page, which is rebuilt per drug, so browsing to another drug or
+ * leaving the page starts fresh.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -81,7 +87,7 @@
  *   onSelectBrand (item) => void — called after this sheet closes
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 
@@ -132,6 +138,9 @@ export default function BrandsBottomSheet({
   onSelectBrand,
 }) {
   const [tab, setTab] = useState(initialTab)
+  // Remembered picks per tab (a ref: no re-render needed, only read when a
+  // list is built).
+  const savedFilters = useRef({ similar: null, alternatives: null })
 
   // Each time the sheet opens, start on the tab the person came in for.
   useEffect(() => {
@@ -191,6 +200,8 @@ export default function BrandsBottomSheet({
           siblings={activeTab === 'alternatives' ? alternatives : siblings}
           onTap={handleTap}
           mode={activeTab}
+          saved={savedFilters.current[activeTab]}
+          onSave={picks => { savedFilters.current[activeTab] = picks }}
           showTitle={!showTabs}
           familyName={alternatives[0]?.subclass}
         />
