@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (no 'All' chips): the 'All Forms' / 'All Generics' chips in the
+ * pop-up headers were removed; the Clear filter button does that job.
+ *
  * 2026-10-03 (pill contrast): inactive filter pills use the muted surface
  * tint instead of the sheet's own colour so they stand out from the sheet.
  *
@@ -314,7 +317,6 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
     disabled: nameById.size <= 1,
     menu: { title: 'Filter by generic', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions, selected: genericSel,
-            allLabel: 'All Generics', onAll: () => setGenericSel([]),
             onPick: v => toggleIn(genericSel, setGenericSel, v),
             onClear: () => setGenericSel([]) },
   }
@@ -327,7 +329,6 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
     menu: { title: 'Form / Route', columns: 2, showCounts: false, options: formOptions, selected: formSel,
-            allLabel: 'All Forms', onAll: () => setFormSel([]),
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
