@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (subclass Google search): the Alternatives title now has a blue
+ * search icon right after the subclass name. Tapping it opens a Google search
+ * for that subclass, the same way SharedDrugCard.jsx's image-search icon opens
+ * its search: Browser.open() from @capacitor/browser (in-app browser on the
+ * phone, new tab on the web). Plain web search, not Images. The Similar title
+ * shows the generic name rather than a subclass, so it has no icon.
+ *
  * 2026-10-03 (pop-ups in the sheet's own layer): BrandsBottomSheet now swipes
  * between its two lists, and anything drawn inside a sliding list gets
  * trapped inside that one list. So the sheet passes popupLayer (an empty
@@ -218,7 +225,8 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
+import { ChevronDown, ListFilter, ArrowUpDown, Pill, Search } from 'lucide-react'
+import { Browser } from '@capacitor/browser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
@@ -320,6 +328,12 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   // Name shown in the heading above the filters.
   const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
 
+  // Search icon after the subclass name (Alternatives only): same opening
+  // method as SharedDrugCard.jsx's image-search icon, but a plain web search.
+  function searchSubclass() {
+    Browser.open({ url: `https://www.google.com/search?q=${encodeURIComponent(headingName)}` })
+  }
+
   // The two filter pills. Alternatives: both always (greyed out when there is
   // only one choice, showing that choice). Similar: Form only, and only when
   // there is more than one form.
@@ -368,6 +382,22 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
           margin:     '0 0 var(--space-3)',
         }}>
           Other <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong> drugs
+          {isAlternatives && (
+            <button
+              onClick={searchSubclass}
+              aria-label={`Search Google for ${headingName}`}
+              style={{
+                background: 'none', border: 'none', padding: 2, marginLeft: 6,
+                cursor: 'pointer', flexShrink: 0,
+                color: 'var(--color-accent)',
+                display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle',
+                lineHeight: 1,
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Search size={16} strokeWidth={1.8} color="currentColor" />
+            </button>
+          )}
         </p>
       )}
 
