@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pill contrast): inactive filter pills use the muted surface
+ * tint instead of the sheet's own colour so they stand out from the sheet.
+ *
  * 2026-10-03 (follow-up): count line reads 'N drugs'; the Form pop-up shows
  * no numbers (zero-result forms are still dimmed), the Generic pop-up keeps
  * them; Similar always shows the Form pill, greyed out with the single form's
@@ -506,7 +509,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
         display:                 'flex',
         alignItems:              'center',
         gap:                     6,
-        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface)',
+        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
         border:                  `1.5px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
         borderRadius:            'var(--radius-full)',
         padding:                 '8px 12px',
