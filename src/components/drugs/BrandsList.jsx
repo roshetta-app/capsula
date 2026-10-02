@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (follow-up): count line reads 'N drugs'; the Form pop-up shows
+ * no numbers (zero-result forms are still dimmed), the Generic pop-up keeps
+ * them; Similar always shows the Form pill, greyed out with the single form's
+ * name when there is only one; Generic and Form pills split 60/40 so
+ * 'Filter by generic' fits.
+ *
  * 2026-10-03 (filter controls redesign): Sort is no longer a pill. The two
  * filter pills (Generic, Form) sit alone in one row; Sort is a quiet text
  * control on the result-count line under them, which also shows 'Clear
@@ -11,7 +17,7 @@
  * dimmed and cannot be added (a picked option can always be removed).
  * Alternatives always shows both pills (a pill with only one choice is greyed
  * out and shows that choice, so the row never changes shape). Similar shows
- * only the Form pill, and no pill row at all when there is a single form.
+ * only the Form pill (greyed out when there is a single form).
  * If removing a pick leaves picks with nothing in common, the list shows
  * 'No brands match' with a Clear filters button.
  *
@@ -297,7 +303,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   // only one choice, showing that choice). Similar: Form only, and only when
   // there is more than one form.
   const genericControl = isAlternatives && nameById.size > 0 && {
-    key: 'generic', icon: Pill,
+    key: 'generic', icon: Pill, flex: 3,
     pillLabel: nameById.size === 1
       ? sentenceCase([...nameById.values()][0])
       : genericLabel(genericSel),
@@ -309,15 +315,15 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
             onPick: v => toggleIn(genericSel, setGenericSel, v),
             onClear: () => setGenericSel([]) },
   }
-  const showFormPill = formGroupsInList.length > 0 && (isAlternatives || formGroupsInList.length > 1)
+  const showFormPill = formGroupsInList.length > 0
   const formControl = showFormPill && {
-    key: 'form', icon: ListFilter,
+    key: 'form', icon: ListFilter, flex: isAlternatives ? 2 : 1,
     pillLabel: formOptions.length === 1
       ? formOptions[0].label
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
-    menu: { title: 'Form / Route', columns: 2, options: formOptions, selected: formSel,
+    menu: { title: 'Form / Route', columns: 2, showCounts: false, options: formOptions, selected: formSel,
             allLabel: 'All Forms', onAll: () => setFormSel([]),
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
@@ -357,6 +363,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
               label={c.pillLabel}
               active={c.active}
               disabled={c.disabled}
+              flex={c.flex}
               onPress={() => setOpenMenu(c.key)}
             />
           ))}
@@ -375,7 +382,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
         color:          'var(--color-text-secondary)',
       }}>
         <div style={{ minWidth: 0 }}>
-          {sorted.length} {sorted.length === 1 ? 'brand' : 'brands'}
+          {sorted.length} {sorted.length === 1 ? 'drug' : 'drugs'}
           {filtersActive && (
             <>
               {' · '}
@@ -481,7 +488,7 @@ function SortButton({ label, onPress }) {
 
 // The filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
-function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
+function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onPress }) {
   const [pressed, setPressed] = useState(false)
   const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
@@ -494,7 +501,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        flex:                    1,
+        flex,
         minWidth:                0,
         display:                 'flex',
         alignItems:              'center',
@@ -538,7 +545,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, columns, wrap = false, single = false, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, columns, wrap = false, single = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -612,7 +619,7 @@ function FilterModal({ title, columns, wrap = false, single = false, listMaxHeig
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
                 showCheckbox={!single}
-                count={opt.count}
+                count={showCounts ? opt.count : undefined}
                 locked={isOptionLocked(opt.count, selected.includes(opt.value))}
               />
             ))}
