@@ -153,6 +153,17 @@
  * with no pop-up. Pill states: plain outline when nothing is chosen, tinted
  * accent pill (with the choice or a count) when a filter is applied; Sort
  * counts as applied once it is not the default A-Z.
+ *
+ * 2026-10-02 (Form and Medicine filters now depend on each other, so a pick
+ * never leads to an empty list): the Form pop-up only offers forms that
+ * exist among the currently chosen medicines (all medicines when none is
+ * chosen), and the Medicine pop-up only offers medicines that have a brand
+ * in the chosen forms (plus any already chosen). Changing the medicines
+ * keeps the forms still available for them and drops the rest; it does not
+ * clear every form, and forms that are new to the added medicine simply
+ * appear as options without being ticked. The Form button greys out when
+ * there is only one form to choose from. A short 'no brands match' note
+ * covers the rare leftover empty case.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -200,21 +211,42 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
   // No real siblings — section disappears entirely.
   if (siblings.length === 0) return null
 
-  // Distinct grouped form options actually present among the siblings.
-  const presentGroups = FORM_OPTIONS.filter(opt =>
+  // Whole-list facts (decide whether each filter exists at all, so the
+  // buttons don't appear and disappear while picking).
+  const groupsInList = FORM_OPTIONS.filter(opt =>
     opt.value !== 'all' &&
     siblings.some(s => resolveFormGroup(s.form)?.value === opt.value)
   )
-  const showFormFilter = presentGroups.length > 1
-  const formOptions = presentGroups.map(g => ({ value: g.value, label: g.label }))
+  const showFormFilter = groupsInList.length > 1
 
-  // Alternatives only: the distinct generics present in the list.
-  const medicineOptions = isAlternatives
-    ? [...new Map(siblings.map(s => [s.genericId, s.genericName])).entries()]
+  const nameById = new Map(siblings.map(s => [s.genericId, s.genericName]))
+  const showMedicineFilter = isAlternatives && nameById.size > 1
+
+  // Form options: only forms that exist among the chosen medicines.
+  const formsFor = ids => FORM_OPTIONS
+    .filter(opt =>
+      opt.value !== 'all' &&
+      siblings.some(s =>
+        (ids.length === 0 || ids.includes(s.genericId)) &&
+        resolveFormGroup(s.form)?.value === opt.value
+      )
+    )
+    .map(g => ({ value: g.value, label: g.label }))
+  const formOptions = formsFor(medicineSel)
+
+  // Medicine options: only medicines with a brand in the chosen forms, plus
+  // anything already chosen (so a chosen medicine never vanishes from view).
+  const idsInChosenForms = new Set(
+    siblings
+      .filter(s => formSel.length === 0 || formSel.includes(resolveFormGroup(s.form)?.value))
+      .map(s => s.genericId)
+  )
+  const medicineOptions = showMedicineFilter
+    ? [...nameById.entries()]
+        .filter(([id]) => idsInChosenForms.has(id) || medicineSel.includes(id))
         .map(([value, label]) => ({ value, label: sentenceCase(label) }))
         .sort((a, b) => a.label.localeCompare(b.label))
     : []
-  const showMedicineFilter = medicineOptions.length > 1
 
   const sortOptions = [
     { value: 'name',  label: 'Name (A–Z)' },
@@ -241,6 +273,14 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
   }
 
+  // Changing the chosen medicines keeps the chosen forms that are still
+  // available for the new set and drops the others (never clears them all).
+  function changeMedicines(next) {
+    setMedicineSel(next)
+    const stillThere = new Set(formsFor(next).map(o => o.value))
+    setFormSel(prev => prev.filter(v => stillThere.has(v)))
+  }
+
   // Every dropdown: its pill, and the menu it opens. Row 1 = sort + form
   // (split evenly), row 2 = medicine (full width).
   const sortControl = {
@@ -254,6 +294,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     key: 'form', icon: ListFilter,
     pillLabel: multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
+    disabled: formOptions.length <= 1 && formSel.length === 0,
     menu: { title: 'Form / Route', columns: 2, options: formOptions, selected: formSel,
             allLabel: 'All Forms', onAll: () => setFormSel([]),
             onPick: v => toggleIn(formSel, setFormSel, v),
@@ -264,9 +305,11 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     pillLabel: multiLabel(medicineSel, medicineOptions, 'All Medicines', 'Medicines'),
     active: medicineSel.length > 0,
     menu: { title: 'Medicine', columns: 1, wrap: true, options: medicineOptions, selected: medicineSel,
-            allLabel: 'All Medicines', onAll: () => setMedicineSel([]),
-            onPick: v => toggleIn(medicineSel, setMedicineSel, v),
-            onClear: () => setMedicineSel([]) },
+            allLabel: 'All Medicines', onAll: () => changeMedicines([]),
+            onPick: v => changeMedicines(
+              medicineSel.includes(v) ? medicineSel.filter(x => x !== v) : [...medicineSel, v]
+            ),
+            onClear: () => changeMedicines([]) },
   }
   const rows = [
     [sortControl, formControl].filter(Boolean),
@@ -310,6 +353,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
               icon={c.icon}
               label={c.pillLabel}
               active={c.active}
+              disabled={c.disabled}
               onPress={() => setOpenMenu(c.key)}
             />
           ))}
@@ -317,6 +361,17 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
       ))}
 
       <div style={{ height: 'var(--space-2)' }} />
+
+      {sorted.length === 0 && (
+        <div style={{
+          padding:   'var(--space-6) 0',
+          textAlign: 'center',
+          fontSize:  13,
+          color:     'var(--color-text-secondary)',
+        }}>
+          No brands match these filters.
+        </div>
+      )}
 
       <div>
         {sorted.map((item, i) => (
@@ -357,14 +412,15 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
 
 // The three filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
-function PillButton({ icon: Icon, label, active, onPress }) {
+function PillButton({ icon: Icon, label, active, disabled = false, onPress }) {
   const [pressed, setPressed] = useState(false)
   const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
     <button
-      onClick={onPress}
+      onClick={disabled ? undefined : onPress}
+      disabled={disabled}
       aria-haspopup="dialog"
-      onPointerDown={() => setPressed(true)}
+      onPointerDown={() => !disabled && setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
@@ -382,7 +438,8 @@ function PillButton({ icon: Icon, label, active, onPress }) {
         fontWeight:              active ? 600 : 500,
         color:                   fg,
         fontFamily:              'var(--font-body)',
-        cursor:                  'pointer',
+        cursor:                  disabled ? 'default' : 'pointer',
+        opacity:                 disabled ? 0.5 : 1,
         transform:               pressed ? 'scale(0.97)' : 'scale(1)',
         transition:              'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',

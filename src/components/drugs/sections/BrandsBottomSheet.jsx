@@ -68,6 +68,10 @@
  * 2026-10-02 (spacing): when the tab bar shows, the list area gets a roomier
  * top padding so the note and filters don't sit tight under the tabs.
  *
+ * 2026-10-02 (fixed height): the sheet is now always its maximum height
+ * (70svh) instead of shrinking to fit a short list, so the tabs, filters and
+ * pop-ups no longer jump around as filters change the list.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -149,6 +153,16 @@ export default function BrandsBottomSheet({
           sibling-list internals, unchanged. BrandsList renders its own
           "Other Brands" section header, so this sheet doesn't duplicate
           a title. */}
+      {/* Fixed-height frame: the sheet used to grow and shrink with the list,
+          which moved the tabs, filters and pop-ups around. 40px is the drag
+          handle's own space in SheetShell, so this fills the sheet's usual
+          maximum height exactly, however few brands there are. */}
+      <div style={{
+        display:       'flex',
+        flexDirection: 'column',
+        height:        'calc(70svh - 40px - env(safe-area-inset-bottom, 0px))',
+        minHeight:     0,
+      }}>
       {showTabs && (
         <div style={{ display: 'flex', padding: '0 var(--space-4)' }}>
           <TabButton
@@ -168,6 +182,7 @@ export default function BrandsBottomSheet({
 
       <div style={{
         flex:      1,
+        minHeight: 0,
         overflowY: 'auto',
         padding:   `${showTabs ? 'var(--space-5)' : '0'} var(--space-4) var(--space-6)`,
       }}>
@@ -179,6 +194,7 @@ export default function BrandsBottomSheet({
           showTitle={!showTabs}
           familyName={alternatives[0]?.subclass}
         />
+      </div>
       </div>
     </SheetShell>
   )
