@@ -69,8 +69,10 @@
  * top padding so the note and filters don't sit tight under the tabs.
  *
  * 2026-10-02 (fixed height): the sheet is now always its maximum height
- * (70svh) instead of shrinking to fit a short list, so the tabs, filters and
+ * (70svh at the time) instead of shrinking to fit a short list, so the tabs, filters and
  * pop-ups no longer jump around as filters change the list.
+ *
+ * 2026-10-03 (taller sheet): the fixed height went from 70svh to 80svh.
  *
  * 2026-10-03 (remembered filters): each tab's Sort / Form / Medicine picks are
  * kept here while the person stays on the same drug page, so closing the
@@ -157,7 +159,7 @@ export default function BrandsBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Related drugs" maxHeight="70svh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Related drugs" maxHeight="80svh">
       {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
           sibling-list internals, unchanged. BrandsList renders its own
           "Other Brands" section header, so this sheet doesn't duplicate
@@ -169,7 +171,7 @@ export default function BrandsBottomSheet({
       <div style={{
         display:       'flex',
         flexDirection: 'column',
-        height:        'calc(70svh - 40px - env(safe-area-inset-bottom, 0px))',
+        height:        'calc(80svh - 40px - env(safe-area-inset-bottom, 0px))',
         minHeight:     0,
       }}>
       {showTabs && (
