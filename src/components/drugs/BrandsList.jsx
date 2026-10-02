@@ -141,6 +141,18 @@
  * scrollbar (globals.css), so long menus draw their own thin scroll
  * indicator (ScrollMenu below). Medicine names show in sentence case.
  * The Alternatives note is now just 'Other [subclass] drugs'.
+ *
+ * 2026-10-02 (filters open in a pop-up): the inline menus were the same
+ * colour as the sheet and hard to tell apart from it, so each pill now opens
+ * a small centered pop-up box (FilterModal below), styled like the app's
+ * InfoSheet/ConfirmSheet dialogs (dimmed backdrop, rounded surface card).
+ * It is drawn INSIDE the brands sheet (covering the sheet, centered in it)
+ * rather than portaled to the page: the sheet library blocks touches and
+ * scrolling for anything outside it, which would break the pop-up. It has no
+ * back-button handling of its own, so Back closes the whole sheet, same as
+ * with no pop-up. Pill states: plain outline when nothing is chosen, tinted
+ * accent pill (with the choice or a count) when a filter is applied; Sort
+ * counts as applied once it is not the default A-Z.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -234,7 +246,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
   const sortControl = {
     key: 'sort', icon: ArrowUpDown,
     pillLabel: sortOptions.find(o => o.value === sortMode)?.label,
-    active: false,
+    active: sortMode !== 'name',
     menu: { title: 'Sort By', columns: 2, options: sortOptions, selected: [sortMode],
             onPick: v => { setSortMode(v); setOpenMenu(null) } },
   }
@@ -260,6 +272,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     [sortControl, formControl].filter(Boolean),
     [medicineControl].filter(Boolean),
   ].filter(r => r.length > 0)
+  const activeControl = rows.flat().find(c => c.key === openMenu) || null
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -287,28 +300,21 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
         </p>
       )}
 
-      {/* Controls: each row of pills, with the open menu right under the row
-          it belongs to (in normal flow, so the sheet never clips it). */}
-      {rows.map((row, ri) => {
-        const open = row.find(c => c.key === openMenu)
-        return (
-          <div key={ri}>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-              {row.map(c => (
-                <PillButton
-                  key={c.key}
-                  icon={c.icon}
-                  label={c.pillLabel}
-                  open={openMenu === c.key}
-                  active={c.active}
-                  onPress={() => setOpenMenu(m => (m === c.key ? null : c.key))}
-                />
-              ))}
-            </div>
-            {open && <MenuPanel {...open.menu} />}
-          </div>
-        )
-      })}
+      {/* Controls: each row of pills. Tapping one opens its pop-up
+          (FilterModal, rendered at the end of this component). */}
+      {rows.map((row, ri) => (
+        <div key={ri} style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
+          {row.map(c => (
+            <PillButton
+              key={c.key}
+              icon={c.icon}
+              label={c.pillLabel}
+              active={c.active}
+              onPress={() => setOpenMenu(c.key)}
+            />
+          ))}
+        </div>
+      ))}
 
       <div style={{ height: 'var(--space-2)' }} />
 
@@ -339,37 +345,51 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
         backgroundColor: 'var(--color-border-subtle)',
         marginTop:       'var(--space-5)',
       }} />
+
+      {activeControl && (
+        <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />
+      )}
     </div>
   )
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function PillButton({ icon: Icon, label, open, active, onPress }) {
+// The three filter buttons. Inactive: plain outline. Active (a filter is
+// applied): tinted accent pill with accent text and icon.
+function PillButton({ icon: Icon, label, active, onPress }) {
+  const [pressed, setPressed] = useState(false)
+  const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
     <button
       onClick={onPress}
-      aria-expanded={open}
+      aria-haspopup="dialog"
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         flex:                    1,
         minWidth:                0,
         display:                 'flex',
         alignItems:              'center',
         gap:                     6,
-        backgroundColor:         'var(--color-surface)',
-        border:                  `1px solid ${open || active ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface)',
+        border:                  `1.5px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
         borderRadius:            'var(--radius-full)',
         padding:                 '8px 12px',
         fontSize:                13,
-        fontWeight:              500,
-        color:                   'var(--color-text-primary)',
+        fontWeight:              active ? 600 : 500,
+        color:                   fg,
         fontFamily:              'var(--font-body)',
         cursor:                  'pointer',
+        transform:               pressed ? 'scale(0.97)' : 'scale(1)',
+        transition:              'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',
         outline:                 'none',
       }}
     >
-      <Icon size={14} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+      <Icon size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
       <span style={{
         flex: 1, minWidth: 0, textAlign: 'left',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -378,66 +398,121 @@ function PillButton({ icon: Icon, label, open, active, onPress }) {
       </span>
       <ChevronDown
         size={14}
-        color="var(--color-text-secondary)"
-        style={{
-          flexShrink: 0,
-          transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
-          transition: 'transform 0.15s ease',
-        }}
+        color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'}
+        style={{ flexShrink: 0 }}
       />
     </button>
   )
 }
 
-// Same look as DrugFilterPanel.jsx's Form / Route section: small grey title
-// with an 'All' chip beside it, a grid of tick chips, and a red 'Clear
-// filter' button. `columns` 1 or 2; `wrap` lets long labels wrap to several
-// lines instead of being clipped.
-function MenuPanel({ title, columns, wrap = false, options, selected, allLabel, onAll, onPick, onClear }) {
+// Small centered pop-up box for one filter — same look as the app's InfoSheet
+// / ConfirmSheet dialogs, and the Drugs filter panel's chips inside it.
+// Drawn inside the brands sheet (see header note): `position: absolute`
+// resolves against the sheet itself, covering it and centering the box in it.
+// `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
+// Form / Medicine (onClear present) stay open while picking and finish with
+// Done; Sort (pick-one) closes as soon as an option is chosen.
+function FilterModal({ title, columns, wrap = false, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+  const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setShown(true))
+    function onKey(e) { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => { cancelAnimationFrame(id); window.removeEventListener('keydown', onKey) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div style={{
-      marginBottom:    'var(--space-3)',
-      backgroundColor: 'var(--color-surface)',
-      border:          '1px solid var(--color-border)',
-      borderRadius:    'var(--radius-md)',
-      padding:         'var(--space-3)',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 'var(--space-2)', marginBottom: 'var(--space-2)',
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-          {title}
+    <div
+      data-vaul-no-drag
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      style={{
+        position:        'absolute',
+        inset:           0,
+        zIndex:          5,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        padding:         'var(--space-4)',
+        opacity:         shown ? 1 : 0,
+        transition:      'opacity var(--motion-base) var(--ease-reveal)',
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        style={{
+          width:           '100%',
+          maxWidth:        360,
+          maxHeight:       '100%',
+          display:         'flex',
+          flexDirection:   'column',
+          boxSizing:       'border-box',
+          backgroundColor: 'var(--color-surface)',
+          borderRadius:    'var(--radius-lg)',
+          boxShadow:       '0 24px 64px rgba(0,0,0,0.18)',
+          padding:         'var(--space-5)',
+          fontFamily:      'var(--font-body)',
+          transform:       shown ? 'scale(1)' : 'scale(0.96)',
+          transition:      'transform var(--motion-base) var(--ease-settle)',
+        }}
+      >
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexShrink: 0,
+        }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            {title}
+          </div>
+          {onAll && (
+            <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
+          )}
         </div>
-        {onAll && (
-          <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
+
+        <ScrollMenu maxHeight="min(320px, 45svh)">
+          <div style={{
+            display:             'grid',
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+            gap:                 'var(--space-2)',
+          }}>
+            {options.map(opt => (
+              <ToggleChip
+                key={opt.value}
+                label={opt.label}
+                active={selected.includes(opt.value)}
+                onToggle={() => onPick(opt.value)}
+                wrap={wrap}
+              />
+            ))}
+          </div>
+        </ScrollMenu>
+
+        {onClear && (
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0 }}>
+            <ClearFilterButton onClick={onClear} disabled={!hasSelection} />
+            <button
+              onClick={onClose}
+              style={{
+                flex: 1, padding: '10px',
+                borderRadius: 'var(--radius-md)',
+                border: 'none',
+                backgroundColor: 'var(--color-accent)',
+                color: '#fff',
+                fontSize: 14, fontWeight: 600,
+                fontFamily: 'var(--font-body)',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline: 'none',
+              }}
+            >
+              Done
+            </button>
+          </div>
         )}
       </div>
-
-      <ScrollMenu maxHeight={220}>
-        <div style={{
-          display:             'grid',
-          gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-          gap:                 'var(--space-2)',
-        }}>
-          {options.map(opt => (
-            <ToggleChip
-              key={opt.value}
-              label={opt.label}
-              active={selected.includes(opt.value)}
-              onToggle={() => onPick(opt.value)}
-              wrap={wrap}
-            />
-          ))}
-        </div>
-      </ScrollMenu>
-
-      {onClear && (
-        <div style={{ marginTop: 'var(--space-3)' }}>
-          <ClearFilterButton onClick={onClear} disabled={!hasSelection} />
-        </div>
-      )}
     </div>
   )
 }
@@ -510,7 +585,7 @@ function ClearFilterButton({ onClick, disabled }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        width: '100%', padding: '10px',
+        flex: 1, padding: '10px',
         borderRadius: 'var(--radius-md)',
         fontSize: 14, fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer',
