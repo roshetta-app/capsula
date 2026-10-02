@@ -114,6 +114,7 @@
  * only appears when the list spans more than one generic. The form filter
  * and the cheapest-first sort work the same on both tabs. Rows stay
  * display-only (not tappable) in both modes for now.
+ * (Superseded 2026-10-02, tappable Alternatives: see the note below.)
  *
  * 2026-10-02 (dropdown clipping fix): the three dropdown menus used to be
  * floating popovers inside the sheet's scroll area, so with only 1-2 rows
@@ -122,6 +123,11 @@
  * scroll for long lists), so they always fit inside the sheet. Only one
  * menu is open at a time; picking an option or tapping the same pill
  * again closes it.
+ *
+ * 2026-10-02 (tappable Alternatives): rows on the Alternatives tab now open
+ * that drug's page when tapped (onTap, with a chevron) — those are different
+ * medicines worth looking at. Rows on the Similar tab stay inert, as before.
+ * onTap is only called from Alternatives rows.
  */
 
 import { useState } from 'react'
@@ -299,8 +305,9 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
             categories={categories}
             isDark={isDark}
             isLast={i === sorted.length - 1}
-            disableTap
-            showChevron={false}
+            onTap={onTap}
+            disableTap={!isAlternatives}
+            showChevron={isAlternatives}
             showImageSearch
             trailing={
               <RowStarButton

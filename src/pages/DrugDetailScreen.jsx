@@ -66,11 +66,27 @@
  * drug's own generic; empty when class or subclass is missing. See
  * findAlternatives below.
  *
+ * 2026-10-02 (Related drugs, tappable Alternatives + back rule): tapping an
+ * Alternatives row opens that drug's page. To stop a long browse chain from
+ * needing one Back press per drug: the first hop from a drug you opened
+ * normally adds one history step (Back returns to that drug); every later
+ * hop made from a page reached this way REPLACES the current step instead
+ * of adding one (flagged with `relatedHop` in the navigation state). Result:
+ * however many alternatives you browse, it is at most 2 Back presses to
+ * leave (back to the drug you started from, then back to where you opened
+ * it). On the website/PWA the open sheet leaves a placeholder history step
+ * on top of the stack: the first hop replaces it (so no ghost step is left
+ * above the page), and later hops step back over it first and then replace
+ * the page. The navigation runs in an effect, after the sheet has
+ * finished closing, so the sheet's own back-handling can't overwrite the new
+ * page's navigation state. Each newly opened drug also starts scrolled to
+ * the top (DrugDetailSheet is keyed by drug id).
+ *
  * Route: /drugs/:slug
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useParams, useNavigate }        from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
@@ -171,6 +187,7 @@ function findAlternatives(drugs, drug) {
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
+  const location   = useLocation()
 
   // Bug fix (2026-09-06): same gap as ConditionDetailScreen — a shared
   // link or notification tap landing directly here had nothing real
@@ -199,9 +216,49 @@ export default function DrugDetailScreen() {
     [drugs, drug?.genericId, drug?.class, drug?.subclass] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
-  function handleSiblingTap(item) {
-    navigate(ROUTES.DRUG_DETAIL(item.slug || item.id))
+  // Back rule for browsing alternatives (see header note). `relatedHop` marks
+  // a page that was itself reached from an Alternatives row.
+  // pendingNav.mode:
+  //   'push'        first hop, native app            -> adds one history step
+  //   'replace'     later hop on native, or first hop on web (replaces the
+  //                 sheet's leftover placeholder step) -> no net new step
+  //   'pop-replace' later hop on web: the sheet's placeholder sits above this
+  //                 page, so step back over it, then replace the page
+  const [pendingNav, setPendingNav] = useState(null)
+
+  function handleAlternativeTap(item) {
+    // On the website/PWA an open sheet has a placeholder history step on top
+    // of the stack (see useBackClose.js); read it now, before the sheet
+    // closes and neutralizes it.
+    const hadSheetPlaceholder = !!window.history.state?.capsulaBackClose
+    const alreadyHop          = !!location.state?.relatedHop
+    const mode = hadSheetPlaceholder
+      ? (alreadyHop ? 'pop-replace' : 'replace')
+      : (alreadyHop ? 'replace' : 'push')
+    setPendingNav({ slug: item.slug || item.id, mode })
   }
+
+  // Runs after the sheet's close cleanup (same commit, cleanups first), so the
+  // sheet can't wipe the new page's navigation state.
+  useEffect(() => {
+    if (!pendingNav) return
+    const to   = ROUTES.DRUG_DETAIL(pendingNav.slug)
+    const opts = { state: { relatedHop: true } }
+
+    if (pendingNav.mode === 'pop-replace') {
+      function onPop() {
+        window.removeEventListener('popstate', onPop)
+        navigate(to, { ...opts, replace: true })
+        setPendingNav(null)
+      }
+      window.addEventListener('popstate', onPop)
+      window.history.back()
+      return () => window.removeEventListener('popstate', onPop)
+    }
+
+    navigate(to, { ...opts, replace: pendingNav.mode === 'replace' })
+    setPendingNav(null)
+  }, [pendingNav]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 3J — log drug view for analytics once drug is resolved
   // FIX: flat drug object uses `genericName`, not `name_en` or `name`
@@ -404,13 +461,13 @@ export default function DrugDetailScreen() {
             Pharmacology → Sources. paddingTop kept per
             drug_detail_moa_spacing_fix; paddingBottom kept so content still
             clears the fixed BottomNav below, same as today. */}
-        <DrugDetailSheet>
+        <DrugDetailSheet key={drug.id}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}
               alternatives={alternatives}
-              onSelectBrand={handleSiblingTap}
+              onSelectBrand={handleAlternativeTap}
             />
 
             <UsesSection
