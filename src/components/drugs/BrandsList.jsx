@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (generic pop-up order and quieter buttons): the Filter by
+ * generic pop-up lists generics with the most brands first (same-count ones
+ * A-Z). The pop-up's Clear filter and Done buttons are smaller and sit at the
+ * right: Clear filter is plain red text, Done is a soft accent tint, so
+ * neither competes with the filter options above them.
+ *
  * 2026-10-03 (no 'All' chips): the 'All Forms' / 'All Generics' chips in the
  * pop-up headers were removed; the Clear filter button does that job.
  *
@@ -208,7 +214,7 @@ import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
-import { applyFilters, countByForm, countByGeneric, sortItems, isOptionLocked } from './brandsFilterLogic.js'
+import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, isOptionLocked } from './brandsFilterLogic.js'
 import { useCategories } from '../../hooks/useCategories'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
@@ -281,9 +287,10 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   const formOptions = formGroupsInList.map(g => ({
     value: g.value, label: g.label, count: formCounts.get(g.value) ?? 0,
   }))
-  const genericOptions = [...nameById.entries()]
-    .map(([value, label]) => ({ value, label: sentenceCase(label), count: genericCounts.get(value) ?? 0 }))
-    .sort((a, b) => a.label.localeCompare(b.label))
+  const genericOptions = sortGenericOptions(
+    [...nameById.entries()]
+      .map(([value, label]) => ({ value, label: sentenceCase(label), count: genericCounts.get(value) ?? 0 }))
+  )
 
   const sortOptions = [
     { value: 'name',  label: 'Name (A–Z)' },
@@ -631,17 +638,20 @@ function FilterModal({ title, columns, wrap = false, single = false, showCounts 
         </ScrollMenu>
 
         {onClear && (
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0 }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+            gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0,
+          }}>
             <ClearFilterButton onClick={onClear} disabled={!hasSelection} />
             <button
               onClick={onClose}
               style={{
-                flex: 1, padding: '10px',
+                padding: '8px 18px',
                 borderRadius: 'var(--radius-md)',
                 border: 'none',
-                backgroundColor: 'var(--color-accent)',
-                color: '#fff',
-                fontSize: 14, fontWeight: 600,
+                backgroundColor: 'var(--color-accent-light)',
+                color: 'var(--color-accent)',
+                fontSize: 13, fontWeight: 600,
                 fontFamily: 'var(--font-body)',
                 cursor: 'pointer',
                 WebkitTapHighlightColor: 'transparent',
@@ -712,8 +722,9 @@ function ScrollMenu({ maxHeight, children }) {
   )
 }
 
-// Copy of DrugFilterPanel.jsx's red Clear All button (not exported there),
-// relabelled for a single filter.
+// Quiet version of DrugFilterPanel.jsx's red Clear All button (not exported
+// there), relabelled for a single filter: plain red text, no fill or border,
+// so it does not compete with the filter options.
 function ClearFilterButton({ onClick, disabled }) {
   const [pressed, setPressed] = useState(false)
   return (
@@ -725,16 +736,16 @@ function ClearFilterButton({ onClick, disabled }) {
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        flex: 1, padding: '10px',
+        padding: '8px 12px',
         borderRadius: 'var(--radius-md)',
-        fontSize: 14, fontWeight: 600,
+        fontSize: 13, fontWeight: 600,
         cursor: disabled ? 'not-allowed' : 'pointer',
-        border: disabled ? '1.5px solid var(--color-border)' : '1.5px solid #DC2626',
-        backgroundColor: disabled ? 'transparent' : '#DC2626',
-        color: disabled ? 'var(--color-text-tertiary)' : '#fff',
+        border: 'none',
+        backgroundColor: 'transparent',
+        color: disabled ? 'var(--color-text-tertiary)' : '#DC2626',
         fontFamily: 'var(--font-body)',
         transform: pressed ? 'scale(0.96)' : 'scale(1)',
-        transition: 'color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease',
+        transition: 'color 0.15s ease, transform 0.15s ease',
         WebkitTapHighlightColor: 'transparent',
         outline: 'none',
       }}

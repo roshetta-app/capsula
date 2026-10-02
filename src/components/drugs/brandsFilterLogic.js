@@ -13,6 +13,9 @@
  *
  * groupOf(item) returns the form group value of an item (or null when the
  * item's form has no group; such an item only shows while no form is picked).
+ *
+ * 2026-10-03 (generic pop-up order): the Filter by generic pop-up lists the
+ * generics with the most brands first (sortGenericOptions below).
  */
 
 // Brands passing the generic picks and the form picks. [] = no filter.
@@ -47,6 +50,15 @@ export function countByGeneric(items, formSel, groupOf) {
 // already picked can always be removed, whatever its number says.
 export function isOptionLocked(count, isPicked) {
   return count === 0 && !isPicked
+}
+
+// Generic pop-up order: most brands first. Generics with the same number of
+// brands fall back to A-Z, so the order never jumps around. Returns a new
+// list; the input is left untouched.
+export function sortGenericOptions(options) {
+  return [...options].sort((a, b) =>
+    (b.count - a.count) || a.label.localeCompare(b.label)
+  )
 }
 
 export function sortItems(items, mode) {
