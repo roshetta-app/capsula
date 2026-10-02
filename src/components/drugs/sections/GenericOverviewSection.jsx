@@ -210,6 +210,19 @@
  * block hides when neither does — same hide-when-empty convention as the
  * Mechanism of Action block above. Visual layout (floating pills, pillStyle)
  * is unchanged.
+ *
+ * 2026-10-02 (Related drugs, Alternatives lookup):
+ *  - New 'alternatives' prop (brands in the same class and subclass, built
+ *    in DrugDetailScreen.jsx). The top-right button is renamed 'Similar
+ *    Brands' -> 'Related drugs' and now shows when either list has brands.
+ *  - The two floating Class/Subclass pills are replaced by one bordered
+ *    card with two stacked rows (class on top, subclass below, no captions),
+ *    so long names wrap instead of being cut off. The subclass row is
+ *    tappable only when there are Alternatives: it opens the brands sheet
+ *    on its Alternatives tab. Otherwise it renders as a plain row like the
+ *    class row. The class row is a plain label for now.
+ *  - Sheet now opens on a chosen tab ('similar' or 'alternatives') via
+ *    BrandsBottomSheet's new initialTab prop.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -218,13 +231,18 @@ import BrandsBottomSheet from './BrandsBottomSheet.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
-const pillStyle = {
-  fontSize:        11,
-  fontWeight:      600,
-  backgroundColor: '#F3F4F6',
-  color:           '#6B7280',
-  padding:         '2px 10px',
-  borderRadius:    'var(--radius-full)',
+// Shared look for both rows of the class/subclass card.
+const tagRowStyle = {
+  display:    'block',
+  width:      '100%',
+  boxSizing:  'border-box',
+  padding:    '12px 14px',
+  fontFamily: 'var(--font-body)',
+  fontSize:   14,
+  fontWeight: 600,
+  lineHeight: 1.4,
+  textAlign:  'left',
+  color:      'var(--color-text-secondary)',
 }
 
 // Mechanism of Action visual clamp (Generic Overview refinement, decision 2
@@ -232,8 +250,13 @@ const pillStyle = {
 // 30-word cutoff so the truncation always matches what's actually shown.
 const MOA_CLAMP_LINES = 3
 
-export default function GenericOverviewSection({ drug, siblings = [], onSelectBrand }) {
+export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
+  // Which tab the brands sheet opens on: 'similar' or 'alternatives'.
+  const [sheetTab, setSheetTab] = useState('similar')
+  // Tap feedback for the subclass row — same pressed pattern as the
+  // Related drugs button below.
+  const [subclassPressed, setSubclassPressed] = useState(false)
   // moaOpen: expanded (true) or clamped-to-3-lines (false) — this directly
   // drives which style the paragraph renders with. moaVisible: the
   // cross-fade opacity, same showX/xVisible shape used by every other
@@ -241,7 +264,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   const [moaOpen,    setMoaOpen]    = useState(false)
   const [moaVisible, setMoaVisible] = useState(true)
   const [moaHasMore, setMoaHasMore] = useState(false)
-  // Tap feedback for the "Similar Brands" button — same pressed/pointer-
+  // Tap feedback for the "Related drugs" button — same pressed/pointer-
   // event pattern SharedDrugCard.jsx uses (muted background tint + a
   // subtle scale(0.99), same shared motion tokens), matched here so this
   // button feels consistent with the rest of the app's tappable rows.
@@ -303,6 +326,20 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
   // Library Identity section, step 5).
   const isCombo = Array.isArray(ingredients) && ingredients.length > 1
 
+  // Sheet entry points. The top-right button opens on Similar when there
+  // are same-generic brands, otherwise on Alternatives (the sheet itself
+  // also falls back, this just keeps the intent explicit). The subclass
+  // row always opens on Alternatives.
+  const hasAlternatives = alternatives.length > 0
+  function openRelated() {
+    setSheetTab(siblings.length > 0 ? 'similar' : 'alternatives')
+    setBrandsOpen(true)
+  }
+  function openAlternatives() {
+    setSheetTab('alternatives')
+    setBrandsOpen(true)
+  }
+
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
 
@@ -327,9 +364,9 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
             </span>
           </div>
 
-          {siblings.length > 0 && (
+          {(siblings.length > 0 || hasAlternatives) && (
             <button
-              onClick={() => setBrandsOpen(true)}
+              onClick={openRelated}
               onPointerDown={() => setSimilarBrandsPressed(true)}
               onPointerUp={() => setSimilarBrandsPressed(false)}
               onPointerLeave={() => setSimilarBrandsPressed(false)}
@@ -354,7 +391,7 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
                 transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
               }}
             >
-              Similar Brands
+              Related drugs
               <ChevronRight size={14} />
             </button>
           )}
@@ -414,17 +451,60 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         </div>
       )}
 
-      {/* -- Class/Subclass tags (4.8) — wired to real data 2026-09-27
-            (floating-pill layout unchanged from the placeholder version).
-            class/subclass are still mid-backfill (drug_group_categorization
-            project) — most generics have neither yet, some only class — so
-            each pill only renders when its own field has a value, and the
-            whole block hides when neither does, matching the Mechanism of
-            Action block's hide-when-empty pattern above. -- */}
+      {/* -- Class/Subclass card (4.8) — wired to real data 2026-09-27; shown
+            as two stacked rows in one bordered card (2026-10-02) instead of
+            two floating pills, so long names wrap cleanly. Each row only
+            renders when its own field has a value, and the whole card hides
+            when neither does (same hide-when-empty convention as the
+            Mechanism of Action block above). The subclass row is a button
+            only when this drug has Alternatives; otherwise it is a plain
+            row that looks like the class row. -- */}
       {(drugClass || subclass) && (
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-          {drugClass && <span style={pillStyle}>{drugClass}</span>}
-          {subclass && <span style={pillStyle}>{subclass}</span>}
+        <div style={{
+          border:       '1px solid var(--color-border)',
+          borderRadius: 12,
+          overflow:     'hidden',
+          marginBottom: 'var(--space-3)',
+        }}>
+          {drugClass && <div style={tagRowStyle}>{drugClass}</div>}
+          {subclass && (hasAlternatives
+            ? (
+              <button
+                onClick={openAlternatives}
+                onPointerDown={() => setSubclassPressed(true)}
+                onPointerUp={() => setSubclassPressed(false)}
+                onPointerLeave={() => setSubclassPressed(false)}
+                onPointerCancel={() => setSubclassPressed(false)}
+                aria-label={`Show alternatives in ${subclass}`}
+                style={{
+                  ...tagRowStyle,
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'space-between',
+                  gap:             12,
+                  minHeight:       48,
+                  border:          'none',
+                  borderTop:       drugClass ? '1px solid var(--color-border)' : 'none',
+                  color:           'var(--color-accent)',
+                  cursor:          'pointer',
+                  WebkitTapHighlightColor: 'transparent',
+                  backgroundColor: subclassPressed ? 'var(--color-surface-muted)' : 'transparent',
+                  transition:      'background-color var(--motion-fast) var(--ease-settle)',
+                }}
+              >
+                <span>{subclass}</span>
+                <ChevronRight size={16} style={{ flexShrink: 0 }} />
+              </button>
+            )
+            : (
+              <div style={{
+                ...tagRowStyle,
+                borderTop: drugClass ? '1px solid var(--color-border)' : 'none',
+              }}>
+                {subclass}
+              </div>
+            )
+          )}
         </div>
       )}
 
@@ -432,6 +512,8 @@ export default function GenericOverviewSection({ drug, siblings = [], onSelectBr
         isOpen={brandsOpen}
         onClose={() => setBrandsOpen(false)}
         siblings={siblings}
+        alternatives={alternatives}
+        initialTab={sheetTab}
         onSelectBrand={onSelectBrand}
       />
 

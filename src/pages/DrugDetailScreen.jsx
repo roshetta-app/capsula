@@ -59,10 +59,17 @@
  * condition"). No other behavior changed — the back arrow already used
  * useDeepLinkParent + navigate(-1) with no split to reconcile (§10.2).
  *
+ * 2026-10-02 (Related drugs, Alternatives lookup): builds the Alternatives
+ * list next to the Similar list (siblings) and passes it to
+ * GenericOverviewSection.jsx as 'alternatives'. Alternatives = every brand
+ * whose generic has the same class and the same subclass, leaving out this
+ * drug's own generic; empty when class or subclass is missing. See
+ * findAlternatives below.
+ *
  * Route: /drugs/:slug
  */
 
-import { useEffect, useRef, useState }   from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate }        from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
@@ -145,6 +152,22 @@ function DrugDetailSkeleton() {
   )
 }
 
+// Alternatives for the Related drugs sheet (2026-10-02, per the plan doc's
+// Related drugs section): every brand whose generic has the same class AND
+// the same subclass as the viewed drug, leaving out the viewed drug's own
+// generic (those brands are the Similar list). No class fallback: a drug
+// with no class, no subclass, or alone in its subclass gets an empty list,
+// so nothing is guessed. Pure function, no hooks, so it can be checked on
+// its own.
+function findAlternatives(drugs, drug) {
+  if (!drug || !drug.class || !drug.subclass) return []
+  return drugs.filter(d =>
+    d.genericId !== drug.genericId &&
+    d.class === drug.class &&
+    d.subclass === drug.subclass
+  )
+}
+
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
@@ -167,6 +190,14 @@ export default function DrugDetailScreen() {
   const siblings = drug
     ? drugs.filter(d => d.genericId === drug.genericId && d.id !== drug.id)
     : []
+
+  // Alternatives (see findAlternatives above) — recomputed only when the
+  // list or the viewed drug's generic/class/subclass actually changes,
+  // since this scans the whole downloaded drug list.
+  const alternatives = useMemo(
+    () => findAlternatives(drugs, drug),
+    [drugs, drug?.genericId, drug?.class, drug?.subclass] // eslint-disable-line react-hooks/exhaustive-deps
+  )
 
   function handleSiblingTap(item) {
     navigate(ROUTES.DRUG_DETAIL(item.slug || item.id))
@@ -378,6 +409,7 @@ export default function DrugDetailScreen() {
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}
+              alternatives={alternatives}
               onSelectBrand={handleSiblingTap}
             />
 

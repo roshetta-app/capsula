@@ -100,10 +100,24 @@
  * icon (see that file's own changelog) for this list only — Drugs and
  * Favourites screens, which also render SharedDrugCard, are unaffected
  * since they don't pass this prop.
+ *
+ * 2026-10-02 (Related drugs, Alternatives lookup): this list now serves two
+ * tabs of the brands sheet. New props:
+ *  - mode: 'similar' (default, same as before) or 'alternatives'.
+ *  - showTitle: false hides the 'Similar Brands' section header when the
+ *    sheet's tab bar already names the list (default true, so a sheet
+ *    with no tabs looks the same as before).
+ *  - familyName: the subclass name shown in the Alternatives note.
+ * Alternatives mode adds a short note ('options for a professional to
+ * consider, not direct substitutes') and a third dropdown pill, a
+ * medicine filter, that narrows a big subclass to one generic. That pill
+ * only appears when the list spans more than one generic. The form filter
+ * and the cheapest-first sort work the same on both tabs. Rows stay
+ * display-only (not tappable) in both modes for now.
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown, ListFilter, ArrowUpDown } from 'lucide-react'
+import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
@@ -123,8 +137,10 @@ function resolveFormGroup(rawForm) {
   return FORM_OPTIONS.find(opt => opt.value !== 'all' && opt.matches.includes(rawForm)) || null
 }
 
-export default function BrandsList({ siblings = [], onTap }) {
+export default function BrandsList({ siblings = [], onTap, mode = 'similar', showTitle = true, familyName }) {
+  const isAlternatives = mode === 'alternatives'
   const [formFilter, setFormFilter] = useState('all')
+  const [medicineFilter, setMedicineFilter] = useState('all')
   const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
   const { categories } = useCategories()
   const isDark = useIsDark()
@@ -143,9 +159,22 @@ export default function BrandsList({ siblings = [], onTap }) {
   )
   const showFormFilter = presentGroups.length > 1
 
-  const filtered = formFilter === 'all'
+  // Alternatives only: the distinct generics present in the list, for the
+  // medicine filter. Keyed by genericId, labelled by the generic's name,
+  // alphabetical. Spanning only one generic means nothing to narrow.
+  const medicineOptions = isAlternatives
+    ? [...new Map(siblings.map(s => [s.genericId, s.genericName])).entries()]
+        .map(([value, label]) => ({ value, label: label ?? '' }))
+        .sort((a, b) => a.label.localeCompare(b.label))
+    : []
+  const showMedicineFilter = medicineOptions.length > 1
+
+  const byForm = formFilter === 'all'
     ? siblings
     : siblings.filter(s => resolveFormGroup(s.form)?.value === formFilter)
+  const filtered = !showMedicineFilter || medicineFilter === 'all'
+    ? byForm
+    : byForm.filter(s => s.genericId === medicineFilter)
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortMode === 'price') {
@@ -158,15 +187,33 @@ export default function BrandsList({ siblings = [], onTap }) {
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
-      {/* Section header */}
-      <div style={{
-        fontSize:     15,
-        fontWeight:   700,
-        color:        'var(--color-text-primary)',
-        marginBottom: 'var(--space-3)',
-      }}>
-        Similar Brands
-      </div>
+      {/* Section header — hidden when the sheet's tab bar already names
+          the list (showTitle false). */}
+      {showTitle && (
+        <div style={{
+          fontSize:     15,
+          fontWeight:   700,
+          color:        'var(--color-text-primary)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          Similar Brands
+        </div>
+      )}
+
+      {/* Alternatives note (2026-10-02): a shared subclass means 'same
+          family', not 'safe to swap', so the list is framed as options for
+          a professional to consider. */}
+      {isAlternatives && (
+        <p style={{
+          fontSize:   13,
+          lineHeight: 1.5,
+          color:      'var(--color-text-secondary)',
+          margin:     '0 0 var(--space-3)',
+        }}>
+          Other medicines in the same family{familyName ? ` as ${familyName}` : ''}.
+          {' '}Options for a professional to consider, not direct substitutes.
+        </p>
+      )}
 
       {/* Controls: form filter + sort, as two in-app popover dropdown pills
           (DropdownPill below) — button + absolutely-positioned option
@@ -189,6 +236,18 @@ export default function BrandsList({ siblings = [], onTap }) {
             options={[
               { value: 'all', label: 'All Forms' },
               ...presentGroups.map(g => ({ value: g.value, label: g.label })),
+            ]}
+          />
+        )}
+
+        {showMedicineFilter && (
+          <DropdownPill
+            icon={Pill}
+            value={medicineFilter}
+            onChange={setMedicineFilter}
+            options={[
+              { value: 'all', label: 'All Medicines' },
+              ...medicineOptions,
             ]}
           />
         )}
@@ -310,7 +369,8 @@ function DropdownPill({ icon: Icon, value, onChange, options }) {
           border:          '1px solid var(--color-border)',
           borderRadius:    'var(--radius-md)',
           boxShadow:       '0 4px 16px rgba(0,0,0,0.12)',
-          overflow:        'hidden',
+          maxHeight:       260,
+          overflowY:       'auto',
         }}>
           {options.map(opt => (
             <button

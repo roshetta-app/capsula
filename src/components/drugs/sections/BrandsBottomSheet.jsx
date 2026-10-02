@@ -55,39 +55,127 @@
  * comment history) is the next thing to test, since it's the other
  * documented unknown for this exact class of bug.
  *
+ * 2026-10-02 (Related drugs, Alternatives lookup): the sheet now has two
+ * tabs, Similar (same generic, as before) and Alternatives (same class and
+ * subclass, other generics). The tab bar only shows when Alternatives has
+ * at least one brand; with none, the sheet looks exactly like before (one
+ * list with its own 'Similar Brands' title). The sheet opens on the tab
+ * given by initialTab, except that when Similar is empty it opens on
+ * Alternatives. Tab bar styling follows FavouritesTabBar.jsx (accent
+ * underline under the active tab). Accessible name renamed 'Similar
+ * drugs' -> 'Related drugs'.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
  *   siblings      array — same shape BrandsList.jsx already receives
+ *   alternatives  array — brands in the same class and subclass (other generics)
+ *   initialTab    'similar' | 'alternatives' — which tab to open on
  *   onSelectBrand (item) => void — called after this sheet closes
  */
 
+import { useState, useEffect } from 'react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
+
+function TabButton({ label, count, active, onClick }) {
+  const fg = active ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <button
+        onClick={onClick}
+        style={{
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'center',
+          gap:            6,
+          height:         50,
+          width:          '100%',
+          border:         'none',
+          background:     'none',
+          cursor:         'pointer',
+          fontFamily:     'var(--font-body)',
+          WebkitTapHighlightColor: 'transparent',
+          outline:        'none',
+          transition:     'color 0.15s ease',
+        }}
+      >
+        <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: fg }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{count}</span>
+      </button>
+      <span style={{
+        display:         'block',
+        height:          2,
+        width:           '100%',
+        marginTop:       2,
+        borderRadius:    'var(--radius-full)',
+        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+        transition:      'background-color 0.15s ease',
+      }} />
+    </div>
+  )
+}
 
 export default function BrandsBottomSheet({
   isOpen,
   onClose,
   siblings = [],
+  alternatives = [],
+  initialTab = 'similar',
   onSelectBrand,
 }) {
+  const [tab, setTab] = useState(initialTab)
+
+  // Each time the sheet opens, start on the tab the person came in for.
+  useEffect(() => {
+    if (isOpen) setTab(initialTab)
+  }, [isOpen, initialTab])
+
+  const showTabs = alternatives.length > 0
+  // No Alternatives: single Similar list. No Similar: Alternatives only.
+  const activeTab = !showTabs ? 'similar' : siblings.length === 0 ? 'alternatives' : tab
+
   function handleTap(item) {
     onClose()
     onSelectBrand?.(item)
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Similar drugs" maxHeight="70svh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Related drugs" maxHeight="70svh">
       {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
           sibling-list internals, unchanged. BrandsList renders its own
           "Other Brands" section header, so this sheet doesn't duplicate
           a title. */}
+      {showTabs && (
+        <div style={{ display: 'flex', padding: '0 var(--space-4)' }}>
+          <TabButton
+            label="Similar"
+            count={siblings.length}
+            active={activeTab === 'similar'}
+            onClick={() => setTab('similar')}
+          />
+          <TabButton
+            label="Alternatives"
+            count={alternatives.length}
+            active={activeTab === 'alternatives'}
+            onClick={() => setTab('alternatives')}
+          />
+        </div>
+      )}
+
       <div style={{
         flex:      1,
         overflowY: 'auto',
         padding:   '0 var(--space-4) var(--space-6)',
       }}>
-        <BrandsList siblings={siblings} onTap={handleTap} />
+        <BrandsList
+          key={activeTab}
+          siblings={activeTab === 'alternatives' ? alternatives : siblings}
+          onTap={handleTap}
+          mode={activeTab}
+          showTitle={!showTabs}
+          familyName={alternatives[0]?.subclass}
+        />
       </div>
     </SheetShell>
   )
