@@ -114,9 +114,17 @@
  * only appears when the list spans more than one generic. The form filter
  * and the cheapest-first sort work the same on both tabs. Rows stay
  * display-only (not tappable) in both modes for now.
+ *
+ * 2026-10-02 (dropdown clipping fix): the three dropdown menus used to be
+ * floating popovers inside the sheet's scroll area, so with only 1-2 rows
+ * in the list they were cut off and ran past the screen edge. They now
+ * open as a normal block right under the pill row (full width, own
+ * scroll for long lists), so they always fit inside the sheet. Only one
+ * menu is open at a time; picking an option or tapping the same pill
+ * again closes it.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { ChevronDown, ListFilter, ArrowUpDown, Pill } from 'lucide-react'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -142,6 +150,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
   const [formFilter, setFormFilter] = useState('all')
   const [medicineFilter, setMedicineFilter] = useState('all')
   const [sortMode,   setSortMode]   = useState('name') // 'name' | 'price'
+  const [openMenu,   setOpenMenu]   = useState(null)   // 'form' | 'medicine' | 'sort' | null
   const { categories } = useCategories()
   const isDark = useIsDark()
   const { isDrugFavourited } = useFavouritesContext()
@@ -185,6 +194,30 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
     return (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? '')
   })
 
+  // The dropdowns present for this list, in display order. Each one is a pill
+  // plus the options its menu shows.
+  const controls = [
+    showFormFilter && {
+      key: 'form', icon: ListFilter, value: formFilter, onChange: setFormFilter,
+      options: [
+        { value: 'all', label: 'All Forms' },
+        ...presentGroups.map(g => ({ value: g.value, label: g.label })),
+      ],
+    },
+    showMedicineFilter && {
+      key: 'medicine', icon: Pill, value: medicineFilter, onChange: setMedicineFilter,
+      options: [{ value: 'all', label: 'All Medicines' }, ...medicineOptions],
+    },
+    {
+      key: 'sort', icon: ArrowUpDown, value: sortMode, onChange: setSortMode,
+      options: [
+        { value: 'name',  label: 'Name (A–Z)' },
+        { value: 'price', label: 'Cheapest first' },
+      ],
+    },
+  ].filter(Boolean)
+  const activeControl = controls.find(c => c.key === openMenu) || null
+
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
       {/* Section header — hidden when the sheet's tab bar already names
@@ -225,43 +258,29 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
       <div style={{
         display:      'flex',
         gap:          'var(--space-2)',
-        marginBottom: 'var(--space-3)',
+        marginBottom: openMenu ? 'var(--space-2)' : 'var(--space-3)',
         flexWrap:     'wrap',
       }}>
-        {showFormFilter && (
-          <DropdownPill
-            icon={ListFilter}
-            value={formFilter}
-            onChange={setFormFilter}
-            options={[
-              { value: 'all', label: 'All Forms' },
-              ...presentGroups.map(g => ({ value: g.value, label: g.label })),
-            ]}
+        {controls.map(c => (
+          <PillButton
+            key={c.key}
+            icon={c.icon}
+            label={c.options.find(o => o.value === c.value)?.label}
+            open={openMenu === c.key}
+            onPress={() => setOpenMenu(m => (m === c.key ? null : c.key))}
           />
-        )}
-
-        {showMedicineFilter && (
-          <DropdownPill
-            icon={Pill}
-            value={medicineFilter}
-            onChange={setMedicineFilter}
-            options={[
-              { value: 'all', label: 'All Medicines' },
-              ...medicineOptions,
-            ]}
-          />
-        )}
-
-        <DropdownPill
-          icon={ArrowUpDown}
-          value={sortMode}
-          onChange={setSortMode}
-          options={[
-            { value: 'name',  label: 'Name (A–Z)' },
-            { value: 'price', label: 'Cheapest first' },
-          ]}
-        />
+        ))}
       </div>
+
+      {/* Open menu — rendered in normal flow under the pills (not a floating
+          popover), so the sheet's scroll area never clips it. */}
+      {activeControl && (
+        <OptionsPanel
+          options={activeControl.options}
+          value={activeControl.value}
+          onChange={v => { activeControl.onChange(v); setOpenMenu(null) }}
+        />
+      )}
 
       {/* Rows — SharedDrugCard.jsx, same component Drugs/Favourites screens
           use. It renders its own hairline divider between rows (isLast
@@ -304,98 +323,76 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', sho
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-function DropdownPill({ icon: Icon, value, onChange, options }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef(null)
-  const current = options.find(opt => opt.value === value)
-
-  // Click/tap outside closes the menu — same idea SpecialtiesBottomSheet.jsx's
-  // own backdrop-tap-to-dismiss uses, just scoped to this one small popover
-  // instead of the whole sheet.
-  useEffect(() => {
-    if (!open) return
-    function handleOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleOutside)
-    document.addEventListener('touchstart', handleOutside)
-    return () => {
-      document.removeEventListener('mousedown', handleOutside)
-      document.removeEventListener('touchstart', handleOutside)
-    }
-  }, [open])
-
+function PillButton({ icon: Icon, label, open, onPress }) {
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        onClick={() => setOpen(o => !o)}
+    <button
+      onClick={onPress}
+      aria-expanded={open}
+      style={{
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     6,
+        backgroundColor:         'var(--color-surface)',
+        border:                  `1px solid ${open ? 'var(--color-accent)' : 'var(--color-border)'}`,
+        borderRadius:            'var(--radius-full)',
+        padding:                 '6px 12px',
+        fontSize:                13,
+        fontWeight:              500,
+        color:                   'var(--color-text-primary)',
+        fontFamily:              'var(--font-body)',
+        cursor:                  'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+        maxWidth:                '100%',
+      }}
+    >
+      <Icon size={14} color="var(--color-text-secondary)" />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+      <ChevronDown
+        size={14}
+        color="var(--color-text-secondary)"
         style={{
-          display:                 'flex',
-          alignItems:              'center',
-          gap:                     6,
-          backgroundColor:         'var(--color-surface)',
-          border:                  '1px solid var(--color-border)',
-          borderRadius:            'var(--radius-full)',
-          padding:                 '6px 12px',
-          fontSize:                13,
-          fontWeight:              500,
-          color:                   'var(--color-text-primary)',
-          fontFamily:              'var(--font-body)',
-          cursor:                  'pointer',
-          WebkitTapHighlightColor: 'transparent',
-          outline:                 'none',
+          flexShrink: 0,
+          transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.15s ease',
         }}
-      >
-        <Icon size={14} color="var(--color-text-secondary)" />
-        {current?.label}
-        <ChevronDown
-          size={14}
-          color="var(--color-text-secondary)"
-          style={{
-            transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.15s ease',
-          }}
-        />
-      </button>
+      />
+    </button>
+  )
+}
 
-      {open && (
-        <div style={{
-          position:        'absolute',
-          top:             'calc(100% + 4px)',
-          left:            0,
-          zIndex:          20,
-          minWidth:        170,
-          backgroundColor: 'var(--color-surface)',
-          border:          '1px solid var(--color-border)',
-          borderRadius:    'var(--radius-md)',
-          boxShadow:       '0 4px 16px rgba(0,0,0,0.12)',
-          maxHeight:       260,
-          overflowY:       'auto',
-        }}>
-          {options.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => { onChange(opt.value); setOpen(false) }}
-              style={{
-                display:                 'block',
-                width:                   '100%',
-                textAlign:               'left',
-                padding:                 '10px 14px',
-                border:                  'none',
-                background:              'none',
-                fontSize:                13,
-                fontFamily:              'var(--font-body)',
-                fontWeight:              opt.value === value ? 600 : 400,
-                color:                   opt.value === value ? 'var(--color-accent)' : 'var(--color-text-primary)',
-                cursor:                  'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+function OptionsPanel({ options, value, onChange }) {
+  return (
+    <div style={{
+      marginBottom:    'var(--space-3)',
+      backgroundColor: 'var(--color-surface)',
+      border:          '1px solid var(--color-border)',
+      borderRadius:    'var(--radius-md)',
+      maxHeight:       240,
+      overflowY:       'auto',
+    }}>
+      {options.map(opt => (
+        <button
+          key={opt.value}
+          onClick={() => onChange(opt.value)}
+          style={{
+            display:                 'block',
+            width:                   '100%',
+            textAlign:               'left',
+            padding:                 '10px 14px',
+            border:                  'none',
+            background:              'none',
+            fontSize:                13,
+            fontFamily:              'var(--font-body)',
+            fontWeight:              opt.value === value ? 600 : 400,
+            color:                   opt.value === value ? 'var(--color-accent)' : 'var(--color-text-primary)',
+            cursor:                  'pointer',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
     </div>
   )
 }
