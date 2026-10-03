@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (count tag): the drug count on each subclass card is now the
+ * small rounded-square tag (CountTag, the one the Related drugs sheet uses),
+ * a little smaller, placed right before the chevron instead of under the
+ * name. It shows the number only; the heading says how many drugs in total.
+ *
  * 2026-10-03 (chemical icon back): the subclass cards have an icon tile again,
  * now a chemistry flask (a drug class is a chemical family) instead of the
  * stacked layers. Tile 34, icon and name in one row (icon centred on the
@@ -104,7 +109,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, FlaskConical } from 'lucide-react'
-import BrandsList from '../BrandsList.jsx'
+import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 
@@ -131,8 +136,7 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-// Size of the icon tile and the gap after it. The count badge is indented by
-// the same amount so it lines up under the name.
+// Size of the icon tile and the gap after it.
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
@@ -148,7 +152,7 @@ function SubclassRow({ name, count, onClick }) {
       style={{
         display:         'flex',
         alignItems:      'center',
-        gap:             12,
+        gap:             10,
         width:           '100%',
         boxSizing:       'border-box',
         flexShrink:      0,
@@ -167,54 +171,42 @@ function SubclassRow({ name, count, onClick }) {
         outline:         'none',
       }}
     >
-      <span style={{ flex: 1, minWidth: 0 }}>
-        {/* Icon and name share one row, so the icon is centred on the name
-            (all its lines) and not on the count badge underneath. */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width:           ICON_TILE,
-              height:          ICON_TILE,
-              borderRadius:    10,
-              backgroundColor: 'var(--color-accent-light)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-            }}
-          >
-            <FlaskConical size={17} strokeWidth={1.9} color="var(--color-accent)" />
-          </span>
-          <span style={{
-            flex:       1,
-            minWidth:   0,
-            fontSize:   15,
-            fontWeight: 500,
-            lineHeight: 1.3,
-            color:      'var(--color-text-primary)',
-          }}>
-            {name}
-          </span>
+      {/* Icon and name share one row, so the icon is centred on the name
+          (all its lines). */}
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
+        <span
+          aria-hidden="true"
+          style={{
+            width:           ICON_TILE,
+            height:          ICON_TILE,
+            borderRadius:    10,
+            backgroundColor: 'var(--color-accent-light)',
+            display:         'flex',
+            alignItems:      'center',
+            justifyContent:  'center',
+            flexShrink:      0,
+          }}
+        >
+          <FlaskConical size={17} strokeWidth={1.9} color="var(--color-accent)" />
         </span>
-        {/* Count badge: lines up under the name text, not under the icon. */}
         <span style={{
-          display:            'inline-block',
-          marginTop:          7,
-          marginLeft:         ICON_TILE + ICON_GAP,
-          padding:            '2px 8px',
-          borderRadius:       999,
-          backgroundColor:    'var(--color-surface)',
-          border:             '0.5px solid var(--color-border)',
-          fontSize:           10.5,
-          fontWeight:         500,
-          lineHeight:         1.5,
-          fontVariantNumeric: 'tabular-nums',
-          color:              'var(--color-text-secondary)',
+          flex:       1,
+          minWidth:   0,
+          fontSize:   15,
+          fontWeight: 500,
+          lineHeight: 1.3,
+          color:      'var(--color-text-primary)',
         }}>
-          {count} {count === 1 ? 'drug' : 'drugs'}
+          {name}
         </span>
       </span>
+      {/* Drug count: the same small rounded-square tag used in the Related
+          drugs sheet, a little smaller, just before the chevron. */}
+      <CountTag
+        style={{ minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11 }}
+      >
+        <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
+      </CountTag>
       <ChevronRight
         aria-hidden="true"
         size={16}
