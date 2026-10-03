@@ -110,8 +110,8 @@ export function Collapsible({ title, children }) {
 // ingredients, so the ingredient name is the main thing on the card.
 const CHIP_SIZES = {
   sm: { fontSize: 14, padding: '4px 10px', borderRadius: 'var(--radius-sm)' },
-  md: { fontSize: 17, padding: '7px 13px', borderRadius: 11, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
-  lg: { fontSize: 20, padding: '8px 16px', borderRadius: 12, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
+  md: { fontSize: 15, padding: '5px 11px', borderRadius: 9, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
+  lg: { fontSize: 16, padding: '6px 12px', borderRadius: 10, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
 }
 export function IngredientChip({ children, style, size = 'sm' }) {
   return (
