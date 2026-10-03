@@ -3,10 +3,11 @@
  *
  * 2026-10-03 (refined look): the subclass list has a real heading (the class
  * name, larger) with a small grey line under it, '<n> drug groups' ('1 drug
- * group' for one). The old sentence title is gone. Option rows lost their box
- * and border: they sit flat on the sheet with a thin line between them, a
- * slightly larger name, the count tag and a grey arrow, and a soft tint when
- * pressed. Order is unchanged (biggest group first).
+ * group' for one). The old sentence title is gone. The heading is fixed at
+ * the top of the sheet with a thin line under it; only the groups scroll.
+ * Each group is a soft rounded card (no border) with the name, the number of
+ * drugs in words under it ('12 drugs', '1 drug') and a small blue circle with
+ * an arrow on the right. Order is unchanged (biggest group first).
  *
  * 2026-10-03 (class sheet): the bottom sheet opened by tapping the Class row
  * in the Generic Overview card (GenericOverviewSection.jsx).
@@ -45,7 +46,7 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import BrandsList, { CountTag } from '../BrandsList.jsx'
+import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 
 // Makes every word start with a capital letter, including the words after a
@@ -71,7 +72,7 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-function SubclassRow({ name, count, onClick, isLast }) {
+function SubclassRow({ name, count, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -86,27 +87,55 @@ function SubclassRow({ name, count, onClick, isLast }) {
         gap:             12,
         width:           '100%',
         boxSizing:       'border-box',
-        minHeight:       48,
-        padding:         '10px 4px',
+        minHeight:       56,
+        padding:         '12px 12px 12px 14px',
         border:          'none',
-        borderBottom:    isLast ? 'none' : '0.5px solid var(--color-border)',
-        borderRadius:    pressed ? 10 : 0,
-        backgroundColor: pressed ? 'var(--color-accent-light)' : 'transparent',
-        transition:      'background-color var(--motion-fast) var(--ease-settle)',
+        borderRadius:    14,
+        backgroundColor: 'var(--color-surface-muted)',
+        opacity:         pressed ? 0.8 : 1,
+        transform:       pressed ? 'scale(0.985)' : 'scale(1)',
+        transition:      'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
         fontFamily:      'var(--font-body)',
-        fontSize:        15,
-        fontWeight:      500,
-        lineHeight:      1.4,
         textAlign:       'left',
-        color:           'var(--color-text-primary)',
         cursor:          'pointer',
         WebkitTapHighlightColor: 'transparent',
         outline:         'none',
       }}
     >
-      <span style={{ flex: 1, minWidth: 0 }}>{name}</span>
-      <CountTag tone="neutral">{count}</CountTag>
-      <ChevronRight size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          display:    'block',
+          fontSize:   15,
+          fontWeight: 500,
+          lineHeight: 1.35,
+          color:      'var(--color-text-primary)',
+        }}>
+          {name}
+        </span>
+        <span style={{
+          display:   'block',
+          marginTop: 2,
+          fontSize:  12,
+          color:     'var(--color-text-secondary)',
+        }}>
+          {count} {count === 1 ? 'drug' : 'drugs'}
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          width:           28,
+          height:          28,
+          borderRadius:    '50%',
+          backgroundColor: 'var(--color-accent-light)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          flexShrink:      0,
+        }}
+      >
+        <ChevronRight size={16} color="var(--color-accent)" />
+      </span>
     </button>
   )
 }
@@ -199,40 +228,49 @@ export default function ClassBottomSheet({
             </div>
           </>
         ) : (
-          <div style={{
-            flex:      1,
-            minHeight: 0,
-            overflowY: 'auto',
-            padding:   'var(--space-2) var(--space-4) var(--space-6)',
-          }}>
-            <p style={{
-              margin:     0,
-              fontSize:   20,
-              fontWeight: 500,
-              lineHeight: 1.3,
-              color:      'var(--color-text-primary)',
+          <>
+            {/* Fixed heading: stays put while the groups scroll under it. */}
+            <div style={{
+              flexShrink:   0,
+              padding:      'var(--space-2) var(--space-4) var(--space-3)',
+              borderBottom: '0.5px solid var(--color-border)',
             }}>
-              {classLabel}
-            </p>
-            <p style={{
-              margin:   '2px 0 var(--space-3)',
-              fontSize: 13,
-              color:    'var(--color-text-secondary)',
+              <p style={{
+                margin:     0,
+                fontSize:   20,
+                fontWeight: 500,
+                lineHeight: 1.3,
+                color:      'var(--color-text-primary)',
+              }}>
+                {classLabel}
+              </p>
+              <p style={{
+                margin:   '2px 0 0',
+                fontSize: 13,
+                color:    'var(--color-text-secondary)',
+              }}>
+                {groups.length} drug {groups.length === 1 ? 'group' : 'groups'}
+              </p>
+            </div>
+            <div style={{
+              flex:          1,
+              minHeight:     0,
+              overflowY:     'auto',
+              display:       'flex',
+              flexDirection: 'column',
+              gap:           'var(--space-2)',
+              padding:       'var(--space-3) var(--space-4) var(--space-6)',
             }}>
-              {groups.length} drug {groups.length === 1 ? 'group' : 'groups'}
-            </p>
-            <div style={{ borderTop: '0.5px solid var(--color-border)' }}>
-              {groups.map((g, i) => (
+              {groups.map(g => (
                 <SubclassRow
                   key={g.name}
                   name={titleCaseWords(g.name)}
                   count={g.items.length}
                   onClick={() => setPicked(g.name)}
-                  isLast={i === groups.length - 1}
                 />
               ))}
             </div>
-          </div>
+          </>
         )}
       </div>
       {/* Pop-up layer: covers the whole sheet and lets touches through until
