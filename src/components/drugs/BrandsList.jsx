@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-up header): the top of the filter pop-ups is refined. The
+ * icon sits in a small blue-tinted tile (same as the class sheet cards) beside
+ * the title (weight 600), the subclass name is a soft badge ('<Subclass>
+ * drugs', name in bold), the hint line is lighter and lined up under the title
+ * text, and a hairline separates the header from the options. Applies to every
+ * pop-up that uses this header (Generic, Form, ...), since they share it.
+ *
  * 2026-10-03 (image search stopped working): the subclass title search now
  * opens through openInAppBrowser (src/utils/openInAppBrowser.js), same fix as
  * the image-search icon in SharedDrugCard.jsx.
@@ -843,35 +850,77 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns
           transition:      'transform var(--motion-base) var(--ease-settle)',
         }}
       >
+        {/* Header: icon tile and title on one row (All chip on the right),
+            then the subclass name as a small badge and the hint line under
+            the title text, all above a hairline. */}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexShrink: 0,
+          flexShrink:    0,
+          marginBottom:  'var(--space-3)',
+          paddingBottom: 'var(--space-3)',
+          borderBottom:  '0.5px solid var(--color-border)',
         }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)',
-            }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 'var(--space-2)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               {TitleIcon && (
-                <TitleIcon size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width:           32,
+                    height:          32,
+                    borderRadius:    9,
+                    backgroundColor: 'var(--color-accent-light)',
+                    display:         'flex',
+                    alignItems:      'center',
+                    justifyContent:  'center',
+                    flexShrink:      0,
+                  }}
+                >
+                  <TitleIcon size={16} color="var(--color-accent)" />
+                </span>
               )}
-              <span>{title}</span>
+              <span style={{
+                fontSize: 16, fontWeight: 600, lineHeight: 1.3,
+                color: 'var(--color-text-primary)',
+              }}>
+                {title}
+              </span>
             </div>
-            {/* Generic pop-up only: which subclass these generics belong to,
-                as '<Subclass> drugs' with the name in bold. */}
-            {scopeName && (
-              <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{scopeName}</span> drugs
-              </div>
-            )}
-            {subtitle && (
-              <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-                {subtitle}
-              </div>
+            {onAll && (
+              <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
             )}
           </div>
-          {onAll && (
-            <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
+          {(scopeName || subtitle) && (
+            <div style={{ marginTop: 10, marginLeft: TitleIcon ? 42 : 0 }}>
+              {/* Generic pop-up only: which subclass these generics belong to,
+                  as '<Subclass> drugs' with the name in bold. */}
+              {scopeName && (
+                <span style={{
+                  display:         'inline-block',
+                  maxWidth:        '100%',
+                  padding:         '2px 10px',
+                  borderRadius:    999,
+                  backgroundColor: 'var(--color-surface-muted)',
+                  fontSize:        12,
+                  lineHeight:      1.5,
+                  color:           'var(--color-text-secondary)',
+                }}>
+                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{scopeName}</span> drugs
+                </span>
+              )}
+              {subtitle && (
+                <div style={{
+                  marginTop: scopeName ? 6 : 0,
+                  fontSize:  12,
+                  lineHeight: 1.4,
+                  color:     'var(--color-text-tertiary)',
+                }}>
+                  {subtitle}
+                </div>
+              )}
+            </div>
           )}
         </div>
 
