@@ -9,12 +9,12 @@
  *
  * 2026-10-03 (you are here card): the Similar list now also shows the drug page
  * that is open, as one more card in the list, tinted with the accent colour so
- * it stands out. It sits at its own place in the current sort order and is
- * always shown, even when the Form filter would not match it (it is a marker
- * for where the person is, not a result). It is not counted in 'N drugs' (that
- * line, like the tab count, counts the other drugs), is not tappable, and
- * its divider line is dropped so the tint reads as one block. Alternatives is
- * unchanged. New prop currentDrug (see Props below).
+ * it stands out. It sits at its own place in the current sort order and follows
+ * the Form filter like every other card: it is hidden while the filter does
+ * not match it. It is not counted in 'N drugs' (that line, like the tab count,
+ * counts the other drugs), is not tappable, and its divider line is dropped so
+ * the tint reads as one block. Alternatives is unchanged. New prop currentDrug
+ * (see Props below).
  *
  * 2026-10-03 (brand list polish): (1) On Alternatives the whole 'Other <subclass>
  * drugs' title is now one tappable button that opens the Google search, not
@@ -349,9 +349,12 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
   const sorted   = sortItems(filtered, sortMode)
   // Similar only: the open drug joins the list as a 'you are here' card at its
-  // place in the current sort order. Counts, the empty message and the filters
-  // keep working on the other drugs only (sorted), so nothing about them shifts.
-  const showCurrent = !!currentDrug && !isAlternatives && !sorted.some(s => s.id === currentDrug.id)
+  // place in the current sort order, but only while it passes the same filters
+  // as the other cards. Counts and the empty message keep working on the other
+  // drugs only (sorted), so nothing about them shifts.
+  const showCurrent = !!currentDrug && !isAlternatives
+    && !sorted.some(s => s.id === currentDrug.id)
+    && applyFilters([currentDrug], { genericSel: activeGenerics, formSel }, groupOf).length > 0
   const rows = showCurrent ? sortItems([...sorted, currentDrug], sortMode) : sorted
   const filtersActive = formSel.length > 0 || activeGenerics.length > 0
 
