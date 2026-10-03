@@ -2,7 +2,7 @@
  * src/components/drugs/BrandsList.jsx
  *
  * 2026-10-03 (sort icons): the two options in the Sort By pop-up now have an
- * icon in front of the text (A to Z arrow for Name, coins for Cheapest first).
+ * icon in front of the text (A to Z arrow for Name, a low-to-high number arrow for Cheapest first).
  * Done with an optional 'icon' on an option, passed to ToggleChip; only the
  * sort options set one, so the Generic and Form pop-ups look the same as
  * before.
@@ -336,7 +336,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, Coins } from 'lucide-react'
+import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -424,7 +424,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
 
   const sortOptions = [
     { value: 'name',  label: 'Name (A–Z)',     icon: ArrowDownAZ },
-    { value: 'price', label: 'Cheapest first', icon: Coins },
+    { value: 'price', label: 'Cheapest first', icon: ArrowDown01 },
   ]
 
   const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
