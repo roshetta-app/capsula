@@ -1,6 +1,18 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (drug families): the grey line under the class name now reads
+ * '<n> drug families' ('1 drug family' for one) instead of 'drug groups'.
+ *
+ * 2026-10-03 (drugs page title): the title above the drugs of a subclass no
+ * longer starts with 'Other'. It reads '<subclass> drugs' (BrandsList hideOther).
+ *
+ * 2026-10-03 (icons and count badge): each subclass card now starts with a
+ * small rounded tile holding a pill icon, and the number of drugs sits under
+ * the name as a subtle badge (a soft pill, same blue family as the arrow
+ * circle but fainter) instead of plain grey text. Order, tapping and the
+ * drugs page are unchanged.
+ *
  * 2026-10-03 (refined look): the subclass list has a real heading (the class
  * name, larger) with a small grey line under it, '<n> drug groups' ('1 drug
  * group' for one). The old sentence title is gone. The heading is fixed at
@@ -54,7 +66,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Pill } from 'lucide-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -113,6 +125,21 @@ function SubclassRow({ name, count, onClick }) {
         outline:         'none',
       }}
     >
+      <span
+        aria-hidden="true"
+        style={{
+          width:           36,
+          height:          36,
+          borderRadius:    10,
+          backgroundColor: 'var(--color-accent-light)',
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          flexShrink:      0,
+        }}
+      >
+        <Pill size={18} color="var(--color-accent)" />
+      </span>
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{
           display:    'block',
@@ -124,10 +151,16 @@ function SubclassRow({ name, count, onClick }) {
           {name}
         </span>
         <span style={{
-          display:   'block',
-          marginTop: 2,
-          fontSize:  12,
-          color:     'var(--color-text-secondary)',
+          display:         'inline-block',
+          marginTop:       6,
+          padding:         '2px 8px',
+          borderRadius:    999,
+          backgroundColor: 'var(--color-surface)',
+          border:          '0.5px solid var(--color-border)',
+          fontSize:        11,
+          fontWeight:      500,
+          lineHeight:      1.5,
+          color:           'var(--color-text-secondary)',
         }}>
           {count} {count === 1 ? 'drug' : 'drugs'}
         </span>
@@ -236,6 +269,7 @@ export default function ClassBottomSheet({
                 siblings={pickedGroup.items}
                 onTap={handleTap}
                 mode="alternatives"
+                hideOther
                 familyName={titleCaseWords(pickedGroup.name)}
                 saved={savedFilters.current[pickedGroup.name] ?? null}
                 onSave={p => { savedFilters.current[pickedGroup.name] = p }}
@@ -265,7 +299,7 @@ export default function ClassBottomSheet({
                 fontSize: 13,
                 color:    'var(--color-text-secondary)',
               }}>
-                {groups.length} drug {groups.length === 1 ? 'group' : 'groups'}
+                {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
               </p>
             </div>
             <div style={{

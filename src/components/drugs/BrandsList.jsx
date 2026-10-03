@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (class sheet title): new optional prop hideOther (default false).
+ * With it on, the heading drops the word 'Other' and reads '<name> drugs'. The
+ * class sheet (ClassBottomSheet.jsx) turns it on for the drugs of a subclass,
+ * because there the open drug is not being left out of the list. Everywhere
+ * else the heading still reads 'Other <name> drugs'.
+ *
  * 2026-10-03 (pop-up scroll bar crash): ScrollMenu (the scroll bar in the filter
  * pop-ups) made a new object on every measure, so with a long list it kept
  * re-rendering itself forever. That was silent until a Back press hit the open
@@ -144,6 +150,8 @@
  *   currentDrug — the flat drug object of the page that is open (Similar mode
  *              only, ignored on Alternatives). Drawn as a tinted card inside
  *              the list. Optional; with none, the list is exactly the siblings.
+ *   hideOther — optional boolean, default false. True drops the word 'Other'
+ *              from the heading ('<name> drugs' instead of 'Other <name> drugs').
  *   similarGenericName — Alternatives only: name of the generic the Similar
  *              tab is about. Listed in the generic pop-up as a greyed-out row.
  *              Leave empty when there is no Similar tab.
@@ -344,7 +352,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -509,7 +517,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               outline:    'none',
             }}
           >
-            Other {nameNode}
+            {hideOther ? null : 'Other '}{nameNode}
             <Search
               size={11}
               strokeWidth={2.2}
@@ -522,7 +530,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         )
         : (
           <p style={headingStyle}>
-            Other {nameNode} drugs
+            {hideOther ? null : 'Other '}{nameNode} drugs
           </p>
         )
       )}
