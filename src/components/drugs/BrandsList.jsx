@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-up icons, ingredient capitals): the 'Filter by generic'
+ * pop-up now shows the pill icon in its title and the 'Form / Route' pop-up
+ * shows the filter icon, the same icons as their two pill buttons. In the
+ * generic list (and the single-generic pill) every ingredient now starts with
+ * a capital letter, e.g. 'Brompheniramine + Paracetamol', not just the first.
+ *
  * 2026-10-03 (title size and form subtitle): the 'Other <name> drugs' title on
  * both tabs is a little smaller (16px down to 15px). The 'Form / Route' pop-up
  * now has the subtitle 'You can pick multiple forms', same look as the one in
@@ -289,6 +295,14 @@ function sentenceCase(text) {
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : ''
 }
 
+// 'brompheniramine + paracetamol' -> 'Brompheniramine + Paracetamol'
+// Generic names list their ingredients separated by ' + '; each one gets its
+// own capital letter (the rest of the name stays lower case).
+function ingredientCase(text) {
+  const t = (text ?? '').trim().toLowerCase()
+  return t.replace(/(^|\+\s*)(\S)/g, (_, lead, ch) => lead + ch.toUpperCase())
+}
+
 // Pill text for the generic filter: a prompt when nothing is picked, else a count.
 function genericLabel(selected) {
   if (selected.length === 0) return 'Filter by generic'
@@ -343,7 +357,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   }))
   const genericOptions = sortGenericOptions(
     [...nameById.entries()]
-      .map(([value, label]) => ({ value, label: sentenceCase(label), count: genericCounts.get(value) ?? 0 }))
+      .map(([value, label]) => ({ value, label: ingredientCase(label), count: genericCounts.get(value) ?? 0 }))
   )
 
   const sortOptions = [
@@ -398,10 +412,10 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   const genericControl = isAlternatives && nameById.size > 0 && {
     key: 'generic', icon: Pill, flex: 3,
     pillLabel: onlyGeneric
-      ? sentenceCase([...nameById.values()][0])
+      ? ingredientCase([...nameById.values()][0])
       : genericLabel(genericSel),
     active: genericSel.length > 0,
-    menu: { title: 'Filter by generic',
+    menu: { title: 'Filter by generic', titleIcon: Pill,
             subtitle: onlyGeneric ? undefined : 'You can pick multiple generics',
             columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions,
@@ -418,7 +432,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
-    menu: { title: 'Form / Route', subtitle: 'You can pick multiple forms', columns: 2, showCounts: false, options: formOptions, selected: formSel,
+    menu: { title: 'Form / Route', titleIcon: ListFilter, subtitle: 'You can pick multiple forms', columns: 2, showCounts: false, options: formOptions, selected: formSel,
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
