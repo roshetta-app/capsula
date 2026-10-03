@@ -235,8 +235,10 @@
  *    (every subclass in the class, then the drugs in the one picked). It is
  *    only tappable when the new 'classDrugs' prop has drugs in it. The
  *    Subclass row still opens the Alternatives tab, as before.
- *  - The two-row card now has its own tinted background (the accent tint,
- *    already dark-mode aware) so it stands out from the page. Both rows share
+ *  - The two-row card now has its own tinted background and border (new
+ *    --color-class-card-bg / --color-class-card-border tokens in globals.css,
+ *    light and dark; the plain accent tint was too close to the page colour
+ *    in light mode) so it stands out from the page. Both rows share
  *    one look: same text colour, and a blue arrow on whichever row can be
  *    tapped. Each row is the new CardRow below.
  *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
@@ -267,7 +269,7 @@ function CardRow({ label, onClick, ariaLabel, topBorder = false }) {
     minHeight:      48,
     padding:        '12px 14px',
     border:         'none',
-    borderTop:      topBorder ? '1px solid var(--color-border)' : 'none',
+    borderTop:      topBorder ? '1px solid var(--color-class-card-border)' : 'none',
     fontFamily:     'var(--font-body)',
     fontSize:       14,
     fontWeight:     600,
@@ -518,10 +520,10 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             cannot be opened is a plain row with no arrow. -- */}
       {(drugClass || subclass) && (
         <div style={{
-          border:          '1px solid var(--color-border)',
+          border:          '1px solid var(--color-class-card-border)',
           borderRadius:    12,
           overflow:        'hidden',
-          backgroundColor: 'var(--color-accent-light)',
+          backgroundColor: 'var(--color-class-card-bg)',
           marginBottom:    'var(--space-3)',
         }}>
           {drugClass && (

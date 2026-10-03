@@ -98,6 +98,13 @@
      shadow) to read as separate. */
   --color-hero-bg:          #FAFAFA;
 
+  /* Class/Subclass card on the drug page (Generic Overview). A dedicated pair
+     because --color-accent-light (#EFF4FF) is almost the same as --color-bg
+     in light mode, so the card did not stand out from the page. This is a
+     clearly bluer tint with a matching border. */
+  --color-class-card-bg:     #E0EAFF;
+  --color-class-card-border: #BFD3FD;
+
   --color-text-primary:     #1A1916;
   --color-text-secondary:   #6B7280;
   --color-text-tertiary:    #9E9B95;
@@ -224,6 +231,10 @@
      from --color-surface for more separation from --color-bg than the
      surface/bg pair alone provided. */
   --color-hero-bg:          #29323F;
+
+  /* Class/Subclass card — dark mode pair (see the light-mode note above). */
+  --color-class-card-bg:     #1E3A5F;
+  --color-class-card-border: #2F5486;
 
   --color-text-primary:     #F9FAFB;
   --color-text-secondary:   #9CA3AF;
