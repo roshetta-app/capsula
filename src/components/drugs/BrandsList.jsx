@@ -1,6 +1,21 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (single generic): on Alternatives with only one generic, the
+ * generic pill is no longer greyed out and dead. It opens the Filter by generic
+ * pop-up, which shows that one generic in full (the name wraps instead of being
+ * cut off), ticked and greyed out so it cannot be changed. That pop-up has no
+ * subtitle and no Clear filter button, only Done. The Form pill is unchanged.
+ *
+ * 2026-10-03 (you are here card): the Similar list now also shows the drug page
+ * that is open, as one more card in the list, tinted with the accent colour so
+ * it stands out. It sits at its own place in the current sort order and is
+ * always shown, even when the Form filter would not match it (it is a marker
+ * for where the person is, not a result). It is not counted in 'N drugs' (that
+ * line, like the tab count, counts the other drugs), is not tappable, and
+ * its divider line is dropped so the tint reads as one block. Alternatives is
+ * unchanged. New prop currentDrug (see Props below).
+ *
  * 2026-10-03 (brand list polish): (1) On Alternatives the whole 'Other <subclass>
  * drugs' title is now one tappable button that opens the Google search, not
  * just the icon; the icon is smaller, sits right after the subclass name and is
@@ -85,6 +100,9 @@
  *              projection) via DrugDetailScreen.jsx: `drugs.filter(d =>
  *              d.genericId === drug.genericId && d.id !== drug.id)`, same
  *              array `drugs` (the full drug list) comes from.
+ *   currentDrug — the flat drug object of the page that is open (Similar mode
+ *              only, ignored on Alternatives). Drawn as a tinted card inside
+ *              the list. Optional; with none, the list is exactly the siblings.
  *   onTap    — (item) => void — no longer called (see 2026-09-19 note
  *              below); kept in the prop list so this file's own public API
  *              doesn't change for whatever screen still passes it in.
@@ -279,7 +297,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], onTap, mode = 'similar', familyName, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -330,6 +348,11 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
 
   const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
   const sorted   = sortItems(filtered, sortMode)
+  // Similar only: the open drug joins the list as a 'you are here' card at its
+  // place in the current sort order. Counts, the empty message and the filters
+  // keep working on the other drugs only (sorted), so nothing about them shifts.
+  const showCurrent = !!currentDrug && !isAlternatives && !sorted.some(s => s.id === currentDrug.id)
+  const rows = showCurrent ? sortItems([...sorted, currentDrug], sortMode) : sorted
   const filtersActive = formSel.length > 0 || activeGenerics.length > 0
 
   function toggleIn(list, setList, value) {
@@ -360,17 +383,24 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   // The two filter pills. Alternatives: both always (greyed out when there is
   // only one choice, showing that choice). Similar: Form only, and only when
   // there is more than one form.
+  // With a single generic there is nothing to choose: the pill still opens its
+  // pop-up (so the full name can be read), where that generic is shown ticked
+  // and greyed out (lockAll) with only a Done button.
+  const onlyGeneric = nameById.size === 1
   const genericControl = isAlternatives && nameById.size > 0 && {
     key: 'generic', icon: Pill, flex: 3,
-    pillLabel: nameById.size === 1
+    pillLabel: onlyGeneric
       ? sentenceCase([...nameById.values()][0])
       : genericLabel(genericSel),
     active: genericSel.length > 0,
-    disabled: nameById.size <= 1,
-    menu: { title: 'Filter by generic', subtitle: 'You can pick multiple generics', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
-            options: genericOptions, selected: genericSel,
+    menu: { title: 'Filter by generic',
+            subtitle: onlyGeneric ? undefined : 'You can pick multiple generics',
+            columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
+            options: genericOptions,
+            selected: onlyGeneric ? [...nameById.keys()] : genericSel,
+            lockAll: onlyGeneric,
             onPick: v => toggleIn(genericSel, setGenericSel, v),
-            onClear: () => setGenericSel([]) },
+            onClear: onlyGeneric ? undefined : () => setGenericSel([]) },
   }
   const showFormPill = formGroupsInList.length > 0
   const formControl = showFormPill && {
@@ -503,25 +533,44 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
       )}
 
       <div>
-        {sorted.map((item, i) => (
-          <SharedDrugCard
-            key={item.id}
-            drug={item}
-            categories={categories}
-            isDark={isDark}
-            isLast={i === sorted.length - 1}
-            onTap={onTap}
-            disableTap={!isAlternatives}
-            showChevron={isAlternatives}
-            showImageSearch
-            trailing={
-              <RowStarButton
-                isFavourited={isDrugFavourited(item.id)}
-                readOnly
-              />
-            }
-          />
-        ))}
+        {rows.map((item, i) => {
+          const isCurrent = showCurrent && item.id === currentDrug.id
+          const card = (
+            <SharedDrugCard
+              key={item.id}
+              drug={item}
+              categories={categories}
+              isDark={isDark}
+              isLast={i === rows.length - 1 || isCurrent}
+              onTap={onTap}
+              disableTap={!isAlternatives}
+              showChevron={isAlternatives}
+              showImageSearch
+              trailing={
+                <RowStarButton
+                  isFavourited={isDrugFavourited(item.id)}
+                  readOnly
+                />
+              }
+            />
+          )
+          // The open drug: same card, wrapped in an accent tint that reaches a
+          // little past the list's edges so it reads as a highlighted band.
+          return isCurrent ? (
+            <div
+              key={item.id}
+              aria-current="true"
+              style={{
+                backgroundColor: 'var(--color-accent-light)',
+                borderRadius:    'var(--radius-md)',
+                margin:          '0 calc(-1 * var(--space-3))',
+                padding:         '0 var(--space-3)',
+              }}
+            >
+              {card}
+            </div>
+          ) : card
+        })}
       </div>
 
       <div style={{
@@ -669,7 +718,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -758,18 +807,18 @@ function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = fa
                 wrap={wrap}
                 showCheckbox={!single}
                 count={showCounts ? opt.count : undefined}
-                locked={isOptionLocked(opt.count, selected.includes(opt.value))}
+                locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
               />
             ))}
           </div>
         </ScrollMenu>
 
-        {onClear && (
+        {(onClear || lockAll) && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
             gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexShrink: 0,
           }}>
-            <ClearFilterButton onClick={onClear} disabled={!hasSelection} />
+            {onClear && <ClearFilterButton onClick={onClear} disabled={!hasSelection} />}
             <button
               onClick={onClose}
               style={{

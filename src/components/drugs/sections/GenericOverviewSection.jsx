@@ -211,6 +211,9 @@
  * Mechanism of Action block above. Visual layout (floating pills, pillStyle)
  * is unchanged.
  *
+ * 2026-10-03 (you are here card): the open drug is now passed to the brands
+ * sheet (currentDrug) so the Similar list can show it highlighted.
+ *
  * 2026-10-02 (Related drugs, Alternatives lookup):
  *  - New 'alternatives' prop (brands in the same class and subclass, built
  *    in DrugDetailScreen.jsx). The top-right button is renamed 'Similar
@@ -512,6 +515,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         isOpen={brandsOpen}
         onClose={() => setBrandsOpen(false)}
         siblings={siblings}
+        currentDrug={drug}
         alternatives={alternatives}
         initialTab={sheetTab}
         onSelectBrand={onSelectBrand}

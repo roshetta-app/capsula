@@ -91,6 +91,10 @@
  * sideways swipe cannot start while one is open. With no Alternatives there is
  * no swipe area: one plain list, exactly as before.
  *
+ * 2026-10-03 (you are here card): new currentDrug prop, the drug page that is
+ * open. It is handed to the Similar list only (BrandsList draws it as a tinted
+ * card among the similar brands); the tab counts still count the other drugs.
+ *
  * 2026-10-03 (tab tap and count tags): tapping a tab now switches to its list
  * at once, with no slide (swiping between the lists still slides). The number
  * next to each tab name is drawn as a small rounded-square tag (CountTag from
@@ -100,6 +104,7 @@
  *   isOpen        boolean
  *   onClose       () => void
  *   siblings      array — same shape BrandsList.jsx already receives
+ *   currentDrug   flat drug object of the open page — shown highlighted in Similar
  *   alternatives  array — brands in the same class and subclass (other generics)
  *   initialTab    'similar' | 'alternatives' — which tab to open on
  *   onSelectBrand (item) => void — called after this sheet closes
@@ -152,6 +157,7 @@ export default function BrandsBottomSheet({
   isOpen,
   onClose,
   siblings = [],
+  currentDrug = null,
   alternatives = [],
   initialTab = 'similar',
   onSelectBrand,
@@ -260,6 +266,7 @@ export default function BrandsBottomSheet({
               >
                 <BrandsList
                   siblings={name === 'alternatives' ? alternatives : siblings}
+                  currentDrug={name === 'similar' ? currentDrug : null}
                   onTap={handleTap}
                   mode={name}
                   saved={savedFilters.current[name]}
@@ -281,6 +288,7 @@ export default function BrandsBottomSheet({
           <BrandsList
             key="similar"
             siblings={siblings}
+            currentDrug={currentDrug}
             onTap={handleTap}
             mode="similar"
             saved={savedFilters.current.similar}
