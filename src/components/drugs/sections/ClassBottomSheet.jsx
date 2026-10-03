@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-04 (All drugs row look): the 'All drugs in this class' row is now
+ * drawn differently from the subclass cards: a soft blue card, a solid blue
+ * icon tile with a white icon, and a bold blue name. A thin line with some air
+ * sits under it, before the subclass cards. A class with no subclasses shows
+ * only that row, so no line is drawn then. Tapping and counts are unchanged.
+ *
  * 2026-10-04 (Class search mode): three changes.
  *  - A first row 'All drugs in this class' now sits above the subclass cards. It
  *    opens every brand in the class (brands with a class but no subclass
@@ -232,7 +238,7 @@ function buildListGroups(groups) {
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
-function SubclassRow({ name, count, Icon = MoleculeIcon, onClick }) {
+function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -252,7 +258,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick }) {
         padding:         '14px 16px',
         border:          'none',
         borderRadius:    16,
-        backgroundColor: 'var(--color-surface-muted)',
+        backgroundColor: featured ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
         opacity:         pressed ? 0.8 : 1,
         transform:       pressed ? 'scale(0.985)' : 'scale(1)',
         transition:      'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
@@ -272,22 +278,22 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick }) {
             width:           ICON_TILE,
             height:          ICON_TILE,
             borderRadius:    10,
-            backgroundColor: 'var(--color-accent-light)',
+            backgroundColor: featured ? 'var(--color-accent)' : 'var(--color-accent-light)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
           }}
         >
-          <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
+          <Icon size={17} strokeWidth={1.9} color={featured ? '#fff' : 'var(--color-accent)'} />
         </span>
         <span style={{
           flex:       1,
           minWidth:   0,
           fontSize:   15,
-          fontWeight: 500,
+          fontWeight: featured ? 600 : 500,
           lineHeight: 1.3,
-          color:      'var(--color-text-primary)',
+          color:      featured ? 'var(--color-accent)' : 'var(--color-text-primary)',
         }}>
           {name}
         </span>
@@ -486,7 +492,21 @@ export default function ClassBottomSheet({
                   name={ALL_LABEL}
                   count={totalDrugs}
                   Icon={List}
+                  featured
                   onClick={() => setPicked(ALL_KEY)}
+                />
+              )}
+              {/* Thin line under the 'All drugs' row, only when subclass
+                  cards follow it. */}
+              {totalDrugs > 0 && listGroups.length > 0 && (
+                <div
+                  aria-hidden="true"
+                  style={{
+                    flexShrink:      0,
+                    height:          0.5,
+                    margin:          'var(--space-2) var(--space-1)',
+                    backgroundColor: 'var(--color-border)',
+                  }}
                 />
               )}
               {listGroups.map(g => (
