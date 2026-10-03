@@ -7,7 +7,10 @@
  * the top of the sheet with a thin line under it; only the groups scroll.
  * Each group is a soft rounded card (no border) with the name, the number of
  * drugs in words under it ('12 drugs', '1 drug') and a small blue circle with
- * an arrow on the right. Order is unchanged (biggest group first).
+ * an arrow on the right. Order is unchanged (biggest group first). Cards
+ * never shrink (flexShrink 0): in the scrolling column they were squeezed
+ * down to their minimum height, which cut into the padding when a name
+ * wrapped or the list was long. Padding is an even 14 (16 on the left).
  *
  * 2026-10-03 (class sheet): the bottom sheet opened by tapping the Class row
  * in the Generic Overview card (GenericOverviewSection.jsx).
@@ -87,8 +90,9 @@ function SubclassRow({ name, count, onClick }) {
         gap:             12,
         width:           '100%',
         boxSizing:       'border-box',
+        flexShrink:      0,
         minHeight:       56,
-        padding:         '12px 12px 12px 14px',
+        padding:         '14px 14px 14px 16px',
         border:          'none',
         borderRadius:    14,
         backgroundColor: 'var(--color-surface-muted)',
