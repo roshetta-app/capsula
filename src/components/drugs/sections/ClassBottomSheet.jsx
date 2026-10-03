@@ -1,9 +1,13 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (taller sheet): the sheet height went from 80svh to 86svh, same as
+ * the related drugs sheet (BrandsBottomSheet.jsx).
+ *
  * 2026-10-03 (molecule icon): the icon on the subclass cards is now a real
- * molecule icon (Material Design Icons 'molecule', copied as published, see
- * MoleculeIcon below) instead of the atom.
+ * molecule icon (Fluent System Icons 'molecule', outline, copied as
+ * published, see MoleculeIcon below) instead of the atom. A first try with the
+ * Material Design molecule was dropped (look).
  *
  * 2026-10-03 (atom icon): the icon on the subclass cards is now an atom (a
  * chemical makeup) instead of the chemistry flask. The flask stays where it
@@ -152,16 +156,16 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-// The 'molecule' icon from Material Design Icons (Apache 2.0), path copied
-// as published in @mdi/js (mdiMolecule), not redrawn. The icon set the app
-// already uses (lucide) has no molecule icon. Takes the same props the row
-// passes to its icon (size, color); strokeWidth is ignored because this one
-// is a filled shape.
-const MOLECULE_PATH = 'M7.27,10L9,7H14.42L15.58,5L15.5,4.5A1.5,1.5 0 0,1 17,3A1.5,1.5 0 0,1 18.5,4.5C18.5,5.21 18,5.81 17.33,5.96L16.37,7.63L17.73,10L18.59,8.5L18.5,8A1.5,1.5 0 0,1 20,6.5A1.5,1.5 0 0,1 21.5,8C21.5,8.71 21,9.3 20.35,9.46L18.89,12L20.62,15C21.39,15.07 22,15.71 22,16.5A1.5,1.5 0 0,1 20.5,18A1.5,1.5 0 0,1 19,16.5V16.24L17.73,14L16.37,16.37L17.33,18.04C18,18.19 18.5,18.79 18.5,19.5A1.5,1.5 0 0,1 17,21A1.5,1.5 0 0,1 15.5,19.5L15.58,19L14.42,17H10.58L9.42,19L9.5,19.5A1.5,1.5 0 0,1 8,21A1.5,1.5 0 0,1 6.5,19.5C6.5,18.79 7,18.19 7.67,18.04L8.63,16.37L4.38,9C3.61,8.93 3,8.29 3,7.5A1.5,1.5 0 0,1 4.5,6A1.5,1.5 0 0,1 6,7.5C6,7.59 6,7.68 6,7.76L7.27,10M10.15,9L8.42,12L10.15,15H14.85L16.58,12L14.85,9H10.15Z'
+// The 'molecule' icon (outline) from Microsoft's Fluent System Icons (MIT
+// licence), 24px size, path copied as published, not redrawn. The icon set
+// the app already uses (lucide) has no molecule icon. Takes the same props the
+// row passes to its icon (size, color); strokeWidth is ignored because this
+// one is a filled outline shape.
+const MOLECULE_PATH = 'M16 12a5 5 0 1 0-4.337-2.51l-2.714 1.808a4 4 0 1 0 .23 5.13l3.887 1.943a3 3 0 1 0 .671-1.341l-3.886-1.943a4 4 0 0 0-.113-2.513l2.863-1.907A4.98 4.98 0 0 0 16 12m0-1.5a3.5 3.5 0 1 1 0-7a3.5 3.5 0 0 1 0 7m-10 6a2.5 2.5 0 1 1 0-5a2.5 2.5 0 0 1 0 5M17.5 19a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0'
 
 function MoleculeIcon({ size = 24, color = 'currentColor' }) {
-  // This icon sits a little smaller in its box than the lucide ones, so it
-  // is drawn 2px larger to look the same size next to them.
+  // Drawn 2px larger than the lucide icons so it looks the same size next to
+  // them (its shapes sit a little inside the box).
   const px = size + 2
   return (
     <svg
@@ -320,14 +324,14 @@ export default function ClassBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Drug class" maxHeight="80svh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Drug class" maxHeight="86svh">
       {/* Same fixed-height frame as the related drugs sheet, so the sheet
           does not grow or shrink between the two views. 40px is the drag
           handle's own space in SheetShell. */}
       <div style={{
         display:       'flex',
         flexDirection: 'column',
-        height:        'calc(80svh - 40px - env(safe-area-inset-bottom, 0px))',
+        height:        'calc(86svh - 40px - env(safe-area-inset-bottom, 0px))',
         minHeight:     0,
       }}>
         {pickedGroup ? (

@@ -105,6 +105,10 @@
  * from the first similar brand, so its 'Filter by generic' pop-up can list
  * that generic as a greyed-out row. Only passed when a Similar tab exists.
  *
+ * 2026-10-03 (taller again): the fixed height went from 80svh to 86svh (the
+ * class sheet, ClassBottomSheet.jsx, changed with it so the two stay the same
+ * height).
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -217,7 +221,7 @@ export default function BrandsBottomSheet({
   }
 
   return (
-    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Related drugs" maxHeight="80svh">
+    <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Related drugs" maxHeight="86svh">
       {/* Scrollable body — BrandsList's existing filter-chip/sort-toggle/
           sibling-list internals, unchanged. BrandsList renders its own
           "Other Brands" section header, so this sheet doesn't duplicate
@@ -229,7 +233,7 @@ export default function BrandsBottomSheet({
       <div style={{
         display:       'flex',
         flexDirection: 'column',
-        height:        'calc(80svh - 40px - env(safe-area-inset-bottom, 0px))',
+        height:        'calc(86svh - 40px - env(safe-area-inset-bottom, 0px))',
         minHeight:     0,
       }}>
       {showTabs && (
