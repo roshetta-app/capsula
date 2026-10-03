@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (title size and form subtitle): the 'Other <name> drugs' title on
+ * both tabs is a little smaller (16px down to 15px). The 'Form / Route' pop-up
+ * now has the subtitle 'You can pick multiple forms', same look as the one in
+ * the 'Filter by generic' pop-up.
+ *
  * 2026-10-03 (single generic): on Alternatives with only one generic, the
  * generic pill is no longer greyed out and dead. It opens the Filter by generic
  * pop-up, which shows that one generic in full (the name wraps instead of being
@@ -369,7 +374,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   // Name shown in the heading above the filters.
   const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
   const headingStyle = {
-    fontSize:   16,
+    fontSize:   15,
     lineHeight: 1.4,
     color:      'var(--color-text-secondary)',
     margin:     '0 0 var(--space-3)',
@@ -413,7 +418,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
-    menu: { title: 'Form / Route', columns: 2, showCounts: false, options: formOptions, selected: formSel,
+    menu: { title: 'Form / Route', subtitle: 'You can pick multiple forms', columns: 2, showCounts: false, options: formOptions, selected: formSel,
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
