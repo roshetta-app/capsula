@@ -5,12 +5,14 @@
  * false), used by the class sheet for its 'Other families' page, which holds
  * the drugs of several families that have only one drug each. With it on:
  * the title is just the bold familyName (no 'drugs', no Google search icon);
- * every card has a small grey family name above it (a new label whenever the
- * family changes); the order is family A to Z, then drug name (the Sort
- * option reads 'Family (A-Z)'; 'Cheapest first' still sorts by price); and
- * the filter pop-ups do not show the '<Subclass> drugs' badge, because there
- * is no single subclass. Filters, counts and tapping work as before. With the
- * prop off (every other screen) nothing changes.
+ * each family is one soft rounded card (same tint and corners as the class
+ * sheet's family cards) with the family name on top, a hairline under it, and
+ * the family's drug card(s) inside, so the name and its drug read as one
+ * block; the order is family A to Z, then drug name (the Sort option reads
+ * 'Family (A-Z)'; 'Cheapest first' still sorts by price); and the filter
+ * pop-ups do not show the '<Subclass> drugs' badge, because there is no
+ * single subclass. Filters, counts and tapping work as before. With the prop
+ * off (every other screen) nothing changes.
  *
  * 2026-10-03 (sort icons): the two options in the Sort By pop-up now have an
  * icon in front of the text (A to Z arrow for Name, a low-to-high number arrow for Cheapest first).
@@ -347,7 +349,7 @@
  * covers the rare leftover empty case.
  */
 
-import { useState, useRef, useEffect, Fragment } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
@@ -463,6 +465,40 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     && applyFilters([currentDrug], { genericSel: activeGenerics, formSel }, groupOf).length > 0
   const rows = showCurrent ? sortItems([...sorted, currentDrug], sortMode) : sorted
   const filtersActive = formSel.length > 0 || activeGenerics.length > 0
+
+  // Other families page: the rows split into one section per family (rows of
+  // the same family are next to each other, whatever the sort).
+  const familySections = []
+  if (groupBySubclass) {
+    for (const item of rows) {
+      const last = familySections[familySections.length - 1]
+      if (last && last.name === item.subclass) last.items.push(item)
+      else familySections.push({ name: item.subclass, items: [item] })
+    }
+  }
+
+  // One drug card. isLast drops its divider line.
+  function renderCard(item, isLast) {
+    return (
+      <SharedDrugCard
+        key={item.id}
+        drug={item}
+        categories={categories}
+        isDark={isDark}
+        isLast={isLast}
+        onTap={onTap}
+        disableTap={!isAlternatives}
+        showChevron={isAlternatives}
+        showImageSearch
+        trailing={
+          <RowStarButton
+            isFavourited={isDrugFavourited(item.id)}
+            readOnly
+          />
+        }
+      />
+    )
+  }
 
   function toggleIn(list, setList, value) {
     setList(list.includes(value) ? list.filter(v => v !== value) : [...list, value])
@@ -655,44 +691,42 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         </div>
       )}
 
+      {groupBySubclass ? (
+        // Other families page: each family is one soft card, the family name
+        // on top with a hairline under it, then its drug card(s).
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {familySections.map(sec => (
+            <div
+              key={sec.name}
+              style={{
+                backgroundColor: 'var(--color-surface-muted)',
+                borderRadius:    16,
+                padding:         '0 var(--space-3)',
+              }}
+            >
+              <p style={{
+                margin:       0,
+                padding:      'var(--space-3) 0 var(--space-2)',
+                fontSize:     12.5,
+                fontWeight:   600,
+                lineHeight:   1.3,
+                color:        'var(--color-text-secondary)',
+                borderBottom: '0.5px solid var(--color-border)',
+              }}>
+                {familyCase(sec.name)}
+              </p>
+              {sec.items.map((item, k) => renderCard(item, k === sec.items.length - 1))}
+            </div>
+          ))}
+        </div>
+      ) : (
       <div>
         {rows.map((item, i) => {
           const isCurrent = showCurrent && item.id === currentDrug.id
-          const card = (
-            <SharedDrugCard
-              key={item.id}
-              drug={item}
-              categories={categories}
-              isDark={isDark}
-              isLast={i === rows.length - 1 || isCurrent}
-              onTap={onTap}
-              disableTap={!isAlternatives}
-              showChevron={isAlternatives}
-              showImageSearch
-              trailing={
-                <RowStarButton
-                  isFavourited={isDrugFavourited(item.id)}
-                  readOnly
-                />
-              }
-            />
-          )
-          // Other families page: a small grey family name above the first
-          // card of each family.
-          const familyLabel = groupBySubclass && (i === 0 || rows[i - 1].subclass !== item.subclass) ? (
-            <p style={{
-              margin:     i === 0 ? '0 0 2px' : 'var(--space-4) 0 2px',
-              fontSize:   12,
-              fontWeight: 600,
-              lineHeight: 1.3,
-              color:      'var(--color-text-secondary)',
-            }}>
-              {familyCase(item.subclass)}
-            </p>
-          ) : null
+          const card = renderCard(item, i === rows.length - 1 || isCurrent)
           // The open drug: same card, wrapped in an accent tint that reaches a
           // little past the list's edges so it reads as a highlighted band.
-          const node = isCurrent ? (
+          return isCurrent ? (
             <div
               key={item.id}
               aria-current="true"
@@ -706,11 +740,9 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               {card}
             </div>
           ) : card
-          return familyLabel
-            ? <Fragment key={item.id}>{familyLabel}{node}</Fragment>
-            : node
         })}
       </div>
+      )}
 
       <div style={{
         height:          1,
