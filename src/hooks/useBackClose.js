@@ -53,6 +53,20 @@
  * no layer open, everything below behaves exactly as before. A layer only
  * does anything while a useBackClose sheet is open under it.
  *
+ * 2026-10-03 (second Back leaving the page, website/installed app): a log
+ * from a real browser showed that after a Back press was handed to a layer,
+ * the NEXT Back press never reached the app at all. The browser jumped
+ * straight out of the app to an older page. Cause (most likely): to keep the
+ * sheet's placeholder step after a layer took the press, this file added a
+ * NEW placeholder step from inside the Back event itself, with no tap behind
+ * it, and browsers distrust history steps that code adds without a tap and
+ * skip over them on the next Back. Fix: no history step is added while a
+ * Back press is being handled any more. Instead the app goes forward again
+ * onto the original placeholder step (the one added by the tap that opened
+ * the sheet), which is still there. The placeholder now also carries a copy
+ * of the page's own router state, so going back onto it leaves the router's
+ * idea of the current page exactly as it was.
+ *
  * 2026-09-19 (this session — spurious-resume-backButton fix): reported
  * symptom — a sheet open behind the new image-search icon (see
  * SharedDrugCard.jsx/BrandsList.jsx) dips closed and snaps back open the
@@ -90,6 +104,15 @@ export function isAnyBackCloseOpen() {
 // --- Back layers (see 2026-10-03 note above) --------------------------------
 const backLayers = []          // open layers, newest last
 let layerPressHandled = false  // one Back press is handled by one layer only
+
+// After a layer takes a Back press, the app goes forward again onto the
+// sheet's placeholder step. That forward move fires its own popstate event,
+// which must not be mistaken for another Back press. 'rearmPending' is set
+// just before going forward; the first popstate afterwards is the landing.
+// 'rearmEvent' lets every other open sheet recognise that same landing.
+let rearmPending = false
+let rearmEvent = null
+const REARM_FALLBACK_MS = 400
 
 // Runs the newest open layer for this Back press. Returns 'none' (no layer
 // open), 'handled' (a layer took the press), or 'already' (another listener
@@ -162,15 +185,34 @@ export function useBackClose(isOpen, onClose) {
     if (Capacitor.isNativePlatform()) return
 
     poppedViaBrowserBackRef.current = false
-    window.history.pushState({ capsulaBackClose: true }, '')
+    window.history.pushState({ ...(window.history.state || {}), capsulaBackClose: true }, '')
     openBackCloseCount++
 
-    function handlePopState() {
+    function handlePopState(event) {
+      // The landing back on the placeholder after a layer took a Back press
+      // (see the 2026-10-03 note above). Not a Back press: ignore it.
+      if (event && event === rearmEvent) return
+      if (rearmPending) {
+        rearmPending = false
+        rearmEvent = event
+        return
+      }
+
       // A layer is open on top of this sheet: it takes the press and the
-      // sheet stays. Put the placeholder back so the stack is unchanged.
+      // sheet stays. Go forward onto the placeholder step this press just
+      // left, so the stack is exactly what it was. No new history step is
+      // added here (see the 2026-10-03 note above).
       const layerResult = runBackLayer()
       if (layerResult === 'handled') {
-        window.history.pushState({ capsulaBackClose: true }, '')
+        rearmPending = true
+        window.history.forward()
+        // Safety net: if the browser never reports the move forward, add the
+        // placeholder the old way so the sheet is never left without one.
+        setTimeout(() => {
+          if (!rearmPending) return
+          rearmPending = false
+          window.history.pushState({ ...(window.history.state || {}), capsulaBackClose: true }, '')
+        }, REARM_FALLBACK_MS)
         return
       }
       if (layerResult === 'already') return
