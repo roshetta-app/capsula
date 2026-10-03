@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-up scroll bar crash): ScrollMenu (the scroll bar in the filter
+ * pop-ups) made a new object on every measure, so with a long list it kept
+ * re-rendering itself forever. That was silent until a Back press hit the open
+ * pop-up, which crashed with React error #185. It now keeps the same value
+ * when nothing visibly changed.
+ *
  * 2026-10-03 (Back closes the pop-up): the phone's Back button now closes an
  * open filter pop-up on its own and leaves the sheet open (useBackLayer in
  * FilterModal). Closing it with Done or by tapping outside is unchanged.
@@ -935,7 +941,15 @@ function ScrollMenu({ maxHeight, children }) {
     const ratio  = el.clientHeight / el.scrollHeight
     const height = Math.max(24, el.clientHeight * ratio)
     const top    = (el.scrollTop / (el.scrollHeight - el.clientHeight)) * (el.clientHeight - height)
-    setBar({ top, height })
+    // Keep the same object when nothing visibly changed. A fresh object every
+    // time made this component re-render itself forever (the effect below runs
+    // after every render), which crashed with React error #185 as soon as a
+    // sync update (like a Back press) hit the open pop-up.
+    setBar(prev => (
+      prev && Math.abs(prev.top - top) < 0.5 && Math.abs(prev.height - height) < 0.5
+        ? prev
+        : { top, height }
+    ))
   }
 
   useEffect(() => {
