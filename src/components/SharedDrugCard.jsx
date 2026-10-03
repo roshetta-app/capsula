@@ -112,6 +112,16 @@
  * two stay in sync. This also applies to the image-search query, which is
  * built from the same suffix.
  *
+ * 2026-10-03 (search strip): with showImageSearch on, the image-search icon
+ * now sits in its own strip at the right end of the row: full row height,
+ * roughly 50px wide, with a faint divider on its left, and it reaches a little
+ * past the row's right edge (the space-3 amount) into the list's side padding
+ * so the screen edge counts as part of it. The icon is a little larger (16 to
+ * 18). Before, it was a 20px target hugging the edge, right beside the
+ * chevron. Pressing the strip
+ * no longer flashes the row's own press tint. Rows without showImageSearch
+ * (Drugs, Favourites) are unchanged.
+ *
  * Props (final shape — trailing is unused until 1d.5/1d.6 wire it up; drug
  * and isLast were already in place from 1d.1):
  *   drug        FlatDrug
@@ -169,6 +179,7 @@ export default function SharedDrugCard({
   showImageSearch = false,
 }) {
   const [pressed, setPressed] = useState(false)
+  const [searchPressed, setSearchPressed] = useState(false)
 
   function handleTap() {
     if (disableTap) return
@@ -232,7 +243,10 @@ export default function SharedDrugCard({
       role={disableTap ? undefined : 'button'}
       tabIndex={disableTap ? undefined : 0}
       onKeyDown={disableTap ? undefined : (e => e.key === 'Enter' && handleTap())}
-      onPointerDown={disableTap ? undefined : () => setPressed(true)}
+      onPointerDown={disableTap ? undefined : e => {
+        // A press on the search strip is not a press on the row.
+        if (!e.target.closest('[data-row-action]')) setPressed(true)
+      }}
       onPointerUp={disableTap ? undefined : () => setPressed(false)}
       onPointerLeave={disableTap ? undefined : () => setPressed(false)}
       onPointerCancel={disableTap ? undefined : () => setPressed(false)}
@@ -321,6 +335,7 @@ export default function SharedDrugCard({
         alignItems: 'center',
         gap:        'var(--space-1)',
         flexShrink: 0,
+        alignSelf:  showImageSearch ? 'stretch' : undefined,
       }}>
         {trailing}
         {showChevron && (
@@ -338,18 +353,50 @@ export default function SharedDrugCard({
           </svg>
         )}
         {showImageSearch && (
+          // Search strip: full row height, reaches the space-3 amount past the
+          // row's right edge (into the list's side padding) so the screen edge
+          // is part of the tap area. The icon sits 6px inside the row's edge.
           <button
+            data-row-action
             onClick={handleSearchClick}
+            onPointerDown={() => setSearchPressed(true)}
+            onPointerUp={() => setSearchPressed(false)}
+            onPointerLeave={() => setSearchPressed(false)}
+            onPointerCancel={() => setSearchPressed(false)}
             aria-label={`Search images for ${toTitleCase(drug.tradenameClean)}`}
             style={{
-              background: 'none', border: 'none', padding: 2,
-              cursor: 'pointer', flexShrink: 0,
-              color: 'var(--color-text-secondary)',
-              display: 'flex', alignItems: 'center',
-              lineHeight: 1,
+              position:       'relative',
+              alignSelf:      'stretch',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              flexShrink:     0,
+              marginLeft:     'var(--space-1)',
+              marginRight:    'calc(-1 * var(--space-3))',
+              padding:        '0 calc(var(--space-3) + 6px) 0 14px',
+              background:     'none',
+              border:         'none',
+              cursor:         'pointer',
+              lineHeight:     1,
+              color:          searchPressed ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+              transition:     'color var(--motion-fast) var(--ease-settle)',
+              WebkitTapHighlightColor: 'transparent',
+              outline:        'none',
             }}
           >
-            <ScanSearch size={16} strokeWidth={1.8} color="currentColor" />
+            {/* faint divider on the strip's left side */}
+            <span
+              aria-hidden="true"
+              style={{
+                position:        'absolute',
+                left:            0,
+                top:             18,
+                bottom:          18,
+                width:           1,
+                backgroundColor: 'var(--color-border-subtle)',
+              }}
+            />
+            <ScanSearch size={18} strokeWidth={1.8} color="currentColor" />
           </button>
         )}
       </div>
