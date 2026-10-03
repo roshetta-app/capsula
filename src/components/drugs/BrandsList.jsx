@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (Back closes the pop-up): the phone's Back button now closes an
+ * open filter pop-up on its own and leaves the sheet open (useBackLayer in
+ * FilterModal). Closing it with Done or by tapping outside is unchanged.
+ *
  * 2026-10-03 (subclass in the generic pop-up): the 'Filter by generic' pop-up
  * now shows '<Subclass> drugs' (name in bold) right under its title, using
  * familyName, so it is clear which subclass the listed generics belong to.
@@ -299,6 +303,7 @@ import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
 import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, isOptionLocked } from './brandsFilterLogic.js'
 import { useCategories } from '../../hooks/useCategories'
+import { useBackLayer } from '../../hooks/useBackClose'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 
@@ -771,6 +776,9 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
+  // Phone/browser Back closes just this pop-up and leaves the sheet open. No
+  // history step of its own (see useBackLayer in useBackClose.js).
+  useBackLayer(true, onClose)
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShown(true))

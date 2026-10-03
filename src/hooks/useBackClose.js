@@ -42,6 +42,17 @@
  * press, instead of both reacting to the same press at once. Purely
  * additive: existing useBackClose callers are unaffected.
  *
+ * 2026-10-03 (back layers): useBackLayer(isOpen, onBack) adds a "layer" ON
+ * TOP of an open sheet, for things inside it that Back should close first
+ * (a filter pop-up, the second page of a two-page sheet). A layer adds NO
+ * history step of its own. When Back is pressed and a layer is open, the
+ * newest layer's onBack runs instead of the sheet closing, and (website
+ * only) the sheet's single placeholder step is put straight back, so the
+ * history stack is exactly what it was before the press. Closing a layer any
+ * other way (Done button, tap outside) does not touch history at all. With
+ * no layer open, everything below behaves exactly as before. A layer only
+ * does anything while a useBackClose sheet is open under it.
+ *
  * 2026-09-19 (this session — spurious-resume-backButton fix): reported
  * symptom — a sheet open behind the new image-search icon (see
  * SharedDrugCard.jsx/BrandsList.jsx) dips closed and snaps back open the
@@ -76,6 +87,42 @@ export function isAnyBackCloseOpen() {
   return openBackCloseCount > 0
 }
 
+// --- Back layers (see 2026-10-03 note above) --------------------------------
+const backLayers = []          // open layers, newest last
+let layerPressHandled = false  // one Back press is handled by one layer only
+
+// Runs the newest open layer for this Back press. Returns 'none' (no layer
+// open), 'handled' (a layer took the press), or 'already' (another listener
+// of the same press already gave it to a layer). The flag is cleared after
+// the whole press has been delivered to every listener.
+function runBackLayer() {
+  if (layerPressHandled) return 'already'
+  const top = backLayers[backLayers.length - 1]
+  if (!top) return 'none'
+  layerPressHandled = true
+  setTimeout(() => { layerPressHandled = false }, 0)
+  top.onBackRef.current()
+  return 'handled'
+}
+
+export function useBackLayer(isOpen, onBack) {
+  const onBackRef = useRef(onBack)
+
+  useEffect(() => {
+    onBackRef.current = onBack
+  }, [onBack])
+
+  useEffect(() => {
+    if (!isOpen) return
+    const layer = { onBackRef }
+    backLayers.push(layer)
+    return () => {
+      const i = backLayers.indexOf(layer)
+      if (i >= 0) backLayers.splice(i, 1)
+    }
+  }, [isOpen])
+}
+
 export function useBackClose(isOpen, onClose) {
   const poppedViaBrowserBackRef = useRef(false)
   const onCloseRef = useRef(onClose)
@@ -97,6 +144,7 @@ export function useBackClose(isOpen, onClose) {
 
     const backListenerPromise = CapacitorApp.addListener('backButton', () => {
       if (Date.now() - lastResumedAt < RESUME_GUARD_MS) return
+      if (runBackLayer() !== 'none') return
       onCloseRef.current()
     })
     openBackCloseCount++
@@ -118,6 +166,14 @@ export function useBackClose(isOpen, onClose) {
     openBackCloseCount++
 
     function handlePopState() {
+      // A layer is open on top of this sheet: it takes the press and the
+      // sheet stays. Put the placeholder back so the stack is unchanged.
+      const layerResult = runBackLayer()
+      if (layerResult === 'handled') {
+        window.history.pushState({ capsulaBackClose: true }, '')
+        return
+      }
+      if (layerResult === 'already') return
       poppedViaBrowserBackRef.current = true
       onCloseRef.current()
     }

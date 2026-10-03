@@ -32,8 +32,14 @@
  * opens that drug's page with the same back-button rule as the Alternatives
  * tab. Tapping the drug that is already open just closes the sheet.
  *
- * The phone's Back button closes the whole sheet (same as every other sheet);
- * only the arrow inside the sheet goes back one view. The sheet always opens
+ * 2026-10-03 (Back button): on the drugs page the phone's Back button now
+ * goes back to the subclass list instead of closing the sheet (useBackLayer).
+ * On the list it closes the sheet like every other sheet. Swiping down or
+ * tapping outside still closes the whole sheet from either page.
+ *
+ * (Older note, now only true for the subclass list:) The phone's Back button
+ * closes the whole sheet (same as every other sheet);
+ * the arrow inside the sheet also goes back one view. The sheet always opens
  * on the subclass list. Picks made in the filters of a subclass are kept
  * while the person stays on the same drug page, per subclass, same as the
  * related drugs sheet.
@@ -51,6 +57,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
+import { useBackLayer } from '../../../hooks/useBackClose'
 
 // Makes every word start with a capital letter, including the words after a
 // plus sign, slash, bracket or hyphen. Only the first letter of each word is
@@ -159,6 +166,11 @@ export default function ClassBottomSheet({
   const savedFilters = useRef({})
   // Where the filter pop-ups are drawn (the full-sheet layer at the end).
   const [popupLayer, setPopupLayer] = useState(null)
+
+  // Phone/browser Back on the drugs page goes back to the subclass list (the
+  // sheet stays open). On the list it closes the sheet as usual. This adds no
+  // history step of its own (see useBackLayer in useBackClose.js).
+  useBackLayer(isOpen && picked !== null, () => setPicked(null))
 
   // Each time the sheet opens, start on the subclass list.
   useEffect(() => {
