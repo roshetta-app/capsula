@@ -11,6 +11,11 @@
  * generics'. (4) The 'Sort By' pop-up shows the sort icon in its title and
  * lists its two options in two rows.
  *
+ * 2026-10-03 (title icon on its own line): the app's base styles (Tailwind) make
+ * every svg icon a block by default, which pushed the search icon onto its own
+ * line and split the title. The icon is now set to inline-block so it stays in
+ * the same line as the sentence, right after the subclass name.
+ *
  * 2026-10-03 (subclass Google search): the Alternatives title now has a blue
  * search icon right after the subclass name. Tapping it opens a Google search
  * for that subclass, the same way SharedDrugCard.jsx's image-search icon opens
@@ -419,7 +424,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
               strokeWidth={2.2}
               color="var(--color-accent)"
               aria-hidden="true"
-              style={{ marginLeft: 3, verticalAlign: 'top' }}
+              style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
             />
             {' '}drugs
           </button>
