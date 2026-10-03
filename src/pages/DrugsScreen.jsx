@@ -12,6 +12,10 @@
  *        Phase 1B's rebuild lands, so most categories show 0 drugs for now
  *        — see GFB_STEPS.md 1A.5.
  *
+ * 2026-10-04 (Families wording): the Class-mode texts the person reads say
+ * 'drug family' instead of 'subclass' (no-match message, its hint, the search
+ * placeholder). Names in the code are unchanged.
+ *
  * Changes from 2F:
  *  - useSearch (simple includes) → useDrugSearch (Fuse.js fuzzy, gap logging)
  *  - Inline SearchBar → shared src/components/ui/SearchBar
@@ -368,7 +372,7 @@ export default function DrugsScreen() {
   // a wrong empty state.
   const isClassSearch = mode === 'class' && hasQuery
   const resultsNotReady = hasQuery && !queryTooShort && ((mode === 'class') !== (classResults != null))
-  const searchPlaceholder = mode === 'class' ? 'Search classes…' : 'Search drugs…'
+  const searchPlaceholder = mode === 'class' ? 'Search classes or families…' : 'Search drugs…'
   // The Form/Route filter does not apply to class cards.
   const filtersApply = !isClassSearch
 
@@ -1404,12 +1408,12 @@ function EmptyState({ query, mode, onClear }) {
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
         {inClassMode
-          ? `No class or subclass matches${query ? ` "${query}"` : ''}`
+          ? `No class or drug family matches${query ? ` "${query}"` : ''}`
           : `No matches${query ? ` for "${query}"` : ''}`}
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
         {inClassMode
-          ? 'Try part of a class or subclass name'
+          ? 'Try part of a class or drug family name'
           : 'Try the generic name or brand name instead'}
       </div>
       <FilledHintButton onClick={onClear}>
@@ -1446,7 +1450,7 @@ function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
         {mode === 'class'
-          ? `No class or subclass matches${query ? ` "${query}"` : ''}`
+          ? `No class or drug family matches${query ? ` "${query}"` : ''}`
           : `No matches${query ? ` for "${query}"` : ''}`}
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>

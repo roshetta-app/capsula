@@ -2,6 +2,10 @@
  * src/components/drugs/ClassSearchResults.jsx
  * Class search mode (CLASS_SEARCH_MODE_PLAN.md, 2026-10-04).
  *
+ * 2026-10-04 (Families wording): everything the person reads that said
+ * 'subclass' now says 'drug family' / 'drug families' (the group title, the
+ * card tag, the counts, 'Show all'). Names in the code are unchanged.
+ *
  * The result list of the Drugs screen in Class mode: cards for the classes and
  * subclasses whose names match what was typed. Drug names are never searched
  * in this mode, and the cards never list drugs, only what they are.
@@ -201,7 +205,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
 
   const parts = []
   if (classes.length > 0)    parts.push(`${classes.length} ${classes.length === 1 ? 'class' : 'classes'}`)
-  if (subclasses.length > 0) parts.push(`${subclasses.length} ${subclasses.length === 1 ? 'subclass' : 'subclasses'}`)
+  if (subclasses.length > 0) parts.push(`${subclasses.length} ${subclasses.length === 1 ? 'drug family' : 'drug families'}`)
 
   return (
     <div>
@@ -221,8 +225,8 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
                 name={titleCaseWords(c.name)}
                 detail={
                   c.subclassCount === 0
-                    ? 'No subclasses'
-                    : `${c.subclassCount} ${c.subclassCount === 1 ? 'subclass' : 'subclasses'}`
+                    ? 'No drug families'
+                    : `${c.subclassCount} ${c.subclassCount === 1 ? 'drug family' : 'drug families'}`
                 }
                 count={c.brandCount}
                 Icon={Layers}
@@ -241,12 +245,12 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
 
       {subclasses.length > 0 && (
         <>
-          {classes.length > 0 && <GroupLabel>Subclasses</GroupLabel>}
+          {classes.length > 0 && <GroupLabel>Drug families</GroupLabel>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownSubclasses.map(s => (
               <ResultCard
                 key={`sub:${s.className}\u0000${s.name}`}
-                kicker="Subclass"
+                kicker="Family"
                 name={titleCaseWords(s.name)}
                 detail={`in ${titleCaseWords(s.className)}`}
                 count={s.brandCount}
@@ -256,7 +260,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
             ))}
             {!showAllSubclasses && subclasses.length > SUBCLASS_LIMIT && (
               <ShowAllRow
-                label={`Show all ${subclasses.length} subclasses`}
+                label={`Show all ${subclasses.length} drug families`}
                 onClick={() => setShowAllSubclasses(true)}
               />
             )}

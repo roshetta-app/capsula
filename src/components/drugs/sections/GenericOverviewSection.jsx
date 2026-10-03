@@ -3,6 +3,9 @@
  * drug_library_ui_ux — Drug Detail Screen rebuild, Phase 1 step 1.1
  * (plan decisions 4.5, 4.7–4.9 — see STEPS_DRUG_DETAIL.md §1.1, plan §10 Section 8)
  *
+ * 2026-10-04 (Families wording): the screen-reader label of the Class row says
+ * 'drug families' instead of 'subclasses'. Nothing changes on screen.
+ *
  * Renders the Active Ingredients / Generic Overview group for a drug:
  *   - top row: "Active ingredient" / "Active ingredients" label (plural only
  *     for combos, 2+ ingredients) + the "See Available Brands" link on the
@@ -626,7 +629,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             <CardRow
               label={drugClass}
               onClick={hasClassList ? () => setClassOpen(true) : undefined}
-              ariaLabel={`Show subclasses in ${drugClass}`}
+              ariaLabel={`Show drug families in ${drugClass}`}
               hasChild={!!subclass}
             />
           )}
