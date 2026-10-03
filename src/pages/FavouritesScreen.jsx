@@ -504,6 +504,12 @@
  * to NothingSavedEmptyState now pass showSignIn={!user}. `user` was
  * already read here via useAuth() for other purposes, so no new context
  * read was needed.
+ *
+ * 2026-10-03 (remembered tab): the screen now remembers which tab (Conditions
+ * or Drugs) was open. Opening a drug or condition from the list and coming
+ * back lands on the same tab instead of always Conditions. Kept for the
+ * current app session only (sessionStorage), so a fresh launch still starts
+ * on Conditions.
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react'
@@ -638,11 +644,31 @@ function SkeletonRow() {
   )
 }
 
+// ─── Remembered tab ───────────────────────────────────────────────────────────
+// The open tab survives leaving this screen (e.g. opening a drug and pressing
+// Back) for the rest of the app session. Storage can be unavailable or hold
+// an old value, so every read/write is guarded and a value that is not one of
+// the two tabs falls back to Conditions.
+const TAB_STORAGE_KEY = 'capsula_favourites_tab'
+
+function readSavedTab() {
+  try {
+    const saved = sessionStorage.getItem(TAB_STORAGE_KEY)
+    return FAVOURITES_TABS.some(t => t.key === saved) ? saved : 'conditions'
+  } catch {
+    return 'conditions'
+  }
+}
+
+function saveTab(key) {
+  try { sessionStorage.setItem(TAB_STORAGE_KEY, key) } catch { /* storage unavailable: just not remembered */ }
+}
+
 // ─── FavouritesScreen ─────────────────────────────────────────────────────────
 
 export default function FavouritesScreen() {
   const navigate = useNavigate()
-  const [activeTab, setActiveTab] = useState('conditions')
+  const [activeTab, setActiveTab] = useState(readSavedTab)
   const isDark = useIsDark()
   const { categories } = useCategories()
 
@@ -1115,6 +1141,7 @@ export default function FavouritesScreen() {
     tabDirection.current = toIndex > fromIndex ? 1 : -1
     hasSwitchedRef.current = true
     setActiveTab(key)
+    saveTab(key)
   }
 
   // Swipe-to-switch-tabs gesture on the tab-content area. Same axis-lock
