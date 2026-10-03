@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (subclass in the generic pop-up): the 'Filter by generic' pop-up
+ * now shows '<Subclass> drugs' (name in bold) right under its title, using
+ * familyName, so it is clear which subclass the listed generics belong to.
+ * Shown in every case, including when there is only one generic.
+ *
  * 2026-10-03 (Similar generic in the generic filter, Similar title): on
  * Alternatives, the 'Filter by generic' pop-up now also lists the generic of
  * the open drug (the one the Similar tab is about) as the last row of the
@@ -437,6 +442,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : genericLabel(genericSel),
     active: genericSel.length > 0,
     menu: { title: 'Filter by generic', titleIcon: FlaskConical,
+            scopeName: familyName,
             subtitle: onlyGeneric ? undefined : 'You can pick multiple generics',
             columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions,
@@ -762,7 +768,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -825,6 +831,13 @@ function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = fa
               )}
               <span>{title}</span>
             </div>
+            {/* Generic pop-up only: which subclass these generics belong to,
+                as '<Subclass> drugs' with the name in bold. */}
+            {scopeName && (
+              <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                <span style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{scopeName}</span> drugs
+              </div>
+            )}
             {subtitle && (
               <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
                 {subtitle}
