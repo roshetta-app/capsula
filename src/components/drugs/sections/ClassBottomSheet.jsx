@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (Back bar): the subclass name beside the Back button on the
+ * drugs page is gone (the drugs list already shows it as its title). The bar
+ * keeps only the Back button and the thin line under it.
+ *
  * 2026-10-03 (cards without icon): the subclass cards no longer have the
  * stacked-layers icon tile. The name is a little larger (15) and uses the
  * full width of the card, with the count badge under it, lined up with the
@@ -242,9 +246,6 @@ export default function ClassBottomSheet({
           <>
             <div style={{
               flexShrink:   0,
-              display:      'flex',
-              alignItems:   'center',
-              gap:          'var(--space-3)',
               padding:      '0 var(--space-4)',
               borderBottom: '0.5px solid var(--color-border)',
             }}>
@@ -272,18 +273,6 @@ export default function ClassBottomSheet({
                 <ChevronLeft size={18} />
                 Back
               </button>
-              <span style={{
-                flex:         1,
-                minWidth:     0,
-                textAlign:    'right',
-                fontSize:     12.5,
-                color:        'var(--color-text-secondary)',
-                overflow:     'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace:   'nowrap',
-              }}>
-                {titleCaseWords(pickedGroup.name)}
-              </span>
             </div>
             <div style={{
               flex:      1,
