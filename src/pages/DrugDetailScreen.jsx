@@ -82,6 +82,13 @@
  * page's navigation state. Each newly opened drug also starts scrolled to
  * the top (DrugDetailSheet is keyed by drug id).
  *
+ * 2026-10-03 (class sheet): also builds the list behind the new class sheet
+ * and passes it to GenericOverviewSection.jsx as 'classDrugs'. It is every
+ * brand whose generic has the same class as this drug and has a subclass
+ * filled in, including this drug's own generic (the class sheet treats it
+ * like any other generic). Empty when this drug has no class. See
+ * findClassDrugs below.
+ *
  * Route: /drugs/:slug
  */
 
@@ -184,6 +191,18 @@ function findAlternatives(drugs, drug) {
   )
 }
 
+// Everything behind the class sheet (2026-10-03): every brand in the same class
+// as the viewed drug that has a subclass filled in. Unlike findAlternatives,
+// the viewed drug's own generic is kept, so the subclass lists in the class
+// sheet show every drug in the subclass. Brands with a class but no subclass
+// yet are left out (nothing is guessed while the categorization is still
+// being filled in). A drug with no class gets an empty list. Pure function,
+// no hooks, so it can be checked on its own.
+function findClassDrugs(drugs, drug) {
+  if (!drug || !drug.class) return []
+  return drugs.filter(d => d.class === drug.class && d.subclass)
+}
+
 export default function DrugDetailScreen() {
   const { slug }   = useParams()
   const navigate   = useNavigate()
@@ -214,6 +233,13 @@ export default function DrugDetailScreen() {
   const alternatives = useMemo(
     () => findAlternatives(drugs, drug),
     [drugs, drug?.genericId, drug?.class, drug?.subclass] // eslint-disable-line react-hooks/exhaustive-deps
+  )
+
+  // Class sheet list (see findClassDrugs above) — recomputed only when the
+  // list or the viewed drug's class changes.
+  const classDrugs = useMemo(
+    () => findClassDrugs(drugs, drug),
+    [drugs, drug?.class] // eslint-disable-line react-hooks/exhaustive-deps
   )
 
   // Back rule for browsing alternatives (see header note). `relatedHop` marks
@@ -467,6 +493,7 @@ export default function DrugDetailScreen() {
               drug={drug}
               siblings={siblings}
               alternatives={alternatives}
+              classDrugs={classDrugs}
               onSelectBrand={handleAlternativeTap}
             />
 

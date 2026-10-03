@@ -206,7 +206,12 @@ export function ChipToggle({ open, moreCount, onClick }) {
 // Deliberately not ChipToggle or ShowMoreToggle: those both read as their
 // own little control surface, which is exactly what MOA's control should
 // avoid looking like.
-export function TextToggle({ open, onClick, moreLabel = 'More', lessLabel = 'Less' }) {
+//
+// 2026-10-03: new optional 'weight' prop (default 700, so every existing
+// use looks exactly as before). The Mechanism of Action text passes a lighter
+// weight so this small control stops pulling the eye away from the
+// Class/Subclass card below it.
+export function TextToggle({ open, onClick, moreLabel = 'More', lessLabel = 'Less', weight = 700 }) {
   return (
     <button
       onClick={onClick}
@@ -219,7 +224,7 @@ export function TextToggle({ open, onClick, moreLabel = 'More', lessLabel = 'Les
         marginTop:  'var(--space-2)',
         cursor:     'pointer',
         fontSize:   13,
-        fontWeight: 700,
+        fontWeight: weight,
         color:      'var(--color-accent)',
         fontFamily: 'var(--font-body)',
         WebkitTapHighlightColor: 'transparent',

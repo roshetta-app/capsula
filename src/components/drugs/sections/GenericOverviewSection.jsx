@@ -226,26 +226,76 @@
  *    class row. The class row is a plain label for now.
  *  - Sheet now opens on a chosen tab ('similar' or 'alternatives') via
  *    BrandsBottomSheet's new initialTab prop.
+ *
+ * 2026-10-03 (Related drugs pill, class sheet, card look):
+ *  - 'Related drugs' is now a filled blue pill (same top-right spot) with a
+ *    count tag showing similar brands plus alternatives, so it is the first
+ *    thing the eye lands on in this section.
+ *  - The Class row is now tappable and opens the new ClassBottomSheet.jsx
+ *    (every subclass in the class, then the drugs in the one picked). It is
+ *    only tappable when the new 'classDrugs' prop has drugs in it. The
+ *    Subclass row still opens the Alternatives tab, as before.
+ *  - The two-row card now has its own tinted background (the accent tint,
+ *    already dark-mode aware) so it stands out from the page. Both rows share
+ *    one look: same text colour, and a blue arrow on whichever row can be
+ *    tapped. Each row is the new CardRow below.
+ *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
+ *    instead of 700) so it no longer competes with the card.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { FlaskConical, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
+import ClassBottomSheet from './ClassBottomSheet.jsx'
+import { CountTag } from '../BrandsList.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
-// Shared look for both rows of the class/subclass card.
-const tagRowStyle = {
-  display:    'block',
-  width:      '100%',
-  boxSizing:  'border-box',
-  padding:    '12px 14px',
-  fontFamily: 'var(--font-body)',
-  fontSize:   14,
-  fontWeight: 600,
-  lineHeight: 1.4,
-  textAlign:  'left',
-  color:      'var(--color-text-secondary)',
+// One row of the Class/Subclass card. A button with a blue arrow when onClick
+// is given, otherwise a plain row; both rows look the same apart from the
+// arrow. Pressed feedback uses the same muted tint as the rest of the app's
+// tappable rows.
+function CardRow({ label, onClick, ariaLabel, topBorder = false }) {
+  const [pressed, setPressed] = useState(false)
+  const base = {
+    display:        'flex',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:            12,
+    width:          '100%',
+    boxSizing:      'border-box',
+    minHeight:      48,
+    padding:        '12px 14px',
+    border:         'none',
+    borderTop:      topBorder ? '1px solid var(--color-border)' : 'none',
+    fontFamily:     'var(--font-body)',
+    fontSize:       14,
+    fontWeight:     600,
+    lineHeight:     1.4,
+    textAlign:      'left',
+    color:          'var(--color-text-primary)',
+  }
+  if (!onClick) return <div style={base}><span>{label}</span></div>
+  return (
+    <button
+      onClick={onClick}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      aria-label={ariaLabel}
+      style={{
+        ...base,
+        cursor:          'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'transparent',
+        transition:      'background-color var(--motion-fast) var(--ease-settle)',
+      }}
+    >
+      <span>{label}</span>
+      <ChevronRight size={16} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+    </button>
+  )
 }
 
 // Mechanism of Action visual clamp (Generic Overview refinement, decision 2
@@ -253,13 +303,12 @@ const tagRowStyle = {
 // 30-word cutoff so the truncation always matches what's actually shown.
 const MOA_CLAMP_LINES = 3
 
-export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], onSelectBrand }) {
+export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], classDrugs = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
   // Which tab the brands sheet opens on: 'similar' or 'alternatives'.
   const [sheetTab, setSheetTab] = useState('similar')
-  // Tap feedback for the subclass row — same pressed pattern as the
-  // Related drugs button below.
-  const [subclassPressed, setSubclassPressed] = useState(false)
+  // Whether the class sheet (subclass list, then drugs) is open.
+  const [classOpen, setClassOpen] = useState(false)
   // moaOpen: expanded (true) or clamped-to-3-lines (false) — this directly
   // drives which style the paragraph renders with. moaVisible: the
   // cross-fade opacity, same showX/xVisible shape used by every other
@@ -267,10 +316,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   const [moaOpen,    setMoaOpen]    = useState(false)
   const [moaVisible, setMoaVisible] = useState(true)
   const [moaHasMore, setMoaHasMore] = useState(false)
-  // Tap feedback for the "Related drugs" button — same pressed/pointer-
-  // event pattern SharedDrugCard.jsx uses (muted background tint + a
-  // subtle scale(0.99), same shared motion tokens), matched here so this
-  // button feels consistent with the rest of the app's tappable rows.
+  // Tap feedback for the "Related drugs" pill — pressed/pointer-event
+  // pattern like SharedDrugCard.jsx (slight shrink, 2026-10-03: plus a faint
+  // fade, since the pill is filled and a muted tint would not show).
   const [similarBrandsPressed, setSimilarBrandsPressed] = useState(false)
 
   const moaTextRef  = useRef(null)
@@ -342,6 +390,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
     setSheetTab('alternatives')
     setBrandsOpen(true)
   }
+  // The class row opens the class sheet whenever the class has any drugs
+  // with a subclass filled in.
+  const hasClassList = classDrugs.length > 0
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -375,26 +426,26 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               onPointerLeave={() => setSimilarBrandsPressed(false)}
               onPointerCancel={() => setSimilarBrandsPressed(false)}
               style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          2,
-                background:   'none',
-                border:       'none',
-                cursor:       'pointer',
-                padding:      '4px 6px',
-                margin:       '-4px -6px',
-                borderRadius: 'var(--radius-sm)',
-                fontFamily:   'var(--font-body)',
-                fontSize:     13,
-                fontWeight:   600,
-                color:        'var(--color-text-primary)',
+                display:         'flex',
+                alignItems:      'center',
+                gap:             6,
+                border:          'none',
+                cursor:          'pointer',
+                padding:         '5px 8px 5px 12px',
+                borderRadius:    'var(--radius-full)',
+                fontFamily:      'var(--font-body)',
+                fontSize:        13,
+                fontWeight:      600,
+                color:           '#fff',
+                backgroundColor: 'var(--color-accent)',
                 WebkitTapHighlightColor: 'transparent',
-                backgroundColor: similarBrandsPressed ? 'var(--color-surface-muted)' : 'transparent',
-                transform:       similarBrandsPressed ? 'scale(0.99)' : 'scale(1)',
-                transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+                opacity:         similarBrandsPressed ? 0.9 : 1,
+                transform:       similarBrandsPressed ? 'scale(0.97)' : 'scale(1)',
+                transition:      'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
               }}
             >
               Related drugs
+              <CountTag tone="onAccent">{siblings.length + alternatives.length}</CountTag>
               <ChevronRight size={14} />
             </button>
           )}
@@ -449,64 +500,44 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             <TextToggle
               open={moaOpen}
               onClick={handleMoaToggle}
+              weight={500}
             />
           )}
         </div>
       )}
 
-      {/* -- Class/Subclass card (4.8) — wired to real data 2026-09-27; shown
-            as two stacked rows in one bordered card (2026-10-02) instead of
-            two floating pills, so long names wrap cleanly. Each row only
-            renders when its own field has a value, and the whole card hides
-            when neither does (same hide-when-empty convention as the
-            Mechanism of Action block above). The subclass row is a button
-            only when this drug has Alternatives; otherwise it is a plain
-            row that looks like the class row. -- */}
+      {/* -- Class/Subclass card (4.8) — wired to real data 2026-09-27; two
+            stacked rows in one bordered card (2026-10-02). 2026-10-03: the
+            card has its own tinted background so it stands out from the
+            page, and both rows share one look. Each row only renders when
+            its own field has a value, and the whole card hides when neither
+            does (same hide-when-empty convention as the Mechanism of Action
+            block above). The class row opens the class sheet when the class
+            has drugs with a subclass; the subclass row opens the
+            Alternatives tab when this drug has Alternatives. A row that
+            cannot be opened is a plain row with no arrow. -- */}
       {(drugClass || subclass) && (
         <div style={{
-          border:       '1px solid var(--color-border)',
-          borderRadius: 12,
-          overflow:     'hidden',
-          marginBottom: 'var(--space-3)',
+          border:          '1px solid var(--color-border)',
+          borderRadius:    12,
+          overflow:        'hidden',
+          backgroundColor: 'var(--color-accent-light)',
+          marginBottom:    'var(--space-3)',
         }}>
-          {drugClass && <div style={tagRowStyle}>{drugClass}</div>}
-          {subclass && (hasAlternatives
-            ? (
-              <button
-                onClick={openAlternatives}
-                onPointerDown={() => setSubclassPressed(true)}
-                onPointerUp={() => setSubclassPressed(false)}
-                onPointerLeave={() => setSubclassPressed(false)}
-                onPointerCancel={() => setSubclassPressed(false)}
-                aria-label={`Show alternatives in ${subclass}`}
-                style={{
-                  ...tagRowStyle,
-                  display:         'flex',
-                  alignItems:      'center',
-                  justifyContent:  'space-between',
-                  gap:             12,
-                  minHeight:       48,
-                  border:          'none',
-                  borderTop:       drugClass ? '1px solid var(--color-border)' : 'none',
-                  color:           'var(--color-accent)',
-                  cursor:          'pointer',
-                  WebkitTapHighlightColor: 'transparent',
-                  backgroundColor: subclassPressed ? 'var(--color-surface-muted)' : 'transparent',
-                  transition:      'background-color var(--motion-fast) var(--ease-settle)',
-                }}
-              >
-                <span>{subclass}</span>
-                <ChevronRight size={16} style={{ flexShrink: 0 }} />
-              </button>
-            )
-            : (
-              <div style={{
-                ...tagRowStyle,
-                borderTop: drugClass ? '1px solid var(--color-border)' : 'none',
-              }}>
-                {subclass}
-              </div>
-            )
+          {drugClass && (
+            <CardRow
+              label={drugClass}
+              onClick={hasClassList ? () => setClassOpen(true) : undefined}
+              ariaLabel={`Show subclasses in ${drugClass}`}
+            />
+          )}
+          {subclass && (
+            <CardRow
+              label={subclass}
+              onClick={hasAlternatives ? openAlternatives : undefined}
+              ariaLabel={`Show alternatives in ${subclass}`}
+              topBorder={!!drugClass}
+            />
           )}
         </div>
       )}
@@ -520,6 +551,17 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         initialTab={sheetTab}
         onSelectBrand={onSelectBrand}
       />
+
+      {drugClass && (
+        <ClassBottomSheet
+          isOpen={classOpen}
+          onClose={() => setClassOpen(false)}
+          classLabel={drugClass}
+          classDrugs={classDrugs}
+          currentDrug={drug}
+          onSelectBrand={onSelectBrand}
+        />
+      )}
 
     </div>
   )
