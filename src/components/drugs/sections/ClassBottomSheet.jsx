@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-04 (Drug families title): a small grey title 'Drug families' now sits
+ * under the line, above the subclass cards. It is only drawn when subclass
+ * cards follow, same as the line.
+ *
  * 2026-10-04 (All drugs row look): the 'All drugs in this class' row is now
  * drawn differently from the subclass cards: a soft blue card, a solid blue
  * icon tile with a white icon, and a bold blue name. A thin line with some air
@@ -508,6 +512,21 @@ export default function ClassBottomSheet({
                     backgroundColor: 'var(--color-border)',
                   }}
                 />
+              )}
+              {/* Small title over the subclass cards, so it is clear they
+                  are the families of the class. */}
+              {totalDrugs > 0 && listGroups.length > 0 && (
+                <p style={{
+                  flexShrink:    0,
+                  margin:        '0 var(--space-1)',
+                  fontSize:      11,
+                  fontWeight:    600,
+                  letterSpacing: '0.06em',
+                  textTransform: 'uppercase',
+                  color:         'var(--color-text-secondary)',
+                }}>
+                  Drug families
+                </p>
               )}
               {listGroups.map(g => (
                 <SubclassRow
