@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (chemical icon back): the subclass cards have an icon tile again,
+ * now a chemistry flask (a drug class is a chemical family) instead of the
+ * stacked layers. Tile 34, icon and name in one row (icon centred on the
+ * name), the count badge under the name lined up with the name text, the
+ * chevron on the right.
+ *
  * 2026-10-03 (Back bar): the subclass name beside the Back button on the
  * drugs page is gone (the drugs list already shows it as its title). The bar
  * keeps only the Back button and the thin line under it.
@@ -97,7 +103,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FlaskConical } from 'lucide-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -124,6 +130,11 @@ function groupBySubclass(drugs) {
     .map(([name, items]) => ({ name, items }))
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
+
+// Size of the icon tile and the gap after it. The count badge is indented by
+// the same amount so it lines up under the name.
+const ICON_TILE = 34
+const ICON_GAP  = 12
 
 function SubclassRow({ name, count, onClick }) {
   const [pressed, setPressed] = useState(false)
@@ -157,19 +168,40 @@ function SubclassRow({ name, count, onClick }) {
       }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          display:    'block',
-          fontSize:   15,
-          fontWeight: 500,
-          lineHeight: 1.3,
-          color:      'var(--color-text-primary)',
-        }}>
-          {name}
+        {/* Icon and name share one row, so the icon is centred on the name
+            (all its lines) and not on the count badge underneath. */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width:           ICON_TILE,
+              height:          ICON_TILE,
+              borderRadius:    10,
+              backgroundColor: 'var(--color-accent-light)',
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+            }}
+          >
+            <FlaskConical size={17} strokeWidth={1.9} color="var(--color-accent)" />
+          </span>
+          <span style={{
+            flex:       1,
+            minWidth:   0,
+            fontSize:   15,
+            fontWeight: 500,
+            lineHeight: 1.3,
+            color:      'var(--color-text-primary)',
+          }}>
+            {name}
+          </span>
         </span>
-        {/* Count badge: sits under the name, lined up with it. */}
+        {/* Count badge: lines up under the name text, not under the icon. */}
         <span style={{
           display:            'inline-block',
           marginTop:          7,
+          marginLeft:         ICON_TILE + ICON_GAP,
           padding:            '2px 8px',
           borderRadius:       999,
           backgroundColor:    'var(--color-surface)',
