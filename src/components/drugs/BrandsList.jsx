@@ -1,6 +1,16 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-04 (long lists): the plain drug list (not the 'Other families' page)
+ * no longer draws every row at once. It draws the first 30 and adds 30 more
+ * each time the person scrolls near the end (GradualList below). Opening a
+ * subclass or a class with thousands of brands (for example 'All drugs in this
+ * class' for Antibiotics) used to build thousands of cards in one go, which
+ * made the app freeze and lag. Lists of 30 or fewer look and behave exactly as
+ * before. Changing the sort or a filter starts the list again from the top 30.
+ * Order, counts, filters, the 'you are here' card and the card look are
+ * unchanged.
+ *
  * 2026-10-03 (Other families): new optional prop groupBySubclass (default
  * false), used by the class sheet for its 'Other families' page, which holds
  * the drugs of several families that have only one drug each. With it on:
@@ -721,26 +731,32 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         </div>
       ) : (
       <div>
-        {rows.map((item, i) => {
-          const isCurrent = showCurrent && item.id === currentDrug.id
-          const card = renderCard(item, i === rows.length - 1 || isCurrent)
-          // The open drug: same card, wrapped in an accent tint that reaches a
-          // little past the list's edges so it reads as a highlighted band.
-          return isCurrent ? (
-            <div
-              key={item.id}
-              aria-current="true"
-              style={{
-                backgroundColor: 'var(--color-accent-light)',
-                borderRadius:    'var(--radius-md)',
-                margin:          '0 calc(-1 * var(--space-3))',
-                padding:         '0 var(--space-3)',
-              }}
-            >
-              {card}
-            </div>
-          ) : card
-        })}
+        {/* Long lists are drawn in batches (see GradualList). The key starts
+            the list again from the top whenever the sort or a filter changes. */}
+        <GradualList
+          key={`${sortMode}|${formSel.join(',')}|${activeGenerics.join(',')}`}
+          rows={rows}
+          renderRow={(item, i) => {
+            const isCurrent = showCurrent && item.id === currentDrug.id
+            const card = renderCard(item, i === rows.length - 1 || isCurrent)
+            // The open drug: same card, wrapped in an accent tint that reaches a
+            // little past the list's edges so it reads as a highlighted band.
+            return isCurrent ? (
+              <div
+                key={item.id}
+                aria-current="true"
+                style={{
+                  backgroundColor: 'var(--color-accent-light)',
+                  borderRadius:    'var(--radius-md)',
+                  margin:          '0 calc(-1 * var(--space-3))',
+                  padding:         '0 var(--space-3)',
+                }}
+              >
+                {card}
+              </div>
+            ) : card
+          }}
+        />
       </div>
       )}
 
@@ -758,6 +774,63 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         : <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />
       )}
     </div>
+  )
+}
+
+// Long-list helper: draws the first FIRST_BATCH rows and adds NEXT_BATCH more
+// whenever an invisible marker under the last drawn row comes within
+// LOOK_AHEAD of the visible area, so rows are ready before the person gets
+// there. 'renderRow(item, indexInFullList)' is the same row drawing the list
+// used before, so the last real row still drops its divider line. The caller
+// gives this a new key whenever the sort or filters change, which starts it
+// again from the first batch.
+const FIRST_BATCH = 30
+const NEXT_BATCH  = 30
+const LOOK_AHEAD  = '1200px'
+
+// The nearest ancestor that scrolls (the sheet's list area), or null.
+function findScrollParent(el) {
+  let node = el?.parentElement
+  while (node && node !== document.body) {
+    const overflowY = getComputedStyle(node).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll') return node
+    node = node.parentElement
+  }
+  return null
+}
+
+function GradualList({ rows, renderRow }) {
+  const [count, setCount] = useState(FIRST_BATCH)
+  const markerRef = useRef(null)
+  const shown = Math.min(count, rows.length)
+  const hasMore = shown < rows.length
+
+  // Watches the marker; each time more rows are drawn (shown changes) the
+  // watch restarts, so a marker that is still near the visible area keeps
+  // pulling in batches until it is far enough away.
+  useEffect(() => {
+    if (!hasMore) return undefined
+    const marker = markerRef.current
+    if (!marker || typeof IntersectionObserver === 'undefined') {
+      // No way to watch (very old browser): draw everything, as before.
+      setCount(rows.length)
+      return undefined
+    }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries.some(e => e.isIntersecting)) setCount(c => c + NEXT_BATCH)
+      },
+      { root: findScrollParent(marker), rootMargin: `0px 0px ${LOOK_AHEAD} 0px` }
+    )
+    observer.observe(marker)
+    return () => observer.disconnect()
+  }, [hasMore, shown, rows.length])
+
+  return (
+    <>
+      {rows.slice(0, shown).map((item, i) => renderRow(item, i))}
+      {hasMore && <div ref={markerRef} aria-hidden="true" style={{ height: 1 }} />}
+    </>
   )
 }
 
