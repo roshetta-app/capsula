@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (cards without icon): the subclass cards no longer have the
+ * stacked-layers icon tile. The name is a little larger (15) and uses the
+ * full width of the card, with the count badge under it, lined up with the
+ * name, and the chevron on the right. Padding is 16 on the sides.
+ *
  * 2026-10-03 (design refinement): the heading now has a small 'Drug class'
  * label above the class name, and the grey line under it also gives the total
  * number of drugs ('4 drug families, 38 drugs'). On the drugs page the Back
@@ -88,7 +93,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Layers } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -116,11 +121,6 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-// Size of the icon tile and the gap after it. The count badge is indented by
-// the same amount so it lines up under the name.
-const ICON_TILE = 32
-const ICON_GAP  = 10
-
 function SubclassRow({ name, count, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
@@ -133,12 +133,12 @@ function SubclassRow({ name, count, onClick }) {
       style={{
         display:         'flex',
         alignItems:      'center',
-        gap:             10,
+        gap:             12,
         width:           '100%',
         boxSizing:       'border-box',
         flexShrink:      0,
         minHeight:       56,
-        padding:         '14px 14px',
+        padding:         '14px 16px',
         border:          'none',
         borderRadius:    16,
         backgroundColor: 'var(--color-surface-muted)',
@@ -153,40 +153,19 @@ function SubclassRow({ name, count, onClick }) {
       }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>
-        {/* Icon and name share one row, so the icon is centred on the name
-            (all its lines) and not on the count badge underneath. */}
-        <span style={{ display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
-          <span
-            aria-hidden="true"
-            style={{
-              width:           ICON_TILE,
-              height:          ICON_TILE,
-              borderRadius:    9,
-              backgroundColor: 'var(--color-accent-light)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              flexShrink:      0,
-            }}
-          >
-            <Layers size={16} color="var(--color-accent)" />
-          </span>
-          <span style={{
-            flex:       1,
-            minWidth:   0,
-            fontSize:   14,
-            fontWeight: 500,
-            lineHeight: 1.3,
-            color:      'var(--color-text-primary)',
-          }}>
-            {name}
-          </span>
+        <span style={{
+          display:    'block',
+          fontSize:   15,
+          fontWeight: 500,
+          lineHeight: 1.3,
+          color:      'var(--color-text-primary)',
+        }}>
+          {name}
         </span>
-        {/* Count badge: lines up under the name text, not under the icon. */}
+        {/* Count badge: sits under the name, lined up with it. */}
         <span style={{
           display:            'inline-block',
           marginTop:          7,
-          marginLeft:         ICON_TILE + ICON_GAP,
           padding:            '2px 8px',
           borderRadius:       999,
           backgroundColor:    'var(--color-surface)',
