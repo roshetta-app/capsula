@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-up header, no hint line): the 'You can pick multiple ...'
+ * line is gone from the Generic and Form pop-ups (the subtitle prop is removed
+ * from FilterModal, nothing used it any more). The subclass badge text is a bit
+ * bigger (14, was 12).
+ *
  * 2026-10-03 (pop-up header, follow-up): the subclass badge and the hint line
  * now start at the left edge, under the icon tile (no indent), and the badge
  * is a rounded square (corner 8) instead of a full pill.
@@ -477,7 +482,6 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     active: genericSel.length > 0,
     menu: { title: 'Filter by generic', titleIcon: FlaskConical,
             scopeName: familyName,
-            subtitle: onlyGeneric ? undefined : 'You can pick multiple generics',
             columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions,
             selected: onlyGeneric ? [...nameById.keys()] : genericSel,
@@ -494,7 +498,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
-    menu: { title: 'Form / Route', titleIcon: ListFilter, subtitle: 'You can pick multiple forms', columns: 2, showCounts: false, options: formOptions, selected: formSel,
+    menu: { title: 'Form / Route', titleIcon: ListFilter, columns: 2, showCounts: false, options: formOptions, selected: formSel,
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
@@ -802,7 +806,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
   // Phone/browser Back closes just this pop-up and leaves the sheet open. No
@@ -897,34 +901,22 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns
               <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
             )}
           </div>
-          {(scopeName || subtitle) && (
+          {/* Generic pop-up only: which subclass these generics belong to,
+              as '<Subclass> drugs' with the name in bold. */}
+          {scopeName && (
             <div style={{ marginTop: 10 }}>
-              {/* Generic pop-up only: which subclass these generics belong to,
-                  as '<Subclass> drugs' with the name in bold. */}
-              {scopeName && (
-                <span style={{
-                  display:         'inline-block',
-                  maxWidth:        '100%',
-                  padding:         '3px 10px',
-                  borderRadius:    8,
-                  backgroundColor: 'var(--color-surface-muted)',
-                  fontSize:        12,
-                  lineHeight:      1.5,
-                  color:           'var(--color-text-secondary)',
-                }}>
-                  <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{scopeName}</span> drugs
-                </span>
-              )}
-              {subtitle && (
-                <div style={{
-                  marginTop: scopeName ? 6 : 0,
-                  fontSize:  12,
-                  lineHeight: 1.4,
-                  color:     'var(--color-text-tertiary)',
-                }}>
-                  {subtitle}
-                </div>
-              )}
+              <span style={{
+                display:         'inline-block',
+                maxWidth:        '100%',
+                padding:         '4px 11px',
+                borderRadius:    8,
+                backgroundColor: 'var(--color-surface-muted)',
+                fontSize:        14,
+                lineHeight:      1.5,
+                color:           'var(--color-text-secondary)',
+              }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>{scopeName}</span> drugs
+              </span>
             </div>
           )}
         </div>
