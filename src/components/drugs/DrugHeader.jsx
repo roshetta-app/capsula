@@ -1,5 +1,9 @@
 /**
  * src/components/drugs/DrugHeader.jsx
+ *
+ * 2026-10-03 (image search stopped working): the image-search icon now opens
+ * through openInAppBrowser (src/utils/openInAppBrowser.js), which recovers when
+ * the phone ignores the request, same fix as SharedDrugCard.jsx.
  * Phase 2G — Drug Detail Screen
  *
  * 2026-07-20 (drug_library_ui_ux, plan §7 step 2b, decisions 4.22–4.24):
@@ -162,9 +166,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { Browser } from '@capacitor/browser'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
+import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -279,7 +283,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
     const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
       .filter(Boolean)
       .join(' ')
-    Browser.open({ url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}` })
+    openInAppBrowser(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`)
   }
 
   return (
