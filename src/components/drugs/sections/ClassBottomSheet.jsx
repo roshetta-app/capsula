@@ -1,6 +1,14 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (Other families): families that hold only one drug are folded
+ * into one 'Other families' card at the bottom of the list (grid icon, count
+ * = all the drugs inside), but only when there are at least two of them and
+ * at least one bigger family remains. Tapping it opens the drugs page in
+ * BrandsList's groupBySubclass mode (small grey family name above each card).
+ * The heading still counts the real families and all drugs. Back, filters
+ * (remembered under their own key) and tapping a drug work as for any family.
+ *
  * 2026-10-03 (count tag): the drug count on each subclass card is now the
  * small rounded-square tag (CountTag, the one the Related drugs sheet uses),
  * a little smaller, placed right before the chevron instead of under the
@@ -108,7 +116,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, FlaskConical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FlaskConical, LayoutGrid } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -136,11 +144,31 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
+// Key and label of the 'Other families' card that collects the families with
+// only one drug each.
+const OTHERS_KEY   = '__other_families__'
+const OTHERS_LABEL = 'Other families'
+
+// Builds the cards of the subclass list. Families with a single drug are
+// collected into one 'Other families' card, put last, but only when there are
+// at least two of them and at least one bigger family stays in the list (with
+// fewer, the card would save nothing). Pure function, no hooks, so it can be
+// checked on its own.
+function buildListGroups(groups) {
+  const singles = groups.filter(g => g.items.length === 1)
+  const bigger  = groups.filter(g => g.items.length !== 1)
+  if (singles.length < 2 || bigger.length === 0) return groups
+  return [
+    ...bigger,
+    { name: OTHERS_KEY, items: singles.flatMap(g => g.items), isOthers: true },
+  ]
+}
+
 // Size of the icon tile and the gap after it.
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
-function SubclassRow({ name, count, onClick }) {
+function SubclassRow({ name, count, Icon = FlaskConical, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -187,7 +215,7 @@ function SubclassRow({ name, count, onClick }) {
             flexShrink:      0,
           }}
         >
-          <FlaskConical size={17} strokeWidth={1.9} color="var(--color-accent)" />
+          <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
         </span>
         <span style={{
           flex:       1,
@@ -244,8 +272,11 @@ export default function ClassBottomSheet({
     if (isOpen) setPicked(null)
   }, [isOpen])
 
+  // Real families (the heading counts these) and the cards shown in the list
+  // (single-drug families may be folded into one 'Other families' card).
   const groups = useMemo(() => groupBySubclass(classDrugs), [classDrugs])
-  const pickedGroup = picked ? groups.find(g => g.name === picked) : null
+  const listGroups = useMemo(() => buildListGroups(groups), [groups])
+  const pickedGroup = picked ? listGroups.find(g => g.name === picked) : null
   const totalDrugs = groups.reduce((sum, g) => sum + g.items.length, 0)
 
   function handleTap(item) {
@@ -310,7 +341,8 @@ export default function ClassBottomSheet({
                 onTap={handleTap}
                 mode="alternatives"
                 hideOther
-                familyName={titleCaseWords(pickedGroup.name)}
+                groupBySubclass={!!pickedGroup.isOthers}
+                familyName={pickedGroup.isOthers ? OTHERS_LABEL : titleCaseWords(pickedGroup.name)}
                 saved={savedFilters.current[pickedGroup.name] ?? null}
                 onSave={p => { savedFilters.current[pickedGroup.name] = p }}
                 popupLayer={popupLayer}
@@ -364,11 +396,12 @@ export default function ClassBottomSheet({
               gap:           'var(--space-2)',
               padding:       'var(--space-3) var(--space-4) var(--space-6)',
             }}>
-              {groups.map(g => (
+              {listGroups.map(g => (
                 <SubclassRow
                   key={g.name}
-                  name={titleCaseWords(g.name)}
+                  name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
+                  Icon={g.isOthers ? LayoutGrid : FlaskConical}
                   onClick={() => setPicked(g.name)}
                 />
               ))}

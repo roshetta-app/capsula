@@ -1,6 +1,17 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (Other families): new optional prop groupBySubclass (default
+ * false), used by the class sheet for its 'Other families' page, which holds
+ * the drugs of several families that have only one drug each. With it on:
+ * the title is just the bold familyName (no 'drugs', no Google search icon);
+ * every card has a small grey family name above it (a new label whenever the
+ * family changes); the order is family A to Z, then drug name (the Sort
+ * option reads 'Family (A-Z)'; 'Cheapest first' still sorts by price); and
+ * the filter pop-ups do not show the '<Subclass> drugs' badge, because there
+ * is no single subclass. Filters, counts and tapping work as before. With the
+ * prop off (every other screen) nothing changes.
+ *
  * 2026-10-03 (sort icons): the two options in the Sort By pop-up now have an
  * icon in front of the text (A to Z arrow for Name, a low-to-high number arrow for Cheapest first).
  * Done with an optional 'icon' on an option, passed to ToggleChip; only the
@@ -176,6 +187,8 @@
  *   currentDrug — the flat drug object of the page that is open (Similar mode
  *              only, ignored on Alternatives). Drawn as a tinted card inside
  *              the list. Optional; with none, the list is exactly the siblings.
+ *   groupBySubclass — optional boolean, default false. True switches to the
+ *              'Other families' page (see the 2026-10-03 note at the top).
  *   hideOther — optional boolean, default false. True drops the word 'Other'
  *              from the heading ('<name> drugs' instead of 'Other <name> drugs').
  *   similarGenericName — Alternatives only: name of the generic the Similar
@@ -334,7 +347,7 @@
  * covers the rare leftover empty case.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
@@ -365,6 +378,13 @@ function ingredientCase(text) {
   return t.replace(/(^|\+\s*)(\S)/g, (_, lead, ch) => lead + ch.toUpperCase())
 }
 
+// 'beta blockers + diuretics' -> 'Beta Blockers + Diuretics'. Only the first
+// letter of each word is touched, so names already in capitals ('ACE') stay.
+// Used for the family labels on the 'Other families' page.
+function familyCase(text) {
+  return (text ?? '').replace(/(^|[\s+/(-])([a-z])/g, (_, lead, ch) => lead + ch.toUpperCase())
+}
+
 // Pill text for the generic filter: a prompt when nothing is picked, else a count.
 function genericLabel(selected) {
   if (selected.length === 0) return 'Filter by generic'
@@ -378,7 +398,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -423,12 +443,17 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   )
 
   const sortOptions = [
-    { value: 'name',  label: 'Name (A–Z)',     icon: ArrowDownAZ },
+    { value: 'name',  label: groupBySubclass ? 'Family (A–Z)' : 'Name (A–Z)', icon: ArrowDownAZ },
     { value: 'price', label: 'Cheapest first', icon: ArrowDown01 },
   ]
 
   const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
-  const sorted   = sortItems(filtered, sortMode)
+  // Other families page: by name means family A to Z, then drug name.
+  const sorted   = groupBySubclass && sortMode === 'name'
+    ? [...filtered].sort((a, b) =>
+        (a.subclass ?? '').localeCompare(b.subclass ?? '') ||
+        (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? ''))
+    : sortItems(filtered, sortMode)
   // Similar only: the open drug joins the list as a 'you are here' card at its
   // place in the current sort order, but only while it passes the same filters
   // as the other cards. Counts and the empty message keep working on the other
@@ -487,7 +512,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : genericLabel(genericSel),
     active: genericSel.length > 0,
     menu: { title: 'Filter by generic', titleIcon: FlaskConical,
-            scopeName: familyName,
+            scopeName: groupBySubclass ? undefined : familyName,
             columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions,
             selected: onlyGeneric ? [...nameById.keys()] : genericSel,
@@ -523,7 +548,11 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           drug's generic name, Alternatives uses the subclass name. Name in bold.
           On Alternatives the whole title is a button that opens the Google
           search; its small icon follows the subclass name. */}
-      {headingName && (isAlternatives
+      {headingName && (groupBySubclass
+        ? (
+          <p style={headingStyle}>{nameNode}</p>
+        )
+        : isAlternatives
         ? (
           <button
             onClick={searchSubclass}
@@ -648,9 +677,22 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               }
             />
           )
+          // Other families page: a small grey family name above the first
+          // card of each family.
+          const familyLabel = groupBySubclass && (i === 0 || rows[i - 1].subclass !== item.subclass) ? (
+            <p style={{
+              margin:     i === 0 ? '0 0 2px' : 'var(--space-4) 0 2px',
+              fontSize:   12,
+              fontWeight: 600,
+              lineHeight: 1.3,
+              color:      'var(--color-text-secondary)',
+            }}>
+              {familyCase(item.subclass)}
+            </p>
+          ) : null
           // The open drug: same card, wrapped in an accent tint that reaches a
           // little past the list's edges so it reads as a highlighted band.
-          return isCurrent ? (
+          const node = isCurrent ? (
             <div
               key={item.id}
               aria-current="true"
@@ -664,6 +706,9 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               {card}
             </div>
           ) : card
+          return familyLabel
+            ? <Fragment key={item.id}>{familyLabel}{node}</Fragment>
+            : node
         })}
       </div>
 
