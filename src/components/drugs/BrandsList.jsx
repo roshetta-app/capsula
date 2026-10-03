@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (sort icons): the two options in the Sort By pop-up now have an
+ * icon in front of the text (A to Z arrow for Name, coins for Cheapest first).
+ * Done with an optional 'icon' on an option, passed to ToggleChip; only the
+ * sort options set one, so the Generic and Form pop-ups look the same as
+ * before.
+ *
  * 2026-10-03 (pop-up header, no hint line): the 'You can pick multiple ...'
  * line is gone from the Generic and Form pop-ups (the subtitle prop is removed
  * from FilterModal, nothing used it any more). The subclass badge text is a bit
@@ -330,7 +336,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search } from 'lucide-react'
+import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, Coins } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -417,8 +423,8 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   )
 
   const sortOptions = [
-    { value: 'name',  label: 'Name (A–Z)' },
-    { value: 'price', label: 'Cheapest first' },
+    { value: 'name',  label: 'Name (A–Z)',     icon: ArrowDownAZ },
+    { value: 'price', label: 'Cheapest first', icon: Coins },
   ]
 
   const filtered = applyFilters(siblings, { genericSel: activeGenerics, formSel }, groupOf)
@@ -931,6 +937,7 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = f
               <ToggleChip
                 key={opt.value}
                 label={opt.label}
+                icon={opt.icon}
                 active={selected.includes(opt.value)}
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
@@ -1085,7 +1092,7 @@ function ClearFilterButton({ onClick, disabled }) {
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
 // for long labels (several lines, softer corners) instead of one clipped line,
 // and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
-function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false }) {
+function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -1129,6 +1136,7 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
           )}
         </span>
       )}
+      {Icon && <Icon size={15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
       <span style={wrap
         ? { minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
