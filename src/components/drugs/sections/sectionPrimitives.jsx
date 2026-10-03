@@ -19,6 +19,9 @@
  * place — it becomes unused by GenericOverviewSection.jsx after this change,
  * but UsesSection.jsx may still reference it, so it isn't removed.
  *
+ * 2026-10-03 (ingredient hierarchy): IngredientChip and InlineTruncatedList
+ * take an optional 'size' prop ('sm' default = unchanged look, 'md', 'lg').
+ *
  * 2026-09-19 (this session, follow-up): GenericOverviewSection.jsx reverted
  * its Classification block back to the original floating pills, so
  * ClassificationCard below is now unused by any known consumer. Left in
@@ -100,16 +103,24 @@ export function Collapsible({ title, children }) {
 // and out. Callers that pass nothing render exactly as before.
 // 2026-09-19 (this session): font size bumped 13 -> 14px, per feedback —
 // chips read a little cramped at 13.
-export function IngredientChip({ children, style }) {
+//
+// 2026-10-03 (ingredient hierarchy): new optional 'size' prop. 'sm' is the
+// old look and stays the default, so any other caller renders exactly as
+// before. 'md' and 'lg' are bigger chips for drugs with only one or two
+// ingredients, so the ingredient name is the main thing on the card.
+const CHIP_SIZES = {
+  sm: { fontSize: 14, padding: '4px 10px', borderRadius: 'var(--radius-sm)' },
+  md: { fontSize: 17, padding: '7px 13px', borderRadius: 11, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
+  lg: { fontSize: 20, padding: '8px 16px', borderRadius: 12, display: 'inline-block', maxWidth: '100%', boxSizing: 'border-box' },
+}
+export function IngredientChip({ children, style, size = 'sm' }) {
   return (
     <span style={{
-      fontSize:        14,
       fontWeight:      500,
       color:           'var(--color-text-primary)',
       backgroundColor: 'var(--color-surface)',
       border:          '0.5px solid var(--color-border)',
-      borderRadius:    'var(--radius-sm)',
-      padding:         '4px 10px',
+      ...(CHIP_SIZES[size] || CHIP_SIZES.sm),
       ...style,
     }}>
       {children}
@@ -324,7 +335,8 @@ export function ClassificationCard({ labels }) {
 // chips rather than a separate control below the list. Expanding appends
 // the extra chips before the toggle, which then re-labels itself
 // "Show less" and stays in place as the trailing chip.
-export function InlineTruncatedList({ items = [], max = 3 }) {
+// 2026-10-03: optional 'size' ('sm' default | 'md' | 'lg') passed to every chip.
+export function InlineTruncatedList({ items = [], max = 3, size = 'sm' }) {
   const [open, setOpen] = useState(false)
   // showExtra: extra chips are in the layout at all. extraVisible: they are
   // opaque. Kept separate so a fade-out can finish before they leave the row.
@@ -364,11 +376,12 @@ export function InlineTruncatedList({ items = [], max = 3 }) {
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
       {shown.map((item, i) => (
-        <IngredientChip key={i}>{item}</IngredientChip>
+        <IngredientChip key={i} size={size}>{item}</IngredientChip>
       ))}
       {hasMore && showExtra && extra.map((item, i) => (
         <IngredientChip
           key={i}
+          size={size}
           style={{
             opacity:    extraVisible ? 1 : 0,
             transition: 'opacity 0.2s ease',

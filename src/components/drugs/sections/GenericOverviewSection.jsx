@@ -248,6 +248,15 @@
  *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
  *    instead of 700) so it no longer competes with the card.
  *
+ * 2026-10-03 (ingredient hierarchy): the ingredient chip is now the focus of
+ * the card, and the two things next to it step back:
+ *  - Chip size follows the ingredient count: 1 = large, 2 = medium, 3 or more
+ *    = the old compact size (so a long combo never takes over the card).
+ *  - 'Related drugs' is a small soft blue-tinted pill instead of solid blue.
+ *  - Class/Subclass tree: grey backing removed, arrows grey (blue is kept for
+ *    'Related drugs' and 'More'), class name medium weight instead of bold,
+ *    and a thin divider line above the tree. Pressed rows still tint blue.
+ *
  * 2026-10-03 (tree redesign): the old elbow looked fragmented — a short stub
  * that started mid-row and didn't touch the Class row. Now:
  *  - The card border, tint and clipping are gone; the rows sit directly on
@@ -269,9 +278,9 @@ import ClassBottomSheet from './ClassBottomSheet.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
-// One row of the Class/Subclass tree. A button with a blue arrow and a soft
-// grey backing when onClick is given, otherwise plain text with no backing and
-// no arrow. 'hasChild' marks a Class row with a Subclass under it: it gets a
+// One row of the Class/Subclass tree. A button with a quiet grey arrow when
+// onClick is given, otherwise plain text with no arrow (2026-10-03 hierarchy
+// pass: no backing and no blue, so the ingredient name stays the focus). 'hasChild' marks a Class row with a Subclass under it: it gets a
 // small dot and the top half of the connecting line. 'child' is the Subclass
 // row under a Class row: indented, smaller and lighter, with the bottom half of
 // the line, which curves into its text. Both halves sit at the same spot, so
@@ -294,12 +303,12 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
     width:          '100%',
     boxSizing:      'border-box',
     minHeight:      40,
-    padding:        child ? '10px 8px 10px 30px' : inTree ? '10px 8px 10px 20px' : '10px 8px 10px 12px',
+    padding:        child ? '10px 4px 10px 30px' : inTree ? '10px 4px 10px 20px' : '10px 4px 10px 4px',
     border:         'none',
     borderRadius:   10,
     fontFamily:     'var(--font-body)',
     fontSize:       child ? 13 : 14,
-    fontWeight:     child ? 500 : 700,
+    fontWeight:     500,
     lineHeight:     '20px',
     textAlign:      'left',
     color:          child ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
@@ -366,14 +375,14 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
         ...base,
         cursor:          'pointer',
         WebkitTapHighlightColor: 'transparent',
-        backgroundColor: pressed ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
+        backgroundColor: pressed ? 'var(--color-accent-light)' : 'transparent',
         transform:       pressed ? 'scale(0.99)' : 'scale(1)',
         transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
       {dot}{elbow}
       <span>{label}</span>
-      <ChevronRight size={child ? 14 : 16} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={child ? 14 : 16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -493,7 +502,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <FlaskConical size={12} color="var(--color-text-secondary)" />
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+            <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
               Active ingredient{isCombo ? 's' : ''}
             </span>
           </div>
@@ -511,13 +520,13 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
                 gap:             2,
                 border:          'none',
                 cursor:          'pointer',
-                padding:         '5px 8px 5px 12px',
+                padding:         '4px 6px 4px 10px',
                 borderRadius:    'var(--radius-full)',
                 fontFamily:      'var(--font-body)',
-                fontSize:        13,
+                fontSize:        12,
                 fontWeight:      600,
-                color:           '#fff',
-                backgroundColor: 'var(--color-accent)',
+                color:           'var(--color-accent)',
+                backgroundColor: 'var(--color-accent-light)',
                 WebkitTapHighlightColor: 'transparent',
                 opacity:         similarBrandsPressed ? 0.9 : 1,
                 transform:       similarBrandsPressed ? 'scale(0.97)' : 'scale(1)',
@@ -525,7 +534,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               }}
             >
               Related drugs
-              <ChevronRight size={14} />
+              <ChevronRight size={13} />
             </button>
           )}
         </div>
@@ -534,8 +543,12 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             inline ChipToggle ("+N more" / "Show less"); single-ingredient
             path renders one chip, no toggle needed. */}
         {isCombo
-          ? <InlineTruncatedList items={ingredients.map(toTitleCase)} max={5} />
-          : <IngredientChip>{toTitleCase(genericName)}</IngredientChip>
+          ? <InlineTruncatedList
+              items={ingredients.map(toTitleCase)}
+              max={5}
+              size={ingredients.length === 2 ? 'md' : 'sm'}
+            />
+          : <IngredientChip size="lg">{toTitleCase(genericName)}</IngredientChip>
         }
       </div>
 
@@ -600,6 +613,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           display:       'flex',
           flexDirection: 'column',
           gap:           2,
+          marginTop:     'var(--space-2)',
+          paddingTop:    'var(--space-2)',
+          borderTop:     '0.5px solid var(--color-border)',
           marginBottom:  'var(--space-3)',
         }}>
           {drugClass && (
