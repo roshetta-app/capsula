@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (pop-up header, follow-up): the subclass badge and the hint line
+ * now start at the left edge, under the icon tile (no indent), and the badge
+ * is a rounded square (corner 8) instead of a full pill.
+ *
  * 2026-10-03 (pop-up header): the top of the filter pop-ups is refined. The
  * icon sits in a small blue-tinted tile (same as the class sheet cards) beside
  * the title (weight 600), the subclass name is a soft badge ('<Subclass>
@@ -851,8 +855,9 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns
         }}
       >
         {/* Header: icon tile and title on one row (All chip on the right),
-            then the subclass name as a small badge and the hint line under
-            the title text, all above a hairline. */}
+            then the subclass name as a small rounded-square badge and the hint
+            line, both lined up on the left edge under the icon, all above a
+            hairline. */}
         <div style={{
           flexShrink:    0,
           marginBottom:  'var(--space-3)',
@@ -893,15 +898,15 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, subtitle, columns
             )}
           </div>
           {(scopeName || subtitle) && (
-            <div style={{ marginTop: 10, marginLeft: TitleIcon ? 42 : 0 }}>
+            <div style={{ marginTop: 10 }}>
               {/* Generic pop-up only: which subclass these generics belong to,
                   as '<Subclass> drugs' with the name in bold. */}
               {scopeName && (
                 <span style={{
                   display:         'inline-block',
                   maxWidth:        '100%',
-                  padding:         '2px 10px',
-                  borderRadius:    999,
+                  padding:         '3px 10px',
+                  borderRadius:    8,
                   backgroundColor: 'var(--color-surface-muted)',
                   fontSize:        12,
                   lineHeight:      1.5,
