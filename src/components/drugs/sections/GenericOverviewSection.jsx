@@ -228,19 +228,23 @@
  *    BrandsBottomSheet's new initialTab prop.
  *
  * 2026-10-03 (Related drugs pill, class sheet, card look):
- *  - 'Related drugs' is now a filled blue pill (same top-right spot) with a
- *    count tag showing similar brands plus alternatives, so it is the first
- *    thing the eye lands on in this section.
+ *  - 'Related drugs' is now a filled blue pill (same top-right spot), so it
+ *    is the first thing the eye lands on in this section. It has no count:
+ *    a count tag was tried the same day and removed.
  *  - The Class row is now tappable and opens the new ClassBottomSheet.jsx
  *    (every subclass in the class, then the drugs in the one picked). It is
  *    only tappable when the new 'classDrugs' prop has drugs in it. The
  *    Subclass row still opens the Alternatives tab, as before.
- *  - The two-row card now has its own tinted background and border (new
- *    --color-class-card-bg / --color-class-card-border tokens in globals.css,
- *    light and dark; the plain accent tint was too close to the page colour
- *    in light mode) so it stands out from the page. Both rows share
- *    one look: same text colour, and a blue arrow on whichever row can be
- *    tapped. Each row is the new CardRow below.
+ *  - The two-row card now has its own tinted background (the plain accent
+ *    tint; a stronger blue was tried the same day and put back because it
+ *    was too loud) so it stands out from the page. Both rows share
+ *    one text colour, and a blue arrow on whichever row can be tapped. Each
+ *    row is the new CardRow below.
+ *  - Tree look: the Subclass row hangs under the Class row, indented with an
+ *    elbow line (like a folder tree), in a lighter, smaller type, while the
+ *    Class row is bolder. The line between the two rows is gone, since the
+ *    elbow does that job. With no class, the subclass row stands alone: no
+ *    indent, no elbow.
  *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
  *    instead of 700) so it no longer competes with the card.
  */
@@ -249,17 +253,19 @@ import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { FlaskConical, ChevronRight } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
 import ClassBottomSheet from './ClassBottomSheet.jsx'
-import { CountTag } from '../BrandsList.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 // One row of the Class/Subclass card. A button with a blue arrow when onClick
-// is given, otherwise a plain row; both rows look the same apart from the
-// arrow. Pressed feedback uses the same muted tint as the rest of the app's
+// is given, otherwise a plain row. 'child' is the Subclass row when a Class row
+// sits above it: it is indented, a size smaller and lighter, with an elbow line
+// drawn from the Class row's text to its own, so the two read as parent and
+// child. Pressed feedback uses the same muted tint as the rest of the app's
 // tappable rows.
-function CardRow({ label, onClick, ariaLabel, topBorder = false }) {
+function CardRow({ label, onClick, ariaLabel, child = false }) {
   const [pressed, setPressed] = useState(false)
   const base = {
+    position:       'relative',
     display:        'flex',
     alignItems:     'center',
     justifyContent: 'space-between',
@@ -267,17 +273,34 @@ function CardRow({ label, onClick, ariaLabel, topBorder = false }) {
     width:          '100%',
     boxSizing:      'border-box',
     minHeight:      48,
-    padding:        '12px 14px',
+    padding:        child ? '12px 14px 12px 40px' : '12px 14px',
     border:         'none',
-    borderTop:      topBorder ? '1px solid var(--color-class-card-border)' : 'none',
     fontFamily:     'var(--font-body)',
-    fontSize:       14,
-    fontWeight:     600,
+    fontSize:       child ? 13 : 14,
+    fontWeight:     child ? 500 : 700,
     lineHeight:     1.4,
     textAlign:      'left',
     color:          'var(--color-text-primary)',
   }
-  if (!onClick) return <div style={base}><span>{label}</span></div>
+  // The elbow: a line down from under the Class text, then across to the
+  // Subclass text. Its height ends at the middle of the first line of text.
+  const elbow = child ? (
+    <span
+      aria-hidden="true"
+      style={{
+        position:     'absolute',
+        left:         22,
+        top:          0,
+        width:        12,
+        height:       21,
+        boxSizing:    'border-box',
+        borderLeft:   '1.5px solid var(--color-text-tertiary)',
+        borderBottom: '1.5px solid var(--color-text-tertiary)',
+        borderBottomLeftRadius: 6,
+      }}
+    />
+  ) : null
+  if (!onClick) return <div style={base}>{elbow}<span>{label}</span></div>
   return (
     <button
       onClick={onClick}
@@ -294,8 +317,9 @@ function CardRow({ label, onClick, ariaLabel, topBorder = false }) {
         transition:      'background-color var(--motion-fast) var(--ease-settle)',
       }}
     >
+      {elbow}
       <span>{label}</span>
-      <ChevronRight size={16} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={child ? 14 : 16} color="var(--color-accent)" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -430,7 +454,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               style={{
                 display:         'flex',
                 alignItems:      'center',
-                gap:             6,
+                gap:             2,
                 border:          'none',
                 cursor:          'pointer',
                 padding:         '5px 8px 5px 12px',
@@ -447,7 +471,6 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               }}
             >
               Related drugs
-              <CountTag tone="onAccent">{siblings.length + alternatives.length}</CountTag>
               <ChevronRight size={14} />
             </button>
           )}
@@ -520,10 +543,10 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             cannot be opened is a plain row with no arrow. -- */}
       {(drugClass || subclass) && (
         <div style={{
-          border:          '1px solid var(--color-class-card-border)',
+          border:          '1px solid var(--color-border)',
           borderRadius:    12,
           overflow:        'hidden',
-          backgroundColor: 'var(--color-class-card-bg)',
+          backgroundColor: 'var(--color-accent-light)',
           marginBottom:    'var(--space-3)',
         }}>
           {drugClass && (
@@ -538,7 +561,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               label={subclass}
               onClick={hasAlternatives ? openAlternatives : undefined}
               ariaLabel={`Show alternatives in ${subclass}`}
-              topBorder={!!drugClass}
+              child={!!drugClass}
             />
           )}
         </div>

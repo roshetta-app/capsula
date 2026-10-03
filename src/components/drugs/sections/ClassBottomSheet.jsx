@@ -6,13 +6,16 @@
  *
  * Two views inside one sheet:
  *   1. Subclass list: every subclass that exists in the open drug's class,
- *      each with how many drugs it holds. Tapping one opens view 2.
+ *      each with how many drugs it holds, biggest group first (A to Z only
+ *      between groups of the same size). Every word of a subclass name
+ *      starts with a capital letter. The title reads 'Subclass <class> drug
+ *      groups'. Tapping one opens view 2.
  *   2. Drugs in that subclass: the same list as the Alternatives tab of the
  *      related drugs sheet (BrandsList.jsx in its Alternatives style: same
  *      title, filters, sort and tappable cards), with one difference: the
  *      open drug's own generic is treated like any other generic. Its brands
  *      are in the list, and it is not greyed out in the generic filter. A
- *      back arrow at the top returns to the subclass list.
+ *      Back button at the top returns to the subclass list.
  *
  * Tapping a drug closes the sheet and hands the drug to onSelectBrand, which
  * opens that drug's page with the same back-button rule as the Alternatives
@@ -38,8 +41,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 
-// Groups drugs by subclass name, sorted A to Z. Drugs without a subclass are
-// skipped. Pure function, no hooks, so it can be checked on its own.
+// Makes every word start with a capital letter, including the words after a
+// plus sign, slash, bracket or hyphen. Only the first letter of each word is
+// touched, so names that are already capitalised ('ACE', 'SGLT2') stay as
+// they are. Pure function, no hooks, so it can be checked on its own.
+function titleCaseWords(text) {
+  return (text ?? '').replace(/(^|[\s+/(-])([a-z])/g, (_, lead, ch) => lead + ch.toUpperCase())
+}
+
+// Groups drugs by subclass name, biggest group first; groups of the same size
+// go A to Z. Drugs without a subclass are skipped. Pure function, no hooks,
+// so it can be checked on its own.
 function groupBySubclass(drugs) {
   const map = new Map()
   for (const d of drugs) {
@@ -49,7 +61,7 @@ function groupBySubclass(drugs) {
   }
   return [...map.entries()]
     .map(([name, items]) => ({ name, items }))
-    .sort((a, b) => a.name.localeCompare(b.name))
+    .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
 const headingStyle = {
@@ -146,7 +158,7 @@ export default function ClassBottomSheet({
             <div style={{ padding: '0 var(--space-4)' }}>
               <button
                 onClick={() => setPicked(null)}
-                aria-label="Back to subclasses"
+                aria-label="Back"
                 style={{
                   display:    'flex',
                   alignItems: 'center',
@@ -165,7 +177,7 @@ export default function ClassBottomSheet({
                 }}
               >
                 <ChevronLeft size={18} />
-                Subclasses
+                Back
               </button>
             </div>
             <div style={{
@@ -179,7 +191,7 @@ export default function ClassBottomSheet({
                 siblings={pickedGroup.items}
                 onTap={handleTap}
                 mode="alternatives"
-                familyName={pickedGroup.name}
+                familyName={titleCaseWords(pickedGroup.name)}
                 saved={savedFilters.current[pickedGroup.name] ?? null}
                 onSave={p => { savedFilters.current[pickedGroup.name] = p }}
                 popupLayer={popupLayer}
@@ -194,14 +206,15 @@ export default function ClassBottomSheet({
             padding:   'var(--space-2) var(--space-4) var(--space-6)',
           }}>
             <p style={headingStyle}>
-              Subclasses of{' '}
+              Subclass{' '}
               <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{classLabel}</strong>
+              {' '}drug groups
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               {groups.map(g => (
                 <SubclassRow
                   key={g.name}
-                  name={g.name}
+                  name={titleCaseWords(g.name)}
                   count={g.items.length}
                   onClick={() => setPicked(g.name)}
                 />
