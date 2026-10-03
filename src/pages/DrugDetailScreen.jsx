@@ -89,6 +89,15 @@
  * like any other generic). Empty when this drug has no class. See
  * findClassDrugs below.
  *
+ * 2026-10-04 (Class search mode): the class sheet's list now holds EVERY
+ * brand in the class, including brands that have a class but no subclass yet.
+ * The new 'All drugs in this class' row in the sheet and the class card in the
+ * Drugs search must show the same number, and about half the generics have a
+ * class without a subclass. The subclass list inside the sheet is unchanged
+ * (it still only groups brands that have a subclass). Because the list is no
+ * longer empty for a class with no subclasses, the Class row on the drug page
+ * now opens the sheet for those drugs too. See findClassDrugs below.
+ *
  * Route: /drugs/:slug
  */
 
@@ -192,15 +201,18 @@ function findAlternatives(drugs, drug) {
 }
 
 // Everything behind the class sheet (2026-10-03): every brand in the same class
-// as the viewed drug that has a subclass filled in. Unlike findAlternatives,
-// the viewed drug's own generic is kept, so the subclass lists in the class
-// sheet show every drug in the subclass. Brands with a class but no subclass
-// yet are left out (nothing is guessed while the categorization is still
-// being filled in). A drug with no class gets an empty list. Pure function,
+// as the viewed drug. Unlike findAlternatives, the viewed drug's own generic is
+// kept, so the subclass lists in the class sheet show every drug in the
+// subclass.
+// 2026-10-04 (Class search mode): brands with a class but no subclass are now
+// kept too (they used to be left out). The sheet still groups only the brands
+// that have a subclass into its subclass list, and counts every brand for the
+// new 'All drugs in this class' row, so the number matches the class card in
+// the Drugs search. A drug with no class gets an empty list. Pure function,
 // no hooks, so it can be checked on its own.
 function findClassDrugs(drugs, drug) {
   if (!drug || !drug.class) return []
-  return drugs.filter(d => d.class === drug.class && d.subclass)
+  return drugs.filter(d => d.class === drug.class)
 }
 
 export default function DrugDetailScreen() {

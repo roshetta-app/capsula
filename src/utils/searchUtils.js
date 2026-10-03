@@ -984,7 +984,10 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
 // Classic edit distance (Levenshtein) between two already-normalized
 // strings — the number of single-letter changes/insertions/deletions
 // needed to turn `a` into `b`.
-function editDistance(a, b) {
+// 2026-10-04 (Class search mode): now exported, unchanged, so the class and
+// subclass 'Did you mean' in classSearch.js uses the same letter-difference
+// rule as Brand and Generic mode.
+export function editDistance(a, b) {
   const m = a.length, n = b.length
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0))
   for (let i = 0; i <= m; i++) dp[i][0] = i
@@ -1002,7 +1005,9 @@ function editDistance(a, b) {
 // compared. Short text gets no guess at all — not just a lower score — since
 // 1-2 letters isn't enough to guess safely; longer text gets a little more
 // room, matching the standard "tighter leash for short words" approach.
-function maxAllowedEdits(length) {
+// 2026-10-04 (Class search mode): exported, unchanged, same reason as
+// editDistance above.
+export function maxAllowedEdits(length) {
   if (length <= 2) return -1
   if (length <= 5) return 1
   return 2

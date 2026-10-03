@@ -128,15 +128,33 @@
  * clear) only runs on confirm. ClearFiltersButton also gained the same
  * pointer-driven press feedback already used elsewhere in this file
  * (CategoryRow, RecentlyViewedButton) rather than a new pattern.
+ *
+ * 2026-10-04 (Class search mode, CLASS_SEARCH_MODE_PLAN.md): 'mode' can now be
+ * 'class'. With a query typed in that mode the results area shows class and
+ * subclass cards (ClassSearchResults) instead of drug rows, and it ignores the
+ * category scope and the Form/Route filter (they apply to drug rows, not to
+ * cards). Tapping a class card opens the class sheet (ClassBottomSheet) on its
+ * subclass list, or straight on its drugs when the class has no subclasses;
+ * tapping a subclass card opens the sheet straight on that subclass's drugs,
+ * and Back closes the sheet. A tapped drug opens like any drug row. The empty
+ * states are reused with Class wording: 'Did you mean' names, a hint when the
+ * typed text is really a drug name (switches to Generic or Brand), and a plain
+ * 'no class or subclass matches' state. With nothing typed, Class mode shows
+ * the usual category list and category browsing, unchanged. While the results
+ * of the other kind are still on their way (the search waits 150ms after
+ * typing or after a mode change), nothing is drawn in the results area, so a
+ * wrong empty state never flashes. Class searches are not logged.
  */
 
 import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
+import ClassSearchResults from '../components/drugs/ClassSearchResults'
+import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -146,6 +164,7 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { normalizeSearchText } from '../utils/searchUtils'
+import { titleCaseWords } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
@@ -205,6 +224,8 @@ export default function DrugsScreen() {
     queryTooShort,
     suggestions,
     crossModeMatch,
+    classResults,
+    crossModeTarget,
   } = useDrugContext()
   const { categories } = useCategories()
   const { toggleDrug, isDrugFavourited } = useFavouritesContext()
@@ -239,6 +260,13 @@ export default function DrugsScreen() {
   const [filterOpen,       setFilterOpen]       = useState(false)
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
+  // Class search mode: the class sheet opened from a class or subclass card.
+  // 'classTarget' stays after the sheet closes so it can slide out showing the
+  // same content; 'classSheetKey' changes on every open so each opening starts
+  // fresh (on the subclass list, or straight on the asked-for drugs).
+  const [classSheetOpen, setClassSheetOpen] = useState(false)
+  const [classTarget,    setClassTarget]    = useState(null)   // { className, direct }
+  const [classSheetKey,  setClassSheetKey]  = useState(0)
   // drug-filter-instant-apply — gates the actual clear behind a confirm
   // step; requestClearFilters() (below) opens this, handleClearFilters()
   // only runs from ConfirmSheet's onConfirm.
@@ -305,8 +333,44 @@ export default function DrugsScreen() {
     setQuery(val)
   }
 
+  // Class search mode: open the class sheet for a tapped card. 'direct' is the
+  // sheet's 'open straight on this' value: a subclass name, or the 'all drugs'
+  // row for a class that has no subclasses to choose from; null means the
+  // subclass list.
+  function openClassSheet(className, direct) {
+    setClassTarget({ className, direct })
+    setClassSheetKey(k => k + 1)
+    setClassSheetOpen(true)
+  }
+
+  function handleOpenClass(className) {
+    const card = classResults?.classes?.find(c => c.name === className)
+    openClassSheet(className, card && card.subclassCount === 0 ? ALL_CLASS_DRUGS_KEY : null)
+  }
+
+  function handleOpenSubclass(className, subclassName) {
+    openClassSheet(className, subclassName)
+  }
+
+  // Every brand in the tapped class, the same list the drug page gives the sheet.
+  const classSheetDrugs = useMemo(
+    () => (classTarget ? drugs.filter(d => d.class === classTarget.className) : []),
+    [drugs, classTarget]
+  )
+
   const hasQuery = query.trim().length > 0
   const hasFilters = !!activeFilters
+
+  // Class search mode: a query typed in Class mode shows class cards. Class
+  // results and drug results come from different searches, so right after a
+  // mode change (or while the search is still waiting out its 150ms) the
+  // hook may still hold the other kind; that moment draws nothing instead of
+  // a wrong empty state.
+  const isClassSearch = mode === 'class' && hasQuery
+  const resultsNotReady = hasQuery && !queryTooShort && ((mode === 'class') !== (classResults != null))
+  const searchPlaceholder = mode === 'class' ? 'Search classes…' : 'Search drugs…'
+  // The Form/Route filter does not apply to class cards.
+  const filtersApply = !isClassSearch
 
   // Same list the category tiles render from (see the category-list view
   // below).
@@ -341,11 +405,15 @@ export default function DrugsScreen() {
     // at once (typing while browsing inside a category) — search results
     // need to stay scoped to that category too, the same way the no-query
     // branch below already scopes the plain drug list.
-    const base = hasQuery
-      ? (activeCategory && activeCategory !== '__all'
-          ? searchResults.filter(d => d.category === activeCategory)
-          : searchResults)
-      : drugs.filter(d => activeCategory === '__all' || d.category === activeCategory)
+    // Class search mode: class cards ignore the category scope, so no drug
+    // rows are listed here at all.
+    const base = isClassSearch
+      ? []
+      : hasQuery
+        ? (activeCategory && activeCategory !== '__all'
+            ? searchResults.filter(d => d.category === activeCategory)
+            : searchResults)
+        : drugs.filter(d => activeCategory === '__all' || d.category === activeCategory)
 
     // Search results now come back pre-ranked from searchDrugsTiered (closeness
     // of match for Brand mode; name-match-before-ingredient-match, then
@@ -386,9 +454,9 @@ export default function DrugsScreen() {
           isDark={isDark}
           query={query}
           onQueryChange={handleQueryChange}
-          placeholder={hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`}
+          placeholder={mode === 'class' ? searchPlaceholder : (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)}
           onFilter={() => setFilterOpen(true)}
-          hasActiveFilters={hasFilters}
+          hasActiveFilters={hasFilters && filtersApply}
         />
         <div>
         <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
@@ -401,9 +469,9 @@ export default function DrugsScreen() {
           <SearchBar
             value={query}
             onChange={handleQueryChange}
-            placeholder="Search drugs…"
+            placeholder={searchPlaceholder}
             onFilter={() => setFilterOpen(true)}
-            hasActiveFilters={hasFilters}
+            hasActiveFilters={hasFilters && filtersApply}
           />
         </div>
 
@@ -436,6 +504,38 @@ export default function DrugsScreen() {
 
           {hasQuery && queryTooShort ? (
             <TooShortState />
+          ) : resultsNotReady ? (
+            // Class search mode: the other kind of results is still on its
+            // way (see resultsNotReady above) — draw nothing for a moment.
+            null
+          ) : isClassSearch ? (
+            // Class search mode: class and subclass cards, or one of the
+            // empty states. The key makes a new search start with the groups
+            // collapsed.
+            (classResults.classes.length + classResults.subclasses.length) > 0 ? (
+              <ClassSearchResults
+                key={query.trim()}
+                results={classResults}
+                query={query}
+                onOpenClass={handleOpenClass}
+                onOpenSubclass={handleOpenSubclass}
+              />
+            ) : crossModeMatch ? (
+              <CrossModeHintState
+                query={query}
+                mode={mode}
+                targetMode={crossModeTarget}
+                onSwitchMode={() => setMode(crossModeTarget ?? 'generic')}
+              />
+            ) : suggestions.length > 0 ? (
+              <DidYouMeanState
+                query={query}
+                suggestions={suggestions}
+                onSelect={(name) => handleQueryChange(name)}
+              />
+            ) : (
+              <EmptyState query={query} mode={mode} onClear={() => handleQueryChange('')} />
+            )
           ) : (
             <>
               {/* drug-filter-instant-apply — only shown while a search
@@ -512,7 +612,7 @@ export default function DrugsScreen() {
                     isDrugFavourited={isDrugFavourited}
                     onToggleFavourite={handleToggleDrugFavourite}
                     highlight={query}
-                    searchMode={mode}
+                    searchMode={mode === 'class' ? 'brand' : mode}
                   />
                 </>
               )}
@@ -539,7 +639,7 @@ export default function DrugsScreen() {
           isDark={isDark}
         query={query}
         onQueryChange={handleQueryChange}
-        placeholder="Search drugs…"
+        placeholder={searchPlaceholder}
         onFilter={() => setFilterOpen(true)}
         hasActiveFilters={hasFilters}
       />
@@ -551,7 +651,7 @@ export default function DrugsScreen() {
           <SearchBar
             value={query}
             onChange={handleQueryChange}
-            placeholder="Search drugs…"
+            placeholder={searchPlaceholder}
             onFilter={() => setFilterOpen(true)}
             hasActiveFilters={hasFilters}
           />
@@ -702,6 +802,19 @@ export default function DrugsScreen() {
       <DrugsInfoSheet
         isOpen={showInfoSheet}
         onClose={() => setShowInfoSheet(false)}
+      />
+
+      {/* Class search mode: the class sheet opened from a class or subclass
+          card. A tapped drug closes the sheet and opens like any drug row. */}
+      <ClassBottomSheet
+        key={classSheetKey}
+        isOpen={classSheetOpen}
+        onClose={() => setClassSheetOpen(false)}
+        classLabel={titleCaseWords(classTarget?.className ?? '')}
+        classDrugs={classSheetDrugs}
+        currentDrug={null}
+        onSelectBrand={handleDrugTap}
+        directSubclass={classTarget?.direct ?? null}
       />
 
       {/* Back to top */}
@@ -1280,17 +1393,24 @@ function ClearFiltersButton({ onClick }) {
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
-function EmptyState({ query, onClear }) {
+// 2026-10-04 (Class search mode): 'mode' is only passed in Class mode, where
+// the wording is about class and subclass names instead of drug names.
+function EmptyState({ query, mode, onClear }) {
+  const inClassMode = mode === 'class'
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
         <SearchX size={28} color="var(--color-text-tertiary)" />
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        No matches{query ? ` for "${query}"` : ''}
+        {inClassMode
+          ? `No class or subclass matches${query ? ` "${query}"` : ''}`
+          : `No matches${query ? ` for "${query}"` : ''}`}
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
-        Try the generic name or brand name instead
+        {inClassMode
+          ? 'Try part of a class or subclass name'
+          : 'Try the generic name or brand name instead'}
       </div>
       <FilledHintButton onClick={onClear}>
         Clear search
@@ -1313,15 +1433,21 @@ function EmptyState({ query, onClear }) {
 // existing query re-searches automatically (mode is already a dependency
 // of useDrugSearch's debounce effect).
 
-function CrossModeHintState({ query, mode, onSwitchMode }) {
-  const otherModeLabel = mode === 'brand' ? 'generic' : 'brand'
+// 2026-10-04 (Class search mode): also used in Class mode, where 'targetMode'
+// says which mode the typed drug name belongs to (the Class search finds out
+// and passes it); in Brand and Generic mode it is left out and the other one
+// is offered, as before.
+function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
+  const otherModeLabel = targetMode ?? (mode === 'brand' ? 'generic' : 'brand')
   return (
     <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
         <ArrowLeftRight size={28} color="var(--color-text-tertiary)" />
       </div>
       <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        No matches{query ? ` for "${query}"` : ''}
+        {mode === 'class'
+          ? `No class or subclass matches${query ? ` "${query}"` : ''}`
+          : `No matches${query ? ` for "${query}"` : ''}`}
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
         It's a {otherModeLabel} name

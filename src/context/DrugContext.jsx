@@ -45,6 +45,13 @@ const DrugContext = createContext(null)
  * 'crossModeMatch' (boolean) — again no code change needed here, since
  * searchValue is spread through as-is; only this doc comment and
  * useDrugContext's below were updated to match.
+ *
+ * 2026-10-04 (Class search mode): 'mode' can now also be 'class', and
+ * useDrugSearch also returns 'classResults' and 'crossModeTarget' — again
+ * nothing to change in the code, searchValue is spread through as-is, and
+ * 'mode' already lives here, so the typed text, the mode and the class cards
+ * survive opening a drug and coming back like everything else. Only these doc
+ * comments were updated.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -60,7 +67,9 @@ export function DrugProvider({ children }) {
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
  * setActiveFilters, sortMode, setSortMode, query, setQuery, results,
- * queryTooShort, suggestions, crossModeMatch }
+ * queryTooShort, suggestions, crossModeMatch, classResults, crossModeTarget }
+ * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
+ * are only filled in Class mode)
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)

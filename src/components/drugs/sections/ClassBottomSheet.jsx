@@ -1,6 +1,34 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-04 (Class search mode): three changes.
+ *  - A first row 'All drugs in this class' now sits above the subclass cards. It
+ *    opens every brand in the class (brands with a class but no subclass
+ *    included) as one plain list, and its number is the same one the class card
+ *    in the Drugs search shows. The heading's drug total is now every brand in
+ *    the class too. A class with no subclasses shows only that row.
+ *  - New optional prop 'directSubclass': the sheet opens straight on the drugs
+ *    of that one subclass (used by the subclass cards in Class search). The
+ *    Back button and the phone's Back button then close the sheet, since there
+ *    is no subclass list to go back to. The subclass is looked up among the
+ *    real subclasses, so a one-drug subclass folded into 'Other families' still
+ *    opens.
+ *  - The capitalisation helper now lives in utils/classSearch.js so the search
+ *    cards and this sheet write names the same way. No visible change.
+ *  - The molecule icon is now exported so the subclass cards in Class search
+ *    draw the same icon. No visible change.
+ * The order of the subclass cards (biggest first) and the 'Other families'
+ * folding are unchanged: they still work on the brands that have a subclass.
+ *
+ * 2026-10-04 (Class search mode, screen wiring): 'directSubclass' can also be
+ * the 'All drugs in this class' row (ALL_KEY, now exported), which the Drugs
+ * screen uses for a class that has no subclasses, so a class card with
+ * nothing to choose from opens straight on its drugs. The sheet also starts on
+ * the asked-for view from its very first draw (the starting view is read when
+ * the sheet is created, not only after it opens), so a subclass card never
+ * flashes the subclass list for a moment first. The Drugs screen creates a
+ * fresh sheet for every opening.
+ *
  * 2026-10-03 (taller sheet): the sheet height went from 80svh to 86svh, same as
  * the related drugs sheet (BrandsBottomSheet.jsx).
  *
@@ -122,24 +150,18 @@
  *   isOpen        boolean
  *   onClose       () => void
  *   classLabel    string: the class name shown in the heading
- *   classDrugs    array: every brand in the class that has a subclass
+ *   classDrugs    array: every brand in the class (with or without a subclass)
  *   currentDrug   flat drug object of the open page
  *   onSelectBrand (item) => void: called after this sheet closes
+ *   directSubclass string|null: open straight on this subclass's drugs
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
-
-// Makes every word start with a capital letter, including the words after a
-// plus sign, slash, bracket or hyphen. Only the first letter of each word is
-// touched, so names that are already capitalised ('ACE', 'SGLT2') stay as
-// they are. Pure function, no hooks, so it can be checked on its own.
-function titleCaseWords(text) {
-  return (text ?? '').replace(/(^|[\s+/(-])([a-z])/g, (_, lead, ch) => lead + ch.toUpperCase())
-}
+import { titleCaseWords } from '../../../utils/classSearch'
 
 // Groups drugs by subclass name, biggest group first; groups of the same size
 // go A to Z. Drugs without a subclass are skipped. Pure function, no hooks,
@@ -163,7 +185,7 @@ function groupBySubclass(drugs) {
 // one is a filled outline shape.
 const MOLECULE_PATH = 'M16 12a5 5 0 1 0-4.337-2.51l-2.714 1.808a4 4 0 1 0 .23 5.13l3.887 1.943a3 3 0 1 0 .671-1.341l-3.886-1.943a4 4 0 0 0-.113-2.513l2.863-1.907A4.98 4.98 0 0 0 16 12m0-1.5a3.5 3.5 0 1 1 0-7a3.5 3.5 0 0 1 0 7m-10 6a2.5 2.5 0 1 1 0-5a2.5 2.5 0 0 1 0 5M17.5 19a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0'
 
-function MoleculeIcon({ size = 24, color = 'currentColor' }) {
+export function MoleculeIcon({ size = 24, color = 'currentColor' }) {
   // Drawn 2px larger than the lucide icons so it looks the same size next to
   // them (its shapes sit a little inside the box).
   const px = size + 2
@@ -185,6 +207,11 @@ function MoleculeIcon({ size = 24, color = 'currentColor' }) {
 // only one drug each.
 const OTHERS_KEY   = '__other_families__'
 const OTHERS_LABEL = 'Other families'
+
+// Key and label of the first row, which opens every brand in the class.
+// Exported so the Drugs screen can open the sheet straight on it.
+export const ALL_KEY = '__all_class_drugs__'
+const ALL_LABEL = 'All drugs in this class'
 
 // Builds the cards of the subclass list. Families with a single drug are
 // collected into one 'Other families' card, put last, but only when there are
@@ -290,9 +317,10 @@ export default function ClassBottomSheet({
   classDrugs = [],
   currentDrug = null,
   onSelectBrand,
+  directSubclass = null,
 }) {
   // The subclass whose drugs are showing, or null for the subclass list.
-  const [picked, setPicked] = useState(null)
+  const [picked, setPicked] = useState(directSubclass ?? null)
   // Remembered filter picks, one entry per subclass (a ref: only read when a
   // list is built, no re-render needed).
   const savedFilters = useRef({})
@@ -302,19 +330,30 @@ export default function ClassBottomSheet({
   // Phone/browser Back on the drugs page goes back to the subclass list (the
   // sheet stays open). On the list it closes the sheet as usual. This adds no
   // history step of its own (see useBackLayer in useBackClose.js).
-  useBackLayer(isOpen && picked !== null, () => setPicked(null))
+  // When the sheet was opened straight on one subclass (directSubclass) there
+  // is no list to go back to, so Back just closes the sheet as usual.
+  useBackLayer(isOpen && picked !== null && !directSubclass, () => setPicked(null))
 
-  // Each time the sheet opens, start on the subclass list.
+  // Each time the sheet opens, start on the subclass list (or, when a
+  // subclass was asked for, straight on its drugs).
   useEffect(() => {
-    if (isOpen) setPicked(null)
-  }, [isOpen])
+    if (isOpen) setPicked(directSubclass ?? null)
+  }, [isOpen, directSubclass])
 
   // Real families (the heading counts these) and the cards shown in the list
   // (single-drug families may be folded into one 'Other families' card).
   const groups = useMemo(() => groupBySubclass(classDrugs), [classDrugs])
   const listGroups = useMemo(() => buildListGroups(groups), [groups])
-  const pickedGroup = picked ? listGroups.find(g => g.name === picked) : null
-  const totalDrugs = groups.reduce((sum, g) => sum + g.items.length, 0)
+  // The picked card: the 'All drugs' row, a card of the list, or (for a
+  // subclass asked for by name) a real subclass even when the list folded it
+  // into 'Other families'.
+  const pickedGroup = !picked
+    ? null
+    : picked === ALL_KEY
+      ? { name: ALL_KEY, items: classDrugs, isAll: true }
+      : (listGroups.find(g => g.name === picked) ?? groups.find(g => g.name === picked) ?? null)
+  // Every brand in the class, with or without a subclass.
+  const totalDrugs = classDrugs.length
 
   function handleTap(item) {
     onClose()
@@ -342,7 +381,7 @@ export default function ClassBottomSheet({
               borderBottom: '0.5px solid var(--color-border)',
             }}>
               <button
-                onClick={() => setPicked(null)}
+                onClick={() => (directSubclass ? onClose() : setPicked(null))}
                 aria-label="Back"
                 style={{
                   display:    'flex',
@@ -379,7 +418,11 @@ export default function ClassBottomSheet({
                 mode="alternatives"
                 hideOther
                 groupBySubclass={!!pickedGroup.isOthers}
-                familyName={pickedGroup.isOthers ? OTHERS_LABEL : titleCaseWords(pickedGroup.name)}
+                familyName={
+                  pickedGroup.isOthers ? OTHERS_LABEL
+                    : pickedGroup.isAll ? titleCaseWords(classLabel)
+                    : titleCaseWords(pickedGroup.name)
+                }
                 saved={savedFilters.current[pickedGroup.name] ?? null}
                 onSave={p => { savedFilters.current[pickedGroup.name] = p }}
                 popupLayer={popupLayer}
@@ -419,8 +462,12 @@ export default function ClassBottomSheet({
                 fontVariantNumeric: 'tabular-nums',
                 color:              'var(--color-text-secondary)',
               }}>
-                {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
-                {', '}
+                {groups.length > 0 && (
+                  <>
+                    {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
+                    {', '}
+                  </>
+                )}
                 {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
             </div>
@@ -433,6 +480,15 @@ export default function ClassBottomSheet({
               gap:           'var(--space-2)',
               padding:       'var(--space-3) var(--space-4) var(--space-6)',
             }}>
+              {totalDrugs > 0 && (
+                <SubclassRow
+                  key={ALL_KEY}
+                  name={ALL_LABEL}
+                  count={totalDrugs}
+                  Icon={List}
+                  onClick={() => setPicked(ALL_KEY)}
+                />
+              )}
               {listGroups.map(g => (
                 <SubclassRow
                   key={g.name}

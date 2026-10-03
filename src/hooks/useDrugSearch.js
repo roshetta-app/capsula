@@ -98,6 +98,19 @@
  * the same way a near-miss is — the content genuinely exists, just under
  * the other mode, so it isn't a real "we don't have this" gap.
  *
+ * Class search mode (2026-10-04, CLASS_SEARCH_MODE_PLAN.md): 'mode' can now
+ * also be 'class'. In that mode the typed text is matched against class and
+ * subclass names only (utils/classSearch.js), never drug names, and the
+ * answer comes back as 'classResults' ({ classes, subclasses }) instead of
+ * drug rows ('results' is left empty). The empty-state pieces are reused:
+ * 'suggestions' holds up to 3 class/subclass names for 'Did you mean', and
+ * 'crossModeMatch' is true when the text is really a drug name, with
+ * 'crossModeTarget' saying which mode to offer ('generic' or 'brand'; null in
+ * Brand and Generic mode, where the target is just the other one). Class-mode
+ * searches are deliberately NOT logged (no usage event, no near-miss, no
+ * search gap): the analytics tables only accept brand or generic as a mode
+ * today and the database is not being changed for this experiment.
+ *
  * Exposes:
  *   query           — current search string
  *   setQuery        — setter
@@ -109,6 +122,10 @@
  *                      something close exists
  *   crossModeMatch   — true when results is empty but the query matches
  *                      something under the other mode (Brand/Generic)
+ *   classResults     — Class mode only: { classes, subclasses } for the typed
+ *                      text, null in every other mode (or with nothing typed)
+ *   crossModeTarget  — Class mode only: 'generic' | 'brand' | null, the mode
+ *                      the 'switch mode' hint should offer
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -120,8 +137,13 @@ import {
   getDrugSearchSuggestion,
   normalizeSearchText,
 } from '../utils/searchUtils'
+import { buildClassIndex, searchClassIndex, getClassSearchSuggestions } from '../utils/classSearch'
 import { logSearchGap } from '../analytics/searchGaps'
 import { logUsageEvent } from '../analytics/usageEvents'
+
+// Class mode has no drug rows to show; one shared empty array keeps the state
+// from changing identity on every search.
+const NO_RESULTS = []
 
 export function useDrugSearch(drugs, mode = 'brand') {
   const [query,          setQuery]          = useState('')
@@ -138,6 +160,11 @@ export function useDrugSearch(drugs, mode = 'brand') {
   // since an exact hit in the other mode is a more certain answer than a
   // same-mode fuzzy typo guess.
   const [crossModeMatch, setCrossModeMatch] = useState(false)
+  // Class search mode (2026-10-04): the class and subclass cards for the typed
+  // text, and which mode the 'it is a drug name' hint should switch to. Both
+  // stay null outside Class mode.
+  const [classResults,    setClassResults]    = useState(null)
+  const [crossModeTarget, setCrossModeTarget] = useState(null)
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -153,6 +180,9 @@ export function useDrugSearch(drugs, mode = 'brand') {
   const genericIndexRef    = useRef(null)
   const ingredientIndexRef = useRef(null)
   const drugsByIdRef       = useRef(null)
+  // Class and subclass entries, built once per drugs load like the indexes
+  // above (Class mode only reads it).
+  const classIndexRef      = useRef(null)
 
   // Per-session dedup (F10 Batch A / D30, D31) — see header comment.
   // loggedGapTermsRef / loggedNearMissTermsRef keys are "mode:normalizedTerm"
@@ -167,6 +197,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     genericIndexRef.current    = buildDrugGenericIndex(drugs)
     ingredientIndexRef.current = buildDrugIngredientIndex(drugs)
     drugsByIdRef.current       = new Map(drugs.map(d => [d.id, d]))
+    classIndexRef.current      = buildClassIndex(drugs)
     runSearch(query, mode)
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -184,9 +215,46 @@ export function useDrugSearch(drugs, mode = 'brand') {
       setResults(drugs)
       setSuggestions([])
       setCrossModeMatch(false)
+      setClassResults(null)
+      setCrossModeTarget(null)
       return
     }
     setQueryTooShort(false)
+
+    // Class search mode (2026-10-04): class and subclass names only, no drug
+    // matching, no logging (see the header note). Nothing typed shows the
+    // usual category list, so there is nothing to compute then.
+    if (currentMode === 'class') {
+      if (trimmed.length === 0) {
+        setResults(drugs)
+        setClassResults(null)
+        setSuggestions([])
+        setCrossModeMatch(false)
+        setCrossModeTarget(null)
+        return
+      }
+      const index = classIndexRef.current ?? buildClassIndex(drugs)
+      const found = searchClassIndex(index, trimmed)
+      setResults(NO_RESULTS)
+      setClassResults(found)
+      if (found.classes.length + found.subclasses.length > 0) {
+        setSuggestions([])
+        setCrossModeMatch(false)
+        setCrossModeTarget(null)
+        return
+      }
+      // Nothing matched. First check whether the text is a drug name (offer
+      // Generic or Brand), the same strict check those modes use; else offer
+      // up to 3 class or subclass names that are one or two letters off.
+      const asGeneric = (searchDrugsTiered(drugs, trimmed, 'generic') ?? []).length > 0
+      const asBrand   = !asGeneric && (searchDrugsTiered(drugs, trimmed, 'brand') ?? []).length > 0
+      setCrossModeTarget(asGeneric ? 'generic' : asBrand ? 'brand' : null)
+      setCrossModeMatch(asGeneric || asBrand)
+      setSuggestions(getClassSearchSuggestions(index, trimmed))
+      return
+    }
+    setClassResults(null)
+    setCrossModeTarget(null)
 
     // Strict "starts with" match, every length — replaces the old
     // 2-3-char-prefix/4+-char-fuzzy split (drug_search_plan §5 final form).
@@ -285,5 +353,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
     queryTooShort,
     suggestions,
     crossModeMatch,
+    classResults,
+    crossModeTarget,
   }
 }

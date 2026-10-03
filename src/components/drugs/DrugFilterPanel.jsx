@@ -115,6 +115,15 @@ import SheetShell from '../ui/SheetShell'
  * read straight from 'activeFilters', so the sheet always matches what is
  * actually applied. Behavior is otherwise unchanged.
  *
+ * 2026-10-04 (Class search mode, CLASS_SEARCH_MODE_PLAN.md): the Search Mode
+ * toggle now has a third option, Class (searches class and subclass names).
+ * While a Class search is active (mode is Class and something is typed) the
+ * Sort By and Form / Route sections, and Clear All with them, are hidden:
+ * they apply to drug rows, and a Class search shows class cards, not drug
+ * rows. With nothing typed, Class mode still browses the usual category list,
+ * so Form / Route stays available there. The mode-change message names Class
+ * too. Nothing else here changed.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -124,7 +133,7 @@ import SheetShell from '../ui/SheetShell'
  *   activeFilters    { forms } | null    — the currently-applied filters; the chips
  *                    read straight from this (EMPTY if null), so the sheet
  *                    always matches what the screen has actually applied
- *   mode             'brand' | 'generic' | undefined — current search mode, for the Search By section
+ *   mode             'brand' | 'generic' | 'class' | undefined — current search mode, for the Search By section
  *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
  *   hasSearchResults boolean | undefined — true as soon as a search query is typed, regardless
  *                    of whether it matched anything; gates the Sort By section
@@ -165,6 +174,9 @@ const EMPTY = {
   forms: ['all'],
 }
 
+// Names used in the 'Searching in ... mode' message.
+const MODE_LABELS = { brand: 'Brand', generic: 'Generic', class: 'Class' }
+
 export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange, hasSearchResults, sortMode, onSortChange }) {
   // The chips read straight from 'activeFilters' (the screen's applied
   // filters) instead of a private copy of them — see the 2026-09-19 note in
@@ -172,6 +184,10 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   // buffer, so the copy added nothing and could only go out of date.
   const filters = activeFilters || EMPTY
   const { toast } = useToast()
+
+  // Class search mode: true while class cards are what the screen shows. Sort
+  // By and Form / Route do not apply to cards, so they are hidden then.
+  const classSearching = mode === 'class' && !!hasSearchResults
 
   // Instant-apply: compute the next forms list and immediately push it out
   // via onApply, instead of buffering until a separate Apply Filters
@@ -199,7 +215,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   // the sheet immediately.
   function handleModeChange(m) {
     onModeChange(m)
-    toast.info(`Searching in ${m === 'brand' ? 'Brand' : 'Generic'} mode`)
+    toast.info(`Searching in ${MODE_LABELS[m] ?? m} mode`)
     onClose()
   }
 
@@ -236,16 +252,20 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
                   options={[
                     { value: 'brand',   label: 'Brand' },
                     { value: 'generic', label: 'Generic' },
+                    { value: 'class',   label: 'Class' },
                   ]}
-                  minOptionWidth={96}
+                  minOptionWidth={64}
                 />
               }
             />
-            <div style={{
-              height: 1,
-              backgroundColor: 'var(--color-border)',
-              margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
-            }} />
+            {/* No line under it while nothing else follows (Class search). */}
+            {!classSearching && (
+              <div style={{
+                height: 1,
+                backgroundColor: 'var(--color-border)',
+                margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
+              }} />
+            )}
           </>
         )}
 
@@ -263,7 +283,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             retyped later.
             drugs-filter-panel-restyle: same inline-action treatment as
             Search Mode above. */}
-        {hasSearchResults && (
+        {hasSearchResults && !classSearching && (
           <>
             <FilterSection
               label="Sort By"
@@ -296,6 +316,8 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             The rest of the chips still sit in the grid below, unchanged —
             there was never any collapse/expand behavior here, so nothing
             about the grid itself changed. */}
+        {!classSearching && (
+        <>
         <FilterSection
           label="Form / Route"
           action={
@@ -330,6 +352,8 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
           <ClearAllButton onClick={handleClear} disabled={!hasActiveFilter} />
         </div>
+        </>
+        )}
       </div>
     </SheetShell>
   )
