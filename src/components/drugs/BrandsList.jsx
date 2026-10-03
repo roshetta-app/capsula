@@ -3,12 +3,14 @@
  *
  * 2026-10-03 (Similar generic in the generic filter, Similar title): on
  * Alternatives, the 'Filter by generic' pop-up now also lists the generic of
- * the open drug (the one the Similar tab is about) as a greyed-out, dashed row
- * under a faint divider, with the note 'Shown in Similar'. It has no tick and
- * no number, cannot be tapped, and is not counted as a pick (pill text and
- * Clear filter ignore it). Shown only when a Similar tab exists. New prop
- * similarGenericName (see below). The Similar tab's 'Other <name> drugs' title
- * now also starts every ingredient with a capital letter.
+ * the open drug (the one the Similar tab is about) as the last row of the
+ * list. It looks like the other rows but faded with a dashed outline (same
+ * inactive look as a locked option), has no tick, and a small grey 'Similar'
+ * tag on the right where the number would be. It cannot be tapped and is not
+ * counted as a pick (pill text and Clear filter ignore it). Shown only when a
+ * Similar tab exists. New prop similarGenericName (see below). The Similar
+ * tab's 'Other <n> drugs' title now also starts every ingredient with a
+ * capital letter.
  *
  * 2026-10-03 (generic icon): the generic filter (its pill button and its
  * pop-up title) now uses the flask icon from the 'Active ingredient' row of
@@ -426,7 +428,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     ? ingredientCase(similarGenericName)
     : ''
   const similarRow = similarRowLabel && !genericOptions.some(o => o.label === similarRowLabel)
-    ? { label: similarRowLabel, note: 'Shown in Similar' }
+    ? { label: similarRowLabel }
     : undefined
   const genericControl = isAlternatives && nameById.size > 0 && {
     key: 'generic', icon: FlaskConical, flex: 3,
@@ -852,38 +854,22 @@ function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = fa
                 locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
               />
             ))}
+            {/* Inert row (generic pop-up only): a generic listed for reference
+                that cannot be picked. Same inactive look as a locked option,
+                no tick, and a 'Similar' tag where the number would be. */}
+            {inertRow && (
+              <ToggleChip
+                label={inertRow.label}
+                active={false}
+                onToggle={() => {}}
+                wrap={wrap}
+                showCheckbox={false}
+                tag="Similar"
+                locked
+              />
+            )}
           </div>
         </ScrollMenu>
-
-        {/* Inert row (generic pop-up only): a generic that is listed for
-            reference but cannot be picked. Same inactive look as a locked
-            option (dashed outline, faded name), no tick and no number, plus a
-            short note on where its brands are. Pinned under the list, so it
-            stays visible however long the list is. */}
-        {inertRow && (
-          <>
-            <div style={{
-              height: 1, flexShrink: 0,
-              backgroundColor: 'var(--color-border-subtle)',
-              margin: 'var(--space-3) 0',
-            }} />
-            <div style={{
-              flexShrink: 0, boxSizing: 'border-box',
-              padding: '8px 14px',
-              borderRadius: 'var(--radius-md)',
-              border: '1.5px dashed var(--color-border)',
-              fontSize: 13, fontWeight: 500,
-              color: 'var(--color-text-secondary)',
-            }}>
-              <div style={{ opacity: 0.45, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
-                {inertRow.label}
-              </div>
-              <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
-                {inertRow.note}
-              </div>
-            </div>
-          </>
-        )}
 
         {(onClear || lockAll) && (
           <div style={{
@@ -1003,9 +989,10 @@ function ClearFilterButton({ onClick, disabled }) {
   )
 }
 
-// Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus `wrap`
-// for long labels (several lines, softer corners) instead of one clipped line.
-function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, locked = false }) {
+// Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
+// for long labels (several lines, softer corners) instead of one clipped line,
+// and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
+function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -1054,7 +1041,11 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
         {label}
       </span>
-      {count !== undefined && (
+      {tag !== undefined ? (
+        <CountTag tone="neutral" style={{ marginLeft: 'auto' }}>
+          {tag}
+        </CountTag>
+      ) : count !== undefined && (
         <CountTag tone={active ? 'onAccent' : 'neutral'} style={{ marginLeft: 'auto' }}>
           {count}
         </CountTag>
