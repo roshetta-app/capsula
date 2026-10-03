@@ -247,6 +247,19 @@
  *    indent, no elbow.
  *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
  *    instead of 700) so it no longer competes with the card.
+ *
+ * 2026-10-03 (tree redesign): the old elbow looked fragmented — a short stub
+ * that started mid-row and didn't touch the Class row. Now:
+ *  - The card border, tint and clipping are gone; the rows sit directly on
+ *    the page.
+ *  - With both a class and a subclass: a small dot before the class name and
+ *    ONE continuous line from it, down and curving into the subclass name.
+ *    The line is drawn as two halves (one in each row) at the same spot, so
+ *    it stays joined even when a long name wraps to two lines.
+ *  - A row you can tap has a soft grey backing and a blue arrow; one you
+ *    can't is plain text, no backing, no arrow.
+ *  - Class only or subclass only: single bold row, flush left, no dot, no line.
+ *  - Subclass row is smaller and lighter; class row stays bold.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -256,14 +269,22 @@ import ClassBottomSheet from './ClassBottomSheet.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
-// One row of the Class/Subclass card. A button with a blue arrow when onClick
-// is given, otherwise a plain row. 'child' is the Subclass row when a Class row
-// sits above it: it is indented, a size smaller and lighter, with an elbow line
-// drawn from the Class row's text to its own, so the two read as parent and
-// child. Pressed feedback uses the same muted tint as the rest of the app's
-// tappable rows.
-function CardRow({ label, onClick, ariaLabel, child = false }) {
+// One row of the Class/Subclass tree. A button with a blue arrow and a soft
+// grey backing when onClick is given, otherwise plain text with no backing and
+// no arrow. 'hasChild' marks a Class row with a Subclass under it: it gets a
+// small dot and the top half of the connecting line. 'child' is the Subclass
+// row under a Class row: indented, smaller and lighter, with the bottom half of
+// the line, which curves into its text. Both halves sit at the same spot, so
+// they join into one unbroken line even when a long name wraps to two lines.
+// A row with no partner (class only, or subclass only) has no dot, no line and
+// no indent. Pressed feedback is a slightly deeper tint plus a tiny shrink.
+const LINE_X     = 7      // horizontal position of the vertical line
+const LINE_COLOR = 'var(--color-text-tertiary)'
+const ROW_GAP    = 2      // space between the two rows (the line bridges it)
+
+function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false }) {
   const [pressed, setPressed] = useState(false)
+  const inTree = child || hasChild
   const base = {
     position:       'relative',
     display:        'flex',
@@ -272,35 +293,67 @@ function CardRow({ label, onClick, ariaLabel, child = false }) {
     gap:            12,
     width:          '100%',
     boxSizing:      'border-box',
-    minHeight:      48,
-    padding:        child ? '12px 14px 12px 40px' : '12px 14px',
+    minHeight:      40,
+    padding:        child ? '10px 8px 10px 30px' : inTree ? '10px 8px 10px 20px' : '10px 8px 10px 12px',
     border:         'none',
+    borderRadius:   10,
     fontFamily:     'var(--font-body)',
     fontSize:       child ? 13 : 14,
     fontWeight:     child ? 500 : 700,
-    lineHeight:     1.4,
+    lineHeight:     '20px',
     textAlign:      'left',
-    color:          'var(--color-text-primary)',
+    color:          child ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+    backgroundColor: 'transparent',
   }
-  // The elbow: a line down from under the Class text, then across to the
-  // Subclass text. Its height ends at the middle of the first line of text.
+  // Class row (when a subclass sits under it): a dot at the middle of the
+  // first text line, and the line running from the dot down past the row's
+  // bottom edge to meet the Subclass row's half.
+  const dot = hasChild ? (
+    <>
+      <span
+        aria-hidden="true"
+        style={{
+          position:        'absolute',
+          left:            LINE_X - 3,
+          top:             20 - 3.5,
+          width:           7,
+          height:          7,
+          borderRadius:    '50%',
+          backgroundColor: LINE_COLOR,
+        }}
+      />
+      <span
+        aria-hidden="true"
+        style={{
+          position:   'absolute',
+          left:       LINE_X - 0.75,
+          top:        20 + 3.5,
+          bottom:     -ROW_GAP,
+          width:      0,
+          borderLeft: `1.5px solid ${LINE_COLOR}`,
+        }}
+      />
+    </>
+  ) : null
+  // Subclass row (under a Class row): the line comes down from the row's top
+  // edge to the middle of the first text line, then curves right to the text.
   const elbow = child ? (
     <span
       aria-hidden="true"
       style={{
         position:     'absolute',
-        left:         22,
+        left:         LINE_X - 0.75,
         top:          0,
-        width:        12,
-        height:       21,
+        width:        30 - 8 - LINE_X,
+        height:       20,
         boxSizing:    'border-box',
-        borderLeft:   '1.5px solid var(--color-text-tertiary)',
-        borderBottom: '1.5px solid var(--color-text-tertiary)',
-        borderBottomLeftRadius: 6,
+        borderLeft:   `1.5px solid ${LINE_COLOR}`,
+        borderBottom: `1.5px solid ${LINE_COLOR}`,
+        borderBottomLeftRadius: 9,
       }}
     />
   ) : null
-  if (!onClick) return <div style={base}>{elbow}<span>{label}</span></div>
+  if (!onClick) return <div style={base}>{dot}{elbow}<span>{label}</span></div>
   return (
     <button
       onClick={onClick}
@@ -313,11 +366,12 @@ function CardRow({ label, onClick, ariaLabel, child = false }) {
         ...base,
         cursor:          'pointer',
         WebkitTapHighlightColor: 'transparent',
-        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'transparent',
-        transition:      'background-color var(--motion-fast) var(--ease-settle)',
+        backgroundColor: pressed ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
+        transform:       pressed ? 'scale(0.99)' : 'scale(1)',
+        transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      {elbow}
+      {dot}{elbow}
       <span>{label}</span>
       <ChevronRight size={child ? 14 : 16} color="var(--color-accent)" style={{ flexShrink: 0 }} />
     </button>
@@ -531,10 +585,10 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         </div>
       )}
 
-      {/* -- Class/Subclass card (4.8) — wired to real data 2026-09-27; two
-            stacked rows in one bordered card (2026-10-02). 2026-10-03: the
-            card has its own tinted background so it stands out from the
-            page, and both rows share one look. Each row only renders when
+      {/* -- Class/Subclass tree (4.8) — wired to real data 2026-09-27; two
+            stacked rows (2026-10-02). 2026-10-03 (tree redesign): no card
+            border or tint any more — the rows sit straight on the page,
+            joined by one continuous line. Each row only renders when
             its own field has a value, and the whole card hides when neither
             does (same hide-when-empty convention as the Mechanism of Action
             block above). The class row opens the class sheet when the class
@@ -543,17 +597,17 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             cannot be opened is a plain row with no arrow. -- */}
       {(drugClass || subclass) && (
         <div style={{
-          border:          '1px solid var(--color-border)',
-          borderRadius:    12,
-          overflow:        'hidden',
-          backgroundColor: 'var(--color-accent-light)',
-          marginBottom:    'var(--space-3)',
+          display:       'flex',
+          flexDirection: 'column',
+          gap:           2,
+          marginBottom:  'var(--space-3)',
         }}>
           {drugClass && (
             <CardRow
               label={drugClass}
               onClick={hasClassList ? () => setClassOpen(true) : undefined}
               ariaLabel={`Show subclasses in ${drugClass}`}
+              hasChild={!!subclass}
             />
           )}
           {subclass && (
