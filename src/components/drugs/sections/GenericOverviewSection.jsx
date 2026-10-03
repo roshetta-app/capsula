@@ -248,6 +248,9 @@
  *  - The Mechanism of Action 'More' / 'Less' toggle is lighter (weight 500
  *    instead of 700) so it no longer competes with the card.
  *
+ * 2026-10-03 (tree spacing): class and subclass rows sit closer together
+ * (row padding 10 -> 8, no gap between rows); the line geometry follows.
+ *
  * 2026-10-03 (ingredient hierarchy): the ingredient chip is now the focus of
  * the card, and the two things next to it step back:
  *  - Chip size follows the ingredient count: 1 = large, 2 = medium, 3 or more
@@ -289,7 +292,8 @@ import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 // no indent. Pressed feedback is a slightly deeper tint plus a tiny shrink.
 const LINE_X     = 7      // horizontal position of the vertical line
 const LINE_COLOR = 'var(--color-text-tertiary)'
-const ROW_GAP    = 2      // space between the two rows (the line bridges it)
+const ROW_GAP    = 0      // space between the two rows (the line bridges it)
+const MID        = 18     // height of the middle of a row's first text line (8 padding + 10)
 
 function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false }) {
   const [pressed, setPressed] = useState(false)
@@ -302,8 +306,8 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
     gap:            12,
     width:          '100%',
     boxSizing:      'border-box',
-    minHeight:      40,
-    padding:        child ? '10px 4px 10px 30px' : inTree ? '10px 4px 10px 20px' : '10px 4px 10px 4px',
+    minHeight:      36,
+    padding:        child ? '8px 4px 8px 30px' : inTree ? '8px 4px 8px 20px' : '8px 4px 8px 4px',
     border:         'none',
     borderRadius:   10,
     fontFamily:     'var(--font-body)',
@@ -324,7 +328,7 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
         style={{
           position:        'absolute',
           left:            LINE_X - 3,
-          top:             20 - 3.5,
+          top:             MID - 3.5,
           width:           7,
           height:          7,
           borderRadius:    '50%',
@@ -336,7 +340,7 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
         style={{
           position:   'absolute',
           left:       LINE_X - 0.75,
-          top:        20 + 3.5,
+          top:        MID + 3.5,
           bottom:     -ROW_GAP,
           width:      0,
           borderLeft: `1.5px solid ${LINE_COLOR}`,
@@ -354,7 +358,7 @@ function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false })
         left:         LINE_X - 0.75,
         top:          0,
         width:        30 - 8 - LINE_X,
-        height:       20,
+        height:       MID,
         boxSizing:    'border-box',
         borderLeft:   `1.5px solid ${LINE_COLOR}`,
         borderBottom: `1.5px solid ${LINE_COLOR}`,
@@ -612,7 +616,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         <div style={{
           display:       'flex',
           flexDirection: 'column',
-          gap:           2,
+          gap:           ROW_GAP,
           marginTop:     'var(--space-2)',
           paddingTop:    'var(--space-2)',
           borderTop:     '0.5px solid var(--color-border)',
