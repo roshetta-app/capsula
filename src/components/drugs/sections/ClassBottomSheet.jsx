@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (card refinement): the blue circle with an arrow on the right is
+ * now a plain soft grey chevron, so the pill icon tile is the only blue thing
+ * on the card and the eye goes name first. Corners are a little rounder (16),
+ * padding is an even 14 all round, the name has a tighter line gap for the
+ * long multi-line names, the count badge has a bit more air above it and its
+ * numbers are the same width (so a column of counts lines up).
+ *
  * 2026-10-03 (drug families): the grey line under the class name now reads
  * '<n> drug families' ('1 drug family' for one) instead of 'drug groups'.
  *
@@ -111,9 +118,9 @@ function SubclassRow({ name, count, onClick }) {
         boxSizing:       'border-box',
         flexShrink:      0,
         minHeight:       56,
-        padding:         '14px 14px 14px 16px',
+        padding:         14,
         border:          'none',
-        borderRadius:    14,
+        borderRadius:    16,
         backgroundColor: 'var(--color-surface-muted)',
         opacity:         pressed ? 0.8 : 1,
         transform:       pressed ? 'scale(0.985)' : 'scale(1)',
@@ -145,14 +152,14 @@ function SubclassRow({ name, count, onClick }) {
           display:    'block',
           fontSize:   15,
           fontWeight: 500,
-          lineHeight: 1.35,
+          lineHeight: 1.3,
           color:      'var(--color-text-primary)',
         }}>
           {name}
         </span>
         <span style={{
           display:         'inline-block',
-          marginTop:       6,
+          marginTop:       8,
           padding:         '2px 8px',
           borderRadius:    999,
           backgroundColor: 'var(--color-surface)',
@@ -160,26 +167,19 @@ function SubclassRow({ name, count, onClick }) {
           fontSize:        11,
           fontWeight:      500,
           lineHeight:      1.5,
+          fontVariantNumeric: 'tabular-nums',
           color:           'var(--color-text-secondary)',
         }}>
           {count} {count === 1 ? 'drug' : 'drugs'}
         </span>
       </span>
-      <span
+      <ChevronRight
         aria-hidden="true"
-        style={{
-          width:           28,
-          height:          28,
-          borderRadius:    '50%',
-          backgroundColor: 'var(--color-accent-light)',
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          flexShrink:      0,
-        }}
-      >
-        <ChevronRight size={16} color="var(--color-accent)" />
-      </span>
+        size={18}
+        strokeWidth={2}
+        color="var(--color-text-tertiary)"
+        style={{ flexShrink: 0 }}
+      />
     </button>
   )
 }
