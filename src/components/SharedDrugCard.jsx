@@ -1,5 +1,10 @@
 /**
  * src/components/SharedDrugCard.jsx
+ *
+ * 2026-10-03 (image search stopped working): the image-search icon often did
+ * nothing until the app was closed and reopened. It now opens the page through
+ * openInAppBrowser (src/utils/openInAppBrowser.js), which notices when the
+ * phone ignores the request, resets the in-app browser and tries again.
  * drug_library_ui_ux — step 1d.1 (decision 4.11)
  *
  * Shell only. Temporary top-level filename/location — the old, boxed
@@ -156,7 +161,7 @@
 
 import { useState } from 'react'
 import { ScanSearch } from 'lucide-react'
-import { Browser } from '@capacitor/browser'
+import { openInAppBrowser } from '../utils/openInAppBrowser'
 import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
@@ -214,7 +219,7 @@ export default function SharedDrugCard({
     const query = [toTitleCase(drug.tradenameClean), titleSuffix, 'Egypt']
       .filter(Boolean)
       .join(' ')
-    Browser.open({ url: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}` })
+    openInAppBrowser(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`)
   }
 
   // Generic/ingredient line (4.13) — combo generics show first 2 ingredients

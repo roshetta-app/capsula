@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (image search stopped working): the subclass title search now
+ * opens through openInAppBrowser (src/utils/openInAppBrowser.js), same fix as
+ * the image-search icon in SharedDrugCard.jsx.
+ *
  * 2026-10-03 (class sheet title): new optional prop hideOther (default false).
  * With it on, the heading drops the word 'Other' and reads '<name> drugs'. The
  * class sheet (ClassBottomSheet.jsx) turns it on for the drugs of a subclass,
@@ -311,7 +315,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search } from 'lucide-react'
-import { Browser } from '@capacitor/browser'
+import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
@@ -435,7 +439,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   // is the button): same opening method as SharedDrugCard.jsx's image-search
   // icon, but a plain web search.
   function searchSubclass() {
-    Browser.open({ url: `https://www.google.com/search?q=${encodeURIComponent(headingName)}` })
+    openInAppBrowser(`https://www.google.com/search?q=${encodeURIComponent(headingName)}`)
   }
 
   // The two filter pills. Alternatives: both always (greyed out when there is
