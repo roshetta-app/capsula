@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (atom icon): the icon on the subclass cards is now an atom (a
+ * chemical makeup) instead of the chemistry flask. The flask stays where it
+ * is used for the generic filter in BrandsList.jsx.
+ *
  * 2026-10-03 (Other families): families that hold only one drug are folded
  * into one 'Other families' card at the bottom of the list (grid icon, count
  * = all the drugs inside), but only when there are at least two of them and
@@ -116,7 +120,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, FlaskConical, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Atom, LayoutGrid } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -168,7 +172,7 @@ function buildListGroups(groups) {
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
-function SubclassRow({ name, count, Icon = FlaskConical, onClick }) {
+function SubclassRow({ name, count, Icon = Atom, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -401,7 +405,7 @@ export default function ClassBottomSheet({
                   key={g.name}
                   name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
-                  Icon={g.isOthers ? LayoutGrid : FlaskConical}
+                  Icon={g.isOthers ? LayoutGrid : Atom}
                   onClick={() => setPicked(g.name)}
                 />
               ))}
