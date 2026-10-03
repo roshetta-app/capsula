@@ -100,6 +100,11 @@
  * next to each tab name is drawn as a small rounded-square tag (CountTag from
  * BrandsList.jsx, same look as the counts in the filter pop-ups).
  *
+ * 2026-10-03 (Similar generic in the generic filter): the Alternatives list
+ * is now told the generic name of the Similar tab (similarGenericName), taken
+ * from the first similar brand, so its 'Filter by generic' pop-up can list
+ * that generic as a greyed-out row. Only passed when a Similar tab exists.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -272,6 +277,7 @@ export default function BrandsBottomSheet({
                   saved={savedFilters.current[name]}
                   onSave={picks => { savedFilters.current[name] = picks }}
                   familyName={alternatives[0]?.subclass}
+                  similarGenericName={name === 'alternatives' && siblings.length > 0 ? siblings[0].genericName : undefined}
                   popupLayer={popupLayer}
                 />
               </div>

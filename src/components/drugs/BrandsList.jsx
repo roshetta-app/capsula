@@ -1,6 +1,19 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (Similar generic in the generic filter, Similar title): on
+ * Alternatives, the 'Filter by generic' pop-up now also lists the generic of
+ * the open drug (the one the Similar tab is about) as a greyed-out, dashed row
+ * under a faint divider, with the note 'Shown in Similar'. It has no tick and
+ * no number, cannot be tapped, and is not counted as a pick (pill text and
+ * Clear filter ignore it). Shown only when a Similar tab exists. New prop
+ * similarGenericName (see below). The Similar tab's 'Other <name> drugs' title
+ * now also starts every ingredient with a capital letter.
+ *
+ * 2026-10-03 (generic icon): the generic filter (its pill button and its
+ * pop-up title) now uses the flask icon from the 'Active ingredient' row of
+ * GenericOverviewSection.jsx, instead of the pill icon.
+ *
  * 2026-10-03 (pop-up icons, ingredient capitals): the 'Filter by generic'
  * pop-up now shows the pill icon in its title and the 'Form / Route' pop-up
  * shows the filter icon, the same icons as their two pill buttons. In the
@@ -114,6 +127,9 @@
  *   currentDrug — the flat drug object of the page that is open (Similar mode
  *              only, ignored on Alternatives). Drawn as a tinted card inside
  *              the list. Optional; with none, the list is exactly the siblings.
+ *   similarGenericName — Alternatives only: name of the generic the Similar
+ *              tab is about. Listed in the generic pop-up as a greyed-out row.
+ *              Leave empty when there is no Similar tab.
  *   onTap    — (item) => void — no longer called (see 2026-09-19 note
  *              below); kept in the prop list so this file's own public API
  *              doesn't change for whatever screen still passes it in.
@@ -269,7 +285,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ListFilter, ArrowUpDown, Pill, Search } from 'lucide-react'
+import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search } from 'lucide-react'
 import { Browser } from '@capacitor/browser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
@@ -287,12 +303,6 @@ import { useFavouritesContext } from '../../context/FavouritesContext'
 function resolveFormGroup(rawForm) {
   if (!rawForm) return null
   return FORM_OPTIONS.find(opt => opt.value !== 'all' && opt.matches.includes(rawForm)) || null
-}
-
-// 'brompheniramine + paracetamol' -> 'Brompheniramine + paracetamol'
-function sentenceCase(text) {
-  const t = (text ?? '').trim().toLowerCase()
-  return t ? t.charAt(0).toUpperCase() + t.slice(1) : ''
 }
 
 // 'brompheniramine + paracetamol' -> 'Brompheniramine + Paracetamol'
@@ -316,7 +326,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -386,7 +396,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   }
 
   // Name shown in the heading above the filters.
-  const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
+  const headingName = isAlternatives ? familyName : ingredientCase(siblings[0]?.genericName)
   const headingStyle = {
     fontSize:   15,
     lineHeight: 1.4,
@@ -409,18 +419,28 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   // pop-up (so the full name can be read), where that generic is shown ticked
   // and greyed out (lockAll) with only a Done button.
   const onlyGeneric = nameById.size === 1
+  // Alternatives only: the generic the Similar tab is about, shown in the
+  // generic pop-up as an inert row. Skipped when it is already one of the
+  // options (same name) so it can never appear twice.
+  const similarRowLabel = isAlternatives && similarGenericName
+    ? ingredientCase(similarGenericName)
+    : ''
+  const similarRow = similarRowLabel && !genericOptions.some(o => o.label === similarRowLabel)
+    ? { label: similarRowLabel, note: 'Shown in Similar' }
+    : undefined
   const genericControl = isAlternatives && nameById.size > 0 && {
-    key: 'generic', icon: Pill, flex: 3,
+    key: 'generic', icon: FlaskConical, flex: 3,
     pillLabel: onlyGeneric
       ? ingredientCase([...nameById.values()][0])
       : genericLabel(genericSel),
     active: genericSel.length > 0,
-    menu: { title: 'Filter by generic', titleIcon: Pill,
+    menu: { title: 'Filter by generic', titleIcon: FlaskConical,
             subtitle: onlyGeneric ? undefined : 'You can pick multiple generics',
             columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions,
             selected: onlyGeneric ? [...nameById.keys()] : genericSel,
             lockAll: onlyGeneric,
+            inertRow: similarRow,
             onPick: v => toggleIn(genericSel, setGenericSel, v),
             onClear: onlyGeneric ? undefined : () => setGenericSel([]) },
   }
@@ -740,7 +760,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -834,6 +854,36 @@ function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = fa
             ))}
           </div>
         </ScrollMenu>
+
+        {/* Inert row (generic pop-up only): a generic that is listed for
+            reference but cannot be picked. Same inactive look as a locked
+            option (dashed outline, faded name), no tick and no number, plus a
+            short note on where its brands are. Pinned under the list, so it
+            stays visible however long the list is. */}
+        {inertRow && (
+          <>
+            <div style={{
+              height: 1, flexShrink: 0,
+              backgroundColor: 'var(--color-border-subtle)',
+              margin: 'var(--space-3) 0',
+            }} />
+            <div style={{
+              flexShrink: 0, boxSizing: 'border-box',
+              padding: '8px 14px',
+              borderRadius: 'var(--radius-md)',
+              border: '1.5px dashed var(--color-border)',
+              fontSize: 13, fontWeight: 500,
+              color: 'var(--color-text-secondary)',
+            }}>
+              <div style={{ opacity: 0.45, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+                {inertRow.label}
+              </div>
+              <div style={{ marginTop: 2, fontSize: 11, fontWeight: 400, color: 'var(--color-text-tertiary)' }}>
+                {inertRow.note}
+              </div>
+            </div>
+          </>
+        )}
 
         {(onClear || lockAll) && (
           <div style={{
