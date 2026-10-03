@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (icon, smaller text, icon on the name): the card icon is now a
+ * stacked-layers icon (a family of drugs) instead of a pill. Name text is 14
+ * (was 15) and the count badge 10.5 (was 11). The icon tile (32) sits in a row
+ * with the name only, centred on the name however many lines it has, and the
+ * count badge sits below, lined up under the name text.
+ *
  * 2026-10-03 (card refinement): the blue circle with an arrow on the right is
  * now a plain soft grey chevron, so the pill icon tile is the only blue thing
  * on the card and the eye goes name first. Corners are a little rounder (16),
@@ -73,7 +79,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Pill } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import BrandsList from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -101,6 +107,11 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
+// Size of the icon tile and the gap after it. The count badge is indented by
+// the same amount so it lines up under the name.
+const ICON_TILE = 32
+const ICON_GAP  = 10
+
 function SubclassRow({ name, count, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
@@ -113,12 +124,12 @@ function SubclassRow({ name, count, onClick }) {
       style={{
         display:         'flex',
         alignItems:      'center',
-        gap:             12,
+        gap:             10,
         width:           '100%',
         boxSizing:       'border-box',
         flexShrink:      0,
-        minHeight:       56,
-        padding:         14,
+        minHeight:       52,
+        padding:         '12px 14px',
         border:          'none',
         borderRadius:    16,
         backgroundColor: 'var(--color-surface-muted)',
@@ -132,50 +143,57 @@ function SubclassRow({ name, count, onClick }) {
         outline:         'none',
       }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width:           36,
-          height:          36,
-          borderRadius:    10,
-          backgroundColor: 'var(--color-accent-light)',
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          flexShrink:      0,
-        }}
-      >
-        <Pill size={18} color="var(--color-accent)" />
-      </span>
       <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          display:    'block',
-          fontSize:   15,
-          fontWeight: 500,
-          lineHeight: 1.3,
-          color:      'var(--color-text-primary)',
-        }}>
-          {name}
+        {/* Icon and name share one row, so the icon is centred on the name
+            (all its lines) and not on the count badge underneath. */}
+        <span style={{ display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
+          <span
+            aria-hidden="true"
+            style={{
+              width:           ICON_TILE,
+              height:          ICON_TILE,
+              borderRadius:    9,
+              backgroundColor: 'var(--color-accent-light)',
+              display:         'flex',
+              alignItems:      'center',
+              justifyContent:  'center',
+              flexShrink:      0,
+            }}
+          >
+            <Layers size={16} color="var(--color-accent)" />
+          </span>
+          <span style={{
+            flex:       1,
+            minWidth:   0,
+            fontSize:   14,
+            fontWeight: 500,
+            lineHeight: 1.3,
+            color:      'var(--color-text-primary)',
+          }}>
+            {name}
+          </span>
         </span>
+        {/* Count badge: lines up under the name text, not under the icon. */}
         <span style={{
-          display:         'inline-block',
-          marginTop:       8,
-          padding:         '2px 8px',
-          borderRadius:    999,
-          backgroundColor: 'var(--color-surface)',
-          border:          '0.5px solid var(--color-border)',
-          fontSize:        11,
-          fontWeight:      500,
-          lineHeight:      1.5,
+          display:            'inline-block',
+          marginTop:          6,
+          marginLeft:         ICON_TILE + ICON_GAP,
+          padding:            '2px 8px',
+          borderRadius:       999,
+          backgroundColor:    'var(--color-surface)',
+          border:             '0.5px solid var(--color-border)',
+          fontSize:           10.5,
+          fontWeight:         500,
+          lineHeight:         1.5,
           fontVariantNumeric: 'tabular-nums',
-          color:           'var(--color-text-secondary)',
+          color:              'var(--color-text-secondary)',
         }}>
           {count} {count === 1 ? 'drug' : 'drugs'}
         </span>
       </span>
       <ChevronRight
         aria-hidden="true"
-        size={18}
+        size={16}
         strokeWidth={2}
         color="var(--color-text-tertiary)"
         style={{ flexShrink: 0 }}
