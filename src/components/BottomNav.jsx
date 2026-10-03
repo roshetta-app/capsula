@@ -125,6 +125,12 @@
  *             window, no toast. Back from any other tab still lands you on
  *             Conditions first, unchanged.
  *
+ * 2026-10-04 (class sheet Back): on the website, Back events that an open
+ * sheet's layer takes (and the move forward that restores the sheet's step)
+ * no longer make this bar add a history step. Fixes the second Back
+ * reloading the page after going back inside the class sheet on the Drugs
+ * screen. Everything else about Back is unchanged.
+ *
  * Changes from previous version:
  *  - Tab 1: Conditions — BookOpen (Lucide), unified with FavouritesScreen's
  *           own Conditions tab icon
@@ -152,7 +158,7 @@ import { App as CapacitorApp }          from '@capacitor/app'
 import { useKeyboardOpen }              from '../hooks/useKeyboardOpen'
 import { useBackToTop }                 from '../hooks/useBackToTop'
 import { useAuth }                      from '../hooks/useAuth'
-import { isAnyBackCloseOpen }           from '../hooks/useBackClose'
+import { isAnyBackCloseOpen, isSheetLayerPress } from '../hooks/useBackClose'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -277,7 +283,13 @@ export default function BottomNav() {
     // Browser back-gesture/button guard (website/PWA only).
     window.history.pushState({ capsulaBottomNavGuard: true }, '')
 
-    function handlePopState() {
+    function handlePopState(event) {
+      // A layer inside an open sheet (a second page of the sheet, a filter
+      // pop-up) is taking this Back press, or this is the move forward that
+      // puts the sheet's own step back. Add no history step here: it would
+      // wipe out the step the sheet is going forward onto and the next Back
+      // would leave the page (2026-10-04, class sheet on the Drugs screen).
+      if (isSheetLayerPress(event)) return
       const stayGuarded = goBack()
       if (stayGuarded) {
         window.history.pushState({ capsulaBottomNavGuard: true }, '')

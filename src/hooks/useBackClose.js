@@ -1,6 +1,16 @@
 /**
  * useBackClose — shared popup/sheet back-close mechanism.
  *
+ * 2026-10-04 (bottom bar and layers): isSheetLayerPress(event) is new. The
+ * bottom bar (BottomNav.jsx) also listens for Back on the website and, while
+ * any sheet was open, added its own history step on EVERY Back event. When a
+ * layer took a press (for example Back from a family's drugs to the family
+ * list in the class sheet on the Drugs screen), that extra step wiped out the
+ * step the sheet was about to go forward onto, so the sheet had to add a new
+ * one from a timer (a step browsers skip), and the next Back left the page
+ * and reloaded it. The bottom bar now asks this function and does nothing for
+ * those events. No change for any other Back press.
+ *
  * Generalizes the dual native+web back-gesture pattern already proven in
  * Lightbox.jsx, so any popup or sheet can register itself as "the thing
  * currently open" and close on back instead of letting the route change
@@ -126,6 +136,16 @@ function runBackLayer() {
   setTimeout(() => { layerPressHandled = false }, 0)
   top.onBackRef.current()
   return 'handled'
+}
+
+// For another always-on Back listener (the bottom bar) that must leave history
+// alone while a layer inside an open sheet is taking a Back press, and for the
+// move forward that puts the sheet's placeholder step back afterwards. True
+// when this popstate event is one of those two. 'event' is the popstate event
+// being handled.
+export function isSheetLayerPress(event) {
+  if (!isAnyBackCloseOpen()) return false
+  return backLayers.length > 0 || rearmPending || (!!event && event === rearmEvent)
 }
 
 export function useBackLayer(isOpen, onBack) {
