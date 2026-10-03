@@ -1,6 +1,15 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (design refinement): the heading now has a small 'Drug class'
+ * label above the class name, and the grey line under it also gives the total
+ * number of drugs ('4 drug families, 38 drugs'). On the drugs page the Back
+ * button now sits in a fixed top bar with the subclass name beside it and a
+ * thin line under it, the same as the heading on the list, so the two pages
+ * feel like one sheet. Cards got a slightly taller tap area and a little more
+ * air above the count badge. Order, tapping and the drugs page contents are
+ * unchanged.
+ *
  * 2026-10-03 (icon, smaller text, icon on the name): the card icon is now a
  * stacked-layers icon (a family of drugs) instead of a pill. Name text is 14
  * (was 15) and the count badge 10.5 (was 11). The icon tile (32) sits in a row
@@ -128,8 +137,8 @@ function SubclassRow({ name, count, onClick }) {
         width:           '100%',
         boxSizing:       'border-box',
         flexShrink:      0,
-        minHeight:       52,
-        padding:         '12px 14px',
+        minHeight:       56,
+        padding:         '14px 14px',
         border:          'none',
         borderRadius:    16,
         backgroundColor: 'var(--color-surface-muted)',
@@ -176,7 +185,7 @@ function SubclassRow({ name, count, onClick }) {
         {/* Count badge: lines up under the name text, not under the icon. */}
         <span style={{
           display:            'inline-block',
-          marginTop:          6,
+          marginTop:          7,
           marginLeft:         ICON_TILE + ICON_GAP,
           padding:            '2px 8px',
           borderRadius:       999,
@@ -230,6 +239,7 @@ export default function ClassBottomSheet({
 
   const groups = useMemo(() => groupBySubclass(classDrugs), [classDrugs])
   const pickedGroup = picked ? groups.find(g => g.name === picked) : null
+  const totalDrugs = groups.reduce((sum, g) => sum + g.items.length, 0)
 
   function handleTap(item) {
     onClose()
@@ -251,7 +261,14 @@ export default function ClassBottomSheet({
       }}>
         {pickedGroup ? (
           <>
-            <div style={{ padding: '0 var(--space-4)' }}>
+            <div style={{
+              flexShrink:   0,
+              display:      'flex',
+              alignItems:   'center',
+              gap:          'var(--space-3)',
+              padding:      '0 var(--space-4)',
+              borderBottom: '0.5px solid var(--color-border)',
+            }}>
               <button
                 onClick={() => setPicked(null)}
                 aria-label="Back"
@@ -259,7 +276,8 @@ export default function ClassBottomSheet({
                   display:    'flex',
                   alignItems: 'center',
                   gap:        2,
-                  height:     44,
+                  flexShrink: 0,
+                  height:     48,
                   padding:    0,
                   border:     'none',
                   background: 'none',
@@ -275,12 +293,24 @@ export default function ClassBottomSheet({
                 <ChevronLeft size={18} />
                 Back
               </button>
+              <span style={{
+                flex:         1,
+                minWidth:     0,
+                textAlign:    'right',
+                fontSize:     12.5,
+                color:        'var(--color-text-secondary)',
+                overflow:     'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace:   'nowrap',
+              }}>
+                {titleCaseWords(pickedGroup.name)}
+              </span>
             </div>
             <div style={{
               flex:      1,
               minHeight: 0,
               overflowY: 'auto',
-              padding:   'var(--space-2) var(--space-4) var(--space-6)',
+              padding:   'var(--space-4) var(--space-4) var(--space-6)',
             }}>
               <BrandsList
                 key={pickedGroup.name}
@@ -304,7 +334,17 @@ export default function ClassBottomSheet({
               borderBottom: '0.5px solid var(--color-border)',
             }}>
               <p style={{
-                margin:     0,
+                margin:        0,
+                fontSize:      11,
+                fontWeight:    600,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color:         'var(--color-accent)',
+              }}>
+                Drug class
+              </p>
+              <p style={{
+                margin:     '2px 0 0',
                 fontSize:   20,
                 fontWeight: 500,
                 lineHeight: 1.3,
@@ -313,11 +353,14 @@ export default function ClassBottomSheet({
                 {classLabel}
               </p>
               <p style={{
-                margin:   '2px 0 0',
-                fontSize: 13,
-                color:    'var(--color-text-secondary)',
+                margin:             '4px 0 0',
+                fontSize:           13,
+                fontVariantNumeric: 'tabular-nums',
+                color:              'var(--color-text-secondary)',
               }}>
                 {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
+                {', '}
+                {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
             </div>
             <div style={{
