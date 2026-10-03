@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (molecule icon): the icon on the subclass cards is now a real
+ * molecule icon (Material Design Icons 'molecule', copied as published, see
+ * MoleculeIcon below) instead of the atom.
+ *
  * 2026-10-03 (atom icon): the icon on the subclass cards is now an atom (a
  * chemical makeup) instead of the chemistry flask. The flask stays where it
  * is used for the generic filter in BrandsList.jsx.
@@ -120,7 +124,7 @@
  */
 
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Atom, LayoutGrid } from 'lucide-react'
+import { ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
@@ -148,6 +152,31 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
+// The 'molecule' icon from Material Design Icons (Apache 2.0), path copied
+// as published in @mdi/js (mdiMolecule), not redrawn. The icon set the app
+// already uses (lucide) has no molecule icon. Takes the same props the row
+// passes to its icon (size, color); strokeWidth is ignored because this one
+// is a filled shape.
+const MOLECULE_PATH = 'M7.27,10L9,7H14.42L15.58,5L15.5,4.5A1.5,1.5 0 0,1 17,3A1.5,1.5 0 0,1 18.5,4.5C18.5,5.21 18,5.81 17.33,5.96L16.37,7.63L17.73,10L18.59,8.5L18.5,8A1.5,1.5 0 0,1 20,6.5A1.5,1.5 0 0,1 21.5,8C21.5,8.71 21,9.3 20.35,9.46L18.89,12L20.62,15C21.39,15.07 22,15.71 22,16.5A1.5,1.5 0 0,1 20.5,18A1.5,1.5 0 0,1 19,16.5V16.24L17.73,14L16.37,16.37L17.33,18.04C18,18.19 18.5,18.79 18.5,19.5A1.5,1.5 0 0,1 17,21A1.5,1.5 0 0,1 15.5,19.5L15.58,19L14.42,17H10.58L9.42,19L9.5,19.5A1.5,1.5 0 0,1 8,21A1.5,1.5 0 0,1 6.5,19.5C6.5,18.79 7,18.19 7.67,18.04L8.63,16.37L4.38,9C3.61,8.93 3,8.29 3,7.5A1.5,1.5 0 0,1 4.5,6A1.5,1.5 0 0,1 6,7.5C6,7.59 6,7.68 6,7.76L7.27,10M10.15,9L8.42,12L10.15,15H14.85L16.58,12L14.85,9H10.15Z'
+
+function MoleculeIcon({ size = 24, color = 'currentColor' }) {
+  // This icon sits a little smaller in its box than the lucide ones, so it
+  // is drawn 2px larger to look the same size next to them.
+  const px = size + 2
+  return (
+    <svg
+      width={px}
+      height={px}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      focusable="false"
+      style={{ fill: color, flexShrink: 0 }}
+    >
+      <path d={MOLECULE_PATH} />
+    </svg>
+  )
+}
+
 // Key and label of the 'Other families' card that collects the families with
 // only one drug each.
 const OTHERS_KEY   = '__other_families__'
@@ -172,7 +201,7 @@ function buildListGroups(groups) {
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
-function SubclassRow({ name, count, Icon = Atom, onClick }) {
+function SubclassRow({ name, count, Icon = MoleculeIcon, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -405,7 +434,7 @@ export default function ClassBottomSheet({
                   key={g.name}
                   name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
-                  Icon={g.isOthers ? LayoutGrid : Atom}
+                  Icon={g.isOthers ? LayoutGrid : MoleculeIcon}
                   onClick={() => setPicked(g.name)}
                 />
               ))}
