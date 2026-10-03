@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-03 (refined look): the subclass list has a real heading (the class
+ * name, larger) with a small grey line under it, '<n> drug groups' ('1 drug
+ * group' for one). The old sentence title is gone. Option rows lost their box
+ * and border: they sit flat on the sheet with a thin line between them, a
+ * slightly larger name, the count tag and a grey arrow, and a soft tint when
+ * pressed. Order is unchanged (biggest group first).
+ *
  * 2026-10-03 (class sheet): the bottom sheet opened by tapping the Class row
  * in the Generic Overview card (GenericOverviewSection.jsx).
  *
@@ -64,14 +71,7 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-const headingStyle = {
-  fontSize:   15,
-  lineHeight: 1.4,
-  color:      'var(--color-text-secondary)',
-  margin:     '0 0 var(--space-3)',
-}
-
-function SubclassRow({ name, count, onClick }) {
+function SubclassRow({ name, count, onClick, isLast }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -86,16 +86,16 @@ function SubclassRow({ name, count, onClick }) {
         gap:             12,
         width:           '100%',
         boxSizing:       'border-box',
-        minHeight:       52,
-        padding:         '12px 14px',
-        border:          '1px solid var(--color-border)',
-        borderRadius:    12,
-        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
-        transform:       pressed ? 'scale(0.99)' : 'scale(1)',
-        transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+        minHeight:       48,
+        padding:         '10px 4px',
+        border:          'none',
+        borderBottom:    isLast ? 'none' : '0.5px solid var(--color-border)',
+        borderRadius:    pressed ? 10 : 0,
+        backgroundColor: pressed ? 'var(--color-accent-light)' : 'transparent',
+        transition:      'background-color var(--motion-fast) var(--ease-settle)',
         fontFamily:      'var(--font-body)',
-        fontSize:        14,
-        fontWeight:      600,
+        fontSize:        15,
+        fontWeight:      500,
         lineHeight:      1.4,
         textAlign:       'left',
         color:           'var(--color-text-primary)',
@@ -106,7 +106,7 @@ function SubclassRow({ name, count, onClick }) {
     >
       <span style={{ flex: 1, minWidth: 0 }}>{name}</span>
       <CountTag tone="neutral">{count}</CountTag>
-      <ChevronRight size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+      <ChevronRight size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -205,18 +205,30 @@ export default function ClassBottomSheet({
             overflowY: 'auto',
             padding:   'var(--space-2) var(--space-4) var(--space-6)',
           }}>
-            <p style={headingStyle}>
-              Subclass{' '}
-              <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{classLabel}</strong>
-              {' '}drug groups
+            <p style={{
+              margin:     0,
+              fontSize:   20,
+              fontWeight: 500,
+              lineHeight: 1.3,
+              color:      'var(--color-text-primary)',
+            }}>
+              {classLabel}
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {groups.map(g => (
+            <p style={{
+              margin:   '2px 0 var(--space-3)',
+              fontSize: 13,
+              color:    'var(--color-text-secondary)',
+            }}>
+              {groups.length} drug {groups.length === 1 ? 'group' : 'groups'}
+            </p>
+            <div style={{ borderTop: '0.5px solid var(--color-border)' }}>
+              {groups.map((g, i) => (
                 <SubclassRow
                   key={g.name}
                   name={titleCaseWords(g.name)}
                   count={g.items.length}
                   onClick={() => setPicked(g.name)}
+                  isLast={i === groups.length - 1}
                 />
               ))}
             </div>
