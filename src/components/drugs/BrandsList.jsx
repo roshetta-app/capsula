@@ -1,6 +1,16 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-03 (brand list polish): (1) On Alternatives the whole 'Other <subclass>
+ * drugs' title is now one tappable button that opens the Google search, not
+ * just the icon; the icon is smaller, sits right after the subclass name and is
+ * lined up with the top of the title text. (2) Brand counts are drawn as small
+ * rounded-square tags (CountTag, also used by the sheet's tab bar): in the
+ * generic and form pop-ups and on the Similar / Alternatives tabs. (3) The
+ * 'Filter by generic' pop-up has the subtitle 'You can pick multiple
+ * generics'. (4) The 'Sort By' pop-up shows the sort icon in its title and
+ * lists its two options in two rows.
+ *
  * 2026-10-03 (subclass Google search): the Alternatives title now has a blue
  * search icon right after the subclass name. Tapping it opens a Google search
  * for that subclass, the same way SharedDrugCard.jsx's image-search icon opens
@@ -327,9 +337,17 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
 
   // Name shown in the heading above the filters.
   const headingName = isAlternatives ? familyName : sentenceCase(siblings[0]?.genericName)
+  const headingStyle = {
+    fontSize:   16,
+    lineHeight: 1.4,
+    color:      'var(--color-text-secondary)',
+    margin:     '0 0 var(--space-3)',
+  }
+  const nameNode = <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong>
 
-  // Search icon after the subclass name (Alternatives only): same opening
-  // method as SharedDrugCard.jsx's image-search icon, but a plain web search.
+  // Opens the Google search for the subclass (Alternatives title, whole title
+  // is the button): same opening method as SharedDrugCard.jsx's image-search
+  // icon, but a plain web search.
   function searchSubclass() {
     Browser.open({ url: `https://www.google.com/search?q=${encodeURIComponent(headingName)}` })
   }
@@ -344,7 +362,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
       : genericLabel(genericSel),
     active: genericSel.length > 0,
     disabled: nameById.size <= 1,
-    menu: { title: 'Filter by generic', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
+    menu: { title: 'Filter by generic', subtitle: 'You can pick multiple generics', columns: 1, wrap: true, listMaxHeight: 'min(240px, 32svh)',
             options: genericOptions, selected: genericSel,
             onPick: v => toggleIn(genericSel, setGenericSel, v),
             onClear: () => setGenericSel([]) },
@@ -364,7 +382,7 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   // Sort is not a filter: it lives on the count line, never in the pill row.
   const sortMenu = {
     key: 'sort',
-    menu: { title: 'Sort By', columns: 2, single: true, options: sortOptions, selected: [sortMode],
+    menu: { title: 'Sort By', titleIcon: ArrowUpDown, columns: 1, single: true, options: sortOptions, selected: [sortMode],
             onPick: v => { setSortMode(v); setOpenMenu(null) } },
   }
   const pills = [genericControl, formControl].filter(Boolean)
@@ -373,32 +391,44 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
       {/* Heading for both tabs: 'Other <name> drugs'. Similar uses the viewed
-          drug's generic name, Alternatives uses the subclass name. Name in bold. */}
-      {headingName && (
-        <p style={{
-          fontSize:   16,
-          lineHeight: 1.4,
-          color:      'var(--color-text-secondary)',
-          margin:     '0 0 var(--space-3)',
-        }}>
-          Other <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong> drugs
-          {isAlternatives && (
-            <button
-              onClick={searchSubclass}
-              aria-label={`Search Google for ${headingName}`}
-              style={{
-                background: 'none', border: 'none', padding: 2, marginLeft: 6,
-                cursor: 'pointer', flexShrink: 0,
-                color: 'var(--color-accent)',
-                display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle',
-                lineHeight: 1,
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              <Search size={16} strokeWidth={1.8} color="currentColor" />
-            </button>
-          )}
-        </p>
+          drug's generic name, Alternatives uses the subclass name. Name in bold.
+          On Alternatives the whole title is a button that opens the Google
+          search; its small icon follows the subclass name. */}
+      {headingName && (isAlternatives
+        ? (
+          <button
+            onClick={searchSubclass}
+            aria-label={`Search Google for ${headingName}`}
+            style={{
+              ...headingStyle,
+              display:    'block',
+              maxWidth:   '100%',
+              padding:    0,
+              border:     'none',
+              background: 'none',
+              textAlign:  'left',
+              fontFamily: 'var(--font-body)',
+              cursor:     'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              outline:    'none',
+            }}
+          >
+            Other {nameNode}
+            <Search
+              size={11}
+              strokeWidth={2.2}
+              color="var(--color-accent)"
+              aria-hidden="true"
+              style={{ marginLeft: 3, verticalAlign: 'top' }}
+            />
+            {' '}drugs
+          </button>
+        )
+        : (
+          <p style={headingStyle}>
+            Other {nameNode} drugs
+          </p>
+        )
       )}
 
       {/* Filter pills — the only buttons in this row. Tapping one opens its
@@ -506,6 +536,42 @@ export default function BrandsList({ siblings = [], onTap, mode = 'similar', fam
   )
 }
 
+// Small rounded-square tag holding a number. One look for every brand count:
+// the generic / form pop-up options and the two tab labels in the sheet.
+// tone: 'neutral' (muted fill), 'accent' (tinted accent, for the active tab),
+// 'onAccent' (translucent white, for a chip that is filled with the accent).
+export function CountTag({ children, tone = 'neutral', style }) {
+  const tones = {
+    neutral:  { bg: 'var(--color-border)',       fg: 'var(--color-text-secondary)' },
+    accent:   { bg: 'var(--color-accent-light)', fg: 'var(--color-accent)' },
+    onAccent: { bg: 'rgba(255,255,255,0.22)',    fg: '#fff' },
+  }
+  const c = tones[tone] ?? tones.neutral
+  return (
+    <span style={{
+      display:             'inline-flex',
+      alignItems:          'center',
+      justifyContent:      'center',
+      boxSizing:           'border-box',
+      minWidth:            22,
+      height:              20,
+      padding:             '0 6px',
+      flexShrink:          0,
+      borderRadius:        7,
+      fontSize:            12,
+      fontWeight:          600,
+      lineHeight:          1,
+      fontVariantNumeric:  'tabular-nums',
+      backgroundColor:     c.bg,
+      color:               c.fg,
+      transition:          'background-color 0.15s ease, color 0.15s ease',
+      ...style,
+    }}>
+      {children}
+    </span>
+  )
+}
+
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 // Sort control: plain text with a small icon and chevron, no outline or fill,
@@ -598,7 +664,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, columns, wrap = false, single = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+function FilterModal({ title, titleIcon: TitleIcon, subtitle, columns, wrap = false, single = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', options, selected, allLabel, onAll, onPick, onClear, onClose }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
 
@@ -651,8 +717,21 @@ function FilterModal({ title, columns, wrap = false, single = false, showCounts 
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           gap: 'var(--space-2)', marginBottom: 'var(--space-3)', flexShrink: 0,
         }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-            {title}
+          <div style={{ minWidth: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)',
+            }}>
+              {TitleIcon && (
+                <TitleIcon size={16} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
+              )}
+              <span>{title}</span>
+            </div>
+            {subtitle && (
+              <div style={{ marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                {subtitle}
+              </div>
+            )}
           </div>
           {onAll && (
             <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />
@@ -850,12 +929,9 @@ function ToggleChip({ label, active, onToggle, showCheckbox = true, fitContent =
         {label}
       </span>
       {count !== undefined && (
-        <span style={{
-          marginLeft: 'auto', paddingLeft: 8, flexShrink: 0,
-          fontSize: 12, fontVariantNumeric: 'tabular-nums',
-        }}>
+        <CountTag tone={active ? 'onAccent' : 'neutral'} style={{ marginLeft: 'auto' }}>
           {count}
-        </span>
+        </CountTag>
       )}
     </button>
   )

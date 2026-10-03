@@ -91,6 +91,11 @@
  * sideways swipe cannot start while one is open. With no Alternatives there is
  * no swipe area: one plain list, exactly as before.
  *
+ * 2026-10-03 (tab tap and count tags): tapping a tab now switches to its list
+ * at once, with no slide (swiping between the lists still slides). The number
+ * next to each tab name is drawn as a small rounded-square tag (CountTag from
+ * BrandsList.jsx, same look as the counts in the filter pop-ups).
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -102,7 +107,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import BrandsList from '../BrandsList.jsx'
+import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 
 function TabButton({ label, count, active, onClick }) {
@@ -128,7 +133,7 @@ function TabButton({ label, count, active, onClick }) {
         }}
       >
         <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: fg }}>{label}</span>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-secondary)' }}>{count}</span>
+        <CountTag tone={active ? 'accent' : 'neutral'}>{count}</CountTag>
       </button>
       <span style={{
         display:         'block',
@@ -188,10 +193,11 @@ export default function BrandsBottomSheet({
     return () => emblaApi.off('select', onSelect)
   }, [emblaApi, canSwipe])
 
-  // Tapping a tab: highlight it right away and slide to its list.
+  // Tapping a tab: highlight it right away and jump straight to its list (no
+  // slide; the second argument tells Embla to jump). Swiping still slides.
   function goToTab(name) {
     setTab(name)
-    if (canSwipe) emblaApi?.scrollTo(name === 'similar' ? 0 : 1)
+    if (canSwipe) emblaApi?.scrollTo(name === 'similar' ? 0 : 1, true)
   }
 
   function handleTap(item) {
