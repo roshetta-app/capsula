@@ -1,11 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Capacitor } from '@capacitor/core'
-// TEMPORARY (2026-10-04): back-button diagnostic for the class sheet bug. Does
-// nothing unless the site is opened with '?backdebug=1'. Loaded before the app
-// so it sees every history step. Remove this line and src/debug/backTrace.js
-// once the bug is fixed.
-import './debug/backTrace.js'
 import './index.css'
 import App from './App.jsx'
 
