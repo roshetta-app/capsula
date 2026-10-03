@@ -125,6 +125,11 @@
  *             window, no toast. Back from any other tab still lands you on
  *             Conditions first, unchanged.
  *
+ * 2026-10-04 (class sheet Back, part 2): the bar no longer adds a guard step
+ * while a sheet is open or when the current step already is a guard (it added
+ * one every time the search keyboard closed, on top of the sheet's own step),
+ * and a Back press that closes a sheet no longer also switches tabs.
+ *
  * 2026-10-04 (class sheet Back): on the website, Back events that an open
  * sheet's layer takes (and the move forward that restores the sheet's step)
  * no longer make this bar add a history step. Fixes the second Back
@@ -158,7 +163,7 @@ import { App as CapacitorApp }          from '@capacitor/app'
 import { useKeyboardOpen }              from '../hooks/useKeyboardOpen'
 import { useBackToTop }                 from '../hooks/useBackToTop'
 import { useAuth }                      from '../hooks/useAuth'
-import { isAnyBackCloseOpen, isSheetLayerPress } from '../hooks/useBackClose'
+import { isAnyBackCloseOpen, isSheetLayerPress, isSheetClosePress } from '../hooks/useBackClose'
 
 // ─── BottomNav ────────────────────────────────────────────────────────────────
 
@@ -281,7 +286,14 @@ export default function BottomNav() {
     }
 
     // Browser back-gesture/button guard (website/PWA only).
-    window.history.pushState({ capsulaBottomNavGuard: true }, '')
+    // Add the guard step only when it is needed: not while a sheet is open
+    // (the step would land on top of the sheet's own step and break going
+    // back and forward over it), and not when the current step already is a
+    // guard. This effect runs again every time the search keyboard closes, and
+    // it used to add one more step each time (2026-10-04).
+    if (!isAnyBackCloseOpen() && !window.history.state?.capsulaBottomNavGuard) {
+      window.history.pushState({ capsulaBottomNavGuard: true }, '')
+    }
 
     function handlePopState(event) {
       // A layer inside an open sheet (a second page of the sheet, a filter
@@ -290,6 +302,16 @@ export default function BottomNav() {
       // wipe out the step the sheet is going forward onto and the next Back
       // would leave the page (2026-10-04, class sheet on the Drugs screen).
       if (isSheetLayerPress(event)) return
+      // A sheet is closing on this Back press (it took it already, or it is
+      // about to). The press is the sheet's, not a tab-level Back: do not
+      // switch tabs. Only make sure the step we land on is a guard step, so the
+      // next Back still comes back to this page's own handling.
+      if (isSheetClosePress(event) || isAnyBackCloseOpen()) {
+        if (!window.history.state?.capsulaBottomNavGuard) {
+          window.history.pushState({ capsulaBottomNavGuard: true }, '')
+        }
+        return
+      }
       const stayGuarded = goBack()
       if (stayGuarded) {
         window.history.pushState({ capsulaBottomNavGuard: true }, '')

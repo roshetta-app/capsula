@@ -1,6 +1,10 @@
 /**
  * useBackClose — shared popup/sheet back-close mechanism.
  *
+ * 2026-10-04 (bottom bar and sheet closing): isSheetClosePress(event) is new.
+ * A sheet closing from a Back press now marks that press, so the bottom bar
+ * does not also act on it (see BottomNav.jsx). Nothing else here changes.
+ *
  * 2026-10-04 (bottom bar and layers): isSheetLayerPress(event) is new. The
  * bottom bar (BottomNav.jsx) also listens for Back on the website and, while
  * any sheet was open, added its own history step on EVERY Back event. When a
@@ -148,6 +152,17 @@ export function isSheetLayerPress(event) {
   return backLayers.length > 0 || rearmPending || (!!event && event === rearmEvent)
 }
 
+// The Back press (popstate event) a sheet took to close itself. The bottom bar
+// also listens for Back; when its listener runs AFTER the sheet's, the sheet
+// is already gone by then and the bar would treat the very same press as a
+// plain Back on the tab (switching tabs on top of the sheet closing). The bar
+// asks isSheetClosePress(event) to tell that case apart.
+let closedByEvent = null
+
+export function isSheetClosePress(event) {
+  return !!event && event === closedByEvent
+}
+
 export function useBackLayer(isOpen, onBack) {
   const onBackRef = useRef(onBack)
 
@@ -237,6 +252,7 @@ export function useBackClose(isOpen, onClose) {
       }
       if (layerResult === 'already') return
       poppedViaBrowserBackRef.current = true
+      closedByEvent = event
       onCloseRef.current()
     }
 
