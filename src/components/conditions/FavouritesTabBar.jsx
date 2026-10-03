@@ -16,9 +16,16 @@
  *
  * Icons represent content type (open book = reference material, pill =
  * medication) rather than favourited-status.
+ *
+ * 2026-10-03 (count tags): the number next to each tab name is now the same
+ * small rounded-square tag (CountTag from BrandsList.jsx) as on the brands
+ * sheet's two tabs: accent tint on the active tab, neutral on the other. This
+ * replaces the plain muted number of Phase 11. Because the sticky header
+ * shares renderTabs, it gets the same tags.
  */
 
 import { BookOpen, Pill } from 'lucide-react'
+import { CountTag } from '../drugs/BrandsList.jsx'
 
 export const FAVOURITES_TABS = [
   {
@@ -72,14 +79,7 @@ export function renderTabs(activeTab, onSelect, counts) {
                 {tab.label}
               </span>
               {count !== undefined && count !== null && count !== '' && (
-                <span style={{
-                  fontSize:   11,
-                  fontWeight: 600,
-                  color:      'var(--color-text-secondary)',
-                  lineHeight: 1.4,
-                }}>
-                  {count}
-                </span>
+                <CountTag tone={isActive ? 'accent' : 'neutral'}>{count}</CountTag>
               )}
             </button>
             {/* Underline — full width of this 50% cell, exactly matching the
