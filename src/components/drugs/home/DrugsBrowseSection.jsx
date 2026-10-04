@@ -2,8 +2,8 @@
  * src/components/drugs/home/DrugsBrowseSection.jsx
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Browse'
  * area of the Drugs home. Its header reads 'Browse by' on the left and, on the
- * right, a small pill switch with 'Category' and 'Class' (the same place and
- * shape as the Search area's mode pill). The chosen option is a filled accent
+ * right, a small pill switch with 'Category' and 'Class' (the same place, tint,
+ * text size and height as the Search area's mode pill). The chosen option is a filled accent
  * pill, the other sits on the soft tint and is one tap away. Under the header
  * it shows the category tiles or every class (A to Z, the same cards Class
  * search uses), plus the loading and failed-download states.
@@ -23,6 +23,7 @@
  *   onOpenClass, onOpenSubclass      open the class sheet from a class card
  */
 
+import { LayoutGrid, Layers } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import CategoryRow from './CategoryRow'
 import { DrugsSkeleton, LibraryErrorState } from './BrowseStates'
@@ -30,15 +31,16 @@ import ClassSearchResults from '../ClassSearchResults'
 import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 
 const BROWSE_OPTIONS = [
-  { value: 'category', label: 'Category' },
-  { value: 'class',    label: 'Class' },
+  { value: 'category', label: 'Category', icon: LayoutGrid },
+  { value: 'class',    label: 'Class',    icon: Layers },
 ]
 
-// The Category / Class switch: a soft accent-tinted pill track holding two
-// options. The chosen option is a filled accent pill with white text; the other
-// is plain accent text on the tint. Each option is at least 28px tall (34px with the track) so it is
-// easy to hit with a thumb. The track never shrinks, so the header title can
-// not squeeze it.
+// The Category / Class switch, made in the same family as the Search area's
+// mode button: the same soft accent tint, round pill shape, 12px semi-bold
+// text, 13px icon, and the same overall height (28px), so the two headers
+// match. The chosen option is a filled accent pill with white icon and text;
+// the other is accent icon and text on the tint, one tap away. The track never
+// shrinks, so the title cannot squeeze it.
 function BrowseSwitch({ value, onChange }) {
   return (
     <div
@@ -48,27 +50,34 @@ function BrowseSwitch({ value, onChange }) {
         display:         'inline-flex',
         alignItems:      'center',
         gap:             2,
-        padding:         3,
+        padding:         2,
         flexShrink:      0,
+        boxSizing:       'border-box',
         borderRadius:    'var(--radius-full)',
         backgroundColor: 'var(--color-accent-light)',
       }}
     >
       {BROWSE_OPTIONS.map(opt => {
         const active = value === opt.value
+        const Icon   = opt.icon
+        const fg     = active ? '#fff' : 'var(--color-accent)'
         return (
           <button
             key={opt.value}
             aria-pressed={active}
             onClick={active ? undefined : () => onChange(opt.value)}
             style={{
-              minHeight:               28,
+              height:                  24,
               boxSizing:               'border-box',
-              padding:                 '0 14px',
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              gap:                     5,
+              padding:                 '0 11px',
               borderRadius:            'var(--radius-full)',
               border:                  'none',
               backgroundColor:         active ? 'var(--color-accent)' : 'transparent',
-              color:                   active ? '#fff' : 'var(--color-accent)',
+              color:                   fg,
               fontFamily:              'var(--font-body)',
               fontSize:                12,
               fontWeight:              600,
@@ -79,7 +88,8 @@ function BrowseSwitch({ value, onChange }) {
               outline:                 'none',
             }}
           >
-            {opt.label}
+            <Icon size={13} color={fg} style={{ flexShrink: 0 }} />
+            <span style={{ whiteSpace: 'nowrap' }}>{opt.label}</span>
           </button>
         )
       })}
