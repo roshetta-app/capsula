@@ -253,9 +253,19 @@
  * the other modes offer each other, and every 'nothing found' card has a quiet
  * 'try another mode' row. The 'Keep typing', loading and filter-hiding cards
  * are unchanged.
+ *
+ * 2026-10-05 (no-result cards, second pass): 'nothing found anywhere' and 'found
+ * in another mode' are now two separate looks. The plain dead end no longer
+ * points to other modes. The found-elsewhere card says this mode has nothing,
+ * then lists 'Found in other modes' as buttons in each mode's own icon and
+ * colour, with a results count for Class. Inside a category the dead end has
+ * one action ('Search all drugs instead', moved into the card). Several 'Did you
+ * mean' guesses are equal full-width rows. 'Your filter is hiding these
+ * results' got the same larger look. The count line and the Sort button are
+ * hidden whenever there are no results to count or sort.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -659,6 +669,14 @@ export default function DrugsScreen() {
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
+    // 2026-10-05 (second pass): a search scoped to one category, and the plain
+    // 'nothing found anywhere' dead end (no filter hiding results, no other
+    // mode has the text, no typo guess). The dead end card then carries the
+    // one 'Search all drugs instead' button itself.
+    const inCategorySearch = Boolean(activeCategory && activeCategory !== '__all')
+    const plainDeadEnd = hasQuery && displayed.length === 0 && !isFilterMasked
+      && !classHint && !crossModeMatch && suggestions.length === 0
+
     body = (
       <>
         {/* Back to categories button (only when in a category, not searching) */}
@@ -729,7 +747,7 @@ export default function DrugsScreen() {
               onSelect={(name) => handleQueryChange(name)}
             />
           ) : (
-            <EmptyState query={query} mode={mode} onSwitch={setMode} onClear={() => handleQueryChange('')} />
+            <EmptyState query={query} mode={mode} onClear={() => handleQueryChange('')} />
           )
         ) : (
           <>
@@ -745,7 +763,7 @@ export default function DrugsScreen() {
               <ClassHintStrip hint={classHint} onSwitch={() => setMode('class')} />
             )}
 
-            {hasQuery && (
+            {hasQuery && displayed.length > 0 && (
             <div style={{
               fontSize: 12, color: 'var(--color-text-tertiary)',
               marginBottom: 'var(--space-2)',
@@ -765,14 +783,15 @@ export default function DrugsScreen() {
             )}
 
             {/* Sort By — on its own line under the count line, only while
-                something is typed. This branch is never reached for a
-                one-character query or a class search, so Sort is not
-                offered there. Stays offered when a search finds nothing,
-                so the choice carries to the next search. */}
+                something is typed AND there is something to sort. This
+                branch is never reached for a one-character query or a class
+                search, so Sort is not offered there. 2026-10-05 (second
+                pass): also hidden when the search finds nothing (or a filter
+                hides everything), since there is no list to sort. */}
             {/* 'Keep typing to narrow these results' sits right above the
                 Sort By button, and only shows for a list past 100. */}
             {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
-            {hasQuery && (
+            {hasQuery && displayed.length > 0 && (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
                 <SortByButton
                   label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
@@ -781,6 +800,10 @@ export default function DrugsScreen() {
               </div>
             )}
 
+            {/* 2026-10-05 (second pass): not shown for the plain 'nothing
+                found' card ('plainDeadEnd'), which carries its own
+                'Search all drugs instead' button so the screen does not
+                stack two. */}
             {/* search-all-drugs-placement (redesigned) — full-width,
                 directly under the count line rather than above it, so it
                 never sits on top of a result the person already found.
@@ -789,7 +812,7 @@ export default function DrugsScreen() {
                 count line right above it already gives the context
                 (what was found and where), so the button reads as "go
                 further" rather than "something's wrong." */}
-            {hasQuery && activeCategory && activeCategory !== '__all' && (
+            {hasQuery && inCategorySearch && !plainDeadEnd && (
               <FilledHintButton
                 onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
                 style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
@@ -827,8 +850,8 @@ export default function DrugsScreen() {
                 <EmptyState
                   query={query}
                   mode={mode}
-                  scopeLabel={activeCategory && activeCategory !== '__all' ? categoryLabel : null}
-                  onSwitch={setMode}
+                  scopeLabel={inCategorySearch ? categoryLabel : null}
+                  onSearchAll={inCategorySearch ? () => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true }) : undefined}
                   onClear={() => handleQueryChange('')}
                 />
               )
@@ -1350,20 +1373,19 @@ const STATE_LINE_STYLE = {
   color: 'var(--color-text-secondary)', overflowWrap: 'anywhere',
 }
 
-const MODE_LABELS = { brand: 'Brand', generic: 'Generic', class: 'Class' }
-
 // ─── EmptyState ───────────────────────────────────────────────────────────────
-// Nothing found, no typo guess, and no other mode has it. 2026-10-05: same
-// wording in every mode ('No drugs match', or 'No classes or drug families
-// match' in Class mode), a line that says how to search instead of sending the
-// person to a mode already checked, the category named when the search is
-// scoped to one ('scopeLabel'), and a quiet row to try the other two modes: a
-// typo is only guessed inside the mode being searched, so another mode may still
-// have a 'Did you mean' for it. 'Clear search' is a quiet text button now.
-function EmptyState({ query, mode, scopeLabel, onSwitch, onClear }) {
+// Nothing found here, no typo guess, and no other mode has it: a plain dead end,
+// so it does NOT point to other modes (2026-10-05, second pass: a garbage search
+// like 'zzqx' should not send anyone on a tour of the other modes). Same wording
+// in every mode ('No drugs match', or 'No classes or drug families match' in
+// Class mode), a line that says how to search, and the category named when the
+// search is scoped to one ('scopeLabel'). One action only: inside a category it
+// is 'Search all drugs instead' ('onSearchAll', moved into this card so the
+// screen no longer stacks a separate button above it); otherwise a quiet
+// 'Clear search'.
+function EmptyState({ query, mode, scopeLabel, onSearchAll, onClear }) {
   const inClassMode = mode === 'class'
   const quoted = query ? ` "${query}"` : ''
-  const otherModes = ['brand', 'generic', 'class'].filter(m => m !== mode)
   return (
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
@@ -1376,20 +1398,18 @@ function EmptyState({ query, mode, scopeLabel, onSwitch, onClear }) {
             ? `No drugs in ${scopeLabel} match${quoted}`
             : `No drugs match${quoted}`}
       </div>
-      <div style={STATE_LINE_STYLE}>
+      <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-3)' }}>
         {inClassMode
           ? 'Try part of a class or drug family name, or a common word like "vomiting"'
           : 'Check the spelling, or try the first letters of the name'}
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--space-2) var(--space-3)', fontSize: 14, color: 'var(--color-text-secondary)' }}>
-        <span>Try another mode:</span>
-        {otherModes.map(m => (
-          <QuietLinkButton key={m} onClick={() => onSwitch(m)}>{MODE_LABELS[m]}</QuietLinkButton>
-        ))}
-      </div>
-      <div style={{ marginTop: 'var(--space-2)' }}>
+      {onSearchAll ? (
+        <FilledHintButton onClick={onSearchAll}>
+          Search all drugs instead
+        </FilledHintButton>
+      ) : (
         <QuietLinkButton onClick={onClear}>Clear search</QuietLinkButton>
-      </div>
+      )}
     </div>
   )
 }
@@ -1421,13 +1441,6 @@ function QuietLinkButton({ onClick, children }) {
 // drug families counted together, with an arrow). When this mode found no
 // drugs at all, the full ModeSwitchState card below is used instead. Both only
 // switch the mode; the typed text stays and searches again.
-function classHintParts(hint) {
-  const parts = []
-  if (hint.classes > 0) parts.push(`${hint.classes} ${hint.classes === 1 ? 'class' : 'classes'}`)
-  if (hint.subclasses > 0) parts.push(`${hint.subclasses} ${hint.subclasses === 1 ? 'drug family' : 'drug families'}`)
-  return parts.join(', ')
-}
-
 function ClassHintStrip({ hint, onSwitch }) {
   const total = hint.classes + hint.subclasses
   return (
@@ -1452,26 +1465,23 @@ function ClassHintStrip({ hint, onSwitch }) {
 }
 
 // ─── ModeSwitchState ─────────────────────────────────────────────────────────
-// 2026-10-05: replaces the two older switch-mode cards (the other of Brand and
-// Generic; Class). Shown when this mode found nothing but the same text is
-// found in one or more other modes. 'targets' lists those modes, most useful
-// first, one button each ('See Generic results'); 'hint' holds the class and
-// drug family counts when 'class' is one of them. In Class mode the targets
-// are Brand and Generic (a drug name typed in Class mode), and both are offered
-// when both have it. Tapping a button only switches the mode; the typed text
-// stays and searches again (the loading placeholder covers the moment between).
-function modeSwitchLine(mode, targets, hint) {
-  const drugModes = targets.filter(t => t !== 'class')
-  if (mode === 'class') {
-    return drugModes.length > 1
-      ? "That's both a brand name and a generic name, not a class or drug family"
-      : `That's a ${drugModes[0]} name, not a class or drug family`
+// 2026-10-05 (second pass): the 'not here, but found in another mode' card.
+// Two clear parts: the top says this mode has nothing (same look as the plain
+// nothing-found card), then a small label 'Found in other modes' with one
+// button per mode that has the text. Each button wears that mode's own icon,
+// colour and tint (MODE_OPTIONS, the same ones the Search mode button and the
+// info sheet use), so Brand is blue, Generic green and Class violet everywhere.
+// 'targets' lists those modes, most useful first. The small line on a button is
+// the number of results for Class (from 'hint'), or which kind of name matched
+// for Brand and Generic. Tapping a button only switches the mode; the typed
+// text stays and searches again (the loading placeholder covers the moment
+// between).
+function modeSwitchSubline(target, hint) {
+  if (target === 'class') {
+    const total = hint ? hint.classes + hint.subclasses : 0
+    return total > 0 ? `${total} ${total === 1 ? 'result' : 'results'}` : null
   }
-  if (targets.includes('class') && hint) {
-    const found = `But it matches ${classHintParts(hint)} in Class mode`
-    return drugModes.length > 0 ? `${found}, and it's a ${drugModes[0]} name` : found
-  }
-  return `It's a ${drugModes[0]} name`
+  return `Matches a ${target} name`
 }
 
 function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
@@ -1479,22 +1489,58 @@ function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
   return (
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
-        <ArrowLeftRight size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
+        <SearchX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
       </div>
-      <div style={STATE_TITLE_STYLE}>
+      <div style={{ ...STATE_TITLE_STYLE, marginBottom: 'var(--space-4)' }}>
         {mode === 'class'
           ? `No classes or drug families match${quoted}`
           : `No drugs match${quoted}`}
       </div>
-      <div style={STATE_LINE_STYLE}>
-        {modeSwitchLine(mode, targets, hint)}
+      <div style={{
+        fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)',
+        color: 'var(--color-text-secondary)',
+      }}>
+        Found in other modes
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-2)' }}>
-        {targets.map(t => (
-          <FilledHintButton key={t} onClick={() => onSwitch(t)}>
-            {`See ${MODE_LABELS[t]} results`}
-          </FilledHintButton>
-        ))}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+        width: '100%', maxWidth: 360, margin: '0 auto',
+      }}>
+        {targets.map(t => {
+          const opt = MODE_OPTIONS.find(o => o.value === t)
+          if (!opt) return null
+          const Icon = opt.icon
+          const sub = modeSwitchSubline(t, hint)
+          return (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onSwitch(t)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                width: '100%', minHeight: 52, boxSizing: 'border-box', textAlign: 'left',
+                padding: 'var(--space-2) var(--space-3)',
+                border: 'none', borderRadius: 'var(--radius-lg)',
+                background: opt.tint, color: opt.color,
+                fontFamily: 'var(--font-body)', cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Icon size={22} color={opt.color} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.25 }}>
+                  {`See ${opt.label} results`}
+                </span>
+                {sub && (
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 400, lineHeight: 1.3, opacity: 0.85 }}>
+                    {sub}
+                  </span>
+                )}
+              </span>
+              <ChevronRight size={18} color={opt.color} style={{ flexShrink: 0 }} />
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -1514,15 +1560,17 @@ function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
 // in this file already uses — no new confirmation pattern introduced.
 
 function FilterMaskedState({ count, query, onClearFilter }) {
+  // 2026-10-05 (second pass): same refined look as the other no-result cards
+  // (bigger icon, bold title, larger supporting line).
   return (
-    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <FilterX size={28} color="var(--color-text-tertiary)" />
+    <div style={STATE_BOX_STYLE}>
+      <div style={STATE_ICON_ROW_STYLE}>
+        <FilterX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
       </div>
-      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+      <div style={STATE_TITLE_STYLE}>
         Your filter is hiding these results
       </div>
-      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+      <div style={STATE_LINE_STYLE}>
         {count} drug{count !== 1 ? 's' : ''} match{query ? ` "${query}"` : ''}
       </div>
       <FilledHintButton onClick={onClearFilter}>
@@ -1599,14 +1647,36 @@ function DidYouMeanState({ query, suggestions, onSelect }) {
         {`No exact match${query ? ` for "${query}"` : ''}`}
       </div>
       {!single && (
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+        // Several guesses: equal full-width rows (same height and shape every
+        // time, whatever the name length). A long combo name wraps onto a second
+        // line and is cut with '...' after that, so a row never grows tall.
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+          width: '100%', maxWidth: 360, margin: '0 auto',
+        }}>
           {suggestions.map(name => (
-            <FilledHintButton key={name} onClick={() => onSelect(name)} style={CHIP_WRAP_STYLE}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <Search size={16} style={{ flexShrink: 0 }} />
-                <span>{titleCaseWords(name)}</span>
+            <button
+              key={name}
+              type="button"
+              onClick={() => onSelect(name)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                width: '100%', minHeight: 48, boxSizing: 'border-box', textAlign: 'left',
+                padding: 'var(--space-2) var(--space-3)',
+                border: 'none', borderRadius: 'var(--radius-lg)',
+                background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+                fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
+                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <Search size={18} style={{ flexShrink: 0 }} />
+              <span style={{
+                flex: 1, minWidth: 0, overflowWrap: 'anywhere',
+                display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
+              }}>
+                {titleCaseWords(name)}
               </span>
-            </FilledHintButton>
+            </button>
           ))}
         </div>
       )}
