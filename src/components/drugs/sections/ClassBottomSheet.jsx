@@ -126,6 +126,11 @@
  * 2026-10-03 (drugs page title): the title above the drugs of a subclass no
  * longer starts with 'Other'. It reads '<subclass> drugs' (BrandsList hideOther).
  *
+ * 2026-10-04 (quieter blue): on the 'All drugs' row, the icon badge and the
+ * count badge are no longer solid bright blue with white inside. Both are now
+ * a soft, see-through tint of the app blue with the blue icon / number on it,
+ * so they sit calmly on the row. The drug family rows are unchanged.
+ *
  * 2026-10-03 (icons and count badge): each subclass card now starts with a
  * small rounded tile holding a pill icon, and the number of drugs sits under
  * the name as a subtle badge (a soft pill, same blue family as the arrow
@@ -292,14 +297,14 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
             width:           ICON_TILE,
             height:          ICON_TILE,
             borderRadius:    10,
-            backgroundColor: featured ? 'var(--color-accent)' : 'var(--color-accent-light)',
+            backgroundColor: featured ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'var(--color-accent-light)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
           }}
         >
-          <Icon size={17} strokeWidth={1.9} color={featured ? '#fff' : 'var(--color-accent)'} />
+          <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
         </span>
         <span style={{
           flex:       1,
@@ -317,7 +322,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
       <CountTag
         style={{
           minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11,
-          ...(featured ? { backgroundColor: 'var(--color-accent)', color: '#fff' } : null),
+          ...(featured ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)', color: 'var(--color-accent)' } : null),
         }}
       >
         <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
