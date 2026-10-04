@@ -28,6 +28,10 @@
  * message is gone; the button shows the mode. Mode and sort still live in
  * DrugContext, so they survive opening a drug and coming back.
  *
+ * 2026-10-04 (Search mode row layout): the row above the search bar now has the
+ * text 'Search mode' on the left and the mode button on the right. The button
+ * is a fixed width, so it keeps the same size for Brand, Generic and Class.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -425,14 +429,25 @@ export default function DrugsScreen() {
   // the 2026-07-19 note at the top of this file).
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
   const searchModeRow = (
-    <div style={{ display: 'flex', marginBottom: 'var(--space-2)' }}>
-      <PillButton
-        icon={currentMode.icon}
-        label={currentMode.label}
-        active={mode !== 'brand'}
-        fit
-        onPress={() => setOpenMenu('mode')}
-      />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
+      <span style={{
+        fontSize:   13,
+        fontWeight: 500,
+        color:      'var(--color-text-secondary)',
+        fontFamily: 'var(--font-body)',
+      }}>
+        Search mode
+      </span>
+      {/* Fixed width, so the button keeps the same size when the mode
+          changes (Brand / Generic / Class). Wide enough for 'Generic'. */}
+      <div style={{ display: 'flex', width: 120, flexShrink: 0 }}>
+        <PillButton
+          icon={currentMode.icon}
+          label={currentMode.label}
+          active={mode !== 'brand'}
+          onPress={() => setOpenMenu('mode')}
+        />
+      </div>
     </div>
   )
 
