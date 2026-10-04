@@ -1334,7 +1334,10 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
     count: drugs.length,
     estimateSize: () => 76,
     overscan: 8,
-    observeWindowOffset: observeWindowOffsetThroughSheetLock,
+    // The list reads its scroll position through the option named
+    // 'observeElementOffset' (even for the whole-page list); the first try used
+    // the wrong name, so it was ignored and the blank page stayed.
+    observeElementOffset: observeWindowOffsetThroughSheetLock,
     scrollMargin: listRef.current?.offsetTop ?? 0,
     getItemKey: index => drugs[index]?.id ?? index,
     initialMeasurementsCache: saved?.measurements,
