@@ -5,7 +5,7 @@
  * ones Class search uses, like 'vomiting') are now shown on the subclass list.
  * Display only, nothing happens when a word is tapped.
  *  - Words that point at the whole class are small chips at the top of the
- *    content, under a small 'Common words' title, the same place for every
+ *    content, under a small 'Keywords' title, the same place for every
  *    class: above the 'All drugs' row of the family list, or above the drugs of
  *    a class with no families. The space above and below the block is equal
  *    (12 on the list, 16 on the drugs page). Up to 6 are shown, then a '+N' chip for the rest. Tapping '+N' shows them all
@@ -283,6 +283,11 @@ function buildListGroups(groups) {
   ]
 }
 
+// A keyword as shown: the first letter capital, the rest as written.
+function capFirst(text) {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text
+}
+
 // Sorts keyword texts A to Z and drops repeats (ignoring capital letters).
 function uniqueSorted(words) {
   const seen = new Map()
@@ -394,7 +399,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
               overflow:     'hidden',
               textOverflow: 'ellipsis',
             }}>
-              {words.join(', ')}
+              {words.map(capFirst).join(', ')}
             </span>
           )}
         </span>
@@ -543,7 +548,7 @@ export default function ClassBottomSheet({
     </div>
   )
 
-  // The 'Common words' title and chips (display only), or null when the class
+  // The 'Keywords' title and chips (display only), or null when the class
   // has none. Drawn at the top of the content for every class: above the 'All
   // drugs' row of the family list, or above the drugs of a class with no
   // families.
@@ -570,7 +575,7 @@ export default function ClassBottomSheet({
           fontWeight:  600,
           color:       'var(--color-text-primary)',
         }}>
-          Common words
+          Keywords
         </p>
         <div style={{
           flexShrink: 0,
@@ -588,7 +593,7 @@ export default function ClassBottomSheet({
               color:           'var(--color-accent)',
               backgroundColor: 'var(--color-accent-light)',
             }}>
-              {w}
+              {capFirst(w)}
             </span>
           ))}
           {hiddenWords > 0 && (
