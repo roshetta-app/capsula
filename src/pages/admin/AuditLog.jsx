@@ -31,6 +31,7 @@ const TABLE_LABELS = {
   brands:           'Brands',
   specialties:      'Specialties',
   notification_log: 'Notifications',
+  class_keywords:   'Class keywords',
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
