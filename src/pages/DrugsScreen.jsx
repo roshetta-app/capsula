@@ -386,6 +386,17 @@ export default function DrugsScreen() {
   // "all"), anything else = that category's slug, taken as-is from the URL.
   const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
 
+  // Opening a category (a tapped category card, or 'All drugs') starts the
+  // page at the top. Only a change INTO a category scrolls: coming back from a
+  // drug page or leaving a category does not, so those keep their place.
+  const prevCategoryRef = useRef(activeCategory)
+  useEffect(() => {
+    if (activeCategory !== null && prevCategoryRef.current !== activeCategory) {
+      window.scrollTo(0, 0)
+    }
+    prevCategoryRef.current = activeCategory
+  }, [activeCategory])
+
   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
   const [filterOpen,       setFilterOpen]       = useState(false)
   // The Sort By pop-up. (The Search Mode pop-up and its info sheet belong to
