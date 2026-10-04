@@ -1441,6 +1441,9 @@ function EmptyState({ query, mode, onClear }) {
 // says which mode the typed drug name belongs to (the Class search finds out
 // and passes it); in Brand and Generic mode it is left out and the other one
 // is offered, as before.
+// 2026-10-04 (hint wording): in Class mode the supporting line now says the
+// typed text is a drug name and not a class or drug family, instead of the
+// plain 'It's a generic name'. Brand and Generic mode wording is unchanged.
 function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
   const otherModeLabel = targetMode ?? (mode === 'brand' ? 'generic' : 'brand')
   return (
@@ -1454,7 +1457,9 @@ function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
           : `No matches${query ? ` for "${query}"` : ''}`}
       </div>
       <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
-        It's a {otherModeLabel} name
+        {mode === 'class'
+          ? `That's a ${otherModeLabel} name, not a class or drug family`
+          : `It's a ${otherModeLabel} name`}
       </div>
       <FilledHintButton onClick={onSwitchMode}>
         See {otherModeLabel} results
