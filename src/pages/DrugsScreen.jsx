@@ -33,6 +33,14 @@
  * is a fixed width, so it keeps the same size for Brand, Generic and Class.
  * The Sort By button sits on the left of its line (it was on the right).
  *
+ * 2026-10-04 (Search mode and Sort styling): 'Search mode' text is bold, black
+ * and bigger. The mode button has two looks: default is a white button with a
+ * thin outline; active (Generic or Class) is the soft blue-tinted pill that
+ * 'Related drugs' uses. Sort By is black and a little bigger. The 'Keep typing
+ * to narrow these results' line now sits above the Sort By button. Both
+ * buttons are now drawn in this file (ModeButton, SortByButton), so the brand
+ * list's own buttons in BrandsList.jsx are untouched.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -171,14 +179,14 @@
  * wrong empty state never flashes. Class searches are not logged.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
-import { PillButton, SortButton, FilterModal } from '../components/drugs/BrandsList'
+import { FilterModal } from '../components/drugs/BrandsList'
 import ClassSearchResults from '../components/drugs/ClassSearchResults'
 import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
@@ -246,6 +254,84 @@ const SORT_OPTIONS = [
   { value: 'relevance', label: 'Relevance',      icon: Target },
   { value: 'cheapest',  label: 'Cheapest first', icon: ArrowDown01 },
 ]
+
+// Search Mode button: a fixed width so it never changes size between Brand,
+// Generic and Class. Two looks: the default (Brand) is a plain white button
+// with a thin grey outline and dark text; the active look (Generic or Class)
+// is the soft blue-tinted pill used by 'Related drugs' in the generic overview.
+// The outline is kept (clear) in the active look so the button does not shift.
+function ModeButton({ icon: Icon, label, active, onPress }) {
+  const [pressed, setPressed] = useState(false)
+  return (
+    <button
+      onClick={onPress}
+      aria-haspopup="dialog"
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      style={{
+        width:                   128,
+        flexShrink:              0,
+        boxSizing:               'border-box',
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     6,
+        padding:                 '8px 12px',
+        borderRadius:            'var(--radius-full)',
+        border:                  `1.5px solid ${active ? 'transparent' : 'var(--color-border)'}`,
+        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface)',
+        color:                   active ? 'var(--color-accent)' : 'var(--color-text-primary)',
+        fontFamily:              'var(--font-body)',
+        fontSize:                13,
+        fontWeight:              600,
+        cursor:                  'pointer',
+        opacity:                 pressed ? 0.9 : 1,
+        transform:               pressed ? 'scale(0.97)' : 'scale(1)',
+        transition:              'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+      }}
+    >
+      <Icon size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {label}
+      </span>
+      <ChevronDown size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
+    </button>
+  )
+}
+
+// Sort By button: plain text with a small icon and chevron, no outline or
+// fill. Black and a little bigger than the brand list's own Sort button.
+function SortByButton({ label, onPress }) {
+  return (
+    <button
+      onClick={onPress}
+      aria-haspopup="dialog"
+      style={{
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     5,
+        flexShrink:              0,
+        background:              'none',
+        border:                  'none',
+        padding:                 '6px 0',
+        fontSize:                14,
+        fontWeight:              600,
+        color:                   'var(--color-text-primary)',
+        fontFamily:              'var(--font-body)',
+        cursor:                  'pointer',
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+      }}
+    >
+      <ArrowUpDown size={16} color="var(--color-text-primary)" style={{ flexShrink: 0 }} />
+      <span>{label}</span>
+      <ChevronDown size={15} color="var(--color-text-primary)" style={{ flexShrink: 0 }} />
+    </button>
+  )
+}
 
 // ─── DrugsScreen ──────────────────────────────────────────────────────────────
 
@@ -432,23 +518,19 @@ export default function DrugsScreen() {
   const searchModeRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
       <span style={{
-        fontSize:   13,
-        fontWeight: 500,
-        color:      'var(--color-text-secondary)',
+        fontSize:   15,
+        fontWeight: 700,
+        color:      'var(--color-text-primary)',
         fontFamily: 'var(--font-body)',
       }}>
         Search mode
       </span>
-      {/* Fixed width, so the button keeps the same size when the mode
-          changes (Brand / Generic / Class). Wide enough for 'Generic'. */}
-      <div style={{ display: 'flex', width: 120, flexShrink: 0 }}>
-        <PillButton
-          icon={currentMode.icon}
-          label={currentMode.label}
-          active={mode !== 'brand'}
-          onPress={() => setOpenMenu('mode')}
-        />
-      </div>
+      <ModeButton
+        icon={currentMode.icon}
+        label={currentMode.label}
+        active={mode !== 'brand'}
+        onPress={() => setOpenMenu('mode')}
+      />
     </div>
   )
 
@@ -641,9 +723,12 @@ export default function DrugsScreen() {
                   one-character query or a class search, so Sort is not
                   offered there. Stays offered when a search finds nothing,
                   so the choice carries to the next search. */}
+              {/* 'Keep typing to narrow these results' sits right above the
+                  Sort By button, and only shows for a list past 100. */}
+              {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
               {hasQuery && (
                 <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
-                  <SortButton
+                  <SortByButton
                     label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
                     onPress={() => setOpenMenu('sort')}
                   />
@@ -690,7 +775,6 @@ export default function DrugsScreen() {
                 )
               ) : (
                 <>
-                  {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
                   <VirtualDrugList
                     drugs={displayed}
                     onTap={handleDrugTap}
