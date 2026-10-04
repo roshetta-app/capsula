@@ -281,8 +281,9 @@
  * molecule icon in the app blue for the subclass (the same two icons the
  * search cards and the class sheet use). The dot is gone; the connecting line
  * now starts right under the class icon, runs down and curves into the
- * subclass icon, and is the same blue as the subclass icon. The subclass stays
- * indented, smaller and lighter. Tapping, arrows and what opens are unchanged.
+ * subclass icon, in a softer tint of the app blue, drawn outside the pressed
+ * button so tapping a row never breaks it. The subclass stays indented, smaller
+ * and lighter. Tapping, arrows and what opens are unchanged.
  *
  * 2026-10-04 (Search mode pop-up): CardRow is now exported, so the Drugs
  * screen's Search mode pop-up (SearchModeInfoSheet.jsx) draws the same
@@ -303,8 +304,9 @@ import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 // stacked-layers icon in the class colour for the Class row, the molecule icon
 // in the app blue for the Subclass row (the same two icons the search cards and
 // the class sheet use). The connecting line now starts right under the class
-// icon (no dot), runs straight down and curves into the subclass icon, and is
-// the same blue as the subclass icon. 'hasChild' marks a Class row with a
+// icon (no dot), runs straight down and curves into the subclass icon, in a
+// softer tint of the app blue. It is drawn outside the button, so pressing a
+// row (tint and tiny shrink) never breaks it. 'hasChild' marks a Class row with a
 // Subclass under it (it draws the straight part); 'child' is the Subclass row
 // under a Class row (indented, smaller and lighter, it draws the curve). The
 // two parts sit at the same spot, so they join into one unbroken line even when
@@ -313,7 +315,7 @@ import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 // the icon; leave it off for no icon. Pressed feedback is a slightly deeper
 // tint plus a tiny shrink.
 const ROW_GAP    = 0      // space between the two rows (the line bridges it)
-const LINE_COLOR = 'var(--color-accent)'
+const LINE_COLOR = 'color-mix(in srgb, var(--color-accent) 45%, transparent)'   // the app blue, softened
 const LINE_X     = 12     // middle of the class icon: where the vertical line sits
 const MID        = 18     // middle of a row's first text line (8 padding + 10)
 const CLASS_ICON = 16
@@ -363,6 +365,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
         bottom:     -ROW_GAP,
         width:      0,
         borderLeft: `1.5px solid ${LINE_COLOR}`,
+        pointerEvents: 'none',
       }}
     />
   ) : null
@@ -381,6 +384,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
         borderLeft:   `1.5px solid ${LINE_COLOR}`,
         borderBottom: `1.5px solid ${LINE_COLOR}`,
         borderBottomLeftRadius: 8,
+        pointerEvents: 'none',
       }}
     />
   ) : null
@@ -404,8 +408,19 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
       <span style={{ minWidth: 0 }}>{label}</span>
     </span>
   )
-  if (!onClick) return <div style={base}>{stem}{elbow}{content}</div>
+  // The line is drawn in a wrapper around the row, not inside the button, so the
+  // small shrink of a pressed row never moves it: the two halves stay joined.
+  const wrapStyle = { position: 'relative', width: '100%' }
+  if (!onClick) {
+    return (
+      <div style={wrapStyle}>
+        <div style={base}>{content}</div>
+        {stem}{elbow}
+      </div>
+    )
+  }
   return (
+    <div style={wrapStyle}>
     <button
       onClick={onClick}
       onPointerDown={() => setPressed(true)}
@@ -422,10 +437,11 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
         transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      {stem}{elbow}
       {content}
       <ChevronRight size={child ? 14 : 16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
     </button>
+    {stem}{elbow}
+    </div>
   )
 }
 
