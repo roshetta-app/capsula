@@ -41,6 +41,11 @@
  * buttons are now drawn in this file (ModeButton, SortByButton), so the brand
  * list's own buttons in BrandsList.jsx are untouched.
  *
+ * 2026-10-04 (mode button one look, Clear filter space): the mode button now
+ * uses the blue pill look in all three modes (Brand included). The three rows
+ * that can show the Clear filter button keep the button's height (28px) even
+ * while it is hidden, so nothing jumps when it appears.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -255,12 +260,15 @@ const SORT_OPTIONS = [
   { value: 'cheapest',  label: 'Cheapest first', icon: ArrowDown01 },
 ]
 
+// Height of the Clear filter button (13px text + 12px padding + 3px border).
+// The three rows that can show it keep at least this height even while it is
+// hidden, so the line and the elements below do not jump when it appears.
+const CLEAR_BUTTON_HEIGHT = 28
+
 // Search Mode button: a fixed width so it never changes size between Brand,
-// Generic and Class. Two looks: the default (Brand) is a plain white button
-// with a thin grey outline and dark text; the active look (Generic or Class)
-// is the soft blue-tinted pill used by 'Related drugs' in the generic overview.
-// The outline is kept (clear) in the active look so the button does not shift.
-function ModeButton({ icon: Icon, label, active, onPress }) {
+// Generic and Class. All three modes use the same look: the soft blue-tinted
+// pill used by 'Related drugs' in the generic overview.
+function ModeButton({ icon: Icon, label, onPress }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -279,9 +287,9 @@ function ModeButton({ icon: Icon, label, active, onPress }) {
         gap:                     6,
         padding:                 '8px 12px',
         borderRadius:            'var(--radius-full)',
-        border:                  `1.5px solid ${active ? 'transparent' : 'var(--color-border)'}`,
-        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface)',
-        color:                   active ? 'var(--color-accent)' : 'var(--color-text-primary)',
+        border:                  'none',
+        backgroundColor:         'var(--color-accent-light)',
+        color:                   'var(--color-accent)',
         fontFamily:              'var(--font-body)',
         fontSize:                13,
         fontWeight:              600,
@@ -293,11 +301,11 @@ function ModeButton({ icon: Icon, label, active, onPress }) {
         outline:                 'none',
       }}
     >
-      <Icon size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
+      <Icon size={14} color="var(--color-accent)" style={{ flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </span>
-      <ChevronDown size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
+      <ChevronDown size={14} color="var(--color-accent)" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -528,7 +536,6 @@ export default function DrugsScreen() {
       <ModeButton
         icon={currentMode.icon}
         label={currentMode.label}
-        active={mode !== 'brand'}
         onPress={() => setOpenMenu('mode')}
       />
     </div>
@@ -634,6 +641,7 @@ export default function DrugsScreen() {
           {!hasQuery && activeCategory !== null && (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              minHeight: CLEAR_BUTTON_HEIGHT,
               marginBottom: 'var(--space-3)',
             }}>
               <button
@@ -700,6 +708,7 @@ export default function DrugsScreen() {
                   duplicate right below it. */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                minHeight: hasQuery ? CLEAR_BUTTON_HEIGHT : undefined,
                 marginBottom: hasQuery ? 0 : 'var(--space-2)',
               }}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
@@ -878,6 +887,7 @@ export default function DrugsScreen() {
           <>
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              minHeight: CLEAR_BUTTON_HEIGHT,
               marginBottom: 'var(--space-2)',
             }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
