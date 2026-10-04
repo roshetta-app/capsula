@@ -1,6 +1,20 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-05 (class keywords on the sheet): the common words (keywords, the
+ * ones Class search uses, like 'vomiting') are now shown on the subclass list.
+ * Display only, nothing happens when a word is tapped.
+ *  - Words that point at the whole class are small chips under the grey
+ *    '<n> drug families, <n> drugs' line in the heading. Up to 6 are shown,
+ *    then a '+N' chip for the rest, so the fixed heading stays short.
+ *  - Words that point at one family are one quiet grey line under the family's
+ *    name on its card, cut with '...' when too long.
+ *  - The 'Other families' card and the 'All drugs in this class' row show no
+ *    words. A class or family with no words looks exactly as before.
+ *  - The words come from the app's shared data (useDrugContext, classKeywords),
+ *    so no screen that opens this sheet had to change. Names are matched
+ *    exactly as stored, like the class sheet's own grouping.
+ *
  * 2026-10-04 (molecule icon from a library): the molecule icon on the subclass
  * cards (here and in the Drugs screen search results, which import it from this
  * file) is now the thin 'molecule-light' icon from the Lets Icons set, loaded from
@@ -205,6 +219,7 @@ import BrandsList from '../BrandsList.jsx'
 import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
+import { useDrugContext } from '../../../context/DrugContext'
 import { titleCaseWords } from '../../../utils/classSearch'
 // Lets Icons (CC BY 4.0, credit in the note at the top of this file).
 import { Icon as IconifyIcon } from '@iconify/react/dist/offline'
@@ -257,11 +272,48 @@ function buildListGroups(groups) {
   ]
 }
 
+// Most keyword chips shown in the heading; the rest become one '+N' chip.
+const MAX_CHIPS = 6
+
+// Sorts keyword texts A to Z and drops repeats (ignoring capital letters).
+function uniqueSorted(words) {
+  const seen = new Map()
+  for (const w of words) {
+    const key = w.trim().toLowerCase()
+    if (key && !seen.has(key)) seen.set(key, w.trim())
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b))
+}
+
+// Splits the active keywords into the ones that point at the whole class and
+// the ones that point at one family of it (a Map: family name -> words).
+// Pure function, no hooks, so it can be checked on its own.
+function splitKeywords(keywords, className) {
+  const classWords = []
+  const byFamily   = new Map()
+  for (const k of keywords ?? []) {
+    if (!k || !k.keyword) continue
+    for (const t of k.targets ?? []) {
+      if (!t || t.class !== className) continue
+      if (t.subclass) {
+        if (!byFamily.has(t.subclass)) byFamily.set(t.subclass, [])
+        byFamily.get(t.subclass).push(k.keyword)
+      } else {
+        classWords.push(k.keyword)
+      }
+    }
+  }
+  return {
+    classWords:   uniqueSorted(classWords),
+    familyWords:  new Map([...byFamily].map(([name, words]) => [name, uniqueSorted(words)])),
+  }
+}
+
 // Size of the icon tile and the gap after it.
 const ICON_TILE = 34
 const ICON_GAP  = 12
 
-function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = false }) {
+function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = false, words = [] }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -319,6 +371,21 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
           color:      featured ? 'var(--color-accent)' : 'var(--color-text-primary)',
         }}>
           {name}
+          {words.length > 0 && (
+            <span style={{
+              display:      'block',
+              marginTop:    2,
+              fontSize:     12.5,
+              fontWeight:   400,
+              lineHeight:   1.3,
+              color:        'var(--color-text-secondary)',
+              whiteSpace:   'nowrap',
+              overflow:     'hidden',
+              textOverflow: 'ellipsis',
+            }}>
+              {words.join(', ')}
+            </span>
+          )}
         </span>
       </span>
       {/* Drug count: the same small rounded-square tag used in the Related
@@ -402,6 +469,15 @@ export default function ClassBottomSheet({
       : (listGroups.find(g => g.name === picked) ?? groups.find(g => g.name === picked) ?? null)
   // Every brand in the class, with or without a subclass.
   const totalDrugs = classDrugs.length
+  // The class name as stored (the keywords point at it by this exact name).
+  const className = classDrugs[0]?.class ?? classLabel
+  const { classKeywords } = useDrugContext()
+  const { classWords, familyWords } = useMemo(
+    () => splitKeywords(classKeywords, className),
+    [classKeywords, className]
+  )
+  const shownWords = classWords.slice(0, MAX_CHIPS)
+  const moreWords  = classWords.length - shownWords.length
 
   // Opening a family from the list: remember the list's scroll first.
   function pickFamily(name) {
@@ -524,6 +600,35 @@ export default function ClassBottomSheet({
                 )}
                 {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
+              {/* Common words that lead to this class (display only). */}
+              {shownWords.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {shownWords.map(w => (
+                    <span key={w} style={{
+                      padding:         '3px 9px',
+                      borderRadius:    999,
+                      fontSize:        12,
+                      lineHeight:      1.3,
+                      color:           'var(--color-accent)',
+                      backgroundColor: 'var(--color-accent-light)',
+                    }}>
+                      {w}
+                    </span>
+                  ))}
+                  {moreWords > 0 && (
+                    <span style={{
+                      padding:      '3px 9px',
+                      borderRadius: 999,
+                      fontSize:     12,
+                      lineHeight:   1.3,
+                      color:        'var(--color-text-secondary)',
+                      backgroundColor: 'var(--color-surface-muted)',
+                    }}>
+                      +{moreWords}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             <div key="class-list" ref={listRef} style={{
               flex:          1,
@@ -576,6 +681,7 @@ export default function ClassBottomSheet({
                   name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
                   Icon={g.isOthers ? LayoutGrid : MoleculeIcon}
+                  words={g.isOthers ? [] : (familyWords.get(g.name) ?? [])}
                   onClick={() => pickFamily(g.name)}
                 />
               ))}
