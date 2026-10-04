@@ -2,8 +2,9 @@
  * src/components/drugs/home/DrugsSearchSection.jsx
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Search'
  * area. Title row with the info icon and the Search Mode button, then the
- * search bar, then (when they apply) the Clear filter button and the Recently
- * viewed shortcut. It is written once and used by every view of the screen (the
+ * search bar, then (when it applies) the Recently viewed shortcut. The Clear filter
+ * button (when a filter is on) sits on the title row beside the Search Mode
+ * button. It is written once and used by every view of the screen (the
  * home view, a category, and typed results). Before, the search bar was written
  * out twice, once per view, and the two copies drifting apart is what closed
  * the keyboard on the first typed letter (see the 2026-07-19 note in
@@ -98,13 +99,18 @@ export default function DrugsSearchSection({
         label="Search"
         title={title}
         trailing={
-          <ModeButton
-            icon={currentMode.icon}
-            label={currentMode.label}
-            color={currentMode.color}
-            tint={currentMode.tint}
-            onPress={() => setModeMenuOpen(true)}
-          />
+          // Clear filter sits on the title row, just left of the Search Mode
+          // button, and only while a filter is on.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {showClear && <ClearFiltersButton onClick={onClearFilters} />}
+            <ModeButton
+              icon={currentMode.icon}
+              label={currentMode.label}
+              color={currentMode.color}
+              tint={currentMode.tint}
+              onPress={() => setModeMenuOpen(true)}
+            />
+          </div>
         }
       >
         {/* The one search bar of the screen. Nothing is added or removed
@@ -120,13 +126,6 @@ export default function DrugsSearchSection({
             hasActiveFilters={hasActiveFilters}
           />
         </div>
-
-        {/* Clear filter lives here, next to the filter button it belongs to. */}
-        {showClear && (
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 'var(--space-3)' }}>
-            <ClearFiltersButton onClick={onClearFilters} />
-          </div>
-        )}
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. */}
         {showRecent && recentDrugs.length > 0 && (
