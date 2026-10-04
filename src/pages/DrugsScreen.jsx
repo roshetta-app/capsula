@@ -60,6 +60,10 @@
  * same accent per mode as the info sheet: Brand blue, Generic green, Class
  * violet (theme variables). Generic uses its own soft green, --color-generic.
  *
+ * 2026-10-04 (mode switch loading): switching Search Mode while a search is on
+ * screen now shows placeholder rows (SearchSwitchingState) instead of a blank
+ * gap while the new mode's results load.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -528,6 +532,23 @@ export default function DrugsScreen() {
   const hasQuery = query.trim().length > 0
   const hasFilters = !!activeFilters
 
+  // Mode switch loading state: when the mode changes while a search is on
+  // screen, show placeholder rows for a moment instead of a blank gap. The
+  // search hook waits 150ms after a mode change before it re-runs, so this
+  // holds a little longer (220ms) and the new results are ready when it lifts.
+  // Brand to Generic would otherwise flash the old mode's results first.
+  const [modeSwitching, setModeSwitching] = useState(false)
+  const queryRef     = useRef(query)
+  const firstModeRef = useRef(true)
+  queryRef.current   = query
+  useEffect(() => {
+    if (firstModeRef.current) { firstModeRef.current = false; return }
+    if (queryRef.current.trim().length === 0) return
+    setModeSwitching(true)
+    const timer = setTimeout(() => setModeSwitching(false), 220)
+    return () => clearTimeout(timer)
+  }, [mode])
+
   // Class search mode: a query typed in Class mode shows class cards. Class
   // results and drug results come from different searches, so right after a
   // mode change (or while the search is still waiting out its 150ms) the
@@ -714,10 +735,11 @@ export default function DrugsScreen() {
 
           {hasQuery && queryTooShort ? (
             <TooShortState />
-          ) : resultsNotReady ? (
-            // Class search mode: the other kind of results is still on its
-            // way (see resultsNotReady above) — draw nothing for a moment.
-            null
+          ) : (resultsNotReady || (modeSwitching && hasQuery)) ? (
+            // The new mode's results are still on their way (a mode switch,
+            // see resultsNotReady and modeSwitching above): show placeholder
+            // rows instead of a blank gap.
+            <SearchSwitchingState />
           ) : isClassSearch ? (
             // Class search mode: class and subclass cards, or one of the
             // empty states. The key makes a new search start with the groups
@@ -1341,6 +1363,27 @@ function DrugsSkeleton() {
       {/* Category grid placeholder */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
         {Array.from({ length: SKELETON_TILE_COUNT }, (_, i) => <SkeletonTile key={i} />)}
+      </div>
+    </div>
+  )
+}
+
+// ─── SearchSwitchingState ───────────────────────────────────────────────────
+// Shown for a moment when the search mode changes while a search is on screen
+// (Brand, Generic and Class draw different results, so the old ones cannot
+// stay). Same shimmer look as DrugsSkeleton: a short title line, then a few
+// rows. A fixed count, only meant to read as 'results are loading'.
+
+const SWITCH_SKELETON_ROWS = 5
+
+function SearchSwitchingState() {
+  return (
+    <div role="status" aria-label="Loading results">
+      <div style={shimmer({ width: 110, height: 13, marginBottom: 'var(--space-3)' })} />
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        {Array.from({ length: SWITCH_SKELETON_ROWS }, (_, i) => (
+          <div key={i} style={shimmer({ height: 64, borderRadius: 'var(--radius-lg)' })} />
+        ))}
       </div>
     </div>
   )
