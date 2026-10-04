@@ -52,20 +52,18 @@ const HEADER_SUPPRESSED_PREFIXES = ['/conditions/', '/drugs/']
 const SELF_CONTAINED_SCROLL_PREFIXES = ['/conditions/']
 
 /**
- * Routes that get narrower side spacing (16px instead of 24px) so their cards
- * and headers use more of the screen width. '/drugs' (the Drug Library list
- * only, exact match) — the drug detail pages and every other screen keep the
- * standard 24px sides. DrugsScreen's own sticky header uses the same 16px so
- * it lines up with the cards.
+ * One shared side gap for every screen (16px, was 24px). Layout publishes it
+ * as --page-gutter on its root element; <main>, the shared header and each
+ * screen's own sliding header read it, so they always line up and the value
+ * is changed in this one place.
  */
-const NARROW_SIDE_ROUTES = ['/drugs']
+const PAGE_GUTTER = 'var(--space-4)'
 
 export default function Layout({ children }) {
   const { pathname } = useLocation()
   const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname) ||
     HEADER_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
   const suppressBottomPadding = SELF_CONTAINED_SCROLL_PREFIXES.some(prefix => pathname.startsWith(prefix))
-  const sideSpace = NARROW_SIDE_ROUTES.includes(pathname) ? 'var(--space-4)' : 'var(--space-6)'
 
   return (
     <div style={{
@@ -76,6 +74,7 @@ export default function Layout({ children }) {
       backgroundColor: 'var(--color-bg)',
       fontFamily:      'var(--font-body)',
       color:           'var(--color-text-primary)',
+      '--page-gutter': PAGE_GUTTER,
     }}>
       <OfflineStatusToast />
 
@@ -86,7 +85,7 @@ export default function Layout({ children }) {
           zIndex:          50,
           backgroundColor: 'var(--color-surface)',
           borderBottom:    '1px solid var(--color-border)',
-          padding:         'var(--space-3) var(--space-6)',
+          padding:         'var(--space-3) var(--page-gutter)',
           display:         'flex',
           alignItems:      'center',
         }}>
@@ -109,7 +108,7 @@ export default function Layout({ children }) {
 
       <NotificationsBanner />
 
-      {/* --space-6 (24px) sides. Bottom pad accounts for BottomNav only —
+      {/* --page-gutter (16px) sides. Bottom pad accounts for BottomNav only —
           keyboard resizing is handled natively via interactive-widget=resizes-content
           on the viewport meta tag, so no JS-computed height is needed here.
           Skipped on self-contained-scroll routes (see
@@ -120,8 +119,8 @@ export default function Layout({ children }) {
         maxWidth: 680,
         margin:   '0 auto',
         padding:  suppressBottomPadding
-          ? `0 ${sideSpace} 0`
-          : `0 ${sideSpace} calc(var(--space-12) + 60px)`,
+          ? '0 var(--page-gutter) 0'
+          : '0 var(--page-gutter) calc(var(--space-12) + 60px)',
       }}>
         {children}
       </main>

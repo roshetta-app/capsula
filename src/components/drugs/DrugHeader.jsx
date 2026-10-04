@@ -332,7 +332,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
       // triggering pull-to-reload). Same fix as DetailHeader's own.
       touchAction:     'none',
     }}>
-      <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--space-6) var(--space-4)' }}>
+      <div style={{ maxWidth: 680, margin: '0 auto', padding: '12px var(--page-gutter, var(--space-6)) var(--space-4)' }}>
 
         {/* Row 1: Back + category group (left), Share + Favourite (right) —
             unchanged from today's behavior, per decision 4.1. */}

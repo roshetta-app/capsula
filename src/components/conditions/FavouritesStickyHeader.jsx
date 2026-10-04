@@ -72,7 +72,7 @@ export default function FavouritesStickyHeader({ visible, activeTab, onSelectTab
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
-          padding:        '8px var(--space-6) 0',
+          padding:        '8px var(--page-gutter, var(--space-6)) 0',
           height:         44,
           boxSizing:      'border-box',
           marginTop:      5,
@@ -199,7 +199,7 @@ export default function FavouritesStickyHeader({ visible, activeTab, onSelectTab
             tab button height itself (inside renderTabs) is untouched. */}
         <div style={{
           marginTop: 0,
-          padding:   '0 var(--space-6) 3px',
+          padding:   '0 var(--page-gutter, var(--space-6)) 3px',
         }}>
           {renderTabs(activeTab, onSelectTab, counts)}
         </div>

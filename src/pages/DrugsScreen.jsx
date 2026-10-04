@@ -1071,7 +1071,7 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
           alignItems:     'center',
           justifyContent: 'space-between',
           gap:            8,
-          padding:        '8px var(--space-4) 0',
+          padding:        '8px var(--page-gutter, var(--space-6)) 0',
           height:         44,
           boxSizing:      'border-box',
           marginTop:      5,
@@ -1104,7 +1104,7 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
         {/* Row 2 — near-full-width compact search bar with its built-in
             filter button on the right (1a.3, decision 4.6's correction). */}
         <div style={{
-          padding:      '6px var(--space-4) 8px',
+          padding:      '6px var(--page-gutter, var(--space-6)) 8px',
           boxSizing:    'border-box',
         }}>
           <SearchBar
