@@ -1,11 +1,12 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Browse'
- * area of the Drugs home. Its title is 'Browse by Category · Class': the word
- * that is chosen is bold and in the accent colour, the other is muted, and a
- * tap on the muted one switches. One tap, both options always visible. Under
- * the title it shows the category tiles or every class (A to Z, the same cards
- * Class search uses), plus the loading and failed-download states.
+ * area of the Drugs home. Its header reads 'Browse by' on the left and, on the
+ * right, a small pill switch with 'Category' and 'Class' (the same place and
+ * shape as the Search area's mode pill). The chosen option is a filled accent
+ * pill, the other sits on the soft tint and is one tap away. Under the header
+ * it shows the category tiles or every class (A to Z, the same cards Class
+ * search uses), plus the loading and failed-download states.
  *
  * Nothing here keeps the choice itself: 'browseMode' and its setter come from
  * the screen, and live in DrugContext so the choice is remembered when you
@@ -33,29 +34,56 @@ const BROWSE_OPTIONS = [
   { value: 'class',    label: 'Class' },
 ]
 
-// The word buttons of the title. Same size as the title; the chosen one is
-// bold and accent-coloured, the other is muted. The padding gives each word a
-// comfortable tap area without changing how the title looks.
-function BrowseWord({ label, active, onPress }) {
+// The Category / Class switch: a soft accent-tinted pill track holding two
+// options. The chosen option is a filled accent pill with white text; the other
+// is plain accent text on the tint. Each option is at least 28px tall (34px with the track) so it is
+// easy to hit with a thumb. The track never shrinks, so the header title can
+// not squeeze it.
+function BrowseSwitch({ value, onChange }) {
   return (
-    <button
-      aria-pressed={active}
-      onClick={active ? undefined : onPress}
+    <div
+      role="group"
+      aria-label="Browse by"
       style={{
-        ...SECTION_TITLE_STYLE,
-        fontWeight:              active ? 700 : 500,
-        color:                   active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-        background:              'none',
-        border:                  'none',
-        padding:                 '6px 2px',
-        cursor:                  active ? 'default' : 'pointer',
-        transition:              'color var(--motion-fast) var(--ease-settle)',
-        WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
+        display:         'inline-flex',
+        alignItems:      'center',
+        gap:             2,
+        padding:         3,
+        flexShrink:      0,
+        borderRadius:    'var(--radius-full)',
+        backgroundColor: 'var(--color-accent-light)',
       }}
     >
-      {label}
-    </button>
+      {BROWSE_OPTIONS.map(opt => {
+        const active = value === opt.value
+        return (
+          <button
+            key={opt.value}
+            aria-pressed={active}
+            onClick={active ? undefined : () => onChange(opt.value)}
+            style={{
+              minHeight:               28,
+              boxSizing:               'border-box',
+              padding:                 '0 14px',
+              borderRadius:            'var(--radius-full)',
+              border:                  'none',
+              backgroundColor:         active ? 'var(--color-accent)' : 'transparent',
+              color:                   active ? '#fff' : 'var(--color-accent)',
+              fontFamily:              'var(--font-body)',
+              fontSize:                12,
+              fontWeight:              600,
+              lineHeight:              1,
+              cursor:                  active ? 'default' : 'pointer',
+              transition:              'background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle)',
+              WebkitTapHighlightColor: 'transparent',
+              outline:                 'none',
+            }}
+          >
+            {opt.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 
@@ -67,21 +95,7 @@ export default function DrugsBrowseSection({
 }) {
   const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
 
-  const title = (
-    <div role="group" aria-label="Browse by" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-      <span style={SECTION_TITLE_STYLE}>Browse by</span>
-      {BROWSE_OPTIONS.map((opt, i) => (
-        <span key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {i > 0 && <span aria-hidden="true" style={{ ...SECTION_TITLE_STYLE, fontWeight: 500, color: 'var(--color-text-tertiary)' }}>·</span>}
-          <BrowseWord
-            label={opt.label}
-            active={browseMode === opt.value}
-            onPress={() => onBrowseModeChange(opt.value)}
-          />
-        </span>
-      ))}
-    </div>
-  )
+  const title = <span style={SECTION_TITLE_STYLE}>Browse by</span>
 
   let body = null
   if (loading && !hasDrugs) {
@@ -139,7 +153,11 @@ export default function DrugsBrowseSection({
   }
 
   return (
-    <DrugsSectionCard label="Browse" title={title}>
+    <DrugsSectionCard
+      label="Browse"
+      title={title}
+      trailing={<BrowseSwitch value={browseMode} onChange={onBrowseModeChange} />}
+    >
       {body}
     </DrugsSectionCard>
   )
