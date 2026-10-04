@@ -131,6 +131,10 @@
  * a soft, see-through tint of the app blue with the blue icon / number on it,
  * so they sit calmly on the row. The drug family rows are unchanged.
  *
+ * 2026-10-04 (families title): the 'Drug families' title over the family cards
+ * is bigger (14.5), black (main text colour) and no longer all capitals: it
+ * reads 'Drug families' with a capital D only.
+ *
  * 2026-10-03 (icons and count badge): each subclass card now starts with a
  * small rounded tile holding a pill icon, and the number of drugs sits under
  * the name as a subtle badge (a soft pill, same blue family as the arrow
@@ -559,11 +563,9 @@ export default function ClassBottomSheet({
                 <p style={{
                   flexShrink:    0,
                   margin:        '0 var(--space-1)',
-                  fontSize:      11,
+                  fontSize:      14.5,
                   fontWeight:    600,
-                  letterSpacing: '0.06em',
-                  textTransform: 'uppercase',
-                  color:         'var(--color-text-secondary)',
+                  color:         'var(--color-text-primary)',
                 }}>
                   Drug families
                 </p>

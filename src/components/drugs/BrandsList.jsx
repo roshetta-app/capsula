@@ -35,6 +35,14 @@
  * single subclass. Filters, counts and tapping work as before. With the prop
  * off (every other screen) nothing changes.
  *
+ * 2026-10-04 (calmer family cards): on the Other families page the family
+ * cards breathe more. More space between the cards (16, was 12), more air
+ * above and below the family name (16 above, 12 below), the name a touch
+ * larger (13) with looser lines so a two-line name is easier to read, a
+ * fainter line under it, and a little space under the drug row. The drug row
+ * itself and its side spacing are untouched (the image-search strip depends
+ * on that spacing), so nothing else in the app changes.
+ *
  * 2026-10-03 (sort icons): the two options in the Sort By pop-up now have an
  * icon in front of the text (A to Z arrow for Name, a low-to-high number arrow for Cheapest first).
  * Done with an optional 'icon' on an option, passed to ToggleChip; only the
@@ -724,24 +732,24 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       {groupBySubclass ? (
         // Other families page: each family is one soft card, the family name
         // on top with a hairline under it, then its drug card(s).
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {familySections.map(sec => (
             <div
               key={sec.name}
               style={{
                 backgroundColor: 'var(--color-surface-muted)',
                 borderRadius:    16,
-                padding:         '0 var(--space-3)',
+                padding:         '0 var(--space-3) var(--space-1)',
               }}
             >
               <p style={{
                 margin:       0,
-                padding:      'var(--space-3) 0 var(--space-2)',
-                fontSize:     12.5,
+                padding:      'var(--space-4) 0 var(--space-3)',
+                fontSize:     13,
                 fontWeight:   600,
-                lineHeight:   1.3,
+                lineHeight:   1.45,
                 color:        'var(--color-text-secondary)',
-                borderBottom: '0.5px solid var(--color-border)',
+                borderBottom: '0.5px solid var(--color-border-subtle)',
               }}>
                 {familyCase(sec.name)}
               </p>
@@ -938,3 +946,4 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
     </button>
   )
 }
+
