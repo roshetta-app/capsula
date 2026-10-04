@@ -41,12 +41,12 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
       border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-lg)',
       boxShadow:       'var(--shadow-card)',
-      padding:         'var(--space-4)',
+      padding:         'var(--space-3)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width:           40,
-          height:          40,
+          width:           34,
+          height:          34,
           borderRadius:    'var(--radius-md)',
           backgroundColor: 'var(--color-surface)',
           display:         'flex',
@@ -54,13 +54,13 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
           justifyContent:  'center',
           flexShrink:      0,
         }}>
-          <Icon size={20} color={color} aria-hidden="true" />
+          <Icon size={18} color={color} aria-hidden="true" />
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
             {title}
           </div>
-          <div style={{ fontSize: 13, lineHeight: 1.4, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+          <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', marginTop: 1 }}>
             {description}
           </div>
         </div>
@@ -71,16 +71,16 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
         display:         'flex',
         alignItems:      'center',
         gap:             10,
-        height:          44,
-        marginTop:       'var(--space-3)',
-        padding:         '0 var(--space-4)',
+        height:          38,
+        marginTop:       10,
+        padding:         '0 var(--space-3)',
         borderRadius:    'var(--radius-full)',
         backgroundColor: 'var(--color-surface)',
         boxShadow:       'var(--shadow-card)',
       }}>
-        <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <Search size={15} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
-          fontSize:     16,
+          fontSize:     15,
           fontWeight:   600,
           color:        'var(--color-text-primary)',
           whiteSpace:   'nowrap',
@@ -157,7 +157,7 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
         padding:       '0 var(--space-4) var(--space-6)',
         display:       'flex',
         flexDirection: 'column',
-        gap:           'var(--space-3)',
+        gap:           10,
       }}>
         <ModeCard
           icon={Tag}
