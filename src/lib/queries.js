@@ -484,6 +484,43 @@ export async function fetchMetadataTimestamps(supabase) {
   }
 }
 
+// ─── Class keywords (class-search keywords) ────────────────────────────────────
+//
+// Keywords that let Class search mode find a class or family by a common word
+// (e.g. "vomiting" -> Antiemetics). One row per keyword in class_keywords;
+// `targets` is a list of { class, subclass } names (subclass null = the whole
+// class). Targets point at class/subclass TEXT as stored on the drug rows —
+// there are no ids — so a target whose class no longer exists is simply
+// ignored by the search, never an error here. Only active keywords are
+// downloaded. Kept out of the drug delta-sync system on purpose, same as
+// categories: the whole (small) list is re-fetched when drugs_updated_at moves.
+
+/**
+ * Fetch every active class keyword.
+ * Returns [{ id, keyword, targets: [{ class, subclass }] }]
+ *
+ * @param {import('@supabase/supabase-js').SupabaseClient} supabase
+ */
+export async function fetchClassKeywords(supabase) {
+  const { data, error } = await supabase
+    .from('class_keywords')
+    .select('id, keyword, targets')
+    .eq('is_active', true)
+    .order('keyword', { ascending: true })
+
+  if (error) throw error
+
+  return (data ?? []).map(row => ({
+    id:      row.id,
+    keyword: row.keyword,
+    targets: Array.isArray(row.targets)
+      ? row.targets
+          .filter(t => t && typeof t.class === 'string' && t.class.trim() !== '')
+          .map(t => ({ class: t.class, subclass: typeof t.subclass === 'string' && t.subclass.trim() !== '' ? t.subclass : null }))
+      : [],
+  }))
+}
+
 // ─── Delta sync (audit_log-based, Phase F14 Stage 3) ───────────────────────────
 //
 // Reuses audit_log — already populated by every admin write via logAudit(),

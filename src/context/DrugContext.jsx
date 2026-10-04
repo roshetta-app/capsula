@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react'
 import { useDrugs } from '../hooks/useDrugs'
 import { useDrugSearch } from '../hooks/useDrugSearch'
+import { useClassKeywords } from '../hooks/useClassKeywords'
 
 const DrugContext = createContext(null)
 
@@ -65,6 +66,11 @@ const DrugContext = createContext(null)
  * (the default) puts the classes with the most drugs first; 'az' is A to Z. In
  * memory only, same rule as the others. It is separate from 'sortMode' above,
  * which belongs to drug search.
+ *
+ * 2026-10-04 (Class keywords, phase B): 'classKeywords' (the active keywords
+ * that will let Class search find a class by a common word) is loaded here, once,
+ * from its saved copy (works offline) and passed through. Nothing searches with it
+ * yet — useDrugSearch is not given it until phase C.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -74,7 +80,8 @@ export function DrugProvider({ children }) {
   const [browseMode, setBrowseMode] = useState('category')
   const [classSortMode, setClassSortMode] = useState('relevance')
   const searchValue = useDrugSearch(drugsValue.drugs, mode)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, classSortMode, setClassSortMode, ...searchValue }
+  const { classKeywords } = useClassKeywords()
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, classSortMode, setClassSortMode, classKeywords, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
@@ -82,12 +89,13 @@ export function DrugProvider({ children }) {
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
  * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode,
- * classSortMode, setClassSortMode, query,
+ * classSortMode, setClassSortMode, classKeywords, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
  * crossModeTarget }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
  * are only filled in Class mode; browseMode is 'category' | 'class';
- * classSortMode is 'relevance' | 'az')
+ * classSortMode is 'relevance' | 'az'; classKeywords is the list of active
+ * class keywords, [{ id, keyword, targets: [{ class, subclass }] }])
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)

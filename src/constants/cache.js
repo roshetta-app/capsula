@@ -15,6 +15,9 @@ export const CACHE_KEYS = {
   CONDITIONS:    'capsula_conditions_cache',
   CATEGORIES:    'capsula_categories_cache',
   ICONS:         'capsula_icons_cache',
+  // Class keywords (class-search keywords): same slice system as CATEGORIES,
+  // invalidated off drugs_updated_at (see hooks/useClassKeywords.js).
+  CLASS_KEYWORDS: 'capsula_class_keywords_cache',
   // account-instant-load: NOT part of the CACHE_KEY_MAP slice system below
   // (utils/cache.js) — that system invalidates on a 7-day TTL/version
   // check, which doesn't apply here. This one is invalidated by identity
@@ -58,4 +61,3 @@ export const DRUGS_CACHE_SCHEMA_VERSION = FLAT_DRUG_SCHEMA_VERSION
  * writeConditionsCache/readConditionsCache).
  */
 export const CONDITIONS_CACHE_SCHEMA_VERSION = CONDITIONS_SCHEMA_VERSION
-

@@ -44,6 +44,7 @@ const CACHE_KEY_MAP = {
   drugs:      CACHE_KEYS.DRUGS,
   conditions: CACHE_KEYS.CONDITIONS,
   categories: CACHE_KEYS.CATEGORIES,
+  classKeywords: CACHE_KEYS.CLASS_KEYWORDS, // class-search keywords; same drugs_updated_at invalidation as categories
 }
 
 function readAll() {
@@ -67,7 +68,7 @@ function readAll() {
  * Write a cache slice.
  * Silently skips writing if data is empty — prevents poisoning the cache
  * with an empty array that would block future re-fetches.
- * @param {'drugs'|'conditions'|'categories'} key
+ * @param {'drugs'|'conditions'|'categories'|'classKeywords'} key
  * @param {Array}  data        — the full fetched dataset
  * @param {string} version     — ISO timestamp from app_metadata
  */
@@ -92,7 +93,7 @@ export function writeCache(key, data, version) {
  * Read the cached data array for a given slice, or null.
  * Returns null (not []) when the stored array is empty — callers treat
  * an empty cache the same as no cache (cold start).
- * @param {'drugs'|'conditions'|'categories'} key
+ * @param {'drugs'|'conditions'|'categories'|'classKeywords'} key
  */
 export function getCacheData(key) {
   try {
@@ -112,7 +113,7 @@ export function getCacheData(key) {
 
 /**
  * Return the cached version string (app_metadata timestamp) for a slice, or null.
- * @param {'drugs'|'conditions'|'categories'} key
+ * @param {'drugs'|'conditions'|'categories'|'classKeywords'} key
  */
 export function getCacheTimestamp(key) {
   try {
@@ -129,7 +130,7 @@ export function getCacheTimestamp(key) {
 /**
  * Returns true if the cache slice is older than CACHE_TTL_MS (7 days),
  * regardless of version. Forces a re-fetch even if version matches.
- * @param {'drugs'|'conditions'|'categories'} key
+ * @param {'drugs'|'conditions'|'categories'|'classKeywords'} key
  */
 export function isCacheExpired(key) {
   try {
@@ -147,11 +148,12 @@ export function isCacheExpired(key) {
 
 /**
  * Clear one or more cache slices.
- * @param {'drugs'|'conditions'|'categories'|'icons'|'all'} key
+ * @param {'drugs'|'conditions'|'categories'|'classKeywords'|'icons'|'all'} key
  */
 export function clearCache(key = 'all') {
   try {
     if (key === 'all' || key === 'categories') localStorage.removeItem(CACHE_KEYS.CATEGORIES)
+    if (key === 'all' || key === 'classKeywords') localStorage.removeItem(CACHE_KEYS.CLASS_KEYWORDS)
     if (key === 'all' || key === 'icons') localStorage.removeItem(CACHE_KEYS.ICONS)
     if (key === 'all' || key === 'drugs') {
       localStorage.removeItem(CACHE_KEYS.DRUGS) // legacy key from before the IndexedDB move — harmless no-op cleanup
