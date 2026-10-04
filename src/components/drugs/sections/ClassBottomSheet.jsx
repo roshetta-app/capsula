@@ -1,6 +1,15 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-04 (molecule icon from a library): the molecule icon on the subclass
+ * cards (here and in the Drugs screen search results, which import it from this
+ * file) is now the thin 'molecule-light' icon from the Lets Icons set, loaded from
+ * the packages @iconify-icons/lets-icons and @iconify/react (offline build, no
+ * network calls), instead of a hand-copied Fluent path. Lets Icons is licensed
+ * CC BY 4.0, which requires credit: 'Lets Icons by Leonid Tsvetkov, CC BY 4.0,
+ * https://creativecommons.org/licenses/by/4.0/'. Name and props of MoleculeIcon
+ * are unchanged, so no other file needs to change.
+ *
  * 2026-10-04 (count tag colour, open at top): two small fixes.
  *  - The number on the 'All drugs in this class' row now gets the blue look: a
  *    solid blue tag with white text, matching the solid blue icon tile on the
@@ -182,6 +191,9 @@ import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 import { titleCaseWords } from '../../../utils/classSearch'
+// Lets Icons (CC BY 4.0, credit in the note at the top of this file).
+import { Icon as IconifyIcon } from '@iconify/react/dist/offline'
+import moleculeLight from '@iconify-icons/lets-icons/molecule-light'
 
 // Groups drugs by subclass name, biggest group first; groups of the same size
 // go A to Z. Drugs without a subclass are skipped. Pure function, no hooks,
@@ -198,29 +210,11 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-// The 'molecule' icon (outline) from Microsoft's Fluent System Icons (MIT
-// licence), 24px size, path copied as published, not redrawn. The icon set
-// the app already uses (lucide) has no molecule icon. Takes the same props the
-// row passes to its icon (size, color); strokeWidth is ignored because this
-// one is a filled outline shape.
-const MOLECULE_PATH = 'M16 12a5 5 0 1 0-4.337-2.51l-2.714 1.808a4 4 0 1 0 .23 5.13l3.887 1.943a3 3 0 1 0 .671-1.341l-3.886-1.943a4 4 0 0 0-.113-2.513l2.863-1.907A4.98 4.98 0 0 0 16 12m0-1.5a3.5 3.5 0 1 1 0-7a3.5 3.5 0 0 1 0 7m-10 6a2.5 2.5 0 1 1 0-5a2.5 2.5 0 0 1 0 5M17.5 19a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0'
-
+// The molecule icon (thin outline) from the Lets Icons set, through the
+// offline Iconify component. Takes the same props the row passes to its icon
+// (size, color); strokeWidth is ignored, the line weight is part of the icon.
 export function MoleculeIcon({ size = 24, color = 'currentColor' }) {
-  // Drawn 2px larger than the lucide icons so it looks the same size next to
-  // them (its shapes sit a little inside the box).
-  const px = size + 2
-  return (
-    <svg
-      width={px}
-      height={px}
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-      focusable="false"
-      style={{ fill: color, flexShrink: 0 }}
-    >
-      <path d={MOLECULE_PATH} />
-    </svg>
-  )
+  return <IconifyIcon icon={moleculeLight} width={size} height={size} color={color} />
 }
 
 // Key and label of the 'Other families' card that collects the families with
