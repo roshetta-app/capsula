@@ -34,6 +34,9 @@
  *   startExpanded   boolean (default false): show every class from the start,
  *                   with no 'Show all' row. The Drugs home 'Browse by class'
  *                   view uses this to list all classes.
+ *   hideKicker      boolean (default false): leave off the small 'Class' label
+ *                   above each class name. The 'Browse by class' view uses
+ *                   this, since the whole list is classes.
  *
  * The screen gives this component a key that changes with the typed text, so
  * a new search always starts with the groups collapsed.
@@ -101,19 +104,21 @@ function ResultCard({ kicker, name, detail, count, Icon, onClick }) {
           <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{
-            display:       'block',
-            fontSize:      10.5,
-            fontWeight:    600,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color:         'var(--color-accent)',
-          }}>
-            {kicker}
-          </span>
+          {kicker && (
+            <span style={{
+              display:       'block',
+              fontSize:      10.5,
+              fontWeight:    600,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color:         'var(--color-accent)',
+            }}>
+              {kicker}
+            </span>
+          )}
           <span style={{
             display:    'block',
-            marginTop:  1,
+            marginTop:  kicker ? 1 : 0,
             fontSize:   15,
             fontWeight: 500,
             lineHeight: 1.3,
@@ -196,7 +201,7 @@ function GroupLabel({ children }) {
   )
 }
 
-export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false }) {
+export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false, hideKicker = false }) {
   const [showAllClasses,    setShowAllClasses]    = useState(startExpanded)
   const [showAllSubclasses, setShowAllSubclasses] = useState(false)
 
@@ -224,7 +229,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
             {shownClasses.map(c => (
               <ResultCard
                 key={`class:${c.name}`}
-                kicker="Class"
+                kicker={hideKicker ? undefined : 'Class'}
                 name={titleCaseWords(c.name)}
                 detail={
                   c.subclassCount === 0

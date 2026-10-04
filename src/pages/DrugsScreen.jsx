@@ -996,6 +996,7 @@ export default function DrugsScreen() {
                   key="browse-classes"
                   results={{ classes: allClasses, subclasses: [] }}
                   startExpanded
+                  hideKicker
                   onOpenClass={handleOpenClass}
                   onOpenSubclass={handleOpenSubclass}
                 />
