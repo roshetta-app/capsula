@@ -57,6 +57,18 @@
  *     A to Z.
  *   - 'Did you mean' can also offer a keyword when the typed text is a small
  *     typo of it; names still come before keywords on a tie.
+ *
+ * Plurals and 'with' (2026-10-05, keyword pass only; name matching is
+ * unchanged): a typed word also matches a keyword word when its singular form
+ * does ('headaches' finds 'headache', 'tonsils' finds 'tonsillitis',
+ * 'allergies' finds 'allergy'), and 'with' is a filler word like 'in' ('anemia
+ * with pregnancy'). Singular forms are only used for words of 4+ letters, so
+ * short words ('gas') behave exactly as before.
+ *
+ * Keyword hits also carry 'matchedExact' (true when the typed words, without
+ * filler or a plural ending, are the keyword itself). keywordHitsToLog uses it
+ * so the usage log counts a keyword only when it was really typed, not while
+ * it is half-typed (phase G).
  */
 
 import { normalizeSearchText, editDistance, maxAllowedEdits } from './searchUtils'
@@ -159,7 +171,7 @@ function matchGroup(entries, q, qWords, tiers) {
 
 // Words that only describe 'a drug for X' and never help find a keyword.
 const KEYWORD_FILLER = new Set([
-  'a', 'an', 'the', 'of', 'for', 'to', 'in', 'and', 'or',
+  'a', 'an', 'the', 'of', 'for', 'to', 'in', 'with', 'and', 'or',
   'drug', 'drugs', 'medicine', 'medicines', 'medication', 'medications',
   'treatment', 'treatments', 'agent', 'agents',
 ])
@@ -167,6 +179,25 @@ const KEYWORD_FILLER = new Set([
 // The typed words that matter for keyword matching (filler removed).
 function keywordQueryWords(q) {
   return tokenize(q).filter(w => !KEYWORD_FILLER.has(w))
+}
+
+// Possible singular forms of a typed word ('headaches' -> 'headache',
+// 'allergies' -> 'allergy'). Words under 4 letters are left alone.
+function singularForms(word) {
+  if (!word || word.length < 4) return []
+  const out = []
+  if (word.endsWith('ies') && word.length >= 5) out.push(word.slice(0, -3) + 'y')
+  if (word.endsWith('es')) out.push(word.slice(0, -2))
+  if (word.endsWith('s') && !word.endsWith('ss')) out.push(word.slice(0, -1))
+  return out.filter(w => w.length >= 3)
+}
+
+// Does a typed word match this word of a keyword? Same 'starts with' rule as
+// before, plus the same test with the typed word's singular form (a singular
+// of 3 letters only counts when it is the whole word: 'ears' = 'ear').
+function wordMatchesToken(word, token) {
+  if (token.startsWith(word)) return true
+  return singularForms(word).some(s => token === s || (s.length >= 4 && token.startsWith(s)))
 }
 
 /**
@@ -216,9 +247,16 @@ export function buildKeywordIndex(index, keywords) {
 // 0 = exact keyword, 1 = keyword starts with the typed phrase, 2 = every typed
 // word starts a word of the keyword, -1 = no match.
 function keywordMatchRank(kw, words, phrase) {
-  if (kw.norm === phrase) return 0
+  const core = kw.tokens.filter(t => !KEYWORD_FILLER.has(t)).join(' ')
+  if (kw.norm === phrase || core === phrase) return 0
+  // Same test with the last typed word in its singular form ('headaches').
+  const last = words[words.length - 1]
+  for (const s of singularForms(last)) {
+    const alt = [...words.slice(0, -1), s].join(' ')
+    if (kw.norm === alt || core === alt) return 0
+  }
   if (kw.norm.startsWith(phrase)) return 1
-  if (words.every(w => kw.tokens.some(t => t.startsWith(w)))) return 2
+  if (words.every(w => kw.tokens.some(t => wordMatchesToken(w, t)))) return 2
   return -1
 }
 
@@ -252,7 +290,7 @@ function matchKeywords(keywordIndex, q, skip) {
       if (ea.brandCount !== eb.brandCount) return eb.brandCount - ea.brandCount
       return ea.name.localeCompare(eb.name) || (ea.className ?? '').localeCompare(eb.className ?? '')
     })
-    .map(([entry, hit]) => ({ ...entry, matchedKeyword: hit.keyword }))
+    .map(([entry, hit]) => ({ ...entry, matchedKeyword: hit.keyword, matchedExact: hit.rank === 0 }))
 
   return { classes: finish(bestClass), subclasses: finish(bestSub) }
 }
@@ -286,6 +324,21 @@ export function searchClassIndex(index, query, keywordIndex = null) {
     classes:    [...byName.classes,    ...byKeyword.classes],
     subclasses: [...byName.subclasses, ...byKeyword.subclasses],
   }
+}
+
+/**
+ * The keywords worth counting in the usage log for one search: only those the
+ * typed words match exactly (see 'matchedExact'), each once, lower-case.
+ *
+ * @param {{ classes: object[], subclasses: object[] }} found — from searchClassIndex
+ * @returns {string[]}
+ */
+export function keywordHitsToLog(found) {
+  const out = new Set()
+  for (const e of [...(found?.classes ?? []), ...(found?.subclasses ?? [])]) {
+    if (e.matchedKeyword && e.matchedExact) out.add(String(e.matchedKeyword).toLowerCase())
+  }
+  return [...out]
 }
 
 /**

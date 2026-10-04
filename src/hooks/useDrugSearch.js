@@ -120,6 +120,12 @@
  *     name is close, and the text is not a drug name either. A drug name typed
  *     in Class mode is not a gap: the content exists under Brand or Generic,
  *     the same rule the other modes follow for a cross-mode match.
+ * Keyword hits (phase G, 2026-10-05): when the typed words are exactly a class
+ * keyword (see keywordHitsToLog in classSearch.js), one 'class_keyword_hit'
+ * event (mode 'class', the keyword in the name column) is logged, once per
+ * keyword per session. Half-typed words are not counted. The database rule
+ * for this event type is live (migration allow_class_keyword_hit_event).
+ *
  * Brand and Generic logging is unchanged: their 'drug_search' events still
  * carry no mode, so existing numbers do not move. Anything counting
  * 'drug_search' events overall now also sees Class searches; filter on mode
@@ -151,7 +157,7 @@ import {
   getDrugSearchSuggestion,
   normalizeSearchText,
 } from '../utils/searchUtils'
-import { buildClassIndex, buildKeywordIndex, searchClassIndex, getClassSearchSuggestions } from '../utils/classSearch'
+import { buildClassIndex, buildKeywordIndex, searchClassIndex, getClassSearchSuggestions, keywordHitsToLog } from '../utils/classSearch'
 import { logSearchGap } from '../analytics/searchGaps'
 import { logUsageEvent } from '../analytics/usageEvents'
 
@@ -217,6 +223,8 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
   const loggedSearchTermsRef   = useRef(new Set())
   const loggedGapTermsRef      = useRef(new Set())
   const loggedNearMissTermsRef = useRef(new Set())
+  // Keywords already counted as 'class_keyword_hit' this session.
+  const loggedKeywordHitsRef   = useRef(new Set())
 
   useEffect(() => {
     brandIndexRef.current      = buildDrugBrandIndex(drugs)
@@ -282,6 +290,12 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       if (classTerm.length >= 2 && !loggedSearchTermsRef.current.has(`class:${classTerm}`)) {
         loggedSearchTermsRef.current.add(`class:${classTerm}`)
         logUsageEvent('drug_search', null, classTerm, 'class')
+      }
+      // Count a keyword once per session, only when it was typed in full.
+      for (const kw of keywordHitsToLog(found)) {
+        if (loggedKeywordHitsRef.current.has(kw)) continue
+        loggedKeywordHitsRef.current.add(kw)
+        logUsageEvent('class_keyword_hit', null, kw, 'class')
       }
       if (found.classes.length + found.subclasses.length > 0) {
         setSuggestions([])
