@@ -1108,7 +1108,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
           <div style={{
             display:             'grid',
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            gap:                 large ? 'var(--space-3)' : 'var(--space-2)',
+            gap:                 large ? 10 : 'var(--space-2)',
           }}>
             {options.map(opt => (
               <ToggleChip
@@ -1284,11 +1284,11 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: large ? 12 : 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: large ? 10 : 8,
         width: fitContent ? 'auto' : '100%', minWidth: 0, boxSizing: 'border-box',
-        padding: large ? '14px 18px' : '8px 14px',
+        padding: large ? '11px 16px' : '8px 14px',
         borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
-        fontSize: large ? 16 : 13, fontWeight: 500, textAlign: 'left',
+        fontSize: large ? 15 : 13, fontWeight: 500, textAlign: 'left',
         cursor: locked ? 'default' : 'pointer',
         opacity: locked ? 0.45 : 1,
         border: active ? '1.5px solid var(--color-accent)' : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
@@ -1317,7 +1317,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
           )}
         </span>
       )}
-      {Icon && <Icon size={large ? 19 : 15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
+      {Icon && <Icon size={large ? 17 : 15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
       <span style={wrap
         ? { minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
