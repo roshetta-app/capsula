@@ -35,7 +35,9 @@ function ModeCard({ icon: Icon, title, description, example }) {
   return (
     <div style={{
       backgroundColor: 'var(--color-surface-muted)',
+      border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-lg)',
+      boxShadow:       'var(--shadow-card)',
       padding:         'var(--space-4)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
