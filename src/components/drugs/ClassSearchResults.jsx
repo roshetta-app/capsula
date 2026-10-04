@@ -46,7 +46,8 @@
  *
  * 2026-10-04 (keyword line, phase D1): a card found through a keyword
  * (the entry carries 'matchedKeyword', set by classSearch.js) gets one small
- * line under the name: 'matches: <keyword>', with the typed part in bold. A
+ * line under the name: 'matches: <keyword>', with the keyword in the accent blue
+ * (so it catches the eye) and the typed part of it in bold. A
  * card found by name, and every card in the Browse view, has no such line and
  * looks exactly as before.
  *
@@ -210,11 +211,13 @@ function ResultCard({ kicker, name, detail, matchedKeyword = '', count, Icon, on
               overflowWrap: 'anywhere',
             }}>
               matches:{' '}
-              {keywordLine.map((seg, i) =>
-                seg.bold
-                  ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
-                  : <span key={i}>{seg.text}</span>
-              )}
+              <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>
+                {keywordLine.map((seg, i) =>
+                  seg.bold
+                    ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+                    : <span key={i}>{seg.text}</span>
+                )}
+              </span>
             </span>
           )}
         </span>
