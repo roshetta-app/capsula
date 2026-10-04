@@ -8,12 +8,13 @@
  *   - Generic -> Pantoprazole
  *   - Class   -> Proton pump inhibitor
  * Flat layout, drawn straight on the white sheet with no cards: each mode is
- * its name (bold, with a small accent icon) and, below it, the example term in
+ * its name (bold, with a small accent icon, followed by a plain 'mode') and, below it, the example term in
  * a quiet, neutral pill that looks like a search field. Thin dividers sit
  * between the three modes. No subtitles. Each mode has its own
  * accent: Brand blue, Generic green, Class violet (theme variables, so light
  * and dark mode follow automatically). One small hint at the bottom explains
- * how to narrow Brand and Generic searches, with its two examples as small tags.
+ * how to narrow Brand and Generic searches, in a subtle card with its two
+ * examples as small tags.
  *
  * Redesign: replaces the earlier version that showed real drug cards, a
  * highlighted-match explanation per mode, and a long footnote. Nothing here
@@ -41,8 +42,9 @@ function ModeSection({ icon: Icon, title, example, color }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Icon size={18} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
-          {title}
+        <span style={{ fontSize: 16, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
+          <span style={{ fontWeight: 700 }}>{title}</span>
+          <span style={{ fontWeight: 400 }}> mode</span>
         </span>
       </div>
 
@@ -85,7 +87,7 @@ function QueryTag({ children }) {
       display:         'inline-block',
       padding:         '5px 12px',
       borderRadius:    'var(--radius-full)',
-      backgroundColor: 'var(--color-surface-muted)',
+      backgroundColor: 'var(--color-surface)',
       fontSize:        12,
       fontWeight:      500,
       color:           'var(--color-text-primary)',
@@ -182,14 +184,16 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
           color="var(--color-class)"
         />
 
-        {/* Hint: a side note, not a fourth mode. The examples sit on their own
+        {/* Hint: a subtle card, not a fourth mode. The examples sit on their own
             line as small query tags. */}
         <div style={{
-          display:    'flex',
-          alignItems: 'flex-start',
-          gap:        10,
-          marginTop:  'var(--space-3)',
-          padding:    '0 var(--space-1)',
+          display:         'flex',
+          alignItems:      'flex-start',
+          gap:             10,
+          marginTop:       'var(--space-3)',
+          padding:         'var(--space-3) var(--space-4)',
+          borderRadius:    'var(--radius-lg)',
+          backgroundColor: 'var(--color-surface-muted)',
         }}>
           <Lightbulb size={16} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
