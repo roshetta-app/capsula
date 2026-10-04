@@ -76,6 +76,7 @@ import ConditionsCMS        from './pages/admin/ConditionsCMS'
 import ConditionEditor      from './components/admin/ConditionEditor'
 import SpecialtiesManager   from './pages/admin/SpecialtiesManager'
 import CategoriesManager    from './pages/admin/CategoriesManager'
+import ClassKeywordsManager from './pages/admin/ClassKeywordsManager'
 import AnalyticsDashboard   from './pages/admin/AnalyticsDashboard'
 import CrashLogs            from './pages/admin/CrashLogs'
 import NotificationsPanel   from './pages/admin/NotificationsPanel'
@@ -105,6 +106,7 @@ export const ROUTES = {
   ADMIN_DRUGS_NEW:        '/admin/drugs/new',
   ADMIN_DRUGS_GENERIC:    (genericId) => `/admin/drugs/generic/${genericId}`,
   ADMIN_CATEGORIES:       '/admin/categories',
+  ADMIN_CLASS_KEYWORDS:   '/admin/class-keywords',
   ADMIN_CONDITIONS:       '/admin/conditions',
   ADMIN_CONDITIONS_NEW:   '/admin/conditions/new',
   ADMIN_CONDITIONS_EDIT:  (id) => `/admin/conditions/${id}`,
@@ -180,6 +182,9 @@ export function AdminRoutes() {
         />
         <Route path="/admin/categories"
           element={<CategoriesManager />}
+        />
+        <Route path="/admin/class-keywords"
+          element={<ClassKeywordsManager />}
         />
         <Route path="/admin/conditions"
           element={<ConditionsCMS />}

@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
 import {
   faHouse, faCapsules, faNotesMedical, faStethoscope, faTags,
   faChartBar, faBug, faBell, faClipboardList, faUsers, faRocket, faBullhorn,
+  faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons'
 import { useAuth } from '../../hooks/useAuth'
 
@@ -38,6 +39,7 @@ const NAV_GROUPS = [
     items: [
       { path: '/admin/drugs',      label: 'Drug Library',    faIcon: faCapsules },
       { path: '/admin/categories', label: 'Drug Categories', faIcon: faTags,        indent: true },
+      { path: '/admin/class-keywords', label: 'Class keywords', faIcon: faMagnifyingGlass, indent: true },
       { path: '/admin/conditions', label: 'Conditions',      faIcon: faNotesMedical },
       { path: '/admin/specialties',label: 'Specialties',     faIcon: faStethoscope, indent: true },
     ],

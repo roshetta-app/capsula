@@ -36,6 +36,9 @@
  *           setMinimumSupported (new)
  *   App Gate Phase 1 Step 3a — listGates, createGate, updateGate,
  *           toggleGateActive (new)
+ *   Class keywords E1 — fetchClassKeywords, fetchClassFamilyPairs,
+ *           insertClassKeyword, updateClassKeyword, toggleClassKeywordActive,
+ *           deleteClassKeyword (new)
  */
 
 import { supabase }  from './supabase'
@@ -978,6 +981,173 @@ export async function toggleBrandPublished(id, isPublished, name = null) {
   return touchAppMetadata('drugs_updated_at')
 }
 
+// ─── Class keywords (E1) ─────────────────────────────────────────────────────
+//
+// Everyday words ("vomiting") that point at drug classes / families in Class
+// search mode. A target is { class, subclass } where subclass is null for a
+// whole class. Targets are plain text names, not ids (generics.class and
+// generics.subclass are text columns), so a rename leaves a dead link — the
+// app ignores those; the CMS warns about them (E3).
+//
+// Like categories, edits bump 'drugs_updated_at' so phones refresh their
+// saved keyword copy.
+
+// Lowercase, trim, collapse inner spaces.
+function normaliseKeyword(raw) {
+  return String(raw ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+// Trim names, turn blank family into null, drop empty and duplicate targets.
+function normaliseTargets(raw) {
+  const seen = new Set()
+  const out  = []
+  for (const t of raw ?? []) {
+    const cls = String(t?.class ?? '').trim()
+    if (!cls) continue
+    const sub = String(t?.subclass ?? '').trim() || null
+    const key = `${cls}\u0000${sub ?? ''}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ class: cls, subclass: sub })
+  }
+  return out
+}
+
+// True when another keyword row already uses this word (case-insensitive).
+async function classKeywordExists(keyword, exceptId = null) {
+  const escaped = keyword.replace(/[\\%_]/g, c => `\\${c}`)
+  let q = supabase
+    .from('class_keywords')
+    .select('id')
+    .ilike('keyword', escaped)
+    .limit(1)
+  if (exceptId) q = q.neq('id', exceptId)
+  const { data, error } = await q
+  if (error) return { exists: false, error }
+  return { exists: (data ?? []).length > 0, error: null }
+}
+
+/**
+ * All keywords (active + inactive), A to Z.
+ */
+export async function fetchClassKeywords() {
+  const { data, error } = await supabase
+    .from('class_keywords')
+    .select('id, keyword, targets, is_active, created_at, updated_at')
+    .order('keyword', { ascending: true })
+    .range(0, 4999)
+  return { data: data ?? [], error }
+}
+
+/**
+ * Every real class + family pair in the drug library, for the pickers.
+ * Read from generics (text columns), paged because a single request returns
+ * at most 1000 rows. Returns { data: [{ class, subclass }], error } with
+ * subclass null for the whole-class entry; sorted by class then family.
+ */
+export async function fetchClassFamilyPairs() {
+  const PAGE = 1000
+  const seen = new Set()
+  const pairs = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('generics')
+      .select('class, subclass')
+      .not('class', 'is', null)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
+    if (error) return { data: null, error }
+    for (const g of data ?? []) {
+      const cls = String(g.class ?? '').trim()
+      if (!cls) continue
+      const sub = String(g.subclass ?? '').trim() || null
+      const key = `${cls}\u0000${sub ?? ''}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      pairs.push({ class: cls, subclass: sub })
+    }
+    if ((data ?? []).length < PAGE) break
+  }
+  pairs.sort((a, b) =>
+    a.class.localeCompare(b.class) ||
+    (a.subclass ?? '').localeCompare(b.subclass ?? ''))
+  return { data: pairs, error: null }
+}
+
+/**
+ * Add a keyword. data = { keyword, targets }. Needs at least one target.
+ */
+export async function insertClassKeyword(data) {
+  const keyword = normaliseKeyword(data.keyword)
+  const targets = normaliseTargets(data.targets)
+  if (!keyword) return { data: null, error: { message: 'Keyword is required' } }
+  if (targets.length === 0) return { data: null, error: { message: 'Pick at least one class or family' } }
+
+  const dup = await classKeywordExists(keyword)
+  if (dup.error) return { data: null, error: dup.error }
+  if (dup.exists) return { data: null, error: { message: `"${keyword}" already exists` } }
+
+  const row = { keyword, targets, is_active: true }
+  const { data: created, error } = await supabase
+    .from('class_keywords')
+    .insert(row)
+    .select('id')
+    .single()
+  if (error || !created) return { data: created, error }
+  await logAudit('create', 'class_keywords', created.id, keyword, row)
+  await touchAppMetadata('drugs_updated_at')
+  return { data: created, error: null }
+}
+
+/**
+ * Edit a keyword's word and/or targets. data = { keyword, targets }.
+ */
+export async function updateClassKeyword(id, data) {
+  const keyword = normaliseKeyword(data.keyword)
+  const targets = normaliseTargets(data.targets)
+  if (!keyword) return { error: { message: 'Keyword is required' } }
+  if (targets.length === 0) return { error: { message: 'Pick at least one class or family' } }
+
+  const dup = await classKeywordExists(keyword, id)
+  if (dup.error) return { error: dup.error }
+  if (dup.exists) return { error: { message: `"${keyword}" already exists` } }
+
+  const patch = { keyword, targets, updated_at: new Date().toISOString() }
+  const { error } = await supabase
+    .from('class_keywords')
+    .update(patch)
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit('update', 'class_keywords', id, keyword, { keyword, targets })
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Switch a keyword on or off. An off keyword is ignored by the app.
+ */
+export async function toggleClassKeywordActive(id, isActive, keyword = null) {
+  const { error } = await supabase
+    .from('class_keywords')
+    .update({ is_active: isActive, updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit(isActive ? 'publish' : 'unpublish', 'class_keywords', id, keyword)
+  return touchAppMetadata('drugs_updated_at')
+}
+
+/**
+ * Delete a keyword for good.
+ */
+export async function deleteClassKeyword(id, keyword = null) {
+  const { error } = await supabase
+    .from('class_keywords')
+    .delete()
+    .eq('id', id)
+  if (error) return { error }
+  await logAudit('delete', 'class_keywords', id, keyword)
+  return touchAppMetadata('drugs_updated_at')
+}
+
 // ─── Cache invalidation (3B+) ────────────────────────────────────────────────
 
 /**
@@ -1559,4 +1729,3 @@ export async function toggleGateActive(id, isActive, title = null) {
   if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
 }
-
