@@ -51,11 +51,21 @@ const HEADER_SUPPRESSED_PREFIXES = ['/conditions/', '/drugs/']
  */
 const SELF_CONTAINED_SCROLL_PREFIXES = ['/conditions/']
 
+/**
+ * Routes that get narrower side spacing (16px instead of 24px) so their cards
+ * and headers use more of the screen width. '/drugs' (the Drug Library list
+ * only, exact match) — the drug detail pages and every other screen keep the
+ * standard 24px sides. DrugsScreen's own sticky header uses the same 16px so
+ * it lines up with the cards.
+ */
+const NARROW_SIDE_ROUTES = ['/drugs']
+
 export default function Layout({ children }) {
   const { pathname } = useLocation()
   const suppressHeader = HEADER_SUPPRESSED_ROUTES.includes(pathname) ||
     HEADER_SUPPRESSED_PREFIXES.some(prefix => pathname.startsWith(prefix))
   const suppressBottomPadding = SELF_CONTAINED_SCROLL_PREFIXES.some(prefix => pathname.startsWith(prefix))
+  const sideSpace = NARROW_SIDE_ROUTES.includes(pathname) ? 'var(--space-4)' : 'var(--space-6)'
 
   return (
     <div style={{
@@ -110,8 +120,8 @@ export default function Layout({ children }) {
         maxWidth: 680,
         margin:   '0 auto',
         padding:  suppressBottomPadding
-          ? '0 var(--space-6) 0'
-          : '0 var(--space-6) calc(var(--space-12) + 60px)',
+          ? `0 ${sideSpace} 0`
+          : `0 ${sideSpace} calc(var(--space-12) + 60px)`,
       }}>
         {children}
       </main>
