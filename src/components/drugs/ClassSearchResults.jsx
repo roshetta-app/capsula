@@ -40,9 +40,14 @@
  * tell apart a family that sits under several classes). The group titles,
  * the count line and the 'Show all' rows are unchanged.
  *
+ * 2026-10-04 (highlight): the typed text is shown bold inside each card name,
+ * the same way the drug cards do it (highlightMatch, weight 800). Nothing is
+ * bolded for a single letter or an empty search.
+ *
  * Props:
  *   results         { classes, subclasses } from useDrugSearch (Class mode)
- *   query           string: the typed text, only used for the count line
+ *   query           string: the typed text, used for the count line and to bold
+ *                   the matching part of each card name (same bolding as drug cards)
  *   onOpenClass     (className) => void
  *   onOpenSubclass  (className, subclassName) => void
  *   startExpanded   boolean (default false): show every class from the start,
@@ -63,6 +68,7 @@ import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
 import CountTag from '../ui/CountTag.jsx'
 import { MoleculeIcon } from './sections/ClassBottomSheet.jsx'
 import { titleCaseWords } from '../../utils/classSearch'
+import { highlightMatch } from '../../utils/highlightMatch'
 
 // Some names are stored with words joined by a slash and no spaces
 // ('Alpha/Beta blocker'), which has no place to break, so a long one was cut in
@@ -82,8 +88,10 @@ const ICON_TILE = 34
 
 // One tappable card. Same look as the subclass cards in the class sheet, with
 // a small kicker above the name so a class and a subclass are told apart.
-function ResultCard({ kicker, name, detail, count, Icon, onClick }) {
+function ResultCard({ kicker, name, detail, count, Icon, onClick, highlight = '' }) {
   const [pressed, setPressed] = useState(false)
+  // Same bolding the drug cards use: the typed text is drawn heavier inside the name.
+  const nameSegments = highlightMatch(name, highlight)
   return (
     <button
       onClick={onClick}
@@ -152,7 +160,11 @@ function ResultCard({ kicker, name, detail, count, Icon, onClick }) {
             color:      'var(--color-text-primary)',
             overflowWrap: 'anywhere',
           }}>
-            {name}
+            {nameSegments.map((seg, i) =>
+              seg.bold
+                ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+                : <span key={i}>{seg.text}</span>
+            )}
           </span>
           {detail && (
             <span style={{
@@ -242,6 +254,10 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
   const shownClasses    = showAllClasses    ? classes    : classes.slice(0, CLASS_LIMIT)
   const shownSubclasses = showAllSubclasses ? subclasses : subclasses.slice(0, SUBCLASS_LIMIT)
 
+  // The typed text with the same slash spacing the names get, so 'alpha/beta' still
+  // lines up with the displayed 'Alpha / Beta'.
+  const highlightText = spaceSlashes(query)
+
   const parts = []
   if (classes.length > 0)    parts.push(`${classes.length} ${classes.length === 1 ? 'class' : 'classes'}`)
   if (subclasses.length > 0) parts.push(`${subclasses.length} ${subclasses.length === 1 ? 'drug family' : 'drug families'}`)
@@ -273,6 +289,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
                 key={`class:${c.name}`}
                 name={spaceSlashes(titleCaseWords(c.name))}
                 count={c.brandCount}
+                highlight={highlightText}
                 Icon={Layers}
                 onClick={() => onOpenClass(c.name)}
               />
@@ -297,6 +314,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
                 count={s.brandCount}
+                highlight={highlightText}
                 Icon={MoleculeIcon}
                 onClick={() => onOpenSubclass(s.className, s.name)}
               />
