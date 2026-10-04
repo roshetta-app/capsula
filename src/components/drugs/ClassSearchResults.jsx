@@ -33,6 +33,13 @@
  * shows a 'No drug families' line. Names with slashes between words get a
  * space on each side of the slash (display only) so they break between words.
  *
+ * 2026-10-04 (plain cards): the cards no longer carry the small 'Class' /
+ * 'Family' label above the name, and the class card no longer shows the
+ * '<n> drug families' line. A card is now its icon, its name, the brand count
+ * and a chevron (a family card still shows 'in <class name>' underneath, to
+ * tell apart a family that sits under several classes). The group titles,
+ * the count line and the 'Show all' rows are unchanged.
+ *
  * Props:
  *   results         { classes, subclasses } from useDrugSearch (Class mode)
  *   query           string: the typed text, only used for the count line
@@ -264,13 +271,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
             {shownClasses.map(c => (
               <ResultCard
                 key={`class:${c.name}`}
-                kicker={hideKicker ? undefined : 'Class'}
                 name={spaceSlashes(titleCaseWords(c.name))}
-                detail={
-                  c.subclassCount === 0
-                    ? null
-                    : `${c.subclassCount} ${c.subclassCount === 1 ? 'drug family' : 'drug families'}`
-                }
                 count={c.brandCount}
                 Icon={Layers}
                 onClick={() => onOpenClass(c.name)}
@@ -293,7 +294,6 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
             {shownSubclasses.map(s => (
               <ResultCard
                 key={`sub:${s.className}\u0000${s.name}`}
-                kicker="Family"
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
                 count={s.brandCount}
@@ -313,3 +313,4 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
     </div>
   )
 }
+
