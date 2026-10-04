@@ -50,6 +50,12 @@
  * 'Search mode' title and opens SearchModeInfoSheet.jsx, a pop-up that explains
  * Brand, Generic and Class search with Controloc as the example.
  *
+ * 2026-10-04 (Search Mode pop-up items): the three pop-up items now read
+ * 'Brand mode', 'Generic mode' and 'Class mode' and are drawn bigger (the
+ * 'large' option of FilterModal in BrandsList.jsx). The button above the search
+ * bar still shows the short name. The info icon by the 'Search mode' title is
+ * smaller (14px); its tap area is unchanged.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -260,6 +266,10 @@ const MODE_OPTIONS = [
   { value: 'generic', label: 'Generic', icon: FlaskConical },
   { value: 'class',   label: 'Class',   icon: Layers },
 ]
+// The Search Mode pop-up shows the same three modes with the word 'mode' added
+// ('Brand mode'). The button above the search bar keeps the short names, since
+// it has a fixed width.
+const MODE_POPUP_OPTIONS = MODE_OPTIONS.map(o => ({ ...o, label: o.label + ' mode' }))
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'Relevance',      icon: Target },
   { value: 'cheapest',  label: 'Cheapest first', icon: ArrowDown01 },
@@ -560,7 +570,7 @@ export default function DrugsScreen() {
             outline:                 'none',
           }}
         >
-          <Info size={17} />
+          <Info size={14} />
         </button>
       </div>
       <ModeButton
@@ -1006,7 +1016,8 @@ export default function DrugsScreen() {
           titleIcon={Search}
           columns={1}
           single
-          options={MODE_OPTIONS}
+          large
+          options={MODE_POPUP_OPTIONS}
           selected={[mode]}
           onPick={handlePickMode}
           onClose={() => setOpenMenu(null)}

@@ -973,7 +973,9 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false }) {
+// 'large' (off by default, so every existing pop-up is unchanged) makes the
+// option rows taller with bigger text and icons; the Search Mode pop-up uses it.
+export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
   // Inside a sheet: phone/browser Back closes just this pop-up and leaves the
@@ -1106,7 +1108,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
           <div style={{
             display:             'grid',
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-            gap:                 'var(--space-2)',
+            gap:                 large ? 'var(--space-3)' : 'var(--space-2)',
           }}>
             {options.map(opt => (
               <ToggleChip
@@ -1116,6 +1118,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
                 active={selected.includes(opt.value)}
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
+                large={large}
                 showCheckbox={!single}
                 count={showCounts ? opt.count : undefined}
                 locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
@@ -1270,7 +1273,7 @@ function ClearFilterButton({ onClick, disabled }) {
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
 // for long labels (several lines, softer corners) instead of one clipped line,
 // and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
-function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false }) {
+function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, large = false }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -1281,11 +1284,11 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 8,
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: large ? 12 : 8,
         width: fitContent ? 'auto' : '100%', minWidth: 0, boxSizing: 'border-box',
-        padding: '8px 14px',
+        padding: large ? '14px 18px' : '8px 14px',
         borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
-        fontSize: 13, fontWeight: 500, textAlign: 'left',
+        fontSize: large ? 16 : 13, fontWeight: 500, textAlign: 'left',
         cursor: locked ? 'default' : 'pointer',
         opacity: locked ? 0.45 : 1,
         border: active ? '1.5px solid var(--color-accent)' : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
@@ -1314,7 +1317,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
           )}
         </span>
       )}
-      {Icon && <Icon size={15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
+      {Icon && <Icon size={large ? 19 : 15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
       <span style={wrap
         ? { minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
