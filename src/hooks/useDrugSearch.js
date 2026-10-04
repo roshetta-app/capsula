@@ -106,10 +106,24 @@
  * 'suggestions' holds up to 3 class/subclass names for 'Did you mean', and
  * 'crossModeMatch' is true when the text is really a drug name, with
  * 'crossModeTarget' saying which mode to offer ('generic' or 'brand'; null in
- * Brand and Generic mode, where the target is just the other one). Class-mode
- * searches are deliberately NOT logged (no usage event, no near-miss, no
- * search gap): the analytics tables only accept brand or generic as a mode
- * today and the database is not being changed for this experiment.
+ * Brand and Generic mode, where the target is just the other one).
+ *
+ * Class-mode logging (2026-10-04, feature kept; the database rules in
+ * search_gaps and usage_events now accept 'class' as a mode). Class searches
+ * are logged with the same event types the other modes use, tagged with mode
+ * 'class', so nothing new is needed in the database:
+ *   - 'drug_search' (mode 'class') once per typed term per session, whether
+ *     or not anything matched.
+ *   - 'drug_search_near_miss' (mode 'class') when nothing matched but 'Did you
+ *     mean' has class or subclass names to offer.
+ *   - a search gap (context 'drugs', mode 'class') when nothing matched, no
+ *     name is close, and the text is not a drug name either. A drug name typed
+ *     in Class mode is not a gap: the content exists under Brand or Generic,
+ *     the same rule the other modes follow for a cross-mode match.
+ * Brand and Generic logging is unchanged: their 'drug_search' events still
+ * carry no mode, so existing numbers do not move. Anything counting
+ * 'drug_search' events overall now also sees Class searches; filter on mode
+ * to separate them.
  *
  * Exposes:
  *   query           — current search string
@@ -222,8 +236,9 @@ export function useDrugSearch(drugs, mode = 'brand') {
     setQueryTooShort(false)
 
     // Class search mode (2026-10-04): class and subclass names only, no drug
-    // matching, no logging (see the header note). Nothing typed shows the
-    // usual category list, so there is nothing to compute then.
+    // matching; searches are logged with mode 'class' (see the header note).
+    // Nothing typed shows the usual category list, so there is nothing to
+    // compute or log then.
     if (currentMode === 'class') {
       if (trimmed.length === 0) {
         setResults(drugs)
@@ -237,6 +252,15 @@ export function useDrugSearch(drugs, mode = 'brand') {
       const found = searchClassIndex(index, trimmed)
       setResults(NO_RESULTS)
       setClassResults(found)
+
+      // Log a real, settled Class search (same 2+ character rule and once per
+      // term per session as the other modes). The key carries the mode so it
+      // never blocks a Brand or Generic log of the same word.
+      const classTerm = trimmed.toLowerCase()
+      if (classTerm.length >= 2 && !loggedSearchTermsRef.current.has(`class:${classTerm}`)) {
+        loggedSearchTermsRef.current.add(`class:${classTerm}`)
+        logUsageEvent('drug_search', null, classTerm, 'class')
+      }
       if (found.classes.length + found.subclasses.length > 0) {
         setSuggestions([])
         setCrossModeMatch(false)
@@ -250,7 +274,26 @@ export function useDrugSearch(drugs, mode = 'brand') {
       const asBrand   = !asGeneric && (searchDrugsTiered(drugs, trimmed, 'brand') ?? []).length > 0
       setCrossModeTarget(asGeneric ? 'generic' : asBrand ? 'brand' : null)
       setCrossModeMatch(asGeneric || asBrand)
-      setSuggestions(getClassSearchSuggestions(index, trimmed))
+      const classSuggestions = getClassSearchSuggestions(index, trimmed)
+      setSuggestions(classSuggestions)
+
+      // Near-miss or real gap, following the Brand and Generic rules below:
+      // a near-miss when 'Did you mean' has a guess; a gap only when there is
+      // no guess and the text is not a drug name either. Deduped per mode and
+      // term per session.
+      const classGapTerm = normalizeSearchText(trimmed)
+      if (classGapTerm.length >= 2) {
+        const classKey = `class:${classGapTerm}`
+        if (classSuggestions.length > 0) {
+          if (!loggedNearMissTermsRef.current.has(classKey)) {
+            loggedNearMissTermsRef.current.add(classKey)
+            logUsageEvent('drug_search_near_miss', null, classGapTerm, 'class')
+          }
+        } else if (!(asGeneric || asBrand) && !loggedGapTermsRef.current.has(classKey)) {
+          loggedGapTermsRef.current.add(classKey)
+          logSearchGap(trimmed, 'drugs', 'class')
+        }
+      }
       return
     }
     setClassResults(null)
