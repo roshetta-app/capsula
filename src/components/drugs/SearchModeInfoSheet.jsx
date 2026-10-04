@@ -11,8 +11,8 @@
  * example term in a pill that looks like a search field. Each mode has its own
  * accent: Brand blue, Generic green, Class violet. The whole card is tinted in
  * it, with the icon tile and the example pill in white on top (all theme variables, so
- * light and dark mode follow automatically). One small tip at the
- * bottom explains how to narrow Brand and Generic searches.
+ * light and dark mode follow automatically). One small plain-text tip
+ * at the bottom (no box) explains how to narrow Brand and Generic searches.
  *
  * Redesign: replaces the earlier version that showed real drug cards, a
  * highlighted-match explanation per mode, and a long footnote. Nothing here
@@ -38,9 +38,7 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
   return (
     <div style={{
       backgroundColor: tint,
-      border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-lg)',
-      boxShadow:       'var(--shadow-card)',
       padding:         'var(--space-3)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -81,7 +79,7 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
         <Search size={15} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
           fontSize:     15,
-          fontWeight:   600,
+          fontWeight:   400,
           color:        'var(--color-text-primary)',
           whiteSpace:   'nowrap',
           overflow:     'hidden',
@@ -184,15 +182,13 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
           tint="var(--color-class-light)"
         />
 
-        {/* Tip: smaller and tinted, so it reads as a side note, not a fourth mode. */}
+        {/* Tip: plain text with a small icon, no box, so it reads as a side note, not a fourth mode. */}
         <div style={{
-          display:         'flex',
-          alignItems:      'flex-start',
-          gap:             'var(--space-3)',
-          marginTop:       'var(--space-1)',
-          padding:         'var(--space-3) var(--space-4)',
-          borderRadius:    'var(--radius-lg)',
-          backgroundColor: 'var(--color-accent-light)',
+          display:    'flex',
+          alignItems: 'flex-start',
+          gap:        'var(--space-3)',
+          marginTop:  'var(--space-2)',
+          padding:    '0 var(--space-1)',
         }}>
           <Lightbulb size={18} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
           <div>
