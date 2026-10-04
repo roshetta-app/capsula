@@ -576,7 +576,7 @@ export default function AccountEditScreen() {
         top:             0,
         zIndex:          50,
         backgroundColor: 'var(--color-bg)',
-        padding:         'var(--space-5) var(--space-6) var(--space-3)',
+        padding:         'var(--space-5) var(--page-gutter, var(--space-4)) var(--space-3)',
         display:         'flex',
         alignItems:      'center',
         justifyContent:  'space-between',
@@ -723,7 +723,7 @@ export default function AccountEditScreen() {
       <main style={{
         maxWidth: 680,
         margin:   '0 auto',
-        padding:  'var(--space-6) var(--space-6) calc(var(--space-12) + 24px)',
+        padding:  'var(--space-6) var(--page-gutter, var(--space-4)) calc(var(--space-12) + 24px)',
       }}>
         {loading ? (
           <ReadOnlySkeleton />
