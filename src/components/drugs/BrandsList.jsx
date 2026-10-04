@@ -1,6 +1,17 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-04 (search mode and sort on the Drugs screen): the Drugs screen now
+ * uses this file's pop-up (FilterModal), pill button (PillButton) and Sort
+ * button (SortButton) for its own Search Mode and Sort By controls, so those
+ * three are exported. Two small additions, both off by default so the brand
+ * list, brand sheet and class sheet look and behave exactly as before:
+ * FilterModal gets an 'onPage' option (the pop-up is then drawn over the whole
+ * screen, above the bottom bar, locks the page scroll, and Back closes just the
+ * pop-up, the same way ConfirmSheet works on a page instead of inside a
+ * sheet), and PillButton gets a 'fit' option (shrinks to its text instead of
+ * stretching).
+ *
  * 2026-10-04 (long lists): the plain drug list (not the 'Other families' page)
  * no longer draws every row at once. It draws the first 30 and adds 30 more
  * each time the person scrolls near the end (GradualList below). Opening a
@@ -368,7 +379,7 @@ import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
 import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, isOptionLocked } from './brandsFilterLogic.js'
 import { useCategories } from '../../hooks/useCategories'
-import { useBackLayer } from '../../hooks/useBackClose'
+import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 
@@ -874,7 +885,7 @@ export function CountTag({ children, tone = 'neutral', style }) {
 
 // Sort control: plain text with a small icon and chevron, no outline or fill,
 // so it never reads as a filter. Same look whatever is chosen.
-function SortButton({ label, onPress }) {
+export function SortButton({ label, onPress }) {
   return (
     <button
       onClick={onPress}
@@ -905,7 +916,7 @@ function SortButton({ label, onPress }) {
 
 // The filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
-function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onPress }) {
+export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, onPress }) {
   const [pressed, setPressed] = useState(false)
   const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
@@ -918,7 +929,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        flex,
+        flex:                    fit ? '0 0 auto' : flex,
         minWidth:                0,
         display:                 'flex',
         alignItems:              'center',
@@ -941,7 +952,7 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
     >
       <Icon size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
       <span style={{
-        flex: 1, minWidth: 0, textAlign: 'left',
+        flex: fit ? '0 1 auto' : 1, minWidth: 0, textAlign: 'left',
         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
       }}>
         {label}
@@ -962,12 +973,26 @@ function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, onP
 // `data-vaul-no-drag` keeps a swipe inside the box from dragging the sheet.
 // Form / Medicine (onClear present) stay open while picking and finish with
 // Done; Sort (pick-one) closes as soon as an option is chosen.
-function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose }) {
+export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
-  // Phone/browser Back closes just this pop-up and leaves the sheet open. No
-  // history step of its own (see useBackLayer in useBackClose.js).
-  useBackLayer(true, onClose)
+  // Inside a sheet: phone/browser Back closes just this pop-up and leaves the
+  // sheet open. No history step of its own (see useBackLayer in
+  // useBackClose.js).
+  useBackLayer(!onPage, onClose)
+  // On a page (the Drugs screen) there is no sheet under it, so the pop-up is
+  // the thing Back closes, the same way ConfirmSheet does it.
+  useBackClose(onPage, onClose)
+
+  // On a page, lock the page scroll while the pop-up is open, the same way
+  // ConfirmSheet does.
+  useEffect(() => {
+    if (!onPage) return
+    const html = document.documentElement
+    const prevOverflow = html.style.overflow
+    html.style.overflow = 'hidden'
+    return () => { html.style.overflow = prevOverflow }
+  }, [onPage])
 
   useEffect(() => {
     const id = requestAnimationFrame(() => setShown(true))
@@ -976,14 +1001,14 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = f
     return () => { cancelAnimationFrame(id); window.removeEventListener('keydown', onKey) }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
+  const modal = (
     <div
       data-vaul-no-drag
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
       style={{
-        position:        'absolute',
+        position:        onPage ? 'fixed' : 'absolute',
         inset:           0,
-        zIndex:          5,
+        zIndex:          onPage ? 1000 : 5,
         pointerEvents:   'auto',
         backgroundColor: 'rgba(0,0,0,0.45)',
         display:         'flex',
@@ -1141,6 +1166,9 @@ function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = f
       </div>
     </div>
   )
+  // On a page it is drawn on the document itself (like ConfirmSheet), so no
+  // parent can clip or offset it.
+  return onPage ? createPortal(modal, document.body) : modal
 }
 
 // Scroll box with a visible thin scroll indicator. The app hides every native

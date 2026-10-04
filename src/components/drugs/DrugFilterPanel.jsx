@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useToast } from '../../context/ToastContext'
 import SheetShell from '../ui/SheetShell'
 
 /**
@@ -115,6 +114,16 @@ import SheetShell from '../ui/SheetShell'
  * read straight from 'activeFilters', so the sheet always matches what is
  * actually applied. Behavior is otherwise unchanged.
  *
+ * 2026-10-04 (search mode and sort moved out): Search Mode and Sort By are no
+ * longer in this sheet. They now sit on the Drugs screen itself (Search Mode
+ * as a button above the search bar, Sort By on its own line under the results
+ * count; see DrugsScreen.jsx), so this sheet holds Form / Route only. The
+ * 'Searching in X mode' message went with the Search Mode section (the button
+ * on the screen always shows the mode). While class cards are showing the
+ * screen does not offer this sheet at all, because Form / Route does not apply
+ * to cards. The entries below about Search Mode, Sort By and Class search
+ * describe how the sheet worked before this change.
+ *
  * 2026-10-04 (Class search mode, CLASS_SEARCH_MODE_PLAN.md): the Search Mode
  * toggle now has a third option, Class (searches class and subclass names).
  * While a Class search is active (mode is Class and something is typed) the
@@ -133,13 +142,6 @@ import SheetShell from '../ui/SheetShell'
  *   activeFilters    { forms } | null    — the currently-applied filters; the chips
  *                    read straight from this (EMPTY if null), so the sheet
  *                    always matches what the screen has actually applied
- *   mode             'brand' | 'generic' | 'class' | undefined — current search mode, for the Search By section
- *   onModeChange     (mode) => void | undefined — instant, not gated by Apply; section hidden if omitted
- *   hasSearchResults boolean | undefined — true as soon as a search query is typed, regardless
- *                    of whether it matched anything; gates the Sort By section
- *                    (drug-search-sort-cheapest). False for category browsing (no query at all)
- *   sortMode         'relevance' | 'cheapest' | undefined — current sort mode, for the Sort By section
- *   onSortChange     (mode) => void | undefined — instant, not gated by Apply; sheet stays open
  */
 
 // Each chip's `matches` list is the full set of real raw form values (from
@@ -174,20 +176,12 @@ const EMPTY = {
   forms: ['all'],
 }
 
-// Names used in the 'Searching in ... mode' message.
-const MODE_LABELS = { brand: 'Brand', generic: 'Generic', class: 'Class' }
-
-export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters, mode, onModeChange, hasSearchResults, sortMode, onSortChange }) {
+export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilters }) {
   // The chips read straight from 'activeFilters' (the screen's applied
   // filters) instead of a private copy of them — see the 2026-09-19 note in
   // the file header for why. With instant-apply there is nothing left to
   // buffer, so the copy added nothing and could only go out of date.
   const filters = activeFilters || EMPTY
-  const { toast } = useToast()
-
-  // Class search mode: true while class cards are what the screen shows. Sort
-  // By and Form / Route do not apply to cards, so they are hidden then.
-  const classSearching = mode === 'class' && !!hasSearchResults
 
   // Instant-apply: compute the next forms list and immediately push it out
   // via onApply, instead of buffering until a separate Apply Filters
@@ -210,15 +204,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
     onClose()
   }
 
-  // Mode (Brand/Generic) is instant and not part of 'filters' — see file
-  // header note. Switching it has nothing left to "Apply", so it closes
-  // the sheet immediately.
-  function handleModeChange(m) {
-    onModeChange(m)
-    toast.info(`Searching in ${MODE_LABELS[m] ?? m} mode`)
-    onClose()
-  }
-
   // Clear All only earns a place in the sheet when a real filter is set —
   // mode alone was never part of 'filters' and shouldn't trigger it.
   const hasActiveFilter = !(filters.forms.length === 1 && filters.forms[0] === 'all')
@@ -234,79 +219,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
           Filter Drugs
         </div>
 
-        {/* Search By — Brand/Generic, instant-switch, not gated by Apply. See
-            file header note above for why this section is different from
-            every other one in this sheet.
-            drugs-filter-panel-restyle: PillToggle now passed as
-            FilterSection's inline 'action' instead of a full-width child
-            below the label — no children, so the section header row is
-            the whole section. */}
-        {onModeChange && (
-          <>
-            <FilterSection
-              label="Search Mode"
-              action={
-                <PillToggle
-                  value={mode}
-                  onChange={handleModeChange}
-                  options={[
-                    { value: 'brand',   label: 'Brand' },
-                    { value: 'generic', label: 'Generic' },
-                    { value: 'class',   label: 'Class' },
-                  ]}
-                  minOptionWidth={64}
-                />
-              }
-            />
-            {/* No line under it while nothing else follows (Class search). */}
-            {!classSearching && (
-              <div style={{
-                height: 1,
-                backgroundColor: 'var(--color-border)',
-                margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
-              }} />
-            )}
-          </>
-        )}
-
-        {/* Sort By — Relevance/Cheapest First, instant-apply like Form/Route
-            below (not a single instant-choice-then-close action like Search
-            Mode above, since 'relevance' vs 'cheapest' has no analogous
-            "brand mode vs generic mode" full context switch to announce).
-            Shown as soon as a search query is typed, whether or not it
-            matched anything — sorting is a property of the search itself,
-            not of currently having results on screen. Hidden only for
-            category browsing (no query at all). 'sortMode' lives in
-            DrugContext (see drug-search-sort-cheapest note there) so it
-            survives navigation the same way Search Mode and Form/Route
-            already do, and stays applied if the query is cleared and
-            retyped later.
-            drugs-filter-panel-restyle: same inline-action treatment as
-            Search Mode above. */}
-        {hasSearchResults && !classSearching && (
-          <>
-            <FilterSection
-              label="Sort By"
-              action={
-                <PillToggle
-                  value={sortMode}
-                  onChange={onSortChange}
-                  options={[
-                    { value: 'relevance', label: 'Relevance' },
-                    { value: 'cheapest',  label: 'Cheapest First' },
-                  ]}
-                  minOptionWidth={96}
-                />
-              }
-            />
-            <div style={{
-              height: 1,
-              backgroundColor: 'var(--color-border)',
-              margin: '0 calc(-1 * var(--space-4)) var(--space-4)',
-            }} />
-          </>
-        )}
-
         {/* Form / Route — instant-apply, see toggleForm above.
             drugs-filter-panel-restyle: "All Forms" moved from its own
             full-width centered row above the grid into FilterSection's
@@ -316,8 +228,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             The rest of the chips still sit in the grid below, unchanged —
             there was never any collapse/expand behavior here, so nothing
             about the grid itself changed. */}
-        {!classSearching && (
-        <>
         <FilterSection
           label="Form / Route"
           action={
@@ -352,8 +262,6 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-5)' }}>
           <ClearAllButton onClick={handleClear} disabled={!hasActiveFilter} />
         </div>
-        </>
-        )}
       </div>
     </SheetShell>
   )
@@ -387,85 +295,6 @@ function FilterSection({ label, action, children }) {
         {action}
       </div>
       {children}
-    </div>
-  )
-}
-
-// drug-filter-instant-apply — fontWeight used to jump 400 -> 600 on active,
-// which visibly resized the pill since bold text is wider (same bug already
-// fixed on ToggleChip below). Weight is now constant; active/inactive reads
-// purely through color/border/background.
-// Generic two-option pill control: one continuous bordered track, active
-// side filled solid, no gap/seam between the two. Originally ModeToggle
-// (Brand/Generic only) — generalized (drug-search-sort-cheapest) to also
-// drive the Sort By toggle (Relevance/Cheapest First), since both are
-// "pick exactly one of two" controls that should look identical rather
-// than duplicating this styling in a second component.
-//
-// drugs-filter-panel-restyle — restyled from a full-width (flex:1 per
-// option) accent-blue bordered/filled track to a compact, fit-content
-// "nested pill" look: a quiet var(--color-border) track holding a solid
-// capsule around whichever option is active, inactive option reading as
-// plain muted text with no border. This is what lets it sit inline next
-// to a section label instead of needing its own full-width row.
-//
-// drugs-filter-panel-refine — two corrections after the first on-device
-// look: (1) the active capsule used var(--color-text-primary) (black),
-// which read as an unrelated new "black" affordance next to the app's
-// existing blue accent used everywhere else (All Forms chip included) —
-// switched to var(--color-accent) to match. (2) Search Mode's toggle
-// (Brand/Generic) and Sort By's toggle (Relevance/Cheapest First) were
-// each sizing to their own content, so the shorter Brand/Generic control
-// ended up visibly narrower than Sort By's — added optional
-// 'minOptionWidth' so a caller can give both toggle instances the same
-// per-button minimum width and have them line up at a matching total
-// width regardless of label length.
-function PillToggle({ value, onChange, options, minOptionWidth }) {
-  // Tracks which of the two buttons (if any) is currently pressed, since
-  // both share this one component instance — same onPointer* + scale
-  // pattern as ToggleChip's own press feedback, just keyed per-button.
-  const [pressedValue, setPressedValue] = useState(null)
-  return (
-    <div style={{
-      display: 'inline-flex',
-      backgroundColor: 'var(--color-border)',
-      borderRadius: 'var(--radius-full)',
-      padding: 2,
-      gap: 2,
-    }}>
-      {options.map(opt => {
-        const active = value === opt.value
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            onPointerDown={() => setPressedValue(opt.value)}
-            onPointerUp={() => setPressedValue(null)}
-            onPointerLeave={() => setPressedValue(null)}
-            onPointerCancel={() => setPressedValue(null)}
-            style={{
-              padding: '6px 12px',
-              minWidth: minOptionWidth || undefined,
-              textAlign: 'center',
-              borderRadius: 'var(--radius-full)',
-              fontSize: 13, fontWeight: 500,
-              cursor: 'pointer',
-              border: 'none',
-              whiteSpace: 'nowrap',
-              backgroundColor: active ? 'var(--color-accent)' : 'transparent',
-              color: active ? '#fff' : 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
-              transform: pressedValue === opt.value ? 'scale(0.96)' : 'scale(1)',
-              transition: 'background-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
-              WebkitTapHighlightColor: 'transparent',
-              outline: 'none',
-            }}
-          >
-            {opt.label}
-          </button>
-        )
-      })}
     </div>
   )
 }

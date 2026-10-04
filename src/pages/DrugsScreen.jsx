@@ -12,6 +12,22 @@
  *        Phase 1B's rebuild lands, so most categories show 0 drugs for now
  *        — see GFB_STEPS.md 1A.5.
  *
+ * 2026-10-04 (search mode and sort on the screen): Search Mode and Sort By
+ * moved out of the filter sheet onto this screen, using the brand list's
+ * pop-up and button style (BrandsList.jsx). Search Mode is one button above
+ * the search bar showing the current mode (Brand, Generic or Class); tapping it
+ * opens a pop-up with the three modes, and a pick switches at once and closes
+ * it. It sits in the same place in the category view and the results view, so
+ * the search box is not rebuilt (and the keyboard not closed) when typing
+ * starts. Sort By (Relevance, Cheapest first) is a quiet text button on its own
+ * line under the count and Clear filter line, shown only while something is
+ * typed (so not on the one-character 'Keep typing' state, and not in Class
+ * search, which shows cards). While class cards are showing, the filter button
+ * in the search bar is hidden too, because the filter sheet now holds Form /
+ * Route only and that does not apply to cards. The 'Searching in X mode'
+ * message is gone; the button shows the mode. Mode and sort still live in
+ * DrugContext, so they survive opening a drug and coming back.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -150,13 +166,14 @@
  * wrong empty state never flashes. Class searches are not logged.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
+import { PillButton, SortButton, FilterModal } from '../components/drugs/BrandsList'
 import ClassSearchResults from '../components/drugs/ClassSearchResults'
 import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
@@ -213,6 +230,18 @@ function sortByPrice(drugs) {
   })
 }
 
+// Search Mode and Sort By pop-up options. The pop-up and the buttons are the
+// brand list's (BrandsList.jsx).
+const MODE_OPTIONS = [
+  { value: 'brand',   label: 'Brand',   icon: Tag },
+  { value: 'generic', label: 'Generic', icon: FlaskConical },
+  { value: 'class',   label: 'Class',   icon: Layers },
+]
+const SORT_OPTIONS = [
+  { value: 'relevance', label: 'Relevance',      icon: Target },
+  { value: 'cheapest',  label: 'Cheapest first', icon: ArrowDown01 },
+]
+
 // ─── DrugsScreen ──────────────────────────────────────────────────────────────
 
 export default function DrugsScreen() {
@@ -262,6 +291,8 @@ export default function DrugsScreen() {
 
   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
   const [filterOpen,       setFilterOpen]       = useState(false)
+  // Which of the Search Mode / Sort By pop-ups is open.
+  const [openMenu,         setOpenMenu]         = useState(null)   // 'mode' | 'sort' | null
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
@@ -337,6 +368,17 @@ export default function DrugsScreen() {
     setQuery(val)
   }
 
+  // Search Mode / Sort By pop-ups: a pick applies at once and closes the pop-up.
+  function handlePickMode(value) {
+    setMode(value)
+    setOpenMenu(null)
+  }
+
+  function handlePickSort(value) {
+    setSortMode(value)
+    setOpenMenu(null)
+  }
+
   // Class search mode: open the class sheet for a tapped card. 'direct' is the
   // sheet's 'open straight on this' value: a subclass name, or the 'all drugs'
   // row for a class that has no subclasses to choose from; null means the
@@ -373,8 +415,25 @@ export default function DrugsScreen() {
   const isClassSearch = mode === 'class' && hasQuery
   const resultsNotReady = hasQuery && !queryTooShort && ((mode === 'class') !== (classResults != null))
   const searchPlaceholder = mode === 'class' ? 'Search classes or families…' : 'Search drugs…'
-  // The Form/Route filter does not apply to class cards.
+  // The Form/Route filter does not apply to class cards, so the filter button
+  // in the search bar is not offered then (the sheet would be empty).
   const filtersApply = !isClassSearch
+
+  // Search Mode button above the search bar: shows the current mode, opens the
+  // pop-up with the three modes. Drawn at the same spot in both views (see
+  // the 2026-07-19 note at the top of this file).
+  const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
+  const searchModeRow = (
+    <div style={{ display: 'flex', marginBottom: 'var(--space-2)' }}>
+      <PillButton
+        icon={currentMode.icon}
+        label={currentMode.label}
+        active={mode !== 'brand'}
+        fit
+        onPress={() => setOpenMenu('mode')}
+      />
+    </div>
+  )
 
   // Same list the category tiles render from (see the category-list view
   // below).
@@ -389,14 +448,6 @@ export default function DrugsScreen() {
   // browsing vs. the category list) so DrugFilterPanel can be mounted once,
   // below, shared by both — instead of once per branch (step 1f.2).
   let content
-  // drug-search-sort-cheapest — gates DrugFilterPanel's Sort By section.
-  // True as soon as a query is typed, regardless of whether it matched
-  // anything — sorting is a property of the search itself (Relevance vs
-  // Cheapest First), not of having results to show right now, so a
-  // no-match/"did you mean" state still keeps the option available for
-  // whatever the person searches next. False for category browsing (no
-  // query at all), same as before.
-  let hasSearchQuery = false
   // Phase 5 (§4.3) — true when the search itself found real results but the
   // active Form/Route filter hid all of them (before/after count compare,
   // set inside the search-results branch below where `base`/`filtered`
@@ -441,8 +492,6 @@ export default function DrugsScreen() {
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
-    hasSearchQuery = hasQuery
-
     // activeCategory holds the category's stable slug (see plan's decided
     // design — generics.category stores a drug_categories.slug, not the
     // display name), so both the back-button label and the sticky search
@@ -459,11 +508,12 @@ export default function DrugsScreen() {
           query={query}
           onQueryChange={handleQueryChange}
           placeholder={mode === 'class' ? searchPlaceholder : (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)}
-          onFilter={() => setFilterOpen(true)}
+          onFilter={filtersApply ? () => setFilterOpen(true) : undefined}
           hasActiveFilters={hasFilters && filtersApply}
         />
         <div>
         <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
+        {searchModeRow}
         {/* Search bar — same single-wrapper shape as the category-list view's
             copy below, on purpose (see 2026-07-19 note at the top of this
             file): keeping both trees identical at this position is what
@@ -474,7 +524,7 @@ export default function DrugsScreen() {
             value={query}
             onChange={handleQueryChange}
             placeholder={searchPlaceholder}
-            onFilter={() => setFilterOpen(true)}
+            onFilter={filtersApply ? () => setFilterOpen(true) : undefined}
             hasActiveFilters={hasFilters && filtersApply}
           />
         </div>
@@ -549,7 +599,7 @@ export default function DrugsScreen() {
                   duplicate right below it. */}
               <div style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                marginBottom: 'var(--space-2)',
+                marginBottom: hasQuery ? 0 : 'var(--space-2)',
               }}>
                 <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
                   {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
@@ -566,6 +616,20 @@ export default function DrugsScreen() {
                 </div>
                 {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
               </div>
+
+              {/* Sort By — on its own line under the count line, only while
+                  something is typed. This branch is never reached for a
+                  one-character query or a class search, so Sort is not
+                  offered there. Stays offered when a search finds nothing,
+                  so the choice carries to the next search. */}
+              {hasQuery && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-2)' }}>
+                  <SortButton
+                    label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
+                    onPress={() => setOpenMenu('sort')}
+                  />
+                </div>
+              )}
 
               {/* search-all-drugs-placement (redesigned) — full-width,
                   directly under the count line rather than above it, so it
@@ -649,6 +713,7 @@ export default function DrugsScreen() {
       />
       <div>
         <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
+        {searchModeRow}
         {/* Same single-wrapper shape as the search-results view's copy
             above, on purpose — see 2026-07-19 note at the top of this file. */}
         <div style={{ marginBottom: 'var(--space-3)' }}>
@@ -787,12 +852,36 @@ export default function DrugsScreen() {
         onClose={() => setFilterOpen(false)}
         onApply={handleApplyFilters}
         activeFilters={activeFilters}
-        mode={mode}
-        onModeChange={setMode}
-        hasSearchResults={hasSearchQuery}
-        sortMode={sortMode}
-        onSortChange={setSortMode}
       />
+
+      {/* Search Mode / Sort By pop-ups: the brand list's pop-up, drawn over the
+          whole page. A pick applies at once and closes it. */}
+      {openMenu === 'mode' && (
+        <FilterModal
+          onPage
+          title="Search Mode"
+          titleIcon={Search}
+          columns={1}
+          single
+          options={MODE_OPTIONS}
+          selected={[mode]}
+          onPick={handlePickMode}
+          onClose={() => setOpenMenu(null)}
+        />
+      )}
+      {openMenu === 'sort' && (
+        <FilterModal
+          onPage
+          title="Sort By"
+          titleIcon={ArrowUpDown}
+          columns={1}
+          single
+          options={SORT_OPTIONS}
+          selected={[sortMode]}
+          onPick={handlePickSort}
+          onClose={() => setOpenMenu(null)}
+        />
+      )}
 
       <RecentlyViewedSheet
         isOpen={showRecentSheet}
