@@ -121,7 +121,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import BrandsList, { CountTag } from '../BrandsList.jsx'
+import BrandsList from '../BrandsList.jsx'
+import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 
 function TabButton({ label, count, active, onClick }) {

@@ -204,21 +204,49 @@
  * of the other kind are still on their way (the search waits 150ms after
  * typing or after a mode change), nothing is drawn in the results area, so a
  * wrong empty state never flashes. Class searches are not logged.
+ *
+ * 2026-10-04 (Search and Browse as two equal areas, full refactor of the top
+ * of the screen): the Drugs screen is now the hero, then two matching cards of
+ * equal weight, 'Search' and (on the home view) 'Browse', drawn by
+ * DrugsSearchSection.jsx, DrugsBrowseSection.jsx and the shared
+ * DrugsSectionCard.jsx in components/drugs/home/. The Search area holds its
+ * title with the info icon, the Search Mode button, the search bar, the Clear
+ * filter button (moved here from three other spots, next to the filter button
+ * it belongs to) and the Recently viewed shortcut (home view only, moved
+ * under the search bar). It is written once and drawn in every view; before,
+ * the search bar and the Search mode row were written out twice, once per
+ * view, which is what the 2026-07-19 keyboard bug above came from. The
+ * Browse area's Category / Class switch is now inside its title ('Browse by
+ * Category · Class', one tap) instead of a separate switch under it, and the
+ * choice is remembered in DrugContext (browseMode) like Search mode, so it
+ * survives opening a drug or switching tabs. The Search Mode pop-up and its
+ * info sheet moved into the Search area; the Sort By pop-up stays here and
+ * both use the shared pop-up in ui/FilterModal.jsx (it used to be borrowed
+ * from BrandsList.jsx). The small pieces that were written in this file
+ * (ModeButton, CategoryRow, RecentlyViewedButton, FilledHintButton,
+ * ClearFiltersButton, the loading placeholder and the failed-download
+ * message) moved unchanged to components/drugs/home/. Filtering, sorting, the
+ * class sheet and the result states are as they were. Older notes above that
+ * say 'Browse by' or describe the Search mode row or the buttons now in
+ * components/drugs/home/ describe the same code, now in those files.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown, Info, LayoutGrid } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
-import { FilterModal } from '../components/drugs/BrandsList'
+import { FilterModal } from '../components/ui/FilterModal'
 import ClassSearchResults from '../components/drugs/ClassSearchResults'
 import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
-import SearchModeInfoSheet from '../components/drugs/SearchModeInfoSheet'
+import DrugsSearchSection from '../components/drugs/home/DrugsSearchSection'
+import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
+import FilledHintButton from '../components/drugs/home/FilledHintButton'
+import { shimmer } from '../components/drugs/home/shimmer'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
@@ -271,72 +299,12 @@ function sortByPrice(drugs) {
   })
 }
 
-// Search Mode and Sort By pop-up options. The pop-up and the buttons are the
-// brand list's (BrandsList.jsx).
-const MODE_OPTIONS = [
-  { value: 'brand',   label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
-  { value: 'generic', label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)', tint: 'var(--color-generic-light)' },
-  { value: 'class',   label: 'Class',   icon: Layers,       color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
-]
-// The Search Mode pop-up shows the same three modes with the word 'mode' added
-// ('Brand mode'). The button above the search bar keeps the short names, since
-// it has a fixed width.
-const MODE_POPUP_OPTIONS = MODE_OPTIONS.map(o => ({ ...o, label: o.label + ' mode' }))
+// Sort By pop-up options. The pop-up is the shared one (ui/FilterModal.jsx). The
+// Search Mode options live with the Search area (DrugsSearchSection.jsx).
 const SORT_OPTIONS = [
   { value: 'relevance', label: 'Relevance',      icon: Target },
   { value: 'cheapest',  label: 'Cheapest first', icon: ArrowDown01 },
 ]
-
-// Height of the Clear filter button (13px text + 12px padding + 3px border).
-// The three rows that can show it keep at least this height even while it is
-// hidden, so the line and the elements below do not jump when it appears.
-const CLEAR_BUTTON_HEIGHT = 28
-
-// Search Mode button: a fixed width so it never changes size between Brand,
-// Generic and Class. Same soft tinted pill for all three, each in its own mode
-// accent (Brand blue, Generic green, Class violet), the same accent the pop-up
-// and the info sheet use.
-function ModeButton({ icon: Icon, label, color, tint, onPress }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      onClick={onPress}
-      aria-haspopup="dialog"
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        width:                   128,
-        flexShrink:              0,
-        boxSizing:               'border-box',
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     6,
-        padding:                 '8px 12px',
-        borderRadius:            'var(--radius-full)',
-        border:                  'none',
-        backgroundColor:         tint,
-        color:                   color,
-        fontFamily:              'var(--font-body)',
-        fontSize:                13,
-        fontWeight:              600,
-        cursor:                  'pointer',
-        opacity:                 pressed ? 0.9 : 1,
-        transform:               pressed ? 'scale(0.97)' : 'scale(1)',
-        transition:              'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-        WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
-      }}
-    >
-      <Icon size={14} color={color} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {label}
-      </span>
-      <ChevronDown size={14} color={color} style={{ flexShrink: 0 }} />
-    </button>
-  )
-}
 
 // Sort By button: plain text with a small icon and chevron, no outline or
 // fill. Black and a little bigger than the brand list's own Sort button.
@@ -379,6 +347,7 @@ export default function DrugsScreen() {
     mode, setMode,
     activeFilters, setActiveFilters,
     sortMode, setSortMode,
+    browseMode, setBrowseMode,
     query, setQuery,
     results:         searchResults,
     queryTooShort,
@@ -418,12 +387,11 @@ export default function DrugsScreen() {
 
   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
   const [filterOpen,       setFilterOpen]       = useState(false)
-  // Which of the Search Mode / Sort By pop-ups is open.
-  const [openMenu,         setOpenMenu]         = useState(null)   // 'mode' | 'sort' | null
+  // The Sort By pop-up. (The Search Mode pop-up and its info sheet belong to
+  // the Search area now, see DrugsSearchSection.jsx.)
+  const [showSortMenu,     setShowSortMenu]     = useState(false)
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
-  // The pop-up that explains the three search modes (info icon by the 'Search mode' title).
-  const [showModeInfo,     setShowModeInfo]     = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
   // 'classTarget' stays after the sheet closes so it can slide out showing the
   // same content; 'classSheetKey' changes on every open so each opening starts
@@ -487,7 +455,7 @@ export default function DrugsScreen() {
   }
 
   // drug-filter-instant-apply — opens the confirm step instead of clearing
-  // directly. Every ClearFiltersButton in this file calls this now, not
+  // directly. Every Clear filter button on this screen calls this now, not
   // handleClearFilters itself.
   function requestClearFilters() {
     setShowClearFiltersConfirm(true)
@@ -497,15 +465,15 @@ export default function DrugsScreen() {
     setQuery(val)
   }
 
-  // Search Mode / Sort By pop-ups: a pick applies at once and closes the pop-up.
-  function handlePickMode(value) {
-    setMode(value)
-    setOpenMenu(null)
-  }
-
+  // Sort By pop-up: a pick applies at once and closes the pop-up.
   function handlePickSort(value) {
     setSortMode(value)
-    setOpenMenu(null)
+    setShowSortMenu(false)
+  }
+
+  // A tapped category tile (or the All Drugs tile, slug 'all').
+  function handleOpenCategory(slug) {
+    navigate(ROUTES.DRUGS_CATEGORY(slug))
   }
 
   // Class search mode: open the class sheet for a tapped card. 'direct' is the
@@ -527,11 +495,8 @@ export default function DrugsScreen() {
     openClassSheet(className, subclassName)
   }
 
-  // Drugs home: which list is shown under the hero, the categories or every
-  // class. 'category' stays the default.
-  const [browseMode, setBrowseMode] = useState('category')
-
-  // Every class in the library, A to Z, for the 'Browse by class' view.
+  // Every class in the library, A to Z, for the Browse area's Class list.
+  // (Which list the Browse area shows, browseMode, lives in DrugContext.)
   const allClasses = useMemo(
     () => buildClassIndex(drugs).classes.slice().sort((a, b) => a.name.localeCompare(b.name)),
     [drugs]
@@ -576,55 +541,7 @@ export default function DrugsScreen() {
   // empty).
   const filtersApply = !isClassSearch
 
-  // Search Mode button above the search bar: shows the current mode, opens the
-  // pop-up with the three modes. Drawn at the same spot in both views (see
-  // the 2026-07-19 note at the top of this file).
-  const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
-  const searchModeRow = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        <span style={{
-          fontSize:   15,
-          fontWeight: 700,
-          color:      'var(--color-text-primary)',
-          fontFamily: 'var(--font-body)',
-        }}>
-          Search mode
-        </span>
-        <button
-          onClick={() => setShowModeInfo(true)}
-          aria-label="How search modes work"
-          style={{
-            display:                 'flex',
-            alignItems:              'center',
-            justifyContent:          'center',
-            width:                   28,
-            height:                  28,
-            borderRadius:            '50%',
-            background:              'none',
-            border:                  'none',
-            padding:                 0,
-            cursor:                  'pointer',
-            color:                   'var(--color-text-tertiary)',
-            WebkitTapHighlightColor: 'transparent',
-            outline:                 'none',
-          }}
-        >
-          <Info size={14} />
-        </button>
-      </div>
-      <ModeButton
-        icon={currentMode.icon}
-        label={currentMode.label}
-        color={currentMode.color}
-        tint={currentMode.tint}
-        onPress={() => setOpenMenu('mode')}
-      />
-    </div>
-  )
-
-  // Same list the category tiles render from (see the category-list view
-  // below).
+  // Same list the category tiles render from (the Browse area).
   const categoriesWithCounts = categories
     .map(cat => ({
       ...cat,
@@ -632,18 +549,30 @@ export default function DrugsScreen() {
     }))
     .filter(c => c.count > 0)
 
-  // content holds whichever view's markup applies (search results/category
-  // browsing vs. the category list) so DrugFilterPanel can be mounted once,
-  // below, shared by both — instead of once per branch (step 1f.2).
-  let content
+  // activeCategory holds the category's stable slug (see plan's decided
+  // design — generics.category stores a drug_categories.slug, not the
+  // display name), so both the back-button label and the sticky search
+  // bar's placeholder (1a.3, decision 4.6's correction) need this lookup.
+  const categoryLabel = activeCategory === null
+    ? ''
+    : activeCategory === '__all'
+      ? 'All Drugs'
+      : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
+
+  // Two views share one screen frame (sticky header, hero, Search area, all
+  // drawn once below): the results view (a query typed, or a category open)
+  // and the home view (the Browse area). 'body' holds whichever applies, drawn
+  // under the Search area.
+  const inResultsView = hasQuery || (activeCategory !== null)
+  let body
   // Phase 5 (§4.3) — true when the search itself found real results but the
   // active Form/Route filter hid all of them (before/after count compare,
-  // set inside the search-results branch below where `base`/`filtered`
-  // exist). Hoisted so the useEffect further down can read it.
+  // set inside the results branch below where `base`/`filtered` exist).
+  // Hoisted so the useEffect further down can read it.
   let isFilterMasked = false
 
-  // ── Search results view ───────────────────────────────────────────────────
-  if (hasQuery || (activeCategory !== null)) {
+  // ── Results view ──────────────────────────────────────────────────────────
+  if (inResultsView) {
     // 1c.1 (decision 4.9): a query and an active category can both be true
     // at once (typing while browsing inside a category) — search results
     // need to stay scoped to that category too, the same way the no-query
@@ -680,364 +609,185 @@ export default function DrugsScreen() {
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
-    // activeCategory holds the category's stable slug (see plan's decided
-    // design — generics.category stores a drug_categories.slug, not the
-    // display name), so both the back-button label and the sticky search
-    // bar's placeholder (1a.3, decision 4.6's correction) need this lookup.
-    const categoryLabel = activeCategory === '__all'
-      ? 'All Drugs'
-      : (categories.find(c => c.slug === activeCategory)?.name_en ?? activeCategory)
-
-    content = (
+    body = (
       <>
-        <StickyDrugsHeader
-          visible={showStickyHeader}
-          isDark={isDark}
-          query={query}
-          onQueryChange={handleQueryChange}
-          placeholder={mode === 'class' ? searchPlaceholder : (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)}
-          onFilter={() => setFilterOpen(true)}
-          filterDisabled={!filtersApply}
-          hasActiveFilters={hasFilters && filtersApply}
-        />
-        <div>
-        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
-        {searchModeRow}
-        {/* Search bar — same single-wrapper shape as the category-list view's
-            copy below, on purpose (see 2026-07-19 note at the top of this
-            file): keeping both trees identical at this position is what
-            lets React preserve the input, and the keyboard with it, across
-            the hasQuery transition. */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
-          <SearchBar
-            value={query}
-            onChange={handleQueryChange}
-            placeholder={searchPlaceholder}
-            onFilter={() => setFilterOpen(true)}
-            filterDisabled={!filtersApply}
-            hasActiveFilters={hasFilters && filtersApply}
-          />
-        </div>
+        {/* Back to categories button (only when in a category, not searching) */}
+        {!hasQuery && activeCategory !== null && (
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            marginBottom: 'var(--space-3)',
+          }}>
+            <button
+              onClick={() => navigate(ROUTES.DRUGS, { replace: true })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+                fontFamily: 'var(--font-body)', padding: '4px 0',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+              {/* categoryLabel computed above, shared with the sticky
+                  search bar's placeholder (1a.3). */}
+              {categoryLabel}
+            </button>
+          </div>
+        )}
 
-          {/* Back to categories button (only when in a category, not searching) */}
-          {!hasQuery && activeCategory !== null && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              minHeight: CLEAR_BUTTON_HEIGHT,
-              marginBottom: 'var(--space-3)',
-            }}>
-              <button
-                onClick={() => navigate(ROUTES.DRUGS, { replace: true })}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
-                  fontFamily: 'var(--font-body)', padding: '4px 0',
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 18 9 12 15 6"/>
-                </svg>
-                {/* categoryLabel computed above, shared with the sticky
-                    search bar's placeholder (1a.3). */}
-                {categoryLabel}
-              </button>
-              {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
-            </div>
-          )}
-
-          {hasQuery && queryTooShort ? (
-            <TooShortState />
-          ) : (resultsNotReady || (modeSwitching && hasQuery)) ? (
-            // The new mode's results are still on their way (a mode switch,
-            // see resultsNotReady and modeSwitching above): show placeholder
-            // rows instead of a blank gap.
-            <SearchSwitchingState />
-          ) : isClassSearch ? (
-            // Class search mode: class and subclass cards, or one of the
-            // empty states. The key makes a new search start with the groups
-            // collapsed.
-            (classResults.classes.length + classResults.subclasses.length) > 0 ? (
-              <ClassSearchResults
-                key={query.trim()}
-                results={classResults}
-                query={query}
-                onOpenClass={handleOpenClass}
-                onOpenSubclass={handleOpenSubclass}
-              />
-            ) : crossModeMatch ? (
-              <CrossModeHintState
-                query={query}
-                mode={mode}
-                targetMode={crossModeTarget}
-                onSwitchMode={() => setMode(crossModeTarget ?? 'generic')}
-              />
-            ) : suggestions.length > 0 ? (
-              <DidYouMeanState
-                query={query}
-                suggestions={suggestions}
-                onSelect={(name) => handleQueryChange(name)}
-              />
-            ) : (
-              <EmptyState query={query} mode={mode} onClear={() => handleQueryChange('')} />
-            )
+        {hasQuery && queryTooShort ? (
+          <TooShortState />
+        ) : (resultsNotReady || (modeSwitching && hasQuery)) ? (
+          // The new mode's results are still on their way (a mode switch,
+          // see resultsNotReady and modeSwitching above): show placeholder
+          // rows instead of a blank gap.
+          <SearchSwitchingState />
+        ) : isClassSearch ? (
+          // Class search mode: class and subclass cards, or one of the
+          // empty states. The key makes a new search start with the groups
+          // collapsed.
+          (classResults.classes.length + classResults.subclasses.length) > 0 ? (
+            <ClassSearchResults
+              key={query.trim()}
+              results={classResults}
+              query={query}
+              onOpenClass={handleOpenClass}
+              onOpenSubclass={handleOpenSubclass}
+            />
+          ) : crossModeMatch ? (
+            <CrossModeHintState
+              query={query}
+              mode={mode}
+              targetMode={crossModeTarget}
+              onSwitchMode={() => setMode(crossModeTarget ?? 'generic')}
+            />
+          ) : suggestions.length > 0 ? (
+            <DidYouMeanState
+              query={query}
+              suggestions={suggestions}
+              onSelect={(name) => handleQueryChange(name)}
+            />
           ) : (
-            <>
-              {/* drug-filter-instant-apply — only shown while a search
-                  query is active. When just browsing a category with no
-                  query, the back-to-categories row above already shows its
-                  own Clear filters link — showing this one too would be a
-                  duplicate right below it. */}
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                minHeight: hasQuery ? CLEAR_BUTTON_HEIGHT : undefined,
-                marginBottom: hasQuery ? 0 : 'var(--space-2)',
-              }}>
-                <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>
-                  {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
-                  {query && ` for "${query}"`}
-                  {/* search-category-notice (corrected) — only added while a
-                      query is active. Browsing a category with no query
-                      already names it in the back-to-categories row right
-                      above, so repeating it here was redundant; it only
-                      earns its place once a query is typed and that back
-                      row disappears (see the !hasQuery condition on it
-                      below), leaving the category name with nowhere else
-                      to show. */}
-                  {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
-                </div>
-                {hasFilters && hasQuery && !isFilterMasked && <ClearFiltersButton onClick={requestClearFilters} />}
-              </div>
-
-              {/* Sort By — on its own line under the count line, only while
-                  something is typed. This branch is never reached for a
-                  one-character query or a class search, so Sort is not
-                  offered there. Stays offered when a search finds nothing,
-                  so the choice carries to the next search. */}
-              {/* 'Keep typing to narrow these results' sits right above the
-                  Sort By button, and only shows for a list past 100. */}
-              {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
-              {hasQuery && (
-                <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
-                  <SortByButton
-                    label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
-                    onPress={() => setOpenMenu('sort')}
-                  />
-                </div>
-              )}
-
-              {/* search-all-drugs-placement (redesigned) — full-width,
-                  directly under the count line rather than above it, so it
-                  never sits on top of a result the person already found.
-                  Shown any time a query is scoped to a specific category,
-                  regardless of whether that category had a match — the
-                  count line right above it already gives the context
-                  (what was found and where), so the button reads as "go
-                  further" rather than "something's wrong." */}
-              {hasQuery && activeCategory && activeCategory !== '__all' && (
-                <FilledHintButton
-                  onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
-                  style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
-                >
-                  Search all drugs instead
-                </FilledHintButton>
-              )}
-
-              {displayed.length === 0 ? (
-                isFilterMasked ? (
-                  <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
-                ) : crossModeMatch ? (
-                  // cross-mode-search-hint — ranked above DidYouMeanState: an
-                  // exact hit in the other mode is a more certain answer than
-                  // a same-mode fuzzy typo guess.
-                  <CrossModeHintState
-                    query={query}
-                    mode={mode}
-                    onSwitchMode={() => setMode(mode === 'brand' ? 'generic' : 'brand')}
-                  />
-                ) : suggestions.length > 0 ? (
-                  <DidYouMeanState
-                    query={query}
-                    suggestions={suggestions}
-                    onSelect={(name) => handleQueryChange(name)}
-                  />
-                ) : (
-                  <EmptyState query={query} onClear={() => handleQueryChange('')} />
-                )
-              ) : (
-                <>
-                  <VirtualDrugList
-                    drugs={displayed}
-                    onTap={handleDrugTap}
-                    categories={categories}
-                    isDark={isDark}
-                    isDrugFavourited={isDrugFavourited}
-                    onToggleFavourite={handleToggleDrugFavourite}
-                    highlight={query}
-                    searchMode={mode === 'class' ? 'brand' : mode}
-                  />
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </>
-    )
-  } else {
-    // ── Category list view ────────────────────────────────────────────────
-    // Matched by slug, the category's stable internal code — not name_en,
-    // which is just the editable display label. This is the plan's decided
-    // design (a generic's category is stored as a drug_categories.slug, kept
-    // as plain text rather than a foreign key, but still the stable code,
-    // not the human-facing name that can be renamed later).
-    // categoriesWithCounts is computed once above (1c.2) so both this tile
-    // list and the search-results branch above share the exact same list.
-    const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
-
-    content = (
-      <>
-        <StickyDrugsHeader
-          visible={showStickyHeader}
-          isDark={isDark}
-        query={query}
-        onQueryChange={handleQueryChange}
-        placeholder={searchPlaceholder}
-        onFilter={() => setFilterOpen(true)}
-        hasActiveFilters={hasFilters}
-      />
-      <div>
-        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
-        {searchModeRow}
-        {/* Same single-wrapper shape as the search-results view's copy
-            above, on purpose — see 2026-07-19 note at the top of this file. */}
-        <div style={{ marginBottom: 'var(--space-3)' }}>
-          <SearchBar
-            value={query}
-            onChange={handleQueryChange}
-            placeholder={searchPlaceholder}
-            onFilter={() => setFilterOpen(true)}
-            hasActiveFilters={hasFilters}
-          />
-        </div>
-
-        {/* Recently viewed — 2026-08-09: replaced the horizontal chip strip
-            with a single button that opens RecentlyViewedSheet, a full list
-            of the last MAX_RECENT (15) drugs rendered as normal
-            SharedDrugCard rows. The strip only ever showed ~5 names before
-            running out of horizontal room; a button + sheet scales to the
-            full 15-item history instead of silently truncating what's
-            visible. */}
-        {recentDrugs.length > 0 && (
-          <RecentlyViewedButton
-            onTap={() => setShowRecentSheet(true)}
-            drugs={recentDrugObjects}
-            categories={categories}
-            isDark={isDark}
-          />
-        )}
-
-        {/* Loading skeleton — was a progress ring; switched to the same
-            shimmer skeleton method ConditionsScreen.jsx uses for its own
-            cold-start loading state. */}
-        {loading && drugs.length === 0 && (
-          <DrugsSkeleton />
-        )}
-
-        {/* 2026-08-31 bugfix: previously, if loading finished but nothing
-            actually came through (a failed cold-start fetch), this screen
-            fell straight through to an empty category grid with no
-            message and no way to recover short of restarting the app.
-            Now a real failure — surfaced by useDrugs.js — gets a plain
-            message and a Retry button instead. Same DrugsSkeleton above
-            still owns the "still downloading" moment; this only covers
-            "finished trying, and it didn't work". */}
-        {!loading && drugs.length === 0 && error && (
-          <LibraryErrorState onRetry={retry} />
-        )}
-
-        {/* Category grid — 2026-08-09: switched from a stacked full-width
-            list to a 2-column grid of compact tiles. The list version used
-            the same full-width white-card shape as DrugsHero and the search
-            bar above it, so the whole screen read as one undifferentiated
-            stack of identical blocks. The grid gives categories a visibly
-            different shape (icon-on-top tile vs. header's icon-left row),
-            so the eye reads it as "a set of options" rather than "more of
-            the same". "All Drugs" stays as the first tile in the grid
-            rather than pulled out as its own row, matching the agreed
-            mockup. */}
-        {!loading && !(drugs.length === 0 && error) && (
+            <EmptyState query={query} mode={mode} onClear={() => handleQueryChange('')} />
+          )
+        ) : (
           <>
+            {/* Results count line. The Clear filter button is not here any
+                more: it lives in the Search area, next to the filter button. */}
             <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              minHeight: CLEAR_BUTTON_HEIGHT,
+              fontSize: 12, color: 'var(--color-text-tertiary)',
               marginBottom: 'var(--space-2)',
             }}>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                {browseMode === 'class' ? 'Browse by class' : 'Browse by category'}
-              </div>
-              {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
+              {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+              {query && ` for "${query}"`}
+              {/* search-category-notice (corrected) — only added while a
+                  query is active. Browsing a category with no query
+                  already names it in the back-to-categories row right
+                  above, so repeating it here was redundant; it only
+                  earns its place once a query is typed and that back
+                  row disappears (see the !hasQuery condition on it
+                  above), leaving the category name with nowhere else
+                  to show. */}
+              {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
             </div>
-            <BrowseModeToggle value={browseMode} onChange={setBrowseMode} />
-            {/* 2026-08-31 (cosmetic-only fix): while almost every category
-                computes to zero drugs (taxonomy mismatch, separate data
-                cleanup — not fixed here), "All Drugs" was the only tile
-                that ever rendered, sitting alone in a 2-column grid with a
-                visibly empty slot next to it. Switching to a single column
-                whenever there are no real categories yet makes that one
-                tile fill the row on purpose, instead of looking like a
-                stalled/broken list. No data or category logic changed —
-                this flips back to the normal 2-column grid automatically,
-                with no further code change, the moment categoriesWithCounts
-                actually has entries again. */}
-            {browseMode === 'class' ? (
-              allClasses.length > 0 ? (
-                <ClassSearchResults
-                  key="browse-classes"
-                  results={{ classes: allClasses, subclasses: [] }}
-                  startExpanded
-                  hideKicker
-                  onOpenClass={handleOpenClass}
-                  onOpenSubclass={handleOpenSubclass}
+
+            {/* Sort By — on its own line under the count line, only while
+                something is typed. This branch is never reached for a
+                one-character query or a class search, so Sort is not
+                offered there. Stays offered when a search finds nothing,
+                so the choice carries to the next search. */}
+            {/* 'Keep typing to narrow these results' sits right above the
+                Sort By button, and only shows for a list past 100. */}
+            {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
+            {hasQuery && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
+                <SortByButton
+                  label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
+                  onPress={() => setShowSortMenu(true)}
+                />
+              </div>
+            )}
+
+            {/* search-all-drugs-placement (redesigned) — full-width,
+                directly under the count line rather than above it, so it
+                never sits on top of a result the person already found.
+                Shown any time a query is scoped to a specific category,
+                regardless of whether that category had a match — the
+                count line right above it already gives the context
+                (what was found and where), so the button reads as "go
+                further" rather than "something's wrong." */}
+            {hasQuery && activeCategory && activeCategory !== '__all' && (
+              <FilledHintButton
+                onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
+                style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
+              >
+                Search all drugs instead
+              </FilledHintButton>
+            )}
+
+            {displayed.length === 0 ? (
+              isFilterMasked ? (
+                <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
+              ) : crossModeMatch ? (
+                // cross-mode-search-hint — ranked above DidYouMeanState: an
+                // exact hit in the other mode is a more certain answer than
+                // a same-mode fuzzy typo guess.
+                <CrossModeHintState
+                  query={query}
+                  mode={mode}
+                  onSwitchMode={() => setMode(mode === 'brand' ? 'generic' : 'brand')}
+                />
+              ) : suggestions.length > 0 ? (
+                <DidYouMeanState
+                  query={query}
+                  suggestions={suggestions}
+                  onSelect={(name) => handleQueryChange(name)}
                 />
               ) : (
-                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 'var(--space-4) 0' }}>
-                  No classes to show yet.
-                </div>
+                <EmptyState query={query} onClear={() => handleQueryChange('')} />
               )
             ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: categoriesWithCounts.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
-              <CategoryRow
-                label="All Drugs"
-                iconType="lucide"
-                iconValue="Pill"
-                color={allDrugsColors.bg}
-                textColor={allDrugsColors.fg}
-                onTap={() => navigate(ROUTES.DRUGS_CATEGORY('all'))}
+              <VirtualDrugList
+                drugs={displayed}
+                onTap={handleDrugTap}
+                categories={categories}
+                isDark={isDark}
+                isDrugFavourited={isDrugFavourited}
+                onToggleFavourite={handleToggleDrugFavourite}
+                highlight={query}
+                searchMode={mode === 'class' ? 'brand' : mode}
               />
-
-              {categoriesWithCounts.map(cat => {
-                const iconType  = cat.icon_type || 'lucide'
-                const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
-                const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
-                return (
-                  <CategoryRow
-                    key={cat.id}
-                    label={cat.name_en}
-                    iconType={iconType}
-                    iconValue={iconValue}
-                    color={colors.bg}
-                    textColor={colors.fg}
-                    onTap={() => navigate(ROUTES.DRUGS_CATEGORY(cat.slug))}
-                  />
-                )
-              })}
-            </div>
             )}
           </>
         )}
-      </div>
       </>
+    )
+  } else {
+    // ── Home view: the Browse area ────────────────────────────────────────
+    // Category tiles are matched by slug, the category's stable internal code
+    // — not name_en, which is just the editable display label. This is the
+    // plan's decided design (a generic's category is stored as a
+    // drug_categories.slug, kept as plain text rather than a foreign key, but
+    // still the stable code, not the human-facing name that can be renamed
+    // later). categoriesWithCounts is computed once above (1c.2) so the tile
+    // list and the results view share the exact same list.
+    body = (
+      <DrugsBrowseSection
+        browseMode={browseMode}
+        onBrowseModeChange={setBrowseMode}
+        loading={loading}
+        hasDrugs={drugs.length > 0}
+        error={error}
+        onRetry={retry}
+        categories={categoriesWithCounts}
+        allClasses={allClasses}
+        isDark={isDark}
+        onOpenCategory={handleOpenCategory}
+        onOpenClass={handleOpenClass}
+        onOpenSubclass={handleOpenSubclass}
+      />
     )
   }
 
@@ -1057,9 +807,54 @@ export default function DrugsScreen() {
     logUsageEvent('drug_search_filter_masked', null, normalized, mode)
   }, [isFilterMasked, query, mode])
 
+  // Sticky search bar hint: in a category with nothing typed it names the
+  // category (1a.3); otherwise it is the same text as the main search bar.
+  const stickyPlaceholder = (inResultsView && mode !== 'class')
+    ? (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)
+    : searchPlaceholder
+
   return (
     <>
-      {content}
+      <StickyDrugsHeader
+        visible={showStickyHeader}
+        isDark={isDark}
+        query={query}
+        onQueryChange={handleQueryChange}
+        placeholder={stickyPlaceholder}
+        onFilter={() => setFilterOpen(true)}
+        filterDisabled={!filtersApply}
+        hasActiveFilters={hasFilters && filtersApply}
+      />
+
+      <div>
+        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
+
+        {/* The Search area: written once, drawn in every view, so the search
+            bar is never rebuilt and the keyboard stays open when typing
+            starts (see DrugsSearchSection.jsx). Recently viewed is a shortcut
+            for the home view only; it would push typed results down. The
+            Clear filter button hides while the filter-hidden-results message
+            is showing, which has its own. */}
+        <DrugsSearchSection
+          mode={mode}
+          onModeChange={setMode}
+          query={query}
+          onQueryChange={handleQueryChange}
+          placeholder={searchPlaceholder}
+          onFilter={() => setFilterOpen(true)}
+          filterDisabled={!filtersApply}
+          hasActiveFilters={hasFilters && filtersApply}
+          showClear={hasFilters && filtersApply && !isFilterMasked}
+          onClearFilters={requestClearFilters}
+          showRecent={!inResultsView}
+          recentDrugs={recentDrugObjects}
+          onOpenRecent={() => setShowRecentSheet(true)}
+          categories={categories}
+          isDark={isDark}
+        />
+
+        {body}
+      </div>
 
       <DrugFilterPanel
         isOpen={filterOpen}
@@ -1068,23 +863,9 @@ export default function DrugsScreen() {
         activeFilters={activeFilters}
       />
 
-      {/* Search Mode / Sort By pop-ups: the brand list's pop-up, drawn over the
-          whole page. A pick applies at once and closes it. */}
-      {openMenu === 'mode' && (
-        <FilterModal
-          onPage
-          title="Search Mode"
-          titleIcon={Search}
-          columns={1}
-          single
-          large
-          options={MODE_POPUP_OPTIONS}
-          selected={[mode]}
-          onPick={handlePickMode}
-          onClose={() => setOpenMenu(null)}
-        />
-      )}
-      {openMenu === 'sort' && (
+      {/* Sort By pop-up: the shared pop-up (ui/FilterModal.jsx), drawn over
+          the whole page. A pick applies at once and closes it. */}
+      {showSortMenu && (
         <FilterModal
           onPage
           title="Sort By"
@@ -1094,7 +875,7 @@ export default function DrugsScreen() {
           options={SORT_OPTIONS}
           selected={[sortMode]}
           onPick={handlePickSort}
-          onClose={() => setOpenMenu(null)}
+          onClose={() => setShowSortMenu(false)}
         />
       )}
 
@@ -1112,15 +893,9 @@ export default function DrugsScreen() {
         onClose={() => setShowInfoSheet(false)}
       />
 
-      <SearchModeInfoSheet
-        isOpen={showModeInfo}
-        onClose={() => setShowModeInfo(false)}
-        categories={categories}
-        isDark={isDark}
-      />
-
       {/* Class search mode: the class sheet opened from a class or subclass
-          card. A tapped drug closes the sheet and opens like any drug row. */}
+          card (in typed results or in the Browse area's Class list). A tapped
+          drug closes the sheet and opens like any drug row. */}
       <ClassBottomSheet
         key={classSheetKey}
         isOpen={classSheetOpen}
@@ -1135,9 +910,10 @@ export default function DrugsScreen() {
       {/* Back to top */}
       <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
 
-      {/* drug-filter-instant-apply — one shared confirm dialog for all
-          three ClearFiltersButton spots. Only handleClearFilters (the
-          actual clear) runs, and only on confirm. */}
+      {/* drug-filter-instant-apply — one shared confirm dialog for the Clear
+          filter buttons (the Search area's, and the filter-hidden-results
+          message's). Only handleClearFilters (the actual clear) runs, and
+          only on confirm. */}
       <ConfirmSheet
         isOpen={showClearFiltersConfirm}
         onClose={() => setShowClearFiltersConfirm(false)}
@@ -1345,120 +1121,6 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
   )
 }
 
-// ─── DrugsSkeleton ──────────────────────────────────────────────────────────
-// Same shimmer() convention ConditionsScreen.jsx / ConditionDetailScreen.jsx
-// already use — copied here rather than shared, matching how those two
-// files each keep their own copy too. ConditionsScreen's proportional-row
-// technique (measure remaining space, fill with identical rows) doesn't
-// transfer here as-is: this screen's cold-start content isn't a scrollable
-// list of identical rows, it's DrugsHero + search bar + a 2-column category
-// grid — so the skeleton mirrors that shape instead: header placeholders
-// followed by a grid of tile placeholders matching CategoryRow's real shape
-// (icon circle + label). A fixed tile count (8, filling 4 grid rows), not
-// computed from viewport height, for the same reason
-// SKELETON_CONTENT_BLOCK_COUNT is fixed on ConditionDetailScreen.jsx: sized
-// to read as plausible content, not to exactly fill the screen.
-
-function shimmer(extra = {}) {
-  return {
-    backgroundColor: 'var(--color-border)',
-    borderRadius:    'var(--radius-sm)',
-    animation:       'shimmer 1.4s ease-in-out infinite',
-    ...extra,
-  }
-}
-
-const SKELETON_TILE_COUNT = 8
-
-function SkeletonTile() {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-      border: '1px solid var(--color-border-subtle)',
-      borderRadius: 'var(--radius-lg)',
-      padding: 'var(--space-3)',
-    }}>
-      <div style={shimmer({ width: 32, height: 32, borderRadius: '50%' })} />
-      <div style={shimmer({ width: '70%', height: 13 })} />
-    </div>
-  )
-}
-
-function DrugsSkeleton() {
-  return (
-    <div>
-      {/* Hero + search bar placeholders */}
-      <div style={{ marginBottom: 'var(--space-3)' }}>
-        <div style={shimmer({ width: '100%', height: 88, marginBottom: 'var(--space-3)', borderRadius: 'var(--radius-lg)' })} />
-        <div style={shimmer({ width: '100%', height: 46, borderRadius: 'var(--radius-full)' })} />
-      </div>
-      {/* Category grid placeholder */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
-        {Array.from({ length: SKELETON_TILE_COUNT }, (_, i) => <SkeletonTile key={i} />)}
-      </div>
-    </div>
-  )
-}
-
-// ─── BrowseModeToggle ───────────────────────────────────────────────────────
-// Two-segment switch under the 'Browse by' title on the Drugs home: the
-// category tiles or every class. Same pill-in-a-track look as other switches
-// in the app, theme variables only.
-
-function BrowseModeToggle({ value, onChange }) {
-  const options = [
-    { value: 'category', label: 'Category', Icon: LayoutGrid },
-    { value: 'class',    label: 'Class',    Icon: Layers },
-  ]
-  return (
-    <div
-      role="tablist"
-      aria-label="Browse by"
-      style={{
-        display:         'flex',
-        gap:             2,
-        padding:         3,
-        marginBottom:    'var(--space-3)',
-        borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-surface-muted)',
-      }}
-    >
-      {options.map(({ value: v, label, Icon }) => {
-        const active = value === v
-        return (
-          <button
-            key={v}
-            role="tab"
-            aria-selected={active}
-            onClick={() => onChange(v)}
-            style={{
-              flex:                    1,
-              display:                 'flex',
-              alignItems:              'center',
-              justifyContent:          'center',
-              gap:                     6,
-              height:                  34,
-              border:                  'none',
-              borderRadius:            'var(--radius-full)',
-              cursor:                  'pointer',
-              fontFamily:              'var(--font-body)',
-              fontSize:                13,
-              fontWeight:              active ? 600 : 500,
-              color:                   active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
-              backgroundColor:         active ? 'var(--color-surface)' : 'transparent',
-              boxShadow:               active ? 'var(--shadow-card)' : 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Icon size={15} aria-hidden="true" />
-            {label}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 // ─── SearchSwitchingState ───────────────────────────────────────────────────
 // Shown for a moment when the search mode changes while a search is on screen
 // (Brand, Generic and Class draw different results, so the old ones cannot
@@ -1476,35 +1138,6 @@ function SearchSwitchingState() {
           <div key={i} style={shimmer({ height: 64, borderRadius: 'var(--radius-lg)' })} />
         ))}
       </div>
-    </div>
-  )
-}
-
-// ─── LibraryErrorState ──────────────────────────────────────────────────────
-// 2026-08-31 bugfix: shown when the cold-start download finishes trying but
-// didn't actually get anything — previously this fell through to an empty
-// category grid with no explanation and no way to recover without
-// restarting the app. Same icon → headline → supporting-line → button shape
-// as EmptyState/CrossModeHintState further down this file, reusing
-// FilledHintButton, so it reads as a native member of that family. onRetry
-// is useDrugs.js's retry() (via DrugContext), the same one the onboarding
-// screen's own Retry button already uses.
-
-function LibraryErrorState({ onRetry }) {
-  return (
-    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <WifiOff size={28} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        Couldn't load your library
-      </div>
-      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
-        Check your connection and try again
-      </div>
-      <FilledHintButton onClick={onRetry}>
-        Try again
-      </FilledHintButton>
     </div>
   )
 }
@@ -1562,228 +1195,6 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
         )
       })}
     </div>
-  )
-}
-
-// ─── CategoryRow ──────────────────────────────────────────────────────────────
-// 2026-07-18 (drug_library_ui_ux, plan §7 step 1c.3, decision 4.21): softened —
-// "N drugs" count removed (and the now-unused `count` prop dropped from both
-// call sites below), border lightened to --color-border-subtle, shadow moved
-// to --shadow-ambient-selector. Radius (--radius-lg) unchanged. Still a card,
-// unlike the flat drug row — kept deliberately distinct per 4.21.
-//
-// 2026-08-09 (2nd pass): added the same tap-feedback treatment
-// SharedDrugCard uses — pointer handlers driving a `pressed` boolean that
-// swaps backgroundColor to var(--color-surface-muted) and scales the tile
-// to 0.99, both animated via var(--motion-fast)/var(--ease-settle) — so
-// every tappable surface on this screen (drug rows, this grid, the
-// Recently Viewed button below) responds to touch the same way.
-
-function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
-  const [pressed, setPressed] = useState(false)
-
-  return (
-    <div
-      onClick={onTap}
-      role="button"
-      tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onTap()}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 'var(--radius-lg)',
-        padding: 'var(--space-3)',
-        cursor: 'pointer',
-        outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        transform: pressed ? 'scale(0.99)' : 'scale(1)',
-        transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-      }}
-    >
-      {/* Icon in tinted circle */}
-      <div style={{
-        width: 32, height: 32, borderRadius: '50%',
-        backgroundColor: color,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        flexShrink: 0,
-      }}>
-        <SpecialtyIcon iconType={iconType} iconValue={iconValue} size={15} color={textColor} />
-      </div>
-
-      {/* Name */}
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)', lineHeight: 1.3 }}>
-        {label}
-      </div>
-    </div>
-  )
-}
-
-// ─── RecentlyViewedButton ───────────────────────────────────────────────────
-// 2026-08-09: extracted from an inline <button> in the category-list view
-// (see call site above) so it can carry its own `pressed` state — same
-// SharedDrugCard-style tap feedback as CategoryRow above, for the same
-// reason (this button sits directly above the category grid, so it needs
-// to feel like part of the same tappable surface, not a plain form button).
-
-// 2026-08-09 (redesign): swapped the clock-icon + label row for an avatar
-// stack of the 3 most recent drugs' initials, colored by each drug's own
-// category token (same resolveToken lookup CategoryRow uses). Gives a
-// visual preview of *what's* recent instead of just naming the feature.
-// Falls back gracefully if fewer than 3 recents exist — `preview` is just
-// however many are actually in `drugs` (already capped at MAX_RECENT
-// upstream, but this row itself only ever shows the first 3).
-
-function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
-  const [pressed, setPressed] = useState(false)
-  const preview = drugs.slice(0, 3)
-
-  function getInitials(drug) {
-    const name = drug.tradenameClean || drug.genericName || ''
-    if (!name) return '?'
-    return name.slice(0, 1).toUpperCase() + name.slice(1, 2).toLowerCase()
-  }
-
-  function getColors(drug) {
-    const cat = categories.find(c => c.slug === drug.category)
-    return resolveToken(cat?.color_token || FALLBACK_TOKEN, isDark)
-  }
-
-  return (
-    <button
-      onClick={onTap}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     'var(--space-2)',
-        width:                   '100%',
-        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
-        border:                  'none',
-        borderRadius:            'var(--radius-lg)',
-        padding:                 'var(--space-1) 0',
-        marginBottom:            'var(--space-2)',
-        cursor:                  'pointer',
-        fontFamily:              'var(--font-body)',
-        outline:                 'none',
-        WebkitTapHighlightColor: 'transparent',
-        transform:               pressed ? 'scale(0.99)' : 'scale(1)',
-        transition:              'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-      }}
-    >
-      <div style={{ display: 'flex', flexShrink: 0 }}>
-        {preview.map((drug, i) => {
-          const colors = getColors(drug)
-          return (
-            <div
-              key={drug.id}
-              style={{
-                width:           28,
-                height:          28,
-                borderRadius:    '50%',
-                backgroundColor: colors.bg,
-                color:           colors.fg,
-                display:         'flex',
-                alignItems:      'center',
-                justifyContent:  'center',
-                fontSize:        11,
-                fontWeight:      600,
-                border:          '2px solid var(--color-surface)',
-                marginLeft:      i === 0 ? 0 : -10,
-              }}
-            >
-              {getInitials(drug)}
-            </div>
-          )
-        })}
-      </div>
-
-      <span style={{
-        fontSize:   13,
-        fontWeight: 500,
-        color:      'var(--color-text-primary)',
-      }}>
-        Recently viewed
-      </span>
-
-      <svg
-        width="16" height="16" viewBox="0 0 24 24" fill="none"
-        stroke="var(--color-text-primary)" strokeWidth="2"
-        strokeLinecap="round" strokeLinejoin="round"
-        style={{ marginLeft: 'auto' }}
-      >
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
-    </button>
-  )
-}
-
-// ─── FilledHintButton ───────────────────────────────────────────────────────
-// Phase 5 (§4.3/§5d, CORRECTED 2026-08-29 after on-device testing): shared
-// filled/bordered treatment for this screen's "next action" hints. Uses
-// var(--color-accent) — the app's existing single action color, already
-// used for every other actionable text/link on this screen — rather than
-// red, since red is this app's destructive/error color elsewhere and
-// clearing a filter isn't destructive. "Search all drugs instead" and
-// ClearFiltersButton both build on this.
-
-function FilledHintButton({ onClick, children, style }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-        cursor: 'pointer',
-        border: '1.5px solid var(--color-accent)',
-        backgroundColor: 'var(--color-accent)',
-        color: '#fff',
-        fontSize: 13, fontWeight: 600,
-        fontFamily: 'var(--font-body)',
-        padding: '6px 12px',
-        borderRadius: 'var(--radius-md)',
-        lineHeight: 1,
-        flexShrink: 0,
-        transform: pressed ? 'scale(0.96)' : 'scale(1)',
-        transition: 'transform 0.15s ease',
-        WebkitTapHighlightColor: 'transparent',
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ─── ClearFiltersButton ─────────────────────────────────────────────────────
-// Appears in three spots: next to "Browse by category", inline with the
-// category back button, and (drug-filter-instant-apply) inline with the
-// results-count line in the search results view.
-//
-// drug-filter-instant-apply — onClick opens a confirm step
-// (requestClearFilters, wired at each call site) rather than clearing
-// directly; the actual clear only happens if the user confirms.
-//
-// CORRECTED (2026-08-29): label is singular "Clear filter" — only one
-// filter type (Form/Route) exists on this screen — and no longer carries
-// its own icon, matching the plain-text-button look of FilledHintButton.
-
-function ClearFiltersButton({ onClick }) {
-  return (
-    <FilledHintButton onClick={onClick}>
-      Clear filter
-    </FilledHintButton>
   )
 }
 

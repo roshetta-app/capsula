@@ -44,7 +44,7 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
-import { CountTag } from './BrandsList.jsx'
+import CountTag from '../ui/CountTag.jsx'
 import { MoleculeIcon } from './sections/ClassBottomSheet.jsx'
 import { titleCaseWords } from '../../utils/classSearch'
 

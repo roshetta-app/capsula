@@ -52,24 +52,33 @@ const DrugContext = createContext(null)
  * 'mode' already lives here, so the typed text, the mode and the class cards
  * survive opening a drug and coming back like everything else. Only these doc
  * comments were updated.
+ *
+ * 2026-10-04 (remembered Browse choice): 'browseMode' ('category' | 'class')
+ * joins 'mode', 'activeFilters' and 'sortMode' here. It is the Category / Class
+ * switch in the title of the Browse area on the Drugs screen. It used to be
+ * local to DrugsScreen, so opening a drug or switching tabs reset it to
+ * Category. Same rule as the others: in memory only, so it survives moving
+ * between screens and resets to Category when the app is fully closed.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
   const [mode, setMode] = useState('brand')
   const [activeFilters, setActiveFilters] = useState(null)
   const [sortMode, setSortMode] = useState('relevance')
+  const [browseMode, setBrowseMode] = useState('category')
   const searchValue = useDrugSearch(drugsValue.drugs, mode)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, ...searchValue }
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
 /**
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
- * setActiveFilters, sortMode, setSortMode, query, setQuery, results,
- * queryTooShort, suggestions, crossModeMatch, classResults, crossModeTarget }
+ * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, query,
+ * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
+ * crossModeTarget }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
- * are only filled in Class mode)
+ * are only filled in Class mode; browseMode is 'category' | 'class')
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)
