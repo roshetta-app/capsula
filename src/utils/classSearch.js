@@ -65,6 +65,15 @@
  * with pregnancy'). Singular forms are only used for words of 4+ letters, so
  * short words ('gas') behave exactly as before.
  *
+ * Class hint (2026-10-05): searchClassHint is a stricter, quieter version of
+ * searchClassIndex for the 'Also in Class mode' hint shown in Brand and
+ * Generic mode. Same entries, same keyword join, but it needs 3+ characters
+ * and only counts names where the whole name or one of its words STARTS with
+ * the typed text (tiers 1 and 2; never 'anywhere in the name'), plus keywords
+ * by the same word-start rule. So a two-letter fragment of a drug name stays
+ * quiet, while 'ssri', 'antibiotic' or 'vomiting' still finds its class.
+ * Class mode itself keeps using searchClassIndex, unchanged.
+ *
  * Keyword hits also carry 'matchedExact' (true when the typed words, without
  * filler or a plural ending, are the keyword itself). keywordHitsToLog uses it
  * so the usage log counts a keyword only when it was really typed, not while
@@ -317,6 +326,41 @@ export function searchClassIndex(index, query, keywordIndex = null) {
     subclasses: matchGroup(index.subclasses, q, qWords, tiers),
   }
   if (!keywordIndex || keywordIndex.length === 0) return byName
+
+  const skip = new Set([...byName.classes, ...byName.subclasses])
+  const byKeyword = matchKeywords(keywordIndex, q, skip)
+  return {
+    classes:    [...byName.classes,    ...byKeyword.classes],
+    subclasses: [...byName.subclasses, ...byKeyword.subclasses],
+  }
+}
+
+/**
+ * Stricter search for the Class hint in Brand and Generic mode (see the header
+ * note). Needs 3+ characters; names match only by 'starts with' or 'a word
+ * starts with' (never anywhere in the name); keywords need 3+ characters once
+ * filler words are removed.
+ *
+ * @param {{ classes: object[], subclasses: object[] }} index — from buildClassIndex
+ * @param {string} query — what the person typed
+ * @param {object[]} [keywordIndex] — from buildKeywordIndex; omit for name-only
+ * @returns {{ classes: object[], subclasses: object[] }} — same shape as
+ *   searchClassIndex; both empty when the text is under 3 characters or
+ *   nothing matched strictly
+ */
+export function searchClassHint(index, query, keywordIndex = null) {
+  const q = normalizeSearchText(query)
+  if (q.length < 3) return { classes: [], subclasses: [] }
+
+  const qWords = tokenize(q).join(' ')
+  const tiers  = [1, 2]
+
+  const byName = {
+    classes:    matchGroup(index.classes,    q, qWords, tiers),
+    subclasses: matchGroup(index.subclasses, q, qWords, tiers),
+  }
+  if (!keywordIndex || keywordIndex.length === 0) return byName
+  if (keywordQueryWords(q).join(' ').length < 3) return byName
 
   const skip = new Set([...byName.classes, ...byName.subclasses])
   const byKeyword = matchKeywords(keywordIndex, q, skip)

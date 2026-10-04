@@ -127,9 +127,11 @@
  * for this event type is live (migration allow_class_keyword_hit_event).
  *
  * Class hint in Brand and Generic mode (2026-10-05): when the typed text also
- * finds classes, drug families or class keywords (the same matching Class mode
- * uses, so 'ssri', 'vomiting' or 'antibiotic' typed in Brand mode), 'classHint'
- * carries the counts so the screen can offer 'See Class results'. It is
+ * finds classes, drug families or class keywords ('ssri', 'vomiting' or
+ * 'antibiotic' typed in Brand mode), 'classHint' carries the counts. It uses a
+ * stricter, quieter check than Class mode (searchClassHint: 3+ characters,
+ * names and keywords matched from the start of a word only), so short
+ * fragments of drug names do not trigger it. The counts so the screen can offer 'See Class results'. It is
  * computed whether or not drugs were found in this mode: the screen shows a
  * slim strip above the drugs, or a full card when there are none. A text that
  * finds classes is not a content gap (the content exists, under Class), so it
@@ -158,8 +160,9 @@
  *   crossModeTarget  — Class mode only: 'generic' | 'brand' | null, the mode
  *                      the 'switch mode' hint should offer
  *   classHint        — Brand and Generic mode only: { classes, subclasses }
- *                      (counts) when the same text finds classes, drug
- *                      families or class keywords in Class mode, else null
+ *                      (counts) when the text clearly means a class, drug
+ *                      family or class keyword (stricter than Class mode's
+ *                      own search), else null
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -171,7 +174,7 @@ import {
   getDrugSearchSuggestion,
   normalizeSearchText,
 } from '../utils/searchUtils'
-import { buildClassIndex, buildKeywordIndex, searchClassIndex, getClassSearchSuggestions, keywordHitsToLog } from '../utils/classSearch'
+import { buildClassIndex, buildKeywordIndex, searchClassIndex, searchClassHint, getClassSearchSuggestions, keywordHitsToLog } from '../utils/classSearch'
 import { logSearchGap } from '../analytics/searchGaps'
 import { logUsageEvent } from '../analytics/usageEvents'
 
@@ -354,14 +357,15 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     setClassResults(null)
     setCrossModeTarget(null)
 
-    // Class hint (2026-10-05): does the same text find classes, drug families
-    // or class keywords? Same matching as Class mode, on the small class list
-    // already built. Nothing is logged here. Computed as a local value so the
+    // Class hint (2026-10-05): does the text clearly mean a class, drug family
+    // or class keyword? A stricter check than Class mode (3+ characters, word
+    // starts only), on the small class list already built. Nothing is logged
+    // here. Computed as a local value so the
     // gap check below can use it in this same run.
     let classHintValue = null
-    if (trimmed.length >= 2) {
+    if (trimmed.length >= 3) {
       const classIndex = classIndexRef.current ?? buildClassIndex(drugs)
-      const classFound = searchClassIndex(classIndex, trimmed, classKeywordIndexRef.current)
+      const classFound = searchClassHint(classIndex, trimmed, classKeywordIndexRef.current)
       if (classFound.classes.length + classFound.subclasses.length > 0) {
         classHintValue = { classes: classFound.classes.length, subclasses: classFound.subclasses.length }
       }

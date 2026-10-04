@@ -74,8 +74,8 @@ const DrugContext = createContext(null)
  * passed through.
  *
  * 2026-10-05 (Class hint in Brand and Generic mode): useDrugSearch also returns
- * 'classHint' (counts of the classes and families the same text finds in Class
- * mode, or null). Nothing to change in the code, searchValue is spread through
+ * 'classHint' (counts of the classes and families the text clearly means, by a
+ * stricter check than Class mode itself, or null). Nothing to change in the code, searchValue is spread through
  * as-is; only these doc comments were updated.
  */
 export function DrugProvider({ children }) {
