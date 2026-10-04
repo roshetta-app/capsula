@@ -8,7 +8,7 @@
  * 2026-10-04 (phase D2, compact rows + more examples): each mode is one row
  * with a small tinted icon tile (Brand blue, Generic green, Class violet,
  * theme variables so light and dark follow automatically), the mode name, and
- * three example searches as small search-bar pills that wrap onto a second
+ * four example searches as small search-bar pills that wrap onto a second
  * line when the screen is narrow. Class has an extra line saying names and
  * everyday words both work (keyword search). The subtitle and the word 'mode'
  * are gone. One small hint card at the bottom explains how to narrow Brand and
@@ -172,21 +172,21 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
             first
             icon={Tag}
             title="Brand"
-            examples={['Controloc', 'Augmentin', 'Panadol']}
+            examples={['Controloc', 'Augmentin', 'Panadol', 'Voltaren']}
             color="var(--color-accent)"
             tint="var(--color-accent-light)"
           />
           <ModeRow
             icon={FlaskConical}
             title="Generic"
-            examples={['Pantoprazole', 'Amoxicillin', 'Paracetamol']}
+            examples={['Pantoprazole', 'Amoxicillin', 'Paracetamol', 'Ibuprofen']}
             color="var(--color-generic)"
             tint="color-mix(in srgb, var(--color-generic) 14%, transparent)"
           />
           <ModeRow
             icon={Layers}
             title="Class"
-            examples={['Proton pump inhibitor', 'vomiting', 'allergy']}
+            examples={['Proton pump inhibitor', 'vomiting', 'allergy', 'Beta blocker']}
             note="Names or everyday words."
             color="var(--color-class)"
             tint="color-mix(in srgb, var(--color-class) 14%, transparent)"
