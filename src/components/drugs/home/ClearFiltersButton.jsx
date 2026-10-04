@@ -20,9 +20,9 @@ import FilledHintButton from './FilledHintButton'
 // filter type (Form/Route) exists on this screen — and no longer carries
 // its own icon, matching the plain-text-button look of FilledHintButton.
 
-export default function ClearFiltersButton({ onClick }) {
+export default function ClearFiltersButton({ onClick, style }) {
   return (
-    <FilledHintButton onClick={onClick}>
+    <FilledHintButton onClick={onClick} style={style}>
       Clear filter
     </FilledHintButton>
   )
