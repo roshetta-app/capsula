@@ -7,7 +7,9 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 
-// 2026-10-04: made a little smaller (114px wide, was 128; 12px text, was 13).
+// 2026-10-04: made a little smaller (104px wide, was 128; 12px text, was 13)
+// and the name no longer stretches, so the arrow sits right after it; the
+// content is centred in the fixed width.
 // Search Mode button: a fixed width so it never changes size between Brand,
 // Generic and Class. Same soft tinted pill for all three, each in its own mode
 // accent (Brand blue, Generic green, Class violet), the same accent the pop-up
@@ -24,11 +26,12 @@ export default function ModeButton({ icon: Icon, label, color, tint, onPress }) 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        width:                   114,
+        width:                   104,
         flexShrink:              0,
         boxSizing:               'border-box',
         display:                 'flex',
         alignItems:              'center',
+        justifyContent:          'center',
         gap:                     6,
         padding:                 '6px 10px',
         borderRadius:            'var(--radius-full)',
@@ -47,7 +50,7 @@ export default function ModeButton({ icon: Icon, label, color, tint, onPress }) 
       }}
     >
       <Icon size={13} color={color} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span style={{ flex: '0 1 auto', minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </span>
       <ChevronDown size={13} color={color} style={{ flexShrink: 0 }} />
