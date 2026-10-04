@@ -48,7 +48,7 @@ const DrugContext = createContext(null)
  * useDrugContext's below were updated to match.
  *
  * 2026-10-04 (Class search mode): 'mode' can now also be 'class', and
- * useDrugSearch also returns 'classResults' and 'crossModeTarget' — again
+ * useDrugSearch also returns 'classResults' and 'crossModeTargets' — again
  * nothing to change in the code, searchValue is spread through as-is, and
  * 'mode' already lives here, so the typed text, the mode and the class cards
  * survive opening a drug and coming back like everything else. Only these doc
@@ -77,6 +77,10 @@ const DrugContext = createContext(null)
  * 'classHint' (counts of the classes and families the text clearly means, by a
  * stricter check than Class mode itself, or null). Nothing to change in the code, searchValue is spread through
  * as-is; only these doc comments were updated.
+ *
+ * 2026-10-05 (Class mode offers Brand and Generic): 'crossModeTarget' (one mode)
+ * became 'crossModeTargets' (a list, so a name found under both Brand and
+ * Generic offers both). Again only these doc comments changed here.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -97,8 +101,8 @@ export function DrugProvider({ children }) {
  * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode,
  * classSortMode, setClassSortMode, classKeywords, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
- * classHint, crossModeTarget }
- * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
+ * classHint, crossModeTargets }
+ * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTargets
  * are only filled in Class mode, classHint only in Brand and Generic mode; browseMode is 'category' | 'class';
  * classSortMode is 'relevance' | 'az'; classKeywords is the list of active
  * class keywords, [{ id, keyword, targets: [{ class, subclass }] }])

@@ -105,8 +105,10 @@
  * drug rows ('results' is left empty). The empty-state pieces are reused:
  * 'suggestions' holds up to 3 class/subclass names for 'Did you mean', and
  * 'crossModeMatch' is true when the text is really a drug name, with
- * 'crossModeTarget' saying which mode to offer ('generic' or 'brand'; null in
- * Brand and Generic mode, where the target is just the other one).
+ * 'crossModeTargets' listing the modes to offer (['generic'], ['brand'] or
+ * both; empty in Brand and Generic mode, where the screen works the other mode
+ * out itself). Before 2026-10-05 this was a single 'crossModeTarget' and only
+ * one of the two was offered.
  *
  * Class-mode logging (2026-10-04, feature kept; the database rules in
  * search_gaps and usage_events now accept 'class' as a mode). Class searches
@@ -157,8 +159,9 @@
  *                      something under the other mode (Brand/Generic)
  *   classResults     — Class mode only: { classes, subclasses } for the typed
  *                      text, null in every other mode (or with nothing typed)
- *   crossModeTarget  — Class mode only: 'generic' | 'brand' | null, the mode
- *                      the 'switch mode' hint should offer
+ *   crossModeTargets — Class mode only: the drug modes ('generic', 'brand',
+ *                      either or both) that have the typed text as a drug
+ *                      name; [] when none or outside Class mode
  *   classHint        — Brand and Generic mode only: { classes, subclasses }
  *                      (counts) when the text clearly means a class, drug
  *                      family or class keyword (stricter than Class mode's
@@ -181,6 +184,8 @@ import { logUsageEvent } from '../analytics/usageEvents'
 // Class mode has no drug rows to show; one shared empty array keeps the state
 // from changing identity on every search.
 const NO_RESULTS = []
+// Same idea for the list of modes a Class search can offer.
+const NO_TARGETS = []
 
 // Class keywords (CLASS_SEARCH_MODE_PLAN.md section 8, phase C, 2026-10-04):
 // the third input is the list of active class keywords from useClassKeywords,
@@ -205,10 +210,11 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
   // same-mode fuzzy typo guess.
   const [crossModeMatch, setCrossModeMatch] = useState(false)
   // Class search mode (2026-10-04): the class and subclass cards for the typed
-  // text, and which mode the 'it is a drug name' hint should switch to. Both
-  // stay null outside Class mode.
+  // text, and which modes the 'it is a drug name' hint should switch to (2026-10-05:
+  // a list, since a name can exist under both Brand and Generic). Both stay
+  // empty outside Class mode.
   const [classResults,    setClassResults]    = useState(null)
-  const [crossModeTarget, setCrossModeTarget] = useState(null)
+  const [crossModeTargets, setCrossModeTargets] = useState(NO_TARGETS)
   // Class hint (2026-10-05): counts of the classes and drug families the typed
   // text finds in Class mode, set only in Brand and Generic mode, else null.
   const [classHint, setClassHint] = useState(null)
@@ -280,7 +286,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       setSuggestions([])
       setCrossModeMatch(false)
       setClassResults(null)
-      setCrossModeTarget(null)
+      setCrossModeTargets(NO_TARGETS)
       setClassHint(null)
       return
     }
@@ -297,7 +303,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
         setClassResults(null)
         setSuggestions([])
         setCrossModeMatch(false)
-        setCrossModeTarget(null)
+        setCrossModeTargets(NO_TARGETS)
         return
       }
       const index = classIndexRef.current ?? buildClassIndex(drugs)
@@ -322,15 +328,15 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       if (found.classes.length + found.subclasses.length > 0) {
         setSuggestions([])
         setCrossModeMatch(false)
-        setCrossModeTarget(null)
+        setCrossModeTargets(NO_TARGETS)
         return
       }
       // Nothing matched. First check whether the text is a drug name (offer
       // Generic or Brand), the same strict check those modes use; else offer
       // up to 3 class or subclass names that are one or two letters off.
       const asGeneric = (searchDrugsTiered(drugs, trimmed, 'generic') ?? []).length > 0
-      const asBrand   = !asGeneric && (searchDrugsTiered(drugs, trimmed, 'brand') ?? []).length > 0
-      setCrossModeTarget(asGeneric ? 'generic' : asBrand ? 'brand' : null)
+      const asBrand   = (searchDrugsTiered(drugs, trimmed, 'brand') ?? []).length > 0
+      setCrossModeTargets([...(asGeneric ? ['generic'] : []), ...(asBrand ? ['brand'] : [])])
       setCrossModeMatch(asGeneric || asBrand)
       const classSuggestions = getClassSearchSuggestions(index, trimmed, classKeywordIndexRef.current)
       setSuggestions(classSuggestions)
@@ -355,7 +361,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       return
     }
     setClassResults(null)
-    setCrossModeTarget(null)
+    setCrossModeTargets(NO_TARGETS)
 
     // Class hint (2026-10-05): does the text clearly mean a class, drug family
     // or class keyword? A stricter check than Class mode (3+ characters, word
@@ -475,7 +481,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     suggestions,
     crossModeMatch,
     classResults,
-    crossModeTarget,
+    crossModeTargets,
     classHint,
   }
 }
