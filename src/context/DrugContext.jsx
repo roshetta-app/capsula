@@ -59,6 +59,12 @@ const DrugContext = createContext(null)
  * local to DrugsScreen, so opening a drug or switching tabs reset it to
  * Category. Same rule as the others: in memory only, so it survives moving
  * between screens and resets to Category when the app is fully closed.
+ *
+ * 2026-10-04 (Class browse sort): 'classSortMode' ('relevance' | 'az') joins
+ * them. It is the sort button above the class list of the Browse area. Relevance
+ * (the default) puts the classes with the most drugs first; 'az' is A to Z. In
+ * memory only, same rule as the others. It is separate from 'sortMode' above,
+ * which belongs to drug search.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -66,19 +72,22 @@ export function DrugProvider({ children }) {
   const [activeFilters, setActiveFilters] = useState(null)
   const [sortMode, setSortMode] = useState('relevance')
   const [browseMode, setBrowseMode] = useState('category')
+  const [classSortMode, setClassSortMode] = useState('relevance')
   const searchValue = useDrugSearch(drugsValue.drugs, mode)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, ...searchValue }
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, classSortMode, setClassSortMode, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
 /**
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
- * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, query,
+ * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode,
+ * classSortMode, setClassSortMode, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
  * crossModeTarget }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
- * are only filled in Class mode; browseMode is 'category' | 'class')
+ * are only filled in Class mode; browseMode is 'category' | 'class';
+ * classSortMode is 'relevance' | 'az')
  */
 export function useDrugContext() {
   const ctx = useContext(DrugContext)

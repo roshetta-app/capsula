@@ -1,12 +1,19 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Browse'
- * area of the Drugs home. Its header reads 'Browse by' on the left and, on the
+ * area of the Drugs home. Its header reads 'Browse drugs' on the left and, on the
  * right, a small pill switch with 'Category' and 'Class' (the same place, tint,
  * text size and height as the Search area's mode pill). The chosen option sits on a white
  * thumb that slides across the soft tint; the other is muted and one tap away. Under the header
- * it shows the category tiles or every class (A to Z, the same cards Class
- * search uses), plus the loading and failed-download states.
+ * it shows the category tiles or every class (the same cards Class search
+ * uses), plus the loading and failed-download states.
+ *
+ * Class view sort: a small sort button at the right of the class count line,
+ * styled like the sort button on the Conditions screen (arrow icon + the name
+ * of the other order). Two orders: Relevance (default, classes with the most
+ * drugs first, ties A to Z) and A - Z. The choice ('classSortMode') lives in
+ * DrugContext so it survives opening a drug or switching tabs; this file reads
+ * it from there directly.
  *
  * Nothing here keeps the choice itself: 'browseMode' and its setter come from
  * the screen, and live in DrugContext so the choice is remembered when you
@@ -17,23 +24,60 @@
  *   loading, hasDrugs, error, onRetry  the library's loading / failed state
  *   categories                       categories that have drugs, with slug,
  *                                    name_en and the icon / colour fields
- *   allClasses                       every class, A to Z
+ *   allClasses                       every class (this file puts them in order)
  *   isDark                           for the category colours
  *   onOpenCategory(slug | 'all')     open a category (or All Drugs)
  *   onOpenClass, onOpenSubclass      open the class sheet from a class card
  */
 
 import { LayoutGrid, Layers } from 'lucide-react'
+import { useMemo } from 'react'
+import { ArrowUpDown } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import CategoryRow from './CategoryRow'
 import { DrugsSkeleton, LibraryErrorState } from './BrowseStates'
 import ClassSearchResults from '../ClassSearchResults'
 import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
+import { useDrugContext } from '../../../context/DrugContext'
 
 const BROWSE_OPTIONS = [
   { value: 'category', label: 'Category', icon: LayoutGrid },
   { value: 'class',    label: 'Class',    icon: Layers },
 ]
+
+const CLASS_SORT_LABELS = { relevance: 'Relevance', az: 'A \u2013 Z' }
+
+// Sort button for the class list. Same look as the Conditions screen sort
+// button: no box, arrow icon, 13px medium text in the secondary colour. Like
+// that one it shows the order a tap will switch to, and says both in its
+// spoken label.
+function ClassSortButton({ sortMode, onToggle }) {
+  const nextMode = sortMode === 'relevance' ? 'az' : 'relevance'
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={`Sort: currently ${CLASS_SORT_LABELS[sortMode]}. Tap to switch to ${CLASS_SORT_LABELS[nextMode]}.`}
+      style={{
+        display:                 'flex',
+        alignItems:              'center',
+        gap:                     4,
+        background:              'none',
+        border:                  'none',
+        cursor:                  'pointer',
+        padding:                 '4px 0 4px 8px',
+        fontSize:                13,
+        fontWeight:              500,
+        color:                   'var(--color-text-secondary)',
+        fontFamily:              'var(--font-body)',
+        WebkitTapHighlightColor: 'transparent',
+        outline:                 'none',
+      }}
+    >
+      <ArrowUpDown size={13} strokeWidth={1.8} aria-hidden="true" />
+      {CLASS_SORT_LABELS[nextMode]}
+    </button>
+  )
+}
 
 // The Category / Class switch. Kept quiet on purpose: a soft tinted track with
 // a plain white (card-colour) thumb that slides between the two options, with
@@ -54,7 +98,7 @@ function BrowseSwitch({ value, onChange }) {
   return (
     <div
       role="group"
-      aria-label="Browse by"
+      aria-label="Browse drugs by"
       style={{
         position:            'relative',
         display:             'inline-grid',
@@ -131,7 +175,15 @@ export default function DrugsBrowseSection({
 }) {
   const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
 
-  const title = <span style={SECTION_TITLE_STYLE}>Browse by</span>
+  const { classSortMode, setClassSortMode } = useDrugContext()
+  const sortedClasses = useMemo(() => {
+    const list   = (allClasses ?? []).slice()
+    const byName = (a, b) => a.name.localeCompare(b.name)
+    if (classSortMode === 'az') return list.sort(byName)
+    return list.sort((a, b) => (b.brandCount - a.brandCount) || byName(a, b))
+  }, [allClasses, classSortMode])
+
+  const title = <span style={SECTION_TITLE_STYLE}>Browse drugs</span>
 
   let body = null
   if (loading && !hasDrugs) {
@@ -140,10 +192,16 @@ export default function DrugsBrowseSection({
     body = <LibraryErrorState onRetry={onRetry} />
   } else if (!loading) {
     body = browseMode === 'class' ? (
-      allClasses.length > 0 ? (
+      sortedClasses.length > 0 ? (
         <ClassSearchResults
           key="browse-classes"
-          results={{ classes: allClasses, subclasses: [] }}
+          results={{ classes: sortedClasses, subclasses: [] }}
+          countTrailing={
+            <ClassSortButton
+              sortMode={classSortMode}
+              onToggle={() => setClassSortMode(classSortMode === 'relevance' ? 'az' : 'relevance')}
+            />
+          }
           startExpanded
           hideKicker
           onOpenClass={onOpenClass}

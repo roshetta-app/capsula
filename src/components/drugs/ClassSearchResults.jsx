@@ -37,6 +37,8 @@
  *   hideKicker      boolean (default false): leave off the small 'Class' label
  *                   above each class name. The 'Browse by class' view uses
  *                   this, since the whole list is classes.
+ *   countTrailing   node (optional): drawn at the right end of the count line
+ *                   ('42 classes'). The Browse area puts its sort button here.
  *
  * The screen gives this component a key that changes with the typed text, so
  * a new search always starts with the groups collapsed.
@@ -201,7 +203,7 @@ function GroupLabel({ children }) {
   )
 }
 
-export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false, hideKicker = false }) {
+export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false, hideKicker = false, countTrailing = null }) {
   const [showAllClasses,    setShowAllClasses]    = useState(startExpanded)
   const [showAllSubclasses, setShowAllSubclasses] = useState(false)
 
@@ -217,9 +219,20 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
 
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
-        {parts.join(' and ')}
-        {query && ` for "${query}"`}
+      <div style={{
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        gap:            8,
+        fontSize:       12,
+        color:          'var(--color-text-tertiary)',
+        marginBottom:   'var(--space-2)',
+      }}>
+        <span>
+          {parts.join(' and ')}
+          {query && ` for "${query}"`}
+        </span>
+        {countTrailing}
       </div>
 
       {classes.length > 0 && (
