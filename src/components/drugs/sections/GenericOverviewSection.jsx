@@ -276,6 +276,15 @@
  *  - Class only or subclass only: single bold row, flush left, no dot, no line.
  *  - Subclass row is smaller and lighter; class row stays bold.
  *
+ * 2026-10-04 (Mechanism of Action slide): opening and closing the Mechanism of
+ * Action text no longer fades the whole paragraph out and back in. The box now
+ * slides: its height grows to the full text or shrinks back to 3 lines, so the
+ * lines that were already showing stay put and only the hidden lines are
+ * uncovered or covered. When closing, the full text stays until the box has
+ * finished shrinking, and only then is the 3-line cut ('...') applied. Taps
+ * during a slide are ignored. More / Less, tapping the text, and the rule for
+ * when the toggle appears are unchanged.
+ *
  * 2026-10-04 (tree icons): each row now starts with a small icon: the
  * stacked-layers icon in the class colour (--color-class) for the class, the
  * molecule icon in the app blue for the subclass (the same two icons the
@@ -290,7 +299,7 @@
  * Class/Subclass tree. Nothing about how it looks or works here changed.
  */
 
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
 import { FlaskConical, ChevronRight, Layers } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
 import ClassBottomSheet, { MoleculeIcon } from './ClassBottomSheet.jsx'
@@ -449,6 +458,8 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
 // above) — ~3 lines at this block's font-size/line-height, replacing the old
 // 30-word cutoff so the truncation always matches what's actually shown.
 const MOA_CLAMP_LINES = 3
+// How long the Mechanism of Action text takes to slide open or closed.
+const MOA_SLIDE_MS = 300
 
 export default function GenericOverviewSection({ drug, siblings = [], alternatives = [], classDrugs = [], onSelectBrand }) {
   const [brandsOpen, setBrandsOpen] = useState(false)
@@ -456,58 +467,93 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   const [sheetTab, setSheetTab] = useState('similar')
   // Whether the class sheet (subclass list, then drugs) is open.
   const [classOpen, setClassOpen] = useState(false)
-  // moaOpen: expanded (true) or clamped-to-3-lines (false) — this directly
-  // drives which style the paragraph renders with. moaVisible: the
-  // cross-fade opacity, same showX/xVisible shape used by every other
-  // truncating list on this page.
+  // moaOpen: expanded (true) or folded to 3 lines (false) — drives the More /
+  // Less label. moaClamped: whether the 3-line cut (with the '...') is applied
+  // to the text. They differ only while the box is sliding shut: the text stays
+  // fully laid out until the box has finished closing, then the cut is applied.
   const [moaOpen,    setMoaOpen]    = useState(false)
-  const [moaVisible, setMoaVisible] = useState(true)
+  const [moaClamped, setMoaClamped] = useState(true)
   const [moaHasMore, setMoaHasMore] = useState(false)
   // Tap feedback for the "Related drugs" pill — pressed/pointer-event
   // pattern like SharedDrugCard.jsx (slight shrink, 2026-10-03: plus a faint
   // fade, since the pill is filled and a muted tint would not show).
   const [similarBrandsPressed, setSimilarBrandsPressed] = useState(false)
 
-  const moaTextRef  = useRef(null)
+  const moaTextRef = useRef(null)
+  const moaBoxRef  = useRef(null)
+  // Height of the folded (3-line) text, measured while it is folded.
+  const moaClosedHeightRef = useRef(0)
+  // A slide has been asked for and is waiting for the new layout to be drawn.
+  const moaPendingRef = useRef(false)
+  // A slide is running (taps are ignored until it ends) and which way it goes.
+  const moaBusyRef = useRef(false)
+  const moaDirRef  = useRef('open')
   const moaTimerRef = useRef(null)
-  const moaRafRef   = useRef(null)
 
-  useEffect(() => () => {
+  useEffect(() => () => clearTimeout(moaTimerRef.current), [])
+
+  // End of a slide. After opening the box simply goes back to its natural
+  // height. After closing the 3-line cut is applied now; the box's fixed height
+  // is released by the measuring effect below, once that cut has been drawn, so
+  // there is no frame where the full text shows.
+  const finishMoaSlide = useCallback(() => {
+    if (!moaBusyRef.current) return
+    moaBusyRef.current = false
     clearTimeout(moaTimerRef.current)
-    cancelAnimationFrame(moaRafRef.current)
+    if (moaDirRef.current === 'close') {
+      setMoaClamped(true)
+    } else if (moaBoxRef.current) {
+      moaBoxRef.current.style.transition = ''
+      moaBoxRef.current.style.height = ''
+    }
   }, [])
 
-  // Measured once per drug, while the text is in its natural closed
-  // (clamped) state: whether it actually overflows that clamp at all —
-  // this, not a word count, decides whether the toggle renders.
+  // Measured while the text is folded (first draw, a new drug, and each time
+  // the fold is applied again): whether it actually overflows the 3 lines —
+  // this, not a word count, decides whether the toggle renders — and how tall
+  // the folded text is. Also releases a fixed height left over from closing.
   useLayoutEffect(() => {
     const text = moaTextRef.current
-    if (!text) return
+    const box  = moaBoxRef.current
+    if (!text || !box || !moaClamped) return
+    box.style.transition = ''
+    box.style.height = ''
     setMoaHasMore(text.scrollHeight > text.clientHeight + 1)
-  }, [drug?.mechanismOfAction])
+    moaClosedHeightRef.current = box.offsetHeight
+  }, [drug?.mechanismOfAction, moaClamped])
+
+  // Runs right after the toggle changed the layout: slides the box from the
+  // height it was pinned at to the new one. Only the box moves — the lines that
+  // were already showing stay exactly where they are, and the hidden lines are
+  // uncovered (or covered) by the edge sliding past them.
+  useLayoutEffect(() => {
+    if (!moaPendingRef.current) return
+    moaPendingRef.current = false
+    const box  = moaBoxRef.current
+    const text = moaTextRef.current
+    if (!box || !text) { moaBusyRef.current = false; return }
+    const target = moaDirRef.current === 'open' ? text.scrollHeight : moaClosedHeightRef.current
+    void box.offsetHeight   // make the pinned start height count before the change
+    box.style.transition = `height ${MOA_SLIDE_MS}ms var(--ease-settle)`
+    box.style.height = `${target}px`
+    // Safety net in case the browser never reports the end of the slide.
+    clearTimeout(moaTimerRef.current)
+    moaTimerRef.current = setTimeout(finishMoaSlide, MOA_SLIDE_MS + 150)
+  }, [moaOpen, finishMoaSlide])
 
   function handleMoaToggle() {
-    clearTimeout(moaTimerRef.current)
-    cancelAnimationFrame(moaRafRef.current)
-    // Fade the current (clamped or expanded) text out, swap the clamp
-    // state once that finishes, then fade the new state back in — the
-    // same cross-fade shape as the extra-items reveal in Uses/Side
-    // Effects/Contraindications, just applied to one paragraph instead of
-    // a list of rows.
-    setMoaVisible(false)
-    moaTimerRef.current = setTimeout(() => {
-      setMoaOpen(o => !o)
-      moaRafRef.current = requestAnimationFrame(() => {
-        // Force the browser to actually compute/paint the just-flipped
-        // clamp state (a real reflow — the line count just changed)
-        // before starting the opacity transition. Without this read, the
-        // reflow and the opacity flip can land in the same paint, and the
-        // browser skips straight to the end state instead of animating
-        // between them — seen as a flash/pop rather than a fade.
-        if (moaTextRef.current) void moaTextRef.current.offsetHeight
-        setMoaVisible(true)
-      })
-    }, 200)
+    const box = moaBoxRef.current
+    if (!box || moaBusyRef.current) return
+    moaBusyRef.current = true
+    const opening = !moaOpen
+    moaDirRef.current = opening ? 'open' : 'close'
+    // Pin the box at the height it has now, so the layout change that follows
+    // cannot make it jump before the slide starts.
+    box.style.transition = 'none'
+    box.style.height = `${box.offsetHeight}px`
+    moaPendingRef.current = true
+    if (opening) setMoaClamped(false)   // closing keeps the full text until the end
+    setMoaOpen(opening)
   }
 
   const {
@@ -611,41 +657,41 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
       </div>
 
       {/* ── Block 2: Mechanism of Action ────────────────────────────────── */}
-      {/* Directly under the ingredients block, no label — clamped to ~3
+      {/* Directly under the ingredients block, no label — folded to ~3
           lines visually; TextToggle (plain bold blue text, no chevron)
-          appears only when the text actually overflows that clamp. Reveal
-          is a cross-fade (opacity, 0.2s ease) — same animation style as
-          the extra-items reveal in Uses/Side Effects/Contraindications. */}
+          appears only when the text actually overflows that fold. Opening
+          and closing slide the box's height (2026-10-04): the lines that
+          are already showing never move or fade, only the hidden lines
+          are uncovered or covered. */}
       {mechanismOfAction && (
         <div style={{ marginBottom: 'var(--space-4)' }}>
-          <p
-            ref={moaTextRef}
-            onClick={moaHasMore ? handleMoaToggle : undefined}
-            style={{
-              fontSize:        14,
-              color:           'var(--color-text-primary)',
-              lineHeight:      1.6,
-              margin:          0,
-              cursor:          moaHasMore ? 'pointer' : 'default',
-              opacity:         moaVisible ? 1 : 0,
-              transition:      'opacity 0.2s ease',
-              WebkitTapHighlightColor: 'transparent',
-              // display/WebkitBoxOrient/overflow stay constant across the
-              // toggle — only WebkitLineClamp's value changes. Switching
-              // `display` itself (as the previous version did, adding it
-              // only while clamped) reset the in-flight opacity
-              // transition in some WebKit builds, so the expanded text
-              // popped straight to full opacity instead of fading in —
-              // this keeps the box model identical in both states so only
-              // opacity is ever what's animating.
-              display:         '-webkit-box',
-              WebkitBoxOrient: 'vertical',
-              WebkitLineClamp: moaOpen ? 'unset' : MOA_CLAMP_LINES,
-              overflow:        'hidden',
+          <div
+            ref={moaBoxRef}
+            onTransitionEnd={e => {
+              if (e.target === e.currentTarget && e.propertyName === 'height') finishMoaSlide()
             }}
+            style={{ overflow: 'hidden' }}
           >
-            {mechanismOfAction}
-          </p>
+            <p
+              ref={moaTextRef}
+              onClick={moaHasMore ? handleMoaToggle : undefined}
+              style={{
+                fontSize:        14,
+                color:           'var(--color-text-primary)',
+                lineHeight:      1.6,
+                margin:          0,
+                cursor:          moaHasMore ? 'pointer' : 'default',
+                WebkitTapHighlightColor: 'transparent',
+                // Only the line count changes between folded and open.
+                display:         '-webkit-box',
+                WebkitBoxOrient: 'vertical',
+                WebkitLineClamp: moaClamped ? MOA_CLAMP_LINES : 'unset',
+                overflow:        'hidden',
+              }}
+            >
+              {mechanismOfAction}
+            </p>
+          </div>
           {moaHasMore && (
             <TextToggle
               open={moaOpen}
