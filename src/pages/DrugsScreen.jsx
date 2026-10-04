@@ -31,6 +31,7 @@
  * 2026-10-04 (Search mode row layout): the row above the search bar now has the
  * text 'Search mode' on the left and the mode button on the right. The button
  * is a fixed width, so it keeps the same size for Brand, Generic and Class.
+ * The Sort By button sits on the left of its line (it was on the right).
  *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
@@ -641,7 +642,7 @@ export default function DrugsScreen() {
                   offered there. Stays offered when a search finds nothing,
                   so the choice carries to the next search. */}
               {hasQuery && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
                   <SortButton
                     label={SORT_OPTIONS.find(o => o.value === sortMode)?.label}
                     onPress={() => setOpenMenu('sort')}
