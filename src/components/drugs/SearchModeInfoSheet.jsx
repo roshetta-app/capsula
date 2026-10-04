@@ -8,7 +8,9 @@
  *   - Generic: 'Search by active ingredient'    -> Pantoprazole
  *   - Class:   'Search by drug class or family' -> Proton pump inhibitor
  * Each card has the same structure: icon, mode name, one short line, and the
- * example term in a pill that looks like a search field. One small tip at the
+ * example term in a pill that looks like a search field. Each mode has its own
+ * accent: Brand blue, Generic green, Class violet (all theme variables, so
+ * light and dark mode follow automatically). One small tip at the
  * bottom explains how to narrow Brand and Generic searches.
  *
  * Redesign: replaces the earlier version that showed real drug cards, a
@@ -31,7 +33,7 @@ import { Tag, FlaskConical, Layers, Search, Lightbulb } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 
 // One card per mode. Same structure every time, so the eye learns it once.
-function ModeCard({ icon: Icon, title, description, example }) {
+function ModeCard({ icon: Icon, title, description, example, color, tint }) {
   return (
     <div style={{
       backgroundColor: 'var(--color-surface-muted)',
@@ -45,13 +47,13 @@ function ModeCard({ icon: Icon, title, description, example }) {
           width:           40,
           height:          40,
           borderRadius:    'var(--radius-md)',
-          backgroundColor: 'var(--color-accent-light)',
+          backgroundColor: tint,
           display:         'flex',
           alignItems:      'center',
           justifyContent:  'center',
           flexShrink:      0,
         }}>
-          <Icon size={20} color="var(--color-accent)" aria-hidden="true" />
+          <Icon size={20} color={color} aria-hidden="true" />
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
@@ -72,10 +74,9 @@ function ModeCard({ icon: Icon, title, description, example }) {
         marginTop:       'var(--space-3)',
         padding:         '0 var(--space-4)',
         borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-surface)',
-        boxShadow:       'var(--shadow-card)',
+        backgroundColor: tint,
       }}>
-        <Search size={16} color="var(--color-text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
+        <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
           fontSize:     16,
           fontWeight:   600,
@@ -161,18 +162,24 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
           title="Brand"
           description="Search by medicine brand name"
           example="Controloc"
+          color="var(--color-accent)"
+          tint="var(--color-accent-light)"
         />
         <ModeCard
           icon={FlaskConical}
           title="Generic"
           description="Search by active ingredient"
           example="Pantoprazole"
+          color="var(--color-success)"
+          tint="var(--color-success-light)"
         />
         <ModeCard
           icon={Layers}
           title="Class"
           description="Search by drug class or family"
           example="Proton pump inhibitor"
+          color="var(--color-class)"
+          tint="var(--color-class-light)"
         />
 
         {/* Tip: smaller and tinted, so it reads as a side note, not a fourth mode. */}

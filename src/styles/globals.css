@@ -142,6 +142,12 @@
      and a section never read as "the same kind of box" at a glance. */
   --color-section-bg:       #F3EFFA;
 
+  /* Class search mode accent (violet): icon and text colour, with its soft
+     tint. The tint reuses the section card violet above, so light and dark
+     mode stay in step with it. Used by the search mode info sheet. */
+  --color-class:            #7C3AED;
+  --color-class-light:      var(--color-section-bg);
+
   --font-display:           "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
   --font-body:              "IBM Plex Sans", "IBM Plex Sans Arabic", sans-serif;
   --font-arabic:            "IBM Plex Sans Arabic", sans-serif;
@@ -263,6 +269,9 @@
   /* Section card — dark mode: deep violet, kept distinct in hue from the
      note card's slate-grey above (same pairing logic as light mode). */
   --color-section-bg:       #241F33;
+
+  /* Class search mode accent — dark mode (tint follows --color-section-bg). */
+  --color-class:            #A78BFA;
 
   --shadow-card:            0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
   --shadow-elevated:        0 4px 12px rgba(0,0,0,0.4);
