@@ -44,6 +44,12 @@
  * the same way the drug cards do it (highlightMatch, weight 800). Nothing is
  * bolded for a single letter or an empty search.
  *
+ * 2026-10-04 (keyword line, phase D1): a card found through a keyword
+ * (the entry carries 'matchedKeyword', set by classSearch.js) gets one small
+ * line under the name: 'matches: <keyword>', with the typed part in bold. A
+ * card found by name, and every card in the Browse view, has no such line and
+ * looks exactly as before.
+ *
  * Props:
  *   results         { classes, subclasses } from useDrugSearch (Class mode)
  *   query           string: the typed text, used for the count line and to bold
@@ -80,6 +86,21 @@ function spaceSlashes(text) {
   return (text ?? '').replace(/\s*\/\s*/g, ' / ')
 }
 
+// The keyword shown on a keyword card, with the typed part in bold. The whole
+// typed text is tried first; if it does not fit inside the keyword (typed
+// 'vomiting drugs', keyword 'vomiting'), the typed words are tried one by one,
+// longest first, and the first one that fits is bolded.
+function keywordSegments(keyword, typed) {
+  const whole = highlightMatch(keyword, typed)
+  if (whole.some(seg => seg.bold)) return whole
+  const words = (typed ?? '').split(/\s+/).filter(Boolean).sort((a, b) => b.length - a.length)
+  for (const w of words) {
+    const segs = highlightMatch(keyword, w)
+    if (segs.some(seg => seg.bold)) return segs
+  }
+  return whole
+}
+
 // How many cards each group shows before its 'Show all' row.
 const CLASS_LIMIT    = 5
 const SUBCLASS_LIMIT = 8
@@ -88,10 +109,11 @@ const ICON_TILE = 34
 
 // One tappable card. Same look as the subclass cards in the class sheet, with
 // a small kicker above the name so a class and a subclass are told apart.
-function ResultCard({ kicker, name, detail, count, Icon, onClick, highlight = '' }) {
+function ResultCard({ kicker, name, detail, matchedKeyword = '', count, Icon, onClick, highlight = '' }) {
   const [pressed, setPressed] = useState(false)
   // Same bolding the drug cards use: the typed text is drawn heavier inside the name.
   const nameSegments = highlightMatch(name, highlight)
+  const keywordLine  = matchedKeyword ? keywordSegments(matchedKeyword, highlight) : null
   return (
     <button
       onClick={onClick}
@@ -176,6 +198,23 @@ function ResultCard({ kicker, name, detail, count, Icon, onClick, highlight = ''
               overflowWrap: 'anywhere',
             }}>
               {detail}
+            </span>
+          )}
+          {keywordLine && (
+            <span style={{
+              display:    'block',
+              marginTop:  2,
+              fontSize:   12.5,
+              lineHeight: 1.3,
+              color:      'var(--color-text-secondary)',
+              overflowWrap: 'anywhere',
+            }}>
+              matches:{' '}
+              {keywordLine.map((seg, i) =>
+                seg.bold
+                  ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+                  : <span key={i}>{seg.text}</span>
+              )}
             </span>
           )}
         </span>
@@ -288,6 +327,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ResultCard
                 key={`class:${c.name}`}
                 name={spaceSlashes(titleCaseWords(c.name))}
+                matchedKeyword={c.matchedKeyword}
                 count={c.brandCount}
                 highlight={highlightText}
                 Icon={Layers}
@@ -313,6 +353,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
                 key={`sub:${s.className}\u0000${s.name}`}
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
+                matchedKeyword={s.matchedKeyword}
                 count={s.brandCount}
                 highlight={highlightText}
                 Icon={MoleculeIcon}
@@ -331,4 +372,6 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
     </div>
   )
 }
+
+
 
