@@ -273,7 +273,7 @@
 import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useWindowVirtualizer } from '@tanstack/react-virtual'
+import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
@@ -1310,6 +1310,22 @@ function SearchSwitchingState() {
 // Only the category view (no typed search) uses it.
 const drugListMemory = new Map()
 
+// 2026-10-05 (blank page behind the filter sheet): every bottom sheet pins the
+// page in place while it is open (SheetShell.jsx sets the page to 'position:
+// fixed' with a negative top equal to how far down you had scrolled). A pinned
+// page reports a scroll position of 0, so the long list believed you were back
+// at the very top, drew only the first rows, and those sit far above the part
+// of the page you are looking at: a blank page behind the dim. This reads the
+// real position from the pin (the negative top) while a sheet is open, and the
+// browser's own number otherwise, so the list keeps drawing the rows you see.
+function observeWindowOffsetThroughSheetLock(instance, cb) {
+  return observeWindowOffset(instance, (offset, isScrolling) => {
+    const html = document.documentElement
+    const pinnedTop = html.style.position === 'fixed' ? parseFloat(html.style.top) : NaN
+    cb(Number.isFinite(pinnedTop) ? -pinnedTop : offset, isScrolling)
+  })
+}
+
 function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite, highlight = '', searchMode = 'brand', memoryKey = null }) {
   const listRef = useRef(null)
   const [saved] = useState(() => (memoryKey ? drugListMemory.get(memoryKey) : undefined))
@@ -1318,6 +1334,7 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
     count: drugs.length,
     estimateSize: () => 76,
     overscan: 8,
+    observeWindowOffset: observeWindowOffsetThroughSheetLock,
     scrollMargin: listRef.current?.offsetTop ?? 0,
     getItemKey: index => drugs[index]?.id ?? index,
     initialMeasurementsCache: saved?.measurements,
