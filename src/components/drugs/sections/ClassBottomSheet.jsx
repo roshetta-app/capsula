@@ -4,10 +4,11 @@
  * 2026-10-05 (class keywords on the sheet): the common words (keywords, the
  * ones Class search uses, like 'vomiting') are now shown on the subclass list.
  * Display only, nothing happens when a word is tapped.
- *  - Words that point at the whole class are small chips at the end of the
- *    scrolling list, under a small 'Common words' title, after the family
- *    cards (or after the 'All drugs' row for a class with no families). Up to
- *    6 are shown, then a '+N' chip for the rest. Tapping '+N' shows them all
+ *  - Words that point at the whole class are small chips at the top of the
+ *    content, under a small 'Common words' title, the same place for every
+ *    class: above the 'All drugs' row of the family list, or above the drugs of
+ *    a class with no families. The space above and below the block is equal
+ *    (12 on the list, 16 on the drugs page). Up to 6 are shown, then a '+N' chip for the rest. Tapping '+N' shows them all
  *    and a 'Show less' chip folds them back. Opening the sheet starts folded.
  *    The fixed heading is unchanged.
  *  - Words that point at one family are one quiet grey line under the family's
@@ -17,9 +18,8 @@
  *    the same heading (class name and '<n> drugs', no '0 drug families'),
  *    no Back bar (the phone's Back button still closes the sheet), and no
  *    repeated class name with the search icon above the drugs (BrandsList's
- *    hideHeading). Its 'Common words' sit at the top of the drugs instead of
- *    the end, because the end of a long drugs list is out of reach. Classes
- *    with families, and a family's own drugs page, are unchanged.
+ *    hideHeading). Classes with families, and a family's own drugs page,
+ *    are unchanged.
  *  - The 'Other families' card and the 'All drugs in this class' row show no
  *    words. A class or family with no words looks exactly as before.
  *  - The words come from the app's shared data (useDrugContext, classKeywords),
@@ -544,19 +544,28 @@ export default function ClassBottomSheet({
   )
 
   // The 'Common words' title and chips (display only), or null when the class
-  // has none. Drawn at the end of the family list; for a class with no families
-  // (which opens straight on its drugs) at the top of the drugs, because the end
-  // of a long drugs list is out of reach.
+  // has none. Drawn at the top of the content for every class: above the 'All
+  // drugs' row of the family list, or above the drugs of a class with no
+  // families.
   // A class with no families, opened straight on its drugs: no Back bar, no
   // repeated class name above the drugs, the same heading as every class.
   const straightToAll = directSubclass === ALL_KEY
 
   const wordsBlock = (
   totalDrugs > 0 && classWords.length > 0 ? (
-      <>
+      <div style={{
+        flexShrink:    0,
+        display:       'flex',
+        flexDirection: 'column',
+        gap:           'var(--space-2)',
+        // The list above it has 12 of space over the first thing in it and 8
+        // between rows, so 4 more under the block makes the space above and
+        // below equal (12). On the drugs page (16 above) it is 16 below.
+        marginBottom:  straightToAll ? 'var(--space-4)' : 'var(--space-1)',
+      }}>
         <p style={{
           flexShrink:  0,
-          margin:      'var(--space-2) var(--space-1) 0',
+          margin:      '0 var(--space-1)',
           fontSize:    14.5,
           fontWeight:  600,
           color:       'var(--color-text-primary)',
@@ -605,7 +614,7 @@ export default function ClassBottomSheet({
             </button>
           )}
         </div>
-      </>
+      </div>
     ) : null
   )
 
@@ -666,11 +675,7 @@ export default function ClassBottomSheet({
               overflowY: 'auto',
               padding:   'var(--space-4) var(--space-4) var(--space-6)',
             }}>
-              {straightToAll && wordsBlock && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
-                  {wordsBlock}
-                </div>
-              )}
+              {straightToAll && wordsBlock}
               <BrandsList
                 hideHeading={straightToAll}
                 key={pickedGroup.name}
@@ -702,6 +707,7 @@ export default function ClassBottomSheet({
               gap:           'var(--space-2)',
               padding:       'var(--space-3) var(--space-4) var(--space-6)',
             }}>
+              {wordsBlock}
               {totalDrugs > 0 && (
                 <SubclassRow
                   key={ALL_KEY}
@@ -748,7 +754,6 @@ export default function ClassBottomSheet({
                   onClick={() => pickFamily(g.name)}
                 />
               ))}
-              {wordsBlock}
             </div>
           </>
         )}
