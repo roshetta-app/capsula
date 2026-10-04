@@ -229,6 +229,18 @@
  * class sheet and the result states are as they were. Older notes above that
  * say 'Browse by' or describe the Search mode row or the buttons now in
  * components/drugs/home/ describe the same code, now in those files.
+ *
+ * 2026-10-05 (Class hint in Brand and Generic mode): when the typed text is
+ * also a class name, a drug family name or a class keyword, the results area
+ * says so and offers the switch. While drugs are listed (or a Form/Route
+ * filter hides them), a slim tappable strip sits above the list: 'Also in
+ * Class mode: 2 classes, 3 drug families', with 'See Class results'. When the
+ * mode finds no drugs at all, a full card takes the place of the usual empty
+ * states, with a second button when the text is also a drug name in the other
+ * of Brand and Generic. Tapping switches to Class mode and the same text
+ * searches again (the existing loading placeholder covers the moment between).
+ * The counts come from useDrugSearch ('classHint'); Class mode itself is
+ * unchanged.
  */
 
 import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
@@ -359,6 +371,7 @@ export default function DrugsScreen() {
     suggestions,
     crossModeMatch,
     classResults,
+    classHint,
     crossModeTarget,
   } = useDrugContext()
   const { categories } = useCategories()
@@ -711,6 +724,14 @@ export default function DrugsScreen() {
                 category with no query, the count sits in the back-button row
                 above. The Clear filter button is not here any more: it lives
                 in the Search area. */}
+            {/* Class hint (2026-10-05): the same text is also a class, drug
+                family or class keyword. Slim strip while drugs are listed or
+                a filter hides them; with no drugs at all the full card in
+                the empty states below is shown instead. */}
+            {hasQuery && classHint && (displayed.length > 0 || isFilterMasked) && (
+              <ClassHintStrip hint={classHint} onSwitch={() => setMode('class')} />
+            )}
+
             {hasQuery && (
             <div style={{
               fontSize: 12, color: 'var(--color-text-tertiary)',
@@ -767,6 +788,17 @@ export default function DrugsScreen() {
             {displayed.length === 0 ? (
               isFilterMasked ? (
                 <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
+              ) : classHint ? (
+                // Class hint (2026-10-05): the text finds classes or drug
+                // families in Class mode. Ranked above the other-mode hint;
+                // that one stays available as a second button when it applies.
+                <ClassHintState
+                  query={query}
+                  hint={classHint}
+                  onSwitchClass={() => setMode('class')}
+                  otherMode={crossModeMatch ? (mode === 'brand' ? 'generic' : 'brand') : null}
+                  onSwitchOther={() => setMode(mode === 'brand' ? 'generic' : 'brand')}
+                />
               ) : crossModeMatch ? (
                 // cross-mode-search-hint — ranked above DidYouMeanState: an
                 // exact hit in the other mode is a more certain answer than
@@ -1356,6 +1388,68 @@ function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
       <FilledHintButton onClick={onSwitchMode}>
         See {otherModeLabel} results
       </FilledHintButton>
+    </div>
+  )
+}
+
+// ─── ClassHintStrip / ClassHintState ────────────────────────────────────────
+// 2026-10-05 (Class hint in Brand and Generic mode): the typed text is also a
+// class, a drug family or a class keyword. 'hint' is { classes, subclasses },
+// the counts Class mode would show (from useDrugSearch). The strip is a slim
+// tappable row above a list that already has drugs; the state is the full
+// card used when this mode found no drugs at all, built like
+// CrossModeHintState, with an optional second button when the text is also a
+// drug name in the other of Brand and Generic ('otherMode'). Both only switch
+// the mode; the typed text stays and searches again in Class mode.
+function classHintParts(hint) {
+  const parts = []
+  if (hint.classes > 0) parts.push(`${hint.classes} ${hint.classes === 1 ? 'class' : 'classes'}`)
+  if (hint.subclasses > 0) parts.push(`${hint.subclasses} ${hint.subclasses === 1 ? 'drug family' : 'drug families'}`)
+  return parts.join(', ')
+}
+
+function ClassHintStrip({ hint, onSwitch }) {
+  return (
+    <button
+      type="button"
+      onClick={onSwitch}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+        width: '100%', textAlign: 'left',
+        marginBottom: 'var(--space-3)',
+        padding: 'var(--space-2) var(--space-3)',
+        border: 'none', borderRadius: 'var(--radius-lg)',
+        background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+        fontFamily: 'var(--font-body)', fontSize: 13, cursor: 'pointer',
+      }}
+    >
+      <ArrowLeftRight size={16} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>Also in Class mode: {classHintParts(hint)}</span>
+      <span style={{ flexShrink: 0, fontWeight: 600 }}>See Class results</span>
+    </button>
+  )
+}
+
+function ClassHintState({ query, hint, onSwitchClass, otherMode, onSwitchOther }) {
+  return (
+    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
+        <ArrowLeftRight size={28} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
+        {`No drugs match${query ? ` "${query}"` : ''}`}
+      </div>
+      <div style={{ fontSize: 13, marginBottom: 'var(--space-3)', color: 'var(--color-text-secondary)' }}>
+        {`But it matches ${classHintParts(hint)} in Class mode`}
+      </div>
+      <FilledHintButton onClick={onSwitchClass}>
+        See Class results
+      </FilledHintButton>
+      {otherMode && (
+        <FilledHintButton onClick={onSwitchOther} style={{ display: 'block', margin: 'var(--space-2) auto 0' }}>
+          {`See ${otherMode} results`}
+        </FilledHintButton>
+      )}
     </div>
   )
 }

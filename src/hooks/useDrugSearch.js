@@ -126,6 +126,17 @@
  * keyword per session. Half-typed words are not counted. The database rule
  * for this event type is live (migration allow_class_keyword_hit_event).
  *
+ * Class hint in Brand and Generic mode (2026-10-05): when the typed text also
+ * finds classes, drug families or class keywords (the same matching Class mode
+ * uses, so 'ssri', 'vomiting' or 'antibiotic' typed in Brand mode), 'classHint'
+ * carries the counts so the screen can offer 'See Class results'. It is
+ * computed whether or not drugs were found in this mode: the screen shows a
+ * slim strip above the drugs, or a full card when there are none. A text that
+ * finds classes is not a content gap (the content exists, under Class), so it
+ * is no longer logged as a search gap in Brand and Generic mode. The logging
+ * of searches and near-misses is unchanged, and nothing here logs a keyword
+ * hit: those are only counted in Class mode.
+ *
  * Brand and Generic logging is unchanged: their 'drug_search' events still
  * carry no mode, so existing numbers do not move. Anything counting
  * 'drug_search' events overall now also sees Class searches; filter on mode
@@ -146,6 +157,9 @@
  *                      text, null in every other mode (or with nothing typed)
  *   crossModeTarget  — Class mode only: 'generic' | 'brand' | null, the mode
  *                      the 'switch mode' hint should offer
+ *   classHint        — Brand and Generic mode only: { classes, subclasses }
+ *                      (counts) when the same text finds classes, drug
+ *                      families or class keywords in Class mode, else null
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -192,6 +206,9 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
   // stay null outside Class mode.
   const [classResults,    setClassResults]    = useState(null)
   const [crossModeTarget, setCrossModeTarget] = useState(null)
+  // Class hint (2026-10-05): counts of the classes and drug families the typed
+  // text finds in Class mode, set only in Brand and Generic mode, else null.
+  const [classHint, setClassHint] = useState(null)
 
   // Both split indexes are built once per drugs load — mode toggling below
   // just picks which already-built index to search against. ingredientIndexRef
@@ -237,12 +254,12 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keywords arrive (or change) after the drugs: rebuild only the small keyword
-  // join, never the drug indexes, and refresh the cards if Class mode is
-  // showing a search.
+  // join, never the drug indexes, and refresh whatever is showing for a typed
+  // search: the cards in Class mode, the class hint in Brand and Generic mode.
   useEffect(() => {
     if (!classIndexRef.current) return
     classKeywordIndexRef.current = buildKeywordIndex(classIndexRef.current, classKeywords)
-    if (mode === 'class' && query.trim().length > 0) runSearch(query, mode)
+    if (query.trim().length > 0) runSearch(query, mode)
   }, [classKeywords]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = useCallback((q, currentMode) => {
@@ -261,6 +278,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       setCrossModeMatch(false)
       setClassResults(null)
       setCrossModeTarget(null)
+      setClassHint(null)
       return
     }
     setQueryTooShort(false)
@@ -270,6 +288,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     // Nothing typed shows the usual category list, so there is nothing to
     // compute or log then.
     if (currentMode === 'class') {
+      setClassHint(null)
       if (trimmed.length === 0) {
         setResults(drugs)
         setClassResults(null)
@@ -334,6 +353,20 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     }
     setClassResults(null)
     setCrossModeTarget(null)
+
+    // Class hint (2026-10-05): does the same text find classes, drug families
+    // or class keywords? Same matching as Class mode, on the small class list
+    // already built. Nothing is logged here. Computed as a local value so the
+    // gap check below can use it in this same run.
+    let classHintValue = null
+    if (trimmed.length >= 2) {
+      const classIndex = classIndexRef.current ?? buildClassIndex(drugs)
+      const classFound = searchClassIndex(classIndex, trimmed, classKeywordIndexRef.current)
+      if (classFound.classes.length + classFound.subclasses.length > 0) {
+        classHintValue = { classes: classFound.classes.length, subclasses: classFound.subclasses.length }
+      }
+    }
+    setClassHint(classHintValue)
 
     // Strict "starts with" match, every length — replaces the old
     // 2-3-char-prefix/4+-char-fuzzy split (drug_search_plan §5 final form).
@@ -404,12 +437,17 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     // real catalog gaps as missing content. Not logged as its own event
     // type, to stay minimally scoped and leave Phase 4's event schema as
     // decided in the plan doc.
+    //
+    // Class hint (2026-10-05): a text that finds classes, drug families or
+    // class keywords is excluded the same way, since that content exists
+    // under Class mode.
     const gapDedupKey = `${currentMode}:${normalizedForGap}`
     if (
       normalizedForGap.length >= 2 &&
       matched.length === 0 &&
       suggestionValue.length === 0 &&
       !crossModeMatchValue &&
+      !classHintValue &&
       !loggedGapTermsRef.current.has(gapDedupKey)
     ) {
       loggedGapTermsRef.current.add(gapDedupKey)
@@ -434,5 +472,6 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     crossModeMatch,
     classResults,
     crossModeTarget,
+    classHint,
   }
 }

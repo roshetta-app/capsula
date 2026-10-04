@@ -72,6 +72,11 @@ const DrugContext = createContext(null)
  * from its saved copy (works offline), handed to useDrugSearch as its third input
  * (phase C: Class mode now also finds classes and families by keyword) and
  * passed through.
+ *
+ * 2026-10-05 (Class hint in Brand and Generic mode): useDrugSearch also returns
+ * 'classHint' (counts of the classes and families the same text finds in Class
+ * mode, or null). Nothing to change in the code, searchValue is spread through
+ * as-is; only these doc comments were updated.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -92,9 +97,9 @@ export function DrugProvider({ children }) {
  * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode,
  * classSortMode, setClassSortMode, classKeywords, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
- * crossModeTarget }
+ * classHint, crossModeTarget }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTarget
- * are only filled in Class mode; browseMode is 'category' | 'class';
+ * are only filled in Class mode, classHint only in Brand and Generic mode; browseMode is 'category' | 'class';
  * classSortMode is 'relevance' | 'az'; classKeywords is the list of active
  * class keywords, [{ id, keyword, targets: [{ class, subclass }] }])
  */
