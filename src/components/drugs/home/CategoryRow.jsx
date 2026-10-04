@@ -19,6 +19,11 @@ import { SpecialtyIcon } from '../../../utils/specialtyIcon'
 // to 0.99, both animated via var(--motion-fast)/var(--ease-settle) — so
 // every tappable surface on this screen (drug rows, this grid, the
 // Recently Viewed button below) responds to touch the same way.
+//
+// 2026-10-04: the tile now has the same look as the class cards (ResultCard in
+// ClassSearchResults.jsx): soft muted fill, no border, 16px corners, and the
+// same press feedback (fade to 0.8 and shrink to 0.985). The theme variables
+// carry it into dark mode.
 
 export default function CategoryRow({ label, iconType, iconValue, color, textColor, onTap }) {
   const [pressed, setPressed] = useState(false)
@@ -35,15 +40,16 @@ export default function CategoryRow({ label, iconType, iconValue, color, textCol
       onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        backgroundColor: pressed ? 'var(--color-surface-muted)' : 'var(--color-surface)',
-        border: '1px solid var(--color-border-subtle)',
-        borderRadius: 'var(--radius-lg)',
+        backgroundColor: 'var(--color-surface-muted)',
+        border: 'none',
+        borderRadius: 16,
         padding: 'var(--space-3)',
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
-        transform: pressed ? 'scale(0.99)' : 'scale(1)',
-        transition: 'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+        opacity: pressed ? 0.8 : 1,
+        transform: pressed ? 'scale(0.985)' : 'scale(1)',
+        transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
       {/* Icon in tinted circle */}
