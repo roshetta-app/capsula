@@ -14,6 +14,13 @@
  * groupOf(item) returns the form group value of an item (or null when the
  * item's form has no group; such an item only shows while no form is picked).
  *
+ * 2026-10-05 (Other generics): in the Filter by generic pop-up, generics that
+ * have only one brand in the whole list are folded into one 'Other generics'
+ * row (otherGenericIds below), but only when there are at least 4 of them and
+ * at least one bigger generic stays in the main list. A generic counts as
+ * one-brand by its brands in the whole list, not by the number shown under the
+ * form picks, so a row never moves in or out of 'Other' while picking.
+ *
  * 2026-10-03 (generic pop-up order): the Filter by generic pop-up lists the
  * generics with the most brands first (sortGenericOptions below).
  */
@@ -59,6 +66,21 @@ export function sortGenericOptions(options) {
   return [...options].sort((a, b) =>
     (b.count - a.count) || a.label.localeCompare(b.label)
   )
+}
+
+// How many one-brand generics it takes before they are folded into 'Other'.
+export const OTHER_GENERICS_MIN = 4
+
+// The generic ids to fold into the 'Other generics' row: the generics with
+// exactly one brand in the whole list. An empty set (nothing is folded) when
+// there are fewer than OTHER_GENERICS_MIN of them, or when every generic has
+// only one brand (then there is no bigger generic to keep in the list).
+export function otherGenericIds(items) {
+  const totals = new Map()
+  for (const s of items) totals.set(s.genericId, (totals.get(s.genericId) ?? 0) + 1)
+  const singles = [...totals].filter(([, n]) => n === 1).map(([id]) => id)
+  const hasBigger = totals.size > singles.length
+  return singles.length >= OTHER_GENERICS_MIN && hasBigger ? new Set(singles) : new Set()
 }
 
 export function sortItems(items, mode) {

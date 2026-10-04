@@ -1,5 +1,13 @@
 /**
  * src/components/ui/FilterModal.jsx
+ * 2026-10-05 (Other generics): new optional 'otherGroup' ({ label, allLabel,
+ * options }) and 'onPickGroup' ((values, on) => void). With them, the pop-up
+ * ends its list with one row (label, number of brands, and how many are
+ * picked) that unfolds the group's options inside the pop-up: an 'All ...'
+ * option first, then each option on its own. It starts unfolded when one of
+ * them is already picked. Only the Filter by generic pop-up passes them, so
+ * every other pop-up is unchanged.
+ *
  * 2026-10-04 (shared pop-up moved out of the Brands list): the small centered
  * pop-up (FilterModal) and the pieces only it uses (ScrollMenu,
  * ClearFilterButton, ToggleChip) moved here unchanged from BrandsList.jsx,
@@ -11,6 +19,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
 import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
@@ -27,8 +36,12 @@ import CountTag from './CountTag.jsx'
 // option rows taller with bigger text and icons; the Search Mode pop-up uses it.
 // An option may carry 'color' and 'tint' (theme variables): its icon then uses
 // that colour, and when picked the row is tinted in it instead of solid accent.
-export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
+export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, otherGroup, onPickGroup, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
   const [shown, setShown] = useState(false)
+  // 'Other generics' row: unfolded from the start when something in it is picked.
+  const [otherOpen, setOtherOpen] = useState(
+    () => !!otherGroup && otherGroup.options.some(o => selected.includes(o.value))
+  )
   const hasSelection = selected.length > 0
   // Inside a sheet: phone/browser Back closes just this pop-up and leaves the
   // sheet open. No history step of its own (see useBackLayer in
@@ -177,6 +190,19 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
                 locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
               />
             ))}
+            {/* 'Other generics' (generic pop-up only): one row that unfolds the
+                generics with a single brand, each still pickable on its own. */}
+            {otherGroup && (
+              <OtherGroup
+                group={otherGroup}
+                selected={selected}
+                open={otherOpen}
+                onToggleOpen={() => setOtherOpen(o => !o)}
+                onPick={onPick}
+                onPickGroup={onPickGroup}
+                wrap={wrap}
+              />
+            )}
             {/* Inert row (generic pop-up only): a generic listed for reference
                 that cannot be picked. Same inactive look as a locked option,
                 no tick, and a 'Similar' tag where the number would be. */}
@@ -225,6 +251,86 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
   // On a page it is drawn on the document itself (like ConfirmSheet), so no
   // parent can clip or offset it.
   return onPage ? createPortal(modal, document.body) : modal
+}
+
+// The 'Other generics' row and, when unfolded, its options. The row shows the
+// number of brands in the group, or how many of its options are picked. The
+// 'All' option picks every option that can be picked (a locked one gives no
+// brand); it is ticked once all of those are picked, and ticking it again
+// clears them.
+function OtherGroup({ group, selected, open, onToggleOpen, onPick, onPickGroup, wrap }) {
+  const [pressed, setPressed] = useState(false)
+  const picked    = group.options.filter(o => selected.includes(o.value)).length
+  const total     = group.options.reduce((sum, o) => sum + (o.count ?? 0), 0)
+  const pickable  = group.options.filter(o => !isOptionLocked(o.count, selected.includes(o.value)))
+  const allPicked = pickable.length > 0 && pickable.every(o => selected.includes(o.value))
+  return (
+    <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <button
+        onClick={onToggleOpen}
+        aria-expanded={open}
+        onPointerDown={() => setPressed(true)}
+        onPointerUp={() => setPressed(false)}
+        onPointerLeave={() => setPressed(false)}
+        onPointerCancel={() => setPressed(false)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          width: '100%', minWidth: 0, boxSizing: 'border-box',
+          padding: '8px 14px',
+          borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
+          fontSize: 13, fontWeight: 500, textAlign: 'left',
+          cursor: 'pointer',
+          border: picked > 0 ? '1.5px solid var(--color-accent)' : '1.5px solid var(--color-border)',
+          backgroundColor: picked > 0 ? 'var(--color-accent-light)' : 'transparent',
+          color: picked > 0 ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+          fontFamily: 'var(--font-body)',
+          transform: pressed ? 'scale(0.98)' : 'scale(1)',
+          transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+          WebkitTapHighlightColor: 'transparent',
+          outline: 'none',
+        }}
+      >
+        <span style={{ flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {group.label}
+        </span>
+        {picked > 0
+          ? <CountTag tone="accent" style={{ padding: '0 8px' }}>{picked} selected</CountTag>
+          : <CountTag tone="neutral">{total}</CountTag>}
+        <ChevronDown
+          aria-hidden="true"
+          size={16}
+          strokeWidth={2}
+          style={{ flexShrink: 0, transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.15s ease' }}
+        />
+      </button>
+      {open && (
+        <div style={{
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+          marginLeft: 8, paddingLeft: 10,
+          borderLeft: '1.5px solid var(--color-border)',
+        }}>
+          <ToggleChip
+            label={group.allLabel}
+            active={allPicked}
+            onToggle={() => onPickGroup(pickable.map(o => o.value), !allPicked)}
+            wrap={wrap}
+            locked={pickable.length === 0}
+          />
+          {group.options.map(opt => (
+            <ToggleChip
+              key={opt.value}
+              label={opt.label}
+              active={selected.includes(opt.value)}
+              onToggle={() => onPick(opt.value)}
+              wrap={wrap}
+              count={opt.count}
+              locked={isOptionLocked(opt.count, selected.includes(opt.value))}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 // Scroll box with a visible thin scroll indicator. The app hides every native

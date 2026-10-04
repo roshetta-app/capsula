@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-05 (Other generics): the Filter by generic pop-up folds the generics
+ * that have only one brand into one 'Other generics' row, which unfolds inside
+ * the pop-up (FilterModal.jsx) so each of them can still be picked on its own.
+ * The rule (at least 4 such generics and at least one bigger generic) lives in
+ * brandsFilterLogic.js. Picks are still kept one generic at a time, so the
+ * pill text, remembered filters, Clear filter and the list work as before.
+ *
  * 2026-10-05 (hideHeading): new optional prop hideHeading (default false).
  * With it on, the title above the filters (the name with the Google search
  * icon) is not drawn. Used by the class sheet for a class with no families,
@@ -405,7 +412,7 @@ import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import SharedDrugCard from '../SharedDrugCard.jsx'
 import RowStarButton from '../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
-import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions } from './brandsFilterLogic.js'
+import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, otherGenericIds } from './brandsFilterLogic.js'
 import { useCategories } from '../../hooks/useCategories'
 import { FilterModal } from '../ui/FilterModal.jsx'
 import { useIsDark } from '../../utils/specialtyIcon'
@@ -488,10 +495,14 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   const formOptions = formGroupsInList.map(g => ({
     value: g.value, label: g.label, count: formCounts.get(g.value) ?? 0,
   }))
-  const genericOptions = sortGenericOptions(
-    [...nameById.entries()]
-      .map(([value, label]) => ({ value, label: ingredientCase(label), count: genericCounts.get(value) ?? 0 }))
-  )
+  const allGenericOptions = [...nameById.entries()]
+    .map(([value, label]) => ({ value, label: ingredientCase(label), count: genericCounts.get(value) ?? 0 }))
+  // Generics with a single brand are folded into one 'Other generics' row
+  // when there are enough of them (see otherGenericIds). Alternatives only,
+  // the only place the generic pop-up has more than one generic.
+  const otherIds = isAlternatives ? otherGenericIds(siblings) : new Set()
+  const genericOptions = sortGenericOptions(allGenericOptions.filter(o => !otherIds.has(o.value)))
+  const otherOptions   = sortGenericOptions(allGenericOptions.filter(o => otherIds.has(o.value)))
 
   const sortOptions = [
     { value: 'name',  label: groupBySubclass ? 'Family (A–Z)' : 'Name (A–Z)', icon: ArrowDownAZ },
@@ -587,7 +598,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   const similarRowLabel = isAlternatives && similarGenericName
     ? ingredientCase(similarGenericName)
     : ''
-  const similarRow = similarRowLabel && !genericOptions.some(o => o.label === similarRowLabel)
+  const similarRow = similarRowLabel && !allGenericOptions.some(o => o.label === similarRowLabel)
     ? { label: similarRowLabel }
     : undefined
   const genericControl = isAlternatives && nameById.size > 0 && {
@@ -603,6 +614,12 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
             selected: onlyGeneric ? [...nameById.keys()] : genericSel,
             lockAll: onlyGeneric,
             inertRow: similarRow,
+            otherGroup: otherOptions.length > 0
+              ? { label: 'Other generics', allLabel: 'All other generics', options: otherOptions }
+              : undefined,
+            onPickGroup: (values, on) => setGenericSel(prev => on
+              ? [...new Set([...prev, ...values])]
+              : prev.filter(v => !values.includes(v))),
             onPick: v => toggleIn(genericSel, setGenericSel, v),
             onClear: onlyGeneric ? undefined : () => setGenericSel([]) },
   }
