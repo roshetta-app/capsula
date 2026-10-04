@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-05 (hideHeading): new optional prop hideHeading (default false).
+ * With it on, the title above the filters (the name with the Google search
+ * icon) is not drawn. Used by the class sheet for a class with no families,
+ * so the class name is not repeated under the sheet heading. With the prop
+ * off (every other screen) nothing changes.
+ *
  * 2026-10-04 (search mode and sort on the Drugs screen): the Drugs screen now
  * uses this file's pop-up (FilterModal), pill button (PillButton) and Sort
  * button (SortButton) for its own Search Mode and Sort By controls, so those
@@ -220,6 +226,11 @@
  *              the list. Optional; with none, the list is exactly the siblings.
  *   groupBySubclass — optional boolean, default false. True switches to the
  *              'Other families' page (see the 2026-10-03 note at the top).
+ *   hideHeading — optional boolean, default false. True leaves out the title
+ *              above the filters (the name with the search icon). The class
+ *              sheet uses it for a class with no families, whose sheet heading
+ *              already shows the class name. Filters and the pop-up badge
+ *              (familyName) are unchanged.
  *   hideOther — optional boolean, default false. True drops the word 'Other'
  *              from the heading ('<name> drugs' instead of 'Other <name> drugs').
  *   similarGenericName — Alternatives only: name of the generic the Similar
@@ -438,7 +449,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -622,7 +633,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           drug's generic name, Alternatives uses the subclass name. Name in bold.
           On Alternatives the whole title is a button that opens the Google
           search; its small icon follows the subclass name. */}
-      {headingName && (groupBySubclass
+      {headingName && !hideHeading && (groupBySubclass
         ? (
           <p style={headingStyle}>{nameNode}</p>
         )
@@ -946,4 +957,3 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
     </button>
   )
 }
-

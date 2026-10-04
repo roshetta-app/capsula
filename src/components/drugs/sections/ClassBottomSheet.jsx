@@ -12,11 +12,14 @@
  *    The fixed heading is unchanged.
  *  - Words that point at one family are one quiet grey line under the family's
  *    name on its card, cut with '...' when too long.
- *  - The heading is now the same for every class: it always reads
- *    '<n> drug families, <n> drugs' (so '0 drug families' for a class with
- *    none), and a class with no families, which opens straight on its drugs
- *    from Class search, shows the same heading above the Back bar. The list
- *    and the drugs page below it are unchanged.
+ *  - A class with no families (it opens straight on its drugs from the Browse
+ *    cards and Class search) now has the same look as a class with families:
+ *    the same heading (class name and '<n> drugs', no '0 drug families'),
+ *    no Back bar (the phone's Back button still closes the sheet), and no
+ *    repeated class name with the search icon above the drugs (BrandsList's
+ *    hideHeading). Its 'Common words' sit at the top of the drugs instead of
+ *    the end, because the end of a long drugs list is out of reach. Classes
+ *    with families, and a family's own drugs page, are unchanged.
  *  - The 'Other families' card and the 'All drugs in this class' row show no
  *    words. A class or family with no words looks exactly as before.
  *  - The words come from the app's shared data (useDrugContext, classKeywords),
@@ -529,11 +532,81 @@ export default function ClassBottomSheet({
         fontVariantNumeric: 'tabular-nums',
         color:              'var(--color-text-secondary)',
       }}>
-        {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
-        {', '}
+        {groups.length > 0 && (
+          <>
+            {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
+            {', '}
+          </>
+        )}
         {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
       </p>
     </div>
+  )
+
+  // The 'Common words' title and chips (display only), or null when the class
+  // has none. Drawn at the end of the family list; for a class with no families
+  // (which opens straight on its drugs) at the top of the drugs, because the end
+  // of a long drugs list is out of reach.
+  // A class with no families, opened straight on its drugs: no Back bar, no
+  // repeated class name above the drugs, the same heading as every class.
+  const straightToAll = directSubclass === ALL_KEY
+
+  const wordsBlock = (
+  totalDrugs > 0 && classWords.length > 0 ? (
+      <>
+        <p style={{
+          flexShrink:  0,
+          margin:      'var(--space-2) var(--space-1) 0',
+          fontSize:    14.5,
+          fontWeight:  600,
+          color:       'var(--color-text-primary)',
+        }}>
+          Common words
+        </p>
+        <div style={{
+          flexShrink: 0,
+          display:    'flex',
+          flexWrap:   'wrap',
+          gap:        6,
+          margin:     '0 var(--space-1)',
+        }}>
+          {shownWords.map(w => (
+            <span key={w} style={{
+              padding:         '3px 9px',
+              borderRadius:    999,
+              fontSize:        12,
+              lineHeight:      1.3,
+              color:           'var(--color-accent)',
+              backgroundColor: 'var(--color-accent-light)',
+            }}>
+              {w}
+            </span>
+          ))}
+          {hiddenWords > 0 && (
+            <button
+              onClick={() => setWordsOpen(o => !o)}
+              aria-label={wordsOpen ? 'Show fewer words' : `Show ${hiddenWords} more words`}
+              aria-expanded={wordsOpen}
+              style={{
+                padding:         '3px 9px',
+                border:          'none',
+                borderRadius:    999,
+                fontFamily:      'var(--font-body)',
+                fontSize:        12,
+                lineHeight:      1.3,
+                color:           'var(--color-text-secondary)',
+                backgroundColor: 'var(--color-surface-muted)',
+                cursor:          'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline:         'none',
+              }}
+            >
+              {wordsOpen ? 'Show less' : `+${hiddenWords}`}
+            </button>
+          )}
+        </div>
+      </>
+    ) : null
   )
 
   function handleTap(item) {
@@ -556,8 +629,8 @@ export default function ClassBottomSheet({
       }}>
         {pickedGroup ? (
           <>
-            {directSubclass === ALL_KEY && classHeading}
-            <div style={{
+            {straightToAll && classHeading}
+            {!straightToAll && <div style={{
               flexShrink:   0,
               padding:      '0 var(--space-4)',
               borderBottom: '0.5px solid var(--color-border)',
@@ -586,14 +659,20 @@ export default function ClassBottomSheet({
                 <ChevronLeft size={18} />
                 Back
               </button>
-            </div>
+            </div>}
             <div key={`drugs-${pickedGroup.name}`} style={{
               flex:      1,
               minHeight: 0,
               overflowY: 'auto',
               padding:   'var(--space-4) var(--space-4) var(--space-6)',
             }}>
+              {straightToAll && wordsBlock && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+                  {wordsBlock}
+                </div>
+              )}
               <BrandsList
+                hideHeading={straightToAll}
                 key={pickedGroup.name}
                 siblings={pickedGroup.items}
                 onTap={handleTap}
@@ -669,63 +748,7 @@ export default function ClassBottomSheet({
                   onClick={() => pickFamily(g.name)}
                 />
               ))}
-              {/* Common words that lead to this class (display only), at the
-                  end of the list, also for a class with no families. */}
-              {totalDrugs > 0 && classWords.length > 0 && (
-                <>
-                  <p style={{
-                    flexShrink:  0,
-                    margin:      'var(--space-2) var(--space-1) 0',
-                    fontSize:    14.5,
-                    fontWeight:  600,
-                    color:       'var(--color-text-primary)',
-                  }}>
-                    Common words
-                  </p>
-                  <div style={{
-                    flexShrink: 0,
-                    display:    'flex',
-                    flexWrap:   'wrap',
-                    gap:        6,
-                    margin:     '0 var(--space-1)',
-                  }}>
-                    {shownWords.map(w => (
-                      <span key={w} style={{
-                        padding:         '3px 9px',
-                        borderRadius:    999,
-                        fontSize:        12,
-                        lineHeight:      1.3,
-                        color:           'var(--color-accent)',
-                        backgroundColor: 'var(--color-accent-light)',
-                      }}>
-                        {w}
-                      </span>
-                    ))}
-                    {hiddenWords > 0 && (
-                      <button
-                        onClick={() => setWordsOpen(o => !o)}
-                        aria-label={wordsOpen ? 'Show fewer words' : `Show ${hiddenWords} more words`}
-                        aria-expanded={wordsOpen}
-                        style={{
-                          padding:         '3px 9px',
-                          border:          'none',
-                          borderRadius:    999,
-                          fontFamily:      'var(--font-body)',
-                          fontSize:        12,
-                          lineHeight:      1.3,
-                          color:           'var(--color-text-secondary)',
-                          backgroundColor: 'var(--color-surface-muted)',
-                          cursor:          'pointer',
-                          WebkitTapHighlightColor: 'transparent',
-                          outline:         'none',
-                        }}
-                      >
-                        {wordsOpen ? 'Show less' : `+${hiddenWords}`}
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
+              {wordsBlock}
             </div>
           </>
         )}
