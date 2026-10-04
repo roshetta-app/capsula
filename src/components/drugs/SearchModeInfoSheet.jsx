@@ -3,23 +3,17 @@
  *
  * 2026-10-04: opened from the info icon next to the 'Search mode' title on the
  * Drugs screen (see DrugsScreen.jsx). A quick visual cheat sheet for the three
- * search modes, built to be scanned, not read:
- *   - Brand   -> Controloc
- *   - Generic -> Pantoprazole
- *   - Class   -> Proton pump inhibitor
- * Flat layout, drawn straight on the white sheet with no cards: each mode is
- * its name (bold, with a small accent icon, followed by a plain 'mode') and, below it, the example term in
- * a quiet, neutral pill that looks like a search field. Thin dividers sit
- * between the three modes. No subtitles. Each mode has its own
- * accent: Brand blue, Generic green, Class violet (theme variables, so light
- * and dark mode follow automatically). One small hint at the bottom explains
- * how to narrow Brand and Generic searches, in a subtle card with its two
- * examples as small tags.
+ * search modes, built to be scanned, not read.
  *
- * Redesign: replaces the earlier version that showed real drug cards, a
- * highlighted-match explanation per mode, and a long footnote. Nothing here
- * explains how search works internally, and there is nothing to load, so the
- * sheet works offline.
+ * 2026-10-04 (phase D2, compact rows + more examples): each mode is one row
+ * with a small tinted icon tile (Brand blue, Generic green, Class violet,
+ * theme variables so light and dark follow automatically), the mode name, and
+ * three example searches as small search-bar pills that wrap onto a second
+ * line when the screen is narrow. Class has an extra line saying names and
+ * everyday words both work (keyword search). The subtitle and the word 'mode'
+ * are gone. One small hint card at the bottom explains how to narrow Brand and
+ * Generic searches. Nothing here explains how search works internally, and
+ * there is nothing to load, so the sheet works offline.
  *
  * Shell (title + close button pinned, body scrolls if the screen is short) is
  * built on SheetShell.jsx like every other sheet.
@@ -35,49 +29,67 @@
 import { Tag, FlaskConical, Layers, Search, Lightbulb } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 
-// One section per mode, drawn flat on the sheet: the mode name with its small
-// accent icon, then the example in a search-bar pill. No card behind it.
-function ModeSection({ icon: Icon, title, example, color }) {
+// One row per mode: a tinted icon tile, the mode name, then its example
+// searches as small search-bar pills (they wrap if the screen is narrow), and
+// an optional one-line note.
+function ModeRow({ icon: Icon, title, examples, note, color, tint, first = false }) {
   return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Icon size={18} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: 16, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
-          <span style={{ fontWeight: 700 }}>{title}</span>
-          <span style={{ fontWeight: 400 }}> mode</span>
-        </span>
-      </div>
-
-      {/* The example: the focal point of the section. */}
-      <div style={{
-        display:         'flex',
-        alignItems:      'center',
-        gap:             10,
-        height:          44,
-        marginTop:       'var(--space-3)',
-        padding:         '0 var(--space-4)',
-        borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-surface-muted)',
-      }}>
-        <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
-        <span style={{
-          fontSize:     15,
-          fontWeight:   400,
-          color:        'var(--color-text-primary)',
-          whiteSpace:   'nowrap',
-          overflow:     'hidden',
-          textOverflow: 'ellipsis',
-        }}>
-          {example}
-        </span>
+    <div style={{
+      display:   'flex',
+      gap:       12,
+      padding:   'var(--space-3) 0',
+      borderTop: first ? 'none' : '1px solid var(--color-border)',
+    }}>
+      <span
+        aria-hidden="true"
+        style={{
+          width:           34,
+          height:          34,
+          borderRadius:    10,
+          backgroundColor: tint,
+          display:         'flex',
+          alignItems:      'center',
+          justifyContent:  'center',
+          flexShrink:      0,
+        }}
+      >
+        <Icon size={17} strokeWidth={1.9} color={color} />
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)', marginTop: 6 }}>
+          {title}
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 'var(--space-2)' }}>
+          {examples.map(ex => (
+            <span
+              key={ex}
+              style={{
+                display:         'inline-flex',
+                alignItems:      'center',
+                gap:             6,
+                maxWidth:        '100%',
+                height:          30,
+                padding:         '0 12px',
+                borderRadius:    'var(--radius-full)',
+                backgroundColor: 'var(--color-surface-muted)',
+                fontSize:        13.5,
+                color:           'var(--color-text-primary)',
+                boxSizing:       'border-box',
+              }}
+            >
+              <Search size={13} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ex}</span>
+            </span>
+          ))}
+        </div>
+        {note && (
+          <div style={{ fontSize: 12.5, lineHeight: 1.4, color: 'var(--color-text-secondary)', marginTop: 'var(--space-2)' }}>
+            {note}
+          </div>
+        )}
       </div>
     </div>
   )
-}
-
-// Thin line between the three modes.
-function Divider() {
-  return <div style={{ height: 1, backgroundColor: 'var(--color-border)' }} />
 }
 
 // A small tag-style example query used in the hint.
@@ -101,7 +113,7 @@ function QueryTag({ children }) {
 export default function SearchModeInfoSheet({ isOpen, onClose }) {
   return (
     <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="How search works" maxHeight="85dvh">
-      {/* Fixed header: title, subtitle and close button. */}
+      {/* Fixed header: title and close button. */}
       <div style={{ flexShrink: 0, padding: '0 var(--space-4)', marginBottom: 'var(--space-4)' }}>
         <div style={{
           display:        'flex',
@@ -119,14 +131,6 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
             }}>
               How search works
             </h2>
-            <p style={{
-              fontSize:   14,
-              lineHeight: 1.4,
-              color:      'var(--color-text-secondary)',
-              margin:     '4px 0 0',
-            }}>
-              Choose what you want to search for.
-            </p>
           </div>
           <button
             onClick={onClose}
@@ -161,28 +165,33 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
         padding:       '0 var(--space-4) var(--space-6)',
         display:       'flex',
         flexDirection: 'column',
-        gap:           'var(--space-4)',
+        gap:           'var(--space-2)',
       }}>
-        <ModeSection
-          icon={Tag}
-          title="Brand"
-          example="Controloc"
-          color="var(--color-accent)"
-        />
-        <Divider />
-        <ModeSection
-          icon={FlaskConical}
-          title="Generic"
-          example="Pantoprazole"
-          color="var(--color-generic)"
-        />
-        <Divider />
-        <ModeSection
-          icon={Layers}
-          title="Class"
-          example="Proton pump inhibitor"
-          color="var(--color-class)"
-        />
+        <div>
+          <ModeRow
+            first
+            icon={Tag}
+            title="Brand"
+            examples={['Controloc', 'Augmentin', 'Panadol']}
+            color="var(--color-accent)"
+            tint="var(--color-accent-light)"
+          />
+          <ModeRow
+            icon={FlaskConical}
+            title="Generic"
+            examples={['Pantoprazole', 'Amoxicillin', 'Paracetamol']}
+            color="var(--color-generic)"
+            tint="color-mix(in srgb, var(--color-generic) 14%, transparent)"
+          />
+          <ModeRow
+            icon={Layers}
+            title="Class"
+            examples={['Proton pump inhibitor', 'vomiting', 'allergy']}
+            note="Names or everyday words."
+            color="var(--color-class)"
+            tint="color-mix(in srgb, var(--color-class) 14%, transparent)"
+          />
+        </div>
 
         {/* Hint: a subtle card, not a fourth mode. The examples sit on their own
             line as small query tags. */}
