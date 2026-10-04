@@ -233,8 +233,9 @@
  * 2026-10-05 (Class hint in Brand and Generic mode): when the typed text is
  * also a class name, a drug family name or a class keyword, the results area
  * says so and offers the switch. While drugs are listed (or a Form/Route
- * filter hides them), a slim tappable strip sits above the list: 'Also in
- * Class mode: 2 classes, 3 drug families', with 'See Class results'. When the
+ * filter hides them), a slim tappable strip sits above the list: one line,
+ * 'See 5 matches in Class mode', with an arrow (the classes and drug families
+ * counted together; the full card below keeps the split). When the
  * mode finds no drugs at all, a full card takes the place of the usual empty
  * states, with a second button when the text is also a drug name in the other
  * of Brand and Generic. Tapping switches to Class mode and the same text
@@ -243,7 +244,7 @@
  * unchanged.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -1396,7 +1397,8 @@ function CrossModeHintState({ query, mode, targetMode, onSwitchMode }) {
 // 2026-10-05 (Class hint in Brand and Generic mode): the typed text is also a
 // class, a drug family or a class keyword. 'hint' is { classes, subclasses },
 // the counts Class mode would show (from useDrugSearch). The strip is a slim
-// tappable row above a list that already has drugs; the state is the full
+// tappable row above a list that already has drugs (one line, the classes and
+// drug families counted together, with an arrow); the state is the full
 // card used when this mode found no drugs at all, built like
 // CrossModeHintState, with an optional second button when the text is also a
 // drug name in the other of Brand and Generic ('otherMode'). Both only switch
@@ -1409,23 +1411,24 @@ function classHintParts(hint) {
 }
 
 function ClassHintStrip({ hint, onSwitch }) {
+  const total = hint.classes + hint.subclasses
   return (
     <button
       type="button"
       onClick={onSwitch}
       style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
-        width: '100%', textAlign: 'left',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        gap: 'var(--space-2)',
+        width: '100%', minHeight: 40, textAlign: 'left',
         marginBottom: 'var(--space-3)',
         padding: 'var(--space-2) var(--space-3)',
         border: 'none', borderRadius: 'var(--radius-lg)',
         background: 'var(--color-accent-light)', color: 'var(--color-accent)',
-        fontFamily: 'var(--font-body)', fontSize: 13, cursor: 'pointer',
+        fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
       }}
     >
-      <ArrowLeftRight size={16} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0 }}>Also in Class mode: {classHintParts(hint)}</span>
-      <span style={{ flexShrink: 0, fontWeight: 600 }}>See Class results</span>
+      <span>{`See ${total} ${total === 1 ? 'match' : 'matches'} in Class mode`}</span>
+      <ChevronRight size={16} style={{ flexShrink: 0 }} />
     </button>
   )
 }
