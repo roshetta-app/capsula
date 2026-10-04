@@ -1492,23 +1492,29 @@ function QuietLinkButton({ onClick, children }) {
 // switch the mode; the typed text stays and searches again.
 function ClassHintStrip({ hint, onSwitch }) {
   const total = hint.classes + hint.subclasses
+  // 2026-10-05: wears the Class mode's own icon, colour and tint (violet), the
+  // same ones the Search mode button and the switch-mode card use.
+  const opt = MODE_OPTIONS.find(o => o.value === 'class')
+  const Icon = opt.icon
   return (
     <button
       type="button"
       onClick={onSwitch}
       style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        display: 'flex', alignItems: 'center',
         gap: 'var(--space-2)',
         width: '100%', minHeight: 40, textAlign: 'left',
         marginBottom: 'var(--space-3)',
         padding: 'var(--space-2) var(--space-3)',
         border: 'none', borderRadius: 'var(--radius-lg)',
-        background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+        background: opt.tint, color: opt.color,
         fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
       }}
     >
-      <span>{`See ${total} ${total === 1 ? 'match' : 'matches'} in Class mode`}</span>
-      <ChevronRight size={16} style={{ flexShrink: 0 }} />
+      <Icon size={16} color={opt.color} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0 }}>{`See ${total} ${total === 1 ? 'match' : 'matches'} in Class mode`}</span>
+      <ChevronRight size={16} color={opt.color} style={{ flexShrink: 0 }} />
     </button>
   )
 }
