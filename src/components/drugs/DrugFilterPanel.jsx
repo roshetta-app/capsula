@@ -120,7 +120,7 @@ import SheetShell from '../ui/SheetShell'
  * count; see DrugsScreen.jsx), so this sheet holds Form / Route only. The
  * 'Searching in X mode' message went with the Search Mode section (the button
  * on the screen always shows the mode). While class cards are showing the
- * screen does not offer this sheet at all, because Form / Route does not apply
+ * screen greys out the filter button, because Form / Route does not apply
  * to cards. The entries below about Search Mode, Sort By and Class search
  * describe how the sheet worked before this change.
  *

@@ -59,12 +59,19 @@
  *             var(--color-accent) and a small 7px dot appears in the
  *             button's top-right corner when hasActiveFilters is true.
  *
+ * 2026-10-04 (Drugs screen, class search): optional filterDisabled prop (default
+ *             false). The filter button stays in place but greyed out and not
+ *             tappable, for a screen state where filtering does not apply (the
+ *             Drugs screen while class cards show). Every other call site is
+ *             unaffected.
+ *
  * Props:
  *   value            string
  *   onChange         (val: string) => void
  *   placeholder      string
  *   onFilter         () => void | undefined  — if provided, shows filter icon
  *   hasActiveFilters boolean                 — highlights filter icon when true
+ *   filterDisabled   boolean                 — greys out the filter icon and ignores taps (default false)
  *   compact          boolean                 — slightly shorter variant (44px vs 46px)
  *   icon             Component               — icon rendered at the input's left edge, defaults to Search
  */
@@ -78,6 +85,7 @@ const SearchBar = forwardRef(function SearchBar({
   placeholder = 'Search conditions or symptoms…',
   onFilter,
   hasActiveFilters = false,
+  filterDisabled = false,
   compact = false,
   icon: Icon = Search,
 }, ref) {
@@ -164,7 +172,8 @@ const SearchBar = forwardRef(function SearchBar({
 
       {onFilter && (
         <button
-          onClick={onFilter}
+          onClick={filterDisabled ? undefined : onFilter}
+          disabled={filterDisabled}
           aria-label="Filter"
           style={{
             position:        'absolute',
@@ -176,8 +185,9 @@ const SearchBar = forwardRef(function SearchBar({
             borderRadius:    '50%',
             border:          'none',
             backgroundColor: 'transparent',
-            color:           hasActiveFilters ? 'var(--color-accent)' : 'var(--color-text-secondary)',
-            cursor:          'pointer',
+            color:           filterDisabled ? 'var(--color-text-tertiary)' : hasActiveFilters ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            opacity:         filterDisabled ? 0.4 : 1,
+            cursor:          filterDisabled ? 'default' : 'pointer',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',

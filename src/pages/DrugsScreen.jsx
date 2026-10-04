@@ -23,8 +23,8 @@
  * line under the count and Clear filter line, shown only while something is
  * typed (so not on the one-character 'Keep typing' state, and not in Class
  * search, which shows cards). While class cards are showing, the filter button
- * in the search bar is hidden too, because the filter sheet now holds Form /
- * Route only and that does not apply to cards. The 'Searching in X mode'
+ * in the search bar stays but is greyed out and not tappable, because the
+ * filter sheet now holds Form / Route only and that does not apply to cards. The 'Searching in X mode'
  * message is gone; the button shows the mode. Mode and sort still live in
  * DrugContext, so they survive opening a drug and coming back.
  *
@@ -416,7 +416,8 @@ export default function DrugsScreen() {
   const resultsNotReady = hasQuery && !queryTooShort && ((mode === 'class') !== (classResults != null))
   const searchPlaceholder = mode === 'class' ? 'Search classes or families…' : 'Search drugs…'
   // The Form/Route filter does not apply to class cards, so the filter button
-  // in the search bar is not offered then (the sheet would be empty).
+  // in the search bar is greyed out and not tappable then (the sheet would be
+  // empty).
   const filtersApply = !isClassSearch
 
   // Search Mode button above the search bar: shows the current mode, opens the
@@ -508,7 +509,8 @@ export default function DrugsScreen() {
           query={query}
           onQueryChange={handleQueryChange}
           placeholder={mode === 'class' ? searchPlaceholder : (hasQuery ? 'Search drugs…' : `Search in ${categoryLabel}…`)}
-          onFilter={filtersApply ? () => setFilterOpen(true) : undefined}
+          onFilter={() => setFilterOpen(true)}
+          filterDisabled={!filtersApply}
           hasActiveFilters={hasFilters && filtersApply}
         />
         <div>
@@ -524,7 +526,8 @@ export default function DrugsScreen() {
             value={query}
             onChange={handleQueryChange}
             placeholder={searchPlaceholder}
-            onFilter={filtersApply ? () => setFilterOpen(true) : undefined}
+            onFilter={() => setFilterOpen(true)}
+            filterDisabled={!filtersApply}
             hasActiveFilters={hasFilters && filtersApply}
           />
         </div>
@@ -1045,7 +1048,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // query — the caller computes and passes that text down, since only it
 // knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, hasActiveFilters }) {
+function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters }) {
   const colors = resolveToken(FALLBACK_TOKEN, isDark)
 
   return (
@@ -1113,6 +1116,7 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
             onChange={onQueryChange}
             placeholder={placeholder}
             onFilter={onFilter}
+            filterDisabled={filterDisabled}
             hasActiveFilters={hasActiveFilters}
             compact
           />
