@@ -50,10 +50,6 @@ const BROWSE_OPTIONS = [
   { value: 'class',    label: 'Class',    icon: Layers,     color: 'var(--color-class)',  tint: 'var(--color-class-light)' },
 ]
 
-// 'Category' is a little longer than the Search mode names, so this button is
-// a bit wider than the Search one (116px, was 104) to keep the whole word.
-const BROWSE_BUTTON_WIDTH = 116
-
 const CLASS_SORT_LABELS = { relevance: 'Relevance', az: 'A \u2013 Z' }
 
 // Sort button for the class list. Same look as the Conditions screen sort
@@ -185,7 +181,6 @@ export default function DrugsBrowseSection({
             label={currentOption.label}
             color={currentOption.color}
             tint={currentOption.tint}
-            width={BROWSE_BUTTON_WIDTH}
             onPress={() => setMenuOpen(true)}
           />
         }

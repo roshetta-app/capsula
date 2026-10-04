@@ -3,13 +3,18 @@
  * 2026-10-04 (Drugs home split into small files): moved unchanged out of
  * DrugsScreen.jsx.
  *
- * 2026-10-04: optional 'width' prop (default 104, so the Search button is
- * unchanged). The Browse area's Category / Class button uses a wider one so
- * the word 'Category' is not cut short.
+ * 2026-10-04: optional 'width' prop. 2026-10-05: the default is now 116 for all
+ * mode buttons (see MODE_BUTTON_WIDTH below), so none needs to pass its own.
  */
 
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
+
+// 2026-10-05: one width for every mode button (116px): the Search mode button,
+// the Browse Category / Class button and the small one in the sticky bar are all
+// the same size, wide enough for the word 'Category'. Before, Search was 104 and
+// Browse 116.
+export const MODE_BUTTON_WIDTH = 116
 
 // 2026-10-04: made a little smaller (104px wide, was 128; 12px text, was 13)
 // and the name no longer stretches, so the arrow sits right after it; the
@@ -19,7 +24,7 @@ import { ChevronDown } from 'lucide-react'
 // accent (Brand blue, Generic green, Class violet), the same accent the pop-up
 // and the info sheet use.
 
-export default function ModeButton({ icon: Icon, label, color, tint, onPress, width = 104 }) {
+export default function ModeButton({ icon: Icon, label, color, tint, onPress, width = MODE_BUTTON_WIDTH }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
