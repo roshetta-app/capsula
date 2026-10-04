@@ -10,13 +10,15 @@
  * the whole class. Targets are plain text names (no ids exist), so the
  * pickers only offer real class / family names read from the drug library.
  *
- * E2 = basic picker (type or choose a class, then a family or "whole
- * class", add one at a time). The many-at-once picker and the broken-link
- * warning list come in E3.
+ * E3 = searchable picker with many-at-once ticking (tick a class for the
+ * whole class, tick its families for specific ones), plus broken-link
+ * warnings: a target whose class or family no longer exists in the drug
+ * library is marked in the list and in the editor, and listed at the top.
+ * The app ignores such links, so they are harmless but worth cleaning up.
  */
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, AlertTriangle } from 'lucide-react'
 import { useToast }       from '../../context/ToastContext'
 import Modal              from '../../components/admin/Modal'
 import ConfirmModal       from '../../components/admin/ConfirmModal'
@@ -41,16 +43,36 @@ function targetKey(t) {
 }
 
 const MAX_CHIPS_IN_LIST = 6
+const MAX_PICKER_ROWS   = 150
+
+// Set of valid class names and valid "class + family" keys from the library.
+function buildValidity(pairs) {
+  const classes = new Set()
+  const keys    = new Set()
+  for (const p of pairs) {
+    classes.add(p.class)
+    if (p.subclass) keys.add(targetKey(p))
+  }
+  return { classes, keys, ready: pairs.length > 0 }
+}
+
+// A target is broken when its class (or class + family) is not in the library.
+// Until the library list has loaded nothing is flagged, to avoid false alarms.
+function isBroken(t, validity) {
+  if (!validity.ready) return false
+  if (!validity.classes.has(t.class)) return true
+  if (t.subclass && !validity.keys.has(targetKey(t))) return true
+  return false
+}
 
 // ─── Add / edit modal ─────────────────────────────────────────────────────────
 
-function KeywordModal({ open, keywordRow, pairs, onClose, onSaved }) {
+function KeywordModal({ open, keywordRow, pairs, validity, onClose, onSaved }) {
   const { toast } = useToast()
 
   const [word,    setWord]    = useState('')
   const [targets, setTargets] = useState([])
-  const [clsText, setClsText] = useState('')
-  const [subText, setSubText] = useState('')   // '' = whole class
+  const [find,    setFind]    = useState('')
   const [busy,    setBusy]    = useState(false)
 
   // Reset the form every time the modal opens.
@@ -58,43 +80,60 @@ function KeywordModal({ open, keywordRow, pairs, onClose, onSaved }) {
     if (!open) return
     setWord(keywordRow?.keyword ?? '')
     setTargets(keywordRow?.targets ?? [])
-    setClsText('')
-    setSubText('')
+    setFind('')
     setBusy(false)
   }, [open, keywordRow])
 
-  const classNames = useMemo(
-    () => [...new Set(pairs.map(p => p.class))],
-    [pairs]
+  const selectedKeys = useMemo(
+    () => new Set(targets.map(targetKey)),
+    [targets]
   )
 
-  // Canonical class name for whatever was typed (case-insensitive), or null.
-  const matchedClass = useMemo(() => {
-    const typed = clsText.trim().toLowerCase()
-    if (!typed) return null
-    return classNames.find(c => c.toLowerCase() === typed) ?? null
-  }, [clsText, classNames])
-
-  const families = useMemo(() => {
-    if (!matchedClass) return []
-    return pairs
-      .filter(p => p.class === matchedClass && p.subclass)
-      .map(p => p.subclass)
-  }, [pairs, matchedClass])
-
-  function handleAddTarget() {
-    if (!matchedClass) {
-      toast.error('Choose a class from the list')
-      return
+  // Picker rows: each class (whole class) followed by its families.
+  const allRows = useMemo(() => {
+    const byClass = new Map()
+    for (const p of pairs) {
+      if (!byClass.has(p.class)) byClass.set(p.class, [])
+      if (p.subclass) byClass.get(p.class).push(p.subclass)
     }
-    const t = { class: matchedClass, subclass: subText || null }
-    if (targets.some(x => targetKey(x) === targetKey(t))) {
-      toast.error('Already added')
-      return
+    const out = []
+    for (const [cls, subs] of byClass) {
+      out.push({ class: cls, subclass: null })
+      for (const sub of subs) out.push({ class: cls, subclass: sub })
     }
-    setTargets(prev => [...prev, t])
-    setClsText('')
-    setSubText('')
+    return out
+  }, [pairs])
+
+  // Search: a class match shows the class and all its families; a family
+  // match shows its class row plus the matching families.
+  const pickerRows = useMemo(() => {
+    const q = find.trim().toLowerCase()
+    if (!q) return allRows
+    const classHit = new Set()
+    const famHit   = new Set()
+    for (const r of allRows) {
+      if (!r.subclass && r.class.toLowerCase().includes(q)) classHit.add(r.class)
+      if (r.subclass && r.subclass.toLowerCase().includes(q)) famHit.add(targetKey(r))
+    }
+    const famClasses = new Set(
+      allRows.filter(r => r.subclass && famHit.has(targetKey(r))).map(r => r.class)
+    )
+    return allRows.filter(r =>
+      classHit.has(r.class) ||
+      (!r.subclass && famClasses.has(r.class)) ||
+      (r.subclass && famHit.has(targetKey(r)))
+    )
+  }, [allRows, find])
+
+  const shownRows = pickerRows.slice(0, MAX_PICKER_ROWS)
+  const hiddenRows = pickerRows.length - shownRows.length
+
+  function toggleTarget(t) {
+    setTargets(prev =>
+      prev.some(x => targetKey(x) === targetKey(t))
+        ? prev.filter(x => targetKey(x) !== targetKey(t))
+        : [...prev, { class: t.class, subclass: t.subclass ?? null }]
+    )
   }
 
   function removeTarget(t) {
@@ -107,7 +146,7 @@ function KeywordModal({ open, keywordRow, pairs, onClose, onSaved }) {
       return
     }
     if (targets.length === 0) {
-      toast.error('Add at least one class or family')
+      toast.error('Tick at least one class or family')
       return
     }
     setBusy(true)
@@ -154,60 +193,93 @@ function KeywordModal({ open, keywordRow, pairs, onClose, onSaved }) {
           <div style={labelText}>Points at ({targets.length})</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
             {targets.length === 0 && (
-              <span style={hintText}>Nothing yet — add a class or family below.</span>
+              <span style={hintText}>Nothing yet — tick classes or families below.</span>
             )}
-            {targets.map(t => (
-              <span key={targetKey(t)} style={chipRemovable}>
-                {targetLabel(t)}
-                <button
-                  onClick={() => removeTarget(t)}
-                  title="Remove"
-                  style={chipX}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
+            {targets.map(t => {
+              const broken = isBroken(t, validity)
+              return (
+                <span key={targetKey(t)} style={broken ? chipBrokenRemovable : chipRemovable}>
+                  {targetLabel(t)}{broken ? ' — not found' : ''}
+                  <button
+                    onClick={() => removeTarget(t)}
+                    title="Remove"
+                    style={chipX}
+                  >
+                    <X size={12} />
+                  </button>
+                </span>
+              )
+            })}
           </div>
         </div>
 
-        {/* Add a target */}
+        {/* Picker */}
         <div style={{
           display: 'flex', flexDirection: 'column', gap: 8,
           padding: 12, borderRadius: 10,
           border: '1px solid var(--color-border)',
           backgroundColor: 'var(--color-surface-muted)',
         }}>
-          <div style={labelText}>Add a class or family</div>
-
+          <div style={labelText}>Pick classes and families</div>
           <input
-            list="class-keywords-class-list"
-            value={clsText}
-            onChange={e => { setClsText(e.target.value); setSubText('') }}
-            placeholder="Class — type or choose"
+            value={find}
+            onChange={e => setFind(e.target.value)}
+            placeholder="Search classes and families…"
             style={inputStyle}
           />
-          <datalist id="class-keywords-class-list">
-            {classNames.map(c => <option key={c} value={c} />)}
-          </datalist>
 
-          <select
-            value={subText}
-            onChange={e => setSubText(e.target.value)}
-            disabled={!matchedClass}
-            style={inputStyle}
-          >
-            <option value="">Whole class</option>
-            {families.map(f => <option key={f} value={f}>{f}</option>)}
-          </select>
-
-          <button
-            onClick={handleAddTarget}
-            disabled={!matchedClass}
-            style={{ ...btnSecondary, opacity: matchedClass ? 1 : 0.5 }}
-          >
-            Add
-          </button>
+          <div style={{
+            maxHeight:       260,
+            overflowY:       'auto',
+            border:          '1px solid var(--color-border)',
+            borderRadius:    8,
+            backgroundColor: 'var(--color-bg)',
+          }}>
+            {pairs.length === 0 && (
+              <div style={{ ...hintText, padding: 12 }}>
+                The class list did not load. Close and reopen this screen.
+              </div>
+            )}
+            {pairs.length > 0 && shownRows.length === 0 && (
+              <div style={{ ...hintText, padding: 12 }}>
+                No class or family matches "{find}".
+              </div>
+            )}
+            {shownRows.map(r => {
+              const checked = selectedKeys.has(targetKey(r))
+              const isFam   = !!r.subclass
+              return (
+                <label
+                  key={targetKey(r)}
+                  style={{
+                    display:         'flex',
+                    alignItems:      'center',
+                    gap:             8,
+                    padding:         isFam ? '5px 10px 5px 30px' : '7px 10px',
+                    fontSize:        isFam ? 13 : 13.5,
+                    fontWeight:      isFam ? 400 : 600,
+                    fontFamily:      'var(--font-body)',
+                    color:           'var(--color-text-primary)',
+                    cursor:          'pointer',
+                    backgroundColor: checked ? 'var(--color-accent-light)' : 'transparent',
+                    borderTop:       !isFam ? '1px solid var(--color-border)' : 'none',
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTarget(r)}
+                  />
+                  {isFam ? r.subclass : `${r.class} (whole class)`}
+                </label>
+              )
+            })}
+            {hiddenRows > 0 && (
+              <div style={{ ...hintText, padding: 10, textAlign: 'center' }}>
+                {hiddenRows} more — type in the search box to narrow the list.
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
@@ -260,6 +332,21 @@ export default function ClassKeywordsManager() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // ── Broken links: targets whose class / family no longer exists ───────────
+
+  const validity = useMemo(() => buildValidity(pairs), [pairs])
+
+  const brokenList = useMemo(() => {
+    const out = []
+    for (const r of rows) {
+      const bad = (r.targets ?? []).filter(t => isBroken(t, validity))
+      if (bad.length > 0) out.push({ row: r, bad })
+    }
+    return out
+  }, [rows, validity])
+
+  const [warnOpen, setWarnOpen] = useState(false)
 
   // ── Search filter (keyword or any target name) ────────────────────────────
 
@@ -319,6 +406,41 @@ export default function ClassKeywordsManager() {
         placeholder="Search keywords or classes…"
         style={{ ...inputStyle, marginBottom: 8 }}
       />
+      {!loading && brokenList.length > 0 && (
+        <div style={warnBox}>
+          <button
+            onClick={() => setWarnOpen(o => !o)}
+            style={warnHead}
+          >
+            <AlertTriangle size={14} />
+            {brokenList.length} keyword{brokenList.length === 1 ? '' : 's'} point
+            {brokenList.length === 1 ? 's' : ''} at a class or family that no longer exists
+            <span style={{ marginLeft: 'auto', fontWeight: 500 }}>
+              {warnOpen ? 'Hide' : 'Show'}
+            </span>
+          </button>
+          {warnOpen && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
+              {brokenList.map(({ row, bad }) => (
+                <div key={row.id} style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                  <button
+                    onClick={() => { setEditTarget(row); setModalOpen(true) }}
+                    style={warnLink}
+                  >
+                    {row.keyword}
+                  </button>
+                  {' — '}{bad.map(targetLabel).join('; ')}
+                </div>
+              ))}
+              <div style={hintText}>
+                The app ignores these links, so nothing is broken for users.
+                Open the keyword to remove them or tick the new name.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {!loading && (
         <div style={{ ...hintText, marginBottom: 12 }}>
           {search.trim()
@@ -370,7 +492,13 @@ export default function ClassKeywordsManager() {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {shown.map(t => (
-                  <span key={targetKey(t)} style={chip}>{targetLabel(t)}</span>
+                  <span
+                    key={targetKey(t)}
+                    style={isBroken(t, validity) ? chipBroken : chip}
+                    title={isBroken(t, validity) ? 'Not found in the drug library' : undefined}
+                  >
+                    {targetLabel(t)}
+                  </span>
                 ))}
                 {extra > 0 && <span style={chip}>+{extra} more</span>}
               </div>
@@ -412,6 +540,7 @@ export default function ClassKeywordsManager() {
         open={modalOpen}
         keywordRow={editTarget}
         pairs={pairs}
+        validity={validity}
         onClose={() => { setModalOpen(false); setEditTarget(null) }}
         onSaved={load}
       />
@@ -533,4 +662,54 @@ const chipX = {
   padding:        0,
   cursor:         'pointer',
   color:          'var(--color-text-tertiary)',
+}
+
+const chipBroken = {
+  ...chip,
+  border:          '1px solid var(--color-danger)',
+  color:           'var(--color-danger)',
+  backgroundColor: 'transparent',
+}
+
+const chipBrokenRemovable = {
+  ...chipRemovable,
+  border:          '1px solid var(--color-danger)',
+  color:           'var(--color-danger)',
+  backgroundColor: 'transparent',
+}
+
+const warnBox = {
+  padding:         '10px 12px',
+  borderRadius:    10,
+  border:          '1px solid var(--color-danger)',
+  backgroundColor: 'var(--color-surface)',
+  marginBottom:    12,
+}
+
+const warnHead = {
+  display:     'flex',
+  alignItems:  'center',
+  gap:         8,
+  width:       '100%',
+  background:  'none',
+  border:      'none',
+  padding:     0,
+  cursor:      'pointer',
+  textAlign:   'left',
+  fontSize:    13,
+  fontWeight:  600,
+  fontFamily:  'var(--font-body)',
+  color:       'var(--color-danger)',
+}
+
+const warnLink = {
+  background:  'none',
+  border:      'none',
+  padding:     0,
+  cursor:      'pointer',
+  fontSize:    12,
+  fontWeight:  600,
+  fontFamily:  'var(--font-body)',
+  color:       'var(--color-accent)',
+  textDecoration: 'underline',
 }
