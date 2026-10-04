@@ -276,35 +276,48 @@
  *  - Class only or subclass only: single bold row, flush left, no dot, no line.
  *  - Subclass row is smaller and lighter; class row stays bold.
  *
+ * 2026-10-04 (tree icons, no line): the dot and the curved line joining the
+ * Class and Subclass rows are gone. Each row now starts with a small icon: the
+ * stacked-layers icon in the class colour (--color-class) for the class, the
+ * molecule icon in the app blue for the subclass (the same two icons the search
+ * cards and the class sheet use). The subclass stays indented under the class
+ * name, smaller and lighter. Tapping, arrows and what opens are unchanged.
+ *
  * 2026-10-04 (Search mode pop-up): CardRow is now exported, so the Drugs
  * screen's Search mode pop-up (SearchModeInfoSheet.jsx) draws the same
  * Class/Subclass tree. Nothing about how it looks or works here changed.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
-import { FlaskConical, ChevronRight } from 'lucide-react'
+import { FlaskConical, ChevronRight, Layers } from 'lucide-react'
 import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import ClassBottomSheet from './ClassBottomSheet.jsx'
+import ClassBottomSheet, { MoleculeIcon } from './ClassBottomSheet.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
 // One row of the Class/Subclass tree. A button with a quiet grey arrow when
 // onClick is given, otherwise plain text with no arrow (2026-10-03 hierarchy
-// pass: no backing and no blue, so the ingredient name stays the focus). 'hasChild' marks a Class row with a Subclass under it: it gets a
-// small dot and the top half of the connecting line. 'child' is the Subclass
-// row under a Class row: indented, smaller and lighter, with the bottom half of
-// the line, which curves into its text. Both halves sit at the same spot, so
-// they join into one unbroken line even when a long name wraps to two lines.
-// A row with no partner (class only, or subclass only) has no dot, no line and
-// no indent. Pressed feedback is a slightly deeper tint plus a tiny shrink.
-const LINE_X     = 7      // horizontal position of the vertical line
-const LINE_COLOR = 'var(--color-text-tertiary)'
-const ROW_GAP    = 0      // space between the two rows (the line bridges it)
-const MID        = 18     // height of the middle of a row's first text line (8 padding + 10)
+// pass: no backing and no blue, so the ingredient name stays the focus).
+// 2026-10-04 (icons, no line): the dot and the curved connecting line are gone.
+// Each row starts with a small icon instead: the stacked-layers icon in the
+// class colour for the Class row, the molecule icon in the app blue for the
+// Subclass row (the same two icons the search cards and the class sheet use).
+// 'child' marks the Subclass row under a Class row: indented under the class
+// name, smaller and lighter, so the order still reads as a tree without a line.
+// A row with no partner (class only, or subclass only) is flush left.
+// 'kind' ('class' | 'subclass') picks the icon; leave it off for no icon.
+// Pressed feedback is a slightly deeper tint plus a tiny shrink.
+const ROW_GAP = 0      // space between the two rows
 
-export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false }) {
+const ROW_ICONS = {
+  class:    { Icon: Layers,       color: 'var(--color-class)'  },
+  subclass: { Icon: MoleculeIcon, color: 'var(--color-accent)' },
+}
+
+export function CardRow({ label, onClick, ariaLabel, child = false, kind = null }) {
   const [pressed, setPressed] = useState(false)
-  const inTree = child || hasChild
+  const iconDef  = kind ? ROW_ICONS[kind] : null
+  const iconSize = child ? 14 : 16
   const base = {
     position:       'relative',
     display:        'flex',
@@ -314,7 +327,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
     width:          '100%',
     boxSizing:      'border-box',
     minHeight:      36,
-    padding:        child ? '8px 4px 8px 30px' : inTree ? '8px 4px 8px 20px' : '8px 4px 8px 4px',
+    padding:        child ? '8px 4px 8px 24px' : '8px 4px',
     border:         'none',
     borderRadius:   10,
     fontFamily:     'var(--font-body)',
@@ -325,55 +338,27 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
     color:          child ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
     backgroundColor: 'transparent',
   }
-  // Class row (when a subclass sits under it): a dot at the middle of the
-  // first text line, and the line running from the dot down past the row's
-  // bottom edge to meet the Subclass row's half.
-  const dot = hasChild ? (
-    <>
-      <span
-        aria-hidden="true"
-        style={{
-          position:        'absolute',
-          left:            LINE_X - 3,
-          top:             MID - 3.5,
-          width:           7,
-          height:          7,
-          borderRadius:    '50%',
-          backgroundColor: LINE_COLOR,
-        }}
-      />
-      <span
-        aria-hidden="true"
-        style={{
-          position:   'absolute',
-          left:       LINE_X - 0.75,
-          top:        MID + 3.5,
-          bottom:     -ROW_GAP,
-          width:      0,
-          borderLeft: `1.5px solid ${LINE_COLOR}`,
-        }}
-      />
-    </>
-  ) : null
-  // Subclass row (under a Class row): the line comes down from the row's top
-  // edge to the middle of the first text line, then curves right to the text.
-  const elbow = child ? (
-    <span
-      aria-hidden="true"
-      style={{
-        position:     'absolute',
-        left:         LINE_X - 0.75,
-        top:          0,
-        width:        30 - 8 - LINE_X,
-        height:       MID,
-        boxSizing:    'border-box',
-        borderLeft:   `1.5px solid ${LINE_COLOR}`,
-        borderBottom: `1.5px solid ${LINE_COLOR}`,
-        borderBottomLeftRadius: 9,
-      }}
-    />
-  ) : null
-  if (!onClick) return <div style={base}>{dot}{elbow}<span>{label}</span></div>
+  // Icon + name together. The icon is lined up with the first line of the name,
+  // so a long name that wraps keeps the icon at the top.
+  const content = (
+    <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      {iconDef && (
+        <span
+          aria-hidden="true"
+          style={{
+            display:    'flex',
+            flexShrink: 0,
+            marginTop:  (20 - iconSize) / 2,
+            color:      iconDef.color,
+          }}
+        >
+          <iconDef.Icon size={iconSize} strokeWidth={1.9} color={iconDef.color} />
+        </span>
+      )}
+      <span style={{ minWidth: 0 }}>{label}</span>
+    </span>
+  )
+  if (!onClick) return <div style={base}>{content}</div>
   return (
     <button
       onClick={onClick}
@@ -391,8 +376,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = f
         transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
-      {dot}{elbow}
-      <span>{label}</span>
+      {content}
       <ChevronRight size={child ? 14 : 16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
     </button>
   )
@@ -634,7 +618,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               label={drugClass}
               onClick={hasClassList ? () => setClassOpen(true) : undefined}
               ariaLabel={`Show drug families in ${drugClass}`}
-              hasChild={!!subclass}
+              kind="class"
             />
           )}
           {subclass && (
@@ -643,6 +627,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               onClick={hasAlternatives ? openAlternatives : undefined}
               ariaLabel={`Show alternatives in ${subclass}`}
               child={!!drugClass}
+              kind="subclass"
             />
           )}
         </div>
@@ -672,3 +657,4 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
     </div>
   )
 }
+
