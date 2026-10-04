@@ -748,7 +748,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
                 fontSize:     13,
                 fontWeight:   600,
                 lineHeight:   1.45,
-                color:        'var(--color-text-secondary)',
+                color:        'var(--color-text-primary)',
                 borderBottom: '0.5px solid var(--color-border-subtle)',
               }}>
                 {familyCase(sec.name)}
