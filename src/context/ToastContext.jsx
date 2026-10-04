@@ -9,6 +9,17 @@
  *   toast.warning('Check your input')
  *   toast.info('Refreshed')
  *
+ * 2026-10-04 (search mode toast): two additions, nothing existing changes.
+ *   toast.custom('Brand mode', { color, icon, duration })
+ *       A toast in a colour the caller picks (any CSS colour or theme variable,
+ *       white text on it) with its own icon: 'icon' is a Lucide component
+ *       (for example Tag), drawn white. Both are optional; with no colour it
+ *       looks like toast.info.
+ *   toast.dismiss(id)
+ *       Closes a toast early. Every toast call returns its id, so a caller
+ *       that shows a toast for a setting can close the earlier one first and
+ *       the stack never piles up.
+ *
  * Icon update (offline-banner-pro-refine session) — toast icons were
  * plain unicode characters (checkmark, cross, triangle, info glyph),
  * which broke Icon.jsx's own app-wide rule ('always use <Icon>, never a
@@ -33,9 +44,9 @@ export function ToastProvider({ children }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const add = useCallback((type, message, duration = 3000) => {
+  const add = useCallback((type, message, duration = 3000, extra = null) => {
     const id = _nextId++
-    setToasts(prev => [...prev, { id, type, message }])
+    setToasts(prev => [...prev, { id, type, message, ...extra }])
     timers.current[id] = setTimeout(() => dismiss(id), duration)
     return id
   }, [dismiss])
@@ -45,6 +56,8 @@ export function ToastProvider({ children }) {
     error:   (msg, dur) => add('error',   msg, dur),
     warning: (msg, dur) => add('warning', msg, dur),
     info:    (msg, dur) => add('info',    msg, dur),
+    custom:  (msg, { color, icon, duration } = {}) => add('info', msg, duration, { color, icon }),
+    dismiss,
   }
 
   return (
@@ -99,7 +112,9 @@ function ToastStack({ toasts, onDismiss }) {
 }
 
 function ToastItem({ toast, onDismiss }) {
-  const { bg, iconName } = TYPE_STYLES[toast.type] ?? TYPE_STYLES.info
+  const { bg: typeBg, iconName } = TYPE_STYLES[toast.type] ?? TYPE_STYLES.info
+  const bg       = toast.color ?? typeBg
+  const CustomIcon = toast.icon
 
   return (
     <div
@@ -123,7 +138,9 @@ function ToastItem({ toast, onDismiss }) {
       }}
       onClick={() => onDismiss(toast.id)}
     >
-      <Icon name={iconName} size={16} color="#fff" />
+      {CustomIcon
+        ? <CustomIcon size={16} color="#fff" style={{ flexShrink: 0 }} />
+        : <Icon name={iconName} size={16} color="#fff" />}
       <span style={{ flex: 1, lineHeight: 1.4 }}>{toast.message}</span>
     </div>
   )
