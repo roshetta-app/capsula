@@ -232,7 +232,7 @@
  */
 
 import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -340,6 +340,10 @@ function SortByButton({ label, onPress }) {
 
 // ─── DrugsScreen ──────────────────────────────────────────────────────────────
 
+// Set when a category card is tapped, cleared once the page has jumped to the
+// top (see the layout effect in DrugsScreen).
+let scrollTopOnCategoryOpen = false
+
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
@@ -386,15 +390,19 @@ export default function DrugsScreen() {
   // "all"), anything else = that category's slug, taken as-is from the URL.
   const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
 
-  // Opening a category (a tapped category card, or 'All drugs') starts the
-  // page at the top. Only a change INTO a category scrolls: coming back from a
-  // drug page or leaving a category does not, so those keep their place.
-  const prevCategoryRef = useRef(activeCategory)
-  useEffect(() => {
-    if (activeCategory !== null && prevCategoryRef.current !== activeCategory) {
+  // A tapped category card (or the All Drugs tile) starts the page at the top.
+  // handleOpenCategory leaves a note (a module-level flag, so it survives the
+  // screen being rebuilt when the address changes) and this runs as soon as
+  // the category is on screen, before it is drawn. Coming back from a drug
+  // page or leaving a category sets no note, so those keep their place.
+  useLayoutEffect(() => {
+    if (scrollTopOnCategoryOpen && activeCategory !== null) {
+      scrollTopOnCategoryOpen = false
       window.scrollTo(0, 0)
+      // Once more on the next frame, in case the list's first measuring
+      // nudged the page.
+      requestAnimationFrame(() => window.scrollTo(0, 0))
     }
-    prevCategoryRef.current = activeCategory
   }, [activeCategory])
 
   const { history: recentDrugs, addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
@@ -488,6 +496,7 @@ export default function DrugsScreen() {
 
   // A tapped category tile (or the All Drugs tile, slug 'all').
   function handleOpenCategory(slug) {
+    scrollTopOnCategoryOpen = true
     navigate(ROUTES.DRUGS_CATEGORY(slug))
   }
 
