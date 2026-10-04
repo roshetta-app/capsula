@@ -9,10 +9,11 @@
  *   - Class   -> Proton pump inhibitor
  * Flat layout, drawn straight on the white sheet with no cards: each mode is
  * its name (bold, with a small accent icon) and, below it, the example term in
- * a pill that looks like a search field. No subtitles. Each mode has its own
+ * a quiet, neutral pill that looks like a search field. Thin dividers sit
+ * between the three modes. No subtitles. Each mode has its own
  * accent: Brand blue, Generic green, Class violet (theme variables, so light
- * and dark mode follow automatically). One small plain-text tip at the bottom
- * explains how to narrow Brand and Generic searches.
+ * and dark mode follow automatically). One small hint at the bottom explains
+ * how to narrow Brand and Generic searches, with its two examples as small tags.
  *
  * Redesign: replaces the earlier version that showed real drug cards, a
  * highlighted-match explanation per mode, and a long footnote. Nothing here
@@ -35,7 +36,7 @@ import SheetShell from '../ui/SheetShell'
 
 // One section per mode, drawn flat on the sheet: the mode name with its small
 // accent icon, then the example in a search-bar pill. No card behind it.
-function ModeSection({ icon: Icon, title, example, color, tint }) {
+function ModeSection({ icon: Icon, title, example, color }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -54,7 +55,7 @@ function ModeSection({ icon: Icon, title, example, color, tint }) {
         marginTop:       'var(--space-3)',
         padding:         '0 var(--space-4)',
         borderRadius:    'var(--radius-full)',
-        backgroundColor: tint,
+        backgroundColor: 'var(--color-surface-muted)',
       }}>
         <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
@@ -69,6 +70,29 @@ function ModeSection({ icon: Icon, title, example, color, tint }) {
         </span>
       </div>
     </div>
+  )
+}
+
+// Thin line between the three modes.
+function Divider() {
+  return <div style={{ height: 1, backgroundColor: 'var(--color-border)' }} />
+}
+
+// A small tag-style example query used in the hint.
+function QueryTag({ children }) {
+  return (
+    <span style={{
+      display:         'inline-block',
+      padding:         '5px 12px',
+      borderRadius:    'var(--radius-full)',
+      backgroundColor: 'var(--color-surface-muted)',
+      fontSize:        12,
+      fontWeight:      500,
+      color:           'var(--color-text-primary)',
+      whiteSpace:      'nowrap',
+    }}>
+      {children}
+    </span>
   )
 }
 
@@ -135,47 +159,49 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
         padding:       '0 var(--space-4) var(--space-6)',
         display:       'flex',
         flexDirection: 'column',
-        gap:           'var(--space-6)',
+        gap:           'var(--space-4)',
       }}>
         <ModeSection
           icon={Tag}
           title="Brand"
           example="Controloc"
           color="var(--color-accent)"
-          tint="var(--color-accent-light)"
         />
+        <Divider />
         <ModeSection
           icon={FlaskConical}
           title="Generic"
           example="Pantoprazole"
           color="var(--color-generic)"
-          tint="var(--color-generic-light)"
         />
+        <Divider />
         <ModeSection
           icon={Layers}
           title="Class"
           example="Proton pump inhibitor"
           color="var(--color-class)"
-          tint="var(--color-class-light)"
         />
 
-        {/* Tip: plain text with a small icon, no box, so it reads as a side note, not a fourth mode. */}
+        {/* Hint: a side note, not a fourth mode. The examples sit on their own
+            line as small query tags. */}
         <div style={{
           display:    'flex',
           alignItems: 'flex-start',
-          gap:        'var(--space-3)',
+          gap:        10,
+          marginTop:  'var(--space-3)',
           padding:    '0 var(--space-1)',
         }}>
-          <Lightbulb size={18} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
+          <Lightbulb size={16} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 2 }} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>
               Narrow your search
             </div>
-            <div style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--color-text-secondary)', marginTop: 2 }}>
-              Add a strength or form when needed:{' '}
-              <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Controloc 40 mg</strong>
-              {' · '}
-              <strong style={{ fontWeight: 600, color: 'var(--color-text-primary)' }}>Pantoprazole tablet</strong>
+            <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--color-text-secondary)', marginTop: 2 }}>
+              Add a strength or form when needed:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 'var(--space-2)' }}>
+              <QueryTag>Controloc 40 mg</QueryTag>
+              <QueryTag>Pantoprazole tablet</QueryTag>
             </div>
           </div>
         </div>
