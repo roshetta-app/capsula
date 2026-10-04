@@ -222,10 +222,10 @@ function GroupLabel({ children }) {
   return (
     <div style={{
       margin:             'var(--space-3) 2px var(--space-2)',
-      fontSize:           12,
+      fontSize:           14.5,
       fontWeight:         600,
       fontVariantNumeric: 'tabular-nums',
-      color:              'var(--color-text-tertiary)',
+      color:              'var(--color-text-primary)',
     }}>
       {children}
     </div>
@@ -266,7 +266,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
 
       {classes.length > 0 && (
         <>
-          {subclasses.length > 0 && <GroupLabel>Classes</GroupLabel>}
+          {subclasses.length > 0 && <GroupLabel>Drug classes</GroupLabel>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownClasses.map(c => (
               <ResultCard
