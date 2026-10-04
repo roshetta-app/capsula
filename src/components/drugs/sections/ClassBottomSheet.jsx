@@ -1,6 +1,16 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-04 (count tag colour, open at top): two small fixes.
+ *  - The number on the 'All drugs in this class' row now gets the blue look: a
+ *    solid blue tag with white text, matching the solid blue icon tile on the
+ *    same row. (The soft blue tag would vanish on the soft blue card.) The
+ *    subclass cards keep their grey tag.
+ *  - Opening the 'All drugs' row or any subclass card always starts at the top
+ *    of its list. Before, the scrolling area was reused between the subclass
+ *    list and the drugs list, so a list scrolled down made the drugs open part
+ *    way down. Each view now gets its own scrolling area.
+ *
  * 2026-10-04 (Drug families title): a small grey title 'Drug families' now sits
  * under the line, above the subclass cards. It is only drawn when subclass
  * cards follow, same as the line.
@@ -305,7 +315,10 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
       {/* Drug count: the same small rounded-square tag used in the Related
           drugs sheet, a little smaller, just before the chevron. */}
       <CountTag
-        style={{ minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11 }}
+        style={{
+          minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11,
+          ...(featured ? { backgroundColor: 'var(--color-accent)', color: '#fff' } : null),
+        }}
       >
         <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
       </CountTag>
@@ -415,7 +428,7 @@ export default function ClassBottomSheet({
                 Back
               </button>
             </div>
-            <div style={{
+            <div key={`drugs-${pickedGroup.name}`} style={{
               flex:      1,
               minHeight: 0,
               overflowY: 'auto',
@@ -481,7 +494,7 @@ export default function ClassBottomSheet({
                 {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
             </div>
-            <div style={{
+            <div key="class-list" style={{
               flex:          1,
               minHeight:     0,
               overflowY:     'auto',
