@@ -30,7 +30,8 @@
  * 2026-10-04 (long names): a long class name wraps onto more lines inside its
  * own space (even a single very long word breaks), and the count and the
  * chevron never shrink or get covered. A class with no drug families no longer
- * shows a 'No drug families' line.
+ * shows a 'No drug families' line. Names with slashes between words get a
+ * space on each side of the slash (display only) so they break between words.
  *
  * Props:
  *   results         { classes, subclasses } from useDrugSearch (Class mode)
@@ -55,6 +56,16 @@ import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
 import CountTag from '../ui/CountTag.jsx'
 import { MoleculeIcon } from './sections/ClassBottomSheet.jsx'
 import { titleCaseWords } from '../../utils/classSearch'
+
+// Some names are stored with words joined by a slash and no spaces
+// ('Alpha/Beta blocker'), which has no place to break, so a long one was cut in
+// the middle of a word. Only for display: a space is put on both sides of each
+// slash so every word stands alone and the line breaks between words. The
+// stored name is not changed and is still what gets passed on when a card is
+// tapped.
+function spaceSlashes(text) {
+  return (text ?? '').replace(/\s*\/\s*/g, ' / ')
+}
 
 // How many cards each group shows before its 'Show all' row.
 const CLASS_LIMIT    = 5
@@ -254,7 +265,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ResultCard
                 key={`class:${c.name}`}
                 kicker={hideKicker ? undefined : 'Class'}
-                name={titleCaseWords(c.name)}
+                name={spaceSlashes(titleCaseWords(c.name))}
                 detail={
                   c.subclassCount === 0
                     ? null
@@ -283,8 +294,8 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ResultCard
                 key={`sub:${s.className}\u0000${s.name}`}
                 kicker="Family"
-                name={titleCaseWords(s.name)}
-                detail={`in ${titleCaseWords(s.className)}`}
+                name={spaceSlashes(titleCaseWords(s.name))}
+                detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
                 count={s.brandCount}
                 Icon={MoleculeIcon}
                 onClick={() => onOpenSubclass(s.className, s.name)}
