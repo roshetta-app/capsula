@@ -175,6 +175,11 @@
  * while the person stays on the same drug page, per subclass, same as the
  * related drugs sheet.
  *
+ * 2026-10-04 (scroll kept): going back from a family's drug list to the subclass
+ * list used to start the list at the top, because the list is drawn fresh each
+ * time. The list's scroll position is now saved when a family is opened and put
+ * back on return.
+ *
  * Props:
  *   isOpen        boolean
  *   onClose       () => void
@@ -185,7 +190,7 @@
  *   directSubclass string|null: open straight on this subclass's drugs
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
 import BrandsList, { CountTag } from '../BrandsList.jsx'
 import SheetShell from '../../ui/SheetShell'
@@ -341,6 +346,10 @@ export default function ClassBottomSheet({
   // Remembered filter picks, one entry per subclass (a ref: only read when a
   // list is built, no re-render needed).
   const savedFilters = useRef({})
+  // The subclass list's scroll box, and how far it was scrolled when a family
+  // was opened, so going back lands where the person left off, not at the top.
+  const listRef         = useRef(null)
+  const savedListScroll = useRef(0)
   // Where the filter pop-ups are drawn (the full-sheet layer at the end).
   const [popupLayer, setPopupLayer] = useState(null)
 
@@ -354,8 +363,20 @@ export default function ClassBottomSheet({
   // Each time the sheet opens, start on the subclass list (or, when a
   // subclass was asked for, straight on its drugs).
   useEffect(() => {
-    if (isOpen) setPicked(directSubclass ?? null)
+    if (isOpen) {
+      savedListScroll.current = 0
+      setPicked(directSubclass ?? null)
+    }
   }, [isOpen, directSubclass])
+
+  // Coming back to the subclass list (Back arrow, phone Back): the list is
+  // drawn fresh each time, so put it back where it was before the family was
+  // opened. Runs before the screen paints, so there is no visible jump.
+  useLayoutEffect(() => {
+    if (picked === null && listRef.current) {
+      listRef.current.scrollTop = savedListScroll.current
+    }
+  }, [picked])
 
   // Real families (the heading counts these) and the cards shown in the list
   // (single-drug families may be folded into one 'Other families' card).
@@ -371,6 +392,12 @@ export default function ClassBottomSheet({
       : (listGroups.find(g => g.name === picked) ?? groups.find(g => g.name === picked) ?? null)
   // Every brand in the class, with or without a subclass.
   const totalDrugs = classDrugs.length
+
+  // Opening a family from the list: remember the list's scroll first.
+  function pickFamily(name) {
+    savedListScroll.current = listRef.current?.scrollTop ?? 0
+    setPicked(name)
+  }
 
   function handleTap(item) {
     onClose()
@@ -488,7 +515,7 @@ export default function ClassBottomSheet({
                 {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
             </div>
-            <div key="class-list" style={{
+            <div key="class-list" ref={listRef} style={{
               flex:          1,
               minHeight:     0,
               overflowY:     'auto',
@@ -504,7 +531,7 @@ export default function ClassBottomSheet({
                   count={totalDrugs}
                   Icon={List}
                   featured
-                  onClick={() => setPicked(ALL_KEY)}
+                  onClick={() => pickFamily(ALL_KEY)}
                 />
               )}
               {/* Thin line under the 'All drugs' row, only when subclass
@@ -541,7 +568,7 @@ export default function ClassBottomSheet({
                   name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
                   Icon={g.isOthers ? LayoutGrid : MoleculeIcon}
-                  onClick={() => setPicked(g.name)}
+                  onClick={() => pickFamily(g.name)}
                 />
               ))}
             </div>
