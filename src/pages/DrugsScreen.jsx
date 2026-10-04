@@ -497,6 +497,7 @@ export default function DrugsScreen() {
   // A tapped category tile (or the All Drugs tile, slug 'all').
   function handleOpenCategory(slug) {
     scrollTopOnCategoryOpen = true
+    drugListMemory.delete(`cat:${slug === 'all' ? '__all' : slug}`)
     navigate(ROUTES.DRUGS_CATEGORY(slug))
   }
 
@@ -786,6 +787,7 @@ export default function DrugsScreen() {
               )
             ) : (
               <VirtualDrugList
+                key={!hasQuery ? `cat:${activeCategory}` : 'search'}
                 drugs={displayed}
                 onTap={handleDrugTap}
                 categories={categories}
@@ -794,6 +796,7 @@ export default function DrugsScreen() {
                 onToggleFavourite={handleToggleDrugFavourite}
                 highlight={query}
                 searchMode={mode === 'class' ? 'brand' : mode}
+                memoryKey={!hasQuery ? `cat:${activeCategory}` : null}
               />
             )}
           </>
@@ -1201,15 +1204,49 @@ function SearchSwitchingState() {
 // (the concentration/form line is optional), so real heights are measured
 // after each row renders rather than assumed.
 
-function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite, highlight = '', searchMode = 'brand' }) {
+//
+// 2026-10-04 (remembered place): when a drug is opened from a category list and
+// the person comes back, the list used to land a little off. The cause: the
+// row heights are only estimated until each row is drawn and measured, so the
+// restored position shifted as the real heights arrived. Now, at the moment a
+// drug is tapped, the exact scroll position and the measured row heights are
+// kept in drugListMemory (key: the open category); coming back, the list
+// starts with those same heights and the page goes straight to that position.
+// Only the category view (no typed search) uses it.
+const drugListMemory = new Map()
+
+function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, onToggleFavourite, highlight = '', searchMode = 'brand', memoryKey = null }) {
   const listRef = useRef(null)
+  const [saved] = useState(() => (memoryKey ? drugListMemory.get(memoryKey) : undefined))
 
   const virtualizer = useWindowVirtualizer({
     count: drugs.length,
     estimateSize: () => 76,
     overscan: 8,
     scrollMargin: listRef.current?.offsetTop ?? 0,
+    getItemKey: index => drugs[index]?.id ?? index,
+    initialMeasurementsCache: saved?.measurements,
+    initialOffset: saved?.scrollY,
   })
+
+  // Back from a drug: go straight to the remembered position.
+  useLayoutEffect(() => {
+    if (!saved) return
+    window.scrollTo(0, saved.scrollY)
+    requestAnimationFrame(() => window.scrollTo(0, saved.scrollY))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // A tapped row: keep the place first, then open the drug.
+  function handleRowTap(...args) {
+    if (memoryKey) {
+      drugListMemory.set(memoryKey, {
+        scrollY:      window.scrollY,
+        measurements: virtualizer.measurementsCache,
+      })
+    }
+    onTap(...args)
+  }
 
   return (
     <div ref={listRef} style={{ position: 'relative', height: virtualizer.getTotalSize() }}>
@@ -1230,7 +1267,7 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
           >
             <SharedDrugCard
               drug={drug}
-              onTap={onTap}
+              onTap={handleRowTap}
               categories={categories}
               isDark={isDark}
               isLast={virtualRow.index === drugs.length - 1}
