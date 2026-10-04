@@ -18,14 +18,14 @@
  * medication) rather than favourited-status.
  *
  * 2026-10-03 (count tags): the number next to each tab name is now the same
- * small rounded-square tag (CountTag from BrandsList.jsx) as on the brands
+ * small rounded-square tag (CountTag from ui/CountTag.jsx) as on the brands
  * sheet's two tabs: accent tint on the active tab, neutral on the other. This
  * replaces the plain muted number of Phase 11. Because the sticky header
  * shares renderTabs, it gets the same tags.
  */
 
 import { BookOpen, Pill } from 'lucide-react'
-import { CountTag } from '../drugs/BrandsList.jsx'
+import CountTag from '../ui/CountTag.jsx'
 
 export const FAVOURITES_TABS = [
   {

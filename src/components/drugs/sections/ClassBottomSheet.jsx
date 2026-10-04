@@ -192,7 +192,8 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
-import BrandsList, { CountTag } from '../BrandsList.jsx'
+import BrandsList from '../BrandsList.jsx'
+import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 import { titleCaseWords } from '../../../utils/classSearch'
