@@ -10,12 +10,16 @@
  * DrugsScreen.jsx). Now there is only one search bar in one place, so the
  * keyboard stays open however the view changes.
  *
- * It owns the Search Mode pop-up and the 'how search modes work' sheet (their
- * open or closed state is local here); the screen owns the mode itself, which
+ * It draws the Search Mode pop-up (its open or closed state is held by the
+ * screen, so the sticky header can open it too) and owns the 'how search modes
+ * work' sheet (open or closed state local here); the screen owns the mode itself, which
  * lives in DrugContext so it survives opening a drug and coming back.
  *
  * Props:
  *   mode, onModeChange           'brand' | 'generic' | 'class' and its setter
+ *   modeMenuOpen, onModeMenuChange  whether the Search Mode pop-up is open and
+ *                                its setter; held by the screen so the sticky
+ *                                header's mode button can open the same pop-up
  *   query, onQueryChange         the typed text and its setter
  *   placeholder                  search bar hint text
  *   onFilter                     opens the Form / Route filter sheet
@@ -41,7 +45,7 @@ import SearchModeInfoSheet from '../SearchModeInfoSheet'
 // width); the pop-up shows the same three modes with the word 'mode' added
 // ('Brand mode'). Each mode keeps its own accent: Brand blue, Generic green,
 // Class violet (theme variables), the same accents the info sheet uses.
-const MODE_OPTIONS = [
+export const MODE_OPTIONS = [
   { value: 'brand',   label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
   { value: 'generic', label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)', tint: 'var(--color-generic-light)' },
   { value: 'class',   label: 'Class',   icon: Layers,       color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
@@ -50,19 +54,19 @@ const MODE_POPUP_OPTIONS = MODE_OPTIONS.map(o => ({ ...o, label: o.label + ' mod
 
 export default function DrugsSearchSection({
   mode, onModeChange,
+  modeMenuOpen, onModeMenuChange,
   query, onQueryChange, placeholder,
   onFilter, filterDisabled, hasActiveFilters,
   showClear, onClearFilters,
   showRecent, recentDrugs, onOpenRecent,
   categories, isDark,
 }) {
-  const [modeMenuOpen, setModeMenuOpen] = useState(false)
   const [showModeInfo, setShowModeInfo] = useState(false)
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   function handlePickMode(value) {
     onModeChange(value)
-    setModeMenuOpen(false)
+    onModeMenuChange(false)
   }
 
   const title = (
@@ -103,7 +107,7 @@ export default function DrugsSearchSection({
             label={currentMode.label}
             color={currentMode.color}
             tint={currentMode.tint}
-            onPress={() => setModeMenuOpen(true)}
+            onPress={() => onModeMenuChange(true)}
           />
         }
       >
@@ -156,7 +160,7 @@ export default function DrugsSearchSection({
           options={MODE_POPUP_OPTIONS}
           selected={[mode]}
           onPick={handlePickMode}
-          onClose={() => setModeMenuOpen(false)}
+          onClose={() => onModeMenuChange(false)}
         />
       )}
 

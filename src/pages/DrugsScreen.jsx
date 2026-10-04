@@ -243,7 +243,8 @@ import ClassSearchResults from '../components/drugs/ClassSearchResults'
 import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
-import DrugsSearchSection from '../components/drugs/home/DrugsSearchSection'
+import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
+import ModeButton from '../components/drugs/home/ModeButton'
 import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
 import FilledHintButton from '../components/drugs/home/FilledHintButton'
 import { shimmer } from '../components/drugs/home/shimmer'
@@ -390,6 +391,9 @@ export default function DrugsScreen() {
   // The Sort By pop-up. (The Search Mode pop-up and its info sheet belong to
   // the Search area now, see DrugsSearchSection.jsx.)
   const [showSortMenu,     setShowSortMenu]     = useState(false)
+  // Search Mode pop-up: opened from the Search card's mode button or the
+  // sticky header's, so its open state lives here.
+  const [modeMenuOpen,      setModeMenuOpen]     = useState(false)
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
@@ -836,6 +840,8 @@ export default function DrugsScreen() {
         onFilter={() => setFilterOpen(true)}
         filterDisabled={!filtersApply}
         hasActiveFilters={hasFilters && filtersApply}
+        mode={mode}
+        onOpenModeMenu={() => setModeMenuOpen(true)}
       />
 
       <div>
@@ -851,6 +857,8 @@ export default function DrugsScreen() {
         <DrugsSearchSection
           mode={mode}
           onModeChange={setMode}
+          modeMenuOpen={modeMenuOpen}
+          onModeMenuChange={setModeMenuOpen}
           query={query}
           onQueryChange={handleQueryChange}
           placeholder={searchPlaceholder}
@@ -1056,8 +1064,9 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // query — the caller computes and passes that text down, since only it
 // knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters }) {
+function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
   const colors = resolveToken(FALLBACK_TOKEN, isDark)
+  const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   return (
     <div
@@ -1111,6 +1120,16 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
               Drug Library
             </div>
           </div>
+
+          {/* The Search Mode button, same as the Search card's; it opens the
+              same Search Mode pop-up. */}
+          <ModeButton
+            icon={currentMode.icon}
+            label={currentMode.label}
+            color={currentMode.color}
+            tint={currentMode.tint}
+            onPress={onOpenModeMenu}
+          />
         </div>
 
         {/* Row 2 — near-full-width compact search bar with its built-in
