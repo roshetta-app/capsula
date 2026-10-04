@@ -832,7 +832,8 @@ export default function DrugsScreen() {
         {/* The Search area: written once, drawn in every view, so the search
             bar is never rebuilt and the keyboard stays open when typing
             starts (see DrugsSearchSection.jsx). Recently viewed is a shortcut
-            for the home view only; it would push typed results down. The
+            shown on the home view and inside a category; it hides while a
+            search is typed, where it would push the results down. The
             Clear filter button hides while the filter-hidden-results message
             is showing, which has its own. */}
         <DrugsSearchSection
@@ -846,7 +847,7 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters && filtersApply}
           showClear={hasFilters && filtersApply && !isFilterMasked}
           onClearFilters={requestClearFilters}
-          showRecent={!inResultsView}
+          showRecent={!hasQuery}
           recentDrugs={recentDrugObjects}
           onOpenRecent={() => setShowRecentSheet(true)}
           categories={categories}
