@@ -265,7 +265,7 @@
  * hidden whenever there are no results to count or sort.
  */
 
-import { FilterX, SearchX, Lightbulb, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -287,6 +287,7 @@ import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
+import { useToast } from '../context/ToastContext'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { normalizeSearchText } from '../utils/searchUtils'
 import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
@@ -448,6 +449,25 @@ export default function DrugsScreen() {
   // Search Mode pop-up: opened from the Search card's mode button or the
   // sticky header's, so its open state lives here.
   const [modeMenuOpen,      setModeMenuOpen]     = useState(false)
+  // 2026-10-05: every way of changing the Search mode (the pop-up, the Class
+  // hint strip, the switch-mode card buttons) goes through this one function,
+  // so each shows the same short toast in the mode's own colour and icon:
+  // 'Searching in <b>Brand</b> mode'. The earlier mode toast is closed first so
+  // quick changes never pile up. (The toast used to live in
+  // DrugsSearchSection.jsx, which now just calls this through onModeChange.)
+  const { toast } = useToast()
+  const modeToastRef = useRef(null)
+  function handleModeChange(value) {
+    setMode(value)
+    const picked = MODE_OPTIONS.find(o => o.value === value)
+    if (!picked) return
+    if (modeToastRef.current != null) toast.dismiss(modeToastRef.current)
+    modeToastRef.current = toast.custom(<>Searching in <strong style={{ fontWeight: 700 }}>{picked.label}</strong> mode</>, {
+      color:    picked.color,
+      icon:     picked.icon,
+      duration: 2000,
+    })
+  }
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
@@ -738,7 +758,7 @@ export default function DrugsScreen() {
               query={query}
               mode={mode}
               targets={crossModeTargets}
-              onSwitch={setMode}
+              onSwitch={handleModeChange}
             />
           ) : suggestions.length > 0 ? (
             <DidYouMeanState
@@ -760,7 +780,7 @@ export default function DrugsScreen() {
                 a filter hides them; with no drugs at all the full card in
                 the empty states below is shown instead. */}
             {hasQuery && classHint && (displayed.length > 0 || isFilterMasked) && (
-              <ClassHintStrip hint={classHint} onSwitch={() => setMode('class')} />
+              <ClassHintStrip hint={classHint} onSwitch={() => handleModeChange('class')} />
             )}
 
             {hasQuery && displayed.length > 0 && (
@@ -813,12 +833,10 @@ export default function DrugsScreen() {
                 (what was found and where), so the button reads as "go
                 further" rather than "something's wrong." */}
             {hasQuery && inCategorySearch && !plainDeadEnd && (
-              <FilledHintButton
+              <SearchAllButton
                 onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
-                style={{ display: 'block', width: '100%', marginBottom: 'var(--space-3)' }}
-              >
-                Search all drugs instead
-              </FilledHintButton>
+                style={{ width: '100%', marginBottom: 'var(--space-3)' }}
+              />
             )}
 
             {displayed.length === 0 ? (
@@ -838,7 +856,7 @@ export default function DrugsScreen() {
                     ...(classHint ? ['class'] : []),
                     ...(crossModeMatch ? [mode === 'brand' ? 'generic' : 'brand'] : []),
                   ]}
-                  onSwitch={setMode}
+                  onSwitch={handleModeChange}
                 />
               ) : suggestions.length > 0 ? (
                 <DidYouMeanState
@@ -949,7 +967,7 @@ export default function DrugsScreen() {
             is showing, which has its own. */}
         <DrugsSearchSection
           mode={mode}
-          onModeChange={setMode}
+          onModeChange={handleModeChange}
           modeMenuOpen={modeMenuOpen}
           onModeMenuChange={setModeMenuOpen}
           query={query}
@@ -1373,43 +1391,74 @@ const STATE_LINE_STYLE = {
   color: 'var(--color-text-secondary)', overflowWrap: 'anywhere',
 }
 
+// ─── SearchAllButton ─────────────────────────────────────────────────────────
+// 2026-10-05 (third pass): 'Search all drugs instead' with a globe icon so it
+// reads as 'widen the search to every category'. One look, used above the
+// results and inside the in-category empty card.
+function SearchAllButton({ onClick, style }) {
+  return (
+    <FilledHintButton
+      onClick={onClick}
+      style={{ fontSize: 14, padding: '10px 16px', gap: 8, ...style }}
+    >
+      <Globe size={17} style={{ flexShrink: 0 }} />
+      Search all drugs instead
+    </FilledHintButton>
+  )
+}
+
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 // Nothing found here, no typo guess, and no other mode has it: a plain dead end,
-// so it does NOT point to other modes (2026-10-05, second pass: a garbage search
-// like 'zzqx' should not send anyone on a tour of the other modes). Same wording
-// in every mode ('No drugs match', or 'No classes or drug families match' in
-// Class mode), a line that says how to search, and the category named when the
-// search is scoped to one ('scopeLabel'). One action only: inside a category it
-// is 'Search all drugs instead' ('onSearchAll', moved into this card so the
-// screen no longer stacks a separate button above it); otherwise a quiet
-// 'Clear search'.
+// so it does NOT point to other modes (a garbage search like 'zzqx' should not
+// send anyone on a tour of the other modes). Same wording in every mode ('No
+// drugs match', or 'No classes or drug families match' in Class mode) and a
+// line that says how to search; one quiet 'Clear search' action.
+//
+// 2026-10-05 (third pass): when the search is inside one category ('scopeLabel')
+// this is NOT the same card. It is a 'widen the search' card: a globe badge in
+// the app's accent instead of the grey no-results icon, a line that names what
+// to do, and the 'Search all drugs instead' button right in the card ('onSearchAll').
 function EmptyState({ query, mode, scopeLabel, onSearchAll, onClear }) {
   const inClassMode = mode === 'class'
   const quoted = query ? ` "${query}"` : ''
+
+  if (scopeLabel && onSearchAll) {
+    return (
+      <div style={STATE_BOX_STYLE}>
+        <div style={STATE_ICON_ROW_STYLE}>
+          <div style={{
+            width: 64, height: 64, borderRadius: '50%',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'var(--color-accent-light)',
+          }}>
+            <Globe size={32} color="var(--color-accent)" />
+          </div>
+        </div>
+        <div style={STATE_TITLE_STYLE}>
+          {`Nothing in ${scopeLabel}${query ? ` for "${query}"` : ''}`}
+        </div>
+        <div style={STATE_LINE_STYLE}>
+          It may be in another category
+        </div>
+        <SearchAllButton onClick={onSearchAll} />
+      </div>
+    )
+  }
+
   return (
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
         <SearchX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
       </div>
       <div style={STATE_TITLE_STYLE}>
-        {inClassMode
-          ? `No classes or drug families match${quoted}`
-          : scopeLabel
-            ? `No drugs in ${scopeLabel} match${quoted}`
-            : `No drugs match${quoted}`}
+        {inClassMode ? `No classes or drug families match${quoted}` : `No drugs match${quoted}`}
       </div>
       <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-3)' }}>
         {inClassMode
           ? 'Try part of a class or drug family name, or a common word like "vomiting"'
           : 'Check the spelling, or try the first letters of the name'}
       </div>
-      {onSearchAll ? (
-        <FilledHintButton onClick={onSearchAll}>
-          Search all drugs instead
-        </FilledHintButton>
-      ) : (
-        <QuietLinkButton onClick={onClear}>Clear search</QuietLinkButton>
-      )}
+      <QuietLinkButton onClick={onClear}>Clear search</QuietLinkButton>
     </div>
   )
 }
@@ -1489,18 +1538,17 @@ function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
   return (
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
-        <SearchX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
+        <ArrowLeftRight size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
       </div>
-      <div style={{ ...STATE_TITLE_STYLE, marginBottom: 'var(--space-4)' }}>
+      <div style={STATE_TITLE_STYLE}>
         {mode === 'class'
           ? `No classes or drug families match${quoted}`
           : `No drugs match${quoted}`}
       </div>
-      <div style={{
-        fontSize: 13, fontWeight: 600, marginBottom: 'var(--space-2)',
-        color: 'var(--color-text-secondary)',
-      }}>
-        Found in other modes
+      <div style={STATE_LINE_STYLE}>
+        {targets.length > 1
+          ? 'But it has results in other search modes'
+          : 'But it has results in another search mode'}
       </div>
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',

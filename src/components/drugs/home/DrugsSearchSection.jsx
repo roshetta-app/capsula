@@ -10,9 +10,11 @@
  * DrugsScreen.jsx). Now there is only one search bar in one place, so the
  * keyboard stays open however the view changes.
  *
- * 2026-10-04: choosing a mode in the pop-up also shows a short toast with the
- * mode ('Searching in Brand mode', the mode word in bold), in that mode's
- * colour and icon.
+ * 2026-10-04: choosing a mode shows a short toast with the mode ('Searching in
+ * Brand mode', the mode word in bold), in that mode's colour and icon.
+ * 2026-10-05: that toast moved up to DrugsScreen.jsx (handleModeChange, passed
+ * in as onModeChange) so the mode switch buttons on the no-result cards show
+ * the very same toast. Picking from the pop-up still shows it, through there.
  *
  * It draws the Search Mode pop-up (its open or closed state is held by the
  * screen, so the sticky header can open it too) and owns the 'how search modes
@@ -35,7 +37,7 @@
  *   categories, isDark           colours for Recently viewed and the info sheet
  */
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { Search, Tag, FlaskConical, Layers, Info } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import ModeButton from './ModeButton'
@@ -44,7 +46,6 @@ import RecentlyViewedButton from './RecentlyViewedButton'
 import SearchBar from '../../ui/SearchBar'
 import { FilterModal } from '../../ui/FilterModal'
 import SearchModeInfoSheet from '../SearchModeInfoSheet'
-import { useToast } from '../../../context/ToastContext'
 
 // Search Mode pop-up options. The button keeps the short names (it has a fixed
 // width); the pop-up shows the same three modes with the word 'mode' added
@@ -67,27 +68,11 @@ export default function DrugsSearchSection({
   categories, isDark,
 }) {
   const [showModeInfo, setShowModeInfo] = useState(false)
-  const { toast } = useToast()
-  const modeToastRef = useRef(null)
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   function handlePickMode(value) {
     onModeChange(value)
     onModeMenuChange(false)
-
-    // A short toast in the chosen mode's own colour and icon (Brand blue,
-    // Generic green, Class violet), reading 'Searching in <b>Brand</b> mode'
-    // with the mode word in bold. The earlier mode toast is closed first so
-    // quick changes never pile up.
-    const picked = MODE_OPTIONS.find(o => o.value === value)
-    if (picked) {
-      if (modeToastRef.current != null) toast.dismiss(modeToastRef.current)
-      modeToastRef.current = toast.custom(<>Searching in <strong style={{ fontWeight: 700 }}>{picked.label}</strong> mode</>, {
-        color:    picked.color,
-        icon:     picked.icon,
-        duration: 2000,
-      })
-    }
   }
 
   const title = (
