@@ -614,7 +614,8 @@ export default function DrugsScreen() {
         {/* Back to categories button (only when in a category, not searching) */}
         {!hasQuery && activeCategory !== null && (
           <div style={{
-            display: 'flex', alignItems: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 'var(--space-3)',
             marginBottom: 'var(--space-3)',
           }}>
             <button
@@ -634,6 +635,13 @@ export default function DrugsScreen() {
                   search bar's placeholder (1a.3). */}
               {categoryLabel}
             </button>
+            {/* The drug count for the open category, at the right end of the
+                back-button row (it used to be its own line below). */}
+            {!resultsNotReady && (
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
+                {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         )}
 
@@ -674,8 +682,11 @@ export default function DrugsScreen() {
           )
         ) : (
           <>
-            {/* Results count line. The Clear filter button is not here any
-                more: it lives in the Search area, next to the filter button. */}
+            {/* Results count line, shown while searching only. When browsing a
+                category with no query, the count sits in the back-button row
+                above. The Clear filter button is not here any more: it lives
+                in the Search area. */}
+            {hasQuery && (
             <div style={{
               fontSize: 12, color: 'var(--color-text-tertiary)',
               marginBottom: 'var(--space-2)',
@@ -692,6 +703,7 @@ export default function DrugsScreen() {
                   to show. */}
               {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
             </div>
+            )}
 
             {/* Sort By — on its own line under the count line, only while
                 something is typed. This branch is never reached for a
