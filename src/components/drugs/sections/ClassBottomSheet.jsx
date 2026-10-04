@@ -6,11 +6,17 @@
  * Display only, nothing happens when a word is tapped.
  *  - Words that point at the whole class are small chips at the end of the
  *    scrolling list, under a small 'Common words' title, after the family
- *    cards (or after the 'All drugs' row for a class with no families). All
- *    of them are shown, wrapping onto as many lines as needed, so none are
- *    hidden. The fixed heading is unchanged.
+ *    cards (or after the 'All drugs' row for a class with no families). Up to
+ *    6 are shown, then a '+N' chip for the rest. Tapping '+N' shows them all
+ *    and a 'Show less' chip folds them back. Opening the sheet starts folded.
+ *    The fixed heading is unchanged.
  *  - Words that point at one family are one quiet grey line under the family's
  *    name on its card, cut with '...' when too long.
+ *  - The heading is now the same for every class: it always reads
+ *    '<n> drug families, <n> drugs' (so '0 drug families' for a class with
+ *    none), and a class with no families, which opens straight on its drugs
+ *    from Class search, shows the same heading above the Back bar. The list
+ *    and the drugs page below it are unchanged.
  *  - The 'Other families' card and the 'All drugs in this class' row show no
  *    words. A class or family with no words looks exactly as before.
  *  - The words come from the app's shared data (useDrugContext, classKeywords),
@@ -308,6 +314,9 @@ function splitKeywords(keywords, className) {
   }
 }
 
+// Most class words shown before the '+N' chip.
+const MAX_CHIPS = 6
+
 // Size of the icon tile and the gap after it.
 const ICON_TILE = 34
 const ICON_GAP  = 12
@@ -426,6 +435,8 @@ export default function ClassBottomSheet({
   // was opened, so going back lands where the person left off, not at the top.
   const listRef         = useRef(null)
   const savedListScroll = useRef(0)
+  // Whether every class word is shown, or only the first few and a '+N' chip.
+  const [wordsOpen, setWordsOpen] = useState(false)
   // Where the filter pop-ups are drawn (the full-sheet layer at the end).
   const [popupLayer, setPopupLayer] = useState(null)
 
@@ -442,6 +453,7 @@ export default function ClassBottomSheet({
     if (isOpen) {
       savedListScroll.current = 0
       setPicked(directSubclass ?? null)
+      setWordsOpen(false)
     }
   }, [isOpen, directSubclass])
 
@@ -475,12 +487,54 @@ export default function ClassBottomSheet({
     () => splitKeywords(classKeywords, className),
     [classKeywords, className]
   )
+  const shownWords = wordsOpen ? classWords : classWords.slice(0, MAX_CHIPS)
+  const hiddenWords = classWords.length - MAX_CHIPS
 
   // Opening a family from the list: remember the list's scroll first.
   function pickFamily(name) {
     savedListScroll.current = listRef.current?.scrollTop ?? 0
     setPicked(name)
   }
+
+  // Fixed heading: the same for every class, with or without families. It stays
+  // put while the list scrolls under it.
+  const classHeading = (
+    <div style={{
+      flexShrink:   0,
+      padding:      'var(--space-2) var(--space-4) var(--space-3)',
+      borderBottom: '0.5px solid var(--color-border)',
+    }}>
+      <p style={{
+        margin:        0,
+        fontSize:      11,
+        fontWeight:    600,
+        letterSpacing: '0.06em',
+        textTransform: 'uppercase',
+        color:         'var(--color-accent)',
+      }}>
+        Drug class
+      </p>
+      <p style={{
+        margin:     '2px 0 0',
+        fontSize:   20,
+        fontWeight: 500,
+        lineHeight: 1.3,
+        color:      'var(--color-text-primary)',
+      }}>
+        {classLabel}
+      </p>
+      <p style={{
+        margin:             '4px 0 0',
+        fontSize:           13,
+        fontVariantNumeric: 'tabular-nums',
+        color:              'var(--color-text-secondary)',
+      }}>
+        {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
+        {', '}
+        {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
+      </p>
+    </div>
+  )
 
   function handleTap(item) {
     onClose()
@@ -502,6 +556,7 @@ export default function ClassBottomSheet({
       }}>
         {pickedGroup ? (
           <>
+            {directSubclass === ALL_KEY && classHeading}
             <div style={{
               flexShrink:   0,
               padding:      '0 var(--space-4)',
@@ -558,46 +613,7 @@ export default function ClassBottomSheet({
           </>
         ) : (
           <>
-            {/* Fixed heading: stays put while the groups scroll under it. */}
-            <div style={{
-              flexShrink:   0,
-              padding:      'var(--space-2) var(--space-4) var(--space-3)',
-              borderBottom: '0.5px solid var(--color-border)',
-            }}>
-              <p style={{
-                margin:        0,
-                fontSize:      11,
-                fontWeight:    600,
-                letterSpacing: '0.06em',
-                textTransform: 'uppercase',
-                color:         'var(--color-accent)',
-              }}>
-                Drug class
-              </p>
-              <p style={{
-                margin:     '2px 0 0',
-                fontSize:   20,
-                fontWeight: 500,
-                lineHeight: 1.3,
-                color:      'var(--color-text-primary)',
-              }}>
-                {classLabel}
-              </p>
-              <p style={{
-                margin:             '4px 0 0',
-                fontSize:           13,
-                fontVariantNumeric: 'tabular-nums',
-                color:              'var(--color-text-secondary)',
-              }}>
-                {groups.length > 0 && (
-                  <>
-                    {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
-                    {', '}
-                  </>
-                )}
-                {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
-              </p>
-            </div>
+            {classHeading}
             <div key="class-list" ref={listRef} style={{
               flex:          1,
               minHeight:     0,
@@ -673,7 +689,7 @@ export default function ClassBottomSheet({
                     gap:        6,
                     margin:     '0 var(--space-1)',
                   }}>
-                    {classWords.map(w => (
+                    {shownWords.map(w => (
                       <span key={w} style={{
                         padding:         '3px 9px',
                         borderRadius:    999,
@@ -685,6 +701,28 @@ export default function ClassBottomSheet({
                         {w}
                       </span>
                     ))}
+                    {hiddenWords > 0 && (
+                      <button
+                        onClick={() => setWordsOpen(o => !o)}
+                        aria-label={wordsOpen ? 'Show fewer words' : `Show ${hiddenWords} more words`}
+                        aria-expanded={wordsOpen}
+                        style={{
+                          padding:         '3px 9px',
+                          border:          'none',
+                          borderRadius:    999,
+                          fontFamily:      'var(--font-body)',
+                          fontSize:        12,
+                          lineHeight:      1.3,
+                          color:           'var(--color-text-secondary)',
+                          backgroundColor: 'var(--color-surface-muted)',
+                          cursor:          'pointer',
+                          WebkitTapHighlightColor: 'transparent',
+                          outline:         'none',
+                        }}
+                      >
+                        {wordsOpen ? 'Show less' : `+${hiddenWords}`}
+                      </button>
+                    )}
                   </div>
                 </>
               )}
