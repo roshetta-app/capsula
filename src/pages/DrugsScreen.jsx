@@ -263,6 +263,11 @@
  * mean' guesses are equal full-width rows. 'Your filter is hiding these
  * results' got the same larger look. The count line and the Sort button are
  * hidden whenever there are no results to count or sort.
+ *
+ * 2026-10-05 (fourth pass): 'Search all drugs instead' (globe icon) is only
+ * offered when the other categories really have more matches, with the number
+ * ('· 12 more'). A category with no results but matches elsewhere shows the
+ * 'widen the search' card; nothing anywhere shows the plain no-results card.
  */
 
 import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
@@ -689,13 +694,15 @@ export default function DrugsScreen() {
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
 
-    // 2026-10-05 (second pass): a search scoped to one category, and the plain
-    // 'nothing found anywhere' dead end (no filter hiding results, no other
-    // mode has the text, no typo guess). The dead end card then carries the
-    // one 'Search all drugs instead' button itself.
+    // 2026-10-05 (fourth pass): a search scoped to one category. 'otherCategoryCount'
+    // is how many more drugs the same search finds in the other categories
+    // (with the Form/Route filter applied the same way), so 'Search all drugs'
+    // is only offered when it would actually show something more.
     const inCategorySearch = Boolean(activeCategory && activeCategory !== '__all')
-    const plainDeadEnd = hasQuery && displayed.length === 0 && !isFilterMasked
-      && !classHint && !crossModeMatch && suggestions.length === 0
+    const otherCategoryCount = (hasQuery && inCategorySearch)
+      ? Math.max(0, applyFilters(searchResults, activeFilters).length - filtered.length)
+      : 0
+    const goSearchAll = () => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })
 
     body = (
       <>
@@ -820,21 +827,14 @@ export default function DrugsScreen() {
               </div>
             )}
 
-            {/* 2026-10-05 (second pass): not shown for the plain 'nothing
-                found' card ('plainDeadEnd'), which carries its own
-                'Search all drugs instead' button so the screen does not
-                stack two. */}
-            {/* search-all-drugs-placement (redesigned) — full-width,
-                directly under the count line rather than above it, so it
-                never sits on top of a result the person already found.
-                Shown any time a query is scoped to a specific category,
-                regardless of whether that category had a match — the
-                count line right above it already gives the context
-                (what was found and where), so the button reads as "go
-                further" rather than "something's wrong." */}
-            {hasQuery && inCategorySearch && !plainDeadEnd && (
+            {/* 'Search all drugs instead' (2026-10-05, fourth pass): only when
+                the open category has results AND the other categories have
+                more, with the number. With no results here, the card below
+                takes over; with nothing anywhere, there is no button. */}
+            {hasQuery && displayed.length > 0 && otherCategoryCount > 0 && (
               <SearchAllButton
-                onClick={() => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })}
+                count={otherCategoryCount}
+                onClick={goSearchAll}
                 style={{ width: '100%', marginBottom: 'var(--space-3)' }}
               />
             )}
@@ -842,6 +842,15 @@ export default function DrugsScreen() {
             {displayed.length === 0 ? (
               isFilterMasked ? (
                 <FilterMaskedState count={base.length} query={query} onClearFilter={requestClearFilters} />
+              ) : otherCategoryCount > 0 ? (
+                // Nothing in this category, but other categories have it: the
+                // surest answer, so it ranks above the mode and typo cards.
+                <WidenSearchState
+                  query={query}
+                  scopeLabel={categoryLabel}
+                  count={otherCategoryCount}
+                  onSearchAll={goSearchAll}
+                />
               ) : (classHint || crossModeMatch) ? (
                 // Class hint and cross-mode hint (2026-10-05): one card lists
                 // every mode where the text is found. Class comes first (it
@@ -868,8 +877,6 @@ export default function DrugsScreen() {
                 <EmptyState
                   query={query}
                   mode={mode}
-                  scopeLabel={inCategorySearch ? categoryLabel : null}
-                  onSearchAll={inCategorySearch ? () => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true }) : undefined}
                   onClear={() => handleQueryChange('')}
                 />
               )
@@ -1392,18 +1399,45 @@ const STATE_LINE_STYLE = {
 }
 
 // ─── SearchAllButton ─────────────────────────────────────────────────────────
-// 2026-10-05 (third pass): 'Search all drugs instead' with a globe icon so it
-// reads as 'widen the search to every category'. One look, used above the
-// results and inside the in-category empty card.
-function SearchAllButton({ onClick, style }) {
+// 'Search all drugs instead' with a globe icon so it reads as 'widen the search
+// to every category'. 'count' (optional) adds how many more drugs that would
+// show ('Search all drugs instead · 12 more').
+function SearchAllButton({ onClick, count, style }) {
   return (
     <FilledHintButton
       onClick={onClick}
       style={{ fontSize: 14, padding: '10px 16px', gap: 8, ...style }}
     >
       <Globe size={17} style={{ flexShrink: 0 }} />
-      Search all drugs instead
+      {count > 0 ? `Search all drugs instead · ${count} more` : 'Search all drugs instead'}
     </FilledHintButton>
+  )
+}
+
+// ─── WidenSearchState ────────────────────────────────────────────────────────
+// Nothing in the open category, but other categories have matches ('count').
+// A 'widen the search' card, not a no-results card: a globe badge in the app's
+// accent, a line saying how many drugs match elsewhere, and the button.
+function WidenSearchState({ query, scopeLabel, count, onSearchAll }) {
+  return (
+    <div style={STATE_BOX_STYLE}>
+      <div style={STATE_ICON_ROW_STYLE}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'var(--color-accent-light)',
+        }}>
+          <Globe size={32} color="var(--color-accent)" />
+        </div>
+      </div>
+      <div style={STATE_TITLE_STYLE}>
+        {`Nothing in ${scopeLabel}${query ? ` for "${query}"` : ''}`}
+      </div>
+      <div style={STATE_LINE_STYLE}>
+        {`${count} ${count === 1 ? 'drug matches' : 'drugs match'} in other categories`}
+      </div>
+      <SearchAllButton onClick={onSearchAll} />
+    </div>
   )
 }
 
@@ -1412,39 +1446,11 @@ function SearchAllButton({ onClick, style }) {
 // so it does NOT point to other modes (a garbage search like 'zzqx' should not
 // send anyone on a tour of the other modes). Same wording in every mode ('No
 // drugs match', or 'No classes or drug families match' in Class mode) and a
-// line that says how to search; one quiet 'Clear search' action.
-//
-// 2026-10-05 (third pass): when the search is inside one category ('scopeLabel')
-// this is NOT the same card. It is a 'widen the search' card: a globe badge in
-// the app's accent instead of the grey no-results icon, a line that names what
-// to do, and the 'Search all drugs instead' button right in the card ('onSearchAll').
-function EmptyState({ query, mode, scopeLabel, onSearchAll, onClear }) {
+// line that says how to search; one quiet 'Clear search' action. Inside a
+// category it reads the same, because by this point no category has it.
+function EmptyState({ query, mode, onClear }) {
   const inClassMode = mode === 'class'
   const quoted = query ? ` "${query}"` : ''
-
-  if (scopeLabel && onSearchAll) {
-    return (
-      <div style={STATE_BOX_STYLE}>
-        <div style={STATE_ICON_ROW_STYLE}>
-          <div style={{
-            width: 64, height: 64, borderRadius: '50%',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'var(--color-accent-light)',
-          }}>
-            <Globe size={32} color="var(--color-accent)" />
-          </div>
-        </div>
-        <div style={STATE_TITLE_STYLE}>
-          {`Nothing in ${scopeLabel}${query ? ` for "${query}"` : ''}`}
-        </div>
-        <div style={STATE_LINE_STYLE}>
-          It may be in another category
-        </div>
-        <SearchAllButton onClick={onSearchAll} />
-      </div>
-    )
-  }
-
   return (
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
