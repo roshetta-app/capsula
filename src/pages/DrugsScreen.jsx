@@ -46,6 +46,10 @@
  * that can show the Clear filter button keep the button's height (28px) even
  * while it is hidden, so nothing jumps when it appears.
  *
+ * 2026-10-04 (Search mode info): a small info icon sits right after the
+ * 'Search mode' title and opens SearchModeInfoSheet.jsx, a pop-up that explains
+ * Brand, Generic and Class search with Controloc as the example.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -184,7 +188,7 @@
  * wrong empty state never flashes. Class searches are not logged.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown, Info } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -196,6 +200,7 @@ import ClassSearchResults from '../components/drugs/ClassSearchResults'
 import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
+import SearchModeInfoSheet from '../components/drugs/SearchModeInfoSheet'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
@@ -394,6 +399,8 @@ export default function DrugsScreen() {
   const [openMenu,         setOpenMenu]         = useState(null)   // 'mode' | 'sort' | null
   const [showRecentSheet,  setShowRecentSheet]  = useState(false)
   const [showInfoSheet,    setShowInfoSheet]    = useState(false)
+  // The pop-up that explains the three search modes (info icon by the 'Search mode' title).
+  const [showModeInfo,     setShowModeInfo]     = useState(false)
   // Class search mode: the class sheet opened from a class or subclass card.
   // 'classTarget' stays after the sheet closes so it can slide out showing the
   // same content; 'classSheetKey' changes on every open so each opening starts
@@ -525,14 +532,37 @@ export default function DrugsScreen() {
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
   const searchModeRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
-      <span style={{
-        fontSize:   15,
-        fontWeight: 700,
-        color:      'var(--color-text-primary)',
-        fontFamily: 'var(--font-body)',
-      }}>
-        Search mode
-      </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{
+          fontSize:   15,
+          fontWeight: 700,
+          color:      'var(--color-text-primary)',
+          fontFamily: 'var(--font-body)',
+        }}>
+          Search mode
+        </span>
+        <button
+          onClick={() => setShowModeInfo(true)}
+          aria-label="How search modes work"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            width:                   28,
+            height:                  28,
+            borderRadius:            '50%',
+            background:              'none',
+            border:                  'none',
+            padding:                 0,
+            cursor:                  'pointer',
+            color:                   'var(--color-text-tertiary)',
+            WebkitTapHighlightColor: 'transparent',
+            outline:                 'none',
+          }}
+        >
+          <Info size={17} />
+        </button>
+      </div>
       <ModeButton
         icon={currentMode.icon}
         label={currentMode.label}
@@ -1008,6 +1038,13 @@ export default function DrugsScreen() {
       <DrugsInfoSheet
         isOpen={showInfoSheet}
         onClose={() => setShowInfoSheet(false)}
+      />
+
+      <SearchModeInfoSheet
+        isOpen={showModeInfo}
+        onClose={() => setShowModeInfo(false)}
+        categories={categories}
+        isDark={isDark}
       />
 
       {/* Class search mode: the class sheet opened from a class or subclass

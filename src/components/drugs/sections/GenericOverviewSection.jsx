@@ -275,6 +275,10 @@
  *    can't is plain text, no backing, no arrow.
  *  - Class only or subclass only: single bold row, flush left, no dot, no line.
  *  - Subclass row is smaller and lighter; class row stays bold.
+ *
+ * 2026-10-04 (Search mode pop-up): CardRow is now exported, so the Drugs
+ * screen's Search mode pop-up (SearchModeInfoSheet.jsx) draws the same
+ * Class/Subclass tree. Nothing about how it looks or works here changed.
  */
 
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
@@ -298,7 +302,7 @@ const LINE_COLOR = 'var(--color-text-tertiary)'
 const ROW_GAP    = 0      // space between the two rows (the line bridges it)
 const MID        = 18     // height of the middle of a row's first text line (8 padding + 10)
 
-function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false }) {
+export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false }) {
   const [pressed, setPressed] = useState(false)
   const inTree = child || hasChild
   const base = {
