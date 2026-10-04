@@ -3,8 +3,8 @@
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Browse'
  * area of the Drugs home. Its header reads 'Browse by' on the left and, on the
  * right, a small pill switch with 'Category' and 'Class' (the same place, tint,
- * text size and height as the Search area's mode pill). The chosen option is a filled accent
- * pill, the other sits on the soft tint and is one tap away. Under the header
+ * text size and height as the Search area's mode pill). The chosen option sits on a white
+ * thumb that slides across the soft tint; the other is muted and one tap away. Under the header
  * it shows the category tiles or every class (A to Z, the same cards Class
  * search uses), plus the loading and failed-download states.
  *
@@ -35,60 +35,86 @@ const BROWSE_OPTIONS = [
   { value: 'class',    label: 'Class',    icon: Layers },
 ]
 
-// The Category / Class switch, made in the same family as the Search area's
-// mode button: the same soft accent tint, round pill shape, 12px semi-bold
-// text, 13px icon, and the same overall height (28px), so the two headers
-// match. The chosen option is a filled accent pill with white icon and text;
-// the other is accent icon and text on the tint, one tap away. The track never
-// shrinks, so the title cannot squeeze it.
+// The Category / Class switch. Kept quiet on purpose: a soft tinted track with
+// a plain white (card-colour) thumb that slides between the two options, with
+// a very light shadow. The chosen option is accent-coloured text on the thumb;
+// the other is muted grey. Both options are the same width so the thumb
+// travels exactly one half of the track. Same pill shape, 12px semi-bold text
+// and 28px height as the Search area's mode button. The thumb slide and the
+// colour change run together; with 'reduce motion' on, the thumb just jumps.
 function BrowseSwitch({ value, onChange }) {
+  const reduceMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  const slide = reduceMotion ? 'none' : '240ms var(--ease-settle)'
+  const fade  = reduceMotion ? 'none' : 'color 200ms var(--ease-settle)'
+  const activeIndex = BROWSE_OPTIONS.findIndex(o => o.value === value)
+
   return (
     <div
       role="group"
       aria-label="Browse by"
       style={{
-        display:         'inline-flex',
-        alignItems:      'center',
-        gap:             2,
-        padding:         2,
-        flexShrink:      0,
-        boxSizing:       'border-box',
-        borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-accent-light)',
+        position:            'relative',
+        display:             'inline-grid',
+        gridTemplateColumns: '1fr 1fr',
+        padding:             2,
+        flexShrink:          0,
+        boxSizing:           'border-box',
+        borderRadius:        'var(--radius-full)',
+        backgroundColor:     'var(--color-accent-light)',
       }}
     >
+      <span
+        aria-hidden="true"
+        style={{
+          position:        'absolute',
+          top:             2,
+          bottom:          2,
+          left:            2,
+          width:           'calc((100% - 4px) / 2)',
+          borderRadius:    'var(--radius-full)',
+          backgroundColor: 'var(--color-surface)',
+          boxShadow:       '0 1px 3px rgba(0, 0, 0, 0.08)',
+          transform:       `translateX(${Math.max(activeIndex, 0) * 100}%)`,
+          transition:      reduceMotion ? 'none' : `transform ${slide}`,
+        }}
+      />
       {BROWSE_OPTIONS.map(opt => {
         const active = value === opt.value
         const Icon   = opt.icon
-        const fg     = active ? '#fff' : 'var(--color-accent)'
+        const fg     = active ? 'var(--color-accent)' : 'var(--color-text-tertiary)'
         return (
           <button
             key={opt.value}
             aria-pressed={active}
             onClick={active ? undefined : () => onChange(opt.value)}
             style={{
+              position:                'relative',
+              zIndex:                  1,
               height:                  24,
               boxSizing:               'border-box',
               display:                 'flex',
               alignItems:              'center',
               justifyContent:          'center',
               gap:                     5,
-              padding:                 '0 11px',
+              padding:                 '0 12px',
               borderRadius:            'var(--radius-full)',
               border:                  'none',
-              backgroundColor:         active ? 'var(--color-accent)' : 'transparent',
+              background:              'none',
               color:                   fg,
               fontFamily:              'var(--font-body)',
               fontSize:                12,
               fontWeight:              600,
               lineHeight:              1,
               cursor:                  active ? 'default' : 'pointer',
-              transition:              'background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle)',
+              transition:              fade,
               WebkitTapHighlightColor: 'transparent',
               outline:                 'none',
             }}
           >
-            <Icon size={13} color={fg} style={{ flexShrink: 0 }} />
+            <Icon size={13} color="currentColor" style={{ flexShrink: 0 }} />
             <span style={{ whiteSpace: 'nowrap' }}>{opt.label}</span>
           </button>
         )
