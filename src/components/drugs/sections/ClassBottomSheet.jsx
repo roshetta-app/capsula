@@ -4,9 +4,11 @@
  * 2026-10-05 (class keywords on the sheet): the common words (keywords, the
  * ones Class search uses, like 'vomiting') are now shown on the subclass list.
  * Display only, nothing happens when a word is tapped.
- *  - Words that point at the whole class are small chips under the grey
- *    '<n> drug families, <n> drugs' line in the heading. Up to 6 are shown,
- *    then a '+N' chip for the rest, so the fixed heading stays short.
+ *  - Words that point at the whole class are small chips at the end of the
+ *    scrolling list, under a small 'Common words' title, after the family
+ *    cards (or after the 'All drugs' row for a class with no families). All
+ *    of them are shown, wrapping onto as many lines as needed, so none are
+ *    hidden. The fixed heading is unchanged.
  *  - Words that point at one family are one quiet grey line under the family's
  *    name on its card, cut with '...' when too long.
  *  - The 'Other families' card and the 'All drugs in this class' row show no
@@ -272,9 +274,6 @@ function buildListGroups(groups) {
   ]
 }
 
-// Most keyword chips shown in the heading; the rest become one '+N' chip.
-const MAX_CHIPS = 6
-
 // Sorts keyword texts A to Z and drops repeats (ignoring capital letters).
 function uniqueSorted(words) {
   const seen = new Map()
@@ -476,8 +475,6 @@ export default function ClassBottomSheet({
     () => splitKeywords(classKeywords, className),
     [classKeywords, className]
   )
-  const shownWords = classWords.slice(0, MAX_CHIPS)
-  const moreWords  = classWords.length - shownWords.length
 
   // Opening a family from the list: remember the list's scroll first.
   function pickFamily(name) {
@@ -600,35 +597,6 @@ export default function ClassBottomSheet({
                 )}
                 {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
               </p>
-              {/* Common words that lead to this class (display only). */}
-              {shownWords.length > 0 && (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                  {shownWords.map(w => (
-                    <span key={w} style={{
-                      padding:         '3px 9px',
-                      borderRadius:    999,
-                      fontSize:        12,
-                      lineHeight:      1.3,
-                      color:           'var(--color-accent)',
-                      backgroundColor: 'var(--color-accent-light)',
-                    }}>
-                      {w}
-                    </span>
-                  ))}
-                  {moreWords > 0 && (
-                    <span style={{
-                      padding:      '3px 9px',
-                      borderRadius: 999,
-                      fontSize:     12,
-                      lineHeight:   1.3,
-                      color:        'var(--color-text-secondary)',
-                      backgroundColor: 'var(--color-surface-muted)',
-                    }}>
-                      +{moreWords}
-                    </span>
-                  )}
-                </div>
-              )}
             </div>
             <div key="class-list" ref={listRef} style={{
               flex:          1,
@@ -685,6 +653,41 @@ export default function ClassBottomSheet({
                   onClick={() => pickFamily(g.name)}
                 />
               ))}
+              {/* Common words that lead to this class (display only), at the
+                  end of the list, also for a class with no families. */}
+              {totalDrugs > 0 && classWords.length > 0 && (
+                <>
+                  <p style={{
+                    flexShrink:  0,
+                    margin:      'var(--space-2) var(--space-1) 0',
+                    fontSize:    14.5,
+                    fontWeight:  600,
+                    color:       'var(--color-text-primary)',
+                  }}>
+                    Common words
+                  </p>
+                  <div style={{
+                    flexShrink: 0,
+                    display:    'flex',
+                    flexWrap:   'wrap',
+                    gap:        6,
+                    margin:     '0 var(--space-1)',
+                  }}>
+                    {classWords.map(w => (
+                      <span key={w} style={{
+                        padding:         '3px 9px',
+                        borderRadius:    999,
+                        fontSize:        12,
+                        lineHeight:      1.3,
+                        color:           'var(--color-accent)',
+                        backgroundColor: 'var(--color-accent-light)',
+                      }}>
+                        {w}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           </>
         )}
