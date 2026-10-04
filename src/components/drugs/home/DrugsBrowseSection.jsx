@@ -33,7 +33,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { LayoutGrid, Layers, ArrowUpDown } from 'lucide-react'
+import { LayoutGrid, Layers, ArrowUpDown, Compass } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import ModeButton from './ModeButton'
 import CategoryRow from './CategoryRow'
@@ -197,7 +197,7 @@ export default function DrugsBrowseSection({
         <FilterModal
           onPage
           title="Browse by"
-          titleIcon={LayoutGrid}
+          titleIcon={Compass}
           columns={1}
           single
           large
