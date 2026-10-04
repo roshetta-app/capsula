@@ -276,12 +276,13 @@
  *  - Class only or subclass only: single bold row, flush left, no dot, no line.
  *  - Subclass row is smaller and lighter; class row stays bold.
  *
- * 2026-10-04 (tree icons, no line): the dot and the curved line joining the
- * Class and Subclass rows are gone. Each row now starts with a small icon: the
+ * 2026-10-04 (tree icons): each row now starts with a small icon: the
  * stacked-layers icon in the class colour (--color-class) for the class, the
- * molecule icon in the app blue for the subclass (the same two icons the search
- * cards and the class sheet use). The subclass stays indented under the class
- * name, smaller and lighter. Tapping, arrows and what opens are unchanged.
+ * molecule icon in the app blue for the subclass (the same two icons the
+ * search cards and the class sheet use). The dot is gone; the connecting line
+ * now starts right under the class icon, runs down and curves into the
+ * subclass icon, and is the same blue as the subclass icon. The subclass stays
+ * indented, smaller and lighter. Tapping, arrows and what opens are unchanged.
  *
  * 2026-10-04 (Search mode pop-up): CardRow is now exported, so the Drugs
  * screen's Search mode pop-up (SearchModeInfoSheet.jsx) draws the same
@@ -298,26 +299,37 @@ import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 // One row of the Class/Subclass tree. A button with a quiet grey arrow when
 // onClick is given, otherwise plain text with no arrow (2026-10-03 hierarchy
 // pass: no backing and no blue, so the ingredient name stays the focus).
-// 2026-10-04 (icons, no line): the dot and the curved connecting line are gone.
-// Each row starts with a small icon instead: the stacked-layers icon in the
-// class colour for the Class row, the molecule icon in the app blue for the
-// Subclass row (the same two icons the search cards and the class sheet use).
-// 'child' marks the Subclass row under a Class row: indented under the class
-// name, smaller and lighter, so the order still reads as a tree without a line.
-// A row with no partner (class only, or subclass only) is flush left.
-// 'kind' ('class' | 'subclass') picks the icon; leave it off for no icon.
-// Pressed feedback is a slightly deeper tint plus a tiny shrink.
-const ROW_GAP = 0      // space between the two rows
+// 2026-10-04 (icons on the line): each row starts with a small icon: the
+// stacked-layers icon in the class colour for the Class row, the molecule icon
+// in the app blue for the Subclass row (the same two icons the search cards and
+// the class sheet use). The connecting line now starts right under the class
+// icon (no dot), runs straight down and curves into the subclass icon, and is
+// the same blue as the subclass icon. 'hasChild' marks a Class row with a
+// Subclass under it (it draws the straight part); 'child' is the Subclass row
+// under a Class row (indented, smaller and lighter, it draws the curve). The
+// two parts sit at the same spot, so they join into one unbroken line even when
+// a long name wraps to two lines. A row with no partner (class only, or
+// subclass only) has no line and no indent. 'kind' ('class' | 'subclass') picks
+// the icon; leave it off for no icon. Pressed feedback is a slightly deeper
+// tint plus a tiny shrink.
+const ROW_GAP    = 0      // space between the two rows (the line bridges it)
+const LINE_COLOR = 'var(--color-accent)'
+const LINE_X     = 12     // middle of the class icon: where the vertical line sits
+const MID        = 18     // middle of a row's first text line (8 padding + 10)
+const CLASS_ICON = 16
+const SUB_ICON   = 14
+const CHILD_PAD  = 24     // left space of the Subclass row (where its icon starts)
+const LINE_GAP   = 3      // air between the line and the icon it touches
 
 const ROW_ICONS = {
   class:    { Icon: Layers,       color: 'var(--color-class)'  },
   subclass: { Icon: MoleculeIcon, color: 'var(--color-accent)' },
 }
 
-export function CardRow({ label, onClick, ariaLabel, child = false, kind = null }) {
+export function CardRow({ label, onClick, ariaLabel, child = false, hasChild = false, kind = null }) {
   const [pressed, setPressed] = useState(false)
   const iconDef  = kind ? ROW_ICONS[kind] : null
-  const iconSize = child ? 14 : 16
+  const iconSize = child ? SUB_ICON : CLASS_ICON
   const base = {
     position:       'relative',
     display:        'flex',
@@ -327,7 +339,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, kind = null 
     width:          '100%',
     boxSizing:      'border-box',
     minHeight:      36,
-    padding:        child ? '8px 4px 8px 24px' : '8px 4px',
+    padding:        child ? `8px 4px 8px ${CHILD_PAD}px` : '8px 4px',
     border:         'none',
     borderRadius:   10,
     fontFamily:     'var(--font-body)',
@@ -338,6 +350,40 @@ export function CardRow({ label, onClick, ariaLabel, child = false, kind = null 
     color:          child ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
     backgroundColor: 'transparent',
   }
+  // Class row (when a subclass sits under it): the straight part of the line,
+  // from just under the class icon down past the row's bottom edge to meet the
+  // Subclass row's curve.
+  const stem = hasChild ? (
+    <span
+      aria-hidden="true"
+      style={{
+        position:   'absolute',
+        left:       LINE_X - 0.75,
+        top:        MID + CLASS_ICON / 2 + LINE_GAP,
+        bottom:     -ROW_GAP,
+        width:      0,
+        borderLeft: `1.5px solid ${LINE_COLOR}`,
+      }}
+    />
+  ) : null
+  // Subclass row (under a Class row): the line comes down from the row's top
+  // edge to the middle of the first text line, then curves right to the icon.
+  const elbow = child ? (
+    <span
+      aria-hidden="true"
+      style={{
+        position:     'absolute',
+        left:         LINE_X - 0.75,
+        top:          0,
+        width:        CHILD_PAD - LINE_GAP - (LINE_X - 0.75),
+        height:       MID,
+        boxSizing:    'border-box',
+        borderLeft:   `1.5px solid ${LINE_COLOR}`,
+        borderBottom: `1.5px solid ${LINE_COLOR}`,
+        borderBottomLeftRadius: 8,
+      }}
+    />
+  ) : null
   // Icon + name together. The icon is lined up with the first line of the name,
   // so a long name that wraps keeps the icon at the top.
   const content = (
@@ -358,7 +404,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, kind = null 
       <span style={{ minWidth: 0 }}>{label}</span>
     </span>
   )
-  if (!onClick) return <div style={base}>{content}</div>
+  if (!onClick) return <div style={base}>{stem}{elbow}{content}</div>
   return (
     <button
       onClick={onClick}
@@ -376,6 +422,7 @@ export function CardRow({ label, onClick, ariaLabel, child = false, kind = null 
         transition:      'background-color var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
       }}
     >
+      {stem}{elbow}
       {content}
       <ChevronRight size={child ? 14 : 16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
     </button>
@@ -618,6 +665,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               label={drugClass}
               onClick={hasClassList ? () => setClassOpen(true) : undefined}
               ariaLabel={`Show drug families in ${drugClass}`}
+              hasChild={!!subclass}
               kind="class"
             />
           )}
