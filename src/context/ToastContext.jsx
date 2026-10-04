@@ -10,7 +10,9 @@
  *   toast.info('Refreshed')
  *
  * 2026-10-04 (search mode toast): two additions, nothing existing changes.
- *   toast.custom('Brand mode', { color, icon, duration })
+ *   toast.custom(message, { color, icon, duration })
+ *       'message' can be plain text or a small piece of JSX (for example with
+ *       one word in bold).
  *       A toast in a colour the caller picks (any CSS colour or theme variable,
  *       white text on it) with its own icon: 'icon' is a Lucide component
  *       (for example Tag), drawn white. Both are optional; with no colour it

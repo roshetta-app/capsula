@@ -11,7 +11,8 @@
  * keyboard stays open however the view changes.
  *
  * 2026-10-04: choosing a mode in the pop-up also shows a short toast with the
- * mode's name, in that mode's colour and icon.
+ * mode ('Searching in Brand mode', the mode word in bold), in that mode's
+ * colour and icon.
  *
  * It draws the Search Mode pop-up (its open or closed state is held by the
  * screen, so the sticky header can open it too) and owns the 'how search modes
@@ -75,12 +76,13 @@ export default function DrugsSearchSection({
     onModeMenuChange(false)
 
     // A short toast in the chosen mode's own colour and icon (Brand blue,
-    // Generic green, Class violet), saying which mode is on now. The earlier
-    // mode toast is closed first so quick changes never pile up.
-    const picked = MODE_POPUP_OPTIONS.find(o => o.value === value)
+    // Generic green, Class violet), reading 'Searching in <b>Brand</b> mode'
+    // with the mode word in bold. The earlier mode toast is closed first so
+    // quick changes never pile up.
+    const picked = MODE_OPTIONS.find(o => o.value === value)
     if (picked) {
       if (modeToastRef.current != null) toast.dismiss(modeToastRef.current)
-      modeToastRef.current = toast.custom(picked.label, {
+      modeToastRef.current = toast.custom(<>Searching in <strong style={{ fontWeight: 700 }}>{picked.label}</strong> mode</>, {
         color:    picked.color,
         icon:     picked.icon,
         duration: 2000,
