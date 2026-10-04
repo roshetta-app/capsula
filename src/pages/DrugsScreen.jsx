@@ -58,7 +58,7 @@
  *
  * 2026-10-04 (mode accents): the Search mode button and the pop-up items use the
  * same accent per mode as the info sheet: Brand blue, Generic green, Class
- * violet (theme variables).
+ * violet (theme variables). Generic uses its own soft green, --color-generic.
  *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
@@ -267,7 +267,7 @@ function sortByPrice(drugs) {
 // brand list's (BrandsList.jsx).
 const MODE_OPTIONS = [
   { value: 'brand',   label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
-  { value: 'generic', label: 'Generic', icon: FlaskConical, color: 'var(--color-success)', tint: 'var(--color-success-light)' },
+  { value: 'generic', label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)', tint: 'var(--color-generic-light)' },
   { value: 'class',   label: 'Class',   icon: Layers,       color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
 ]
 // The Search Mode pop-up shows the same three modes with the word 'mode' added

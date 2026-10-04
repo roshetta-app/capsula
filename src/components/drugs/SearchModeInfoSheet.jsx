@@ -9,7 +9,8 @@
  *   - Class:   'Search by drug class or family' -> Proton pump inhibitor
  * Each card has the same structure: icon, mode name, one short line, and the
  * example term in a pill that looks like a search field. Each mode has its own
- * accent: Brand blue, Generic green, Class violet (all theme variables, so
+ * accent: Brand blue, Generic green, Class violet. The whole card is tinted in
+ * it, with the icon tile and the example pill in white on top (all theme variables, so
  * light and dark mode follow automatically). One small tip at the
  * bottom explains how to narrow Brand and Generic searches.
  *
@@ -36,7 +37,7 @@ import SheetShell from '../ui/SheetShell'
 function ModeCard({ icon: Icon, title, description, example, color, tint }) {
   return (
     <div style={{
-      backgroundColor: 'var(--color-surface-muted)',
+      backgroundColor: tint,
       border:          '1px solid var(--color-border)',
       borderRadius:    'var(--radius-lg)',
       boxShadow:       'var(--shadow-card)',
@@ -47,7 +48,7 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
           width:           40,
           height:          40,
           borderRadius:    'var(--radius-md)',
-          backgroundColor: tint,
+          backgroundColor: 'var(--color-surface)',
           display:         'flex',
           alignItems:      'center',
           justifyContent:  'center',
@@ -74,7 +75,8 @@ function ModeCard({ icon: Icon, title, description, example, color, tint }) {
         marginTop:       'var(--space-3)',
         padding:         '0 var(--space-4)',
         borderRadius:    'var(--radius-full)',
-        backgroundColor: tint,
+        backgroundColor: 'var(--color-surface)',
+        boxShadow:       'var(--shadow-card)',
       }}>
         <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
@@ -170,8 +172,8 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
           title="Generic"
           description="Search by active ingredient"
           example="Pantoprazole"
-          color="var(--color-success)"
-          tint="var(--color-success-light)"
+          color="var(--color-generic)"
+          tint="var(--color-generic-light)"
         />
         <ModeCard
           icon={Layers}
