@@ -4,15 +4,15 @@
  * 2026-10-04: opened from the info icon next to the 'Search mode' title on the
  * Drugs screen (see DrugsScreen.jsx). A quick visual cheat sheet for the three
  * search modes, built to be scanned, not read:
- *   - Brand:   'Search by medicine brand name'  -> Controloc
- *   - Generic: 'Search by active ingredient'    -> Pantoprazole
- *   - Class:   'Search by drug class or family' -> Proton pump inhibitor
- * Each card has the same structure: icon, mode name, one short line, and the
- * example term in a pill that looks like a search field. Each mode has its own
- * accent: Brand blue, Generic green, Class violet. The whole card is tinted in
- * it, with the icon tile and the example pill in white on top (all theme variables, so
- * light and dark mode follow automatically). One small plain-text tip
- * at the bottom (no box) explains how to narrow Brand and Generic searches.
+ *   - Brand   -> Controloc
+ *   - Generic -> Pantoprazole
+ *   - Class   -> Proton pump inhibitor
+ * Flat layout, drawn straight on the white sheet with no cards: each mode is
+ * its name (bold, with a small accent icon) and, below it, the example term in
+ * a pill that looks like a search field. No subtitles. Each mode has its own
+ * accent: Brand blue, Generic green, Class violet (theme variables, so light
+ * and dark mode follow automatically). One small plain-text tip at the bottom
+ * explains how to narrow Brand and Generic searches.
  *
  * Redesign: replaces the earlier version that showed real drug cards, a
  * highlighted-match explanation per mode, and a long footnote. Nothing here
@@ -33,50 +33,30 @@
 import { Tag, FlaskConical, Layers, Search, Lightbulb } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 
-// One card per mode. Same structure every time, so the eye learns it once.
-function ModeCard({ icon: Icon, title, description, example, color, tint }) {
+// One section per mode, drawn flat on the sheet: the mode name with its small
+// accent icon, then the example in a search-bar pill. No card behind it.
+function ModeSection({ icon: Icon, title, example, color, tint }) {
   return (
-    <div style={{
-      backgroundColor: tint,
-      borderRadius:    'var(--radius-lg)',
-      padding:         'var(--space-3)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width:           34,
-          height:          34,
-          borderRadius:    'var(--radius-md)',
-          backgroundColor: 'var(--color-surface)',
-          display:         'flex',
-          alignItems:      'center',
-          justifyContent:  'center',
-          flexShrink:      0,
-        }}>
-          <Icon size={18} color={color} aria-hidden="true" />
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
-            {title}
-          </div>
-          <div style={{ fontSize: 12, lineHeight: 1.4, color: 'var(--color-text-secondary)', marginTop: 1 }}>
-            {description}
-          </div>
-        </div>
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon size={18} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
+          {title}
+        </span>
       </div>
 
-      {/* The example: the focal point of the card. */}
+      {/* The example: the focal point of the section. */}
       <div style={{
         display:         'flex',
         alignItems:      'center',
         gap:             10,
-        height:          38,
-        marginTop:       10,
-        padding:         '0 var(--space-3)',
+        height:          44,
+        marginTop:       'var(--space-3)',
+        padding:         '0 var(--space-4)',
         borderRadius:    'var(--radius-full)',
-        backgroundColor: 'var(--color-surface)',
-        boxShadow:       'var(--shadow-card)',
+        backgroundColor: tint,
       }}>
-        <Search size={15} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
+        <Search size={16} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
         <span style={{
           fontSize:     15,
           fontWeight:   400,
@@ -155,28 +135,25 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
         padding:       '0 var(--space-4) var(--space-6)',
         display:       'flex',
         flexDirection: 'column',
-        gap:           10,
+        gap:           'var(--space-6)',
       }}>
-        <ModeCard
+        <ModeSection
           icon={Tag}
           title="Brand"
-          description="Search by medicine brand name"
           example="Controloc"
           color="var(--color-accent)"
           tint="var(--color-accent-light)"
         />
-        <ModeCard
+        <ModeSection
           icon={FlaskConical}
           title="Generic"
-          description="Search by active ingredient"
           example="Pantoprazole"
           color="var(--color-generic)"
           tint="var(--color-generic-light)"
         />
-        <ModeCard
+        <ModeSection
           icon={Layers}
           title="Class"
-          description="Search by drug class or family"
           example="Proton pump inhibitor"
           color="var(--color-class)"
           tint="var(--color-class-light)"
@@ -187,7 +164,6 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
           display:    'flex',
           alignItems: 'flex-start',
           gap:        'var(--space-3)',
-          marginTop:  'var(--space-2)',
           padding:    '0 var(--space-1)',
         }}>
           <Lightbulb size={18} color="var(--color-accent)" aria-hidden="true" style={{ flexShrink: 0, marginTop: 1 }} />
