@@ -64,6 +64,10 @@
  * screen now shows placeholder rows (SearchSwitchingState) instead of a blank
  * gap while the new mode's results load.
  *
+ * 2026-10-04 (Browse by class): the Drugs home has a Category / Class switch
+ * under the 'Browse by' title. Class lists every class (A to Z) as the same
+ * cards Class search uses; tapping one opens the class sheet like Class search.
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -202,7 +206,7 @@
  * wrong empty state never flashes. Class searches are not logged.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown, Info } from 'lucide-react'
+import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Search, WifiOff, Tag, FlaskConical, Layers, Target, ArrowDown01, ArrowUpDown, ChevronDown, Info, LayoutGrid } from 'lucide-react'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
@@ -222,7 +226,7 @@ import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { normalizeSearchText } from '../utils/searchUtils'
-import { titleCaseWords } from '../utils/classSearch'
+import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
@@ -515,13 +519,23 @@ export default function DrugsScreen() {
   }
 
   function handleOpenClass(className) {
-    const card = classResults?.classes?.find(c => c.name === className)
+    const card = classResults?.classes?.find(c => c.name === className) ?? allClasses.find(c => c.name === className)
     openClassSheet(className, card && card.subclassCount === 0 ? ALL_CLASS_DRUGS_KEY : null)
   }
 
   function handleOpenSubclass(className, subclassName) {
     openClassSheet(className, subclassName)
   }
+
+  // Drugs home: which list is shown under the hero, the categories or every
+  // class. 'category' stays the default.
+  const [browseMode, setBrowseMode] = useState('category')
+
+  // Every class in the library, A to Z, for the 'Browse by class' view.
+  const allClasses = useMemo(
+    () => buildClassIndex(drugs).classes.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [drugs]
+  )
 
   // Every brand in the tapped class, the same list the drug page gives the sheet.
   const classSheetDrugs = useMemo(
@@ -960,10 +974,11 @@ export default function DrugsScreen() {
               marginBottom: 'var(--space-2)',
             }}>
               <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text-primary)' }}>
-                Browse by category
+                {browseMode === 'class' ? 'Browse by class' : 'Browse by category'}
               </div>
               {hasFilters && <ClearFiltersButton onClick={requestClearFilters} />}
             </div>
+            <BrowseModeToggle value={browseMode} onChange={setBrowseMode} />
             {/* 2026-08-31 (cosmetic-only fix): while almost every category
                 computes to zero drugs (taxonomy mismatch, separate data
                 cleanup — not fixed here), "All Drugs" was the only tile
@@ -975,6 +990,21 @@ export default function DrugsScreen() {
                 this flips back to the normal 2-column grid automatically,
                 with no further code change, the moment categoriesWithCounts
                 actually has entries again. */}
+            {browseMode === 'class' ? (
+              allClasses.length > 0 ? (
+                <ClassSearchResults
+                  key="browse-classes"
+                  results={{ classes: allClasses, subclasses: [] }}
+                  startExpanded
+                  onOpenClass={handleOpenClass}
+                  onOpenSubclass={handleOpenSubclass}
+                />
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 'var(--space-4) 0' }}>
+                  No classes to show yet.
+                </div>
+              )
+            ) : (
             <div style={{ display: 'grid', gridTemplateColumns: categoriesWithCounts.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
               <CategoryRow
                 label="All Drugs"
@@ -1002,6 +1032,7 @@ export default function DrugsScreen() {
                 )
               })}
             </div>
+            )}
           </>
         )}
       </div>
@@ -1364,6 +1395,65 @@ function DrugsSkeleton() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
         {Array.from({ length: SKELETON_TILE_COUNT }, (_, i) => <SkeletonTile key={i} />)}
       </div>
+    </div>
+  )
+}
+
+// ─── BrowseModeToggle ───────────────────────────────────────────────────────
+// Two-segment switch under the 'Browse by' title on the Drugs home: the
+// category tiles or every class. Same pill-in-a-track look as other switches
+// in the app, theme variables only.
+
+function BrowseModeToggle({ value, onChange }) {
+  const options = [
+    { value: 'category', label: 'Category', Icon: LayoutGrid },
+    { value: 'class',    label: 'Class',    Icon: Layers },
+  ]
+  return (
+    <div
+      role="tablist"
+      aria-label="Browse by"
+      style={{
+        display:         'flex',
+        gap:             2,
+        padding:         3,
+        marginBottom:    'var(--space-3)',
+        borderRadius:    'var(--radius-full)',
+        backgroundColor: 'var(--color-surface-muted)',
+      }}
+    >
+      {options.map(({ value: v, label, Icon }) => {
+        const active = value === v
+        return (
+          <button
+            key={v}
+            role="tab"
+            aria-selected={active}
+            onClick={() => onChange(v)}
+            style={{
+              flex:                    1,
+              display:                 'flex',
+              alignItems:              'center',
+              justifyContent:          'center',
+              gap:                     6,
+              height:                  34,
+              border:                  'none',
+              borderRadius:            'var(--radius-full)',
+              cursor:                  'pointer',
+              fontFamily:              'var(--font-body)',
+              fontSize:                13,
+              fontWeight:              active ? 600 : 500,
+              color:                   active ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+              backgroundColor:         active ? 'var(--color-surface)' : 'transparent',
+              boxShadow:               active ? 'var(--shadow-card)' : 'none',
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Icon size={15} aria-hidden="true" />
+            {label}
+          </button>
+        )
+      })}
     </div>
   )
 }

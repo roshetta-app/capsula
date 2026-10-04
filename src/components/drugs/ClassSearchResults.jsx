@@ -31,6 +31,9 @@
  *   query           string: the typed text, only used for the count line
  *   onOpenClass     (className) => void
  *   onOpenSubclass  (className, subclassName) => void
+ *   startExpanded   boolean (default false): show every class from the start,
+ *                   with no 'Show all' row. The Drugs home 'Browse by class'
+ *                   view uses this to list all classes.
  *
  * The screen gives this component a key that changes with the typed text, so
  * a new search always starts with the groups collapsed.
@@ -193,8 +196,8 @@ function GroupLabel({ children }) {
   )
 }
 
-export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass }) {
-  const [showAllClasses,    setShowAllClasses]    = useState(false)
+export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false }) {
+  const [showAllClasses,    setShowAllClasses]    = useState(startExpanded)
   const [showAllSubclasses, setShowAllSubclasses] = useState(false)
 
   const classes    = results?.classes    ?? []
