@@ -10,8 +10,9 @@
  * subclasses whose names match what was typed. Drug names are never searched
  * in this mode, and the cards never list drugs, only what they are.
  *
- * Class card:    kicker 'Class', the class name, '<n> subclasses' (or 'No
- *                subclasses') underneath, the brand count and a chevron.
+ * Class card:    kicker 'Class', the class name, '<n> drug families' underneath
+ *                (nothing at all for a class with none), the brand count and a
+ *                chevron.
  *                Tapping it opens the class sheet on its subclass list (the
  *                screen opens the sheet; a class with no subclasses opens
  *                straight on its drugs, decided by the screen from the
@@ -25,6 +26,11 @@
  * order inside each group is decided by classSearch.js. A broad search shows
  * the first 5 classes and the first 8 subclasses, each group followed by a
  * 'Show all N' row.
+ *
+ * 2026-10-04 (long names): a long class name wraps onto more lines inside its
+ * own space (even a single very long word breaks), and the count and the
+ * chevron never shrink or get covered. A class with no drug families no longer
+ * shows a 'No drug families' line.
  *
  * Props:
  *   results         { classes, subclasses } from useDrugSearch (Class mode)
@@ -72,6 +78,7 @@ function ResultCard({ kicker, name, detail, count, Icon, onClick }) {
         alignItems:      'center',
         gap:             10,
         width:           '100%',
+        minWidth:        0,
         boxSizing:       'border-box',
         flexShrink:      0,
         minHeight:       64,
@@ -125,22 +132,26 @@ function ResultCard({ kicker, name, detail, count, Icon, onClick }) {
             fontWeight: 500,
             lineHeight: 1.3,
             color:      'var(--color-text-primary)',
+            overflowWrap: 'anywhere',
           }}>
             {name}
           </span>
-          <span style={{
-            display:    'block',
-            marginTop:  2,
-            fontSize:   12.5,
-            lineHeight: 1.3,
-            color:      'var(--color-text-secondary)',
-          }}>
-            {detail}
-          </span>
+          {detail && (
+            <span style={{
+              display:    'block',
+              marginTop:  2,
+              fontSize:   12.5,
+              lineHeight: 1.3,
+              color:      'var(--color-text-secondary)',
+              overflowWrap: 'anywhere',
+            }}>
+              {detail}
+            </span>
+          )}
         </span>
       </span>
       <CountTag
-        style={{ minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11 }}
+        style={{ minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11, flexShrink: 0 }}
       >
         <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
       </CountTag>
@@ -246,7 +257,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
                 name={titleCaseWords(c.name)}
                 detail={
                   c.subclassCount === 0
-                    ? 'No drug families'
+                    ? null
                     : `${c.subclassCount} ${c.subclassCount === 1 ? 'drug family' : 'drug families'}`
                 }
                 count={c.brandCount}
