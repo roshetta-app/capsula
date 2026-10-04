@@ -151,7 +151,7 @@ import {
   getDrugSearchSuggestion,
   normalizeSearchText,
 } from '../utils/searchUtils'
-import { buildClassIndex, searchClassIndex, getClassSearchSuggestions } from '../utils/classSearch'
+import { buildClassIndex, buildKeywordIndex, searchClassIndex, getClassSearchSuggestions } from '../utils/classSearch'
 import { logSearchGap } from '../analytics/searchGaps'
 import { logUsageEvent } from '../analytics/usageEvents'
 
@@ -159,7 +159,14 @@ import { logUsageEvent } from '../analytics/usageEvents'
 // from changing identity on every search.
 const NO_RESULTS = []
 
-export function useDrugSearch(drugs, mode = 'brand') {
+// Class keywords (CLASS_SEARCH_MODE_PLAN.md section 8, phase C, 2026-10-04):
+// the third input is the list of active class keywords from useClassKeywords,
+// handed in by DrugContext. They only matter in Class mode: a keyword is a
+// common word ('vomiting') that finds a class or family by name-link, shown
+// below the name matches. One shared empty list when none are loaded.
+const NO_KEYWORDS = []
+
+export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS) {
   const [query,          setQuery]          = useState('')
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
@@ -197,6 +204,11 @@ export function useDrugSearch(drugs, mode = 'brand') {
   // Class and subclass entries, built once per drugs load like the indexes
   // above (Class mode only reads it).
   const classIndexRef      = useRef(null)
+  // Keywords joined to the entries above (only live links kept), and the
+  // latest keyword list, so the drugs effect can rebuild the join too.
+  const classKeywordIndexRef = useRef([])
+  const classKeywordsRef     = useRef(classKeywords)
+  classKeywordsRef.current   = classKeywords
 
   // Per-session dedup (F10 Batch A / D30, D31) — see header comment.
   // loggedGapTermsRef / loggedNearMissTermsRef keys are "mode:normalizedTerm"
@@ -212,8 +224,18 @@ export function useDrugSearch(drugs, mode = 'brand') {
     ingredientIndexRef.current = buildDrugIngredientIndex(drugs)
     drugsByIdRef.current       = new Map(drugs.map(d => [d.id, d]))
     classIndexRef.current      = buildClassIndex(drugs)
+    classKeywordIndexRef.current = buildKeywordIndex(classIndexRef.current, classKeywordsRef.current)
     runSearch(query, mode)
   }, [drugs]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keywords arrive (or change) after the drugs: rebuild only the small keyword
+  // join, never the drug indexes, and refresh the cards if Class mode is
+  // showing a search.
+  useEffect(() => {
+    if (!classIndexRef.current) return
+    classKeywordIndexRef.current = buildKeywordIndex(classIndexRef.current, classKeywords)
+    if (mode === 'class' && query.trim().length > 0) runSearch(query, mode)
+  }, [classKeywords]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const runSearch = useCallback((q, currentMode) => {
     if (!drugs) return
@@ -249,7 +271,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
         return
       }
       const index = classIndexRef.current ?? buildClassIndex(drugs)
-      const found = searchClassIndex(index, trimmed)
+      const found = searchClassIndex(index, trimmed, classKeywordIndexRef.current)
       setResults(NO_RESULTS)
       setClassResults(found)
 
@@ -274,7 +296,7 @@ export function useDrugSearch(drugs, mode = 'brand') {
       const asBrand   = !asGeneric && (searchDrugsTiered(drugs, trimmed, 'brand') ?? []).length > 0
       setCrossModeTarget(asGeneric ? 'generic' : asBrand ? 'brand' : null)
       setCrossModeMatch(asGeneric || asBrand)
-      const classSuggestions = getClassSearchSuggestions(index, trimmed)
+      const classSuggestions = getClassSearchSuggestions(index, trimmed, classKeywordIndexRef.current)
       setSuggestions(classSuggestions)
 
       // Near-miss or real gap, following the Brand and Generic rules below:

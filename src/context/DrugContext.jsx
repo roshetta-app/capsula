@@ -69,8 +69,9 @@ const DrugContext = createContext(null)
  *
  * 2026-10-04 (Class keywords, phase B): 'classKeywords' (the active keywords
  * that will let Class search find a class by a common word) is loaded here, once,
- * from its saved copy (works offline) and passed through. Nothing searches with it
- * yet — useDrugSearch is not given it until phase C.
+ * from its saved copy (works offline), handed to useDrugSearch as its third input
+ * (phase C: Class mode now also finds classes and families by keyword) and
+ * passed through.
  */
 export function DrugProvider({ children }) {
   const drugsValue = useDrugs()
@@ -79,8 +80,8 @@ export function DrugProvider({ children }) {
   const [sortMode, setSortMode] = useState('relevance')
   const [browseMode, setBrowseMode] = useState('category')
   const [classSortMode, setClassSortMode] = useState('relevance')
-  const searchValue = useDrugSearch(drugsValue.drugs, mode)
   const { classKeywords } = useClassKeywords()
+  const searchValue = useDrugSearch(drugsValue.drugs, mode, classKeywords)
   const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, classSortMode, setClassSortMode, classKeywords, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
