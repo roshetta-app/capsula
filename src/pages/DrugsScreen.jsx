@@ -56,6 +56,10 @@
  * bar still shows the short name. The info icon by the 'Search mode' title is
  * smaller (14px); its tap area is unchanged.
  *
+ * 2026-10-04 (mode accents): the Search mode button and the pop-up items use the
+ * same accent per mode as the info sheet: Brand blue, Generic green, Class
+ * violet (theme variables).
+ *
  * 2026-10-04 (Families wording): the Class-mode texts the person reads say
  * 'drug family' instead of 'subclass' (no-match message, its hint, the search
  * placeholder). Names in the code are unchanged.
@@ -262,9 +266,9 @@ function sortByPrice(drugs) {
 // Search Mode and Sort By pop-up options. The pop-up and the buttons are the
 // brand list's (BrandsList.jsx).
 const MODE_OPTIONS = [
-  { value: 'brand',   label: 'Brand',   icon: Tag },
-  { value: 'generic', label: 'Generic', icon: FlaskConical },
-  { value: 'class',   label: 'Class',   icon: Layers },
+  { value: 'brand',   label: 'Brand',   icon: Tag,          color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
+  { value: 'generic', label: 'Generic', icon: FlaskConical, color: 'var(--color-success)', tint: 'var(--color-success-light)' },
+  { value: 'class',   label: 'Class',   icon: Layers,       color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
 ]
 // The Search Mode pop-up shows the same three modes with the word 'mode' added
 // ('Brand mode'). The button above the search bar keeps the short names, since
@@ -281,9 +285,10 @@ const SORT_OPTIONS = [
 const CLEAR_BUTTON_HEIGHT = 28
 
 // Search Mode button: a fixed width so it never changes size between Brand,
-// Generic and Class. All three modes use the same look: the soft blue-tinted
-// pill used by 'Related drugs' in the generic overview.
-function ModeButton({ icon: Icon, label, onPress }) {
+// Generic and Class. Same soft tinted pill for all three, each in its own mode
+// accent (Brand blue, Generic green, Class violet), the same accent the pop-up
+// and the info sheet use.
+function ModeButton({ icon: Icon, label, color, tint, onPress }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -303,8 +308,8 @@ function ModeButton({ icon: Icon, label, onPress }) {
         padding:                 '8px 12px',
         borderRadius:            'var(--radius-full)',
         border:                  'none',
-        backgroundColor:         'var(--color-accent-light)',
-        color:                   'var(--color-accent)',
+        backgroundColor:         tint,
+        color:                   color,
         fontFamily:              'var(--font-body)',
         fontSize:                13,
         fontWeight:              600,
@@ -316,11 +321,11 @@ function ModeButton({ icon: Icon, label, onPress }) {
         outline:                 'none',
       }}
     >
-      <Icon size={14} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+      <Icon size={14} color={color} style={{ flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {label}
       </span>
-      <ChevronDown size={14} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+      <ChevronDown size={14} color={color} style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -576,6 +581,8 @@ export default function DrugsScreen() {
       <ModeButton
         icon={currentMode.icon}
         label={currentMode.label}
+        color={currentMode.color}
+        tint={currentMode.tint}
         onPress={() => setOpenMenu('mode')}
       />
     </div>

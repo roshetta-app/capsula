@@ -975,6 +975,8 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
 // Done; Sort (pick-one) closes as soon as an option is chosen.
 // 'large' (off by default, so every existing pop-up is unchanged) makes the
 // option rows taller with bigger text and icons; the Search Mode pop-up uses it.
+// An option may carry 'color' and 'tint' (theme variables): its icon then uses
+// that colour, and when picked the row is tinted in it instead of solid accent.
 export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
   const [shown, setShown] = useState(false)
   const hasSelection = selected.length > 0
@@ -1119,6 +1121,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
                 onToggle={() => onPick(opt.value)}
                 wrap={wrap}
                 large={large}
+                tone={opt.color ? { color: opt.color, tint: opt.tint } : undefined}
                 showCheckbox={!single}
                 count={showCounts ? opt.count : undefined}
                 locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
@@ -1273,7 +1276,7 @@ function ClearFilterButton({ onClick, disabled }) {
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
 // for long labels (several lines, softer corners) instead of one clipped line,
 // and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
-function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, large = false }) {
+function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, large = false, tone }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -1291,9 +1294,9 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
         fontSize: large ? 15 : 13, fontWeight: 500, textAlign: 'left',
         cursor: locked ? 'default' : 'pointer',
         opacity: locked ? 0.45 : 1,
-        border: active ? '1.5px solid var(--color-accent)' : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
-        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
-        color: active ? '#fff' : 'var(--color-text-secondary)',
+        border: active ? `1.5px solid ${tone ? tone.color : 'var(--color-accent)'}` : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
+        backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : 'transparent',
+        color: active ? (tone ? tone.color : '#fff') : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
         transform: pressed ? 'scale(0.96)' : 'scale(1)',
         transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
@@ -1317,7 +1320,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
           )}
         </span>
       )}
-      {Icon && <Icon size={large ? 17 : 15} strokeWidth={2} style={{ flexShrink: 0 }} aria-hidden="true" />}
+      {Icon && <Icon size={large ? 17 : 15} strokeWidth={2} color={tone ? tone.color : undefined} style={{ flexShrink: 0 }} aria-hidden="true" />}
       <span style={wrap
         ? { minWidth: 0, lineHeight: 1.35, overflowWrap: 'anywhere' }
         : { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
