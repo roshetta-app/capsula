@@ -4,9 +4,9 @@
  * 2026-10-05 (family keywords on the family page): when a family's drugs page
  * is open (from the family list, or straight from a family card in Class
  * search), the words that point at that family are shown right under the
- * family title, above the filter buttons, with the same 'Keywords' title and
- * chips as the class sheet (first 6, '+N' chip to show all, 'Show less' to
- * fold). Display only. A family with no words looks as before, and the
+ * family title, above the filter buttons, as the same chips as the class sheet
+ * (first 6, '+N' chip to show all, 'Show less' to fold) but without the small
+ * 'Keywords' title (the class sheet keeps its title). Display only. A family with no words looks as before, and the
  * 'Other families' page and the 'All drugs' page show none. The chips block
  * is now one shared helper used for the class words and the family words.
  * The chips fold again whenever the page changes (list to family and back).
@@ -585,8 +585,9 @@ export default function ClassBottomSheet({
 
   // Builds the 'Keywords' title and chips for a list of words (or null when
   // the list is empty). Used for the class words and for a family's words.
-  // marginBottom is the space left under the block.
-  function buildWordsBlock(words, marginBottom) {
+  // marginBottom is the space left under the block. showTitle false leaves out
+  // the small 'Keywords' title and draws the chips alone.
+  function buildWordsBlock(words, marginBottom, showTitle = true) {
     if (words.length === 0) return null
     const shown  = wordsOpen ? words : words.slice(0, MAX_CHIPS)
     const hidden = words.length - MAX_CHIPS
@@ -598,15 +599,17 @@ export default function ClassBottomSheet({
         gap:           'var(--space-2)',
         marginBottom,
       }}>
-        <p style={{
-          flexShrink:  0,
-          margin:      '0 var(--space-1)',
-          fontSize:    14.5,
-          fontWeight:  600,
-          color:       'var(--color-text-primary)',
-        }}>
-          Keywords
-        </p>
+        {showTitle && (
+          <p style={{
+            flexShrink:  0,
+            margin:      '0 var(--space-1)',
+            fontSize:    14.5,
+            fontWeight:  600,
+            color:       'var(--color-text-primary)',
+          }}>
+            Keywords
+          </p>
+        )}
         <div style={{
           flexShrink: 0,
           display:    'flex',
@@ -661,8 +664,9 @@ export default function ClassBottomSheet({
     : null
 
   // The family words block, drawn under the family title on the drugs page of
-  // a family. 12 under it matches the 12 the title leaves above it.
-  const familyBlock = buildWordsBlock(pickedFamilyWords, 'var(--space-3)')
+  // a family, as chips alone (no 'Keywords' title). 12 under it matches the 12
+  // the title leaves above it.
+  const familyBlock = buildWordsBlock(pickedFamilyWords, 'var(--space-3)', false)
 
   function handleTap(item) {
     onClose()
