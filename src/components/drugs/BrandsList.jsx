@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-05 (belowHeading): new optional prop belowHeading (default null). A
+ * piece of screen drawn right under the title and above the filter buttons.
+ * The class sheet uses it to show a family's keywords under the family title.
+ * With the prop off (every other screen) nothing changes.
+ *
  * 2026-10-05 (Other generics): the Filter by generic pop-up folds the generics
  * that have only one brand into one 'Other generics' row, which unfolds inside
  * the pop-up (FilterModal.jsx) so each of them can still be picked on its own.
@@ -238,6 +243,9 @@
  *              sheet uses it for a class with no families, whose sheet heading
  *              already shows the class name. Filters and the pop-up badge
  *              (familyName) are unchanged.
+ *   belowHeading — optional node, default null. Drawn under the title and
+ *              above the filters (the class sheet puts a family's keywords
+ *              here). Not drawn on its own space when empty.
  *   hideOther — optional boolean, default false. True drops the word 'Other'
  *              from the heading ('<name> drugs' instead of 'Other <name> drugs').
  *   similarGenericName — Alternatives only: name of the generic the Similar
@@ -456,7 +464,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, belowHeading = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -690,6 +698,8 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           </p>
         )
       )}
+
+      {belowHeading}
 
       {/* Filter pills — the only buttons in this row. Tapping one opens its
           pop-up (FilterModal, rendered at the end of this component). */}
@@ -974,3 +984,4 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
     </button>
   )
 }
+

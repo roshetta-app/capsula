@@ -1,6 +1,17 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-05 (family keywords on the family page): when a family's drugs page
+ * is open (from the family list, or straight from a family card in Class
+ * search), the words that point at that family are shown right under the
+ * family title, above the filter buttons, with the same 'Keywords' title and
+ * chips as the class sheet (first 6, '+N' chip to show all, 'Show less' to
+ * fold). Display only. A family with no words looks as before, and the
+ * 'Other families' page and the 'All drugs' page show none. The chips block
+ * is now one shared helper used for the class words and the family words.
+ * The chips fold again whenever the page changes (list to family and back).
+ * The title slot is a new optional prop of BrandsList (belowHeading).
+ *
  * 2026-10-05 (quieter All drugs row): the icon and the count on the 'All drugs
  * in this class' row no longer sit on their own tinted badge (blue on the
  * blue card looked heavy). Both now sit straight on the card: the blue icon in
@@ -455,6 +466,12 @@ export default function ClassBottomSheet({
   // Where the filter pop-ups are drawn (the full-sheet layer at the end).
   const [popupLayer, setPopupLayer] = useState(null)
 
+  // The chips start folded on every page: opening a family, or coming back to
+  // the list, folds them again.
+  useEffect(() => {
+    setWordsOpen(false)
+  }, [picked])
+
   // Phone/browser Back on the drugs page goes back to the subclass list (the
   // sheet stays open). On the list it closes the sheet as usual. This adds no
   // history step of its own (see useBackLayer in useBackClose.js).
@@ -502,8 +519,11 @@ export default function ClassBottomSheet({
     () => splitKeywords(classKeywords, className),
     [classKeywords, className]
   )
-  const shownWords = wordsOpen ? classWords : classWords.slice(0, MAX_CHIPS)
-  const hiddenWords = classWords.length - MAX_CHIPS
+  // The words of the family whose drugs page is open: only a real family (not
+  // the 'Other families' page, not the 'All drugs' page).
+  const pickedFamilyWords = pickedGroup && !pickedGroup.isOthers && !pickedGroup.isAll
+    ? (familyWords.get(pickedGroup.name) ?? [])
+    : []
 
   // Opening a family from the list: remember the list's scroll first.
   function pickFamily(name) {
@@ -563,17 +583,20 @@ export default function ClassBottomSheet({
   // repeated class name above the drugs, the same heading as every class.
   const straightToAll = directSubclass === ALL_KEY
 
-  const wordsBlock = (
-  totalDrugs > 0 && classWords.length > 0 ? (
+  // Builds the 'Keywords' title and chips for a list of words (or null when
+  // the list is empty). Used for the class words and for a family's words.
+  // marginBottom is the space left under the block.
+  function buildWordsBlock(words, marginBottom) {
+    if (words.length === 0) return null
+    const shown  = wordsOpen ? words : words.slice(0, MAX_CHIPS)
+    const hidden = words.length - MAX_CHIPS
+    return (
       <div style={{
         flexShrink:    0,
         display:       'flex',
         flexDirection: 'column',
         gap:           'var(--space-2)',
-        // The list above it has 12 of space over the first thing in it and 8
-        // between rows, so 4 more under the block makes the space above and
-        // below equal (12). On the drugs page (16 above) it is 16 below.
-        marginBottom:  straightToAll ? 'var(--space-4)' : 'var(--space-1)',
+        marginBottom,
       }}>
         <p style={{
           flexShrink:  0,
@@ -591,7 +614,7 @@ export default function ClassBottomSheet({
           gap:        6,
           margin:     '0 var(--space-1)',
         }}>
-          {shownWords.map(w => (
+          {shown.map(w => (
             <span key={w} style={{
               padding:         '3px 9px',
               borderRadius:    999,
@@ -603,10 +626,10 @@ export default function ClassBottomSheet({
               {capFirst(w)}
             </span>
           ))}
-          {hiddenWords > 0 && (
+          {hidden > 0 && (
             <button
               onClick={() => setWordsOpen(o => !o)}
-              aria-label={wordsOpen ? 'Show fewer words' : `Show ${hiddenWords} more words`}
+              aria-label={wordsOpen ? 'Show fewer words' : `Show ${hidden} more words`}
               aria-expanded={wordsOpen}
               style={{
                 padding:         '3px 9px',
@@ -622,13 +645,24 @@ export default function ClassBottomSheet({
                 outline:         'none',
               }}
             >
-              {wordsOpen ? 'Show less' : `+${hiddenWords}`}
+              {wordsOpen ? 'Show less' : `+${hidden}`}
             </button>
           )}
         </div>
       </div>
-    ) : null
-  )
+    )
+  }
+
+  // The class words block. The list above it has 12 of space over the first
+  // thing in it and 8 between rows, so 4 more under the block makes the space
+  // above and below equal (12). On the drugs page (16 above) it is 16 below.
+  const wordsBlock = totalDrugs > 0
+    ? buildWordsBlock(classWords, straightToAll ? 'var(--space-4)' : 'var(--space-1)')
+    : null
+
+  // The family words block, drawn under the family title on the drugs page of
+  // a family. 12 under it matches the 12 the title leaves above it.
+  const familyBlock = buildWordsBlock(pickedFamilyWords, 'var(--space-3)')
 
   function handleTap(item) {
     onClose()
@@ -690,6 +724,7 @@ export default function ClassBottomSheet({
               {straightToAll && wordsBlock}
               <BrandsList
                 hideHeading={straightToAll}
+                belowHeading={familyBlock}
                 key={pickedGroup.name}
                 siblings={pickedGroup.items}
                 onTap={handleTap}
@@ -779,3 +814,4 @@ export default function ClassBottomSheet({
     </SheetShell>
   )
 }
+
