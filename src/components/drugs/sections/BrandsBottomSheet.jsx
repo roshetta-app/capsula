@@ -1,5 +1,14 @@
 /**
  * src/components/drugs/sections/BrandsBottomSheet.jsx
+ *
+ * 2026-10-05 (family keywords on the Alternatives list): the words that point
+ * at the family of the open drug (same class and family name, exactly as
+ * stored) are shown as chips right under the Alternatives title, above the
+ * filter buttons, the same look as on the family page of the class sheet (no
+ * 'Keywords' title). First 6, '+N' to show all, 'Show less' to fold; they
+ * start folded each time the sheet opens. Display only. A family with no
+ * words looks as before, and the Similar list is unchanged. The words come
+ * from the app's shared data (useDrugContext, classKeywords).
  * Phase 2c — Drug Detail Screen, grouped sections
  *
  * Bottom sheet for "Available Brands" (decision 4.27), opened by the
@@ -119,9 +128,11 @@
  *   onSelectBrand (item) => void — called after this sheet closes
  */
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
 import BrandsList from '../BrandsList.jsx'
+import KeywordChips, { wordsForFamily } from '../KeywordChips.jsx'
+import { useDrugContext } from '../../../context/DrugContext'
 import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 
@@ -187,6 +198,16 @@ export default function BrandsBottomSheet({
   const activeTab = !showTabs ? 'similar' : siblings.length === 0 ? 'alternatives' : tab
   // Two lists to swipe between only when both have brands.
   const canSwipe = showTabs && siblings.length > 0
+
+  // The words of the open drug's family (all Alternatives share its class and
+  // family name). Empty when the family has none.
+  const { classKeywords } = useDrugContext()
+  const altClass    = alternatives[0]?.class
+  const altFamily   = alternatives[0]?.subclass
+  const familyWords = useMemo(
+    () => wordsForFamily(classKeywords, altClass, altFamily),
+    [classKeywords, altClass, altFamily]
+  )
 
   // Where the filter pop-ups are drawn (see the layer at the end of the sheet).
   const [popupLayer, setPopupLayer] = useState(null)
@@ -282,6 +303,14 @@ export default function BrandsBottomSheet({
                   saved={savedFilters.current[name]}
                   onSave={picks => { savedFilters.current[name] = picks }}
                   familyName={alternatives[0]?.subclass}
+                  belowHeading={name === 'alternatives' && familyWords.length > 0 ? (
+                    <KeywordChips
+                      key={isOpen ? 'open' : 'closed'}
+                      words={familyWords}
+                      showTitle={false}
+                      marginBottom="var(--space-3)"
+                    />
+                  ) : null}
                   similarGenericName={name === 'alternatives' && siblings.length > 0 ? siblings[0].genericName : undefined}
                   popupLayer={popupLayer}
                 />
