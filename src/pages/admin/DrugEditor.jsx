@@ -263,8 +263,10 @@ export default function DrugEditor() {
           }
           continue
         }
+        const brandName = brand.tradename_clean.trim()
         const payload = {
-          tradename_clean: brand.tradename_clean.trim(),
+          name:            brandName,
+          tradename_clean: brandName,
           manufacturer:    brand.manufacturer?.trim() || null,
           is_published:    brand.is_published ?? true,
         }
