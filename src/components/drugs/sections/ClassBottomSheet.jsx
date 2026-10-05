@@ -5,7 +5,7 @@
  * in this class' row no longer sit on their own tinted badge (blue on the
  * blue card looked heavy). Both now sit straight on the card: the blue icon in
  * the same 34 space as the family cards' icons (so the names line up), and the
- * count as a plain blue number. The family cards keep their grey tag and
+ * count as a plain blue number, and the chevron is blue too. The family cards keep their grey tag and
  * tinted icon tile.
  *
  * 2026-10-05 (class keywords on the sheet): the common words (keywords, the
@@ -425,7 +425,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
         aria-hidden="true"
         size={16}
         strokeWidth={2}
-        color="var(--color-text-tertiary)"
+        color={featured ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
         style={{ flexShrink: 0 }}
       />
     </button>
