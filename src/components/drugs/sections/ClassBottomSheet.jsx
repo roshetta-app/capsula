@@ -1,6 +1,13 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-05 (quieter All drugs row): the icon and the count on the 'All drugs
+ * in this class' row no longer sit on their own tinted badge (blue on the
+ * blue card looked heavy). Both now sit straight on the card: the blue icon in
+ * the same 34 space as the family cards' icons (so the names line up), and the
+ * count as a plain blue number. The family cards keep their grey tag and
+ * tinted icon tile.
+ *
  * 2026-10-05 (class keywords on the sheet): the common words (keywords, the
  * ones Class search uses, like 'vomiting') are now shown on the subclass list.
  * Display only, nothing happens when a word is tapped.
@@ -369,7 +376,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
             width:           ICON_TILE,
             height:          ICON_TILE,
             borderRadius:    10,
-            backgroundColor: featured ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'var(--color-accent-light)',
+            backgroundColor: featured ? 'transparent' : 'var(--color-accent-light)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
@@ -409,7 +416,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
       <CountTag
         style={{
           minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11,
-          ...(featured ? { backgroundColor: 'color-mix(in srgb, var(--color-accent) 16%, transparent)', color: 'var(--color-accent)' } : null),
+          ...(featured ? { backgroundColor: 'transparent', color: 'var(--color-accent)' } : null),
         }}
       >
         <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
