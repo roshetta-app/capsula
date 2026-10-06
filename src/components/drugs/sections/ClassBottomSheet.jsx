@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-06 (icon before the family title): the title on a family's page has the
+ * same icon as its card on the list (molecule; grid for 'Other families', list for
+ * 'All drugs in this class').
+ *
  * 2026-10-06 (keywords fit two lines): the class and family keyword chips no
  * longer stop at 6 words. They show as many as fit in about two lines, counted
  * by letters (long words take more room), then the '+N' chip. Shared with
@@ -738,6 +742,11 @@ export default function ClassBottomSheet({
               <BrandsList
                 hideHeading={straightToAll}
                 belowHeading={familyBlock}
+                titleIcon={
+                  pickedGroup.isOthers ? <LayoutGrid size={20} strokeWidth={1.9} color="var(--color-accent)" />
+                    : pickedGroup.isAll ? <List size={20} strokeWidth={1.9} color="var(--color-accent)" />
+                    : <MoleculeIcon size={20} color="var(--color-accent)" />
+                }
                 key={pickedGroup.name}
                 siblings={pickedGroup.items}
                 onTap={handleTap}
