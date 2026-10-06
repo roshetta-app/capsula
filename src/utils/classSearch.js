@@ -37,6 +37,11 @@
  * (editDistance and maxAllowedEdits from searchUtils.js): same first letter,
  * tolerance grows with the length of the typed text.
  *
+ * 2026-10-06 (plurals): when the typed text finds no class or subclass by name, the
+ * same search is repeated with its words made singular ('antibiotics' finds
+ * 'Antibiotic', 'beta blockers' finds 'Beta blocker'). The hint in Brand and
+ * Generic mode does the same. Typed singular already finds a stored plural.
+ *
  * Keywords (class keywords plan, CLASS_SEARCH_MODE_PLAN.md section 8, phase C,
  * 2026-10-04): a keyword is a common word ('vomiting') that points at one or
  * more classes or families by NAME. They are an extra pass on top of the name
@@ -174,6 +179,37 @@ function matchGroup(entries, q, qWords, tiers) {
   for (const tier of tiers) {
     const matched = entries.filter(e => entryMatchesAtTier(e, q, qWords, tier))
     if (matched.length > 0) return sortEntries(matched, q)
+  }
+  return []
+}
+
+// 2026-10-06 (plurals in class names): the typed text again, with its words made
+// singular ('antibiotics' -> 'antibiotic', 'beta blockers' -> 'beta blocker',
+// 'anti-inflammatories' -> 'anti-inflammatory'). Up to three variants, because
+// a word can lose '-ies' -> 'y', '-es' or '-s'. Used only when the typed text
+// itself finds nothing. A typed singular already finds a stored plural by
+// 'starts with', so that direction needs nothing.
+function singularQueryVariants(q) {
+  const words = q.split(' ').filter(Boolean)
+  const out = []
+  for (let k = 0; k < 3; k++) {
+    const variant = words.map(w => {
+      const forms = singularForms(w)
+      return forms.length > k ? forms[k] : (forms.length > 0 ? forms[forms.length - 1] : w)
+    }).join(' ')
+    if (variant !== q && !out.includes(variant)) out.push(variant)
+  }
+  return out
+}
+
+// matchGroup on the typed text first; if that finds nothing, on its singular
+// variants (first one that finds anything wins).
+function matchGroupWithPlurals(entries, q, tiersFor) {
+  const direct = matchGroup(entries, q, tokenize(q).join(' '), tiersFor(q))
+  if (direct.length > 0) return direct
+  for (const v of singularQueryVariants(q)) {
+    const found = matchGroup(entries, v, tokenize(v).join(' '), tiersFor(v))
+    if (found.length > 0) return found
   }
   return []
 }
@@ -318,12 +354,11 @@ export function searchClassIndex(index, query, keywordIndex = null) {
   const q = normalizeSearchText(query)
   if (q.length < 2) return { classes: [], subclasses: [] }
 
-  const qWords = tokenize(q).join(' ')
-  const tiers  = q.length >= 4 ? [1, 2, 3] : [1, 2]
+  const tiersFor = text => (text.length >= 4 ? [1, 2, 3] : [1, 2])
 
   const byName = {
-    classes:    matchGroup(index.classes,    q, qWords, tiers),
-    subclasses: matchGroup(index.subclasses, q, qWords, tiers),
+    classes:    matchGroupWithPlurals(index.classes,    q, tiersFor),
+    subclasses: matchGroupWithPlurals(index.subclasses, q, tiersFor),
   }
   if (!keywordIndex || keywordIndex.length === 0) return byName
 
@@ -352,12 +387,11 @@ export function searchClassHint(index, query, keywordIndex = null) {
   const q = normalizeSearchText(query)
   if (q.length < 3) return { classes: [], subclasses: [] }
 
-  const qWords = tokenize(q).join(' ')
-  const tiers  = [1, 2]
+  const tiersFor = () => [1, 2]
 
   const byName = {
-    classes:    matchGroup(index.classes,    q, qWords, tiers),
-    subclasses: matchGroup(index.subclasses, q, qWords, tiers),
+    classes:    matchGroupWithPlurals(index.classes,    q, tiersFor),
+    subclasses: matchGroupWithPlurals(index.subclasses, q, tiersFor),
   }
   if (!keywordIndex || keywordIndex.length === 0) return byName
   if (keywordQueryWords(q).join(' ').length < 3) return byName

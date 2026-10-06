@@ -1,6 +1,13 @@
 /**
  * src/utils/searchUtils.js
  *
+ * 2026-10-06 ('Did you mean' catches more typos): (1) two neighbouring letters
+ * swapped ('cipor' for 'cipro') now count as one change, not two; (2) the typed
+ * text is also compared with each single word of a name and with the start of
+ * the name, so a typo in the first word of a multi-word brand, or a typo in a
+ * half-typed name, still gets a suggestion (4+ typed letters, same first-letter
+ * rule). Whole-name matches are still listed first.
+ *
  * Condition search uses a tiered strategy:
  *   1 char  — prefix match only (name starts with the letter)
  *   2 chars — prefix OR any word in name starts with the query
@@ -996,9 +1003,39 @@ export function editDistance(a, b) {
     for (let j = 1; j <= n; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1
       dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost)
+      // 2026-10-06: two neighbouring letters swapped ('pnaadol' / 'panadol') count as ONE change, not two.
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        dp[i][j] = Math.min(dp[i][j], dp[i - 2][j - 2] + 1)
+      }
     }
   }
   return dp[m][n]
+}
+
+// 2026-10-06 ('Did you mean' for half-typed or multi-word names): the typed text is also compared
+// with each single word of a name (3+ letters) and with the start of the name cut to the typed
+// length (and one shorter / longer). So a typo in the first word of 'Cal-D Plus', or a typo while
+// the name is still half typed, is caught too. Needs 4+ typed letters, the same first-letter rule
+// and the same allowed number of changes as the full-name check. Returns the fewest changes
+// found, or null.
+function partialNameDistance(lower, candidate, allowed) {
+  if (!candidate || lower.length < 4) return null
+  let best = null
+  const consider = (text) => {
+    if (!text || text[0] !== lower[0]) return
+    if (Math.abs(text.length - lower.length) > allowed) return
+    const d = editDistance(lower, text)
+    if (d <= allowed && (best === null || d < best)) best = d
+  }
+  for (const word of candidate.split(/[^\p{L}\p{N}]+/u)) {
+    if (word.length >= 4) consider(word)
+  }
+  if (lower.length >= 5) {
+    for (const len of [lower.length - 1, lower.length, lower.length + 1]) {
+      if (candidate.length > len) consider(candidate.slice(0, len))
+    }
+  }
+  return best
 }
 
 // How many letters are allowed to be wrong, based on how much text is being
@@ -1070,33 +1107,44 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
     // the genericName itself doesn't qualify — not "whichever scores
     // closest" as before, which let a combo's alphabetically-earlier name
     // outrank a plain single-ingredient drug's own exact-name match on a tie.
-    let matchedOwnName = false
+    // 2026-10-06: 'rank' replaces the old true/false flag: 0 = the whole own
+    // name is close, 1 = only one word of it or its start is close (see
+    // partialNameDistance), 2 = only an ingredient is close (Generic mode).
+    let rank = 0
     if (mode === 'generic') {
       const genericCandidate = normalizeSearchText(drug.genericName ?? '')
       if (genericCandidate && genericCandidate[0] === lower[0]) {
         const d = editDistance(lower, genericCandidate)
-        if (d <= allowed) { best = d; matchedOwnName = true }
+        if (d <= allowed) { best = d; rank = 0 }
+      }
+      if (best === null) {
+        const pd = partialNameDistance(lower, genericCandidate, allowed)
+        if (pd !== null) { best = pd; rank = 1 }
       }
       if (best === null && Array.isArray(drug.ingredients)) {
         for (const ingredient of drug.ingredients) {
           const candidate = normalizeSearchText(ingredient)
           if (!candidate || candidate[0] !== lower[0]) continue
           const d = editDistance(lower, candidate)
-          if (d <= allowed && (best === null || d < best)) best = d
+          if (d <= allowed && (best === null || d < best)) { best = d; rank = 2 }
         }
       }
     } else {
       const candidate = normalizeSearchText(drugFieldForMode(drug, 'brand'))
       if (candidate && candidate[0] === lower[0]) {
         const d = editDistance(lower, candidate)
-        if (d <= allowed) { best = d; matchedOwnName = true }
+        if (d <= allowed) { best = d; rank = 0 }
+      }
+      if (best === null) {
+        const pd = partialNameDistance(lower, candidate, allowed)
+        if (pd !== null) { best = pd; rank = 1 }
       }
     }
-    if (best !== null) scored.push({ drug, d: best, matchedOwnName })
+    if (best !== null) scored.push({ drug, d: best, rank })
   }
 
   scored.sort((a, b) => {
-    if (a.matchedOwnName !== b.matchedOwnName) return a.matchedOwnName ? -1 : 1
+    if (a.rank !== b.rank) return a.rank - b.rank
     if (a.d !== b.d) return a.d - b.d
     return drugFieldForMode(a.drug, mode).localeCompare(drugFieldForMode(b.drug, mode))
   })
