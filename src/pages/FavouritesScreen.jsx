@@ -1,5 +1,9 @@
 /**
  * src/pages/FavouritesScreen.jsx
+ *
+ * 2026-10-06 (bug fix): a favourite drug with no slug (a new brand) opened
+ * /drugs/null and showed 'Drug not found'. The card now falls back to the
+ * drug id, the same as the Drugs screen and the Alternatives list do.
  * Phase 2H — Favourites Screen rebuild
  *
  * Changes from stub:
@@ -1488,7 +1492,7 @@ export default function FavouritesScreen() {
                           onTap={
                             isManaging
                               ? () => toggleSelectId(drug.id)
-                              : () => navigate(`/drugs/${drug.slug}`)
+                              : () => navigate(`/drugs/${drug.slug || drug.id}`)
                           }
                           trailing={
                             isManaging
