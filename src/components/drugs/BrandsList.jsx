@@ -5,6 +5,9 @@
  * drugs', family name in bold) is 18px instead of 15px, on the class sheet's family
  * page and on both Related drugs tabs, so they stay the same size when swiping.
  *
+ * 2026-10-06 (titleIcon): new optional prop titleIcon (default null). A small icon
+ * drawn before the title; the class sheet passes the same icon the family card has.
+ *
  * 2026-10-05 (belowHeading): new optional prop belowHeading (default null). A
  * piece of screen drawn right under the title and above the filter buttons.
  * The class sheet uses it to show a family's keywords under the family title.
@@ -247,6 +250,8 @@
  *              sheet uses it for a class with no families, whose sheet heading
  *              already shows the class name. Filters and the pop-up badge
  *              (familyName) are unchanged.
+ *   titleIcon — optional node, default null. Drawn before the title (the class
+ *              sheet puts the family's own icon here). Nothing changes when empty.
  *   belowHeading — optional node, default null. Drawn under the title and
  *              above the filters (the class sheet puts a family's keywords
  *              here). Not drawn on its own space when empty.
@@ -468,7 +473,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, belowHeading = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -588,6 +593,11 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     color:      'var(--color-text-secondary)',
     margin:     '0 0 var(--space-3)',
   }
+  const iconNode = titleIcon ? (
+    <span aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-4px', marginRight: 8, lineHeight: 0 }}>
+      {titleIcon}
+    </span>
+  ) : null
   const nameNode = <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong>
 
   // Opens the Google search for the subclass (Alternatives title, whole title
@@ -664,7 +674,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           search; its small icon follows the subclass name. */}
       {headingName && !hideHeading && (groupBySubclass
         ? (
-          <p style={headingStyle}>{nameNode}</p>
+          <p style={headingStyle}>{iconNode}{nameNode}</p>
         )
         : isAlternatives
         ? (
@@ -685,7 +695,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               outline:    'none',
             }}
           >
-            {hideOther ? null : 'Other '}{nameNode}
+            {iconNode}{hideOther ? null : 'Other '}{nameNode}
             <Search
               size={11}
               strokeWidth={2.2}
@@ -698,7 +708,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         )
         : (
           <p style={headingStyle}>
-            {hideOther ? null : 'Other '}{nameNode} drugs
+            {iconNode}{hideOther ? null : 'Other '}{nameNode} drugs
           </p>
         )
       )}
