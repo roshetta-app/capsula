@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-06 (no keywords on the family cards): the grey keyword line under
+ * the family name on the family cards of the class sheet is removed. The class
+ * words at the top of the sheet and the chips on a family's own drugs page are
+ * unchanged.
+ *
  * 2026-10-05 (family keywords on the family page): when a family's drugs page
  * is open (from the family list, or straight from a family card in Class
  * search), the words that point at that family are shown right under the
@@ -801,7 +806,6 @@ export default function ClassBottomSheet({
                   name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
                   count={g.items.length}
                   Icon={g.isOthers ? LayoutGrid : MoleculeIcon}
-                  words={g.isOthers ? [] : (familyWords.get(g.name) ?? [])}
                   onClick={() => pickFamily(g.name)}
                 />
               ))}
