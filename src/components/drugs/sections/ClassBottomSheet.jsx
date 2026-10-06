@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-06 (keywords fit two lines): the class and family keyword chips no
+ * longer stop at 6 words. They show as many as fit in about two lines, counted
+ * by letters (long words take more room), then the '+N' chip. Shared with
+ * KeywordChips (visibleCount).
+ *
  * 2026-10-06 (no keywords on the family cards): the grey keyword line under
  * the family name on the family cards of the class sheet is removed. The class
  * words at the top of the sheet and the chips on a family's own drugs page are
@@ -255,6 +260,7 @@ import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 import { useDrugContext } from '../../../context/DrugContext'
 import { titleCaseWords } from '../../../utils/classSearch'
+import { visibleCount } from '../KeywordChips.jsx'
 // Lets Icons (CC BY 4.0, credit in the note at the top of this file).
 import { Icon as IconifyIcon } from '@iconify/react/dist/offline'
 import moleculeLight from '@iconify-icons/lets-icons/molecule-light'
@@ -344,9 +350,6 @@ function splitKeywords(keywords, className) {
     familyWords:  new Map([...byFamily].map(([name, words]) => [name, uniqueSorted(words)])),
   }
 }
-
-// Most class words shown before the '+N' chip.
-const MAX_CHIPS = 6
 
 // Size of the icon tile and the gap after it.
 const ICON_TILE = 34
@@ -594,8 +597,9 @@ export default function ClassBottomSheet({
   // the small 'Keywords' title and draws the chips alone.
   function buildWordsBlock(words, marginBottom, showTitle = true) {
     if (words.length === 0) return null
-    const shown  = wordsOpen ? words : words.slice(0, MAX_CHIPS)
-    const hidden = words.length - MAX_CHIPS
+    const limit  = visibleCount(words)
+    const shown  = wordsOpen ? words : words.slice(0, limit)
+    const hidden = words.length - limit
     return (
       <div style={{
         flexShrink:    0,
