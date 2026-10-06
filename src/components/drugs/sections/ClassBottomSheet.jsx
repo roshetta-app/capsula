@@ -2,7 +2,7 @@
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
  * 2026-10-06 (icon before the family title): the title on a family's page has the
- * same icon as its card on the list (molecule; grid for 'Other families', list for
+ * same icon as its card on the list, at 17px (molecule; grid for 'Other families', list for
  * 'All drugs in this class').
  *
  * 2026-10-06 (keywords fit two lines): the class and family keyword chips no
@@ -743,9 +743,9 @@ export default function ClassBottomSheet({
                 hideHeading={straightToAll}
                 belowHeading={familyBlock}
                 titleIcon={
-                  pickedGroup.isOthers ? <LayoutGrid size={20} strokeWidth={1.9} color="var(--color-accent)" />
-                    : pickedGroup.isAll ? <List size={20} strokeWidth={1.9} color="var(--color-accent)" />
-                    : <MoleculeIcon size={20} color="var(--color-accent)" />
+                  pickedGroup.isOthers ? <LayoutGrid size={17} strokeWidth={1.9} color="var(--color-accent)" />
+                    : pickedGroup.isAll ? <List size={17} strokeWidth={1.9} color="var(--color-accent)" />
+                    : <MoleculeIcon size={17} color="var(--color-accent)" />
                 }
                 key={pickedGroup.name}
                 siblings={pickedGroup.items}
