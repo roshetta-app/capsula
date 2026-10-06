@@ -85,7 +85,7 @@
  * it is half-typed (phase G).
  */
 
-import { normalizeSearchText, editDistance, maxAllowedEdits } from './searchUtils'
+import { normalizeSearchText, editDistance, maxAllowedEdits, sameFirstLetter } from './searchUtils'
 
 // Makes every word start with a capital letter, including the words after a
 // plus sign, slash, bracket or hyphen. Only the first letter of each word is
@@ -445,7 +445,7 @@ export function getClassSearchSuggestions(index, query, keywordIndex = null) {
     const candidates = [entry.norm, ...entry.tokens.filter(t => t.length >= 3)]
     let best = null
     for (const cand of candidates) {
-      if (!cand || cand[0] !== q[0]) continue
+      if (!cand || !sameFirstLetter(cand[0], q[0])) continue
       const d = editDistance(q, cand)
       if (d <= allowed && (best === null || d < best)) best = d
     }
@@ -463,7 +463,7 @@ export function getClassSearchSuggestions(index, query, keywordIndex = null) {
         const candidates = [kw.norm, ...kw.tokens.filter(t => t.length >= 3)]
         let best = null
         for (const cand of candidates) {
-          if (!cand || cand[0] !== qk[0]) continue
+          if (!cand || !sameFirstLetter(cand[0], qk[0])) continue
           const d = editDistance(qk, cand)
           if (d <= allowedK && (best === null || d < best)) best = d
         }

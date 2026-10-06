@@ -1,6 +1,14 @@
 /**
  * src/utils/searchUtils.js
  *
+ * 2026-10-06 (strength and form typed the way people write them): strength units
+ * can be mgs / gm / gram / ug / percent etc.; a per-volume strength ('250mg/5ml',
+ * '5mg/ml') is understood instead of leaving '/5ml' in the name text; '1gm' also
+ * finds 1000mg (g, mg and mcg are interchangeable). Form words now accept plurals
+ * ('tablets', 'capsules') and one wrong letter in a form word of 5+ letters
+ * ('tabelt', 'sirup') when a drug name is typed beside it. 'Did you mean': c/k and
+ * s/z count as the same first letter, and names of 11+ letters allow three changes.
+ *
  * 2026-10-06 ('Did you mean' catches more typos): (1) two neighbouring letters
  * swapped ('cipor' for 'cipro') now count as one change, not two; (2) the typed
  * text is also compared with each single word of a name and with the start of
@@ -462,8 +470,27 @@ const STRENGTH_UNITS = ['mcg', 'mg', 'iu', 'ml', 'g', '%']
 // read as "500mc" + a stray "g". '(?![a-z])' stops a real word starting
 // right after the unit from being swallowed in (so "500ml" doesn't also
 // swallow a following "milk", for instance, if that were ever typed).
+// 2026-10-06 (strength typed the way people write it): the unit can be written
+// 'mgs', 'gm', 'gms', 'gram(s)', 'milligram(s)', 'ug', 'µg', 'microgram(s)', 'cc' or
+// 'percent' and is turned into the stored form (mg, g, mcg, ml, %) before it is
+// matched. A 'per volume' part is read too: '250mg/5ml', '250 mg / 5 ml',
+// '5mg/ml' (the number after the slash is optional, 'ml' or 'cc'). Before this,
+// '500mgs' and '1gm' found no strength at all, and '250mg/5ml' split into
+// '250mg' plus a leftover '/5ml' that then broke the name search.
+const STRENGTH_UNIT_ALIASES = {
+  mg: 'mg', mgs: 'mg', milligram: 'mg', milligrams: 'mg',
+  mcg: 'mcg', mcgs: 'mcg', ug: 'mcg', 'µg': 'mcg', microgram: 'mcg', micrograms: 'mcg',
+  g: 'g', gm: 'g', gms: 'g', gram: 'g', grams: 'g',
+  iu: 'iu', ml: 'ml', cc: 'ml', percent: '%', '%': '%',
+}
+// Longest alias first so 'mcg' is never read as 'mc' + 'g', 'mgs' as 'mg' + 's'.
+const STRENGTH_ALIAS_ALTERNATION = Object.keys(STRENGTH_UNIT_ALIASES)
+  .sort((a, b) => b.length - a.length)
+  .map(escapeRegExp)
+  .join('|')
 const STRENGTH_PATTERN = new RegExp(
-  `(\\d+(?:\\.\\d+)?)\\s*(${STRENGTH_UNITS.join('|')})(?![a-z])`,
+  `(\\d+(?:\\.\\d+)?)\\s*(${STRENGTH_ALIAS_ALTERNATION})(?![a-z])` +
+  `(?:\\s*\\/\\s*(\\d+(?:\\.\\d+)?)?\\s*(ml|cc)(?![a-z]))?`,
   'i'
 )
 
@@ -496,11 +523,14 @@ export function extractStrengthFromQuery(query) {
 
   const withUnit = text.match(STRENGTH_PATTERN)
   if (withUnit) {
-    const [fullMatch, value, unit] = withUnit
+    const [fullMatch, value, unit, perAmount, perUnit] = withUnit
     const remainingText = (text.slice(0, withUnit.index) + text.slice(withUnit.index + fullMatch.length))
       .replace(/\s+/g, ' ')
       .trim()
-    return { value, unit: unit.toLowerCase(), remainingText }
+    const canonicalUnit = STRENGTH_UNIT_ALIASES[unit.toLowerCase()] ?? unit.toLowerCase()
+    // 'per' is set only when a '/ ml' part was typed: { amount: '5'|null, unit: 'ml' }.
+    const per = perUnit ? { amount: perAmount ?? null, unit: 'ml' } : null
+    return { value, unit: canonicalUnit, per, remainingText }
   }
 
   const bare = text.match(BARE_NUMBER_PATTERN)
@@ -511,7 +541,7 @@ export function extractStrengthFromQuery(query) {
     .replace(/\s+/g, ' ')
     .trim()
 
-  return { value, unit: null, remainingText }
+  return { value, unit: null, per: null, remainingText }
 }
 
 // ─── Query facet extraction — form (DRUG_SEARCH_REFINEMENT_PLAN.md §4.5,
@@ -536,11 +566,11 @@ export function extractStrengthFromQuery(query) {
 // would recognize as themselves having typed, not anything that could read
 // as a real word with a different meaning.
 const FORM_ABBREVIATIONS = {
-  tablet:      ['tab', 'tabs', 'cap', 'caps'],
-  syrup:       ['syr', 'susp', 'sol', 'soln'],
+  tablet:      ['tab', 'tabs', 'cap', 'caps', 'pill'],
+  syrup:       ['syr', 'syp', 'susp', 'sol', 'soln', 'elixir'],
   sachet:      ['sach'],
   inhaler:     ['inh'],
-  injection:   ['inj', 'amp', 'vax'],
+  injection:   ['inj', 'inject', 'amp', 'ampule', 'vax'],
   suppository: ['supp', 'supps'],
   cream:       ['crm', 'oint', 'ung'],
 }
@@ -619,6 +649,45 @@ function resolveUniqueFormOption(fragmentNormalized) {
   return resolvedOption
 }
 
+// 2026-10-06 (plurals and typos in the form word): 'tablets', 'capsules',
+// 'syrups', 'sprays', 'ampoules' now resolve like their singular ('panadol
+// tablets' used to leave 'tablets' in the name text and find nothing). A typo in a
+// form word of 5+ letters ('tabelt', 'sirup', 'injecion') also resolves, but only
+// when a drug name is typed beside it, only with one wrong letter, only on the same
+// first letter, and only when exactly one form fits. Short words are never guessed.
+function formFragmentVariants(fragment) {
+  const out = [fragment]
+  if (fragment.length >= 4 && fragment.endsWith('s')) out.push(fragment.slice(0, -1))
+  if (fragment.length >= 5 && fragment.endsWith('es')) out.push(fragment.slice(0, -2))
+  return out
+}
+
+function resolveFormFragment(fragmentNormalized, exactOnly) {
+  for (const variant of formFragmentVariants(fragmentNormalized)) {
+    const option = exactOnly ? resolveExactFormOption(variant) : resolveUniqueFormOption(variant)
+    if (option) return option
+  }
+  return null
+}
+
+function resolveTypoFormOption(fragmentNormalized) {
+  if (fragmentNormalized.length < 5 || fragmentNormalized.includes(' ')) return null
+  let resolved = null
+  for (const variant of formFragmentVariants(fragmentNormalized)) {
+    if (variant.length < 5) continue
+    for (const { word, option } of FORM_WORD_ENTRIES) {
+      const w = normalizeSearchText(word)
+      if (w.length < 5 || w.includes(' ') || w[0] !== variant[0]) continue
+      if (Math.abs(w.length - variant.length) > 1) continue
+      if (w === variant || editDistance(variant, w) !== 1) continue
+      if (resolved === null) resolved = option
+      else if (resolved.value !== option.value) return null
+    }
+    if (resolved) return resolved
+  }
+  return null
+}
+
 /**
  * Pulls a known form word/phrase out of a typed drug search query — fully
  * typed ("tablet", "eye drops"), a recognized abbreviation (see
@@ -639,7 +708,7 @@ function resolveUniqueFormOption(fragmentNormalized) {
  *   is the query with that fragment removed and spacing cleaned up — the
  *   piece that still needs to be matched against the drug name.
  */
-export function extractFormFromQuery(query) {
+export function extractFormFromQuery(query, { allowTypo = false } = {}) {
   const text = (query ?? '').trim()
   if (text.length === 0) return null
 
@@ -657,7 +726,7 @@ export function extractFormFromQuery(query) {
       const twoWordText = text.slice(tokens[i].start, tokens[i + 1].end)
       const fragment = normalizeSearchText(twoWordText)
       if (fragment.replace(/\s/g, '').length >= MIN_FORM_FRAGMENT_LETTERS) {
-        const option = resolveUniqueFormOption(fragment)
+        const option = resolveFormFragment(fragment, false)
         if (option) {
           const remainingText = (text.slice(0, tokens[i].start) + text.slice(tokens[i + 1].end))
             .replace(/\s+/g, ' ')
@@ -685,8 +754,8 @@ export function extractFormFromQuery(query) {
     const oneFragment = normalizeSearchText(oneWordText)
     if (oneFragment.length >= MIN_FORM_FRAGMENT_LETTERS) {
       const option = tokens.length > 1
-        ? resolveUniqueFormOption(oneFragment)
-        : resolveExactFormOption(oneFragment)
+        ? (resolveFormFragment(oneFragment, false) ?? (allowTypo ? resolveTypoFormOption(oneFragment) : null))
+        : resolveFormFragment(oneFragment, true)
       if (option) {
         const remainingText = (text.slice(0, tokens[i].start) + text.slice(tokens[i].end))
           .replace(/\s+/g, ' ')
@@ -859,12 +928,37 @@ function drugMatchesStrength(drug, strength) {
   const raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
   if (!raw) return false
 
-  const unitsToTry = strength.unit !== null ? [strength.unit] : [...STRENGTH_UNITS, '']
+  // Per-volume typed ('250mg/5ml', '5mg/ml'): the stored text must carry the same
+  // 'amount unit / volume ml' ('5mg/ml' also matches a stored '5mg / 1ml').
+  if (strength.per) {
+    const amountPart = strength.per.amount !== null ? escapeRegExp(strength.per.amount) : '(?:1)?'
+    const perTarget = `${escapeRegExp(`${strength.value}${strength.unit}`.toLowerCase())}/${amountPart}ml`
+    return new RegExp(`(^|[^0-9])${perTarget}([^0-9a-z]|$)`).test(raw)
+  }
 
-  return unitsToTry.some(unit => {
-    const target = escapeRegExp(`${strength.value}${unit}`.toLowerCase().replace(/\s+/g, ''))
+  // 2026-10-06: the same amount written in another unit also counts ('1gm' finds a
+  // drug stored as 1000mg, '1000mg' finds 1g, '0.5mg' finds 500mcg).
+  const candidates = strength.unit !== null
+    ? equivalentStrengths(strength.value, strength.unit)
+    : [...STRENGTH_UNITS, ''].map(unit => ({ value: strength.value, unit }))
+
+  return candidates.some(({ value, unit }) => {
+    const target = escapeRegExp(`${value}${unit}`.toLowerCase().replace(/\s+/g, ''))
     return new RegExp(`(^|[^0-9])${target}([^0-9]|$)`).test(raw)
   })
+}
+
+// The typed amount plus the same amount in the neighbouring units (g <-> mg <-> mcg).
+function equivalentStrengths(value, unit) {
+  const out = [{ value, unit }]
+  const n = parseFloat(value)
+  if (!Number.isFinite(n)) return out
+  const fmt = x => String(parseFloat(x.toFixed(6)))
+  const add = (x, u) => { if (x > 0) out.push({ value: fmt(x), unit: u }) }
+  if (unit === 'g')   { add(n * 1000, 'mg'); add(n * 1000000, 'mcg') }
+  if (unit === 'mg')  { add(n / 1000, 'g');  add(n * 1000, 'mcg') }
+  if (unit === 'mcg') { add(n / 1000, 'mg'); add(n / 1000000, 'g') }
+  return out
 }
 
 /**
@@ -929,13 +1023,26 @@ function drugMatchesForm(drug, form) {
  * @returns {object[]|null}  — null means "show everything" (query too short)
  */
 export function searchDrugsTiered(pool, query, mode = 'brand') {
+  // 2026-10-06: a misspelled form word ('tabelt', 'sirup') is only guessed when the
+  // plain reading finds nothing. A real brand word that happens to sit one letter
+  // from a form word ('Inhalex', 'Point') is therefore never taken for a form while
+  // it still finds its own drug.
+  const plain = searchDrugsTieredCore(pool, query, mode, false)
+  if (plain !== null && plain.length === 0) {
+    const withTypo = searchDrugsTieredCore(pool, query, mode, true)
+    if (withTypo !== null && withTypo.length > 0) return withTypo
+  }
+  return plain
+}
+
+function searchDrugsTieredCore(pool, query, mode, allowTypoForm) {
   const q = query.trim()
   if (q.length === 0) return null
 
   // Pull strength/form facets out first — whatever's left is the name text.
   const strength      = extractStrengthFromQuery(q)
   const afterStrength = strength ? strength.remainingText : q
-  const form          = extractFormFromQuery(afterStrength)
+  const form          = extractFormFromQuery(afterStrength, { allowTypo: allowTypoForm })
   const nameText       = form ? form.remainingText : afterStrength
 
   // Normalized, not just lowercased (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1) —
@@ -1022,7 +1129,7 @@ function partialNameDistance(lower, candidate, allowed) {
   if (!candidate || lower.length < 4) return null
   let best = null
   const consider = (text) => {
-    if (!text || text[0] !== lower[0]) return
+    if (!text || !sameFirstLetter(text[0], lower[0])) return
     if (Math.abs(text.length - lower.length) > allowed) return
     const d = editDistance(lower, text)
     if (d <= allowed && (best === null || d < best)) best = d
@@ -1044,10 +1151,24 @@ function partialNameDistance(lower, candidate, allowed) {
 // room, matching the standard "tighter leash for short words" approach.
 // 2026-10-04 (Class search mode): exported, unchanged, same reason as
 // editDistance above.
+// 2026-10-06: names of 11+ letters now allow three changes (long generic names
+// like 'acetylcysteine' often carry more than two slips).
 export function maxAllowedEdits(length) {
   if (length <= 2) return -1
   if (length <= 5) return 1
-  return 2
+  if (length <= 10) return 2
+  return 3
+}
+
+// 2026-10-06: the first-letter rule used to demand the very same letter. Two
+// pairs that sound alike are now treated as the same first letter: c/k
+// ('kalcium' for 'calcium') and s/z ('zinc' typed 'sinc'). Everything else
+// still has to match exactly. Exported so Class mode uses the same rule.
+const SAME_SOUND_FIRST_LETTERS = [['c', 'k'], ['s', 'z']]
+export function sameFirstLetter(a, b) {
+  if (!a || !b) return false
+  if (a === b) return true
+  return SAME_SOUND_FIRST_LETTERS.some(group => group.includes(a) && group.includes(b))
 }
 
 /**
@@ -1082,7 +1203,7 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
   // strength/form is the text that actually gets matched for closeness.
   const strength      = extractStrengthFromQuery(q)
   const afterStrength = strength ? strength.remainingText : q
-  const form          = extractFormFromQuery(afterStrength)
+  const form          = extractFormFromQuery(afterStrength, { allowTypo: true })
   const nameText       = form ? form.remainingText : afterStrength
 
   const lower = normalizeSearchText(nameText)
@@ -1113,7 +1234,7 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
     let rank = 0
     if (mode === 'generic') {
       const genericCandidate = normalizeSearchText(drug.genericName ?? '')
-      if (genericCandidate && genericCandidate[0] === lower[0]) {
+      if (genericCandidate && sameFirstLetter(genericCandidate[0], lower[0])) {
         const d = editDistance(lower, genericCandidate)
         if (d <= allowed) { best = d; rank = 0 }
       }
@@ -1124,14 +1245,14 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
       if (best === null && Array.isArray(drug.ingredients)) {
         for (const ingredient of drug.ingredients) {
           const candidate = normalizeSearchText(ingredient)
-          if (!candidate || candidate[0] !== lower[0]) continue
+          if (!candidate || !sameFirstLetter(candidate[0], lower[0])) continue
           const d = editDistance(lower, candidate)
           if (d <= allowed && (best === null || d < best)) { best = d; rank = 2 }
         }
       }
     } else {
       const candidate = normalizeSearchText(drugFieldForMode(drug, 'brand'))
-      if (candidate && candidate[0] === lower[0]) {
+      if (candidate && sameFirstLetter(candidate[0], lower[0])) {
         const d = editDistance(lower, candidate)
         if (d <= allowed) { best = d; rank = 0 }
       }
