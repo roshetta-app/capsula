@@ -3,7 +3,8 @@
  *
  * 2026-10-05 (new): the keyword chips of a family, shown on the Alternatives
  * list of the Related drugs sheet (BrandsBottomSheet.jsx). Same chip look as
- * the class sheet: up to 6 words, then a '+N' chip that shows all of them,
+ * the class sheet: as many words as fit in about two lines (counted by letters,
+ * so long words take more room), then a '+N' chip that shows all of them,
  * and a 'Show less' chip that folds them back. Words start with a capital
  * letter. Display only, nothing happens when a word is tapped.
  *
@@ -23,8 +24,32 @@
 
 import { useState } from 'react'
 
-// Most words shown before the '+N' chip.
-const MAX_CHIPS = 6
+// How many words fit in about two lines before the '+N' chip. Long words take
+// more room than short ones, so the count follows the letters, not a fixed
+// number. Sizes are estimates of the chip width in px (12px text, 9px padding
+// each side, 6px gap) on a small phone, whose chip area is about 320px wide.
+const LINE_WIDTH   = 320
+const MAX_LINES    = 2
+const CHAR_WIDTH   = 6.2
+const CHIP_EXTRA   = 24   // padding + gap around the letters
+const MORE_CHIP    = 44   // room kept for the '+N' chip
+
+export function visibleCount(words) {
+  const cost = w => (w ? w.length : 0) * CHAR_WIDTH + CHIP_EXTRA
+  const total = words.reduce((sum, w) => sum + cost(w), 0)
+  // Everything fits in two lines: show all, no '+N' needed.
+  if (total <= LINE_WIDTH * MAX_LINES) return words.length
+  const budget = LINE_WIDTH * MAX_LINES - MORE_CHIP - 20
+  let used = 0
+  let n = 0
+  for (const w of words) {
+    const c = cost(w)
+    if (used + c > budget) break
+    used += c
+    n++
+  }
+  return Math.max(1, n)
+}
 
 // A keyword as shown: the first letter capital, the rest as written.
 function capFirst(text) {
@@ -62,8 +87,9 @@ export default function KeywordChips({ words = [], showTitle = true, marginBotto
   const [open, setOpen] = useState(false)
   if (words.length === 0) return null
 
-  const shown  = open ? words : words.slice(0, MAX_CHIPS)
-  const hidden = words.length - MAX_CHIPS
+  const limit  = visibleCount(words)
+  const shown  = open ? words : words.slice(0, limit)
+  const hidden = words.length - limit
 
   return (
     <div style={{
