@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/BrandsList.jsx
  *
+ * 2026-10-06 (bigger family title): the heading above the filters ('Other <name>
+ * drugs', family name in bold) is 18px instead of 15px, on the class sheet's family
+ * page and on both Related drugs tabs, so they stay the same size when swiping.
+ *
  * 2026-10-05 (belowHeading): new optional prop belowHeading (default null). A
  * piece of screen drawn right under the title and above the filter buttons.
  * The class sheet uses it to show a family's keywords under the family title.
@@ -579,7 +583,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
   // Name shown in the heading above the filters.
   const headingName = isAlternatives ? familyName : ingredientCase(siblings[0]?.genericName)
   const headingStyle = {
-    fontSize:   15,
+    fontSize:   18,
     lineHeight: 1.4,
     color:      'var(--color-text-secondary)',
     margin:     '0 0 var(--space-3)',
