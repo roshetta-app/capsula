@@ -1,6 +1,11 @@
 /**
  * src/utils/searchUtils.js
  *
+ * 2026-10-06 (wrong strength): 'augmentin 500' with no 500 on file now offers the
+ * strengths that exist ('Augmentin 1000mg', 'Augmentin 457mg/5ml'), nearest first,
+ * also after a name typo ('augmetin 500'). Done inside getDrugSearchSuggestion, so
+ * the screen needs no change.
+ *
  * 2026-10-06 (strength and form typed the way people write them): strength units
  * can be mgs / gm / gram / ug / percent etc.; a per-volume strength ('250mg/5ml',
  * '5mg/ml') is understood instead of leaving '/5ml' in the name text; '1gm' also
@@ -933,7 +938,7 @@ function drugMatchesStrength(drug, strength) {
   if (strength.per) {
     const amountPart = strength.per.amount !== null ? escapeRegExp(strength.per.amount) : '(?:1)?'
     const perTarget = `${escapeRegExp(`${strength.value}${strength.unit}`.toLowerCase())}/${amountPart}ml`
-    return new RegExp(`(^|[^0-9])${perTarget}([^0-9a-z]|$)`).test(raw)
+    return new RegExp(`(^|[^0-9.])${perTarget}([^0-9a-z]|$)`).test(raw)
   }
 
   // 2026-10-06: the same amount written in another unit also counts ('1gm' finds a
@@ -944,7 +949,8 @@ function drugMatchesStrength(drug, strength) {
 
   return candidates.some(({ value, unit }) => {
     const target = escapeRegExp(`${value}${unit}`.toLowerCase().replace(/\s+/g, ''))
-    return new RegExp(`(^|[^0-9])${target}([^0-9]|$)`).test(raw)
+    // '(^|[^0-9.])': a number right after a decimal point is not a match, so '2g' no longer finds '1.2g' or '5mg' '2.5mg'.
+    return new RegExp(`(^|[^0-9.])${target}([^0-9]|$)`).test(raw)
   })
 }
 
@@ -1276,5 +1282,72 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
     if (name && !names.includes(name)) names.push(name)
     if (names.length === 3) break
   }
+  // 2026-10-06: nothing close once the typed strength was applied, so the strength may
+  // be the wrong part ('augmentin 500' when there is only 457mg and 1000mg).
+  if (names.length === 0 && strength) {
+    return getStrengthSuggestions(drugs, nameText, strength, form, mode)
+  }
   return names
+}
+
+// Amount of a strength in milligrams so '1g', '1000mg' and '500mcg' can be compared
+// for closeness. Other units (%, iu, ml) are returned as they are.
+function strengthAmount(value, unit) {
+  const n = parseFloat(value)
+  if (!Number.isFinite(n)) return null
+  if (unit === 'g') return n * 1000
+  if (unit === 'mcg') return n / 1000
+  return n
+}
+
+/**
+ * 2026-10-06 — 'Did you mean' for a wrong strength. The drug name is right (or a small
+ * typo) but nothing exists at the typed strength: returns up to 3 ready-to-run searches
+ * like 'Augmentin 1000mg' built from the strengths that DO exist, nearest to the typed
+ * amount first. A typed form is kept ('augmentin 500 tab' -> 'Augmentin 1000mg tab').
+ * Every suggestion is checked to really find drugs before it is offered.
+ *
+ * @returns {string[]} — up to 3 search texts, or [] when the name finds no drug or the
+ *   drugs found carry no stored strength
+ */
+function getStrengthSuggestions(drugs, nameText, strength, form, mode) {
+  const lowerName = normalizeSearchText(nameText)
+  if (!lowerName) return []
+
+  // Drugs for the name, with the form kept if one was typed.
+  let named = searchDrugsTieredCore(drugs, nameText, mode, false) ?? []
+  if (named.length === 0) {
+    const nameGuesses = getDrugSearchSuggestion(drugs, nameText, mode)
+    if (nameGuesses.length === 0) return []
+    const guessSet = new Set(nameGuesses)
+    named = drugs.filter(d => guessSet.has(drugFieldForMode(d, mode)))
+  }
+  if (form) named = named.filter(d => drugMatchesForm(d, form))
+
+  // One entry per (name, stored strength).
+  const typedAmount = strengthAmount(strength.value, strength.unit)
+  const seen = new Set()
+  const candidates = []
+  named.forEach((drug, order) => {
+    const conc = (drug.concentration ?? '').replace(/\s+/g, '')
+    const name = drugFieldForMode(drug, mode)
+    if (!conc || !name) return
+    const key = `${name}|${conc}`.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    const m = conc.match(/^(\d+(?:\.\d+)?)([a-z%]+)/i)
+    const amount = m ? strengthAmount(m[1], STRENGTH_UNIT_ALIASES[m[2].toLowerCase()] ?? m[2].toLowerCase()) : null
+    const gap = typedAmount !== null && amount !== null ? Math.abs(Math.log((amount || 1e-9) / (typedAmount || 1e-9))) : 99
+    candidates.push({ name, conc, gap, order })
+  })
+  candidates.sort((a, b) => a.gap - b.gap || a.order - b.order)
+
+  const out = []
+  for (const c of candidates.slice(0, 10)) {
+    const text = `${c.name} ${c.conc}${form ? ' ' + form.matchedText : ''}`
+    const found = searchDrugsTiered(drugs, text, mode)
+    if (found && found.length > 0) out.push(text)
+    if (out.length === 3) break
+  }
+  return out
 }
