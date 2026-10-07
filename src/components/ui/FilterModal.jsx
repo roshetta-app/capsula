@@ -204,8 +204,8 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
               />
             )}
             {/* Inert row (generic pop-up only): a generic listed for reference
-                that cannot be picked. Drawn at full strength on a soft
-                neutral fill (not dimmed), no tick, and a 'Similar' tag where
+                that cannot be picked. Drawn at full strength with a subtle
+                blue tint and border (not dimmed), no tick, and a 'Similar' tag where
                 the number would be. */}
             {inertRow && (
               <ToggleChip
@@ -455,8 +455,8 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
         // cannot be removed (the only generic) keeps its full selected look;
         // an inert reference row is drawn at full strength too (2026-10-07).
         opacity: locked && !active && !inert ? 0.45 : 1,
-        border: active ? `1.5px solid ${tone ? tone.color : 'var(--color-accent)'}` : `1.5px ${locked && !inert ? 'dashed' : 'solid'} var(--color-border)`,
-        backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : (inert ? 'var(--color-surface-muted)' : 'transparent'),
+        border: active ? `1.5px solid ${tone ? tone.color : 'var(--color-accent)'}` : (inert ? '1.5px solid color-mix(in srgb, var(--color-accent) 28%, transparent)' : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`),
+        backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : (inert ? 'color-mix(in srgb, var(--color-accent) 7%, transparent)' : 'transparent'),
         color: active ? (tone ? tone.color : '#fff') : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
         transform: pressed ? 'scale(0.96)' : 'scale(1)',
@@ -488,7 +488,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
         {label}
       </span>
       {tag !== undefined ? (
-        <CountTag tone="neutral" style={{ marginLeft: 'auto' }}>
+        <CountTag tone={inert ? 'accent' : 'neutral'} style={{ marginLeft: 'auto' }}>
           {tag}
         </CountTag>
       ) : count !== undefined && (
