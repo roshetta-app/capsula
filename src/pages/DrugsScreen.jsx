@@ -300,7 +300,6 @@ import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
-import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
@@ -955,7 +954,6 @@ export default function DrugsScreen() {
     <>
       <StickyDrugsHeader
         visible={showStickyHeader}
-        isDark={isDark}
         query={query}
         onQueryChange={handleQueryChange}
         placeholder={stickyPlaceholder}
@@ -1177,7 +1175,9 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // rather than reinvented, so all three peer screens' sticky headers stay
 // pixel-matched. Badge reuses DrugsHero's own Pill icon + color token,
 // scaled down the same way Favourites' badge shrinks from hero to sticky
-// state.
+// state. 2026-10-07: badge is now the solid accent circle with a white icon
+// (28px / icon 15), the same look as Favourites' sticky badge and Drugs' own
+// hero badge, instead of the old tinted circle.
 // Row 2 is the shared SearchBar itself (compact prop, per decision 4.6's
 // correction) with its own built-in filter button (onFilter/hasActiveFilters
 // — the same filter-sheet trigger the main header's search bar already
@@ -1186,8 +1186,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // query — the caller computes and passes that text down, since only it
 // knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
-  const colors = resolveToken(FALLBACK_TOKEN, isDark)
+function StickyDrugsHeader({ visible, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   return (
@@ -1224,13 +1223,13 @@ function StickyDrugsHeader({ visible, isDark, query, onQueryChange, placeholder,
               width:           28,
               height:          28,
               borderRadius:    '50%',
-              backgroundColor: colors.bg,
+              backgroundColor: 'var(--color-accent)',
               display:         'flex',
               alignItems:      'center',
               justifyContent:  'center',
               flexShrink:      0,
             }}>
-              <SpecialtyIcon iconType="lucide" iconValue="Pill" size={15} color={colors.fg} />
+              <SpecialtyIcon iconType="lucide" iconValue="Pill" size={15} color="#fff" />
             </div>
             <div style={{
               fontSize:      18,
