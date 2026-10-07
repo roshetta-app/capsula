@@ -629,7 +629,7 @@ function StickyLogoHeader({
         <div style={{
           display:    'flex',
           alignItems: 'center',
-          padding:    '16px var(--space-6) 0',
+          padding:    '16px var(--page-gutter, var(--space-4)) 0',
         }}>
           <img
             src={`${import.meta.env.BASE_URL}logo.svg`}
@@ -640,7 +640,7 @@ function StickyLogoHeader({
         </div>
 
         {/* 2. Toolbar — specialty pill (fills available space), search icon (right).
-            Horizontal padding matches var(--space-6) = 24px page margins so the
+            Horizontal padding matches the shared --page-gutter page margins so the
             pill's left edge and the search pill's right edge align with the
             condition list content and the logo above. */}
         <div style={{
@@ -648,7 +648,7 @@ function StickyLogoHeader({
           alignItems:     'center',
           gap:            10,
           marginTop:      10,
-          padding:        '0 var(--space-6) 14px',
+          padding:        '0 var(--page-gutter, var(--space-4)) 14px',
         }}>
 
           {/* Specialty pill — flex:1 so it fills all space left of the search icon */}
@@ -1168,10 +1168,10 @@ export default function ConditionsScreen() {
           and the current 20px gap is the intended look, kept as-is.) */}
       <div style={{
         backgroundColor: 'var(--color-hero-bg)',
-        marginLeft:      'calc(var(--space-6) * -1)',
-        marginRight:     'calc(var(--space-6) * -1)',
-        paddingLeft:     'var(--space-6)',
-        paddingRight:    'var(--space-6)',
+        marginLeft:      'calc(var(--page-gutter, var(--space-4)) * -1)',
+        marginRight:     'calc(var(--page-gutter, var(--space-4)) * -1)',
+        paddingLeft:     'var(--page-gutter, var(--space-4))',
+        paddingRight:    'var(--page-gutter, var(--space-4))',
         paddingBottom:   'calc(var(--space-5) + var(--radius-xl))',
       }}>
 
@@ -1240,10 +1240,10 @@ export default function ConditionsScreen() {
           ? '1px solid rgba(255, 255, 255, 0.11)'
           : '1px solid rgba(15, 23, 42, 0.09)',
         marginTop:       'calc(var(--radius-xl) * -1)',
-        marginLeft:      'calc(var(--space-6) * -1)',
-        marginRight:     'calc(var(--space-6) * -1)',
-        paddingLeft:     'var(--space-6)',
-        paddingRight:    'var(--space-6)',
+        marginLeft:      'calc(var(--page-gutter, var(--space-4)) * -1)',
+        marginRight:     'calc(var(--page-gutter, var(--space-4)) * -1)',
+        paddingLeft:     'var(--page-gutter, var(--space-4))',
+        paddingRight:    'var(--page-gutter, var(--space-4))',
         paddingTop:      'var(--space-4)',
         boxShadow:       '0 -6px 14px rgba(15, 23, 42, 0.035)',
         ...entranceStyle(2),
