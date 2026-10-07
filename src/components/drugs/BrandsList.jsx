@@ -473,7 +473,16 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+// Tells the screen around the list how many drugs show now and how many there
+// are in all (see onFilteredCount), without putting a hook after the list's
+// early return. Renders nothing; clears itself when the list goes away.
+function CountReporter({ onCount, shown, total, active }) {
+  useEffect(() => { onCount({ shown, total, active }) }, [onCount, shown, total, active])
+  useEffect(() => () => onCount(null), [onCount])
+  return null
+}
+
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, onFilteredCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -714,6 +723,14 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       )}
 
       {belowHeading}
+      {onFilteredCount && (
+        <CountReporter
+          onCount={onFilteredCount}
+          shown={sorted.length}
+          total={siblings.length}
+          active={filtersActive}
+        />
+      )}
 
       {/* Filter pills — the only buttons in this row. Tapping one opens its
           pop-up (FilterModal, rendered at the end of this component). */}
@@ -745,7 +762,10 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         color:          'var(--color-text-secondary)',
       }}>
         <div style={{ minWidth: 0 }}>
-          {sorted.length} {sorted.length === 1 ? 'drug' : 'drugs'}
+          {/* With a filter on: 'shown/all' (5/20 drugs), so the full size of the
+              list stays visible while it is narrowed. */}
+          {filtersActive ? `${sorted.length}/${siblings.length}` : sorted.length}
+          {' '}{(filtersActive ? siblings.length : sorted.length) === 1 ? 'drug' : 'drugs'}
           {filtersActive && (
             <>
               {' · '}

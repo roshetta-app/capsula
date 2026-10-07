@@ -471,6 +471,9 @@ export default function ClassBottomSheet({
   const directSubclass = directSubclassProp ?? (hasNoFamilies ? ALL_KEY : null)
   // The subclass whose drugs are showing, or null for the subclass list.
   const [picked, setPicked] = useState(directSubclass ?? null)
+  // How many drugs the list below shows now / in all, reported by the list
+  // while a filter is on (null until it reports).
+  const [listCount, setListCount] = useState(null)
   // Remembered filter picks, one entry per subclass (a ref: only read when a
   // list is built, no re-render needed).
   const savedFilters = useRef({})
@@ -550,6 +553,7 @@ export default function ClassBottomSheet({
 
   // Fixed heading: the same for every class, with or without families. It stays
   // put while the list scrolls under it.
+  const straightToAll = directSubclass === ALL_KEY
   const classHeading = (
     <div style={{
       flexShrink:   0,
@@ -587,7 +591,9 @@ export default function ClassBottomSheet({
             {', '}
           </>
         )}
-        {totalDrugs} {totalDrugs === 1 ? 'drug' : 'drugs'}
+        {/* While a filter is on in the all-drugs list below: 'shown/all'. */}
+        {straightToAll && listCount?.active ? `${listCount.shown}/${listCount.total}` : totalDrugs}
+        {' '}{(straightToAll && listCount?.active ? listCount.total : totalDrugs) === 1 ? 'drug' : 'drugs'}
       </p>
     </div>
   )
@@ -598,7 +604,6 @@ export default function ClassBottomSheet({
   // families.
   // A class with no families, opened straight on its drugs: no Back bar, no
   // repeated class name above the drugs, the same heading as every class.
-  const straightToAll = directSubclass === ALL_KEY
 
   // Builds the 'Keywords' title and chips for a list of words (or null when
   // the list is empty). Used for the class words and for a family's words.
@@ -749,6 +754,7 @@ export default function ClassBottomSheet({
               {straightToAll && wordsBlock}
               <BrandsList
                 hideHeading={straightToAll}
+                onFilteredCount={straightToAll ? setListCount : undefined}
                 belowHeading={familyBlock}
                 titleIcon={
                   pickedGroup.isOthers ? <LayoutGrid size={17} strokeWidth={1.9} color="var(--color-accent)" />
