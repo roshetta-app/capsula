@@ -137,8 +137,13 @@ import CountTag from '../../ui/CountTag.jsx'
 import { Pill, ArrowLeftRight } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 
-function TabButton({ label, count, active, onClick }) {
-  const fg = active ? 'var(--color-accent)' : 'var(--color-text-secondary)'
+// color / tint: the tab's own active colour (Similar = accent blue, Alternatives
+// = the class violet, so the two tabs read as different things at a glance).
+const ALT_COLOR = 'var(--color-class)'
+const ALT_TINT  = 'var(--color-class-light)'
+
+function TabButton({ label, count, active, onClick, color = 'var(--color-accent)', tint = 'var(--color-accent-light)' }) {
+  const fg = active ? color : 'var(--color-text-secondary)'
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <button
@@ -160,7 +165,12 @@ function TabButton({ label, count, active, onClick }) {
         }}
       >
         <span style={{ fontSize: 14, fontWeight: active ? 700 : 500, color: fg }}>{label}</span>
-        <CountTag tone={active ? 'accent' : 'neutral'}>{count}</CountTag>
+        <CountTag
+          tone={active ? 'accent' : 'neutral'}
+          style={active ? { backgroundColor: tint, color } : undefined}
+        >
+          {count}
+        </CountTag>
       </button>
       <span style={{
         display:         'block',
@@ -168,7 +178,7 @@ function TabButton({ label, count, active, onClick }) {
         width:           '100%',
         marginTop:       2,
         borderRadius:    'var(--radius-full)',
-        backgroundColor: active ? 'var(--color-accent)' : 'transparent',
+        backgroundColor: active ? color : 'transparent',
         transition:      'background-color 0.15s ease',
       }} />
     </div>
@@ -178,7 +188,7 @@ function TabButton({ label, count, active, onClick }) {
 // What a tab shows when it has nothing in it: an icon, a short title, one
 // plain line, and (when the other tab has something) a button to go there.
 // Same layout for every empty tab, centred in the tab's space.
-function EmptyPanel({ Icon, title, body, actionLabel, onAction }) {
+function EmptyPanel({ Icon, title, body, actionLabel, onAction, color = 'var(--color-accent)', tint = 'var(--color-accent-light)' }) {
   return (
     <div style={{
       height:         '100%',
@@ -199,9 +209,9 @@ function EmptyPanel({ Icon, title, body, actionLabel, onAction }) {
         alignItems:      'center',
         justifyContent:  'center',
         marginBottom:    'var(--space-2)',
-        backgroundColor: 'var(--color-accent-light)',
+        backgroundColor: tint,
       }}>
-        <Icon size={28} strokeWidth={1.8} color="var(--color-accent)" />
+        <Icon size={28} strokeWidth={1.8} color={color} />
       </div>
       <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--color-text-primary)' }}>
         {title}
@@ -221,8 +231,8 @@ function EmptyPanel({ Icon, title, body, actionLabel, onAction }) {
             fontFamily:      'var(--font-body)',
             fontSize:        14,
             fontWeight:      600,
-            color:           'var(--color-accent)',
-            backgroundColor: 'var(--color-accent-light)',
+            color,
+            backgroundColor: tint,
             WebkitTapHighlightColor: 'transparent',
           }}
         >
@@ -329,6 +339,8 @@ export default function BrandsBottomSheet({
             count={alternatives.length}
             active={activeTab === 'alternatives'}
             onClick={() => goToTab('alternatives')}
+            color={ALT_COLOR}
+            tint={ALT_TINT}
           />
         </div>
       )}
@@ -357,7 +369,7 @@ export default function BrandsBottomSheet({
                   <EmptyPanel
                     Icon={Pill}
                     title="No other brands"
-                    body="This is the only brand we have with this ingredient."
+                    body="No other brand with the same ingredient yet."
                     actionLabel={alternatives.length > 0 ? 'See Alternatives' : undefined}
                     onAction={() => goToTab('alternatives')}
                   />
@@ -365,7 +377,9 @@ export default function BrandsBottomSheet({
                   <EmptyPanel
                     Icon={ArrowLeftRight}
                     title="No alternatives yet"
-                    body="We haven't added other drugs of this type yet."
+                    body="No other drug of the same family yet."
+                    color={ALT_COLOR}
+                    tint={ALT_TINT}
                     actionLabel={siblings.length > 0 ? 'See Similar' : undefined}
                     onAction={() => goToTab('similar')}
                   />
