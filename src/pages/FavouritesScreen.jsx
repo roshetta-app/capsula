@@ -1554,10 +1554,16 @@ export default function FavouritesScreen() {
           </div>
         </div>
 
+        {/* Select mode: the fixed action bar sits over the bottom of the
+            page, so add room under the list to let the last cards scroll
+            clear of it. */}
+        {isManaging && <div aria-hidden="true" style={{ height: 64 }} />}
+
       </div>
 
-      {/* Back to top */}
-      <BackToTopButton visible={showBackToTop} onClick={handleBackToTop} />
+      {/* Back to top — hidden in select mode, where it would sit on top
+          of the action bar. */}
+      <BackToTopButton visible={showBackToTop && !isManaging} onClick={handleBackToTop} />
 
       {isManaging && (
         <ManageActionBar
