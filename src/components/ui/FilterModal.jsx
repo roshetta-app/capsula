@@ -204,8 +204,9 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
               />
             )}
             {/* Inert row (generic pop-up only): a generic listed for reference
-                that cannot be picked. Same inactive look as a locked option,
-                no tick, and a 'Similar' tag where the number would be. */}
+                that cannot be picked. Drawn at full strength on a soft
+                neutral fill (not dimmed), no tick, and a 'Similar' tag where
+                the number would be. */}
             {inertRow && (
               <ToggleChip
                 label={inertRow.label}
@@ -215,6 +216,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
                 showCheckbox={false}
                 tag="Similar"
                 locked
+                inert
               />
             )}
           </div>
@@ -432,7 +434,7 @@ function ClearFilterButton({ onClick, disabled }) {
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
 // for long labels (several lines, softer corners) instead of one clipped line,
 // and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
-function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, large = false, tone }) {
+function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, inert = false, large = false, tone }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
@@ -449,9 +451,12 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
         borderRadius: wrap ? 'var(--radius-md)' : 'var(--radius-full)',
         fontSize: large ? 15 : 13, fontWeight: 500, textAlign: 'left',
         cursor: locked ? 'default' : 'pointer',
-        opacity: locked ? 0.45 : 1,
-        border: active ? `1.5px solid ${tone ? tone.color : 'var(--color-accent)'}` : `1.5px ${locked ? 'dashed' : 'solid'} var(--color-border)`,
-        backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : 'transparent',
+        // Dimmed only when it is locked AND not picked. A picked option that
+        // cannot be removed (the only generic) keeps its full selected look;
+        // an inert reference row is drawn at full strength too (2026-10-07).
+        opacity: locked && !active && !inert ? 0.45 : 1,
+        border: active ? `1.5px solid ${tone ? tone.color : 'var(--color-accent)'}` : `1.5px ${locked && !inert ? 'dashed' : 'solid'} var(--color-border)`,
+        backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : (inert ? 'var(--color-surface-muted)' : 'transparent'),
         color: active ? (tone ? tone.color : '#fff') : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
         transform: pressed ? 'scale(0.96)' : 'scale(1)',
