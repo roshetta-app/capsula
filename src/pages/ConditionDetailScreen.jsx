@@ -415,6 +415,9 @@ export default function ConditionDetailScreen() {
           flex: 1,
           minHeight: 0, // required so this flex child can actually shrink and scroll instead of pushing the root taller
           overflowY: 'auto',
+          // Contains the tab slide-in (translateX ±16px) so it can never
+          // make this box scroll sideways; only this box is clipped.
+          overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
         }}
       >

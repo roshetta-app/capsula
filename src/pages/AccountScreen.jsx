@@ -540,9 +540,9 @@ function AccountSkeleton() {
     <div>
       {/* Sticky title bar placeholder */}
       <div style={{
-        marginLeft:      'calc(-1 * var(--space-6))',
-        marginRight:     'calc(-1 * var(--space-6))',
-        padding:         'var(--space-5) var(--space-6) var(--space-3)',
+        marginLeft:      'calc(-1 * var(--page-gutter, var(--space-4)))',
+        marginRight:     'calc(-1 * var(--page-gutter, var(--space-4)))',
+        padding:         'var(--space-5) var(--page-gutter, var(--space-4)) var(--space-3)',
         marginBottom:    'var(--space-5)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', maxWidth: 680, margin: '0 auto' }}>
@@ -672,7 +672,7 @@ export default function AccountScreen() {
   return (
     <div>
       {/* account-screen-visual-refresh: sticky, full-bleed title bar —
-          breaks out of Layout's <main> side padding (var(--space-6) each
+          breaks out of Layout's <main> side padding (--page-gutter each
           side) via negative margins, same visual weight as
           AccountEditScreen/AccountFaqScreen's own sticky back-arrow
           headers. This was the one screen in the app without a sticky
@@ -683,10 +683,10 @@ export default function AccountScreen() {
         position:        'sticky',
         top:             0,
         zIndex:          50,
-        marginLeft:      'calc(-1 * var(--space-6))',
-        marginRight:     'calc(-1 * var(--space-6))',
+        marginLeft:      'calc(-1 * var(--page-gutter, var(--space-4)))',
+        marginRight:     'calc(-1 * var(--page-gutter, var(--space-4)))',
         backgroundColor: 'var(--color-bg)',
-        padding:         'var(--space-5) var(--space-6) var(--space-3)',
+        padding:         'var(--space-5) var(--page-gutter, var(--space-4)) var(--space-3)',
         marginBottom:    'var(--space-5)',
       }}>
         <div style={{
