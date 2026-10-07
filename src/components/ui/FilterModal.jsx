@@ -24,6 +24,7 @@ import { createPortal } from 'react-dom'
 import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
 import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
 import CountTag from './CountTag.jsx'
+import ProTag from './ProTag.jsx'
 
 // Small centered pop-up box for one filter — same look as the app's InfoSheet
 // / ConfirmSheet dialogs, and the Drugs filter panel's chips inside it.
@@ -36,7 +37,7 @@ import CountTag from './CountTag.jsx'
 // option rows taller with bigger text and icons; the Search Mode pop-up uses it.
 // An option may carry 'color' and 'tint' (theme variables): its icon then uses
 // that colour, and when picked the row is tinted in it instead of solid accent.
-export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, otherGroup, onPickGroup, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
+export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, wrap = false, single = false, lockAll = false, proTag = false, showCounts = true, listMaxHeight = 'min(320px, 45svh)', inertRow, otherGroup, onPickGroup, options, selected, allLabel, onAll, onPick, onClear, onClose, onPage = false, large = false }) {
   const [shown, setShown] = useState(false)
   // 'Other generics' row: unfolded from the start when something in it is picked.
   const [otherOpen, setOtherOpen] = useState(
@@ -151,6 +152,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
               }}>
                 {title}
               </span>
+              {proTag && <ProTag />}
             </div>
             {onAll && (
               <ToggleChip label={allLabel} active={!hasSelection} onToggle={onAll} showCheckbox={false} fitContent />

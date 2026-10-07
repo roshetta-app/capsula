@@ -435,7 +435,6 @@ import { FilterModal } from '../ui/FilterModal.jsx'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
 import PaywallGateSheet from '../ui/PaywallGateSheet.jsx'
-import ProTag from '../ui/ProTag.jsx'
 import { useIsPro } from '../../hooks/useIsPro'
 
 // Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
@@ -663,6 +662,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
             onClear: onlyGeneric ? undefined : () => setGenericSel([]) },
   }
   const showFormPill = formGroupsInList.length > 0
+  const formGated = formLocked && formOptions.length > 1
   const formControl = showFormPill && {
     key: 'form', icon: ListFilter, flex: isAlternatives ? 2 : 1,
     pillLabel: formOptions.length === 1
@@ -670,11 +670,15 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
-    // Pro-only: tag the pill and send the tap to the paywall. A pill with a
-    // single form is already inert (nothing to choose), so it gets no tag.
-    locked: formLocked && formOptions.length > 1,
+    // Pro-only: the pill looks and opens like any other. Inside the pop-up
+    // the title carries the Pro tag and any form tapped opens the paywall
+    // (same as the Drugs search filter sheet). A pill with a single form is
+    // already inert (nothing to choose), so it is never gated.
     menu: { title: 'Form / Route', titleIcon: ListFilter, columns: 2, showCounts: false, options: formOptions, selected: formSel,
-            onPick: v => toggleIn(formSel, setFormSel, v),
+            proTag: formGated,
+            onPick: formGated
+              ? () => { setOpenMenu(null); setShowProGate(true) }
+              : v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
   }
   // Sort is not a filter: it lives on the count line, never in the pill row.
@@ -755,8 +759,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               active={c.active}
               disabled={c.disabled}
               flex={c.flex}
-              proTag={!!c.locked}
-              onPress={() => (c.locked ? setShowProGate(true) : setOpenMenu(c.key))}
+              onPress={() => setOpenMenu(c.key)}
             />
           ))}
         </div>
@@ -990,7 +993,7 @@ export function SortButton({ label, onPress }) {
 
 // The filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
-export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, proTag = false, onPress }) {
+export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, onPress }) {
   const [pressed, setPressed] = useState(false)
   const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
@@ -1031,7 +1034,6 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
       }}>
         {label}
       </span>
-      {proTag && <ProTag />}
       <ChevronDown
         size={14}
         color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'}
