@@ -18,7 +18,7 @@
  * were.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react'
 import { ChevronDown, Pill } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
@@ -43,6 +43,13 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
     () => !!otherGroup && otherGroup.options.some(o => selected.includes(o.value))
   )
   const hasSelection = selected.length > 0
+  // Picks as a Set (one lookup per option instead of a scan of the whole
+  // list), and one steady pick handler, so an option that did not change is
+  // not drawn again when another is picked (matters with hundreds of generics).
+  const selectedSet = useMemo(() => new Set(selected), [selected])
+  const onPickRef = useRef(onPick)
+  useEffect(() => { onPickRef.current = onPick })
+  const pick = useCallback(v => onPickRef.current?.(v), [])
   // Inside a sheet: phone/browser Back closes just this pop-up and leaves the
   // sheet open. No history step of its own (see useBackLayer in
   // useBackClose.js).
@@ -180,14 +187,15 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
                 key={opt.value}
                 label={opt.label}
                 icon={opt.icon}
-                active={selected.includes(opt.value)}
-                onToggle={() => onPick(opt.value)}
+                active={selectedSet.has(opt.value)}
+                value={opt.value}
+                onToggle={pick}
                 wrap={wrap}
                 large={large}
                 tone={opt.color ? { color: opt.color, tint: opt.tint } : undefined}
                 showCheckbox={!single}
                 count={showCounts ? opt.count : undefined}
-                locked={lockAll || isOptionLocked(opt.count, selected.includes(opt.value))}
+                locked={lockAll || isOptionLocked(opt.count, selectedSet.has(opt.value))}
               />
             ))}
             {/* 'Other generics' (generic pop-up only): one row that unfolds the
@@ -195,10 +203,10 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
             {otherGroup && (
               <OtherGroup
                 group={otherGroup}
-                selected={selected}
+                selectedSet={selectedSet}
                 open={otherOpen}
                 onToggleOpen={() => setOtherOpen(o => !o)}
-                onPick={onPick}
+                onPick={pick}
                 onPickGroup={onPickGroup}
                 wrap={wrap}
               />
@@ -273,12 +281,15 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
 // 'All' option picks every option that can be picked (a locked one gives no
 // brand); it is ticked once all of those are picked, and ticking it again
 // clears them.
-function OtherGroup({ group, selected, open, onToggleOpen, onPick, onPickGroup, wrap }) {
+function OtherGroup({ group, selectedSet, open, onToggleOpen, onPick, onPickGroup, wrap }) {
   const [pressed, setPressed] = useState(false)
-  const picked    = group.options.filter(o => selected.includes(o.value)).length
+  const picked    = group.options.filter(o => selectedSet.has(o.value)).length
   const total     = group.options.reduce((sum, o) => sum + (o.count ?? 0), 0)
-  const pickable  = group.options.filter(o => !isOptionLocked(o.count, selected.includes(o.value)))
-  const allPicked = pickable.length > 0 && pickable.every(o => selected.includes(o.value))
+  const pickable  = group.options.filter(o => !isOptionLocked(o.count, selectedSet.has(o.value)))
+  // A long group: draw its options plain (no fade or press animation, and
+  // rows off screen are skipped by the browser) so picking all stays smooth.
+  const plain     = group.options.length > 40
+  const allPicked = pickable.length > 0 && pickable.every(o => selectedSet.has(o.value))
   return (
     <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <button
@@ -329,17 +340,20 @@ function OtherGroup({ group, selected, open, onToggleOpen, onPick, onPickGroup, 
             active={allPicked}
             onToggle={() => onPickGroup(pickable.map(o => o.value), !allPicked)}
             wrap={wrap}
+            plain={plain}
             locked={pickable.length === 0}
           />
           {group.options.map(opt => (
             <ToggleChip
               key={opt.value}
               label={opt.label}
-              active={selected.includes(opt.value)}
-              onToggle={() => onPick(opt.value)}
+              active={selectedSet.has(opt.value)}
+              value={opt.value}
+              onToggle={onPick}
               wrap={wrap}
+              plain={plain}
               count={opt.count}
-              locked={isOptionLocked(opt.count, selected.includes(opt.value))}
+              locked={isOptionLocked(opt.count, selectedSet.has(opt.value))}
             />
           ))}
         </div>
@@ -447,11 +461,11 @@ function ClearFilterButton({ onClick, disabled }) {
 // Copy of DrugFilterPanel.jsx's ToggleChip (not exported there), plus 'wrap'
 // for long labels (several lines, softer corners) instead of one clipped line,
 // and 'tag' (a word shown in the count tag's place, e.g. 'Similar').
-function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, inert = false, large = false, tone }) {
+function ToggleChipBase({ value, plain = false, label, icon: Icon, active, onToggle, showCheckbox = true, fitContent = false, wrap = false, count, tag, locked = false, inert = false, large = false, tone }) {
   const [pressed, setPressed] = useState(false)
   return (
     <button
-      onClick={locked ? undefined : onToggle}
+      onClick={locked ? undefined : () => onToggle(value)}
       aria-disabled={locked || undefined}
       onPointerDown={() => !locked && setPressed(true)}
       onPointerUp={() => setPressed(false)}
@@ -472,8 +486,9 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
         backgroundColor: active ? (tone ? tone.tint : 'var(--color-accent)') : (inert ? 'color-mix(in srgb, var(--color-accent) 7%, transparent)' : 'transparent'),
         color: active ? (tone ? tone.color : '#fff') : 'var(--color-text-secondary)',
         fontFamily: 'var(--font-body)',
-        transform: pressed ? 'scale(0.96)' : 'scale(1)',
-        transition: 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+        transform: pressed && !plain ? 'scale(0.96)' : 'scale(1)',
+        transition: plain ? 'none' : 'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
+        ...(plain ? { contentVisibility: 'auto', containIntrinsicSize: 'auto 38px' } : null),
         WebkitTapHighlightColor: 'transparent',
         outline: 'none',
       }}
@@ -485,7 +500,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
           borderRadius: '50%',
           border: active ? '1.5px solid #fff' : '1.5px solid var(--color-text-tertiary)',
           backgroundColor: active ? '#fff' : 'transparent',
-          transition: 'background-color 0.15s ease, border-color 0.15s ease',
+          transition: plain ? 'none' : 'background-color 0.15s ease, border-color 0.15s ease',
         }}>
           {active && (
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
@@ -512,3 +527,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
     </button>
   )
 }
+
+// Drawn again only when its own look changes (see the steady pick handler in
+// FilterModal), so one pick does not redraw hundreds of other options.
+const ToggleChip = memo(ToggleChipBase)
