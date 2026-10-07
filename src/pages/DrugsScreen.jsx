@@ -290,6 +290,7 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/ui/SearchBar'
+import ScrollRevealHeader from '../components/ui/ScrollRevealHeader'
 import { useDrugContext } from '../context/DrugContext'
 import { useFavouritesContext } from '../context/FavouritesContext'
 import { useToast } from '../context/ToastContext'
@@ -499,27 +500,6 @@ export default function DrugsScreen() {
   const recentDrugObjects = recentDrugs
     .map(d => drugs.find(x => x.id === d.id))
     .filter(Boolean)
-
-  // ── Sliding sticky header: visible once DrugsHero leaves viewport ────────
-  // Same IntersectionObserver approach as FavouritesScreen's heroRef watch
-  // (step 1a.2, decision 4.6). heroRef is the one already threaded through
-  // both view branches by step 1a.1.
-  const [showStickyHeader, setShowStickyHeader] = useState(false)
-
-  useEffect(() => {
-    const el = heroRef.current
-    if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setShowStickyHeader(!entry.isIntersecting)
-      },
-      { threshold: 0, rootMargin: '-1px 0px 0px 0px' }
-    )
-
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
 
   function handleDrugTap(drug) {
     addRecentDrug({ id: drug.id, name: drug.genericName, slug: drug.slug || drug.id })
@@ -953,7 +933,7 @@ export default function DrugsScreen() {
   return (
     <>
       <StickyDrugsHeader
-        visible={showStickyHeader}
+        watchRef={heroRef}
         query={query}
         onQueryChange={handleQueryChange}
         placeholder={stickyPlaceholder}
@@ -1175,7 +1155,9 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // rather than reinvented, so all three peer screens' sticky headers stay
 // pixel-matched. Badge reuses DrugsHero's own Pill icon + color token,
 // scaled down the same way Favourites' badge shrinks from hero to sticky
-// state. 2026-10-07: badge is now the solid accent circle with a white icon
+// state. 2026-10-07: the slide-in shell and the show/hide check moved to
+// ScrollRevealHeader (ui/), so a scroll no longer redraws this whole screen.
+// 2026-10-07: badge is now the solid accent circle with a white icon
 // (28px / icon 15), the same look as Favourites' sticky badge and Drugs' own
 // hero badge, instead of the old tinted circle.
 // Row 2 is the shared SearchBar itself (compact prop, per decision 4.6's
@@ -1186,27 +1168,11 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // query — the caller computes and passes that text down, since only it
 // knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ visible, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
+function StickyDrugsHeader({ watchRef, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   return (
-    <div
-      aria-hidden="true"
-      style={{
-        position:                'fixed',
-        top:                     0,
-        left:                    0,
-        right:                   0,
-        zIndex:                  50,
-        backgroundColor:         'var(--color-surface)',
-        borderBottomLeftRadius:  18,
-        borderBottomRightRadius: 18,
-        boxShadow:               '0 4px 12px rgba(0, 0, 0, 0.06)',
-        transform:               visible ? 'translateY(0)' : 'translateY(-100%)',
-        transition:              'transform 0.25s ease',
-        pointerEvents:           visible ? 'auto' : 'none',
-      }}
-    >
+    <ScrollRevealHeader watchRef={watchRef}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto' }}>
         <div style={{
           display:        'flex',
@@ -1270,7 +1236,7 @@ function StickyDrugsHeader({ visible, query, onQueryChange, placeholder, onFilte
           />
         </div>
       </div>
-    </div>
+    </ScrollRevealHeader>
   )
 }
 
