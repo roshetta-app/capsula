@@ -29,9 +29,13 @@
 
 // Brands passing the generic picks and the form picks. [] = no filter.
 export function applyFilters(items, { genericSel = [], formSel = [] }, groupOf) {
+  // Sets, so each brand costs one lookup however many generics are picked
+  // (picking 'All other generics' can mean hundreds of picks).
+  const genericSet = genericSel.length > 0 ? new Set(genericSel) : null
+  const formSet    = formSel.length > 0 ? new Set(formSel) : null
   return items.filter(s =>
-    (genericSel.length === 0 || genericSel.includes(s.genericId)) &&
-    (formSel.length === 0 || formSel.includes(groupOf(s)))
+    (!genericSet || genericSet.has(s.genericId)) &&
+    (!formSet || formSet.has(groupOf(s)))
   )
 }
 
