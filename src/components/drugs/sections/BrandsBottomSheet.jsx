@@ -134,7 +134,7 @@ import BrandsList from '../BrandsList.jsx'
 import KeywordChips, { wordsForFamily } from '../KeywordChips.jsx'
 import { useDrugContext } from '../../../context/DrugContext'
 import CountTag from '../../ui/CountTag.jsx'
-import { toTitleCase } from '../../../utils/drugTitleFormat.js'
+import { Pill, ArrowLeftRight } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 
 function TabButton({ label, count, active, onClick }) {
@@ -175,35 +175,51 @@ function TabButton({ label, count, active, onClick }) {
   )
 }
 
-// Short explanation shown in a tab that has nothing in it, so the tab never
-// looks broken. Optional button jumps to the other tab.
-function EmptyPanel({ title, body, actionLabel, onAction }) {
+// What a tab shows when it has nothing in it: an icon, a short title, one
+// plain line, and (when the other tab has something) a button to go there.
+// Same layout for every empty tab, centred in the tab's space.
+function EmptyPanel({ Icon, title, body, actionLabel, onAction }) {
   return (
     <div style={{
-      display:       'flex',
-      flexDirection: 'column',
-      alignItems:    'center',
-      textAlign:     'center',
-      gap:           'var(--space-2)',
-      padding:       'var(--space-8, 40px) var(--space-4)',
+      height:         '100%',
+      boxSizing:      'border-box',
+      display:        'flex',
+      flexDirection:  'column',
+      alignItems:     'center',
+      justifyContent: 'center',
+      textAlign:      'center',
+      gap:            'var(--space-2)',
+      padding:        '0 var(--space-6) 64px',
     }}>
-      <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+      <div style={{
+        width:           64,
+        height:          64,
+        borderRadius:    '50%',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        marginBottom:    'var(--space-2)',
+        backgroundColor: 'var(--color-accent-light)',
+      }}>
+        <Icon size={28} strokeWidth={1.8} color="var(--color-accent)" />
+      </div>
+      <p style={{ margin: 0, fontSize: 17, fontWeight: 600, color: 'var(--color-text-primary)' }}>
         {title}
       </p>
-      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: 'var(--color-text-secondary)', maxWidth: 300 }}>
+      <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, color: 'var(--color-text-secondary)', maxWidth: 280 }}>
         {body}
       </p>
       {actionLabel && (
         <button
           onClick={onAction}
           style={{
-            marginTop:       'var(--space-2)',
+            marginTop:       'var(--space-3)',
             border:          'none',
             cursor:          'pointer',
-            padding:         '8px 14px',
+            padding:         '9px 18px',
             borderRadius:    'var(--radius-full)',
             fontFamily:      'var(--font-body)',
-            fontSize:        13,
+            fontSize:        14,
             fontWeight:      600,
             color:           'var(--color-accent)',
             backgroundColor: 'var(--color-accent-light)',
@@ -279,14 +295,6 @@ export default function BrandsBottomSheet({
     if (canSwipe) emblaApi?.scrollTo(name === 'similar' ? 0 : 1, true)
   }
 
-  // Why Alternatives is empty. They need a class AND a subclass, so the reason
-  // depends on which one is missing.
-  const noAlternativesReason = !currentDrug?.class
-    ? 'This drug is not grouped into a class yet, so there are no drugs to compare it with.'
-    : !currentDrug?.subclass
-      ? 'This drug has no drug family yet, so there are no drugs to compare it with.'
-      : 'No other drug in its family is listed yet.'
-
   function handleTap(item) {
     onClose()
     onSelectBrand?.(item)
@@ -347,15 +355,17 @@ export default function BrandsBottomSheet({
               >
                 {name === 'similar' && siblings.length === 0 ? (
                   <EmptyPanel
-                    title={`No other brands of ${currentDrug?.genericName ? toTitleCase(currentDrug.genericName) : 'this drug'}`}
-                    body="This is the only product we have with this active ingredient."
+                    Icon={Pill}
+                    title="No other brands"
+                    body="This is the only brand we have with this ingredient."
                     actionLabel={alternatives.length > 0 ? 'See Alternatives' : undefined}
                     onAction={() => goToTab('alternatives')}
                   />
                 ) : name === 'alternatives' && alternatives.length === 0 ? (
                   <EmptyPanel
+                    Icon={ArrowLeftRight}
                     title="No alternatives yet"
-                    body={noAlternativesReason}
+                    body="We haven't added other drugs of this type yet."
                     actionLabel={siblings.length > 0 ? 'See Similar' : undefined}
                     onAction={() => goToTab('similar')}
                   />
