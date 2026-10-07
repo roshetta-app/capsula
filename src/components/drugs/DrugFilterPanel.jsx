@@ -1,5 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { ListFilter } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
+import PaywallGateSheet from '../ui/PaywallGateSheet'
+import ProTag from '../ui/ProTag'
+import { useAuth } from '../../hooks/useAuth'
+import { useIsPro } from '../../hooks/useIsPro'
 
 /**
  * DrugFilterPanel — bottom-sheet filter panel for the Drugs screen.
@@ -133,6 +138,11 @@ import SheetShell from '../ui/SheetShell'
  * so Form / Route stays available there. The mode-change message names Class
  * too. Nothing else here changed.
  *
+ * Form / Route is Pro-only: free users see the chips as normal plus a small
+ * "Pro" tag by the section label, and tapping any chip opens the paywall
+ * sheet instead of filtering. A filter left over from before (or from losing
+ * Pro) is cleared once the account has finished loading.
+ *
  * Props:
  *   isOpen           boolean
  *   onClose          () => void
@@ -183,11 +193,24 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   // buffer, so the copy added nothing and could only go out of date.
   const filters = activeFilters || EMPTY
 
+  // Form / Route is Pro-only. Free users can look but not filter: a tap
+  // opens the paywall sheet instead of toggling the chip.
+  const isPro = useIsPro()
+  const { loading: authLoading } = useAuth()
+  const [showProGate, setShowProGate] = useState(false)
+  const hasFormFilter = !(filters.forms.length === 1 && filters.forms[0] === 'all')
+  // Drop any leftover form filter for a free account — only once sign-in has
+  // finished loading, so a Pro user is never cleared by a brief loading blip.
+  useEffect(() => {
+    if (!authLoading && !isPro && hasFormFilter) onApply(EMPTY)
+  }, [authLoading, isPro, hasFormFilter, onApply])
+
   // Instant-apply: compute the next forms list and immediately push it out
   // via onApply, instead of buffering until a separate Apply Filters
   // action. The chips re-render from 'activeFilters' once the screen has
   // applied it.
   function toggleForm(val) {
+    if (!isPro) { setShowProGate(true); return }
     const nextForms = val === 'all'
       ? ['all']
       : (() => {
@@ -209,6 +232,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
   const hasActiveFilter = !(filters.forms.length === 1 && filters.forms[0] === 'all')
 
   return (
+    <>
     <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Filter drugs" maxHeight="80dvh">
       <div style={{
         flex:      1,
@@ -230,6 +254,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             about the grid itself changed. */}
         <FilterSection
           label="Form / Route"
+          proTag={!isPro}
           action={
             <ToggleChip
               label="All Forms"
@@ -264,6 +289,16 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
         </div>
       </div>
     </SheetShell>
+
+    <PaywallGateSheet
+      isOpen={showProGate}
+      onClose={() => setShowProGate(false)}
+      icon={ListFilter}
+      headline="Filter by Form"
+      message="Find the exact form you need, like tablets, syrups, or injections."
+      dismissLabel="Not now"
+    />
+    </>
   )
 }
 
@@ -282,15 +317,16 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 // titles with no hierarchy between them. Demoted to 14px/600 in the
 // secondary text color so "Filter Drugs" reads as the one heading and
 // these read as its subsections.
-function FilterSection({ label, action, children }) {
+function FilterSection({ label, action, proTag = false, children }) {
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
         marginBottom: children ? 'var(--space-2)' : 0,
       }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
           {label}
+          {proTag && <ProTag />}
         </div>
         {action}
       </div>

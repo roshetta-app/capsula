@@ -765,6 +765,7 @@ export default function ClassBottomSheet({
                 siblings={pickedGroup.items}
                 onTap={handleTap}
                 mode="alternatives"
+                proGateForm
                 hideOther
                 groupBySubclass={!!pickedGroup.isOthers}
                 familyName={

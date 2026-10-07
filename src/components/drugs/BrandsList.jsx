@@ -434,6 +434,9 @@ import { useCategories } from '../../hooks/useCategories'
 import { FilterModal } from '../ui/FilterModal.jsx'
 import { useIsDark } from '../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../context/FavouritesContext'
+import PaywallGateSheet from '../ui/PaywallGateSheet.jsx'
+import ProTag from '../ui/ProTag.jsx'
+import { useIsPro } from '../../hooks/useIsPro'
 
 // Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
 // grouped filter option it belongs to (e.g. the 'Tab / Cap.' group) —
@@ -482,11 +485,16 @@ function CountReporter({ onCount, shown, total, active }) {
   return null
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, onFilteredCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, onFilteredCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null, proGateForm = false }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
-  const [formSel,    setFormSel]    = useState(saved?.formSel    ?? [])     // picked form groups; [] = all
+  // proGateForm: the Form pill is Pro-only here (class sheets). Free users see
+  // it with a small Pro tag and a tap opens the paywall sheet.
+  const isPro = useIsPro()
+  const formLocked = proGateForm && !isPro
+  const [showProGate, setShowProGate] = useState(false)
+  const [formSel,    setFormSel]    = useState(proGateForm && !isPro ? [] : (saved?.formSel ?? []))     // picked form groups; [] = all
   const [genericSel, setGenericSel] = useState(saved?.genericSel ?? [])     // picked genericIds; [] = all
   const [sortMode,   setSortMode]   = useState(saved?.sortMode   ?? 'name') // 'name' | 'price'
   const [openMenu,   setOpenMenu]   = useState(null)   // 'form' | 'generic' | 'sort' | null
@@ -662,6 +670,9 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       : multiLabel(formSel, formOptions, 'All Forms', 'Forms'),
     active: formSel.length > 0,
     disabled: formOptions.length <= 1,
+    // Pro-only: tag the pill and send the tap to the paywall. A pill with a
+    // single form is already inert (nothing to choose), so it gets no tag.
+    locked: formLocked && formOptions.length > 1,
     menu: { title: 'Form / Route', titleIcon: ListFilter, columns: 2, showCounts: false, options: formOptions, selected: formSel,
             onPick: v => toggleIn(formSel, setFormSel, v),
             onClear: () => setFormSel([]) },
@@ -744,7 +755,8 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
               active={c.active}
               disabled={c.disabled}
               flex={c.flex}
-              onPress={() => setOpenMenu(c.key)}
+              proTag={!!c.locked}
+              onPress={() => (c.locked ? setShowProGate(true) : setOpenMenu(c.key))}
             />
           ))}
         </div>
@@ -873,6 +885,15 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           )
         : <FilterModal {...activeControl.menu} onClose={() => setOpenMenu(null)} />
       )}
+
+      <PaywallGateSheet
+        isOpen={showProGate}
+        onClose={() => setShowProGate(false)}
+        icon={ListFilter}
+        headline="Filter by Form"
+        message="Find the exact form you need, like tablets, syrups, or injections."
+        dismissLabel="Not now"
+      />
     </div>
   )
 }
@@ -969,7 +990,7 @@ export function SortButton({ label, onPress }) {
 
 // The filter buttons. Inactive: plain outline. Active (a filter is
 // applied): tinted accent pill with accent text and icon.
-export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, onPress }) {
+export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, proTag = false, onPress }) {
   const [pressed, setPressed] = useState(false)
   const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
   return (
@@ -1010,6 +1031,7 @@ export function PillButton({ icon: Icon, label, active, disabled = false, flex =
       }}>
         {label}
       </span>
+      {proTag && <ProTag />}
       <ChevronDown
         size={14}
         color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'}
