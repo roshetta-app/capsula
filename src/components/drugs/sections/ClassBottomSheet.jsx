@@ -462,8 +462,13 @@ export default function ClassBottomSheet({
   classDrugs = [],
   currentDrug = null,
   onSelectBrand,
-  directSubclass = null,
+  directSubclass: directSubclassProp = null,
 }) {
+  // A class with no families (no drug in it has a subclass) has no list to
+  // choose from, so it opens straight on all its drugs, whichever screen
+  // opened the sheet (2026-10-07). A subclass asked for by name still wins.
+  const hasNoFamilies = classDrugs.length > 0 && !classDrugs.some(d => d.subclass)
+  const directSubclass = directSubclassProp ?? (hasNoFamilies ? ALL_KEY : null)
   // The subclass whose drugs are showing, or null for the subclass list.
   const [picked, setPicked] = useState(directSubclass ?? null)
   // Remembered filter picks, one entry per subclass (a ref: only read when a
