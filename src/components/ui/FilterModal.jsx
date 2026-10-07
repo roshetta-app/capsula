@@ -19,7 +19,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Pill } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
 import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
@@ -204,20 +204,33 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
               />
             )}
             {/* Inert row (generic pop-up only): a generic listed for reference
-                that cannot be picked. Drawn at full strength with a subtle
-                blue tint and border (not dimmed), no tick, and a 'Similar' tag where
-                the number would be. */}
+                that cannot be picked. Drawn at full strength (not dimmed). */}
             {inertRow && (
-              <ToggleChip
-                label={inertRow.label}
-                active={false}
-                onToggle={() => {}}
-                wrap={wrap}
-                showCheckbox={false}
-                tag="Similar"
-                locked
-                inert
-              />
+              <>
+                {/* A reference row for the generic whose brands live in the
+                    Similar tab: set apart under a hairline and a small
+                    caption, so it reads as a family member that is shown
+                    elsewhere, not as a dimmed option. Same size and shape as
+                    the options, blue like the Similar tab, with its real
+                    brand count, and no tick because it cannot be picked. */}
+                <div style={{ gridColumn: '1 / -1', borderTop: '0.5px solid var(--color-border)', marginTop: 'var(--space-1)', paddingTop: 'var(--space-2)' }}>
+                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-tertiary)' }}>
+                    Shown in Similar
+                  </span>
+                </div>
+                <ToggleChip
+                  label={inertRow.label}
+                  icon={Pill}
+                  tone={{ color: 'var(--color-accent)' }}
+                  active={false}
+                  onToggle={() => {}}
+                  wrap={wrap}
+                  showCheckbox={false}
+                  count={inertRow.count}
+                  locked
+                  inert
+                />
+              </>
             )}
           </div>
         </ScrollMenu>
@@ -492,7 +505,7 @@ function ToggleChip({ label, icon: Icon, active, onToggle, showCheckbox = true, 
           {tag}
         </CountTag>
       ) : count !== undefined && (
-        <CountTag tone={active ? 'onAccent' : 'neutral'} style={{ marginLeft: 'auto' }}>
+        <CountTag tone={active ? 'onAccent' : inert ? 'accent' : 'neutral'} style={{ marginLeft: 'auto' }}>
           {count}
         </CountTag>
       )}
