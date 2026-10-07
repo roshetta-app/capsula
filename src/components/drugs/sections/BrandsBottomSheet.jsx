@@ -401,6 +401,7 @@ export default function BrandsBottomSheet({
                     />
                   ) : null}
                   similarGenericName={name === 'alternatives' && siblings.length > 0 ? siblings[0].genericName : undefined}
+                  similarCount={siblings.length}
                   popupLayer={popupLayer}
                 />
                 )}
