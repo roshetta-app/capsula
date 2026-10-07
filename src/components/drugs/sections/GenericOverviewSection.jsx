@@ -576,7 +576,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   // row always opens on Alternatives.
   const hasAlternatives = alternatives.length > 0
   function openRelated() {
-    setSheetTab(siblings.length > 0 ? 'similar' : 'alternatives')
+    setSheetTab(siblings.length > 0 || !hasAlternatives ? 'similar' : 'alternatives')
     setBrandsOpen(true)
   }
   function openAlternatives() {
@@ -611,7 +611,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             </span>
           </div>
 
-          {(siblings.length > 0 || hasAlternatives) && (
+          {/* Always shown (2026-10-07): with nothing related, the sheet itself
+              explains why. */}
+          {(
             <button
               onClick={openRelated}
               onPointerDown={() => setSimilarBrandsPressed(true)}
@@ -641,6 +643,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               <ChevronRight size={13} />
             </button>
           )}
+
         </div>
 
         {/* Ingredient chip(s) — combo path truncates past 5 with the
@@ -740,6 +743,24 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
               kind="subclass"
             />
           )}
+        </div>
+      )}
+
+      {/* No class and no subclass on file: show a short note instead of
+          dropping the block, so the gap is explained. */}
+      {!drugClass && !subclass && (
+        <div style={{
+          marginTop:    'var(--space-2)',
+          paddingTop:   'var(--space-2)',
+          borderTop:    '0.5px solid var(--color-border)',
+          marginBottom: 'var(--space-3)',
+        }}>
+          <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: 'var(--color-text-secondary)' }}>
+            Class not added yet
+          </p>
+          <p style={{ margin: '2px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--color-text-tertiary)' }}>
+            This drug is not grouped into a class yet, so there are no class mates to browse.
+          </p>
         </div>
       )}
 
