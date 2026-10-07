@@ -703,6 +703,10 @@ export default function DrugsScreen() {
       ? Math.max(0, applyFilters(searchResults, activeFilters).length - filtered.length)
       : 0
     const goSearchAll = () => navigate(ROUTES.DRUGS_CATEGORY('all'), { replace: true })
+    // Count text: 'N drugs', or 'shown/all drugs' (5/20 drugs) while a Form or
+    // Route filter is on, so the size of the list before filtering stays visible.
+    const countTotal = hasFilters ? base.length : displayed.length
+    const countText = `${hasFilters ? `${displayed.length}/${base.length}` : displayed.length} drug${countTotal !== 1 ? 's' : ''}`
 
     body = (
       <>
@@ -734,7 +738,7 @@ export default function DrugsScreen() {
                 back-button row (it used to be its own line below). */}
             {!resultsNotReady && (
               <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', flexShrink: 0 }}>
-                {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+                {countText}
               </span>
             )}
           </div>
@@ -795,7 +799,7 @@ export default function DrugsScreen() {
               fontSize: 12, color: 'var(--color-text-tertiary)',
               marginBottom: 'var(--space-2)',
             }}>
-              {displayed.length} drug{displayed.length !== 1 ? 's' : ''}
+              {countText}
               {query && ` for "${query}"`}
               {/* search-category-notice (corrected) — only added while a
                   query is active. Browsing a category with no query
