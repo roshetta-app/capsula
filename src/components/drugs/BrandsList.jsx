@@ -473,7 +473,7 @@ function multiLabel(selected, options, allLabel, plural) {
   return `${selected.length} ${plural}`
 }
 
-export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
+export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null }) {
   const isAlternatives = mode === 'alternatives'
   // Start from the picks the sheet remembered for this drug (if any), so
   // closing and reopening the sheet keeps the filters.
@@ -621,7 +621,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     ? ingredientCase(similarGenericName)
     : ''
   const similarRow = similarRowLabel && !allGenericOptions.some(o => o.label === similarRowLabel)
-    ? { label: similarRowLabel }
+    ? { label: similarRowLabel, count: similarCount }
     : undefined
   const genericControl = isAlternatives && nameById.size > 0 && {
     key: 'generic', icon: FlaskConical, flex: 3,
