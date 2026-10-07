@@ -368,16 +368,16 @@ export default function BrandsBottomSheet({
                 {name === 'similar' && siblings.length === 0 ? (
                   <EmptyPanel
                     Icon={Pill}
-                    title="No other brands"
-                    body="No other brand with the same ingredient yet."
+                    title="No similar drugs"
+                    body="Other brands with the same ingredient show up here."
                     actionLabel={alternatives.length > 0 ? 'See Alternatives' : undefined}
                     onAction={() => goToTab('alternatives')}
                   />
                 ) : name === 'alternatives' && alternatives.length === 0 ? (
                   <EmptyPanel
                     Icon={ArrowLeftRight}
-                    title="No alternatives yet"
-                    body="No other drug of the same family yet."
+                    title="No alternative drugs"
+                    body="Other drugs from the same family show up here."
                     color={ALT_COLOR}
                     tint={ALT_TINT}
                     actionLabel={siblings.length > 0 ? 'See Similar' : undefined}
