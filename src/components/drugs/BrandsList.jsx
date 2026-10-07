@@ -370,6 +370,11 @@
  * menu is open at a time; picking an option or tapping the same pill
  * again closes it.
  *
+ * 2026-10-07 (tappable Similar): rows on the Similar tab now open that drug's
+ * page when tapped (onTap, with a chevron), same as Alternatives. The
+ * highlighted card of the page that is already open stays inert, without a
+ * chevron. The Similar-tab line in the 2026-10-02 note below is superseded.
+ *
  * 2026-10-02 (tappable Alternatives): rows on the Alternatives tab now open
  * that drug's page when tapped (onTap, with a chevron) — those are different
  * medicines worth looking at. Rows on the Similar tab stay inert, as before.
@@ -572,6 +577,10 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
 
   // One drug card. isLast drops its divider line.
   function renderCard(item, isLast) {
+    // 2026-10-07: Similar rows now open that drug's page too, like Alternatives
+    // rows. Only the highlighted card of the page already open stays inert
+    // (tapping it would just reopen the same page).
+    const isCurrent = !isAlternatives && !!currentDrug && item.id === currentDrug.id
     return (
       <SharedDrugCard
         key={item.id}
@@ -580,8 +589,8 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
         isDark={isDark}
         isLast={isLast}
         onTap={onTap}
-        disableTap={!isAlternatives}
-        showChevron={isAlternatives}
+        disableTap={isCurrent}
+        showChevron={!isCurrent}
         showImageSearch
         trailing={
           <RowStarButton
