@@ -713,8 +713,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
             does (same hide-when-empty convention as the Mechanism of Action
             block above). The class row opens the class sheet when the class
             has drugs with a subclass; the subclass row opens the
-            Alternatives tab when this drug has Alternatives. A row that
-            cannot be opened is a plain row with no arrow. -- */}
+            Alternatives tab (2026-10-07: always, even with none, since the tab
+            now explains the empty case). The class row is a plain row with
+            no arrow only if the class has no drugs. -- */}
       {(drugClass || subclass) && (
         <div style={{
           display:       'flex',
@@ -737,7 +738,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           {subclass && (
             <CardRow
               label={subclass}
-              onClick={hasAlternatives ? openAlternatives : undefined}
+              onClick={openAlternatives}
               ariaLabel={`Show alternatives in ${subclass}`}
               child={!!drugClass}
               kind="subclass"
