@@ -707,7 +707,10 @@ export default function ClassBottomSheet({
         {pickedGroup ? (
           <>
             {straightToAll && classHeading}
-            {!straightToAll && <div style={{
+            {/* No Back row when the sheet was opened straight on a drug list
+                (all drugs, or one named family): there is no list behind it to
+                go back to, so it would only close the sheet. */}
+            {!straightToAll && !directSubclass && <div style={{
               flexShrink:   0,
               padding:      '0 var(--space-4)',
               borderBottom: '0.5px solid var(--color-border)',
