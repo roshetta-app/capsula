@@ -467,6 +467,9 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   const [sheetTab, setSheetTab] = useState('similar')
   // Whether the class sheet (subclass list, then drugs) is open.
   const [classOpen, setClassOpen] = useState(false)
+  // The subclass the class sheet opens straight on (the subclass row), or null
+  // for the class row, which opens on the list of subclasses.
+  const [classDirect, setClassDirect] = useState(null)
   // moaOpen: expanded (true) or folded to 3 lines (false) — drives the More /
   // Less label. moaClamped: whether the 3-line cut (with the '...') is applied
   // to the text. They differ only while the box is sliding shut: the text stays
@@ -573,7 +576,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   // Sheet entry points. The top-right button opens on Similar when there
   // are same-generic brands, otherwise on Alternatives (the sheet itself
   // also falls back, this just keeps the intent explicit). The subclass
-  // row always opens on Alternatives.
+  // row opens its family's drug list (see openFamily below).
   const hasAlternatives = alternatives.length > 0
   function openRelated() {
     setSheetTab(siblings.length > 0 || !hasAlternatives ? 'similar' : 'alternatives')
@@ -586,6 +589,14 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
   // The class row opens the class sheet whenever the class has any drugs
   // with a subclass filled in.
   const hasClassList = classDrugs.length > 0
+  // The subclass row opens the family's drug list (this drug's own brands are
+  // in it, so it is never empty). With no class to open it in, it falls back to
+  // the Alternatives tab.
+  const subclassOpensFamily = !!drugClass && hasClassList
+  function openFamily() {
+    setClassDirect(subclass)
+    setClassOpen(true)
+  }
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -729,7 +740,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           {drugClass && (
             <CardRow
               label={drugClass}
-              onClick={hasClassList ? () => setClassOpen(true) : undefined}
+              onClick={hasClassList ? () => { setClassDirect(null); setClassOpen(true) } : undefined}
               ariaLabel={`Show drug families in ${drugClass}`}
               hasChild={!!subclass}
               kind="class"
@@ -738,8 +749,8 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           {subclass && (
             <CardRow
               label={subclass}
-              onClick={openAlternatives}
-              ariaLabel={`Show alternatives in ${subclass}`}
+              onClick={subclassOpensFamily ? openFamily : openAlternatives}
+              ariaLabel={subclassOpensFamily ? `Show drugs in ${subclass}` : `Show alternatives in ${subclass}`}
               child={!!drugClass}
               kind="subclass"
             />
@@ -782,6 +793,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
           classLabel={drugClass}
           classDrugs={classDrugs}
           currentDrug={drug}
+          directSubclass={classDirect}
           onSelectBrand={onSelectBrand}
         />
       )}
