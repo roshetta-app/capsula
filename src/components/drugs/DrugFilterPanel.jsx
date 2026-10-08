@@ -15,6 +15,11 @@ import { useIsPro } from '../../hooks/useIsPro'
  *  - Clear All + Apply Filters buttons
  *  - Filters do NOT persist between sessions
  *
+ * 2026-10-08 (Form / Route title): the 'Form / Route' section title now has the
+ * filter icon in a soft accent badge before it (same badge as the filter pop-ups) and
+ * is 16px in the main text colour instead of 14px grey. FilterSection gets an optional
+ * 'icon' prop; sections without it look as before.
+ *
  * 2026-07-18 (decision 4.10): added a Category section here, kept in sync
  * with the category tiles — reverted 2026-07-19 (user decision). Category
  * picking is tile-only again; this sheet no longer knows about it.
@@ -254,6 +259,7 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
             about the grid itself changed. */}
         <FilterSection
           label="Form / Route"
+          icon={ListFilter}
           proTag={!isPro}
           action={
             <ToggleChip
@@ -317,14 +323,32 @@ export default function DrugFilterPanel({ isOpen, onClose, onApply, activeFilter
 // titles with no hierarchy between them. Demoted to 14px/600 in the
 // secondary text color so "Filter Drugs" reads as the one heading and
 // these read as its subsections.
-function FilterSection({ label, action, proTag = false, children }) {
+function FilterSection({ label, action, icon: Icon, proTag = false, children }) {
   return (
     <div style={{ marginBottom: 'var(--space-4)' }}>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
         marginBottom: children ? 'var(--space-2)' : 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize:   Icon ? 16 : 14,
+          fontWeight: 600,
+          color:      Icon ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+        }}>
+          {Icon && (
+            <span
+              aria-hidden="true"
+              style={{
+                width: 32, height: 32, borderRadius: 9,
+                backgroundColor: 'var(--color-accent-light)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <Icon size={16} color="var(--color-accent)" />
+            </span>
+          )}
           {label}
           {proTag && <ProTag />}
         </div>
