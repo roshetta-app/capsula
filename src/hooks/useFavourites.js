@@ -485,7 +485,9 @@ export function useFavourites() {
         // so a separate effect adding the pending item first would get
         // silently wiped out the moment this resolves.
         const pending = pendingFavouriteRef.current
-        if (pending) {
+        // 2026-10-08: a pending class/family heart (type 'classes') is folded in
+        // by useFavouriteClasses, not here, and stays recorded until it does.
+        if (pending && pending.type !== 'classes') {
           if (!next[pending.type].includes(pending.id)) {
             const atCap = !isProRef.current && next[pending.type].length >= CAPS[pending.type]
             if (atCap) {
@@ -603,6 +605,10 @@ export function useFavourites() {
 
   const dismissPendingFavourite = clearPendingFavourite
   const dismissCapBlocked       = useCallback(() => setCapBlocked(null), [])
+  // 2026-10-08 — used by useFavouriteClasses: ask a guest to sign in (the tap is
+  // kept as the pending favourite) and show the free-limit sheet.
+  const promptSignIn    = useCallback((type, id) => recordPendingFavourite({ type, id }), [recordPendingFavourite])
+  const showCapBlocked   = useCallback((type) => setCapBlocked(type), [])
 
   return {
     favourites,
@@ -616,5 +622,7 @@ export function useFavourites() {
     capBlocked,
     dismissPendingFavourite,
     dismissCapBlocked,
+    promptSignIn,
+    showCapBlocked,
   }
 }

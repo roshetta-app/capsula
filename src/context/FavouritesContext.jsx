@@ -5,11 +5,15 @@
 
 import { createContext, useContext } from 'react'
 import { useFavourites } from '../hooks/useFavourites'
+import { useFavouriteClasses } from '../hooks/useFavouriteClasses'
 
 const FavCtx = createContext(null)
 
 export function FavouritesProvider({ children }) {
-  const value = useFavourites()
+  const fav = useFavourites()
+  // 2026-10-08: favourite classes and families ride on the same provider.
+  const classFavs = useFavouriteClasses(fav)
+  const value = { ...fav, ...classFavs }
   return <FavCtx.Provider value={value}>{children}</FavCtx.Provider>
 }
 

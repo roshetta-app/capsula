@@ -18,6 +18,9 @@
  * PaywallGateSheet's `message` prop takes a plain string or a node, so
  * this passes a JSX fragment to get the bold word in.
  *
+ * 2026-10-08: also handles listType 'classes' (drug classes and families,
+ * one shared cap).
+ *
  * Props:
  *   isOpen     boolean
  *   listType   'drugs' | 'conditions'
@@ -26,11 +29,12 @@
 
 import { Heart } from 'lucide-react'
 import PaywallGateSheet from './PaywallGateSheet'
-import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../../constants/features'
+import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS, FAVOURITES_CAP_CLASSES } from '../../constants/features'
 
 const CAPS = {
   drugs:      FAVOURITES_CAP_DRUGS,
   conditions: FAVOURITES_CAP_CONDITIONS,
+  classes:    FAVOURITES_CAP_CLASSES,
 }
 
 export default function FavouriteLimitSheet({ isOpen, listType, onClose }) {
@@ -43,7 +47,7 @@ export default function FavouriteLimitSheet({ isOpen, listType, onClose }) {
       icon={Heart}
       countLabel={`${cap}/${cap}`}
       headline="Favourites limit reached"
-      message={<>You've reached your limit of favourite {listType}, go <strong>Pro</strong> for unlimited access.</>}
+      message={<>You've reached your limit of favourite {listType === 'classes' ? 'classes and families' : listType}, go <strong>Pro</strong> for unlimited access.</>}
       dismissLabel="Maybe Later"
     />
   )

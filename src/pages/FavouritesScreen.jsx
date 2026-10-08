@@ -545,7 +545,10 @@ import { useBackClose } from '../hooks/useBackClose'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import ProUpsellBanner from '../components/ui/ProUpsellBanner'
-import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS } from '../constants/features'
+import FavouriteClassesSheet, { FavouriteClassesCard } from '../components/drugs/FavouriteClassesSheet'
+import ClassBottomSheet from '../components/drugs/sections/ClassBottomSheet'
+import { titleCaseWords } from '../utils/classSearch'
+import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS, FAVOURITES_CAP_CLASSES } from '../constants/features'
 
 // Row remove/restore animation durations — must match the @keyframes
 // durations declared in the local <style> block below exactly, since the
@@ -781,7 +784,7 @@ export default function FavouritesScreen() {
 
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
-  const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt } = useFavouritesContext()
+  const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt, favClasses, toggleClass } = useFavouritesContext()
   const { conditions, specialties, loading: conditionsLoading } = useConditionContext()
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { user } = useAuth()
@@ -829,6 +832,27 @@ export default function FavouritesScreen() {
   const tabCounts = {
     conditions: isFreeAccount ? `${savedConditions.length}/${FAVOURITES_CAP_CONDITIONS}` : savedConditions.length,
     drugs:      isFreeAccount ? `${savedDrugs.length}/${FAVOURITES_CAP_DRUGS}`           : savedDrugs.length,
+  }
+
+  // Saved classes and families (2026-10-08): the card at the top of the Drugs
+  // tab opens a sheet listing them; a tapped one opens in the class sheet.
+  const [showClassesSheet, setShowClassesSheet] = useState(false)
+  const [classSheetOpen,   setClassSheetOpen]   = useState(false)
+  const [classTarget,      setClassTarget]      = useState(null)   // { className, direct }
+  const [classSheetKey,    setClassSheetKey]    = useState(0)
+  const classesCountLabel = isFreeAccount ? `${favClasses.length}/${FAVOURITES_CAP_CLASSES}` : favClasses.length
+  const classSheetDrugs = useMemo(
+    () => (classTarget ? drugs.filter(d => d.class === classTarget.className) : []),
+    [drugs, classTarget]
+  )
+  function drugCountOfFavClass(item) {
+    return drugs.filter(d => d.class === item.className && (!item.familyName || d.subclass === item.familyName)).length
+  }
+  function openFavClass(item) {
+    setShowClassesSheet(false)
+    setClassTarget({ className: item.className, direct: item.familyName || null })
+    setClassSheetKey(k => k + 1)
+    setClassSheetOpen(true)
   }
 
   // Sort (Phase 14) — own storage key ('capsula_favourites_sort'), separate
@@ -1470,6 +1494,13 @@ export default function FavouritesScreen() {
                 left between the two tabs. */}
             {activeTab === 'drugs' && (
               <>
+                {!isManaging && !drugQuery.trim() && (
+                  <FavouriteClassesCard
+                    count={favClasses.length}
+                    countLabel={classesCountLabel}
+                    onClick={() => setShowClassesSheet(true)}
+                  />
+                )}
                 {drugsAtCap && (
                   <div style={{ marginBottom: 'var(--space-3)' }}>
                     <ProUpsellBanner subtitle="Unlock unlimited favourites" />
@@ -1585,6 +1616,25 @@ export default function FavouritesScreen() {
           onCancel={toggleManage}
         />
       )}
+
+      <FavouriteClassesSheet
+        isOpen={showClassesSheet}
+        onClose={() => setShowClassesSheet(false)}
+        items={favClasses}
+        drugCountOf={drugCountOfFavClass}
+        onOpen={openFavClass}
+        onRemove={item => toggleClass(item.className, item.familyName)}
+      />
+      <ClassBottomSheet
+        key={classSheetKey}
+        isOpen={classSheetOpen}
+        onClose={() => setClassSheetOpen(false)}
+        classLabel={titleCaseWords(classTarget?.className ?? '')}
+        classDrugs={classSheetDrugs}
+        currentDrug={null}
+        onSelectBrand={d => navigate(`/drugs/${d.slug || d.id}`)}
+        directSubclass={classTarget?.direct ?? null}
+      />
 
       <FavouritesManagerSheet
         isOpen={showManagerSheet}

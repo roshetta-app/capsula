@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/sections/ClassBottomSheet.jsx
  *
+ * 2026-10-08 (favourite classes and families): a heart in the class heading saves
+ * the whole class; a heart in the bar above a family's drugs saves that family.
+ * When the sheet is opened straight on a family (from Favourites) that bar shows
+ * the family name instead of Back. Saved items show in the Favourites screen.
+ *
  * 2026-10-06 (icon before the family title): the title on a family's page has the
  * same icon as its card on the list, at 17px (molecule; grid for 'Other families', list for
  * 'All drugs in this class').
@@ -265,6 +270,8 @@ import { useBackLayer } from '../../../hooks/useBackClose'
 import { useDrugContext } from '../../../context/DrugContext'
 import { titleCaseWords } from '../../../utils/classSearch'
 import { visibleCount } from '../KeywordChips.jsx'
+import ClassHeartButton from '../../ui/ClassHeartButton.jsx'
+import { useFavouritesContext } from '../../../context/FavouritesContext'
 // Lets Icons (CC BY 4.0, credit in the note at the top of this file).
 import { Icon as IconifyIcon } from '@iconify/react/dist/offline'
 import moleculeLight from '@iconify-icons/lets-icons/molecule-light'
@@ -534,6 +541,8 @@ export default function ClassBottomSheet({
   const totalDrugs = classDrugs.length
   // The class name as stored (the keywords point at it by this exact name).
   const className = classDrugs[0]?.class ?? classLabel
+  // Hearts: save the whole class, or the family whose drugs page is open.
+  const { isClassFavourited, toggleClass } = useFavouritesContext()
   const { classKeywords } = useDrugContext()
   const { classWords, familyWords } = useMemo(
     () => splitKeywords(classKeywords, className),
@@ -544,6 +553,9 @@ export default function ClassBottomSheet({
   const pickedFamilyWords = pickedGroup && !pickedGroup.isOthers && !pickedGroup.isAll
     ? (familyWords.get(pickedGroup.name) ?? [])
     : []
+
+  // The real family whose drugs page is open (not 'Other families', not 'All drugs').
+  const familyKey = pickedGroup && !pickedGroup.isOthers && !pickedGroup.isAll ? pickedGroup.name : null
 
   // Opening a family from the list: remember the list's scroll first.
   function pickFamily(name) {
@@ -556,10 +568,20 @@ export default function ClassBottomSheet({
   const straightToAll = directSubclass === ALL_KEY
   const classHeading = (
     <div style={{
+      position:     'relative',
       flexShrink:   0,
-      padding:      'var(--space-2) var(--space-4) var(--space-3)',
+      padding:      'var(--space-2) 56px var(--space-3) var(--space-4)',
       borderBottom: '0.5px solid var(--color-border)',
     }}>
+      {totalDrugs > 0 && (
+        <div style={{ position: 'absolute', top: 6, right: 6 }}>
+          <ClassHeartButton
+            label="class"
+            active={isClassFavourited(className, '')}
+            onPress={() => toggleClass(className, '')}
+          />
+        </div>
+      )}
       <p style={{
         margin:        0,
         fontSize:      11,
@@ -715,12 +737,23 @@ export default function ClassBottomSheet({
             {/* No Back row when the sheet was opened straight on a drug list
                 (all drugs, or one named family): there is no list behind it to
                 go back to, so it would only close the sheet. */}
-            {!straightToAll && !directSubclass && <div style={{
-              flexShrink:   0,
-              padding:      '0 var(--space-4)',
-              borderBottom: '0.5px solid var(--color-border)',
+            {!straightToAll && (!directSubclass || familyKey) && <div style={{
+              flexShrink:     0,
+              padding:        '0 var(--space-2) 0 var(--space-4)',
+              borderBottom:   '0.5px solid var(--color-border)',
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'space-between',
+              gap:            'var(--space-2)',
             }}>
-              <button
+              {directSubclass ? (
+                <span style={{
+                  minWidth: 0, fontSize: 15, fontWeight: 600,
+                  color: 'var(--color-text-primary)',
+                }}>
+                  {titleCaseWords(familyKey)}
+                </span>
+              ) : <button
                 onClick={() => (directSubclass ? onClose() : setPicked(null))}
                 aria-label="Back"
                 style={{
@@ -743,7 +776,14 @@ export default function ClassBottomSheet({
               >
                 <ChevronLeft size={18} />
                 Back
-              </button>
+              </button>}
+              {familyKey && (
+                <ClassHeartButton
+                  label="family"
+                  active={isClassFavourited(className, familyKey)}
+                  onPress={() => toggleClass(className, familyKey)}
+                />
+              )}
             </div>}
             <div key={`drugs-${pickedGroup.name}`} style={{
               flex:      1,

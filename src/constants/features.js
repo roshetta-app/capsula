@@ -28,6 +28,8 @@ export const FEATURES = {
  */
 export const FAVOURITES_CAP_DRUGS = 10
 export const FAVOURITES_CAP_CONDITIONS = 10
+// 2026-10-08 — drug classes and families together share one free-tier cap.
+export const FAVOURITES_CAP_CLASSES = 5
 
 /**
  * notes-pro-image-and-char-cap
