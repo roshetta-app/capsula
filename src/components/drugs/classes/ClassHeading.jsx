@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-08 (icon tile): the Class / Family badge is gone. The same icon tile
+ * as the class and family cards (Layers violet, molecule blue) sits at the left
+ * of the title, which sits beside it.
+ *
  * 2026-10-08 (no counts, badges): the 'x families, y drugs' line is gone. The
  * 'Drug class' / 'Drug family' labels are replaced by a small Class / Family
  * badge in front of the name. The search icon (family) sits small and raised
@@ -29,7 +33,9 @@
  *   onBack       when set, a Back arrow is drawn in the top row
  *   onSearch     when set, the name is a button with a small search icon
  */
-import { ChevronLeft, Search } from 'lucide-react'
+import { ChevronLeft, Search, Layers } from 'lucide-react'
+import { ClassIconTile } from './ClassCard.jsx'
+import { MoleculeIcon } from './ClassIcons.jsx'
 import ClassHeartButton from './ClassHeartButton.jsx'
 
 export default function ClassHeading({
@@ -43,7 +49,9 @@ export default function ClassHeading({
   onSearch = null,
 }) {
   const isFamily  = kind === 'family'
-  const labelColor = isFamily ? 'var(--color-accent)' : 'var(--color-class)'
+  const words    = String(title ?? '').split(' ')
+  const lastWord = words.pop()
+  const head     = words.length ? words.join(' ') + ' ' : ''
 
   const nameStyle = {
     fontSize:   20,
@@ -94,34 +102,32 @@ export default function ClassHeading({
           Back
         </button>
       )}
-      {(() => {
-        // The name, with its badge on a line of its own above it. The last word and the small raised
-        // search icon are kept together so the icon never lands on its own line.
-        const words    = String(title ?? '').split(' ')
-        const lastWord = words.pop()
-        const head     = words.length ? words.join(' ') + ' ' : ''
-        const badge = (
-          <span style={{
-            display:       'inline-block',
-            padding:       '1px 7px',
-            borderRadius:  999,
-            border:        `0.5px solid ${labelColor}`,
-            color:         labelColor,
-            fontSize:      10.5,
-            fontWeight:    600,
-            letterSpacing: '0.05em',
-            textTransform: 'uppercase',
-            lineHeight:    1.5,
-          }}>
-            {isFamily ? 'Family' : 'Class'}
-          </span>
-        )
-        const nameText = (
-          <>
-            {head}
-            <span style={{ whiteSpace: 'nowrap' }}>
-              {lastWord}
-              {onSearch && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+        {/* The same icon tile as the class / family cards: stacked layers
+            (violet) for a class, molecule (blue) for a family. */}
+        <ClassIconTile Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
+        <div style={{ minWidth: 0, flex: 1 }}>
+          {onSearch ? (
+            <button
+              onClick={onSearch}
+              aria-label={`Search Google for ${title}`}
+              style={{
+                ...nameStyle,
+                display:    'block',
+                maxWidth:   '100%',
+                padding:    0,
+                border:     'none',
+                background: 'none',
+                textAlign:  'left',
+                fontFamily: 'var(--font-body)',
+                cursor:     'pointer',
+                WebkitTapHighlightColor: 'transparent',
+                outline:    'none',
+              }}
+            >
+              {head}
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {lastWord}
                 <Search
                   size={11}
                   strokeWidth={2.2}
@@ -129,49 +135,18 @@ export default function ClassHeading({
                   aria-hidden="true"
                   style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
                 />
-              )}
-            </span>
-          </>
-        )
-        return (<>
-          <p style={{ margin: '4px 0 0' }}>{badge}</p>
-          {onSearch ? (
-          <button
-            onClick={onSearch}
-            aria-label={`Search Google for ${title}`}
-            style={{
-              ...nameStyle,
-              display:    'block',
-              maxWidth:   '100%',
-              margin:     '2px 0 0',
-              padding:    0,
-              border:     'none',
-              background: 'none',
-              textAlign:  'left',
-              fontFamily: 'var(--font-body)',
-              cursor:     'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              outline:    'none',
-            }}
-          >
-            {nameText}
-          </button>
-        ) : (
-          <p style={{ ...nameStyle, margin: '2px 0 0' }}>
-            {nameText}
-          </p>
-        )}
-        </>)
-      })()}
-      {isFamily && parentName && (
-        <p style={{
-          margin:   '4px 0 0',
-          fontSize: 13,
-          color:    'var(--color-text-secondary)',
-        }}>
-          in {parentName}
-        </p>
-      )}
+              </span>
+            </button>
+          ) : (
+            <p style={{ ...nameStyle, margin: 0 }}>{title}</p>
+          )}
+          {isFamily && parentName && (
+            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>
+              in {parentName}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
