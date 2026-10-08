@@ -8,14 +8,15 @@
  *    Shows how many are saved ('3/5' for a free account) and opens the sheet.
  *  - FavouriteClassesSheet: lists every saved class and family, newest first.
  *    Tapping one calls onOpen(item) (the screen opens the class sheet on it).
- *    The heart on each row removes it.
+ *    The heart on each row calls onRemove(item); the screen asks for
+ *    confirmation and offers Undo, like the drug rows.
  *
  * Items are { className, familyName } as stored (familyName '' = whole class).
- * Names are shown in title case; a family row shows its class underneath.
+ * Names are shown in title case. The rows carry no 'class' / 'family' wording
+ * and no drug count; a family row shows its class name underneath, plain.
  *
  * Props (card):  count, countLabel, onClick
- * Props (sheet): isOpen, onClose, items, drugCountOf(item) => number,
- *                onOpen(item), onRemove(item)
+ * Props (sheet): isOpen, onClose, items, onOpen(item), onRemove(item)
  */
 
 import { useState } from 'react'
@@ -55,11 +56,12 @@ export function FavouriteClassesCard({ count, countLabel, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
         width: '100%', boxSizing: 'border-box',
-        minHeight: 60, padding: '12px 16px',
+        minHeight: 64, padding: '14px 16px',
         marginBottom: 'var(--space-3)',
-        border: 'none', borderRadius: 16,
-        backgroundColor: 'var(--color-surface-muted)',
-        opacity: pressed ? 0.8 : 1,
+        border: '0.5px solid var(--color-border)', borderRadius: 16,
+        backgroundColor: 'var(--color-surface)',
+        boxShadow: 'var(--shadow-card)',
+        opacity: pressed ? 0.85 : 1,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
         fontFamily: 'var(--font-body)', textAlign: 'left', cursor: 'pointer',
@@ -67,19 +69,11 @@ export function FavouriteClassesCard({ count, countLabel, onClick }) {
       }}
     >
       <IconTile Icon={MoleculeIcon} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
-          color: 'var(--color-text-primary)',
-        }}>
-          Classes &amp; families
-        </span>
-        <span style={{
-          display: 'block', marginTop: 2, fontSize: 12.5, lineHeight: 1.3,
-          color: 'var(--color-text-secondary)',
-        }}>
-          {count === 0 ? 'Tap the heart in a drug class to save it here' : 'Your saved drug classes and families'}
-        </span>
+      <span style={{
+        flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.3,
+        color: 'var(--color-text-primary)',
+      }}>
+        Classes &amp; families
       </span>
       <CountTag tone={count > 0 ? 'accent' : 'neutral'}>{countLabel ?? count}</CountTag>
       <ChevronRight aria-hidden="true" size={16} strokeWidth={2} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
@@ -87,7 +81,7 @@ export function FavouriteClassesCard({ count, countLabel, onClick }) {
   )
 }
 
-function Row({ item, drugCount, onOpen, onRemove }) {
+function Row({ item, onOpen, onRemove }) {
   const [pressed, setPressed] = useState(false)
   const isFamily = !!item.familyName
   const title    = titleCaseWords(isFamily ? item.familyName : item.className)
@@ -123,14 +117,15 @@ function Row({ item, drugCount, onOpen, onRemove }) {
           }}>
             {title}
           </span>
-          <span style={{
-            display: 'block', marginTop: 2, fontSize: 12.5, lineHeight: 1.3,
-            color: 'var(--color-text-secondary)',
-            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
-            {isFamily ? `Family · ${titleCaseWords(item.className)}` : 'Drug class'}
-            {drugCount > 0 ? ` · ${drugCount} ${drugCount === 1 ? 'drug' : 'drugs'}` : ''}
-          </span>
+          {isFamily && (
+            <span style={{
+              display: 'block', marginTop: 2, fontSize: 12.5, lineHeight: 1.3,
+              color: 'var(--color-text-secondary)',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {titleCaseWords(item.className)}
+            </span>
+          )}
         </span>
         <ChevronRight aria-hidden="true" size={16} strokeWidth={2} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
       </button>
@@ -139,7 +134,7 @@ function Row({ item, drugCount, onOpen, onRemove }) {
   )
 }
 
-export default function FavouriteClassesSheet({ isOpen, onClose, items, drugCountOf, onOpen, onRemove }) {
+export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, onRemove }) {
   // Newest first, same as the other Favourites lists.
   const shown = items.slice().reverse()
   return (
@@ -178,13 +173,12 @@ export default function FavouriteClassesSheet({ isOpen, onClose, items, drugCoun
               color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.5,
             }}>
               <Heart size={28} strokeWidth={1.6} color="var(--color-text-tertiary)" />
-              Nothing saved yet. Open a drug class and tap the heart to save the class or one of its families.
+              Nothing saved yet. Tap the heart in a class or family to save it here.
             </div>
           ) : shown.map(item => (
             <Row
               key={`${item.className}\u0001${item.familyName}`}
               item={item}
-              drugCount={drugCountOf(item)}
               onOpen={onOpen}
               onRemove={onRemove}
             />

@@ -25,6 +25,7 @@
  *   favClasses         { className, familyName }[]  oldest first
  *   isClassFavourited  (className, familyName?) => boolean
  *   toggleClass        (className, familyName?, { silent }?) => Promise<void>
+ *   restoreClassAt     (className, familyName, index) => void  (Undo: puts it back where it was)
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -120,6 +121,21 @@ export function useFavouriteClasses(fav) {
     })
   }, [user, has, write, toast, promptSignIn, showCapBlocked])
 
+  // Undo after a remove: put the item back at its old position (add is
+  // otherwise append-only). Does nothing if it is already there.
+  const restoreClassAt = useCallback((className, familyName, index) => {
+    if (!user) return
+    const list = favRef.current
+    if (has(list, className, familyName)) return
+    const next = list.slice()
+    next.splice(Math.min(Math.max(index, 0), next.length), 0, { className, familyName })
+    setFavClasses(next)
+    write(className, familyName, true).catch(() => {
+      setFavClasses(prev => prev.filter(i => !(i.className === className && i.familyName === familyName)))
+      toast.error('Could not restore it. Check your connection and try again.')
+    })
+  }, [user, has, write, toast])
+
   const isClassFavourited = useCallback(
     (className, familyName = '') => has(favClasses, className, familyName),
     [favClasses, has]
@@ -150,5 +166,5 @@ export function useFavouriteClasses(fav) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, pendingFavourite])
 
-  return { favClasses, isClassFavourited, toggleClass }
+  return { favClasses, isClassFavourited, toggleClass, restoreClassAt }
 }

@@ -784,7 +784,7 @@ export default function FavouritesScreen() {
 
   const [showBulkConfirm, setShowBulkConfirm] = useState(false)
 
-  const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt, favClasses, toggleClass } = useFavouritesContext()
+  const { favourites, toggleDrug, toggleCondition, restoreConditionAt, restoreDrugAt, favClasses, toggleClass, restoreClassAt } = useFavouritesContext()
   const { conditions, specialties, loading: conditionsLoading } = useConditionContext()
   const { drugs, loading: drugsLoading } = useDrugContext()
   const { user } = useAuth()
@@ -845,8 +845,19 @@ export default function FavouritesScreen() {
     () => (classTarget ? drugs.filter(d => d.class === classTarget.className) : []),
     [drugs, classTarget]
   )
-  function drugCountOfFavClass(item) {
-    return drugs.filter(d => d.class === item.className && (!item.familyName || d.subclass === item.familyName)).length
+  // Removing a saved class/family from its list: confirm first, then offer Undo,
+  // the same as a drug row.
+  const [confirmingClass, setConfirmingClass] = useState(null)
+  function handleConfirmRemoveClass() {
+    if (!confirmingClass) return Promise.resolve()
+    const { className, familyName } = confirmingClass
+    const index = favClasses.findIndex(i => i.className === className && i.familyName === familyName)
+    return toggleClass(className, familyName, { silent: true }).then(() => {
+      showSnack('Removed from favourites', {
+        label: 'Undo',
+        onAction: () => restoreClassAt(className, familyName, index),
+      })
+    })
   }
   function openFavClass(item) {
     setShowClassesSheet(false)
@@ -1621,9 +1632,8 @@ export default function FavouritesScreen() {
         isOpen={showClassesSheet}
         onClose={() => setShowClassesSheet(false)}
         items={favClasses}
-        drugCountOf={drugCountOfFavClass}
         onOpen={openFavClass}
-        onRemove={item => toggleClass(item.className, item.familyName)}
+        onRemove={setConfirmingClass}
       />
       <ClassBottomSheet
         key={classSheetKey}
@@ -1664,6 +1674,16 @@ export default function FavouritesScreen() {
         onConfirm={handleConfirmRemoveCondition}
         title="Remove from favourites?"
         message={confirmingCondition ? `"${confirmingCondition.name}" will be removed from your favourites.` : ''}
+        confirmLabel="Remove"
+        destructive
+      />
+
+      <ConfirmSheet
+        isOpen={!!confirmingClass}
+        onClose={() => setConfirmingClass(null)}
+        onConfirm={handleConfirmRemoveClass}
+        title="Remove from favourites?"
+        message={confirmingClass ? `"${titleCaseWords(confirmingClass.familyName || confirmingClass.className)}" will be removed from your favourites.` : ''}
         confirmLabel="Remove"
         destructive
       />
