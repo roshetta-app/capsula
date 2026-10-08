@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-09 (tile column): icon tile (28) on the left, the title (name, search icon and
+ * '> Class') in its own column on the right, so nothing wraps under the tile.
+ *
  * 2026-10-09 (class after the name): the class of a family is now '> Class', small
  * and grey, right after the family name on the same line (it wraps with the name).
  * The earlier try on the Back line is dropped.
@@ -123,17 +126,13 @@ export default function ClassHeading({
           </button>
         </div>
       )}
-      {/* The small icon tile sits inside the name's text, so a long name
-          wraps under it instead of making the heading tall and narrow. */}
       {/* Title row: at least as tall as the heart's row, name centred in it,
           so the heart (always the same corner spot) lines up with the name.
           With a Back arrow above, the heart lines up with the Back row. */}
       <div style={{ display: 'flex', alignItems: 'center', minHeight: 0 }}>
       {(() => {
         const tile = (
-          <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8, position: 'relative', top: -1 }}>
-            <ClassIconTile size={26} Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
-          </span>
+          <ClassIconTile size={28} Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
         )
         // '> Class' after the family name, on the same line (wraps with the name).
         const crumb = isFamily && parentName ? (
@@ -146,29 +145,34 @@ export default function ClassHeading({
           </span>
         ) : null
         return (
-          <p style={{ ...nameStyle, margin: '2px 0 0' }}>
-            <span
-              onClick={onSearch ?? undefined}
-              role={onSearch ? 'button' : undefined}
-              aria-label={onSearch ? `Search Google for ${title}` : undefined}
-              style={{ cursor: onSearch ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
-            >
-              {tile}{head}
-              <span style={{ whiteSpace: 'nowrap' }}>
-                {lastWord}
-                {onSearch && (
-                  <Search
-                    size={11}
-                    strokeWidth={2.2}
-                    color="var(--color-accent)"
-                    aria-hidden="true"
-                    style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
-                  />
-                )}
+          // Icon tile on the left, the whole title in its own column to the right:
+          // the text never wraps under the tile, and the tile is centred on it.
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0, margin: '2px 0 0' }}>
+            {tile}
+            <p style={{ ...nameStyle, margin: 0, flex: 1, minWidth: 0 }}>
+              <span
+                onClick={onSearch ?? undefined}
+                role={onSearch ? 'button' : undefined}
+                aria-label={onSearch ? `Search Google for ${title}` : undefined}
+                style={{ cursor: onSearch ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
+              >
+                {head}
+                <span style={{ whiteSpace: 'nowrap' }}>
+                  {lastWord}
+                  {onSearch && (
+                    <Search
+                      size={11}
+                      strokeWidth={2.2}
+                      color="var(--color-accent)"
+                      aria-hidden="true"
+                      style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
+                    />
+                  )}
+                </span>
               </span>
-            </span>
-            {crumb}
-          </p>
+              {crumb}
+            </p>
+          </div>
         )
       })()}
       </div>
