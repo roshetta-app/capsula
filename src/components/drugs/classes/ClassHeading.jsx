@@ -71,7 +71,9 @@ export default function ClassHeading({
       // 56 on the right keeps the name clear of the heart, but only when the
       // heart sits beside the name. With a Back arrow the heart is up in the
       // Back row, so the name gets the full width.
-      padding:      `var(--space-2) ${onBack ? 'var(--space-4)' : '56px'} var(--space-2) var(--space-4)`,
+      // No Back arrow: the heart is beside the name, so the top is 18, which puts the
+      // heart's own top edge level with the top of the name's icon tile.
+      padding:      `${onBack ? 'var(--space-2)' : '18px'} ${onBack ? 'var(--space-4)' : '56px'} var(--space-2) var(--space-4)`,
       borderBottom: '0.5px solid var(--color-border)',
     }}>
       {/* The heart: same corner on every heading. */}
@@ -114,7 +116,7 @@ export default function ClassHeading({
       {/* Title row: at least as tall as the heart's row, name centred in it,
           so the heart (always the same corner spot) lines up with the name.
           With a Back arrow above, the heart lines up with the Back row. */}
-      <div style={{ display: 'flex', alignItems: 'center', minHeight: onBack ? 0 : 40 }}>
+      <div style={{ display: 'flex', alignItems: 'center', minHeight: 0 }}>
       {(() => {
         const tile = (
           <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8, position: 'relative', top: -1 }}>
