@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-09 (class on the Back line): the 'in <class>' line under a family name is
+ * gone. With a Back arrow the class shows on the Back line as '> Class' (shortened
+ * with '...' if long, clear of the heart). Without a Back arrow it is a small
+ * '> Class' line under the name.
+ *
  * 2026-10-08 (compact): the icon tile is smaller (26) and sits inside the name's
  * text, and the name is 17px, so a long name wraps under the icon and the heading
  * stays short.
@@ -37,7 +42,7 @@
  *   onBack       when set, a Back arrow is drawn in the top row
  *   onSearch     when set, the name is a button with a small search icon
  */
-import { ChevronLeft, Search, Layers } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Search, Layers } from 'lucide-react'
 import { ClassIconTile } from './ClassCard.jsx'
 import { MoleculeIcon } from './ClassIcons.jsx'
 import ClassHeartButton from './ClassHeartButton.jsx'
@@ -87,29 +92,49 @@ export default function ClassHeading({
         </div>
       )}
       {onBack && (
-        <button
-          onClick={onBack}
-          aria-label="Back"
-          style={{
-            display:    'flex',
-            alignItems: 'center',
-            gap:        2,
-            height:     40,
-            padding:    0,
-            border:     'none',
-            background: 'none',
-            cursor:     'pointer',
-            fontFamily: 'var(--font-body)',
-            fontSize:   14,
-            fontWeight: 600,
-            color:      'var(--color-accent)',
-            WebkitTapHighlightColor: 'transparent',
-            outline:    'none',
-          }}
-        >
-          <ChevronLeft size={18} />
-          Back
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', minWidth: 0, marginRight: 34 }}>
+          <button
+            onClick={onBack}
+            aria-label="Back"
+            style={{
+              display:    'flex',
+              alignItems: 'center',
+              gap:        2,
+              flexShrink: 0,
+              height:     40,
+              padding:    0,
+              border:     'none',
+              background: 'none',
+              cursor:     'pointer',
+              fontFamily: 'var(--font-body)',
+              fontSize:   14,
+              fontWeight: 600,
+              color:      'var(--color-accent)',
+              WebkitTapHighlightColor: 'transparent',
+              outline:    'none',
+            }}
+          >
+            <ChevronLeft size={18} />
+            Back
+          </button>
+          {/* The class of a family, on the Back line: '> Class'. */}
+          {isFamily && parentName && (
+            <span style={{
+              display:      'flex',
+              alignItems:   'center',
+              gap:          2,
+              minWidth:     0,
+              marginLeft:   8,
+              fontSize:     13,
+              color:        'var(--color-text-secondary)',
+            }}>
+              <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {parentName}
+              </span>
+            </span>
+          )}
+        </div>
       )}
       {/* The small icon tile sits inside the name's text, so a long name
           wraps under it instead of making the heading tall and narrow. */}
@@ -159,9 +184,9 @@ export default function ClassHeading({
         )
       })()}
       </div>
-      {isFamily && parentName && (
+      {isFamily && parentName && !onBack && (
         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          in {parentName}
+          &rsaquo; {parentName}
         </p>
       )}
     </div>
