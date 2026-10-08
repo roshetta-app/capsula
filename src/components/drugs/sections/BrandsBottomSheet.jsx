@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/sections/BrandsBottomSheet.jsx
  *
+ * 2026-10-08 (Pro Form filter): the Form filter on the Similar and Alternatives tabs is
+ * now Pro-only, like on the class sheet (BrandsList gets proGateForm). Free users see
+ * the Pro tag and a tap opens the paywall sheet.
+ *
  * 2026-10-05 (family keywords on the Alternatives list): the words that point
  * at the family of the open drug (same class and family name, exactly as
  * stored) are shown as chips right under the Alternatives title, above the
@@ -389,6 +393,7 @@ export default function BrandsBottomSheet({
                   currentDrug={name === 'similar' ? currentDrug : null}
                   onTap={handleTap}
                   mode={name}
+                  proGateForm
                   saved={savedFilters.current[name]}
                   onSave={picks => { savedFilters.current[name] = picks }}
                   familyName={alternatives[0]?.subclass}
