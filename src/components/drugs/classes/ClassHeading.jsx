@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-09 (heart centred): with no Back arrow the heart is drawn inside the title row and
+ * centred on the icon tile and title together (also for a long, wrapped name).
+ *
  * 2026-10-09 (tile column): icon tile (28) on the left, the title (name, search icon and
  * '> Class') in its own column on the right, so nothing wraps under the tile.
  *
@@ -83,13 +86,13 @@ export default function ClassHeading({
       // 56 on the right keeps the name clear of the heart, but only when the
       // heart sits beside the name. With a Back arrow the heart is up in the
       // Back row, so the name gets the full width.
-      // No Back arrow: the heart is beside the name, so the top is 18, which puts the
-      // heart's own top edge level with the top of the name's icon tile.
-      padding:      `${onBack ? 'var(--space-2)' : '18px'} ${onBack ? 'var(--space-4)' : '56px'} var(--space-2) var(--space-4)`,
+      padding:      `var(--space-2) ${onBack ? 'var(--space-4)' : '56px'} var(--space-2) var(--space-4)`,
       borderBottom: '0.5px solid var(--color-border)',
     }}>
-      {/* The heart: same corner on every heading. */}
-      {drugCount > 0 && (
+      {/* The heart. With a Back arrow it sits in the Back row (top right corner).
+          Without one it sits beside the name, centred on the icon and title
+          (drawn inside the title row below). */}
+      {drugCount > 0 && onBack && (
         <div style={{ position: 'absolute', top: 6, right: 6 }}>
           <ClassHeartButton
             label={isFamily ? 'family' : 'class'}
@@ -129,7 +132,16 @@ export default function ClassHeading({
       {/* Title row: at least as tall as the heart's row, name centred in it,
           so the heart (always the same corner spot) lines up with the name.
           With a Back arrow above, the heart lines up with the Back row. */}
-      <div style={{ display: 'flex', alignItems: 'center', minHeight: 0 }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: 0 }}>
+        {drugCount > 0 && !onBack && (
+          <div style={{ position: 'absolute', top: '50%', right: -50, transform: 'translateY(-50%)' }}>
+            <ClassHeartButton
+              label={isFamily ? 'family' : 'class'}
+              active={favourited}
+              onPress={onToggleFavourite}
+            />
+          </div>
+        )}
       {(() => {
         const tile = (
           <ClassIconTile size={28} Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
