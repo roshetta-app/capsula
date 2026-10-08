@@ -95,7 +95,7 @@ export default function ClassHeading({
         </button>
       )}
       {(() => {
-        // The name with its badge in front. The last word and the small raised
+        // The name, with its badge on a line of its own above it. The last word and the small raised
         // search icon are kept together so the icon never lands on its own line.
         const words    = String(title ?? '').split(' ')
         const lastWord = words.pop()
@@ -103,7 +103,6 @@ export default function ClassHeading({
         const badge = (
           <span style={{
             display:       'inline-block',
-            marginRight:   8,
             padding:       '1px 7px',
             borderRadius:  999,
             border:        `0.5px solid ${labelColor}`,
@@ -113,9 +112,6 @@ export default function ClassHeading({
             letterSpacing: '0.05em',
             textTransform: 'uppercase',
             lineHeight:    1.5,
-            verticalAlign: 'middle',
-            position:      'relative',
-            top:           -1,
           }}>
             {isFamily ? 'Family' : 'Class'}
           </span>
@@ -127,22 +123,19 @@ export default function ClassHeading({
               {lastWord}
               {onSearch && (
                 <Search
-                  size={12}
-                  strokeWidth={2.4}
+                  size={11}
+                  strokeWidth={2.2}
                   color="var(--color-accent)"
                   aria-hidden="true"
-                  style={{
-                    marginLeft:    2,
-                    verticalAlign: 'top',
-                    position:      'relative',
-                    top:           2,
-                  }}
+                  style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
                 />
               )}
             </span>
           </>
         )
-        return onSearch ? (
+        return (<>
+          <p style={{ margin: '4px 0 0' }}>{badge}</p>
+          {onSearch ? (
           <button
             onClick={onSearch}
             aria-label={`Search Google for ${title}`}
@@ -161,13 +154,14 @@ export default function ClassHeading({
               outline:    'none',
             }}
           >
-            {badge}{nameText}
+            {nameText}
           </button>
         ) : (
           <p style={{ ...nameStyle, margin: '2px 0 0' }}>
-            {badge}{nameText}
+            {nameText}
           </p>
-        )
+        )}
+        </>)
       })()}
       {isFamily && parentName && (
         <p style={{
