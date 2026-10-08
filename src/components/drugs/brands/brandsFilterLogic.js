@@ -118,3 +118,16 @@ export function sortItems(items, mode) {
     return (a.tradenameClean ?? '').localeCompare(b.tradenameClean ?? '')
   })
 }
+
+// Other families page: splits the rows into one section per family. Rows of
+// the same family sit next to each other (whatever the sort), so a new section
+// starts whenever the family changes. Pure function, moved from BrandsList.jsx.
+export function buildFamilySections(rows) {
+  const sections = []
+  for (const item of rows) {
+    const last = sections[sections.length - 1]
+    if (last && last.name === item.subclass) last.items.push(item)
+    else sections.push({ name: item.subclass, items: [item] })
+  }
+  return sections
+}

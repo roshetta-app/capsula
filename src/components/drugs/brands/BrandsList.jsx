@@ -1,6 +1,15 @@
 /**
  * src/components/drugs/brands/BrandsList.jsx
  *
+ * 2026-10-08 (refactor, phase 3): smaller file, no behaviour change. Moved out:
+ * the text helpers (brandsText.js), the filter and sort buttons, the count
+ * reporter and the gradual list (BrandsListParts.jsx), the title
+ * (BrandsListHeading.jsx), the count line (BrandsCountLine.jsx), the 'Other
+ * families' cards (BrandsFamilySections.jsx) and the family grouping function
+ * (buildFamilySections in brandsFilterLogic.js). This file keeps the filter
+ * state and builds the pills and pop-ups. The groupBySubclass flag is still
+ * here; removing it would mean a second copy of the filter code.
+ *
  * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/brands/. No code change.
  *
  * 2026-10-06 (bigger family title): the heading above the filters ('Other <name>
@@ -429,67 +438,24 @@
  * FilterModal.jsx.
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
-import { openInAppBrowser } from '../../../utils/openInAppBrowser'
+import { ListFilter, ArrowUpDown, FlaskConical, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
 import SharedDrugCard from '../../SharedDrugCard.jsx'
 import RowStarButton from '../../ui/RowStarButton.jsx'
 import { FORM_OPTIONS } from '../DrugFilterPanel.jsx'
-import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, otherGenericIds } from './brandsFilterLogic.js'
+import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, otherGenericIds, buildFamilySections } from './brandsFilterLogic.js'
+import { resolveFormGroup, ingredientCase, genericLabel, multiLabel } from './brandsText.js'
+import { CountReporter, GradualList, PillButton } from './BrandsListParts.jsx'
+import BrandsListHeading from './BrandsListHeading.jsx'
+import BrandsCountLine from './BrandsCountLine.jsx'
+import BrandsFamilySections from './BrandsFamilySections.jsx'
 import { useCategories } from '../../../hooks/useCategories'
 import { FilterModal } from '../../ui/FilterModal.jsx'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import PaywallGateSheet from '../../ui/PaywallGateSheet.jsx'
 import { useIsPro } from '../../../hooks/useIsPro'
-
-// Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
-// grouped filter option it belongs to (e.g. the 'Tab / Cap.' group) —
-// same grouping DrugFilterPanel.jsx's Form/Route section already uses,
-// via its exported FORM_OPTIONS. A value with no match resolves to null
-// and is simply left out of the filter rather than guessed into a group.
-function resolveFormGroup(rawForm) {
-  if (!rawForm) return null
-  return FORM_OPTIONS.find(opt => opt.value !== 'all' && opt.matches.includes(rawForm)) || null
-}
-
-// 'brompheniramine + paracetamol' -> 'Brompheniramine + Paracetamol'
-// Generic names list their ingredients separated by ' + '; each one gets its
-// own capital letter (the rest of the name stays lower case).
-function ingredientCase(text) {
-  const t = (text ?? '').trim().toLowerCase()
-  return t.replace(/(^|\+\s*)(\S)/g, (_, lead, ch) => lead + ch.toUpperCase())
-}
-
-// 'beta blockers + diuretics' -> 'Beta Blockers + Diuretics'. Only the first
-// letter of each word is touched, so names already in capitals ('ACE') stay.
-// Used for the family labels on the 'Other families' page.
-function familyCase(text) {
-  return (text ?? '').replace(/(^|[\s+/(-])([a-z])/g, (_, lead, ch) => lead + ch.toUpperCase())
-}
-
-// Pill text for the generic filter: a prompt when nothing is picked, else a count.
-function genericLabel(selected) {
-  if (selected.length === 0) return 'Filter by generic'
-  return `${selected.length} ${selected.length === 1 ? 'generic' : 'generics'} selected`
-}
-
-// Pill text for a multi-select filter: nothing picked, one picked, or a count.
-function multiLabel(selected, options, allLabel, plural) {
-  if (selected.length === 0) return allLabel
-  if (selected.length === 1) return options.find(o => o.value === selected[0])?.label ?? allLabel
-  return `${selected.length} ${plural}`
-}
-
-// Tells the screen around the list how many drugs show now and how many there
-// are in all (see onFilteredCount), without putting a hook after the list's
-// early return. Renders nothing; clears itself when the list goes away.
-function CountReporter({ onCount, shown, total, active }) {
-  useEffect(() => { onCount({ shown, total, active }) }, [onCount, shown, total, active])
-  useEffect(() => () => onCount(null), [onCount])
-  return null
-}
 
 export default function BrandsList({ siblings = [], currentDrug = null, onTap, mode = 'similar', familyName, similarGenericName = null, similarCount, onFilteredCount, hideOther = false, hideHeading = false, belowHeading = null, titleIcon = null, groupBySubclass = false, saved = null, onSave, popupLayer = null, proGateForm = false }) {
   const isAlternatives = mode === 'alternatives'
@@ -568,14 +534,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
 
   // Other families page: the rows split into one section per family (rows of
   // the same family are next to each other, whatever the sort).
-  const familySections = []
-  if (groupBySubclass) {
-    for (const item of rows) {
-      const last = familySections[familySections.length - 1]
-      if (last && last.name === item.subclass) last.items.push(item)
-      else familySections.push({ name: item.subclass, items: [item] })
-    }
-  }
+  const familySections = groupBySubclass ? buildFamilySections(rows) : []
 
   // One drug card. isLast drops its divider line.
   function renderCard(item, isLast) {
@@ -614,25 +573,6 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
 
   // Name shown in the heading above the filters.
   const headingName = isAlternatives ? familyName : ingredientCase(siblings[0]?.genericName)
-  const headingStyle = {
-    fontSize:   18,
-    lineHeight: 1.4,
-    color:      'var(--color-text-secondary)',
-    margin:     '0 0 var(--space-3)',
-  }
-  const iconNode = titleIcon ? (
-    <span aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-4px', marginRight: 8, lineHeight: 0 }}>
-      {titleIcon}
-    </span>
-  ) : null
-  const nameNode = <strong style={{ fontWeight: 700, color: 'var(--color-text-primary)' }}>{headingName}</strong>
-
-  // Opens the Google search for the subclass (Alternatives title, whole title
-  // is the button): same opening method as SharedDrugCard.jsx's image-search
-  // icon, but a plain web search.
-  function searchSubclass() {
-    openInAppBrowser(`https://www.google.com/search?q=${encodeURIComponent(headingName)}`)
-  }
 
   // The two filter pills. Alternatives: both always (greyed out when there is
   // only one choice, showing that choice). Similar: Form only, and only when
@@ -707,45 +647,14 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
           drug's generic name, Alternatives uses the subclass name. Name in bold.
           On Alternatives the whole title is a button that opens the Google
           search; its small icon follows the subclass name. */}
-      {headingName && !hideHeading && (groupBySubclass
-        ? (
-          <p style={headingStyle}>{iconNode}{nameNode}</p>
-        )
-        : isAlternatives
-        ? (
-          <button
-            onClick={searchSubclass}
-            aria-label={`Search Google for ${headingName}`}
-            style={{
-              ...headingStyle,
-              display:    'block',
-              maxWidth:   '100%',
-              padding:    0,
-              border:     'none',
-              background: 'none',
-              textAlign:  'left',
-              fontFamily: 'var(--font-body)',
-              cursor:     'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              outline:    'none',
-            }}
-          >
-            {iconNode}{hideOther ? null : 'Other '}{nameNode}
-            <Search
-              size={11}
-              strokeWidth={2.2}
-              color="var(--color-accent)"
-              aria-hidden="true"
-              style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
-            />
-            {' '}drugs
-          </button>
-        )
-        : (
-          <p style={headingStyle}>
-            {iconNode}{hideOther ? null : 'Other '}{nameNode} drugs
-          </p>
-        )
+      {!hideHeading && (
+        <BrandsListHeading
+          headingName={headingName}
+          titleIcon={titleIcon}
+          groupBySubclass={groupBySubclass}
+          isAlternatives={isAlternatives}
+          hideOther={hideOther}
+        />
       )}
 
       {belowHeading}
@@ -778,41 +687,15 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
 
       {/* Count line: how many brands are showing (plus Clear filters while
           anything is picked) on the left, Sort as a quiet text control on the right. */}
-      <div style={{
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'space-between',
-        gap:            'var(--space-2)',
-        marginTop:      pills.length > 0 ? 'var(--space-3)' : 0,
-        fontSize:       13,
-        color:          'var(--color-text-secondary)',
-      }}>
-        <div style={{ minWidth: 0 }}>
-          {/* With a filter on: 'shown/all' (5/20 drugs), so the full size of the
-              list stays visible while it is narrowed. */}
-          {filtersActive ? `${sorted.length}/${siblings.length}` : sorted.length}
-          {' '}{(filtersActive ? siblings.length : sorted.length) === 1 ? 'drug' : 'drugs'}
-          {filtersActive && (
-            <>
-              {' · '}
-              <button
-                onClick={clearFilters}
-                style={{
-                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-body)',
-                  color: '#DC2626', WebkitTapHighlightColor: 'transparent', outline: 'none',
-                }}
-              >
-                Clear filters
-              </button>
-            </>
-          )}
-        </div>
-        <SortButton
-          label={sortOptions.find(o => o.value === sortMode)?.label}
-          onPress={() => setOpenMenu('sort')}
-        />
-      </div>
+      <BrandsCountLine
+        hasPills={pills.length > 0}
+        filtersActive={filtersActive}
+        shown={sorted.length}
+        total={siblings.length}
+        onClear={clearFilters}
+        sortLabel={sortOptions.find(o => o.value === sortMode)?.label}
+        onSortPress={() => setOpenMenu('sort')}
+      />
 
       <div style={{ height: 'var(--space-2)' }} />
 
@@ -830,31 +713,7 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
       {groupBySubclass ? (
         // Other families page: each family is one soft card, the family name
         // on top with a hairline under it, then its drug card(s).
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {familySections.map(sec => (
-            <div
-              key={sec.name}
-              style={{
-                backgroundColor: 'var(--color-surface-muted)',
-                borderRadius:    16,
-                padding:         '0 var(--space-3) var(--space-1)',
-              }}
-            >
-              <p style={{
-                margin:       0,
-                padding:      'var(--space-4) 0 var(--space-3)',
-                fontSize:     13,
-                fontWeight:   600,
-                lineHeight:   1.45,
-                color:        'var(--color-text-primary)',
-                borderBottom: '0.5px solid var(--color-border-subtle)',
-              }}>
-                {familyCase(sec.name)}
-              </p>
-              {sec.items.map((item, k) => renderCard(item, k === sec.items.length - 1))}
-            </div>
-          ))}
-        </div>
+        <BrandsFamilySections sections={familySections} renderCard={renderCard} />
       ) : (
       <div>
         {/* Long lists are drawn in batches (see GradualList). The key starts
@@ -911,146 +770,3 @@ export default function BrandsList({ siblings = [], currentDrug = null, onTap, m
     </div>
   )
 }
-
-// Long-list helper: draws the first FIRST_BATCH rows and adds NEXT_BATCH more
-// whenever an invisible marker under the last drawn row comes within
-// LOOK_AHEAD of the visible area, so rows are ready before the person gets
-// there. 'renderRow(item, indexInFullList)' is the same row drawing the list
-// used before, so the last real row still drops its divider line. The caller
-// gives this a new key whenever the sort or filters change, which starts it
-// again from the first batch.
-const FIRST_BATCH = 30
-const NEXT_BATCH  = 30
-const LOOK_AHEAD  = '1200px'
-
-// The nearest ancestor that scrolls (the sheet's list area), or null.
-function findScrollParent(el) {
-  let node = el?.parentElement
-  while (node && node !== document.body) {
-    const overflowY = getComputedStyle(node).overflowY
-    if (overflowY === 'auto' || overflowY === 'scroll') return node
-    node = node.parentElement
-  }
-  return null
-}
-
-function GradualList({ rows, renderRow }) {
-  const [count, setCount] = useState(FIRST_BATCH)
-  const markerRef = useRef(null)
-  const shown = Math.min(count, rows.length)
-  const hasMore = shown < rows.length
-
-  // Watches the marker; each time more rows are drawn (shown changes) the
-  // watch restarts, so a marker that is still near the visible area keeps
-  // pulling in batches until it is far enough away.
-  useEffect(() => {
-    if (!hasMore) return undefined
-    const marker = markerRef.current
-    if (!marker || typeof IntersectionObserver === 'undefined') {
-      // No way to watch (very old browser): draw everything, as before.
-      setCount(rows.length)
-      return undefined
-    }
-    const observer = new IntersectionObserver(
-      entries => {
-        if (entries.some(e => e.isIntersecting)) setCount(c => c + NEXT_BATCH)
-      },
-      { root: findScrollParent(marker), rootMargin: `0px 0px ${LOOK_AHEAD} 0px` }
-    )
-    observer.observe(marker)
-    return () => observer.disconnect()
-  }, [hasMore, shown, rows.length])
-
-  return (
-    <>
-      {rows.slice(0, shown).map((item, i) => renderRow(item, i))}
-      {hasMore && <div ref={markerRef} aria-hidden="true" style={{ height: 1 }} />}
-    </>
-  )
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
-
-// Sort control: plain text with a small icon and chevron, no outline or fill,
-// so it never reads as a filter. Same look whatever is chosen.
-export function SortButton({ label, onPress }) {
-  return (
-    <button
-      onClick={onPress}
-      aria-haspopup="dialog"
-      style={{
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     4,
-        flexShrink:              0,
-        background:              'none',
-        border:                  'none',
-        padding:                 '6px 0 6px 8px',
-        fontSize:                13,
-        fontWeight:              500,
-        color:                   'var(--color-text-secondary)',
-        fontFamily:              'var(--font-body)',
-        cursor:                  'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
-      }}
-    >
-      <ArrowUpDown size={14} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
-      <span>{label}</span>
-      <ChevronDown size={13} color="var(--color-text-secondary)" style={{ flexShrink: 0 }} />
-    </button>
-  )
-}
-
-// The filter buttons. Inactive: plain outline. Active (a filter is
-// applied): tinted accent pill with accent text and icon.
-export function PillButton({ icon: Icon, label, active, disabled = false, flex = 1, fit = false, onPress }) {
-  const [pressed, setPressed] = useState(false)
-  const fg = active ? 'var(--color-accent)' : 'var(--color-text-primary)'
-  return (
-    <button
-      onClick={disabled ? undefined : onPress}
-      disabled={disabled}
-      aria-haspopup="dialog"
-      onPointerDown={() => !disabled && setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        flex:                    fit ? '0 0 auto' : flex,
-        minWidth:                0,
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     6,
-        backgroundColor:         active ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
-        border:                  `1.5px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`,
-        borderRadius:            'var(--radius-full)',
-        padding:                 '8px 12px',
-        fontSize:                13,
-        fontWeight:              active ? 600 : 500,
-        color:                   fg,
-        fontFamily:              'var(--font-body)',
-        cursor:                  disabled ? 'default' : 'pointer',
-        opacity:                 disabled ? 0.5 : 1,
-        transform:               pressed ? 'scale(0.97)' : 'scale(1)',
-        transition:              'background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease',
-        WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
-      }}
-    >
-      <Icon size={14} color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'} style={{ flexShrink: 0 }} />
-      <span style={{
-        flex: fit ? '0 1 auto' : 1, minWidth: 0, textAlign: 'left',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {label}
-      </span>
-      <ChevronDown
-        size={14}
-        color={active ? 'var(--color-accent)' : 'var(--color-text-secondary)'}
-        style={{ flexShrink: 0 }}
-      />
-    </button>
-  )
-}
-
