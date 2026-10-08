@@ -1,7 +1,10 @@
 /**
  * src/components/drugs/classes/ClassSearchResults.jsx
  *
- *  * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/classes/;
+ * 2026-10-08 (refactor, phase 2b): the result card (ResultCard) is gone; the
+ * cards are now the shared ClassCard in its 'search' look. No behaviour change.
+ *
+ * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/classes/;
  *   MoleculeIcon now imported from ClassIcons.jsx. No behaviour change.
  *
  * 2026-10-08: the icon tile on the class and family cards now uses the class colour
@@ -78,8 +81,8 @@
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
-import CountTag from '../../ui/CountTag.jsx'
+import { ChevronDown, Layers } from 'lucide-react'
+import ClassCard from './ClassCard.jsx'
 import { MoleculeIcon } from './ClassIcons.jsx'
 import { titleCaseWords } from '../../../utils/classSearch'
 import { highlightMatch } from '../../../utils/highlightMatch'
@@ -113,135 +116,13 @@ function keywordSegments(keyword, typed) {
 const CLASS_LIMIT    = 5
 const SUBCLASS_LIMIT = 8
 
-const ICON_TILE = 34
-
-// One tappable card. Same look as the subclass cards in the class sheet, with
-// a small kicker above the name so a class and a subclass are told apart.
-function ResultCard({ kicker, name, detail, matchedKeyword = '', count, Icon, onClick, highlight = '' }) {
-  const [pressed, setPressed] = useState(false)
-  // Same bolding the drug cards use: the typed text is drawn heavier inside the name.
-  const nameSegments = highlightMatch(name, highlight)
-  const keywordLine  = matchedKeyword ? keywordSegments(matchedKeyword, highlight) : null
-  return (
-    <button
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display:         'flex',
-        alignItems:      'center',
-        gap:             10,
-        width:           '100%',
-        minWidth:        0,
-        boxSizing:       'border-box',
-        flexShrink:      0,
-        minHeight:       64,
-        padding:         '12px 16px',
-        border:          'none',
-        borderRadius:    16,
-        backgroundColor: 'var(--color-surface-muted)',
-        opacity:         pressed ? 0.8 : 1,
-        transform:       pressed ? 'scale(0.985)' : 'scale(1)',
-        transition:      'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-        fontFamily:      'var(--font-body)',
-        textAlign:       'left',
-        cursor:          'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        outline:         'none',
-      }}
-    >
-      <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span
-          aria-hidden="true"
-          style={{
-            width:           ICON_TILE,
-            height:          ICON_TILE,
-            borderRadius:    10,
-            backgroundColor: 'var(--color-class-light)',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            flexShrink:      0,
-          }}
-        >
-          <Icon size={17} strokeWidth={1.9} color="var(--color-class)" />
-        </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          {kicker && (
-            <span style={{
-              display:       'block',
-              fontSize:      10.5,
-              fontWeight:    600,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color:         'var(--color-accent)',
-            }}>
-              {kicker}
-            </span>
-          )}
-          <span style={{
-            display:    'block',
-            marginTop:  kicker ? 1 : 0,
-            fontSize:   15,
-            fontWeight: 500,
-            lineHeight: 1.3,
-            color:      'var(--color-text-primary)',
-            overflowWrap: 'anywhere',
-          }}>
-            {nameSegments.map((seg, i) =>
-              seg.bold
-                ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
-                : <span key={i}>{seg.text}</span>
-            )}
-          </span>
-          {detail && (
-            <span style={{
-              display:    'block',
-              marginTop:  2,
-              fontSize:   12.5,
-              lineHeight: 1.3,
-              color:      'var(--color-text-secondary)',
-              overflowWrap: 'anywhere',
-            }}>
-              {detail}
-            </span>
-          )}
-          {keywordLine && (
-            <span style={{
-              display:    'block',
-              marginTop:  2,
-              fontSize:   12.5,
-              lineHeight: 1.3,
-              color:      'var(--color-text-secondary)',
-              overflowWrap: 'anywhere',
-            }}>
-              matches:{' '}
-              <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>
-                {keywordLine.map((seg, i) =>
-                  seg.bold
-                    ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
-                    : <span key={i}>{seg.text}</span>
-                )}
-              </span>
-            </span>
-          )}
-        </span>
-      </span>
-      <CountTag
-        style={{ minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11, flexShrink: 0 }}
-      >
-        <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
-      </CountTag>
-      <ChevronRight
-        aria-hidden="true"
-        size={16}
-        strokeWidth={2}
-        color="var(--color-text-tertiary)"
-        style={{ flexShrink: 0 }}
-      />
-    </button>
+// The matched keyword with the typed part in bold, as a node for ClassCard.
+function matchNode(keyword, typed) {
+  if (!keyword) return null
+  return keywordSegments(keyword, typed).map((seg, i) =>
+    seg.bold
+      ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+      : <span key={i}>{seg.text}</span>
   )
 }
 
@@ -334,10 +215,12 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
           {subclasses.length > 0 && <GroupLabel>Drug classes</GroupLabel>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownClasses.map(c => (
-              <ResultCard
+              <ClassCard
                 key={`class:${c.name}`}
+                variant="search"
+                tone="class"
                 name={spaceSlashes(titleCaseWords(c.name))}
-                matchedKeyword={c.matchedKeyword}
+                matches={matchNode(c.matchedKeyword, highlightText)}
                 count={c.brandCount}
                 highlight={highlightText}
                 Icon={Layers}
@@ -359,11 +242,13 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
           {classes.length > 0 && <GroupLabel>Drug families</GroupLabel>}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownSubclasses.map(s => (
-              <ResultCard
+              <ClassCard
                 key={`sub:${s.className}\u0000${s.name}`}
+                variant="search"
+                tone="class"
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
-                matchedKeyword={s.matchedKeyword}
+                matches={matchNode(s.matchedKeyword, highlightText)}
                 count={s.brandCount}
                 highlight={highlightText}
                 Icon={MoleculeIcon}
