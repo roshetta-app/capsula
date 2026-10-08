@@ -68,7 +68,10 @@ export default function ClassHeading({
     <div style={{
       position:     'relative',
       flexShrink:   0,
-      padding:      'var(--space-2) 56px var(--space-2) var(--space-4)',
+      // 56 on the right keeps the name clear of the heart, but only when the
+      // heart sits beside the name. With a Back arrow the heart is up in the
+      // Back row, so the name gets the full width.
+      padding:      `var(--space-2) ${onBack ? 'var(--space-4)' : '56px'} var(--space-2) var(--space-4)`,
       borderBottom: '0.5px solid var(--color-border)',
     }}>
       {/* The heart: same corner on every heading. */}
