@@ -24,13 +24,15 @@
  * and no drug count; a family row shows its class name underneath, plain.
  *
  * Props (card):  count, countLabel, onClick
- * Props (sheet): isOpen, onClose, items, onOpen(item), onRemove(item)
+ * Props (sheet): isOpen, onClose, items, onOpen(item), onRemove(item), countLabel
+ *   (the saved count as on the card, '3/5' for a free account; shown in the header)
  */
 import { Heart } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import FavouriteClassRow from './FavouriteClassRow.jsx'
+import CountTag from '../../ui/CountTag'
 
-export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, onRemove }) {
+export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, onRemove, countLabel }) {
   // Newest first, same as the other Favourites lists.
   const shown = items.slice().reverse()
   return (
@@ -43,7 +45,9 @@ export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, 
         <div style={{
           flexShrink: 0, padding: 'var(--space-2) var(--space-4) var(--space-3)',
           borderBottom: '0.5px solid var(--color-border)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12,
         }}>
+          <div style={{ minWidth: 0 }}>
           <p style={{
             margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: '0.06em',
             textTransform: 'uppercase', color: 'var(--color-accent)',
@@ -56,6 +60,13 @@ export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, 
           }}>
             Classes &amp; families
           </p>
+          </div>
+          <CountTag
+            tone="accent"
+            style={{ backgroundColor: 'transparent', color: 'var(--color-class)', marginBottom: 3 }}
+          >
+            {countLabel ?? items.length}
+          </CountTag>
         </div>
         <div style={{
           flex: 1, minHeight: 0, overflowY: 'auto',

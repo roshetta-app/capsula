@@ -1633,6 +1633,7 @@ export default function FavouritesScreen() {
         isOpen={showClassesSheet}
         onClose={() => setShowClassesSheet(false)}
         items={favClasses}
+        countLabel={classesCountLabel}
         onOpen={openFavClass}
         onRemove={setConfirmingClass}
       />
