@@ -1,9 +1,10 @@
 /**
  * src/components/drugs/classes/FavouriteClassesCard.jsx
  *
- * 2026-10-08 (pill): no longer a full-width card. It is a small left-aligned
- * pill (layers icon, name, count, arrow) in the soft class tint, so it does not
- * compete with the upgrade banner above it.
+ * 2026-10-09 (slim full width): full width again, but slim (46) and soft: the
+ * class tint only, layers icon, name, count and arrow. No icon tile, no shadow.
+ *
+ * 2026-10-08 (pill): was a small left-aligned pill for a while.
  *
  * 2026-10-08 (refactor, phase 2b): the 'Classes & families' card at the top of
  * the Drugs tab of the Favourites screen, moved here from
@@ -20,8 +21,8 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
   const [pressed, setPressed] = useState(false)
   return (
     <div style={{ marginBottom: 'var(--space-3)' }}>
-      {/* A small pill, not a full-width block: it sits left, takes only the
-          room it needs, and leaves the upgrade banner as the one big shape. */}
+      {/* Full width, but slim and soft (tint only, no shadow), so the upgrade
+          banner stays the louder of the two. */}
       <button
         onClick={onClick}
         onPointerDown={() => setPressed(true)}
@@ -29,9 +30,9 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
         onPointerLeave={() => setPressed(false)}
         onPointerCancel={() => setPressed(false)}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 8,
-          height: 38, padding: '0 12px 0 12px', boxSizing: 'border-box',
-          border: 'none', borderRadius: 999,
+          display: 'flex', alignItems: 'center', gap: 10,
+          width: '100%', height: 46, padding: '0 14px', boxSizing: 'border-box',
+          border: 'none', borderRadius: 16,
           backgroundColor: 'var(--color-class-light)',
           opacity: pressed ? 0.8 : 1,
           transform: pressed ? 'scale(0.98)' : 'scale(1)',
@@ -41,7 +42,7 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
         }}
       >
         <Layers aria-hidden="true" size={16} strokeWidth={1.9} color="var(--color-class)" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-primary)' }}>
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: 14, fontWeight: 500, lineHeight: 1, color: 'var(--color-text-primary)' }}>
           Classes &amp; families
         </span>
         <span style={{
@@ -50,7 +51,7 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
         }}>
           {countLabel ?? count}
         </span>
-        <ChevronRight aria-hidden="true" size={15} strokeWidth={2} color="var(--color-class)" style={{ flexShrink: 0, opacity: 0.7, marginLeft: -2 }} />
+        <ChevronRight aria-hidden="true" size={15} strokeWidth={2} color="var(--color-class)" style={{ flexShrink: 0, opacity: 0.7, marginLeft: 0 }} />
       </button>
     </div>
   )
