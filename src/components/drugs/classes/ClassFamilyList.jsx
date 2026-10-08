@@ -37,6 +37,7 @@ export default function ClassFamilyList({ listRef, wordsBlock, totalDrugs, listG
           name={ALL_LABEL}
           count={totalDrugs}
           Icon={List}
+          tone="class"
           featured
           onClick={() => onPick(ALL_KEY)}
         />

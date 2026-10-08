@@ -87,7 +87,7 @@ export default function FamilyDrugsView({
         flex:      1,
         minHeight: 0,
         overflowY: 'auto',
-        padding:   'var(--space-4) var(--space-4) var(--space-6)',
+        padding:   'var(--space-3) var(--space-4) var(--space-6)',
       }}>
         {wordsBlock}
         <BrandsList

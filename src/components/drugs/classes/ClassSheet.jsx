@@ -436,7 +436,9 @@ export default function ClassSheet({
         words={classWords}
         open={wordsOpen}
         onToggle={() => setWordsOpen(o => !o)}
-        marginBottom={straightToAll ? 'var(--space-4)' : 'var(--space-1)'}
+        marginBottom={straightToAll ? 'var(--space-3)' : 'var(--space-1)'}
+        showTitle={false}
+        tone="class"
       />
     : null
 

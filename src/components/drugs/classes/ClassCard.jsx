@@ -81,6 +81,8 @@ export default function ClassCard({
 }) {
   const [pressed, setPressed] = useState(false)
   const isSearch = variant === 'search'
+  const toneColor = tone === 'class' ? 'var(--color-class)' : 'var(--color-accent)'
+  const toneTint  = tone === 'class' ? 'var(--color-class-light)' : 'var(--color-accent-light)'
   const isSaved  = variant === 'saved'
   const wrap     = isSearch ? { overflowWrap: 'anywhere' } : null
   const nameSegments = highlight ? highlightMatch(name, highlight) : null
@@ -113,7 +115,7 @@ export default function ClassCard({
         fontSize:   15,
         fontWeight: featured ? 600 : 500,
         lineHeight: 1.3,
-        color:      featured ? 'var(--color-accent)' : 'var(--color-text-primary)',
+        color:      featured ? toneColor : 'var(--color-text-primary)',
         ...wrap,
       }}>
         {nameSegments
@@ -172,7 +174,7 @@ export default function ClassCard({
       aria-hidden="true"
       size={16}
       strokeWidth={2}
-      color={featured ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
+      color={featured ? toneColor : 'var(--color-text-tertiary)'}
       style={{ flexShrink: 0 }}
     />
   )
@@ -229,7 +231,7 @@ export default function ClassCard({
         padding:         isSearch ? '12px 16px' : '14px 16px',
         border:          'none',
         borderRadius:    16,
-        backgroundColor: featured ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
+        backgroundColor: featured ? toneTint : 'var(--color-surface-muted)',
         opacity:         pressed ? 0.8 : 1,
         transform:       pressed ? 'scale(0.985)' : 'scale(1)',
         transition:      press,
@@ -253,7 +255,7 @@ export default function ClassCard({
           style={{
             minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11,
             ...(isSearch ? { flexShrink: 0 } : null),
-            ...(featured ? { backgroundColor: 'transparent', color: 'var(--color-accent)' } : null),
+            ...(featured ? { backgroundColor: 'transparent', color: toneColor } : null),
           }}
         >
           <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>

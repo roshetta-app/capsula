@@ -16,7 +16,10 @@
 import { visibleCount } from './KeywordChips.jsx'
 import { capFirst } from './classGrouping.js'
 
-export default function ClassKeywords({ words, open, onToggle, marginBottom, showTitle = true }) {
+export default function ClassKeywords({ words, open, onToggle, marginBottom, showTitle = true, tone = 'accent' }) {
+  const isClass = tone === 'class'
+  const chipColor = isClass ? 'var(--color-class)' : 'var(--color-accent)'
+  const chipTint  = isClass ? 'var(--color-class-light)' : 'var(--color-accent-light)'
   if (words.length === 0) return null
   const limit  = visibleCount(words)
   const shown  = open ? words : words.slice(0, limit)
@@ -45,7 +48,7 @@ export default function ClassKeywords({ words, open, onToggle, marginBottom, sho
         display:    'flex',
         flexWrap:   'wrap',
         gap:        6,
-        margin:     '0 var(--space-1)',
+        margin:     0,
       }}>
         {shown.map(w => (
           <span key={w} style={{
@@ -53,8 +56,8 @@ export default function ClassKeywords({ words, open, onToggle, marginBottom, sho
             borderRadius:    999,
             fontSize:        12,
             lineHeight:      1.3,
-            color:           'var(--color-accent)',
-            backgroundColor: 'var(--color-accent-light)',
+            color:           chipColor,
+            backgroundColor: chipTint,
           }}>
             {capFirst(w)}
           </span>
