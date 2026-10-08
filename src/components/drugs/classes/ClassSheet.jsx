@@ -1,7 +1,15 @@
 /**
  * src/components/drugs/classes/ClassSheet.jsx
  *
- *  * 2026-10-08 (refactor, phase 1): renamed from ClassBottomSheet and moved
+ * 2026-10-08 (refactor, phase 2): the sheet is split into smaller files, no
+ * behaviour change. The pure helpers are in classGrouping.js, the heading in
+ * ClassHeading.jsx, the keyword chips in ClassKeywords.jsx, the family cards
+ * in ClassCard.jsx (was SubclassRow here), the family list in ClassFamilyList.jsx
+ * and the drugs page in FamilyDrugsView.jsx. This file keeps the state (which
+ * page is open, scroll memory, remembered filters, keyword fold) and picks the
+ * page to show.
+ *
+ * 2026-10-08 (refactor, phase 1): renamed from ClassBottomSheet and moved
  *   from sections/ to drugs/classes/. MoleculeIcon is now in ClassIcons.jsx and
  *   ALL_KEY in classKeys.js. No behaviour change.
  *
@@ -266,196 +274,16 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
-import { ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
-import BrandsList from '../brands/BrandsList.jsx'
-import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 import { useDrugContext } from '../../../context/DrugContext'
-import { titleCaseWords } from '../../../utils/classSearch'
-import { visibleCount } from './KeywordChips.jsx'
-import ClassHeartButton from './ClassHeartButton.jsx'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
-import { MoleculeIcon } from './ClassIcons.jsx'
+import ClassHeading from './ClassHeading.jsx'
+import ClassKeywords from './ClassKeywords.jsx'
+import ClassFamilyList from './ClassFamilyList.jsx'
+import FamilyDrugsView from './FamilyDrugsView.jsx'
+import { groupBySubclass, buildListGroups, splitKeywords } from './classGrouping.js'
 import { ALL_KEY } from './classKeys.js'
-
-// Groups drugs by subclass name, biggest group first; groups of the same size
-// go A to Z. Drugs without a subclass are skipped. Pure function, no hooks,
-// so it can be checked on its own.
-function groupBySubclass(drugs) {
-  const map = new Map()
-  for (const d of drugs) {
-    if (!d.subclass) continue
-    if (!map.has(d.subclass)) map.set(d.subclass, [])
-    map.get(d.subclass).push(d)
-  }
-  return [...map.entries()]
-    .map(([name, items]) => ({ name, items }))
-    .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
-}
-
-// Key and label of the 'Other families' card that collects the families with
-// only one drug each.
-const OTHERS_KEY   = '__other_families__'
-const OTHERS_LABEL = 'Other families'
-
-// Key of the first row (opens every brand in the class) lives in classKeys.js,
-// so the Drugs screen can open the sheet straight on it without importing the sheet.
-const ALL_LABEL = 'All drugs in this class'
-
-// Builds the cards of the subclass list. Families with a single drug are
-// collected into one 'Other families' card, put last, but only when there are
-// at least two of them and at least one bigger family stays in the list (with
-// fewer, the card would save nothing). Pure function, no hooks, so it can be
-// checked on its own.
-function buildListGroups(groups) {
-  const singles = groups.filter(g => g.items.length === 1)
-  const bigger  = groups.filter(g => g.items.length !== 1)
-  if (singles.length < 2 || bigger.length === 0) return groups
-  return [
-    ...bigger,
-    { name: OTHERS_KEY, items: singles.flatMap(g => g.items), isOthers: true },
-  ]
-}
-
-// A keyword as shown: the first letter capital, the rest as written.
-function capFirst(text) {
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text
-}
-
-// Sorts keyword texts A to Z and drops repeats (ignoring capital letters).
-function uniqueSorted(words) {
-  const seen = new Map()
-  for (const w of words) {
-    const key = w.trim().toLowerCase()
-    if (key && !seen.has(key)) seen.set(key, w.trim())
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b))
-}
-
-// Splits the active keywords into the ones that point at the whole class and
-// the ones that point at one family of it (a Map: family name -> words).
-// Pure function, no hooks, so it can be checked on its own.
-function splitKeywords(keywords, className) {
-  const classWords = []
-  const byFamily   = new Map()
-  for (const k of keywords ?? []) {
-    if (!k || !k.keyword) continue
-    for (const t of k.targets ?? []) {
-      if (!t || t.class !== className) continue
-      if (t.subclass) {
-        if (!byFamily.has(t.subclass)) byFamily.set(t.subclass, [])
-        byFamily.get(t.subclass).push(k.keyword)
-      } else {
-        classWords.push(k.keyword)
-      }
-    }
-  }
-  return {
-    classWords:   uniqueSorted(classWords),
-    familyWords:  new Map([...byFamily].map(([name, words]) => [name, uniqueSorted(words)])),
-  }
-}
-
-// Size of the icon tile and the gap after it.
-const ICON_TILE = 34
-const ICON_GAP  = 12
-
-function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = false, words = [] }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display:         'flex',
-        alignItems:      'center',
-        gap:             10,
-        width:           '100%',
-        boxSizing:       'border-box',
-        flexShrink:      0,
-        minHeight:       56,
-        padding:         '14px 16px',
-        border:          'none',
-        borderRadius:    16,
-        backgroundColor: featured ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
-        opacity:         pressed ? 0.8 : 1,
-        transform:       pressed ? 'scale(0.985)' : 'scale(1)',
-        transition:      'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
-        fontFamily:      'var(--font-body)',
-        textAlign:       'left',
-        cursor:          'pointer',
-        WebkitTapHighlightColor: 'transparent',
-        outline:         'none',
-      }}
-    >
-      {/* Icon and name share one row, so the icon is centred on the name
-          (all its lines). */}
-      <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: ICON_GAP }}>
-        <span
-          aria-hidden="true"
-          style={{
-            width:           ICON_TILE,
-            height:          ICON_TILE,
-            borderRadius:    10,
-            backgroundColor: featured ? 'transparent' : 'var(--color-accent-light)',
-            display:         'flex',
-            alignItems:      'center',
-            justifyContent:  'center',
-            flexShrink:      0,
-          }}
-        >
-          <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
-        </span>
-        <span style={{
-          flex:       1,
-          minWidth:   0,
-          fontSize:   15,
-          fontWeight: featured ? 600 : 500,
-          lineHeight: 1.3,
-          color:      featured ? 'var(--color-accent)' : 'var(--color-text-primary)',
-        }}>
-          {name}
-          {words.length > 0 && (
-            <span style={{
-              display:      'block',
-              marginTop:    2,
-              fontSize:     12.5,
-              fontWeight:   400,
-              lineHeight:   1.3,
-              color:        'var(--color-text-secondary)',
-              whiteSpace:   'nowrap',
-              overflow:     'hidden',
-              textOverflow: 'ellipsis',
-            }}>
-              {words.map(capFirst).join(', ')}
-            </span>
-          )}
-        </span>
-      </span>
-      {/* Drug count: the same small rounded-square tag used in the Related
-          drugs sheet, a little smaller, just before the chevron. */}
-      <CountTag
-        style={{
-          minWidth: 20, height: 18, padding: '0 5px', borderRadius: 6, fontSize: 11,
-          ...(featured ? { backgroundColor: 'transparent', color: 'var(--color-accent)' } : null),
-        }}
-      >
-        <span aria-label={`${count} ${count === 1 ? 'drug' : 'drugs'}`}>{count}</span>
-      </CountTag>
-      <ChevronRight
-        aria-hidden="true"
-        size={16}
-        strokeWidth={2}
-        color={featured ? 'var(--color-accent)' : 'var(--color-text-tertiary)'}
-        style={{ flexShrink: 0 }}
-      />
-    </button>
-  )
-}
 
 export default function ClassSheet({
   isOpen,
@@ -561,58 +389,15 @@ export default function ClassSheet({
   // Fixed heading: the same for every class, with or without families. It stays
   // put while the list scrolls under it.
   const straightToAll = directSubclass === ALL_KEY
-  const classHeading = (
-    <div style={{
-      position:     'relative',
-      flexShrink:   0,
-      padding:      'var(--space-2) 56px var(--space-3) var(--space-4)',
-      borderBottom: '0.5px solid var(--color-border)',
-    }}>
-      {totalDrugs > 0 && (
-        <div style={{ position: 'absolute', top: 6, right: 6 }}>
-          <ClassHeartButton
-            label="class"
-            active={isClassFavourited(className, '')}
-            onPress={() => toggleClass(className, '')}
-          />
-        </div>
-      )}
-      <p style={{
-        margin:        0,
-        fontSize:      11,
-        fontWeight:    600,
-        letterSpacing: '0.06em',
-        textTransform: 'uppercase',
-        color:         'var(--color-accent)',
-      }}>
-        Drug class
-      </p>
-      <p style={{
-        margin:     '2px 0 0',
-        fontSize:   20,
-        fontWeight: 500,
-        lineHeight: 1.3,
-        color:      'var(--color-text-primary)',
-      }}>
-        {classLabel}
-      </p>
-      <p style={{
-        margin:             '4px 0 0',
-        fontSize:           13,
-        fontVariantNumeric: 'tabular-nums',
-        color:              'var(--color-text-secondary)',
-      }}>
-        {groups.length > 0 && (
-          <>
-            {groups.length} drug {groups.length === 1 ? 'family' : 'families'}
-            {', '}
-          </>
-        )}
-        {/* While a filter is on in the all-drugs list below: 'shown/all'. */}
-        {straightToAll && listCount?.active ? `${listCount.shown}/${listCount.total}` : totalDrugs}
-        {' '}{(straightToAll && listCount?.active ? listCount.total : totalDrugs) === 1 ? 'drug' : 'drugs'}
-      </p>
-    </div>
+  const heading = (
+    <ClassHeading
+      classLabel={classLabel}
+      familyCount={groups.length}
+      drugCount={totalDrugs}
+      filtered={straightToAll && listCount?.active ? listCount : null}
+      favourited={isClassFavourited(className, '')}
+      onToggleFavourite={() => toggleClass(className, '')}
+    />
   )
 
   // The 'Keywords' title and chips (display only), or null when the class
@@ -622,91 +407,30 @@ export default function ClassSheet({
   // A class with no families, opened straight on its drugs: no Back bar, no
   // repeated class name above the drugs, the same heading as every class.
 
-  // Builds the 'Keywords' title and chips for a list of words (or null when
-  // the list is empty). Used for the class words and for a family's words.
-  // marginBottom is the space left under the block. showTitle false leaves out
-  // the small 'Keywords' title and draws the chips alone.
-  function buildWordsBlock(words, marginBottom, showTitle = true) {
-    if (words.length === 0) return null
-    const limit  = visibleCount(words)
-    const shown  = wordsOpen ? words : words.slice(0, limit)
-    const hidden = words.length - limit
-    return (
-      <div style={{
-        flexShrink:    0,
-        display:       'flex',
-        flexDirection: 'column',
-        gap:           'var(--space-2)',
-        marginBottom,
-      }}>
-        {showTitle && (
-          <p style={{
-            flexShrink:  0,
-            margin:      '0 var(--space-1)',
-            fontSize:    14.5,
-            fontWeight:  600,
-            color:       'var(--color-text-primary)',
-          }}>
-            Keywords
-          </p>
-        )}
-        <div style={{
-          flexShrink: 0,
-          display:    'flex',
-          flexWrap:   'wrap',
-          gap:        6,
-          margin:     '0 var(--space-1)',
-        }}>
-          {shown.map(w => (
-            <span key={w} style={{
-              padding:         '3px 9px',
-              borderRadius:    999,
-              fontSize:        12,
-              lineHeight:      1.3,
-              color:           'var(--color-accent)',
-              backgroundColor: 'var(--color-accent-light)',
-            }}>
-              {capFirst(w)}
-            </span>
-          ))}
-          {hidden > 0 && (
-            <button
-              onClick={() => setWordsOpen(o => !o)}
-              aria-label={wordsOpen ? 'Show fewer words' : `Show ${hidden} more words`}
-              aria-expanded={wordsOpen}
-              style={{
-                padding:         '3px 9px',
-                border:          'none',
-                borderRadius:    999,
-                fontFamily:      'var(--font-body)',
-                fontSize:        12,
-                lineHeight:      1.3,
-                color:           'var(--color-text-secondary)',
-                backgroundColor: 'var(--color-surface-muted)',
-                cursor:          'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                outline:         'none',
-              }}
-            >
-              {wordsOpen ? 'Show less' : `+${hidden}`}
-            </button>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   // The class words block. The list above it has 12 of space over the first
   // thing in it and 8 between rows, so 4 more under the block makes the space
   // above and below equal (12). On the drugs page (16 above) it is 16 below.
-  const wordsBlock = totalDrugs > 0
-    ? buildWordsBlock(classWords, straightToAll ? 'var(--space-4)' : 'var(--space-1)')
+  const wordsBlock = totalDrugs > 0 && classWords.length > 0
+    ? <ClassKeywords
+        words={classWords}
+        open={wordsOpen}
+        onToggle={() => setWordsOpen(o => !o)}
+        marginBottom={straightToAll ? 'var(--space-4)' : 'var(--space-1)'}
+      />
     : null
 
   // The family words block, drawn under the family title on the drugs page of
   // a family, as chips alone (no 'Keywords' title). 12 under it matches the 12
   // the title leaves above it.
-  const familyBlock = buildWordsBlock(pickedFamilyWords, 'var(--space-3)', false)
+  const familyBlock = pickedFamilyWords.length > 0
+    ? <ClassKeywords
+        words={pickedFamilyWords}
+        open={wordsOpen}
+        onToggle={() => setWordsOpen(o => !o)}
+        marginBottom="var(--space-3)"
+        showTitle={false}
+      />
+    : null
 
   function handleTap(item) {
     onClose()
@@ -727,152 +451,36 @@ export default function ClassSheet({
         minHeight:     0,
       }}>
         {pickedGroup ? (
-          <>
-            {straightToAll && classHeading}
-            {/* No Back row when the sheet was opened straight on a drug list
-                (all drugs, or one named family): there is no list behind it to
-                go back to, so it would only close the sheet. */}
-            {!straightToAll && (!directSubclass || familyKey) && <div style={{
-              flexShrink:     0,
-              padding:        '0 var(--space-2) 0 var(--space-4)',
-              borderBottom:   '0.5px solid var(--color-border)',
-              display:        'flex',
-              alignItems:     'center',
-              justifyContent: 'space-between',
-              gap:            'var(--space-2)',
-            }}>
-              {directSubclass ? (
-                <span style={{
-                  minWidth: 0, fontSize: 15, fontWeight: 600,
-                  color: 'var(--color-text-primary)',
-                }}>
-                  {titleCaseWords(familyKey)}
-                </span>
-              ) : <button
-                onClick={() => (directSubclass ? onClose() : setPicked(null))}
-                aria-label="Back"
-                style={{
-                  display:    'flex',
-                  alignItems: 'center',
-                  gap:        2,
-                  flexShrink: 0,
-                  height:     48,
-                  padding:    0,
-                  border:     'none',
-                  background: 'none',
-                  cursor:     'pointer',
-                  fontFamily: 'var(--font-body)',
-                  fontSize:   14,
-                  fontWeight: 600,
-                  color:      'var(--color-accent)',
-                  WebkitTapHighlightColor: 'transparent',
-                  outline:    'none',
-                }}
-              >
-                <ChevronLeft size={18} />
-                Back
-              </button>}
-              {familyKey && (
-                <ClassHeartButton
-                  label="family"
-                  active={isClassFavourited(className, familyKey)}
-                  onPress={() => toggleClass(className, familyKey)}
-                />
-              )}
-            </div>}
-            <div key={`drugs-${pickedGroup.name}`} style={{
-              flex:      1,
-              minHeight: 0,
-              overflowY: 'auto',
-              padding:   'var(--space-4) var(--space-4) var(--space-6)',
-            }}>
-              {straightToAll && wordsBlock}
-              <BrandsList
-                hideHeading={straightToAll}
-                onFilteredCount={straightToAll ? setListCount : undefined}
-                belowHeading={familyBlock}
-                titleIcon={
-                  pickedGroup.isOthers ? <LayoutGrid size={17} strokeWidth={1.9} color="var(--color-accent)" />
-                    : pickedGroup.isAll ? <List size={17} strokeWidth={1.9} color="var(--color-accent)" />
-                    : <MoleculeIcon size={17} color="var(--color-accent)" />
-                }
-                key={pickedGroup.name}
-                siblings={pickedGroup.items}
-                onTap={handleTap}
-                mode="alternatives"
-                proGateForm
-                hideOther
-                groupBySubclass={!!pickedGroup.isOthers}
-                familyName={
-                  pickedGroup.isOthers ? OTHERS_LABEL
-                    : pickedGroup.isAll ? titleCaseWords(classLabel)
-                    : titleCaseWords(pickedGroup.name)
-                }
-                saved={savedFilters.current[pickedGroup.name] ?? null}
-                onSave={p => { savedFilters.current[pickedGroup.name] = p }}
-                popupLayer={popupLayer}
-              />
-            </div>
-          </>
+          <FamilyDrugsView
+            pickedGroup={pickedGroup}
+            heading={straightToAll ? heading : null}
+            showBar={!straightToAll && (!directSubclass || !!familyKey)}
+            directSubclass={directSubclass}
+            familyKey={familyKey}
+            onBack={() => setPicked(null)}
+            favourited={familyKey ? isClassFavourited(className, familyKey) : false}
+            onToggleFavourite={() => toggleClass(className, familyKey)}
+            wordsBlock={straightToAll ? wordsBlock : null}
+            familyBlock={familyBlock}
+            hideHeading={straightToAll}
+            onFilteredCount={straightToAll ? setListCount : undefined}
+            classLabel={classLabel}
+            onTap={handleTap}
+            saved={savedFilters.current[pickedGroup.name] ?? null}
+            onSave={p => { savedFilters.current[pickedGroup.name] = p }}
+            popupLayer={popupLayer}
+          />
         ) : (
           <>
-            {classHeading}
-            <div key="class-list" ref={listRef} style={{
-              flex:          1,
-              minHeight:     0,
-              overflowY:     'auto',
-              display:       'flex',
-              flexDirection: 'column',
-              gap:           'var(--space-2)',
-              padding:       'var(--space-3) var(--space-4) var(--space-6)',
-            }}>
-              {wordsBlock}
-              {totalDrugs > 0 && (
-                <SubclassRow
-                  key={ALL_KEY}
-                  name={ALL_LABEL}
-                  count={totalDrugs}
-                  Icon={List}
-                  featured
-                  onClick={() => pickFamily(ALL_KEY)}
-                />
-              )}
-              {/* Thin line under the 'All drugs' row, only when subclass
-                  cards follow it. */}
-              {totalDrugs > 0 && listGroups.length > 0 && (
-                <div
-                  aria-hidden="true"
-                  style={{
-                    flexShrink:      0,
-                    height:          0.5,
-                    margin:          'var(--space-2) var(--space-1)',
-                    backgroundColor: 'var(--color-border)',
-                  }}
-                />
-              )}
-              {/* Small title over the subclass cards, so it is clear they
-                  are the families of the class. */}
-              {totalDrugs > 0 && listGroups.length > 0 && (
-                <p style={{
-                  flexShrink:    0,
-                  margin:        '0 var(--space-1)',
-                  fontSize:      14.5,
-                  fontWeight:    600,
-                  color:         'var(--color-text-primary)',
-                }}>
-                  Drug families
-                </p>
-              )}
-              {listGroups.map(g => (
-                <SubclassRow
-                  key={g.name}
-                  name={g.isOthers ? OTHERS_LABEL : titleCaseWords(g.name)}
-                  count={g.items.length}
-                  Icon={g.isOthers ? LayoutGrid : MoleculeIcon}
-                  onClick={() => pickFamily(g.name)}
-                />
-              ))}
-            </div>
+            {heading}
+            <ClassFamilyList
+              key="class-list"
+              listRef={listRef}
+              wordsBlock={wordsBlock}
+              totalDrugs={totalDrugs}
+              listGroups={listGroups}
+              onPick={pickFamily}
+            />
           </>
         )}
       </div>
