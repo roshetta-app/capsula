@@ -12,6 +12,8 @@
  *    confirmation and offers Undo, like the drug rows.
  *
  * Items are { className, familyName } as stored (familyName '' = whole class).
+ * The icon tiles use the class icon and colour (Layers for a class, the molecule
+ * for a family, both in --color-class), same as the class cards in Browse.
  * Names are shown in title case. The rows carry no 'class' / 'family' wording
  * and no drug count; a family row shows its class name underneath, plain.
  *
@@ -20,7 +22,7 @@
  */
 
 import { useState } from 'react'
-import { ChevronRight, Heart, LayoutGrid } from 'lucide-react'
+import { ChevronRight, Heart, Layers } from 'lucide-react'
 import SheetShell from '../ui/SheetShell'
 import CountTag from '../ui/CountTag'
 import RowStarButton from '../ui/RowStarButton'
@@ -35,11 +37,11 @@ function IconTile({ Icon }) {
       aria-hidden="true"
       style={{
         width: TILE, height: TILE, borderRadius: 10, flexShrink: 0,
-        backgroundColor: 'var(--color-accent-light)',
+        backgroundColor: 'var(--color-class-light)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
-      <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
+      <Icon size={17} strokeWidth={1.9} color="var(--color-class)" />
     </span>
   )
 }
@@ -60,7 +62,7 @@ export function FavouriteClassesCard({ count, countLabel, onClick }) {
         marginBottom: 'var(--space-3)',
         border: '0.5px solid var(--color-border)', borderRadius: 16,
         backgroundColor: 'var(--color-surface)',
-        boxShadow: 'var(--shadow-card)',
+        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
         opacity: pressed ? 0.85 : 1,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
@@ -68,7 +70,7 @@ export function FavouriteClassesCard({ count, countLabel, onClick }) {
         WebkitTapHighlightColor: 'transparent', outline: 'none',
       }}
     >
-      <IconTile Icon={MoleculeIcon} />
+      <IconTile Icon={Layers} />
       <span style={{
         flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.3,
         color: 'var(--color-text-primary)',
@@ -109,7 +111,7 @@ function Row({ item, onOpen, onRemove }) {
           WebkitTapHighlightColor: 'transparent', outline: 'none',
         }}
       >
-        <IconTile Icon={isFamily ? MoleculeIcon : LayoutGrid} />
+        <IconTile Icon={isFamily ? MoleculeIcon : Layers} />
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{
             display: 'block', fontSize: 15, fontWeight: 500, lineHeight: 1.3,

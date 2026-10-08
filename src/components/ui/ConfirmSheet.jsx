@@ -177,6 +177,10 @@ export default function ConfirmSheet({
         position:        'fixed',
         inset:           0,
         zIndex,
+        // 2026-10-08: an open sheet (vaul) turns off pointer events on <body>, and
+        // this portal lives in <body>, so it inherited that: taps and scrolling
+        // went straight through it to the sheet behind. Stay hit-testable.
+        pointerEvents:   'auto',
         backgroundColor: 'rgba(0,0,0,0.45)',
         display:         'flex',
         alignItems:      'center',

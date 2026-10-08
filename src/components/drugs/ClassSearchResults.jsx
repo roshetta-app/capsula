@@ -1,5 +1,8 @@
 /**
  * src/components/drugs/ClassSearchResults.jsx
+ * 2026-10-08: the icon tile on the class and family cards now uses the class colour
+ * (--color-class on --color-class-light, the same as the Class option in Browse)
+ * instead of the blue accent, matching the saved classes list in Favourites.
  * Class search mode (CLASS_SEARCH_MODE_PLAN.md, 2026-10-04).
  *
  * 2026-10-04 (Families wording): everything the person reads that said
@@ -152,14 +155,14 @@ function ResultCard({ kicker, name, detail, matchedKeyword = '', count, Icon, on
             width:           ICON_TILE,
             height:          ICON_TILE,
             borderRadius:    10,
-            backgroundColor: 'var(--color-accent-light)',
+            backgroundColor: 'var(--color-class-light)',
             display:         'flex',
             alignItems:      'center',
             justifyContent:  'center',
             flexShrink:      0,
           }}
         >
-          <Icon size={17} strokeWidth={1.9} color="var(--color-accent)" />
+          <Icon size={17} strokeWidth={1.9} color="var(--color-class)" />
         </span>
         <span style={{ flex: 1, minWidth: 0 }}>
           {kicker && (

@@ -1505,7 +1505,7 @@ export default function FavouritesScreen() {
                 left between the two tabs. */}
             {activeTab === 'drugs' && (
               <>
-                {!isManaging && !drugQuery.trim() && (
+                {!isManaging && !drugQuery.trim() && (savedDrugs.length > 0 || favClasses.length > 0) && (
                   <FavouriteClassesCard
                     count={favClasses.length}
                     countLabel={classesCountLabel}
