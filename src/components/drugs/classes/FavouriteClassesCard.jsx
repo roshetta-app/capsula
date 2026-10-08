@@ -28,9 +28,8 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
         width: '100%', boxSizing: 'border-box',
         minHeight: 64, padding: '14px 16px',
         marginBottom: 'var(--space-3)',
-        border: '0.5px solid var(--color-border)', borderRadius: 16,
-        backgroundColor: 'var(--color-surface)',
-        boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+        border: 'none', borderRadius: 16,
+        backgroundColor: 'var(--color-class-light)',
         opacity: pressed ? 0.85 : 1,
         transform: pressed ? 'scale(0.985)' : 'scale(1)',
         transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
@@ -38,15 +37,18 @@ export default function FavouriteClassesCard({ count, countLabel, onClick }) {
         WebkitTapHighlightColor: 'transparent', outline: 'none',
       }}
     >
-      <ClassIconTile Icon={Layers} tone="class" />
+      <ClassIconTile Icon={Layers} tone="class" transparent />
       <span style={{
-        flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600, lineHeight: 1.3,
+        flex: 1, minWidth: 0, fontSize: 15, fontWeight: 500, lineHeight: 1.3,
         color: 'var(--color-text-primary)',
       }}>
         Classes &amp; families
       </span>
-      <CountTag tone={count > 0 ? 'accent' : 'neutral'}>{countLabel ?? count}</CountTag>
-      <ChevronRight aria-hidden="true" size={16} strokeWidth={2} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
+      <CountTag
+        tone={count > 0 ? 'accent' : 'neutral'}
+        style={count > 0 ? { backgroundColor: 'transparent', color: 'var(--color-class)' } : { backgroundColor: 'transparent' }}
+      >{countLabel ?? count}</CountTag>
+      <ChevronRight aria-hidden="true" size={16} strokeWidth={2} color="var(--color-class)" style={{ flexShrink: 0, opacity: 0.7 }} />
     </button>
   )
 }

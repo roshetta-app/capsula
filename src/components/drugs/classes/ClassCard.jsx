@@ -207,9 +207,21 @@ export default function ClassCard({
         >
           <ClassIconTile Icon={Icon} tone={tone} />
           {textBlock}
+        </button>
+        {/* Heart first, then the chevron (its own tap area, same action). */}
+        {trailing}
+        <button
+          {...pressHandlers}
+          aria-label={`Open ${name}`}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            alignSelf: 'stretch', width: 24, padding: 0, marginRight: 8,
+            border: 'none', background: 'none', cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent', outline: 'none',
+          }}
+        >
           {chevron}
         </button>
-        {trailing}
       </div>
     )
   }

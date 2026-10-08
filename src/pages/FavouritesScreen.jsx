@@ -1506,17 +1506,17 @@ export default function FavouritesScreen() {
                 left between the two tabs. */}
             {activeTab === 'drugs' && (
               <>
+                {drugsAtCap && (
+                  <div style={{ marginBottom: 'var(--space-3)' }}>
+                    <ProUpsellBanner subtitle="Unlock unlimited favourites" />
+                  </div>
+                )}
                 {!isManaging && !drugQuery.trim() && (savedDrugs.length > 0 || favClasses.length > 0) && (
                   <FavouriteClassesCard
                     count={favClasses.length}
                     countLabel={classesCountLabel}
                     onClick={() => setShowClassesSheet(true)}
                   />
-                )}
-                {drugsAtCap && (
-                  <div style={{ marginBottom: 'var(--space-3)' }}>
-                    <ProUpsellBanner subtitle="Unlock unlimited favourites" />
-                  </div>
                 )}
                 {!drugsEverLoaded ? (
                   Array.from({ length: SKELETON_ROW_COUNT }, (_, i) => <SkeletonRow key={i} />)
