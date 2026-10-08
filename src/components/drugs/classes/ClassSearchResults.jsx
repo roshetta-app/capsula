@@ -1,6 +1,8 @@
 /**
  * src/components/drugs/classes/ClassSearchResults.jsx
  *
+ * 2026-10-08 (colours): family cards are blue (tone accent), class cards stay violet.
+ *
  * 2026-10-08 (refactor, phase 2b): the result card (ResultCard) is gone; the
  * cards are now the shared ClassCard in its 'search' look. No behaviour change.
  *
@@ -245,7 +247,7 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ClassCard
                 key={`sub:${s.className}\u0000${s.name}`}
                 variant="search"
-                tone="class"
+                tone="accent"
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
                 matches={matchNode(s.matchedKeyword, highlightText)}

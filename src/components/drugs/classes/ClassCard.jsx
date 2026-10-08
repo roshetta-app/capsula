@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/classes/ClassCard.jsx
  *
+ * 2026-10-08 (colours): the matched word follows the card's tone (violet on a
+ * class card, blue on a family card).
+ *
  * 2026-10-08 (refactor, phase 2b): the one card for classes and families,
  * replacing three near-copies: SubclassRow (class sheet family list, moved here
  * in 2a), ResultCard (Class search results) and Row (saved classes sheet). Each
@@ -158,7 +161,7 @@ export default function ClassCard({
           overflowWrap: 'anywhere',
         }}>
           matches:{' '}
-          <span style={{ color: 'var(--color-accent)', fontWeight: 500 }}>{matches}</span>
+          <span style={{ color: tone === 'class' ? 'var(--color-class)' : 'var(--color-accent)', fontWeight: 500 }}>{matches}</span>
         </span>
       )}
     </span>

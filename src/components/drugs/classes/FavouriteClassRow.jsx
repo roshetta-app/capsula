@@ -1,6 +1,8 @@
 /**
  * src/components/drugs/classes/FavouriteClassRow.jsx
  *
+ * 2026-10-08 (colours): a saved family is blue, a saved class stays violet.
+ *
  * 2026-10-08 (refactor, phase 2b): one row of the saved classes sheet, moved
  * here from FavouriteClassesSheet.jsx. It is now the shared ClassCard in its
  * 'saved' look, with the heart as the trailing button. Same look. No
@@ -19,7 +21,7 @@ export default function FavouriteClassRow({ item, onOpen, onRemove }) {
   return (
     <ClassCard
       variant="saved"
-      tone="class"
+      tone={isFamily ? 'accent' : 'class'}
       name={titleCaseWords(isFamily ? item.familyName : item.className)}
       subline={isFamily ? titleCaseWords(item.className) : null}
       Icon={isFamily ? MoleculeIcon : Layers}

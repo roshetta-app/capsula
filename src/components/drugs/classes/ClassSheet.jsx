@@ -13,6 +13,12 @@
  *   from sections/ to drugs/classes/. MoleculeIcon is now in ClassIcons.jsx and
  *   ALL_KEY in classKeys.js. No behaviour change.
  *
+ * 2026-10-08 (shared header): a real family's page now has the same heading as
+ * the class sheet (label, name, 'in <class>', heart in the same corner, Back
+ * arrow when a list is behind it). The old thin Back bar and the repeated family
+ * title above the filters are gone on those pages; the Google search icon moved
+ * into the heading. 'All drugs' and 'Other families' pages keep the Back bar.
+ *
  * 2026-10-08 (favourite classes and families): a heart in the class heading saves
  * the whole class; a heart in the bar above a family's drugs saves that family.
  * When the sheet is opened straight on a family (from Favourites) that bar shows
@@ -284,6 +290,8 @@ import ClassFamilyList from './ClassFamilyList.jsx'
 import FamilyDrugsView from './FamilyDrugsView.jsx'
 import { groupBySubclass, buildListGroups, splitKeywords } from './classGrouping.js'
 import { ALL_KEY } from './classKeys.js'
+import { titleCaseWords } from '../../../utils/classSearch'
+import { openInAppBrowser } from '../../../utils/openInAppBrowser'
 
 export default function ClassSheet({
   isOpen,
@@ -391,7 +399,7 @@ export default function ClassSheet({
   const straightToAll = directSubclass === ALL_KEY
   const heading = (
     <ClassHeading
-      classLabel={classLabel}
+      title={classLabel}
       familyCount={groups.length}
       drugCount={totalDrugs}
       filtered={straightToAll && listCount?.active ? listCount : null}
@@ -399,6 +407,24 @@ export default function ClassSheet({
       onToggleFavourite={() => toggleClass(className, '')}
     />
   )
+
+  // The heading of a real family's page: same look as the class heading. A Back
+  // arrow only when the list is behind it (not when opened straight on the
+  // family). The name is a button that opens the Google search for it.
+  const familyHeading = familyKey ? (
+    <ClassHeading
+      kind="family"
+      title={titleCaseWords(familyKey)}
+      parentName={classLabel}
+      drugCount={pickedGroup.items.length}
+      favourited={isClassFavourited(className, familyKey)}
+      onToggleFavourite={() => toggleClass(className, familyKey)}
+      onBack={directSubclass ? null : () => setPicked(null)}
+      onSearch={() => openInAppBrowser(
+        `https://www.google.com/search?q=${encodeURIComponent(titleCaseWords(familyKey))}`
+      )}
+    />
+  ) : null
 
   // The 'Keywords' title and chips (display only), or null when the class
   // has none. Drawn at the top of the content for every class: above the 'All
@@ -453,16 +479,12 @@ export default function ClassSheet({
         {pickedGroup ? (
           <FamilyDrugsView
             pickedGroup={pickedGroup}
-            heading={straightToAll ? heading : null}
-            showBar={!straightToAll && (!directSubclass || !!familyKey)}
-            directSubclass={directSubclass}
-            familyKey={familyKey}
+            heading={straightToAll ? heading : familyHeading}
+            showBar={!straightToAll && !familyKey && !directSubclass}
             onBack={() => setPicked(null)}
-            favourited={familyKey ? isClassFavourited(className, familyKey) : false}
-            onToggleFavourite={() => toggleClass(className, familyKey)}
             wordsBlock={straightToAll ? wordsBlock : null}
             familyBlock={familyBlock}
-            hideHeading={straightToAll}
+            hideHeading={straightToAll || !!familyKey}
             onFilteredCount={straightToAll ? setListCount : undefined}
             classLabel={classLabel}
             onTap={handleTap}
