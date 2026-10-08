@@ -1,6 +1,11 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-09 (same heart spot): with no Back arrow the title row is at least 40 tall (the
+ * height of the Back row), so the heart sits at the very same spot (28 from the top, 6 from
+ * the right) in the class sheet, a family page and a family page with a Back arrow. A long,
+ * wrapped name still grows the row and the heart stays centred on it.
+ *
  * 2026-10-09 (heart centred): with no Back arrow the heart is drawn inside the title row and
  * centred on the icon tile and title together (also for a long, wrapped name).
  *
@@ -132,7 +137,7 @@ export default function ClassHeading({
       {/* Title row: at least as tall as the heart's row, name centred in it,
           so the heart (always the same corner spot) lines up with the name.
           With a Back arrow above, the heart lines up with the Back row. */}
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: 0 }}>
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center', minHeight: onBack ? 0 : 40 }}>
         {drugCount > 0 && !onBack && (
           <div style={{ position: 'absolute', top: '50%', right: -50, transform: 'translateY(-50%)' }}>
             <ClassHeartButton
