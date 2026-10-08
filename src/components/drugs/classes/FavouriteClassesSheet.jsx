@@ -25,14 +25,16 @@
  *
  * Props (card):  count, countLabel, onClick
  * Props (sheet): isOpen, onClose, items, onOpen(item), onRemove(item), countLabel
- *   (the saved count as on the card, '3/5' for a free account; shown in the header)
+ *   (the saved count as on the card, '3/5' for a free account; shown in the header),
+ *   atCap (free account at its limit: the Pro upgrade banner is drawn at the top of the list)
  */
 import { Heart } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import FavouriteClassRow from './FavouriteClassRow.jsx'
 import CountTag from '../../ui/CountTag'
+import ProUpsellBanner from '../../ui/ProUpsellBanner'
 
-export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, onRemove, countLabel }) {
+export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, onRemove, countLabel, atCap = false }) {
   // Newest first, same as the other Favourites lists.
   const shown = items.slice().reverse()
   return (
@@ -73,6 +75,7 @@ export default function FavouriteClassesSheet({ isOpen, onClose, items, onOpen, 
           display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
           padding: 'var(--space-3) var(--space-4) var(--space-6)',
         }}>
+          {atCap && <ProUpsellBanner subtitle="Unlock unlimited favourites" />}
           {shown.length === 0 ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',

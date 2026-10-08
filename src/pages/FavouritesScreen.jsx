@@ -841,6 +841,7 @@ export default function FavouritesScreen() {
   const [classSheetOpen,   setClassSheetOpen]   = useState(false)
   const [classTarget,      setClassTarget]      = useState(null)   // { className, direct }
   const [classSheetKey,    setClassSheetKey]    = useState(0)
+  const classesAtCap = isFreeAccount && favClasses.length >= FAVOURITES_CAP_CLASSES
   const classesCountLabel = isFreeAccount ? `${favClasses.length}/${FAVOURITES_CAP_CLASSES}` : favClasses.length
   const classSheetDrugs = useMemo(
     () => (classTarget ? drugs.filter(d => d.class === classTarget.className) : []),
@@ -1634,6 +1635,7 @@ export default function FavouritesScreen() {
         onClose={() => setShowClassesSheet(false)}
         items={favClasses}
         countLabel={classesCountLabel}
+        atCap={classesAtCap}
         onOpen={openFavClass}
         onRemove={setConfirmingClass}
       />
