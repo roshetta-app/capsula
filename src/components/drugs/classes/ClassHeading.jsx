@@ -137,7 +137,7 @@ export default function ClassHeading({
         // '> Class' after the family name, on the same line (wraps with the name).
         const crumb = isFamily && parentName ? (
           <span style={{
-            whiteSpace: 'nowrap', marginLeft: 8, fontSize: 13, fontWeight: 400,
+            whiteSpace: 'nowrap', fontSize: 13, fontWeight: 400,
             color: 'var(--color-text-secondary)',
           }}>
             <ChevronRight size={13} aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 1 }} />
@@ -170,7 +170,10 @@ export default function ClassHeading({
                   )}
                 </span>
               </span>
-              {crumb}
+              {/* A plain space (not a margin) before it: on the same line it is the gap,
+                  and when '> Class' drops to its own line the space disappears, so
+                  there is no indent. */}
+              {crumb && <>{' '}{' '}{crumb}</>}
             </p>
           </div>
         )
