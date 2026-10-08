@@ -54,6 +54,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useBackClose } from '../../hooks/useBackClose'
+import { lockScroll } from '../../utils/scrollLock'
 
 export default function ConfirmSheet({
   isOpen,
@@ -92,12 +93,10 @@ export default function ConfirmSheet({
   // either of those reverted attempts.
   useEffect(() => {
     if (!isOpen) return
-    const html = document.documentElement
-    const prevOverflow = html.style.overflow
-    html.style.overflow = 'hidden'
-    return () => {
-      html.style.overflow = prevOverflow
-    }
+    // 2026-10-08: shared, counted lock (utils/scrollLock). The old save-and-restore
+    // of the page's overflow left the page locked for good when this dialog
+    // opened over a sheet and the two closed in the wrong order.
+    return lockScroll('overflow')
   }, [isOpen])
 
   useEffect(() => {

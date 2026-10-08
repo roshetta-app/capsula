@@ -25,6 +25,7 @@ import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
 import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
 import CountTag from './CountTag.jsx'
 import ProTag from './ProTag.jsx'
+import { lockScroll } from '../../utils/scrollLock'
 
 // Small centered pop-up box for one filter — same look as the app's InfoSheet
 // / ConfirmSheet dialogs, and the Drugs filter panel's chips inside it.
@@ -63,10 +64,7 @@ export function FilterModal({ title, titleIcon: TitleIcon, scopeName, columns, w
   // ConfirmSheet does.
   useEffect(() => {
     if (!onPage) return
-    const html = document.documentElement
-    const prevOverflow = html.style.overflow
-    html.style.overflow = 'hidden'
-    return () => { html.style.overflow = prevOverflow }
+    return lockScroll('overflow')
   }, [onPage])
 
   useEffect(() => {

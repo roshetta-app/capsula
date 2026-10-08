@@ -63,6 +63,7 @@
 import { useEffect, useState } from 'react'
 import { Drawer } from 'vaul'
 import { useBackClose } from '../../hooks/useBackClose'
+import { lockScroll } from '../../utils/scrollLock'
 
 const VISUALLY_HIDDEN_STYLE = {
   position:   'absolute',
@@ -88,28 +89,13 @@ export default function SheetShell({
 }) {
   useBackClose(isOpen, onClose)
 
+  // Pin the page while the sheet is open. Shared, counted lock (utils/scrollLock):
+  // a dialog opened over this sheet can close before or after it without
+  // leaving the page locked.
   useEffect(() => {
     if (!isOpen) return
-    const html = document.documentElement
-    const scrollY = window.scrollY
-    const prevPosition = html.style.position
-    const prevTop = html.style.top
-    const prevWidth = html.style.width
-    const prevOverflow = html.style.overflow
-
-    html.style.position = 'fixed'
-    html.style.top = `-${scrollY}px`
-    html.style.width = '100%'
-    html.style.overflow = 'hidden'
-
-    return () => {
-      html.style.position = prevPosition
-      html.style.top = prevTop
-      html.style.width = prevWidth
-      html.style.overflow = prevOverflow
-      window.scrollTo(0, scrollY)
-    }
-  }, [isOpen]) // eslint-disable-line react-hooks/exhaustive-deps
+    return lockScroll('fixed')
+  }, [isOpen])
 
   const [contentEl, setContentEl] = useState(null)
 
