@@ -21,7 +21,6 @@
  *   wordsBlock        class keywords drawn above the list (all-drugs page), or null
  *   familyBlock       family keywords drawn under the family title, or null
  *   hideHeading       true on the all-drugs page (the class heading is above)
- *   onFilteredCount   reports 'shown / total' while a filter is on (all-drugs page)
  *   classLabel        class name as shown
  *   onTap             called with a brand when one is tapped
  *   saved, onSave     the remembered filter picks of this page
@@ -41,7 +40,6 @@ export default function FamilyDrugsView({
   wordsBlock,
   familyBlock,
   hideHeading,
-  onFilteredCount,
   classLabel,
   onTap,
   saved,
@@ -94,7 +92,6 @@ export default function FamilyDrugsView({
         {wordsBlock}
         <BrandsList
           hideHeading={hideHeading}
-          onFilteredCount={onFilteredCount}
           belowHeading={familyBlock}
           titleIcon={
             pickedGroup.isOthers ? <LayoutGrid size={17} strokeWidth={1.9} color="var(--color-accent)" />

@@ -309,9 +309,6 @@ export default function ClassSheet({
   const directSubclass = directSubclassProp ?? (hasNoFamilies ? ALL_KEY : null)
   // The subclass whose drugs are showing, or null for the subclass list.
   const [picked, setPicked] = useState(directSubclass ?? null)
-  // How many drugs the list below shows now / in all, reported by the list
-  // while a filter is on (null until it reports).
-  const [listCount, setListCount] = useState(null)
   // Remembered filter picks, one entry per subclass (a ref: only read when a
   // list is built, no re-render needed).
   const savedFilters = useRef({})
@@ -400,9 +397,7 @@ export default function ClassSheet({
   const heading = (
     <ClassHeading
       title={classLabel}
-      familyCount={groups.length}
       drugCount={totalDrugs}
-      filtered={straightToAll && listCount?.active ? listCount : null}
       favourited={isClassFavourited(className, '')}
       onToggleFavourite={() => toggleClass(className, '')}
     />
@@ -485,7 +480,6 @@ export default function ClassSheet({
             wordsBlock={straightToAll ? wordsBlock : null}
             familyBlock={familyBlock}
             hideHeading={straightToAll || !!familyKey}
-            onFilteredCount={straightToAll ? setListCount : undefined}
             classLabel={classLabel}
             onTap={handleTap}
             saved={savedFilters.current[pickedGroup.name] ?? null}
