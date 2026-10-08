@@ -41,15 +41,15 @@ import { highlightMatch } from '../../../utils/highlightMatch'
 // Size of the icon tile.
 const ICON_TILE = 34
 
-export function ClassIconTile({ Icon, tone = 'accent', transparent = false }) {
+export function ClassIconTile({ Icon, tone = 'accent', transparent = false, size = ICON_TILE }) {
   const isClass = tone === 'class'
   return (
     <span
       aria-hidden="true"
       style={{
-        width:           ICON_TILE,
-        height:          ICON_TILE,
-        borderRadius:    10,
+        width:           size,
+        height:          size,
+        borderRadius:    size < ICON_TILE ? 8 : 10,
         backgroundColor: transparent ? 'transparent' : (isClass ? 'var(--color-class-light)' : 'var(--color-accent-light)'),
         display:         'flex',
         alignItems:      'center',
@@ -57,7 +57,7 @@ export function ClassIconTile({ Icon, tone = 'accent', transparent = false }) {
         flexShrink:      0,
       }}
     >
-      <Icon size={17} strokeWidth={1.9} color={isClass ? 'var(--color-class)' : 'var(--color-accent)'} />
+      <Icon size={Math.round(size / 2)} strokeWidth={1.9} color={isClass ? 'var(--color-class)' : 'var(--color-accent)'} />
     </span>
   )
 }

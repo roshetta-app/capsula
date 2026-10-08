@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
+ * 2026-10-08 (compact): the icon tile is smaller (26) and sits inside the name's
+ * text, and the name is 17px, so a long name wraps under the icon and the heading
+ * stays short.
+ *
  * 2026-10-08 (icon tile): the Class / Family badge is gone. The same icon tile
  * as the class and family cards (Layers violet, molecule blue) sits at the left
  * of the title, which sits beside it.
@@ -54,7 +58,7 @@ export default function ClassHeading({
   const head     = words.length ? words.join(' ') + ' ' : ''
 
   const nameStyle = {
-    fontSize:   20,
+    fontSize:   17,
     fontWeight: 500,
     lineHeight: 1.3,
     color:      'var(--color-text-primary)',
@@ -64,7 +68,7 @@ export default function ClassHeading({
     <div style={{
       position:     'relative',
       flexShrink:   0,
-      padding:      'var(--space-2) 56px var(--space-3) var(--space-4)',
+      padding:      'var(--space-2) 56px var(--space-2) var(--space-4)',
       borderBottom: '0.5px solid var(--color-border)',
     }}>
       {/* The heart: same corner on every heading. */}
@@ -102,51 +106,54 @@ export default function ClassHeading({
           Back
         </button>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
-        {/* The same icon tile as the class / family cards: stacked layers
-            (violet) for a class, molecule (blue) for a family. */}
-        <ClassIconTile Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
-        <div style={{ minWidth: 0, flex: 1 }}>
-          {onSearch ? (
-            <button
-              onClick={onSearch}
-              aria-label={`Search Google for ${title}`}
-              style={{
-                ...nameStyle,
-                display:    'block',
-                maxWidth:   '100%',
-                padding:    0,
-                border:     'none',
-                background: 'none',
-                textAlign:  'left',
-                fontFamily: 'var(--font-body)',
-                cursor:     'pointer',
-                WebkitTapHighlightColor: 'transparent',
-                outline:    'none',
-              }}
-            >
-              {head}
-              <span style={{ whiteSpace: 'nowrap' }}>
-                {lastWord}
-                <Search
-                  size={11}
-                  strokeWidth={2.2}
-                  color="var(--color-accent)"
-                  aria-hidden="true"
-                  style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
-                />
-              </span>
-            </button>
-          ) : (
-            <p style={{ ...nameStyle, margin: 0 }}>{title}</p>
-          )}
-          {isFamily && parentName && (
-            <p style={{ margin: '2px 0 0', fontSize: 13, color: 'var(--color-text-secondary)' }}>
-              in {parentName}
-            </p>
-          )}
-        </div>
-      </div>
+      {/* The small icon tile sits inside the name's text, so a long name
+          wraps under it instead of making the heading tall and narrow. */}
+      {(() => {
+        const tile = (
+          <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8, position: 'relative', top: -1 }}>
+            <ClassIconTile size={26} Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
+          </span>
+        )
+        return onSearch ? (
+          <button
+            onClick={onSearch}
+            aria-label={`Search Google for ${title}`}
+            style={{
+              ...nameStyle,
+              display:    'block',
+              maxWidth:   '100%',
+              margin:     '2px 0 0',
+              padding:    0,
+              border:     'none',
+              background: 'none',
+              textAlign:  'left',
+              fontFamily: 'var(--font-body)',
+              cursor:     'pointer',
+              WebkitTapHighlightColor: 'transparent',
+              outline:    'none',
+            }}
+          >
+            {tile}{head}
+            <span style={{ whiteSpace: 'nowrap' }}>
+              {lastWord}
+              <Search
+                size={11}
+                strokeWidth={2.2}
+                color="var(--color-accent)"
+                aria-hidden="true"
+                style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
+              />
+            </span>
+          </button>
+        ) : (
+          <p style={{ ...nameStyle, margin: '2px 0 0' }}>{tile}{title}</p>
+        )
+      })()}
+      {isFamily && parentName && (
+        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+          in {parentName}
+        </p>
+      )}
     </div>
   )
 }
