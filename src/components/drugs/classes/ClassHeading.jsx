@@ -108,6 +108,10 @@ export default function ClassHeading({
       )}
       {/* The small icon tile sits inside the name's text, so a long name
           wraps under it instead of making the heading tall and narrow. */}
+      {/* Title row: at least as tall as the heart's row, name centred in it,
+          so the heart (always the same corner spot) lines up with the name.
+          With a Back arrow above, the heart lines up with the Back row. */}
+      <div style={{ display: 'flex', alignItems: 'center', minHeight: onBack ? 0 : 40 }}>
       {(() => {
         const tile = (
           <span style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: 8, position: 'relative', top: -1 }}>
@@ -122,7 +126,7 @@ export default function ClassHeading({
               ...nameStyle,
               display:    'block',
               maxWidth:   '100%',
-              margin:     '2px 0 0',
+              margin:     0,
               padding:    0,
               border:     'none',
               background: 'none',
@@ -146,9 +150,10 @@ export default function ClassHeading({
             </span>
           </button>
         ) : (
-          <p style={{ ...nameStyle, margin: '2px 0 0' }}>{tile}{title}</p>
+          <p style={{ ...nameStyle, margin: 0 }}>{tile}{title}</p>
         )
       })()}
+      </div>
       {isFamily && parentName && (
         <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
           in {parentName}
