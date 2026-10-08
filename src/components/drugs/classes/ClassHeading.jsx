@@ -1,7 +1,11 @@
 /**
  * src/components/drugs/classes/ClassHeading.jsx
  *
- * 2026-10-09 (class on the Back line): the 'in <class>' line under a family name is
+ * 2026-10-09 (class after the name): the class of a family is now '> Class', small
+ * and grey, right after the family name on the same line (it wraps with the name).
+ * The earlier try on the Back line is dropped.
+ *
+ * (superseded) 2026-10-09 (class on the Back line): the 'in <class>' line under a family name is
  * gone. With a Back arrow the class shows on the Back line as '> Class' (shortened
  * with '...' if long, clear of the heart). Without a Back arrow it is a small
  * '> Class' line under the name.
@@ -117,23 +121,6 @@ export default function ClassHeading({
             <ChevronLeft size={18} />
             Back
           </button>
-          {/* The class of a family, on the Back line: '> Class'. */}
-          {isFamily && parentName && (
-            <span style={{
-              display:      'flex',
-              alignItems:   'center',
-              gap:          2,
-              minWidth:     0,
-              marginLeft:   8,
-              fontSize:     13,
-              color:        'var(--color-text-secondary)',
-            }}>
-              <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {parentName}
-              </span>
-            </span>
-          )}
         </div>
       )}
       {/* The small icon tile sits inside the name's text, so a long name
@@ -148,47 +135,43 @@ export default function ClassHeading({
             <ClassIconTile size={26} Icon={isFamily ? MoleculeIcon : Layers} tone={isFamily ? 'accent' : 'class'} />
           </span>
         )
-        return onSearch ? (
-          <button
-            onClick={onSearch}
-            aria-label={`Search Google for ${title}`}
-            style={{
-              ...nameStyle,
-              display:    'block',
-              maxWidth:   '100%',
-              margin:     0,
-              padding:    0,
-              border:     'none',
-              background: 'none',
-              textAlign:  'left',
-              fontFamily: 'var(--font-body)',
-              cursor:     'pointer',
-              WebkitTapHighlightColor: 'transparent',
-              outline:    'none',
-            }}
-          >
-            {tile}{head}
-            <span style={{ whiteSpace: 'nowrap' }}>
-              {lastWord}
-              <Search
-                size={11}
-                strokeWidth={2.2}
-                color="var(--color-accent)"
-                aria-hidden="true"
-                style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
-              />
+        // '> Class' after the family name, on the same line (wraps with the name).
+        const crumb = isFamily && parentName ? (
+          <span style={{
+            whiteSpace: 'nowrap', marginLeft: 8, fontSize: 13, fontWeight: 400,
+            color: 'var(--color-text-secondary)',
+          }}>
+            <ChevronRight size={13} aria-hidden="true" style={{ display: 'inline-block', verticalAlign: '-2px', marginRight: 1 }} />
+            {parentName}
+          </span>
+        ) : null
+        return (
+          <p style={{ ...nameStyle, margin: '2px 0 0' }}>
+            <span
+              onClick={onSearch ?? undefined}
+              role={onSearch ? 'button' : undefined}
+              aria-label={onSearch ? `Search Google for ${title}` : undefined}
+              style={{ cursor: onSearch ? 'pointer' : 'default', WebkitTapHighlightColor: 'transparent' }}
+            >
+              {tile}{head}
+              <span style={{ whiteSpace: 'nowrap' }}>
+                {lastWord}
+                {onSearch && (
+                  <Search
+                    size={11}
+                    strokeWidth={2.2}
+                    color="var(--color-accent)"
+                    aria-hidden="true"
+                    style={{ display: 'inline-block', marginLeft: 3, verticalAlign: 'top' }}
+                  />
+                )}
+              </span>
             </span>
-          </button>
-        ) : (
-          <p style={{ ...nameStyle, margin: 0 }}>{tile}{title}</p>
+            {crumb}
+          </p>
         )
       })()}
       </div>
-      {isFamily && parentName && !onBack && (
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
-          &rsaquo; {parentName}
-        </p>
-      )}
     </div>
   )
 }
