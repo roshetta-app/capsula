@@ -21,7 +21,7 @@
 import { useState, useRef, useEffect, useMemo, useCallback, memo } from 'react'
 import { ChevronDown, Pill } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { isOptionLocked } from '../drugs/brandsFilterLogic.js'
+import { isOptionLocked } from '../drugs/brands/brandsFilterLogic.js'
 import { useBackLayer, useBackClose } from '../../hooks/useBackClose'
 import CountTag from './CountTag.jsx'
 import ProTag from './ProTag.jsx'

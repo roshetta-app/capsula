@@ -7,7 +7,7 @@
  *
  * Shell (backdrop fade, slide-up transition, mount/unmount timing, Escape
  * key, body-scroll lock) is copied directly from RecentlyViewedSheet.jsx /
- * BrandsBottomSheet.jsx / SpecialtiesBottomSheet.jsx so it reads as the
+ * SimilarAlternativesSheet.jsx / SpecialtiesBottomSheet.jsx so it reads as the
  * same bottom-sheet pattern already used everywhere else in the app,
  * rather than introducing a new one.
  *

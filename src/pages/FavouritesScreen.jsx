@@ -545,8 +545,8 @@ import { useBackClose } from '../hooks/useBackClose'
 import { useAuth } from '../hooks/useAuth'
 import { useIsPro } from '../hooks/useIsPro'
 import ProUpsellBanner from '../components/ui/ProUpsellBanner'
-import FavouriteClassesSheet, { FavouriteClassesCard } from '../components/drugs/FavouriteClassesSheet'
-import ClassBottomSheet from '../components/drugs/sections/ClassBottomSheet'
+import FavouriteClassesSheet, { FavouriteClassesCard } from '../components/drugs/classes/FavouriteClassesSheet'
+import ClassSheet from '../components/drugs/classes/ClassSheet'
 import { titleCaseWords } from '../utils/classSearch'
 import { FAVOURITES_CAP_DRUGS, FAVOURITES_CAP_CONDITIONS, FAVOURITES_CAP_CLASSES } from '../constants/features'
 
@@ -1635,7 +1635,7 @@ export default function FavouritesScreen() {
         onOpen={openFavClass}
         onRemove={setConfirmingClass}
       />
-      <ClassBottomSheet
+      <ClassSheet
         key={classSheetKey}
         isOpen={classSheetOpen}
         onClose={() => setClassSheetOpen(false)}

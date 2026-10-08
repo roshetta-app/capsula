@@ -1,5 +1,9 @@
 /**
- * src/components/drugs/sections/BrandsBottomSheet.jsx
+ * src/components/drugs/brands/SimilarAlternativesSheet.jsx
+ *
+ *  * 2026-10-08 (refactor, phase 1): renamed from BrandsBottomSheet and moved
+ *   from sections/ to drugs/brands/. This is the sheet with the Similar and
+ *   Alternatives tabs, opened from the drug page. No behaviour change.
  *
  * 2026-10-08 (Pro Form filter): the Form filter on the Similar and Alternatives tabs is
  * now Pro-only, like on the class sheet (BrandsList gets proGateForm). Free users see
@@ -119,7 +123,7 @@
  * that generic as a greyed-out row. Only passed when a Similar tab exists.
  *
  * 2026-10-03 (taller again): the fixed height went from 80svh to 86svh (the
- * class sheet, ClassBottomSheet.jsx, changed with it so the two stay the same
+ * class sheet, ClassSheet.jsx, changed with it so the two stay the same
  * height).
  *
  * Props:
@@ -134,8 +138,8 @@
 
 import { useState, useEffect, useMemo, useRef } from 'react'
 import useEmblaCarousel from 'embla-carousel-react'
-import BrandsList from '../BrandsList.jsx'
-import KeywordChips, { wordsForFamily } from '../KeywordChips.jsx'
+import BrandsList from './BrandsList.jsx'
+import KeywordChips, { wordsForFamily } from '../classes/KeywordChips.jsx'
 import { useDrugContext } from '../../../context/DrugContext'
 import CountTag from '../../ui/CountTag.jsx'
 import { Pill, ArrowLeftRight } from 'lucide-react'
@@ -247,7 +251,7 @@ function EmptyPanel({ Icon, title, body, actionLabel, onAction, color = 'var(--c
   )
 }
 
-export default function BrandsBottomSheet({
+export default function SimilarAlternativesSheet({
   isOpen,
   onClose,
   siblings = [],

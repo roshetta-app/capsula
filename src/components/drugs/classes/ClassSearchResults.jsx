@@ -1,5 +1,9 @@
 /**
- * src/components/drugs/ClassSearchResults.jsx
+ * src/components/drugs/classes/ClassSearchResults.jsx
+ *
+ *  * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/classes/;
+ *   MoleculeIcon now imported from ClassIcons.jsx. No behaviour change.
+ *
  * 2026-10-08: the icon tile on the class and family cards now uses the class colour
  * (--color-class on --color-class-light, the same as the Class option in Browse)
  * instead of the blue accent, matching the saved classes list in Favourites.
@@ -75,10 +79,10 @@
 
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
-import CountTag from '../ui/CountTag.jsx'
-import { MoleculeIcon } from './sections/ClassBottomSheet.jsx'
-import { titleCaseWords } from '../../utils/classSearch'
-import { highlightMatch } from '../../utils/highlightMatch'
+import CountTag from '../../ui/CountTag.jsx'
+import { MoleculeIcon } from './ClassIcons.jsx'
+import { titleCaseWords } from '../../../utils/classSearch'
+import { highlightMatch } from '../../../utils/highlightMatch'
 
 // Some names are stored with words joined by a slash and no spaces
 // ('Alpha/Beta blocker'), which has no place to break, so a long one was cut in

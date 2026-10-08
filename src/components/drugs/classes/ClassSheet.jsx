@@ -1,5 +1,9 @@
 /**
- * src/components/drugs/sections/ClassBottomSheet.jsx
+ * src/components/drugs/classes/ClassSheet.jsx
+ *
+ *  * 2026-10-08 (refactor, phase 1): renamed from ClassBottomSheet and moved
+ *   from sections/ to drugs/classes/. MoleculeIcon is now in ClassIcons.jsx and
+ *   ALL_KEY in classKeys.js. No behaviour change.
  *
  * 2026-10-08 (favourite classes and families): a heart in the class heading saves
  * the whole class; a heart in the bar above a family's drugs saves that family.
@@ -121,7 +125,7 @@
  * fresh sheet for every opening.
  *
  * 2026-10-03 (taller sheet): the sheet height went from 80svh to 86svh, same as
- * the related drugs sheet (BrandsBottomSheet.jsx).
+ * the related drugs sheet (SimilarAlternativesSheet.jsx).
  *
  * 2026-10-03 (molecule icon): the icon on the subclass cards is now a real
  * molecule icon (Fluent System Icons 'molecule', outline, copied as
@@ -263,18 +267,17 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { ChevronLeft, ChevronRight, LayoutGrid, List } from 'lucide-react'
-import BrandsList from '../BrandsList.jsx'
+import BrandsList from '../brands/BrandsList.jsx'
 import CountTag from '../../ui/CountTag.jsx'
 import SheetShell from '../../ui/SheetShell'
 import { useBackLayer } from '../../../hooks/useBackClose'
 import { useDrugContext } from '../../../context/DrugContext'
 import { titleCaseWords } from '../../../utils/classSearch'
-import { visibleCount } from '../KeywordChips.jsx'
-import ClassHeartButton from '../../ui/ClassHeartButton.jsx'
+import { visibleCount } from './KeywordChips.jsx'
+import ClassHeartButton from './ClassHeartButton.jsx'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
-// Lets Icons (CC BY 4.0, credit in the note at the top of this file).
-import { Icon as IconifyIcon } from '@iconify/react/dist/offline'
-import moleculeLight from '@iconify-icons/lets-icons/molecule-light'
+import { MoleculeIcon } from './ClassIcons.jsx'
+import { ALL_KEY } from './classKeys.js'
 
 // Groups drugs by subclass name, biggest group first; groups of the same size
 // go A to Z. Drugs without a subclass are skipped. Pure function, no hooks,
@@ -291,21 +294,13 @@ function groupBySubclass(drugs) {
     .sort((a, b) => b.items.length - a.items.length || a.name.localeCompare(b.name))
 }
 
-// The molecule icon (thin outline) from the Lets Icons set, through the
-// offline Iconify component. Takes the same props the row passes to its icon
-// (size, color); strokeWidth is ignored, the line weight is part of the icon.
-export function MoleculeIcon({ size = 24, color = 'currentColor' }) {
-  return <IconifyIcon icon={moleculeLight} width={size} height={size} color={color} />
-}
-
 // Key and label of the 'Other families' card that collects the families with
 // only one drug each.
 const OTHERS_KEY   = '__other_families__'
 const OTHERS_LABEL = 'Other families'
 
-// Key and label of the first row, which opens every brand in the class.
-// Exported so the Drugs screen can open the sheet straight on it.
-export const ALL_KEY = '__all_class_drugs__'
+// Key of the first row (opens every brand in the class) lives in classKeys.js,
+// so the Drugs screen can open the sheet straight on it without importing the sheet.
 const ALL_LABEL = 'All drugs in this class'
 
 // Builds the cards of the subclass list. Families with a single drug are
@@ -462,7 +457,7 @@ function SubclassRow({ name, count, Icon = MoleculeIcon, onClick, featured = fal
   )
 }
 
-export default function ClassBottomSheet({
+export default function ClassSheet({
   isOpen,
   onClose,
   classLabel,

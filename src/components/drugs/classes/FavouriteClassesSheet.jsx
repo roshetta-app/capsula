@@ -1,5 +1,7 @@
 /**
- * src/components/drugs/FavouriteClassesSheet.jsx
+ * src/components/drugs/classes/FavouriteClassesSheet.jsx
+ *
+ * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/classes/. No behaviour change.
  *
  * 2026-10-08 (favourite classes and families): two pieces for the Drugs tab of
  * the Favourites screen.
@@ -23,11 +25,11 @@
 
 import { useState } from 'react'
 import { ChevronRight, Heart, Layers } from 'lucide-react'
-import SheetShell from '../ui/SheetShell'
-import CountTag from '../ui/CountTag'
-import RowStarButton from '../ui/RowStarButton'
-import { MoleculeIcon } from './sections/ClassBottomSheet'
-import { titleCaseWords } from '../../utils/classSearch'
+import SheetShell from '../../ui/SheetShell'
+import CountTag from '../../ui/CountTag'
+import RowStarButton from '../../ui/RowStarButton'
+import { MoleculeIcon } from './ClassIcons.jsx'
+import { titleCaseWords } from '../../../utils/classSearch'
 
 const TILE = 34
 

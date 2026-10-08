@@ -1,5 +1,7 @@
 /**
- * src/components/drugs/BrandsList.jsx
+ * src/components/drugs/brands/BrandsList.jsx
+ *
+ * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/brands/. No code change.
  *
  * 2026-10-06 (bigger family title): the heading above the filters ('Other <name>
  * drugs', family name in bold) is 18px instead of 15px, on the class sheet's family
@@ -96,7 +98,7 @@
  *
  * 2026-10-03 (class sheet title): new optional prop hideOther (default false).
  * With it on, the heading drops the word 'Other' and reads '<name> drugs'. The
- * class sheet (ClassBottomSheet.jsx) turns it on for the drugs of a subclass,
+ * class sheet (ClassSheet.jsx) turns it on for the drugs of a subclass,
  * because there the open drug is not being left out of the list. Everywhere
  * else the heading still reads 'Other <name> drugs'.
  *
@@ -178,7 +180,7 @@
  * phone, new tab on the web). Plain web search, not Images. The Similar title
  * shows the generic name rather than a subclass, so it has no icon.
  *
- * 2026-10-03 (pop-ups in the sheet's own layer): BrandsBottomSheet now swipes
+ * 2026-10-03 (pop-ups in the sheet's own layer): SimilarAlternativesSheet now swipes
  * between its two lists, and anything drawn inside a sliding list gets
  * trapped inside that one list. So the sheet passes popupLayer (an empty
  * full-sheet layer) and the filter pop-ups are drawn into it, which keeps the
@@ -274,7 +276,7 @@
  *    useCategories.js does its own Supabase fetch + cache, not seeded by a
  *    parent; useIsDark follows SourcesSection.jsx's own established
  *    direct-call precedent), so both are called directly here rather than
- *    threading two new props down through BrandsBottomSheet.jsx and
+ *    threading two new props down through SimilarAlternativesSheet.jsx and
  *    GenericOverviewSection.jsx. Price (SharedDrugCard has no dedicated
  *    price slot) now rides in its `trailing` slot instead. Sort-by-name
  *    switched from the old row's `item.name` (SharedDrugCard's own header
@@ -430,17 +432,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, ListFilter, ArrowUpDown, FlaskConical, Search, ArrowDownAZ, ArrowDown01 } from 'lucide-react'
-import { openInAppBrowser } from '../../utils/openInAppBrowser'
-import SharedDrugCard from '../SharedDrugCard.jsx'
-import RowStarButton from '../ui/RowStarButton.jsx'
-import { FORM_OPTIONS } from './DrugFilterPanel.jsx'
+import { openInAppBrowser } from '../../../utils/openInAppBrowser'
+import SharedDrugCard from '../../SharedDrugCard.jsx'
+import RowStarButton from '../../ui/RowStarButton.jsx'
+import { FORM_OPTIONS } from '../DrugFilterPanel.jsx'
 import { applyFilters, countByForm, countByGeneric, sortItems, sortGenericOptions, otherGenericIds } from './brandsFilterLogic.js'
-import { useCategories } from '../../hooks/useCategories'
-import { FilterModal } from '../ui/FilterModal.jsx'
-import { useIsDark } from '../../utils/specialtyIcon'
-import { useFavouritesContext } from '../../context/FavouritesContext'
-import PaywallGateSheet from '../ui/PaywallGateSheet.jsx'
-import { useIsPro } from '../../hooks/useIsPro'
+import { useCategories } from '../../../hooks/useCategories'
+import { FilterModal } from '../../ui/FilterModal.jsx'
+import { useIsDark } from '../../../utils/specialtyIcon'
+import { useFavouritesContext } from '../../../context/FavouritesContext'
+import PaywallGateSheet from '../../ui/PaywallGateSheet.jsx'
+import { useIsPro } from '../../../hooks/useIsPro'
 
 // Maps a sibling's raw `form` value (e.g. 'capsule', 'eye drops') to the
 // grouped filter option it belongs to (e.g. the 'Tab / Cap.' group) —

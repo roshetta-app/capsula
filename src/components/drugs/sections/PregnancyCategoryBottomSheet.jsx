@@ -8,9 +8,9 @@
  * category badge alone (shown inline in the table) isn't enough context.
  *
  * Visual shell (backdrop fade, slide-up transition, mount/unmount timing,
- * Escape key, body-scroll lock) is copied from BrandsBottomSheet.jsx, same
+ * Escape key, body-scroll lock) is copied from SimilarAlternativesSheet.jsx, same
  * convention already used for DoseAdjustmentsBottomSheet.jsx — no new sheet
- * mechanism introduced. Unlike BrandsBottomSheet.jsx (whose body already
+ * mechanism introduced. Unlike SimilarAlternativesSheet.jsx (whose body already
  * supplies its own section header via BrandsList), this sheet has no such
  * built-in title, so a plain title is added directly under the drag handle
  * here.

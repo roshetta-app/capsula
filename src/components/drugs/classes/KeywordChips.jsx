@@ -1,14 +1,17 @@
 /**
- * src/components/drugs/KeywordChips.jsx
+ * src/components/drugs/classes/KeywordChips.jsx
+ *
+ *  * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/classes/ (the
+ *   chips show a class family's keywords). No code change.
  *
  * 2026-10-05 (new): the keyword chips of a family, shown on the Alternatives
- * list of the Related drugs sheet (BrandsBottomSheet.jsx). Same chip look as
+ * list of the Related drugs sheet (SimilarAlternativesSheet.jsx). Same chip look as
  * the class sheet: as many words as fit in about two lines (counted by letters,
  * so long words take more room), then a '+N' chip that shows all of them,
  * and a 'Show less' chip that folds them back. Words start with a capital
  * letter. Display only, nothing happens when a word is tapped.
  *
- * ClassBottomSheet.jsx keeps its own copy of this look for now (so a tested
+ * ClassSheet.jsx keeps its own copy of this look for now (so a tested
  * file is left alone); the two can be merged later.
  *
  * Exports:

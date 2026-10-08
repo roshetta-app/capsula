@@ -193,7 +193,7 @@
  * 'class'. With a query typed in that mode the results area shows class and
  * subclass cards (ClassSearchResults) instead of drug rows, and it ignores the
  * category scope and the Form/Route filter (they apply to drug rows, not to
- * cards). Tapping a class card opens the class sheet (ClassBottomSheet) on its
+ * cards). Tapping a class card opens the class sheet (ClassSheet) on its
  * subclass list, or straight on its drugs when the class has no subclasses;
  * tapping a subclass card opens the sheet straight on that subclass's drugs,
  * and Back closes the sheet. A tapped drug opens like any drug row. The empty
@@ -278,8 +278,9 @@ import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import DrugFilterPanel, { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
 import { FilterModal } from '../components/ui/FilterModal'
-import ClassSearchResults from '../components/drugs/ClassSearchResults'
-import ClassBottomSheet, { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/sections/ClassBottomSheet'
+import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
+import ClassSheet from '../components/drugs/classes/ClassSheet'
+import { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/classes/classKeys'
 import RecentlyViewedSheet from '../components/drugs/RecentlyViewedSheet'
 import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
@@ -1017,7 +1018,7 @@ export default function DrugsScreen() {
       {/* Class search mode: the class sheet opened from a class or subclass
           card (in typed results or in the Browse area's Class list). A tapped
           drug closes the sheet and opens like any drug row. */}
-      <ClassBottomSheet
+      <ClassSheet
         key={classSheetKey}
         isOpen={classSheetOpen}
         onClose={() => setClassSheetOpen(false)}

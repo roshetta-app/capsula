@@ -1,5 +1,8 @@
 /**
- * src/components/ui/ClassHeartButton.jsx
+ * src/components/drugs/classes/ClassHeartButton.jsx
+ *
+ *  * 2026-10-08 (refactor, phase 1): moved from ui/ to drugs/classes/ (only the
+ *   class sheet uses it). No code change.
  *
  * 2026-10-08 (favourite classes and families): the heart in the class sheet
  * that saves or removes a drug class or family. Outline when not saved, filled

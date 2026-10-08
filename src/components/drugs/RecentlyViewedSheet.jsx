@@ -9,16 +9,16 @@
  * plain-text links.
  *
  * Shell (backdrop fade, slide-up transition, mount/unmount timing, Escape
- * key, body-scroll lock) is copied from BrandsBottomSheet.jsx /
+ * key, body-scroll lock) is copied from SimilarAlternativesSheet.jsx /
  * SpecialtiesBottomSheet.jsx so it reads as the same "extra list in a
- * sheet" pattern already established there. Unlike BrandsBottomSheet (which
+ * sheet" pattern already established there. Unlike SimilarAlternativesSheet (which
  * mounts BrandsList and relies on that child's own section header), nothing
  * rendered inside this sheet provides a title on its own, so — like
  * FavouritesManagerSheet — this shell renders its own "Recently viewed"
  * heading next to the drag handle. Unlike FavouritesManagerSheet, no
  * separate close button — this list has no other controls competing for
  * attention, so backdrop-tap/gesture alone is enough, same as
- * BrandsBottomSheet and SpecialtiesBottomSheet.
+ * SimilarAlternativesSheet and SpecialtiesBottomSheet.
  *
  * Phase 3 (Back-Button & State-Audit merged plan) — wired into
  * useBackClose so back closes this sheet instead of changing the route;
@@ -66,7 +66,7 @@ export default function RecentlyViewedSheet({
 
   return (
     <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="Recently viewed" maxHeight="70dvh">
-      {/* Fixed header — title, since (unlike BrandsBottomSheet) nothing
+      {/* Fixed header — title, since (unlike SimilarAlternativesSheet) nothing
           mounted below provides its own section header. The drag handle
           itself now lives in SheetShell, above this. */}
       <div style={{ flexShrink: 0, padding: '0 var(--space-4)' }}>

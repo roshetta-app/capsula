@@ -9,7 +9,7 @@
  * Renders the Active Ingredients / Generic Overview group for a drug:
  *   - top row: "Active ingredient" / "Active ingredients" label (plural only
  *     for combos, 2+ ingredients) + the "See Available Brands" link on the
- *     right, opens BrandsBottomSheet, disappears entirely when there are no
+ *     right, opens SimilarAlternativesSheet, disappears entirely when there are no
  *     siblings — same behavior as before, just restyled as a top-right link
  *     instead of a full-width button (2026-07-25, mockup reconciliation)
  *   - fixed decorative icon + generic/combo name (4.9)
@@ -41,7 +41,7 @@
  *   drug          — flat drug object from DrugContext
  *   siblings      — array of sibling flat drug objects sharing the same
  *                   generic, same shape BrandsList.jsx already receives
- *   onSelectBrand — (item) => void — passed through to BrandsBottomSheet,
+ *   onSelectBrand — (item) => void — passed through to SimilarAlternativesSheet,
  *                   called after the sheet closes
  *
  * Phase 6 (re-scoped, 2026-09-03, plan §4.9): the Mechanism of Action
@@ -228,13 +228,13 @@
  *    on its Alternatives tab. Otherwise it renders as a plain row like the
  *    class row. The class row is a plain label for now.
  *  - Sheet now opens on a chosen tab ('similar' or 'alternatives') via
- *    BrandsBottomSheet's new initialTab prop.
+ *    SimilarAlternativesSheet's new initialTab prop.
  *
  * 2026-10-03 (Related drugs pill, class sheet, card look):
  *  - 'Related drugs' is now a filled blue pill (same top-right spot), so it
  *    is the first thing the eye lands on in this section. It has no count:
  *    a count tag was tried the same day and removed.
- *  - The Class row is now tappable and opens the new ClassBottomSheet.jsx
+ *  - The Class row is now tappable and opens the new ClassSheet.jsx
  *    (every subclass in the class, then the drugs in the one picked). It is
  *    only tappable when the new 'classDrugs' prop has drugs in it. The
  *    Subclass row still opens the Alternatives tab, as before.
@@ -301,8 +301,9 @@
 
 import { useState, useRef, useLayoutEffect, useEffect, useCallback } from 'react'
 import { FlaskConical, ChevronRight, Layers } from 'lucide-react'
-import BrandsBottomSheet from './BrandsBottomSheet.jsx'
-import ClassBottomSheet, { MoleculeIcon } from './ClassBottomSheet.jsx'
+import SimilarAlternativesSheet from '../brands/SimilarAlternativesSheet.jsx'
+import ClassSheet from '../classes/ClassSheet.jsx'
+import { MoleculeIcon } from '../classes/ClassIcons.jsx'
 import { InlineTruncatedList, IngredientChip, TextToggle } from './sectionPrimitives.jsx'
 import { toTitleCase } from '../../../utils/drugTitleFormat.js'
 
@@ -776,7 +777,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
         </div>
       )}
 
-      <BrandsBottomSheet
+      <SimilarAlternativesSheet
         isOpen={brandsOpen}
         onClose={() => setBrandsOpen(false)}
         siblings={siblings}
@@ -787,7 +788,7 @@ export default function GenericOverviewSection({ drug, siblings = [], alternativ
       />
 
       {drugClass && (
-        <ClassBottomSheet
+        <ClassSheet
           isOpen={classOpen}
           onClose={() => setClassOpen(false)}
           classLabel={drugClass}

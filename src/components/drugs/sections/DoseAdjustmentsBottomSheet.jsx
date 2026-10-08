@@ -6,7 +6,7 @@
  * Bottom sheet for "Dose adjustments", opened by the text-link trigger in
  * DoseSection.jsx's header row. Visual shell (backdrop fade, slide-up
  * transition, mount/unmount timing, Escape key, body-scroll lock) is copied
- * from BrandsBottomSheet.jsx — matching the app's established convention of
+ * from SimilarAlternativesSheet.jsx — matching the app's established convention of
  * copying the sheet shell per new sheet, not sharing one component (decision
  * 4.11, confirmed against plan §10 Section 10).
  *

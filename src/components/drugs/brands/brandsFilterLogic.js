@@ -1,5 +1,8 @@
 /**
- * src/components/drugs/brandsFilterLogic.js
+ * src/components/drugs/brands/brandsFilterLogic.js
+ *
+ * 2026-10-08 (refactor, phase 1): moved from drugs/ to drugs/brands/. No code change.
+ *
  * Related drugs sheet — the filter rules, kept as plain functions so they can
  * be tested on their own (no screen needed).
  *
