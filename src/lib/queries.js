@@ -85,6 +85,11 @@
  *     later open. This closes a blind spot where the light list could land
  *     successfully while the fuller background fetch silently failed,
  *     leaving onboarding reporting success with nothing actually saved.
+ *   - 2026-10-14 (Arabic names, plan v9 Session 13): added name_ar and
+ *     name_ar_full (brands) to FULL_BRAND_SELECT and mapped them to nameAr /
+ *     nameArFull in mapFlatDrugRows. Only shown statuses are ever in these
+ *     columns (hidden ones live in brand_ar_hidden). The select text is hashed
+ *     into the cache version, so every device re-downloads the list once.
  *   - 2026-09-27 (class/subclass wiring): added subclass (generics) to
  *     FULL_BRAND_SELECT and mapFlatDrugRows, right alongside the existing
  *     class field — GenericOverviewSection.jsx's Classification block was
@@ -126,7 +131,7 @@ const BRAND_PAGE_BATCH_SIZE = 4
 // Full select — every field either the list screens or the detail page
 // reads. Used by fetchFlatDrugs.
 const FULL_BRAND_SELECT = `
-  id, slug, name, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
+  id, slug, name, name_ar, name_ar_full, tradename_clean, manufacturer, price, pack_size, fill_volume, is_published,
   formulations (
     id, slug, concentration, strength_value, strength_unit, strength_basis, form, form_modifier, route, route_details, doses_structured, default_dose_override, is_published,
     generics (
@@ -340,6 +345,8 @@ function mapFlatDrugRows(rows) {
         slug:                 b.slug,
         name:                 b.name,
         tradenameClean:       b.tradename_clean,
+        nameAr:               b.name_ar ?? null,
+        nameArFull:           b.name_ar_full ?? null,
         manufacturer:         b.manufacturer,
         price:                b.price,
         packSize:             b.pack_size,

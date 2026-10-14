@@ -1,6 +1,13 @@
 /**
  * src/utils/searchUtils.js
  *
+ * 2026-10-14 (Arabic brand search, plan v9 Session 13): in Brand mode, text that
+ * contains Arabic letters is searched on the phone against the brand's Arabic
+ * name (nameAr) and full Arabic title (nameArFull), after the same cleanup the
+ * database uses (ar_search_norm). Text with no Arabic letters takes exactly the
+ * old path, so English results are unchanged. Generic mode and Class mode are
+ * untouched.
+ *
  * 2026-10-06 (wrong strength): 'augmentin 500' with no 500 on file now offers the
  * strengths that exist ('Augmentin 1000mg', 'Augmentin 457mg/5ml'), nearest first,
  * also after a name typo ('augmetin 500'). Done inside getDrugSearchSuggestion, so
@@ -773,6 +780,110 @@ export function extractFormFromQuery(query, { allowTypo = false } = {}) {
   return null
 }
 
+// ─── Arabic brand search (plan v9 Session 13) ─────────────────────────────────
+// Mirrors the database function ar_search_norm so a phone search and a database
+// search clean text the same way: diacritics (U+064B-0652, U+0670) and tatweel
+// (U+0640) removed; hamza alef forms to alef; alef maqsura to ya; ta marbuta to
+// ha; hamza on waw to waw; hamza on ya to ya; Arabic-Indic digits to Western;
+// leading "al-" dropped per word; spaces collapsed. One addition: hyphens are
+// removed (some full titles carry a stray '-'), as the English cleanup does.
+// Comparison-only: nothing shown on screen passes through this.
+const AR_LETTER_RE = /[\u0600-\u06FF]/
+const AR_FOLD = {
+  '\u0623': '\u0627', '\u0625': '\u0627', '\u0622': '\u0627', '\u0671': '\u0627',
+  '\u0649': '\u064A', '\u0629': '\u0647', '\u0624': '\u0648', '\u0626': '\u064A',
+}
+
+export function hasArabicLetters(text) {
+  return AR_LETTER_RE.test(text ?? '')
+}
+
+export function arSearchNorm(text) {
+  return (text ?? '')
+    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+    .replace(/[\u0623\u0625\u0622\u0671\u0649\u0629\u0624\u0626]/g, c => AR_FOLD[c])
+    .replace(/[\u0660-\u0669]/g, c => String(c.charCodeAt(0) - 0x0660))
+    .replace(/[\u06F0-\u06F9]/g, c => String(c.charCodeAt(0) - 0x06F0))
+    .replace(/-/g, '')
+    .replace(/(^|\s)\u0627\u0644(?=\S)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+// Small-misspelling tolerance for Arabic: spelling of foreign brand names is not
+// standard (ك/ق, ث/س, ي/ى, a dropped vowel letter), so one or two letter changes
+// are allowed on 3+ letter text, compared with the whole name, each word, and the
+// start of the name cut to the typed length (and one shorter / longer). No
+// same-first-letter rule here, unlike English: Arabic variants do change it.
+function arMaxEdits(length) {
+  if (length < 3) return -1
+  if (length <= 4) return 1
+  if (length <= 8) return 1
+  return 2
+}
+
+function arFuzzyDistance(q, field) {
+  if (!field) return null
+  const allowed = arMaxEdits(q.length)
+  if (allowed < 0) return null
+  const candidates = [field, ...field.split(' ').filter(w => w.length >= 3)]
+  for (const len of [q.length, q.length - 1, q.length + 1]) {
+    if (len >= 3 && len < field.length) candidates.push(field.slice(0, len))
+  }
+  let best = null
+  for (const c of candidates) {
+    if (Math.abs(c.length - q.length) > allowed) continue
+    const d = editDistance(q, c)
+    if (d <= allowed && (best === null || d < best)) best = d
+  }
+  return best
+}
+
+function searchBrandsArabic(pool, query) {
+  const q = arSearchNorm(query)
+  if (q.length === 0) return []
+
+  const rows = []
+  for (const d of pool) {
+    const brandPart = arSearchNorm(d.nameAr)
+    const fullTitle = arSearchNorm(d.nameArFull)
+    if (!brandPart && !fullTitle) continue
+    rows.push({ d, brandPart, fullTitle })
+  }
+
+  // Same three tiers as the English brand search: starts with, a word starts
+  // with, anywhere (3rd tier only from 4 letters). Brand part first, then the
+  // full title, per tier. Shorter name first inside a tier.
+  const tiers = q.length >= 4 ? [1, 2, 3] : [1, 2]
+  for (const tier of tiers) {
+    const hit = rows.filter(r =>
+      (r.brandPart && fieldMatchesAtTier(r.brandPart, q, tier)) ||
+      (r.fullTitle && fieldMatchesAtTier(r.fullTitle, q, tier)))
+    if (hit.length > 0) {
+      return hit
+        .sort((a, b) => {
+          const al = (a.brandPart || a.fullTitle).length
+          const bl = (b.brandPart || b.fullTitle).length
+          return al !== bl ? al - bl : (a.brandPart || a.fullTitle).localeCompare(b.brandPart || b.fullTitle)
+        })
+        .map(r => r.d)
+    }
+  }
+
+  // Nothing matched exactly: allow a small misspelling, closest first.
+  const near = []
+  for (const r of rows) {
+    const d1 = arFuzzyDistance(q, r.brandPart)
+    const d2 = arFuzzyDistance(q, r.fullTitle)
+    const best = d1 === null ? d2 : d2 === null ? d1 : Math.min(d1, d2)
+    if (best !== null) near.push({ r, best })
+  }
+  return near
+    .sort((a, b) => a.best - b.best ||
+      (a.r.brandPart || a.r.fullTitle).length - (b.r.brandPart || b.r.fullTitle).length)
+    .map(x => x.r.d)
+}
+
 function drugFieldForMode(drug, mode) {
   // Brand mode reads tradenameClean (not the raw 'name' field) — see
   // DRUG_GENERIC_FUSE_OPTIONS' neighbor for the 2026-07-19 fix note
@@ -1044,6 +1155,11 @@ export function searchDrugsTiered(pool, query, mode = 'brand') {
 function searchDrugsTieredCore(pool, query, mode, allowTypoForm) {
   const q = query.trim()
   if (q.length === 0) return null
+
+  // Arabic text in Brand mode: searched against the Arabic names (see above).
+  // Strength/form reading is English-only, so it is skipped. Any other text takes
+  // the unchanged path below.
+  if (mode === 'brand' && hasArabicLetters(q)) return searchBrandsArabic(pool, q)
 
   // Pull strength/form facets out first — whatever's left is the name text.
   const strength      = extractStrengthFromQuery(q)

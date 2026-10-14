@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
+ * 2026-10-14 (Arabic names, plan v9 Session 13): an Arabic line sits right
+ * under the English name (nameArFull, else nameAr, else nothing), right to left.
+ *
  * 2026-10-03 (image search stopped working): the image-search icon now opens
  * through openInAppBrowser (src/utils/openInAppBrowser.js), which recovers when
  * the phone ignores the request, same fix as SharedDrugCard.jsx.
@@ -469,6 +472,33 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             <ScanSearch size={20} strokeWidth={1.8} color="currentColor" />
           </button>
         </div>
+
+        {/* Arabic name (plan v9 Session 13): directly under the English name,
+            right to left. Full Arabic title when there is one, else the Arabic
+            brand name, else nothing at all. Only shown statuses ever reach the
+            phone, so no status check here. Scrolls sideways if long. */}
+        {(drug.nameArFull || drug.nameAr) && (
+          <div
+            dir="rtl"
+            lang="ar"
+            style={{
+              fontSize:                15,
+              fontWeight:              500,
+              lineHeight:              1.4,
+              color:                   'var(--color-text-secondary)',
+              textAlign:               'right',
+              marginBottom:            2,
+              overflowX:               'auto',
+              whiteSpace:              'nowrap',
+              scrollbarWidth:          'none',
+              msOverflowStyle:         'none',
+              WebkitOverflowScrolling: 'touch',
+              touchAction:             'pan-x',
+            }}
+          >
+            {drug.nameArFull || drug.nameAr}
+          </div>
+        )}
 
         {/* Row 3: strength/form suffix — own line beneath the brand name
             now, instead of sharing row 2's single scrolling line. Same

@@ -25,6 +25,10 @@
  *   line → 1d.3 / 1d.4 (generic line, category icon)
  *   trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
+ * 2026-10-14 (Arabic names, plan v9 Session 13): when the typed text has Arabic
+ * letters and the search is in Brand mode, the matched drug's Arabic name shows
+ * as a small right-to-left line under the title. Nowhere else.
+ *
  * Title line (1d.2, decision 4.12; corrected 2026-07-19): tradenameClean +
  * concentration + form — replacing the old card's approach of appending a
  * second, already-baked-in strength/form onto a pre-composed name string
@@ -166,6 +170,7 @@ import { SpecialtyIcon } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../utils/drugTitleFormat'
+import { hasArabicLetters } from '../utils/searchUtils'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
@@ -242,6 +247,14 @@ export default function SharedDrugCard({
   const titleSegments   = highlightMatch(toTitleCase(drug.tradenameClean), searchMode === 'brand'   ? highlight : '')
   const genericSegments = highlightMatch(genericLine || '',   searchMode === 'generic' ? highlight : '')
 
+  // Arabic line (plan v9 Session 13): only while the typed text has Arabic letters
+  // and the search is in Brand mode, so it shows which Arabic name matched and
+  // never appears in any other list or search. Brand part first (it is what the
+  // search matches on); full title only when there is no brand part.
+  const arabicLine = searchMode === 'brand' && hasArabicLetters(highlight)
+    ? (drug.nameAr || drug.nameArFull || '')
+    : ''
+
   return (
     <div
       onClick={disableTap ? undefined : handleTap}
@@ -309,6 +322,25 @@ export default function SharedDrugCard({
             </span>
           )}
         </div>
+
+        {arabicLine && (
+          <div
+            dir="rtl"
+            lang="ar"
+            style={{
+              fontSize:     13,
+              fontWeight:   500,
+              color:        'var(--color-text-secondary)',
+              lineHeight:   1.3,
+              textAlign:    'right',
+              overflow:     'hidden',
+              whiteSpace:   'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {arabicLine}
+          </div>
+        )}
 
         {genericLine && (
           <div style={{
