@@ -88,6 +88,7 @@ const SearchBar = forwardRef(function SearchBar({
   filterDisabled = false,
   compact = false,
   icon: Icon = Search,
+  onInputFocus,
 }, ref) {
   const height = compact ? 44 : 46
 
@@ -140,6 +141,7 @@ const SearchBar = forwardRef(function SearchBar({
         onFocus={e => {
           e.target.style.borderColor = 'var(--color-accent)'
           e.target.style.boxShadow   = '0 0 0 3px var(--color-accent-light), var(--shadow-ambient-search)'
+          onInputFocus?.()
         }}
         onBlur={e => {
           e.target.style.borderColor = 'var(--color-border)'

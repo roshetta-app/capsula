@@ -66,6 +66,7 @@ export default function DrugsSearchSection({
   showClear, onClearFilters,
   showRecent, recentDrugs, onOpenRecent,
   categories, isDark,
+  searchOpen = false, onSearchFocus, onSearchCancel, searchInputRef,
 }) {
   const [showModeInfo, setShowModeInfo] = useState(false)
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
@@ -120,15 +121,32 @@ export default function DrugsSearchSection({
         {/* The one search bar of the screen. Nothing is added or removed
             above it, so React keeps the same input (and the keyboard) while
             the view below changes. */}
-        <div>
-          <SearchBar
-            value={query}
-            onChange={onQueryChange}
-            placeholder={placeholder}
-            onFilter={onFilter}
-            filterDisabled={filterDisabled}
-            hasActiveFilters={hasActiveFilters}
-          />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <SearchBar
+              ref={searchInputRef}
+              value={query}
+              onChange={onQueryChange}
+              onInputFocus={onSearchFocus}
+              placeholder={placeholder}
+              onFilter={onFilter}
+              filterDisabled={filterDisabled}
+              hasActiveFilters={hasActiveFilters}
+            />
+          </div>
+          {searchOpen && (
+            <button
+              onClick={onSearchCancel}
+              style={{
+                flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px 2px', fontSize: 14, fontWeight: 600,
+                color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. */}

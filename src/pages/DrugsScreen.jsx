@@ -303,6 +303,9 @@ import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { ROUTES } from '../router'
+import { useBackClose } from '../hooks/useBackClose'
+import { useSearchHistory } from '../hooks/useSearchHistory'
+import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
 
@@ -587,10 +590,56 @@ export default function DrugsScreen() {
   // search that takes longer than 300ms swaps them for the placeholder rows.
   const [slowPending, setSlowPending] = useState(false)
   useEffect(() => {
-    if (!searchPending) { setSlowPending(false); return }
+    if (!searchPending) return
     const timer = setTimeout(() => setSlowPending(true), 300)
-    return () => clearTimeout(timer)
+    return () => { clearTimeout(timer); setSlowPending(false) }
   }, [searchPending])
+
+  // Search open (2026-10-14): tapping the search bar hides the hero and the sticky
+  // header and lifts the Search card to the top; the results area shows recent
+  // searches until something is typed. Cancel or the phone's back button closes it.
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInputRef = useRef(null)
+  const { history, addSearch, removeSearch, clearHistory } = useSearchHistory()
+
+  function openSearch() {
+    setSearchOpen(true)
+  }
+  function closeSearch() {
+    setSearchOpen(false)
+    handleQueryChange('')
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+  }
+  useBackClose(searchOpen, closeSearch)
+
+  // Opening from the sticky header's own bar: bring the page to the top and put the
+  // cursor in the main bar once it has moved there.
+  useEffect(() => {
+    if (!searchOpen) return
+    window.scrollTo(0, 0)
+    const frame = requestAnimationFrame(() => {
+      const input = searchInputRef.current
+      if (input && document.activeElement !== input) input.focus()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [searchOpen])
+
+  // A search is saved to history once it has sat for 2 seconds and found something.
+  const foundSomething = mode === 'class'
+    ? Boolean(classResults && (classResults.classes.length + classResults.subclasses.length) > 0)
+    : (searchResults?.length ?? 0) > 0 && !queryTooShort
+  useEffect(() => {
+    if (!hasQuery || searchPending || !foundSomething) return
+    const text = query.trim()
+    const timer = setTimeout(() => addSearch(text, mode), 2000)
+    return () => clearTimeout(timer)
+  }, [query, mode, hasQuery, searchPending, foundSomething, addSearch])
+
+  function handlePickHistory(entry) {
+    if (entry.mode !== mode) handleModeChange(entry.mode)
+    handleQueryChange(entry.text)
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+  }
   const queryRef     = useRef(query)
   const firstModeRef = useRef(true)
   queryRef.current   = query
@@ -948,20 +997,23 @@ export default function DrugsScreen() {
 
   return (
     <>
-      <StickyDrugsHeader
-        watchRef={heroRef}
-        query={query}
-        onQueryChange={handleQueryChange}
-        placeholder={stickyPlaceholder}
-        onFilter={() => setFilterOpen(true)}
-        filterDisabled={!filtersApply}
-        hasActiveFilters={hasFilters && filtersApply}
-        mode={mode}
-        onOpenModeMenu={() => setModeMenuOpen(true)}
-      />
+      {!searchOpen && (
+        <StickyDrugsHeader
+          watchRef={heroRef}
+          query={query}
+          onQueryChange={handleQueryChange}
+          onSearchFocus={openSearch}
+          placeholder={stickyPlaceholder}
+          onFilter={() => setFilterOpen(true)}
+          filterDisabled={!filtersApply}
+          hasActiveFilters={hasFilters && filtersApply}
+          mode={mode}
+          onOpenModeMenu={() => setModeMenuOpen(true)}
+        />
+      )}
 
       <div>
-        <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
+        {!searchOpen && <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />}
 
         {/* The Search area: written once, drawn in every view, so the search
             bar is never rebuilt and the keyboard stays open when typing
@@ -970,7 +1022,15 @@ export default function DrugsScreen() {
             search is typed, where it would push the results down. The
             Clear filter button hides while the filter-hidden-results message
             is showing, which has its own. */}
+        <div style={searchOpen
+          ? { position: 'sticky', top: 0, zIndex: 40, backgroundColor: 'var(--color-bg)', paddingTop: 8 }
+          : undefined}
+        >
         <DrugsSearchSection
+          searchOpen={searchOpen}
+          onSearchFocus={openSearch}
+          onSearchCancel={closeSearch}
+          searchInputRef={searchInputRef}
           mode={mode}
           onModeChange={handleModeChange}
           modeMenuOpen={modeMenuOpen}
@@ -983,14 +1043,22 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters && filtersApply}
           showClear={hasFilters && filtersApply && !isFilterMasked}
           onClearFilters={requestClearFilters}
-          showRecent={!hasQuery}
+          showRecent={!hasQuery && !searchOpen}
           recentDrugs={recentDrugObjects}
           onOpenRecent={() => setShowRecentSheet(true)}
           categories={categories}
           isDark={isDark}
         />
+        </div>
 
-        {body}
+        {searchOpen && !hasQuery ? (
+          <SearchHistoryList
+            history={history}
+            onPick={handlePickHistory}
+            onRemove={removeSearch}
+            onClear={clearHistory}
+          />
+        ) : body}
       </div>
 
       <DrugFilterPanel
@@ -1184,7 +1252,7 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
 // query — the caller computes and passes that text down, since only it
 // knows hasQuery/activeCategory.
 
-function StickyDrugsHeader({ watchRef, query, onQueryChange, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
+function StickyDrugsHeader({ watchRef, query, onQueryChange, onSearchFocus, placeholder, onFilter, filterDisabled, hasActiveFilters, mode, onOpenModeMenu }) {
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
 
   return (
@@ -1244,6 +1312,7 @@ function StickyDrugsHeader({ watchRef, query, onQueryChange, placeholder, onFilt
           <SearchBar
             value={query}
             onChange={onQueryChange}
+            onInputFocus={onSearchFocus}
             placeholder={placeholder}
             onFilter={onFilter}
             filterDisabled={filterDisabled}
