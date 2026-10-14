@@ -1,6 +1,10 @@
 /**
  * src/hooks/useSearchHistory.js
  *
+ * 2026-10-15: matchingSearches() picks the past searches that start with what is being
+ * typed (for the hints above the results). Saving now happens only on a commit (a result
+ * opened, the keyboard's Search key, a tapped hint or a tapped past search); see DrugsScreen.
+ *
  * 2026-10-14: the drug search's recent searches (text + the search mode it was typed
  * in), newest first, at most 10, kept on this device only. A repeat of the same text
  * in the same mode moves to the top instead of being listed twice. Storage failures
@@ -29,6 +33,19 @@ function write(list) {
 }
 
 const same = (a, b) => a.mode === b.mode && a.text.trim().toLowerCase() === b.text.trim().toLowerCase()
+
+// Past searches that start with the typed text (not counting an exact repeat of the same
+// search in the same mode), newest first, at most 'limit'.
+export function matchingSearches(history, text, mode, limit = 3) {
+  const t = (text ?? '').trim().toLowerCase()
+  if (!t) return []
+  return history
+    .filter(e => {
+      const et = e.text.trim().toLowerCase()
+      return et.startsWith(t) && !(et === t && e.mode === mode)
+    })
+    .slice(0, limit)
+}
 
 export function useSearchHistory() {
   const [history, setHistory] = useState(read)

@@ -1,5 +1,8 @@
 /**
  * src/components/ui/SearchBar.jsx
+ *
+ * 2026-10-15: optional 'onSubmit': the keyboard's Search key calls it with the typed text
+ * and closes the keyboard. Without it nothing changes (no Search key behaviour).
  * Phase 2I — shared search bar used on ConditionsScreen and DrugsScreen.
  * Phase 3  — updated default placeholder to "Search conditions or symptoms…"
  * Phase 5  — flat border-only style; accent ring on focus; no shadow
@@ -89,6 +92,7 @@ const SearchBar = forwardRef(function SearchBar({
   compact = false,
   icon: Icon = Search,
   onInputFocus,
+  onSubmit,
 }, ref) {
   const height = compact ? 44 : 46
 
@@ -122,6 +126,13 @@ const SearchBar = forwardRef(function SearchBar({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        enterKeyHint={onSubmit ? 'search' : undefined}
+        onKeyDown={onSubmit ? (e => {
+          if (e.key === 'Enter') {
+            onSubmit(e.target.value)
+            e.target.blur()
+          }
+        }) : undefined}
         style={{
           width:           '100%',
           boxSizing:       'border-box',

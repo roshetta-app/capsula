@@ -270,7 +270,7 @@
  * 'widen the search' card; nothing anywhere shows the plain no-results card.
  */
 
-import { FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
+import { History as HistoryIcon, FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
@@ -304,7 +304,7 @@ import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { ROUTES } from '../router'
 import { useBackClose } from '../hooks/useBackClose'
-import { useSearchHistory } from '../hooks/useSearchHistory'
+import { useSearchHistory, matchingSearches } from '../hooks/useSearchHistory'
 import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
@@ -528,7 +528,11 @@ export default function DrugsScreen() {
     setShowClearFiltersConfirm(true)
   }
 
+  // Armed by commitSearch() (further down); a typed change disarms it.
+  const commitRef = useRef(false)
   function handleQueryChange(val) {
+    // Typing never saves a search; a save is only armed by commitSearch() below.
+    commitRef.current = false
     setQuery(val)
   }
 
@@ -556,11 +560,13 @@ export default function DrugsScreen() {
   }
 
   function handleOpenClass(className) {
+    if (hasQuery && mode === 'class') addSearch(className, 'class')
     const card = classResults?.classes?.find(c => c.name === className) ?? allClasses.find(c => c.name === className)
     openClassSheet(className, card && card.subclassCount === 0 ? ALL_CLASS_DRUGS_KEY : null)
   }
 
   function handleOpenSubclass(className, subclassName) {
+    if (hasQuery && mode === 'class') addSearch(subclassName || className, 'class')
     openClassSheet(className, subclassName)
   }
 
@@ -595,14 +601,32 @@ export default function DrugsScreen() {
     return () => { clearTimeout(timer); setSlowPending(false) }
   }, [searchPending])
 
-  // Search open (2026-10-14): tapping the search bar hides the hero and the sticky
-  // header and lifts the Search card to the top; the results area shows recent
-  // searches until something is typed. Cancel or the phone's back button closes it.
-  const [searchOpen, setSearchOpen] = useState(false)
+  // Search open (2026-10-14, reworked 2026-10-15): tapping the search bar hides the hero
+  // and the sticky header (they fade and fold away) and lifts the Search card to the top;
+  // the results area shows recent searches until something is typed. The back arrow in the
+  // card or the phone's back button closes it and clears the text. It also starts open when
+  // this screen is drawn again with a search still typed (coming back from an opened
+  // drug), so the person lands in the search with the results and no keyboard.
+  const [searchOpen, setSearchOpen] = useState(() => query.trim().length > 0)
+  const restoredOpenRef = useRef(searchOpen)
   const searchInputRef = useRef(null)
   const { history, addSearch, removeSearch, clearHistory } = useSearchHistory()
+  const [showClearHistoryConfirm, setShowClearHistoryConfirm] = useState(false)
+  const [commitTick, setCommitTick] = useState(0)
+
+  // The sticky header comes back only after the hero has finished unfolding, so it never
+  // flashes in while the hero is still short.
+  const [headerReady, setHeaderReady] = useState(!searchOpen)
+  useEffect(() => {
+    if (searchOpen) return
+    const timer = setTimeout(() => setHeaderReady(true), 260)
+    return () => { clearTimeout(timer); setHeaderReady(false) }
+  }, [searchOpen])
+  const reduceMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
   function openSearch() {
+    restoredOpenRef.current = false
     setSearchOpen(true)
   }
   function closeSearch() {
@@ -613,9 +637,11 @@ export default function DrugsScreen() {
   useBackClose(searchOpen, closeSearch)
 
   // Opening from the sticky header's own bar: bring the page to the top and put the
-  // cursor in the main bar once it has moved there.
+  // cursor in the main bar once it has moved there. Not when the search was reopened by
+  // coming back from a drug.
   useEffect(() => {
     if (!searchOpen) return
+    if (restoredOpenRef.current) { restoredOpenRef.current = false; return }
     window.scrollTo(0, 0)
     const frame = requestAnimationFrame(() => {
       const input = searchInputRef.current
@@ -624,22 +650,82 @@ export default function DrugsScreen() {
     return () => cancelAnimationFrame(frame)
   }, [searchOpen])
 
-  // A search is saved to history once it has sat for 2 seconds and found something.
+  // The keyboard folds away when the person drags the results.
+  useEffect(() => {
+    if (!searchOpen) return
+    let startY = null
+    const onStart = (e) => { startY = e.touches && e.touches[0] ? e.touches[0].clientY : null }
+    const onMove = (e) => {
+      if (startY === null || !e.touches || !e.touches[0]) return
+      if (Math.abs(e.touches[0].clientY - startY) > 12) {
+        startY = null
+        const el = document.activeElement
+        if (el && el === searchInputRef.current) el.blur()
+      }
+    }
+    window.addEventListener('touchstart', onStart, { passive: true })
+    window.addEventListener('touchmove', onMove, { passive: true })
+    return () => {
+      window.removeEventListener('touchstart', onStart)
+      window.removeEventListener('touchmove', onMove)
+    }
+  }, [searchOpen])
+
+  // What counts as a recent search: only a committed one. Typing and pausing saves
+  // nothing. A search is saved (as the text that was run, or the drug's own name when a
+  // result is opened) when the person opens a result, presses the keyboard's Search key,
+  // taps a 'Did you mean' hint, or taps a past search, and only if it found something.
+  // commitSearch() arms a save; the effect below does it once the search has settled.
+  function commitSearch() {
+    commitRef.current = true
+    setCommitTick(t => t + 1)
+  }
   const foundSomething = mode === 'class'
     ? Boolean(classResults && (classResults.classes.length + classResults.subclasses.length) > 0)
     : (searchResults?.length ?? 0) > 0 && !queryTooShort
   useEffect(() => {
-    if (!hasQuery || searchPending || !foundSomething) return
-    const text = query.trim()
-    const timer = setTimeout(() => addSearch(text, mode), 2000)
-    return () => clearTimeout(timer)
-  }, [query, mode, hasQuery, searchPending, foundSomething, addSearch])
+    if (!commitRef.current || !hasQuery || searchPending) return
+    commitRef.current = false
+    if (foundSomething) addSearch(query.trim(), mode)
+  }, [commitTick, query, mode, hasQuery, searchPending, foundSomething, addSearch])
 
+  function handleSearchSubmit() {
+    commitSearch()
+  }
+  function handlePickHint(name) {
+    handleQueryChange(name)
+    commitSearch()
+  }
   function handlePickHistory(entry) {
     if (entry.mode !== mode) handleModeChange(entry.mode)
     handleQueryChange(entry.text)
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+    commitSearch()
   }
+  // A result opened from a typed search is saved under the drug's own name (clean, no
+  // typos, no half-typed text).
+  function handleResultTap(drug) {
+    if (hasQuery && mode !== 'class') {
+      const name = (mode === 'generic' ? drug.genericName : drug.tradenameClean) || query.trim()
+      addSearch(name, mode)
+    }
+    handleDrugTap(drug)
+  }
+  const typingHints = useMemo(
+    () => (searchOpen && hasQuery ? matchingSearches(history, query, mode) : []),
+    [searchOpen, hasQuery, history, query, mode]
+  )
+
+  // Fade while typing (reworked 2026-10-15): only real result cards fade, and only once the
+  // search has been waiting a moment (120ms), gently; they stay tappable. Hints, empty
+  // states and the mode-switch card swap at once.
+  const [dimmed, setDimmed] = useState(false)
+  useEffect(() => {
+    if (!searchPending) return
+    const timer = setTimeout(() => setDimmed(true), 120)
+    return () => { clearTimeout(timer); setDimmed(false) }
+  }, [searchPending])
+
   const queryRef     = useRef(query)
   const firstModeRef = useRef(true)
   queryRef.current   = query
@@ -688,6 +774,7 @@ export default function DrugsScreen() {
   // under the Search area.
   const inResultsView = hasQuery || (activeCategory !== null)
   let body
+  let cardsShowing
   // Phase 5 (§4.3) — true when the search itself found real results but the
   // active Form/Route filter hid all of them (before/after count compare,
   // set inside the results branch below where `base`/`filtered` exist).
@@ -731,6 +818,10 @@ export default function DrugsScreen() {
     const displayed = hasQuery
       ? (sortMode === 'cheapest' ? sortByPrice(filtered) : filtered)
       : filtered.slice().sort((a, b) => a.tradenameClean.localeCompare(b.tradenameClean))
+
+    cardsShowing = hasQuery && (isClassSearch
+      ? Boolean(classResults && (classResults.classes.length + classResults.subclasses.length) > 0)
+      : displayed.length > 0)
 
     // 2026-10-05 (fourth pass): a search scoped to one category. 'otherCategoryCount'
     // is how many more drugs the same search finds in the other categories
@@ -783,9 +874,8 @@ export default function DrugsScreen() {
         )}
 
         <div style={{
-          opacity:       searchPending && hasQuery ? 0.55 : 1,
-          pointerEvents: searchPending && hasQuery ? 'none' : 'auto',
-          transition:    'opacity 120ms ease',
+          opacity:    dimmed && cardsShowing && !queryTooShort && !resultsNotReady && !modeSwitching && !slowPending ? 0.7 : 1,
+          transition: 'opacity 150ms ease',
         }}>
         {hasQuery && queryTooShort ? (
           <TooShortState />
@@ -818,7 +908,7 @@ export default function DrugsScreen() {
             <DidYouMeanState
               query={query}
               suggestions={suggestions}
-              onSelect={(name) => handleQueryChange(name)}
+              onSelect={handlePickHint}
             />
           ) : (
             <EmptyState query={query} mode={mode} onClear={() => handleQueryChange('')} />
@@ -918,7 +1008,7 @@ export default function DrugsScreen() {
                 <DidYouMeanState
                   query={query}
                   suggestions={suggestions}
-                  onSelect={(name) => handleQueryChange(name)}
+                  onSelect={handlePickHint}
                 />
               ) : (
                 <EmptyState
@@ -931,7 +1021,7 @@ export default function DrugsScreen() {
               <VirtualDrugList
                 key={!hasQuery ? `cat:${activeCategory}` : 'search'}
                 drugs={displayed}
-                onTap={handleDrugTap}
+                onTap={handleResultTap}
                 categories={categories}
                 isDark={isDark}
                 isDrugFavourited={isDrugFavourited}
@@ -997,7 +1087,7 @@ export default function DrugsScreen() {
 
   return (
     <>
-      {!searchOpen && (
+      {!searchOpen && headerReady && (
         <StickyDrugsHeader
           watchRef={heroRef}
           query={query}
@@ -1013,7 +1103,21 @@ export default function DrugsScreen() {
       )}
 
       <div>
-        {!searchOpen && <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />}
+        {/* The hero folds away and fades when the search opens, and unfolds when it closes. */}
+        <div
+          aria-hidden={searchOpen}
+          style={{
+            display:          'grid',
+            gridTemplateRows: searchOpen ? '0fr' : '1fr',
+            opacity:          searchOpen ? 0 : 1,
+            pointerEvents:    searchOpen ? 'none' : 'auto',
+            transition:       reduceMotion ? 'none' : 'grid-template-rows 220ms ease, opacity 160ms ease',
+          }}
+        >
+          <div style={{ minHeight: 0, overflow: searchOpen || !headerReady ? 'hidden' : 'visible' }}>
+            <DrugsHero heroRef={heroRef} isDark={isDark} onInfoTap={() => setShowInfoSheet(true)} />
+          </div>
+        </div>
 
         {/* The Search area: written once, drawn in every view, so the search
             bar is never rebuilt and the keyboard stays open when typing
@@ -1022,14 +1126,19 @@ export default function DrugsScreen() {
             search is typed, where it would push the results down. The
             Clear filter button hides while the filter-hidden-results message
             is showing, which has its own. */}
-        <div style={searchOpen
-          ? { position: 'sticky', top: 0, zIndex: 40, backgroundColor: 'var(--color-bg)', paddingTop: 8 }
-          : undefined}
-        >
+        <div style={{
+          position:        searchOpen ? 'sticky' : 'static',
+          top:             0,
+          zIndex:          searchOpen ? 40 : 'auto',
+          backgroundColor: searchOpen ? 'var(--color-bg)' : 'transparent',
+          paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 16px)' : 0,
+          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease',
+        }}>
         <DrugsSearchSection
           searchOpen={searchOpen}
           onSearchFocus={openSearch}
           onSearchCancel={closeSearch}
+          onSearchSubmit={handleSearchSubmit}
           searchInputRef={searchInputRef}
           mode={mode}
           onModeChange={handleModeChange}
@@ -1043,7 +1152,7 @@ export default function DrugsScreen() {
           hasActiveFilters={hasFilters && filtersApply}
           showClear={hasFilters && filtersApply && !isFilterMasked}
           onClearFilters={requestClearFilters}
-          showRecent={!hasQuery && !searchOpen}
+          showRecent={!hasQuery}
           recentDrugs={recentDrugObjects}
           onOpenRecent={() => setShowRecentSheet(true)}
           categories={categories}
@@ -1052,13 +1161,34 @@ export default function DrugsScreen() {
         </div>
 
         {searchOpen && !hasQuery ? (
-          <SearchHistoryList
-            history={history}
-            onPick={handlePickHistory}
-            onRemove={removeSearch}
-            onClear={clearHistory}
-          />
-        ) : body}
+          <FadeIn key="recent-searches" disabled={reduceMotion}>
+            {history.length === 0 ? (
+              <RecentEmptyState />
+            ) : (
+              <SearchHistoryList
+                history={history}
+                onPick={handlePickHistory}
+                onRemove={removeSearch}
+                onClear={() => setShowClearHistoryConfirm(true)}
+              />
+            )}
+          </FadeIn>
+        ) : (
+          <>
+            {typingHints.length > 0 && (
+              <div style={{ marginBottom: 'var(--space-3)' }}>
+                <SearchHistoryList
+                  heading="From your recent searches"
+                  history={typingHints}
+                  onPick={handlePickHistory}
+                  showClear={false}
+                  showRemove={false}
+                />
+              </div>
+            )}
+            {body}
+          </>
+        )}
       </div>
 
       <DrugFilterPanel
@@ -1119,6 +1249,16 @@ export default function DrugsScreen() {
           filter buttons (the Search area's, and the filter-hidden-results
           message's). Only handleClearFilters (the actual clear) runs, and
           only on confirm. */}
+      <ConfirmSheet
+        isOpen={showClearHistoryConfirm}
+        onClose={() => setShowClearHistoryConfirm(false)}
+        onConfirm={clearHistory}
+        title="Clear recent searches?"
+        message="This removes all your recent searches from this phone."
+        confirmLabel="Clear all"
+        destructive
+      />
+
       <ConfirmSheet
         isOpen={showClearFiltersConfirm}
         onClose={() => setShowClearFiltersConfirm(false)}
@@ -1511,6 +1651,40 @@ function WidenSearchState({ query, scopeLabel, count, onSearchAll }) {
         {`${count} ${count === 1 ? 'drug matches' : 'drugs match'} in other categories`}
       </div>
       <SearchAllButton onClick={onSearchAll} />
+    </div>
+  )
+}
+
+// ─── RecentEmptyState / FadeIn ───────────────────────────────────────────────
+// 2026-10-15: the search focus mode's empty list, built like the other search states
+// (icon, bold title, supporting line). FadeIn eases the list in when the search opens.
+function RecentEmptyState() {
+  return (
+    <div style={STATE_BOX_STYLE}>
+      <div style={STATE_ICON_ROW_STYLE}>
+        <HistoryIcon size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
+      </div>
+      <div style={STATE_TITLE_STYLE}>No recent searches</div>
+      <div style={{ ...STATE_LINE_STYLE, marginBottom: 0 }}>
+        Drugs you open from a search will show up here
+      </div>
+    </div>
+  )
+}
+
+function FadeIn({ children, disabled = false }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setOn(true))
+    return () => cancelAnimationFrame(frame)
+  }, [])
+  return (
+    <div style={{
+      opacity:    on || disabled ? 1 : 0,
+      transform:  on || disabled ? 'none' : 'translateY(6px)',
+      transition: disabled ? 'none' : 'opacity 200ms ease, transform 200ms ease',
+    }}>
+      {children}
     </div>
   )
 }

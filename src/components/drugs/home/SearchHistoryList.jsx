@@ -1,6 +1,10 @@
 /**
  * src/components/drugs/home/SearchHistoryList.jsx
  *
+ * 2026-10-15: the empty message moved to DrugsScreen (same look as the other search
+ * states). 'heading', 'showClear' and 'showRemove' let the same rows serve as the short
+ * hints under the typed text (no Clear all, no X).
+ *
  * 2026-10-14: shown in the results area while the search box is open and empty.
  * Each row is a previous search (with the mode it was typed in); tapping it runs it
  * again at once, in that mode. The small X removes one row, 'Clear all' empties the list.
@@ -14,19 +18,11 @@ const MODE_META = {
   class:   { label: 'Class',   color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
 }
 
-export default function SearchHistoryList({ history, onPick, onRemove, onClear }) {
-  if (history.length === 0) {
-    return (
-      <div style={{
-        padding:   'var(--space-8, 32px) var(--space-4)',
-        textAlign: 'center',
-        fontSize:  14,
-        color:     'var(--color-text-tertiary)',
-      }}>
-        Your recent searches will show here.
-      </div>
-    )
-  }
+export default function SearchHistoryList({
+  history, onPick, onRemove, onClear,
+  heading = 'Recent searches', showClear = true, showRemove = true,
+}) {
+  if (history.length === 0) return null
 
   return (
     <div>
@@ -37,8 +33,9 @@ export default function SearchHistoryList({ history, onPick, onRemove, onClear }
         padding:        '4px 2px 8px',
       }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-          Recent searches
+          {heading}
         </span>
+        {showClear && (
         <button
           onClick={onClear}
           style={{
@@ -49,6 +46,7 @@ export default function SearchHistoryList({ history, onPick, onRemove, onClear }
         >
           Clear all
         </button>
+        )}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -89,6 +87,7 @@ export default function SearchHistoryList({ history, onPick, onRemove, onClear }
                   {meta.label}
                 </span>
               </button>
+              {showRemove && (
               <button
                 onClick={() => onRemove(entry)}
                 aria-label={`Remove ${entry.text} from recent searches`}
@@ -100,6 +99,7 @@ export default function SearchHistoryList({ history, onPick, onRemove, onClear }
               >
                 <X size={15} />
               </button>
+              )}
             </div>
           )
         })}

@@ -1,5 +1,9 @@
 /**
  * src/components/drugs/home/DrugsSearchSection.jsx
+ * 2026-10-15 (search focus mode): the Cancel button beside the bar is gone. While the
+ * search is open, a small back arrow sits at the left of the 'Search' title and leaves
+ * the search (and clears the text), so the bar keeps its full width. 'onSearchSubmit' is
+ * the keyboard's Search key.
  * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Search'
  * area. Title row with the info icon and the Search Mode button, then the
  * search bar, then (when it applies) the Recently viewed shortcut, then (when a filter
@@ -38,7 +42,7 @@
  */
 
 import { useState } from 'react'
-import { Search, Tag, FlaskConical, Layers, Info } from 'lucide-react'
+import { Search, Tag, FlaskConical, Layers, Info, ArrowLeft } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import ModeButton from './ModeButton'
 import ClearFiltersButton from './ClearFiltersButton'
@@ -66,7 +70,7 @@ export default function DrugsSearchSection({
   showClear, onClearFilters,
   showRecent, recentDrugs, onOpenRecent,
   categories, isDark,
-  searchOpen = false, onSearchFocus, onSearchCancel, searchInputRef,
+  searchOpen = false, onSearchFocus, onSearchCancel, onSearchSubmit, searchInputRef,
 }) {
   const [showModeInfo, setShowModeInfo] = useState(false)
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
@@ -78,6 +82,30 @@ export default function DrugsSearchSection({
 
   const title = (
     <>
+      {searchOpen && (
+        <button
+          onClick={onSearchCancel}
+          aria-label="Close search"
+          style={{
+            display:                 'flex',
+            alignItems:              'center',
+            justifyContent:          'center',
+            width:                   32,
+            height:                  32,
+            marginLeft:              -6,
+            borderRadius:            '50%',
+            background:              'none',
+            border:                  'none',
+            padding:                 0,
+            cursor:                  'pointer',
+            color:                   'var(--color-text-primary)',
+            WebkitTapHighlightColor: 'transparent',
+            outline:                 'none',
+          }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+      )}
       <span style={SECTION_TITLE_STYLE}>Search</span>
       <button
         onClick={() => setShowModeInfo(true)}
@@ -128,25 +156,13 @@ export default function DrugsSearchSection({
               value={query}
               onChange={onQueryChange}
               onInputFocus={onSearchFocus}
+              onSubmit={onSearchSubmit}
               placeholder={placeholder}
               onFilter={onFilter}
               filterDisabled={filterDisabled}
               hasActiveFilters={hasActiveFilters}
             />
           </div>
-          {searchOpen && (
-            <button
-              onClick={onSearchCancel}
-              style={{
-                flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
-                padding: '8px 2px', fontSize: 14, fontWeight: 600,
-                color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              Cancel
-            </button>
-          )}
         </div>
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. */}
