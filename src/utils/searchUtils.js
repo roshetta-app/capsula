@@ -841,6 +841,9 @@ function arFuzzyDistance(q, field) {
 export function readArabicQuery(query, allowTypoForm = false) {
   const converted     = arabicUnitsToLatin(query)
   const strength      = extractArabicCombo(converted) ?? extractStrengthFromQuery(converted)
+  // A bare number with no unit ('دانست 4') means the drug's strength amount, not the
+  // volume it is dissolved in, so '4' must not find '8mg / 4ml'. English is unchanged.
+  if (strength && strength.unit === null && !strength.combo) strength.amountOnly = true
   const afterStrength = strength ? strength.remainingText : converted
   const form          = extractArabicForm(afterStrength, { allowTypo: allowTypoForm })
   const nameText      = form ? form.remainingText : afterStrength
@@ -1075,8 +1078,11 @@ function searchBrandAtTier(pool, lower, tier) {
 function drugMatchesStrength(drug, strength) {
   if (!strength) return true
 
-  const raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
+  let raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
   if (!raw) return false
+  // Arabic bare number: compare with the strength amount only, leaving out a per-volume
+  // part ('8mg/4ml' is read as '8mg'). A combo like '250mcg/50mcg' keeps both parts.
+  if (strength.amountOnly) raw = raw.replace(/\/[\d.]*ml\b.*$/, '')
 
   // Combination strength typed in Arabic ('250/50 mcg'): every typed part must be a
   // part of the stored 'a/b' text, in either order (see extractArabicCombo).
