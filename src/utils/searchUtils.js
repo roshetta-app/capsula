@@ -850,7 +850,14 @@ export function readArabicQuery(query, allowTypoForm = false) {
   return { strength, form, nameText }
 }
 
+// The cleaned Arabic names are worked out once per drug list and reused for every
+// keystroke (they only change when the list itself is replaced). Cleaning all
+// ~21k names on every keystroke is what made Arabic typing lag on phones.
+const ARABIC_ROWS_CACHE = new WeakMap()
+
 function arabicRows(pool) {
+  const cached = ARABIC_ROWS_CACHE.get(pool)
+  if (cached) return cached
   const rows = []
   for (const d of pool) {
     const brandPart = arSearchNorm(d.nameAr)
@@ -858,6 +865,7 @@ function arabicRows(pool) {
     if (!brandPart && !fullTitle) continue
     rows.push({ d, brandPart, fullTitle })
   }
+  ARABIC_ROWS_CACHE.set(pool, rows)
   return rows
 }
 
