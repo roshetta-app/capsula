@@ -509,10 +509,10 @@ export default function DrugDetailScreen() {
                 dir="rtl"
                 lang="ar"
                 style={{
-                  fontSize:     17,
-                  fontWeight:   600,
+                  fontSize:     14,
+                  fontWeight:   500,
                   lineHeight:   1.5,
-                  color:        'var(--color-text-primary)',
+                  color:        'var(--color-text-secondary)',
                   textAlign:    'right',
                   marginBottom: 'var(--space-4)',
                   overflowWrap: 'anywhere',
