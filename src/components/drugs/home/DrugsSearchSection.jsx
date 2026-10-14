@@ -43,7 +43,7 @@ import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import ModeButton from './ModeButton'
 import ClearFiltersButton from './ClearFiltersButton'
 import RecentlyViewedButton from './RecentlyViewedButton'
-import SearchBar from '../../ui/SearchBar'
+import SearchBar from '../DrugSearchBar'
 import { FilterModal } from '../../ui/FilterModal'
 import SearchModeInfoSheet from '../SearchModeInfoSheet'
 
