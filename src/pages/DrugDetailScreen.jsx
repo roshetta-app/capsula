@@ -501,27 +501,6 @@ export default function DrugDetailScreen() {
             clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet key={drug.id}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
-            {/* Arabic name (plan v9 Session 13, moved here 2026-10-14): right above the
-                generic overview. Full Arabic title when there is one, else the Arabic
-                brand name, else nothing. Only shown statuses reach the phone. */}
-            {(drug.nameArFull || drug.nameAr) && (
-              <div
-                dir="rtl"
-                lang="ar"
-                style={{
-                  fontSize:     14,
-                  fontWeight:   500,
-                  lineHeight:   1.5,
-                  color:        'var(--color-text-secondary)',
-                  textAlign:    'right',
-                  marginBottom: 'var(--space-4)',
-                  overflowWrap: 'anywhere',
-                }}
-              >
-                {drug.nameArFull || drug.nameAr}
-              </div>
-            )}
-
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}

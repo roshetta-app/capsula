@@ -271,8 +271,13 @@ export default function SharedDrugCard({
       onPointerCancel={disableTap ? undefined : () => setPressed(false)}
       style={{
         display:                 'flex',
-        alignItems:              'center',
-        height:                  ROW_HEIGHT,
+        // With an Arabic line the row grows (taller, with a little more room above and
+        // below) and its icon, text and trailing icons line up with the two English
+        // lines at the top; without one it is the same fixed row as before.
+        alignItems:              arabicLine ? 'flex-start' : 'center',
+        ...(arabicLine
+          ? { minHeight: ROW_HEIGHT, paddingTop: 12, paddingBottom: 12, boxSizing: 'border-box' }
+          : { height: ROW_HEIGHT }),
         gap:                     'var(--space-3)',
         borderBottom:            isLast ? 'none' : '1px solid var(--color-border-subtle)',
         cursor:                  disableTap ? 'default' : 'pointer',
@@ -288,9 +293,9 @@ export default function SharedDrugCard({
         width:           36,
         height:          36,
         flexShrink:      0,
-        // With an Arabic line under the text, keep the badge level with the English
-        // title + generic lines instead of centring on all three.
-        ...(arabicLine ? { alignSelf: 'flex-start', marginTop: 5 } : {}),
+        // With an Arabic line, the badge is centred on the English title + generic lines
+        // (about 40px tall), not on all three lines.
+        ...(arabicLine ? { marginTop: 2 } : {}),
         borderRadius:    'var(--radius-md)',
         backgroundColor: categoryColors.bg,
         display:         'flex',
@@ -356,6 +361,7 @@ export default function SharedDrugCard({
               fontWeight:   500,
               color:        'var(--color-text-secondary)',
               lineHeight:   1.3,
+              marginTop:    4,
               textAlign:    'right',
               overflow:     'hidden',
               whiteSpace:   'nowrap',
@@ -378,6 +384,15 @@ export default function SharedDrugCard({
         flexShrink: 0,
         alignSelf:  showImageSearch ? 'stretch' : undefined,
       }}>
+        {/* Bookmark + chevron. With an Arabic line they are centred on the two English
+            lines like the badge, so a saved drug does not look shifted. */}
+        <div style={{
+          display:    'flex',
+          alignItems: 'center',
+          gap:        'var(--space-1)',
+          flexShrink: 0,
+          ...(arabicLine ? { alignSelf: 'flex-start', height: 40 } : {}),
+        }}>
         {trailing}
         {showChevron && (
           <svg
@@ -393,6 +408,7 @@ export default function SharedDrugCard({
             <polyline points="9 18 15 12 9 6" />
           </svg>
         )}
+        </div>
         {showImageSearch && (
           // Search strip: full row height, reaches the space-3 amount past the
           // row's right edge (into the list's side padding) so the screen edge
