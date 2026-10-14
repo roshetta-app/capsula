@@ -810,9 +810,9 @@ function arMaxEdits(length) {
   return 2
 }
 
-function arFuzzyDistance(q, field) {
+function arFuzzyDistance(q, field, allowedOverride) {
   if (!field) return null
-  const allowed = arMaxEdits(q.length)
+  const allowed = allowedOverride ?? arMaxEdits(q.length)
   if (allowed < 0) return null
   const candidates = [field, ...field.split(' ').filter(w => w.length >= 3)]
   for (const len of [q.length, q.length - 1, q.length + 1]) {
@@ -1369,6 +1369,9 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
   const q = query.trim()
   if (q.length === 0) return []
 
+  // Arabic text in Brand mode: 'Did you mean' in Arabic (see getArabicSuggestions).
+  if (mode === 'brand' && hasArabicLetters(q)) return getArabicSuggestions(drugs, q)
+
   // Same facet extraction as searchDrugsTiered — whatever's left after
   // strength/form is the text that actually gets matched for closeness.
   const strength      = extractStrengthFromQuery(q)
@@ -1456,6 +1459,83 @@ export function getDrugSearchSuggestion(drugs, query, mode = 'brand') {
 
 // Amount of a strength in milligrams so '1g', '1000mg' and '500mcg' can be compared
 // for closeness. Other units (%, iu, ml) are returned as they are.
+// ─── 'Did you mean' for Arabic brand search ─────────────────────────────────
+// Runs only when the Arabic search found nothing (see useDrugSearch). Suggestions are
+// Arabic text that, searched as it stands, finds results; tapping one re-runs the search
+// with it (the screen does that already). Like English: (1) a brand name close to the
+// typed one, among drugs that also pass a typed strength and form; the strength and form
+// themselves are dropped from the suggestion. (2) If nothing is close and a strength was
+// typed, the brand's real strengths, nearest first, written in Arabic units.
+const EN_UNIT_TO_AR = { mcg: 'مكجم', mg: 'مجم', ml: 'مل', iu: 'وحدة دولية', g: 'جم', '%': '%' }
+
+// '4mg / 2ml' becomes '4مجم/2مل'. Null when the stored text has units that have no
+// Arabic spelling here (per dose, per litre ...), so such a strength is never suggested.
+function arabicStrengthText(concentration) {
+  const compact = (concentration ?? '').toLowerCase().replace(/\s+/g, '')
+  if (!compact) return null
+  const out = compact.replace(/mcg|mg|ml|iu|g|%/g, u => EN_UNIT_TO_AR[u])
+  return /[a-z]/.test(out) ? null : out
+}
+
+function getArabicSuggestions(drugs, query) {
+  const { strength, form, nameText } = readArabicQuery(query, true)
+  const q = arSearchNorm(nameText)
+  if (q.length < 3) return [] // strength/form alone, or too little text to guess safely
+
+  const rows = arabicRows(drugs)
+  const passes = d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form)
+
+  // (1) A close brand name. A little more room than the search itself allows.
+  const allowed = q.length <= 4 ? 1 : q.length <= 8 ? 2 : 3
+  const scored = []
+  for (const r of rows) {
+    if (!r.brandPart || !passes(r.d)) continue
+    const dist = arFuzzyDistance(q, r.brandPart, allowed)
+    if (dist !== null) scored.push({ d: r.d, dist })
+  }
+  scored.sort((a, b) => a.dist - b.dist ||
+    (a.d.nameAr ?? '').length - (b.d.nameAr ?? '').length ||
+    (a.d.nameAr ?? '').localeCompare(b.d.nameAr ?? ''))
+  const names = []
+  for (const { d } of scored) {
+    const name = (d.nameAr ?? '').trim()
+    if (name && !names.includes(name)) names.push(name)
+    if (names.length === 3) break
+  }
+  if (names.length > 0) return names
+
+  // (2) The brand exists but not at the typed strength.
+  if (!strength) return []
+  const named = arabicNameSearch(rows, q, true).filter(d => drugMatchesForm(d, form))
+  if (named.length === 0) return []
+
+  const typedAmount = strength.combo ? null : strengthAmount(strength.value, strength.unit)
+  const seen = new Set()
+  const candidates = []
+  named.forEach((d, order) => {
+    const name = (d.nameAr ?? '').trim()
+    const conc = arabicStrengthText(d.concentration)
+    if (!name || !conc) return
+    const key = `${name}|${conc}`
+    if (seen.has(key)) return
+    seen.add(key)
+    const m = (d.concentration ?? '').replace(/\s+/g, '').match(/^(\d+(?:\.\d+)?)([a-z%]+)/i)
+    const amount = m ? strengthAmount(m[1], STRENGTH_UNIT_ALIASES[m[2].toLowerCase()] ?? m[2].toLowerCase()) : null
+    const gap = typedAmount !== null && amount !== null
+      ? Math.abs(Math.log((amount || 1e-9) / (typedAmount || 1e-9))) : 99
+    candidates.push({ text: `${name} ${conc}`, gap, order })
+  })
+  candidates.sort((a, b) => a.gap - b.gap || a.order - b.order)
+
+  const out = []
+  for (const c of candidates.slice(0, 10)) {
+    const found = searchDrugsTiered(drugs, c.text, 'brand')
+    if (found && found.length > 0) out.push(c.text)
+    if (out.length === 3) break
+  }
+  return out
+}
+
 function strengthAmount(value, unit) {
   const n = parseFloat(value)
   if (!Number.isFinite(n)) return null
