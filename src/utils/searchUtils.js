@@ -913,16 +913,19 @@ function arabicNameSearch(rows, q, allowFuzzy) {
 // takes exactly the old name-only path. If narrowing leaves nothing, the whole typed
 // text is tried once more as a plain name (exact tiers only), so a name or title
 // that really contains a number or a form-like word still finds itself.
+// 2026-10-14 (Omar): a misspelled Arabic name no longer silently returns cards. Like
+// English, the search is strict (spelling cleanup only) and a miss gets 'Did you mean'
+// hints from getArabicSuggestions, which still tolerates small typos.
 function searchBrandsArabic(pool, query, allowTypoForm) {
   const rows = arabicRows(pool)
   const { strength, form, nameText } = readArabicQuery(query, allowTypoForm)
 
-  if (!strength && !form) return arabicNameSearch(rows, arSearchNorm(query), true)
+  if (!strength && !form) return arabicNameSearch(rows, arSearchNorm(query), false)
 
   const q = arSearchNorm(nameText)
   if (q.length === 0) return []
 
-  const kept = arabicNameSearch(rows, q, true)
+  const kept = arabicNameSearch(rows, q, false)
     .filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
   if (kept.length > 0) return kept
 
