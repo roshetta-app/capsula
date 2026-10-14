@@ -362,7 +362,9 @@ export default function SharedDrugCard({
               color:        'var(--color-text-secondary)',
               lineHeight:   1.3,
               marginTop:    4,
-              textAlign:    'right',
+              // Starts at the same left edge as the English lines. Right-aligning it made
+              // it move left whenever a saved-drug heart narrowed the text column.
+              textAlign:    'left',
               overflow:     'hidden',
               whiteSpace:   'nowrap',
               textOverflow: 'ellipsis',
