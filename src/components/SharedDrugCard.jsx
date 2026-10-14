@@ -27,7 +27,7 @@
  *
  * 2026-10-14 (Arabic names, plan v9 Session 13): when the typed text has Arabic
  * letters and the search is in Brand mode, the matched drug's Arabic name shows
- * as a small right-to-left line under the title. Nowhere else.
+ * as a small right-to-left line under the generic line. Nowhere else.
  *
  * Title line (1d.2, decision 4.12; corrected 2026-07-19): tradenameClean +
  * concentration + form — replacing the old card's approach of appending a
@@ -287,6 +287,9 @@ export default function SharedDrugCard({
         width:           36,
         height:          36,
         flexShrink:      0,
+        // With an Arabic line under the text, keep the badge level with the English
+        // title + generic lines instead of centring on all three.
+        ...(arabicLine ? { alignSelf: 'flex-start', marginTop: 5 } : {}),
         borderRadius:    'var(--radius-md)',
         backgroundColor: categoryColors.bg,
         display:         'flex',
@@ -323,25 +326,6 @@ export default function SharedDrugCard({
           )}
         </div>
 
-        {arabicLine && (
-          <div
-            dir="rtl"
-            lang="ar"
-            style={{
-              fontSize:     13,
-              fontWeight:   500,
-              color:        'var(--color-text-secondary)',
-              lineHeight:   1.3,
-              textAlign:    'right',
-              overflow:     'hidden',
-              whiteSpace:   'nowrap',
-              textOverflow: 'ellipsis',
-            }}
-          >
-            {arabicLine}
-          </div>
-        )}
-
         {genericLine && (
           <div style={{
             fontSize:     13,
@@ -359,6 +343,25 @@ export default function SharedDrugCard({
                 ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
                 : <span key={i}>{seg.text}</span>
             )}
+          </div>
+        )}
+
+        {arabicLine && (
+          <div
+            dir="rtl"
+            lang="ar"
+            style={{
+              fontSize:     13,
+              fontWeight:   500,
+              color:        'var(--color-text-secondary)',
+              lineHeight:   1.3,
+              textAlign:    'right',
+              overflow:     'hidden',
+              whiteSpace:   'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {arabicLine}
           </div>
         )}
       </div>
