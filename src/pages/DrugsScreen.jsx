@@ -243,6 +243,11 @@
  * The counts come from useDrugSearch ('classHint'); Class mode itself is
  * unchanged.
  *
+ * 2026-10-15 (search focus mode, refinements): (1) a soft fade strip sits under the sticky
+ * Search card so results fade out below it instead of running up to its edge; (2) a single
+ * 'Did you mean' guess is drawn like several (wide row); (3) the no-result cards (Did you
+ * mean, nothing found, switch mode, widen, filter-hidden) fade in softly (170ms, 4px) when
+ * a different kind of card replaces another; typing within the same kind does not replay it.
  * 2026-10-05 (no-result cards refined): the 'nothing found' card, the 'Did you
  * mean' card and the switch-mode cards share one bigger look (larger icon,
  * bold title). 'Did you mean' with one guess: the title itself is the button
@@ -1132,7 +1137,8 @@ export default function DrugsScreen() {
           zIndex:          searchOpen ? 40 : 'auto',
           backgroundColor: searchOpen ? 'var(--color-bg)' : 'transparent',
           paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 16px)' : 0,
-          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease',
+          paddingBottom:   searchOpen ? 8 : 0,
+          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease',
         }}>
         <DrugsSearchSection
           searchOpen={searchOpen}
@@ -1158,6 +1164,18 @@ export default function DrugsScreen() {
           categories={categories}
           isDark={isDark}
         />
+        {/* Buffer strip: the results fade out just under the Search card instead of running
+            right up to its edge. */}
+        {searchOpen && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute', left: 0, right: 0, top: '100%', height: 18,
+              pointerEvents: 'none',
+              background: 'linear-gradient(to bottom, var(--color-bg), transparent)',
+            }}
+          />
+        )}
         </div>
 
         {searchOpen && !hasQuery ? (
@@ -1636,6 +1654,7 @@ function SearchAllButton({ onClick, count, style }) {
 // accent, a line saying how many drugs match elsewhere, and the button.
 function WidenSearchState({ query, scopeLabel, count, onSearchAll }) {
   return (
+    <FadeIn ms={170} rise={4}>
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
         <div style={{
@@ -1654,6 +1673,7 @@ function WidenSearchState({ query, scopeLabel, count, onSearchAll }) {
       </div>
       <SearchAllButton onClick={onSearchAll} />
     </div>
+    </FadeIn>
   )
 }
 
@@ -1674,17 +1694,19 @@ function RecentEmptyState() {
   )
 }
 
-function FadeIn({ children, disabled = false }) {
+function FadeIn({ children, disabled = false, ms = 200, rise = 6 }) {
   const [on, setOn] = useState(false)
   useEffect(() => {
     const frame = requestAnimationFrame(() => setOn(true))
     return () => cancelAnimationFrame(frame)
   }, [])
+  const still = disabled || (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
   return (
     <div style={{
-      opacity:    on || disabled ? 1 : 0,
-      transform:  on || disabled ? 'none' : 'translateY(6px)',
-      transition: disabled ? 'none' : 'opacity 200ms ease, transform 200ms ease',
+      opacity:    on || still ? 1 : 0,
+      transform:  on || still ? 'none' : `translateY(${rise}px)`,
+      transition: still ? 'none' : `opacity ${ms}ms ease, transform ${ms}ms ease`,
     }}>
       {children}
     </div>
@@ -1702,6 +1724,7 @@ function EmptyState({ query, mode, onClear }) {
   const inClassMode = mode === 'class'
   const quoted = query ? ` "${query}"` : ''
   return (
+    <FadeIn ms={170} rise={4}>
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
         <SearchX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
@@ -1716,6 +1739,7 @@ function EmptyState({ query, mode, onClear }) {
       </div>
       <QuietLinkButton onClick={onClear}>Clear search</QuietLinkButton>
     </div>
+    </FadeIn>
   )
 }
 
@@ -1798,6 +1822,7 @@ function modeSwitchSubline(target, hint) {
 function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
   const quoted = query ? ` "${query}"` : ''
   return (
+    <FadeIn ms={170} rise={4}>
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
         <ArrowLeftRight size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
@@ -1853,6 +1878,7 @@ function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
         })}
       </div>
     </div>
+    </FadeIn>
   )
 }
 
@@ -1873,6 +1899,7 @@ function FilterMaskedState({ count, query, onClearFilter }) {
   // 2026-10-05 (second pass): same refined look as the other no-result cards
   // (bigger icon, bold title, larger supporting line).
   return (
+    <FadeIn ms={170} rise={4}>
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
         <FilterX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
@@ -1887,6 +1914,7 @@ function FilterMaskedState({ count, query, onClearFilter }) {
         Clear filter
       </FilledHintButton>
     </div>
+    </FadeIn>
   )
 }
 
@@ -1905,92 +1933,58 @@ function FilterMaskedState({ count, query, onClearFilter }) {
 // equal-weight FilledHintButton chip in a wrapping row — user-confirmed
 // design, so there's no "primary vs secondary" distinction to maintain.
 
-// Lets a chip's own drug-name text wrap onto multiple lines and shrink to
-// fit the screen, overriding FilledHintButton's normal one-line/no-shrink
-// default — see the note where this is used below for why.
-const CHIP_WRAP_STYLE = {
-  maxWidth: '100%',
-  flexShrink: 1,
-  minWidth: 0,
-  whiteSpace: 'normal',
-  textAlign: 'center',
-}
-
-// 2026-10-05: one guess: the title itself is the button and runs the search.
-// Several guesses: each is a button with a search icon. Every name is shown
-// capitalised ('titleCaseWords', display only); the search uses the name
-// exactly as the app gave it.
+// 2026-10-15: one guess now looks like several: the same title line ('Did you mean this?'),
+// the 'No exact match' line, and one full-width row with a search icon. Every name is
+// shown capitalised ('titleCaseWords', display only); the search uses the name exactly
+// as the app gave it.
 function DidYouMeanState({ query, suggestions, onSelect }) {
   const single = suggestions.length === 1
   return (
+    <FadeIn ms={170} rise={4}>
     <div style={STATE_BOX_STYLE}>
       <div style={STATE_ICON_ROW_STYLE}>
-        <Lightbulb size={STATE_ICON_SIZE} color={single ? 'var(--color-accent)' : 'var(--color-text-tertiary)'} />
+        <Lightbulb size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
       </div>
-      {single ? (
-        // A full combo name can be long: the title button may wrap and shrink
-        // (CHIP_WRAP_STYLE) so the page never scrolls sideways.
-        <button
-          type="button"
-          onClick={() => onSelect(suggestions[0])}
-          style={{
-            ...CHIP_WRAP_STYLE,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            gap: 'var(--space-2)',
-            marginBottom: 6,
-            padding: 'var(--space-2) var(--space-4)',
-            border: 'none', borderRadius: 'var(--radius-lg)',
-            background: 'var(--color-accent-light)', color: 'var(--color-accent)',
-            fontFamily: 'var(--font-body)', fontSize: 19, fontWeight: 500, lineHeight: 1.3,
-            cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          <Search size={20} style={{ flexShrink: 0 }} />
-          <span>Did you mean <span style={{ fontWeight: 700 }}>{titleCaseWords(suggestions[0])}</span>?</span>
-        </button>
-      ) : (
-        <div style={STATE_TITLE_STYLE}>
-          Did you mean one of these?
-        </div>
-      )}
-      <div style={{ ...STATE_LINE_STYLE, marginBottom: single ? 0 : 'var(--space-4)' }}>
-        {`No exact match${query ? ` for "${query}"` : ''}`}
+      <div style={STATE_TITLE_STYLE}>
+        {single ? 'Did you mean this?' : 'Did you mean one of these?'}
       </div>
-      {!single && (
-        // Several guesses: equal full-width rows (same height and shape every
-        // time, whatever the name length). A long combo name wraps onto a second
-        // line and is cut with '...' after that, so a row never grows tall.
-        <div style={{
-          display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-          width: '100%', maxWidth: 360, margin: '0 auto',
-        }}>
-          {suggestions.map(name => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => onSelect(name)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-                width: '100%', minHeight: 48, boxSizing: 'border-box', textAlign: 'left',
-                padding: 'var(--space-2) var(--space-3)',
-                border: 'none', borderRadius: 'var(--radius-lg)',
-                background: 'var(--color-accent-light)', color: 'var(--color-accent)',
-                fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
-                cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Search size={18} style={{ flexShrink: 0 }} />
-              <span style={{
-                flex: 1, minWidth: 0, overflowWrap: 'anywhere',
-                display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
-              }}>
-                {titleCaseWords(name)}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-4)' }}>
+        {`No exact match${query ? ` for \"${query}\"` : ''}`}
+      </div>
+      {/* One guess or several: the same equal full-width rows (same height and shape every
+          time, whatever the name length). A long combo name wraps onto a second line and is
+          cut with '...' after that, so a row never grows tall. */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+        width: '100%', maxWidth: 360, margin: '0 auto',
+      }}>
+        {suggestions.map(name => (
+          <button
+            key={name}
+            type="button"
+            onClick={() => onSelect(name)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              width: '100%', minHeight: 48, boxSizing: 'border-box', textAlign: 'left',
+              padding: 'var(--space-2) var(--space-3)',
+              border: 'none', borderRadius: 'var(--radius-lg)',
+              background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+              fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Search size={18} style={{ flexShrink: 0 }} />
+            <span style={{
+              flex: 1, minWidth: 0, overflowWrap: 'anywhere',
+              display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
+            }}>
+              {titleCaseWords(name)}
+            </span>
+          </button>
+        ))}
+      </div>
     </div>
+    </FadeIn>
   )
 }
 

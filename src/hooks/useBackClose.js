@@ -1,6 +1,11 @@
 /**
  * useBackClose — shared popup/sheet back-close mechanism.
  *
+ * 2026-10-15 (Drugs search coming back from an opened drug): when the screen is drawn again
+ * standing on the placeholder step it added earlier, and nothing else is open, the hook reuses
+ * that step instead of pushing a second one (see the note in the website effect below). Every
+ * other case is unchanged: a sheet opened by a tap still pushes its own step.
+ *
  * 2026-10-04 (bottom bar and sheet closing): isSheetClosePress(event) is new.
  * A sheet closing from a Back press now marks that press, so the bottom bar
  * does not also act on it (see BottomNav.jsx). Nothing else here changes.
@@ -220,7 +225,15 @@ export function useBackClose(isOpen, onClose) {
     if (Capacitor.isNativePlatform()) return
 
     poppedViaBrowserBackRef.current = false
-    window.history.pushState({ ...(window.history.state || {}), capsulaBackClose: true }, '')
+    // 2026-10-15: coming back onto this screen with the same thing still open (the Drugs search
+    // drawn again after a drug opened from it is closed) lands ON the placeholder step that
+    // was added when it first opened. Adding a second one from here, with no tap behind it,
+    // left two steps stacked and the next Back did not close the search cleanly. So when
+    // nothing else is open and the step we are on is already ours, reuse it.
+    const alreadyOnPlaceholder = openBackCloseCount === 0 && !!(window.history.state && window.history.state.capsulaBackClose)
+    if (!alreadyOnPlaceholder) {
+      window.history.pushState({ ...(window.history.state || {}), capsulaBackClose: true }, '')
+    }
     openBackCloseCount++
 
     function handlePopState(event) {
