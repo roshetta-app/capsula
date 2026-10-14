@@ -1175,7 +1175,9 @@ export default function DrugsScreen() {
           </FadeIn>
         ) : (
           <>
-            {typingHints.length > 0 && (
+            {/* Past-search hints sit only above real result cards, never with the mode-switch,
+                'Did you mean', empty, filter or 'Keep typing' states. */}
+            {typingHints.length > 0 && cardsShowing && !queryTooShort && !resultsNotReady && !modeSwitching && (
               <div style={{ marginBottom: 'var(--space-3)' }}>
                 <SearchHistoryList
                   heading="From your recent searches"
