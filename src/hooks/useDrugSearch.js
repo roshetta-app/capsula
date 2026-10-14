@@ -209,6 +209,9 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
   // since an exact hit in the other mode is a more certain answer than a
   // same-mode fuzzy typo guess.
   const [crossModeMatch, setCrossModeMatch] = useState(false)
+  // The text the last search actually ran for. While it differs from the typed text
+  // the search is still waiting out its 150ms, so the cards on screen are for older text.
+  const [settledQuery, setSettledQuery] = useState('')
   // Class search mode (2026-10-04): the class and subclass cards for the typed
   // text, and which modes the 'it is a drug name' hint should switch to (2026-10-05:
   // a list, since a name can exist under both Brand and Generic). Both stay
@@ -273,6 +276,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
 
   const runSearch = useCallback((q, currentMode) => {
     if (!drugs) return
+    setSettledQuery(q)
 
     const trimmed = q.trim()
 
@@ -483,5 +487,6 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     classResults,
     crossModeTargets,
     classHint,
+    searchPending: query !== settledQuery,
   }
 }

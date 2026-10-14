@@ -400,6 +400,7 @@ export default function DrugsScreen() {
     suggestions,
     crossModeMatch,
     classResults,
+    searchPending,
     classHint,
     crossModeTargets,
   } = useDrugContext()
@@ -582,6 +583,14 @@ export default function DrugsScreen() {
   // holds a little longer (220ms) and the new results are ready when it lifts.
   // Brand to Generic would otherwise flash the old mode's results first.
   const [modeSwitching, setModeSwitching] = useState(false)
+  // Typing: the cards on screen stay but fade while the search waits for a pause; only a
+  // search that takes longer than 300ms swaps them for the placeholder rows.
+  const [slowPending, setSlowPending] = useState(false)
+  useEffect(() => {
+    if (!searchPending) { setSlowPending(false); return }
+    const timer = setTimeout(() => setSlowPending(true), 300)
+    return () => clearTimeout(timer)
+  }, [searchPending])
   const queryRef     = useRef(query)
   const firstModeRef = useRef(true)
   queryRef.current   = query
@@ -724,9 +733,14 @@ export default function DrugsScreen() {
           </div>
         )}
 
+        <div style={{
+          opacity:       searchPending && hasQuery ? 0.55 : 1,
+          pointerEvents: searchPending && hasQuery ? 'none' : 'auto',
+          transition:    'opacity 120ms ease',
+        }}>
         {hasQuery && queryTooShort ? (
           <TooShortState />
-        ) : (resultsNotReady || (modeSwitching && hasQuery)) ? (
+        ) : (resultsNotReady || (modeSwitching && hasQuery) || (slowPending && hasQuery)) ? (
           // The new mode's results are still on their way (a mode switch,
           // see resultsNotReady and modeSwitching above): show placeholder
           // rows instead of a blank gap.
@@ -880,6 +894,7 @@ export default function DrugsScreen() {
             )}
           </>
         )}
+        </div>
       </>
     )
   } else {
