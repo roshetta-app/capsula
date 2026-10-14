@@ -28,6 +28,8 @@
  * 2026-10-14 (Arabic names, plan v9 Session 13): when the typed text has Arabic
  * letters and the search is in Brand mode, the matched drug's Arabic name shows
  * as a small right-to-left line under the generic line. Nowhere else.
+ * 2026-10-14 (later): the typed name is bolded inside that Arabic line (see
+ * utils/arabicHighlight.js), like the English title line.
  *
  * Title line (1d.2, decision 4.12; corrected 2026-07-19): tradenameClean +
  * concentration + form — replacing the old card's approach of appending a
@@ -172,6 +174,7 @@ import { highlightMatch } from '../utils/highlightMatch'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../utils/drugTitleFormat'
 import { hasArabicLetters } from '../utils/searchUtils'
 import { formatArabicFullName } from '../utils/arabicName'
+import { highlightArabic } from '../utils/arabicHighlight'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
@@ -255,6 +258,9 @@ export default function SharedDrugCard({
   const arabicLine = searchMode === 'brand' && hasArabicLetters(highlight)
     ? formatArabicFullName(drug.nameAr, drug.nameArFull)
     : ''
+  // The typed name is bolded inside that line (spelling variants still match; a
+  // strength or form typed beside the name is not bolded).
+  const arabicSegments = arabicLine ? highlightArabic(arabicLine, highlight) : []
 
   return (
     <div
@@ -370,7 +376,11 @@ export default function SharedDrugCard({
               textOverflow: 'ellipsis',
             }}
           >
-            {arabicLine}
+            {arabicSegments.map((seg, i) =>
+              seg.bold
+                ? <strong key={i} style={{ fontWeight: 800 }}>{seg.text}</strong>
+                : <span key={i}>{seg.text}</span>
+            )}
           </div>
         )}
       </div>

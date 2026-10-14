@@ -8,6 +8,13 @@
  * old path, so English results are unchanged. Generic mode and Class mode are
  * untouched.
  *
+ * 2026-10-14 (later, 'Arabic search like English'): the Arabic branch now reads the
+ * typed text as name + strength + form like the English one: Arabic units (مجم,
+ * جم, مكجم, مل, %, وحدة دولية) and form words (قرص, امبول, كيس ...) are read by
+ * arabicQuery.js, and the results are narrowed by the stored strength and form
+ * with the existing checks. A name alone, English and Generic search behave exactly
+ * as before.
+ *
  * 2026-10-06 (wrong strength): 'augmentin 500' with no 500 on file now offers the
  * strengths that exist ('Augmentin 1000mg', 'Augmentin 457mg/5ml'), nearest first,
  * also after a name typo ('augmetin 500'). Done inside getDrugSearchSuggestion, so
@@ -200,6 +207,11 @@
 
 import Fuse from 'fuse.js'
 import { FORM_OPTIONS } from '../components/drugs/DrugFilterPanel'
+import { hasArabicLetters, arSearchNorm, arabicUnitsToLatin, extractArabicCombo, extractArabicForm } from './arabicQuery'
+
+// The Arabic cleanup now lives in arabicQuery.js (no import back into this file);
+// re-exported so every existing import from searchUtils keeps working.
+export { hasArabicLetters, arSearchNorm }
 
 // ─── Shared text normalization (DRUG_SEARCH_REFINEMENT_PLAN.md §4.1/§5, Phase 1) ──
 // One shared helper so every drug-search comparison treats punctuation/spacing
@@ -781,34 +793,10 @@ export function extractFormFromQuery(query, { allowTypo = false } = {}) {
 }
 
 // ─── Arabic brand search (plan v9 Session 13) ─────────────────────────────────
-// Mirrors the database function ar_search_norm so a phone search and a database
-// search clean text the same way: diacritics (U+064B-0652, U+0670) and tatweel
-// (U+0640) removed; hamza alef forms to alef; alef maqsura to ya; ta marbuta to
-// ha; hamza on waw to waw; hamza on ya to ya; Arabic-Indic digits to Western;
-// leading "al-" dropped per word; spaces collapsed. One addition: hyphens are
-// removed (some full titles carry a stray '-'), as the English cleanup does.
-// Comparison-only: nothing shown on screen passes through this.
-const AR_LETTER_RE = /[\u0600-\u06FF]/
-const AR_FOLD = {
-  '\u0623': '\u0627', '\u0625': '\u0627', '\u0622': '\u0627', '\u0671': '\u0627',
-  '\u0649': '\u064A', '\u0629': '\u0647', '\u0624': '\u0648', '\u0626': '\u064A',
-}
-
-export function hasArabicLetters(text) {
-  return AR_LETTER_RE.test(text ?? '')
-}
-
-export function arSearchNorm(text) {
-  return (text ?? '')
-    .replace(/[\u064B-\u0652\u0670\u0640]/g, '')
-    .replace(/[\u0623\u0625\u0622\u0671\u0649\u0629\u0624\u0626]/g, c => AR_FOLD[c])
-    .replace(/[\u0660-\u0669]/g, c => String(c.charCodeAt(0) - 0x0660))
-    .replace(/[\u06F0-\u06F9]/g, c => String(c.charCodeAt(0) - 0x06F0))
-    .replace(/-/g, '')
-    .replace(/(^|\s)\u0627\u0644(?=\S)/g, '$1')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+// The cleanup that mirrors the database function ar_search_norm (diacritics,
+// hamza forms, ta marbuta, alef maqsura, Arabic-Indic digits, leading 'al-',
+// hyphens) lives in arabicQuery.js. Comparison-only: nothing shown on screen
+// passes through it.
 
 // Small-misspelling tolerance for Arabic: spelling of foreign brand names is not
 // standard (ك/ق, ث/س, ي/ى, a dropped vowel letter), so one or two letter changes
@@ -839,10 +827,27 @@ function arFuzzyDistance(q, field) {
   return best
 }
 
-function searchBrandsArabic(pool, query) {
-  const q = arSearchNorm(query)
-  if (q.length === 0) return []
+/**
+ * Reads a typed Arabic brand query the way the English search reads 'panadol
+ * 500mg tab': name text + strength + form. Arabic units after a number become the
+ * English units the stored strengths use (so extractStrengthFromQuery and
+ * drugMatchesStrength are reused as they are); an Arabic form word is looked up in
+ * arabicQuery.js and points at the same stored forms the English chips use. Any
+ * word that is not recognised stays in the name text. Used by the search and by
+ * the card's highlight.
+ *
+ * @returns {{ strength: object|null, form: object|null, nameText: string }}
+ */
+export function readArabicQuery(query, allowTypoForm = false) {
+  const converted     = arabicUnitsToLatin(query)
+  const strength      = extractArabicCombo(converted) ?? extractStrengthFromQuery(converted)
+  const afterStrength = strength ? strength.remainingText : converted
+  const form          = extractArabicForm(afterStrength, { allowTypo: allowTypoForm })
+  const nameText      = form ? form.remainingText : afterStrength
+  return { strength, form, nameText }
+}
 
+function arabicRows(pool) {
   const rows = []
   for (const d of pool) {
     const brandPart = arSearchNorm(d.nameAr)
@@ -850,10 +855,17 @@ function searchBrandsArabic(pool, query) {
     if (!brandPart && !fullTitle) continue
     rows.push({ d, brandPart, fullTitle })
   }
+  return rows
+}
 
-  // Same three tiers as the English brand search: starts with, a word starts
-  // with, anywhere (3rd tier only from 4 letters). Brand part first, then the
-  // full title, per tier. Shorter name first inside a tier.
+// Name matching on already-cleaned text q. Same three tiers as the English brand
+// search: starts with, a word starts with, anywhere (3rd tier only from 4 letters).
+// Brand part first, then the full title, per tier. Shorter name first inside a
+// tier. With allowFuzzy, nothing matched exactly: a small misspelling is allowed,
+// closest first.
+function arabicNameSearch(rows, q, allowFuzzy) {
+  if (q.length === 0) return []
+
   const tiers = q.length >= 4 ? [1, 2, 3] : [1, 2]
   for (const tier of tiers) {
     const hit = rows.filter(r =>
@@ -869,8 +881,8 @@ function searchBrandsArabic(pool, query) {
         .map(r => r.d)
     }
   }
+  if (!allowFuzzy) return []
 
-  // Nothing matched exactly: allow a small misspelling, closest first.
   const near = []
   for (const r of rows) {
     const d1 = arFuzzyDistance(q, r.brandPart)
@@ -882,6 +894,28 @@ function searchBrandsArabic(pool, query) {
     .sort((a, b) => a.best - b.best ||
       (a.r.brandPart || a.r.fullTitle).length - (b.r.brandPart || b.r.fullTitle).length)
     .map(x => x.r.d)
+}
+
+// Arabic brand search with the same rules as English: the name is required, a
+// strength and/or form typed beside it narrows the result (name AND strength AND
+// form), and a strength or form alone finds nothing. Text with no strength or form
+// takes exactly the old name-only path. If narrowing leaves nothing, the whole typed
+// text is tried once more as a plain name (exact tiers only), so a name or title
+// that really contains a number or a form-like word still finds itself.
+function searchBrandsArabic(pool, query, allowTypoForm) {
+  const rows = arabicRows(pool)
+  const { strength, form, nameText } = readArabicQuery(query, allowTypoForm)
+
+  if (!strength && !form) return arabicNameSearch(rows, arSearchNorm(query), true)
+
+  const q = arSearchNorm(nameText)
+  if (q.length === 0) return []
+
+  const kept = arabicNameSearch(rows, q, true)
+    .filter(d => drugMatchesStrength(d, strength) && drugMatchesForm(d, form))
+  if (kept.length > 0) return kept
+
+  return arabicNameSearch(rows, arSearchNorm(query), false)
 }
 
 function drugFieldForMode(drug, mode) {
@@ -1044,6 +1078,14 @@ function drugMatchesStrength(drug, strength) {
   const raw = (drug.concentration ?? '').toLowerCase().replace(/\s+/g, '')
   if (!raw) return false
 
+  // Combination strength typed in Arabic ('250/50 mcg'): every typed part must be a
+  // part of the stored 'a/b' text, in either order (see extractArabicCombo).
+  if (strength.combo) {
+    const stored = raw.split('/')
+    const typed = [...strength.combo].sort()
+    return stored.length === typed.length && [...stored].sort().every((p, i) => p === typed[i])
+  }
+
   // Per-volume typed ('250mg/5ml', '5mg/ml'): the stored text must carry the same
   // 'amount unit / volume ml' ('5mg/ml' also matches a stored '5mg / 1ml').
   if (strength.per) {
@@ -1156,10 +1198,10 @@ function searchDrugsTieredCore(pool, query, mode, allowTypoForm) {
   const q = query.trim()
   if (q.length === 0) return null
 
-  // Arabic text in Brand mode: searched against the Arabic names (see above).
-  // Strength/form reading is English-only, so it is skipped. Any other text takes
-  // the unchanged path below.
-  if (mode === 'brand' && hasArabicLetters(q)) return searchBrandsArabic(pool, q)
+  // Arabic text in Brand mode: searched against the Arabic names (see above), with
+  // the Arabic strength and form words read like the English ones below. Any other
+  // text takes the unchanged path below.
+  if (mode === 'brand' && hasArabicLetters(q)) return searchBrandsArabic(pool, q, allowTypoForm)
 
   // Pull strength/form facets out first — whatever's left is the name text.
   const strength      = extractStrengthFromQuery(q)
