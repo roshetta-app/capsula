@@ -171,6 +171,7 @@ import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { highlightMatch } from '../utils/highlightMatch'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../utils/drugTitleFormat'
 import { hasArabicLetters } from '../utils/searchUtils'
+import { formatArabicFullName } from '../utils/arabicName'
 
 const ROW_HEIGHT = 64 // tentative — revisit once 1d.2-1d.4 content is in place
 
@@ -249,10 +250,10 @@ export default function SharedDrugCard({
 
   // Arabic line (plan v9 Session 13): only while the typed text has Arabic letters
   // and the search is in Brand mode, so it shows which Arabic name matched and
-  // never appears in any other list or search. Brand part first (it is what the
-  // search matches on); full title only when there is no brand part.
+  // never appears in any other list or search. Full Arabic title with " - " between
+  // its parts; the Arabic brand name alone when there is no full title.
   const arabicLine = searchMode === 'brand' && hasArabicLetters(highlight)
-    ? (drug.nameAr || drug.nameArFull || '')
+    ? formatArabicFullName(drug.nameAr, drug.nameArFull)
     : ''
 
   return (

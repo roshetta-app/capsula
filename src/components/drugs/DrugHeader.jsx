@@ -1,8 +1,8 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
- * 2026-10-14 (Arabic names, plan v9 Session 13): an Arabic line sits right
- * under the English name (nameArFull, else nameAr, else nothing), right to left.
+ * 2026-10-14 (Arabic names, plan v9 Session 13): the Arabic name sits last in the
+ * title block, under the suffix (full title, parts joined with " - ").
  *
  * 2026-10-03 (image search stopped working): the image-search icon now opens
  * through openInAppBrowser (src/utils/openInAppBrowser.js), which recovers when
@@ -168,6 +168,7 @@
  *   onToggleFav   — () => void
  */
 
+import { formatArabicFullName } from '../../utils/arabicName'
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
@@ -241,6 +242,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // uses for its title line (see utils/drugTitleFormat.js), including the
   // shared list of modifier tags left out of the suffix (2026-09-19).
   const titleSuffix = getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
+  const arabicFull = formatArabicFullName(drug.nameAr, drug.nameArFull)
 
   // Favourite-toggle pop animation (this session) — no existing precedent
   // in the codebase to match (checked RowStarButton.jsx and
@@ -473,33 +475,6 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           </button>
         </div>
 
-        {/* Arabic name (plan v9 Session 13): directly under the English name,
-            right to left. Full Arabic title when there is one, else the Arabic
-            brand name, else nothing at all. Only shown statuses ever reach the
-            phone, so no status check here. Scrolls sideways if long. */}
-        {(drug.nameArFull || drug.nameAr) && (
-          <div
-            dir="rtl"
-            lang="ar"
-            style={{
-              fontSize:                15,
-              fontWeight:              500,
-              lineHeight:              1.4,
-              color:                   'var(--color-text-secondary)',
-              textAlign:               'right',
-              marginBottom:            2,
-              overflowX:               'auto',
-              whiteSpace:              'nowrap',
-              scrollbarWidth:          'none',
-              msOverflowStyle:         'none',
-              WebkitOverflowScrolling: 'touch',
-              touchAction:             'pan-x',
-            }}
-          >
-            {drug.nameArFull || drug.nameAr}
-          </div>
-        )}
-
         {/* Row 3: strength/form suffix — own line beneath the brand name
             now, instead of sharing row 2's single scrolling line. Same
             edge-fade + horizontal-scroll treatment as the brand-name line
@@ -523,6 +498,33 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             }}
           >
             {titleSuffix}
+          </div>
+        )}
+
+        {/* Arabic name (plan v9 Session 13): last row of the title block, under all
+            the English lines. Full Arabic title with " - " between brand, strength
+            and pack; Arabic brand name alone when there is no full title; nothing
+            when there is neither. Right to left; scrolls sideways if long. */}
+        {arabicFull && (
+          <div
+            dir="rtl"
+            lang="ar"
+            style={{
+              fontSize:                14,
+              fontWeight:              500,
+              lineHeight:              1.5,
+              color:                   'var(--color-text-secondary)',
+              textAlign:               'right',
+              marginTop:               2,
+              overflowX:               'auto',
+              whiteSpace:              'nowrap',
+              scrollbarWidth:          'none',
+              msOverflowStyle:         'none',
+              WebkitOverflowScrolling: 'touch',
+              touchAction:             'pan-x',
+            }}
+          >
+            {arabicFull}
           </div>
         )}
 
