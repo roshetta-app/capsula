@@ -251,6 +251,9 @@ function clearAllRecentlyViewedStorage() {
   try {
     localStorage.removeItem('capsula_recent_conditions')
     localStorage.removeItem('capsula_recent_drugs')
+    // 2026-10-15: the drug search's recent searches are saved to the account now, so the
+    // phone's copy goes on sign-out too (the next person on this phone must not see it).
+    localStorage.removeItem('capsula_drug_search_history')
   } catch {
     // localStorage unavailable — silently ignore
   }
