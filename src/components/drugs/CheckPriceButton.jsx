@@ -11,11 +11,15 @@
  *     brand_price_link(brand id), which returns only the page link (no price,
  *     no barcode, no dates). Caption says it opens DawaaGate (credit to the
  *     source, as the permission request promised).
- *   - No matched page, or the lookup fails (offline, error): a ready-made
- *     Google search. Arabic full title + "سعر" when the drug has one, else
- *     the Arabic or English name + strength + form + pack + "سعر". The
- *     caption says to check strength and pack, because search results can
- *     show a different strength or pack.
+ *   - No matched page, or the lookup fails (offline, error): DawaaGate's own
+ *     search for the brand name (https://www.dawaagate.com/search?q=<name>),
+ *     which lists every strength and pack it has. The caption says to check
+ *     strength and pack. Updated 2026-10-16 (Omar): this replaces the Google
+ *     search as the main fallback.
+ *   - Only in that fallback case, a small "Search the web instead" link under
+ *     the caption opens the old Google search (Arabic full title + "سعر", else
+ *     name + strength + form + pack + "سعر"), because DawaaGate does not list
+ *     every brand and its search can come back empty.
  *
  * The button is greyed for a moment while the link lookup runs, so a quick
  * tap cannot open a search for a drug that does have a page.
@@ -29,7 +33,12 @@ import { Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
-function buildSearchUrl(drug) {
+function buildDawaaGateSearchUrl(drug) {
+  const name = (drug.tradenameClean || drug.nameAr || '').trim()
+  return `https://www.dawaagate.com/search?q=${encodeURIComponent(name)}`
+}
+
+function buildWebSearchUrl(drug) {
   const parts = drug.nameArFull
     ? [drug.nameArFull, 'سعر']
     : [drug.nameAr ?? drug.tradenameClean, drug.concentration, drug.form, drug.packSize, 'سعر']
@@ -61,14 +70,18 @@ export default function CheckPriceButton({ drug }) {
 
   const handleClick = () => {
     if (!ready) return
-    openInAppBrowser(link ?? buildSearchUrl(drug))
+    openInAppBrowser(link ?? buildDawaaGateSearchUrl(drug))
+  }
+
+  const handleWebSearch = () => {
+    openInAppBrowser(buildWebSearchUrl(drug))
   }
 
   const caption = !ready
     ? ' '
     : link
       ? 'Opens the DawaaGate page for this drug'
-      : 'Web search: check the strength and pack size'
+      : 'Searches DawaaGate: check the strength and pack size'
 
   return (
     <div style={{ marginBottom: 'var(--space-5)' }}>
@@ -111,6 +124,26 @@ export default function CheckPriceButton({ drug }) {
       >
         {caption}
       </p>
+      {ready && !link && (
+        <button
+          type="button"
+          onClick={handleWebSearch}
+          style={{
+            display: 'block',
+            margin: 'var(--space-1) auto 0',
+            padding: 'var(--space-2) var(--space-3)',
+            background: 'none',
+            border: 'none',
+            fontSize: 12,
+            color: 'var(--color-text-tertiary)',
+            textDecoration: 'underline',
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+        >
+          Search the web instead
+        </button>
+      )}
     </div>
   )
 }
