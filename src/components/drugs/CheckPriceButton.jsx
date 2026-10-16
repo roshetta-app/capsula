@@ -29,8 +29,8 @@
  *
  * Where the page lands (2026-10-16, Omar): not at the top.
  *   The address ends with a text hint ("#:~:text=...") that tells Chrome to
- *   scroll to a printed word. Drug page: single words that appear only in the
- *   FIRST price card ("للعلبة" from "السعر الحالي للعلبة", "الشريط", "الكبرى");
+ *   scroll to a printed word. Drug page: the word "تغيير" from "آخر تغيير في
+ *   السعر", a line low in the FIRST price card (see the note at the hints below);
  *   the page's own #price anchor is a second, lower price section, so it is
  *   not used. Search page: "التفاصيل" (the button on each result card), which
  *   is the first result card, past the filters.
@@ -58,11 +58,14 @@ import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
 // Scroll hints (see the header). The Arabic text is what DawaaGate prints on
 // the page.
-const PRICE_CARD_HASH = '#:~:text=' + [
-  'للعلبة',
-  'الشريط',
-  'الكبرى',
-].map(encodeURIComponent).join('&text=')
+// One word only, because Chrome highlights every matched word and draws it
+// in purple (it cannot be hidden from the link), and Chrome puts the matched
+// word in the MIDDLE of the screen. "تغيير" is from "آخر تغيير في السعر", a line
+// near the bottom of the first price card, so centring it brings the top of the
+// card up to the top of the screen. (Phone test 2026-10-16: with the first
+// line of the card, "للعلبة", the card sat in the middle with other content
+// above it.)
+const PRICE_CARD_HASH = `#:~:text=${encodeURIComponent('تغيير')}`
 const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('التفاصيل')}`
 
 // Opens a DawaaGate page. 'noopener' is what lets Chrome apply the scroll hint.
