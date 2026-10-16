@@ -188,6 +188,7 @@ import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { supabase } from '../../lib/supabase'
 import Lightbox from '../ui/Lightbox'
+import CheckPriceButton from './CheckPriceButton'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -503,6 +504,8 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             </span>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <CheckPriceButton drug={drug} />
           <button
             onClick={handleSearchClick}
             aria-label={`Search images for ${drug.tradenameClean}`}
@@ -517,6 +520,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           >
             <ScanSearch size={20} strokeWidth={1.8} color="currentColor" />
           </button>
+          </div>
         </div>
 
         {/* Row 3: strength/form suffix — own line beneath the brand name

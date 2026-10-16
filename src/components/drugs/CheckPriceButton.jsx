@@ -54,6 +54,13 @@
  * Native app: openInAppBrowser (same helper as the image-search icon in
  * DrugHeader.jsx). Web/PWA: window.open with 'noopener' for DawaaGate pages
  * (see above). Nothing is stored; nothing is shown as our price.
+ *
+ * 2026-10-17 (Omar, redesign): now a small tag icon in the drug header, next
+ * to the image icon, instead of a full-width button with caption and two
+ * small links. The two links ("Search by name only", "Search the web") and
+ * the caption are gone; an unmatched drug keeps the DawaaGate search with
+ * the strength number (the old primary button behaviour). Offline: the icon
+ * is dimmed and a tap shows a message (same as the image icon).
  */
 
 import { useEffect, useState } from 'react'
@@ -91,14 +98,6 @@ function withPriceCardHash(url) {
   return url.includes('#') ? url : `${url}${PRICE_CARD_HASH}`
 }
 
-function buildWebSearchUrl(drug) {
-  const parts = drug.nameArFull
-    ? [drug.nameArFull, 'سعر']
-    : [drug.nameAr ?? drug.tradenameClean, drug.concentration, drug.form, drug.packSize, 'سعر']
-  const query = parts.filter(Boolean).join(' ')
-  return `https://www.google.com/search?q=${encodeURIComponent(query)}`
-}
-
 const OFFLINE_PRICE_MSG = 'Checking the price needs an internet connection. Connect and try again.'
 
 export default function CheckPriceButton({ drug }) {
@@ -127,102 +126,30 @@ export default function CheckPriceButton({ drug }) {
 
   const ready = link !== undefined
 
-  const handleClick = () => {
+  const handleClick = (e) => {
+    e.stopPropagation()
     if (!ready) return
     if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
     openDawaaGate(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug, true))
   }
 
-  const handleNameSearch = () => {
-    if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
-    openDawaaGate(buildDawaaGateSearchUrl(drug, false))
-  }
-
-  const handleWebSearch = () => {
-    if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
-    openInAppBrowser(buildWebSearchUrl(drug))
-  }
-
-  const caption = !ready
-    ? ' '
-    : link
-      ? 'Opens the DawaaGate page for this drug'
-      : 'Searches DawaaGate: check the strength and pack size'
-
   return (
-    <div style={{ marginBottom: 'var(--space-5)' }}>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={!ready}
-        aria-label="Check price"
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 'var(--space-2)',
-          minHeight: 48,
-          padding: 'var(--space-3) var(--space-4)',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--color-accent)',
-          backgroundColor: 'var(--color-accent-light)',
-          color: 'var(--color-accent)',
-          fontSize: 15,
-          fontWeight: 600,
-          cursor: ready ? 'pointer' : 'default',
-          opacity: ready && isOnline ? 1 : 0.6,
-          touchAction: 'manipulation',
-        }}
-      >
-        <Tag size={18} strokeWidth={1.8} color="currentColor" aria-hidden="true" />
-        Check price
-      </button>
-      <p
-        style={{
-          margin: 'var(--space-2) 0 0',
-          textAlign: 'center',
-          fontSize: 12,
-          lineHeight: 1.4,
-          color: 'var(--color-text-tertiary)',
-          minHeight: 17,
-        }}
-      >
-        {caption}
-      </p>
-      {ready && !link && (
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            gap: 'var(--space-2)',
-            marginTop: 'var(--space-1)',
-          }}
-        >
-          {[
-            ['Search by name only', handleNameSearch],
-            ['Search the web', handleWebSearch],
-          ].map(([label, onClick]) => (
-            <button
-              key={label}
-              type="button"
-              onClick={onClick}
-              style={{
-                padding: 'var(--space-2) var(--space-3)',
-                background: 'none',
-                border: 'none',
-                fontSize: 12,
-                color: 'var(--color-text-tertiary)',
-                textDecoration: 'underline',
-                cursor: 'pointer',
-                touchAction: 'manipulation',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={!ready}
+      aria-label="Check price"
+      style={{
+        background: 'none', border: 'none', padding: 2,
+        cursor: ready ? 'pointer' : 'default', flexShrink: 0,
+        color: 'var(--color-text-primary)',
+        display: 'flex', alignItems: 'center',
+        lineHeight: 1,
+        opacity: ready && isOnline ? 1 : 0.4,
+        touchAction: 'manipulation',
+      }}
+    >
+      <Tag size={20} strokeWidth={1.8} color="currentColor" aria-hidden="true" />
+    </button>
   )
 }
