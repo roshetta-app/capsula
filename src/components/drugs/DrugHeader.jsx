@@ -1,6 +1,16 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
+ * 2026-10-17 (image icon, Omar): for a drug that has a DawaaGate page link
+ * (same database lookup the "Check price" button uses, brand_price_link), the
+ * image icon now opens that page instead of Google Images: its photo sits in
+ * the top block of the page, under the title, so it shows on the first screen
+ * with no jump needed (their page has no named spot for the photo; a jump to
+ * the photo would hide its top under their fixed bar). The photo stays on
+ * their site; nothing is copied or shown inside our app. A drug with no page
+ * link, or a failed lookup, still opens Google Images exactly as before. The
+ * link is looked up when the drug page opens, so the tap opens at once.
+ *
  * 2026-10-14 (Arabic names, plan v9 Session 13): the Arabic name sits last in the
  * title block, under the suffix (full title, parts joined with " - ").
  *
@@ -173,6 +183,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
+import { supabase } from '../../lib/supabase'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -259,6 +270,17 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
 
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
 
+  // DawaaGate page link for this drug (string), or null when there is none or
+  // the lookup fails. Looked up once per drug; the image icon waits for it.
+  const pageLinkRef = useRef(Promise.resolve(null))
+  useEffect(() => {
+    pageLinkRef.current = Promise.resolve(
+      supabase.rpc('brand_price_link', { p_brand_id: drug.id })
+    )
+      .then(({ data, error }) => (!error && typeof data === 'string' && data ? data : null))
+      .catch(() => null)
+  }, [drug.id])
+
   function handleToggleFav() {
     onToggleFav()
     setPopped(true)
@@ -283,8 +305,13 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // own copy of this same handler still uses window.open — not touched
   // here, out of this session's scope, so the two now differ until that
   // one's updated too.
-  const handleSearchClick = (e) => {
+  const handleSearchClick = async (e) => {
     e.stopPropagation()
+    const pageLink = await pageLinkRef.current
+    if (pageLink) {
+      openInAppBrowser(pageLink)
+      return
+    }
     const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
       .filter(Boolean)
       .join(' ')
