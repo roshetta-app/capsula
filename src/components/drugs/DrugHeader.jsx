@@ -1,15 +1,16 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
- * 2026-10-17 (image icon, Omar): for a drug that has a DawaaGate page link
- * (same database lookup the "Check price" button uses, brand_price_link), the
- * image icon now opens that page instead of Google Images: its photo sits in
- * the top block of the page, under the title, so it shows on the first screen
- * with no jump needed (their page has no named spot for the photo; a jump to
- * the photo would hide its top under their fixed bar). The photo stays on
- * their site; nothing is copied or shown inside our app. A drug with no page
- * link, or a failed lookup, still opens Google Images exactly as before. The
- * link is looked up when the drug page opens, so the tap opens at once.
+ * 2026-10-17 (image icon, Omar; DawaaGate gave full permission to use their
+ * drug pictures): for a drug whose DawaaGate page has a picture, the image
+ * icon opens that picture in the app's full-screen viewer (ui/Lightbox.jsx:
+ * pinch to zoom, back button closes) with a "Source: DawaaGate" credit. The
+ * picture address comes from the database function brand_image_url(brand id),
+ * filled by the page reader (migration p23_s15g_brand_image_url); the file is
+ * shown from DawaaGate's own server, nothing is copied. A drug with no
+ * picture address (no DawaaGate page, a page without a picture, or not read
+ * yet) still opens Google Images exactly as before. The address is looked up
+ * when the drug page opens, so the tap responds at once.
  *
  * 2026-10-14 (Arabic names, plan v9 Session 13): the Arabic name sits last in the
  * title block, under the suffix (full title, parts joined with " - ").
@@ -184,6 +185,7 @@ import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { supabase } from '../../lib/supabase'
+import Lightbox from '../ui/Lightbox'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -242,6 +244,8 @@ function edgeFadeStyle(fade) {
   return { WebkitMaskImage: gradient, maskImage: gradient }
 }
 
+const noop = () => {}
+
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, category, colors }) {
   const brandFade  = useEdgeFade(drug.id)
   const suffixFade = useEdgeFade(drug.id)
@@ -270,12 +274,13 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
 
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
 
-  // DawaaGate page link for this drug (string), or null when there is none or
-  // the lookup fails. Looked up once per drug; the image icon waits for it.
-  const pageLinkRef = useRef(Promise.resolve(null))
+  // DawaaGate picture address for this drug (string), or null when there is
+  // none or the lookup fails. Looked up once per drug; the icon waits for it.
+  const pictureRef = useRef(Promise.resolve(null))
+  const [viewerImage, setViewerImage] = useState(null)
   useEffect(() => {
-    pageLinkRef.current = Promise.resolve(
-      supabase.rpc('brand_price_link', { p_brand_id: drug.id })
+    pictureRef.current = Promise.resolve(
+      supabase.rpc('brand_image_url', { p_brand_id: drug.id })
     )
       .then(({ data, error }) => (!error && typeof data === 'string' && data ? data : null))
       .catch(() => null)
@@ -307,9 +312,9 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // one's updated too.
   const handleSearchClick = async (e) => {
     e.stopPropagation()
-    const pageLink = await pageLinkRef.current
-    if (pageLink) {
-      openInAppBrowser(pageLink)
+    const picture = await pictureRef.current
+    if (picture) {
+      setViewerImage(picture)
       return
     }
     const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
@@ -319,6 +324,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   }
 
   return (
+    <>
     <header style={{
       // 2026-07-25 (step 0.4 fix, same session): no longer sticky/rounded/
       // shadowed — those made this read as a separate floating card on top
@@ -557,5 +563,15 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
 
       </div>
     </header>
+    {viewerImage && (
+      <Lightbox
+        images={[{ id: drug.id, url: viewerImage, caption: 'Source: DawaaGate' }]}
+        activeIndex={0}
+        onClose={() => setViewerImage(null)}
+        onGo={noop}
+        title={drug.tradenameClean || ''}
+      />
+    )}
+    </>
   )
 }
