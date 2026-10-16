@@ -37,12 +37,16 @@
  *   card; the share box is about 100 px higher, which leaves the whole card in
  *   view under the bar. The page's own #price anchor is a second, lower price
  *   section, so it is not used.
- *   Search page: a text hint ("#:~:text=التفاصيل", the button on each result
- *   card) lands on the first result; Chrome highlights the word and centres it.
- *   That hint only works in a browser tab opened with 'noopener' (below), so on
- *   the web the page is opened that way; in the Android app it is ignored
- *   (earlier tries all failed because of this: Omar uses the PWA).
- *   Only a scroll hint: if it fails, the page opens at the top.
+ *   Search page: the address ends with #results-grid, a named spot in
+ *   DawaaGate's page code (found in saved copies of a results page): the box
+ *   that holds the result cards, directly under the filters that fill the
+ *   first phone screen. It jumps to the top of the first card, with no
+ *   highlight. DawaaGate's top bar (about 66 px, fixed) may cover the top
+ *   strip of that card's picture. A search with no results has no such spot,
+ *   so the page just opens at the top, where "no results" is shown.
+ *   (The earlier text hint on the card's details button is gone: it centred
+ *   the button and painted it purple.)
+ *   On the web the page is still opened with 'noopener'; harmless for named spots.
  *
  * The button is greyed for a moment while the link lookup runs, so a quick
  * tap cannot open a search for a drug that does have a page.
@@ -58,10 +62,9 @@ import { supabase } from '../../lib/supabase'
 import { Capacitor } from '@capacitor/core'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
-// Scroll hints (see the header). The search hint uses the Arabic text DawaaGate
-// prints on each result card.
+// Named spots in DawaaGate's page code (see the header).
 const PRICE_CARD_HASH = '#ddm-share'
-const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('التفاصيل')}`
+const FIRST_RESULT_HASH = '#results-grid'
 
 // Opens a DawaaGate page. 'noopener' is what lets Chrome apply the scroll hint.
 function openDawaaGate(url) {
