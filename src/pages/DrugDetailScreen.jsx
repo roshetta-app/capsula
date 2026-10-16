@@ -106,6 +106,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
+import CheckPriceButton                 from '../components/drugs/CheckPriceButton'
 import BottomNav                         from '../components/BottomNav'
 import GenericOverviewSection            from '../components/drugs/sections/GenericOverviewSection'
 import UsesSection                       from '../components/drugs/sections/UsesSection'
@@ -501,6 +502,10 @@ export default function DrugDetailScreen() {
             clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet key={drug.id}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
+            {/* 2026-10-16 (plan v9 S15d, D21): one "Check price" button on every drug
+                page; no price is shown anywhere in the app. */}
+            <CheckPriceButton drug={drug} />
+
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}
