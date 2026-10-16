@@ -21,6 +21,17 @@
  *     name + strength + form + pack + "سعر"), because DawaaGate does not list
  *     every brand and its search can come back empty.
  *
+ * Where the page lands (2026-10-16, Omar): not at the top.
+ *   - DawaaGate drug page: jumps to the price card ("السعر الحالي للعلبة").
+ *     The address ends with #price:~:text=... : browsers that support text
+ *     fragments (Chrome and Chrome Custom Tabs, Safari 16.1+) scroll to that
+ *     text; if the text is not found, the page's own #price section is used.
+ *   - DawaaGate search: jumps to the first result card (first "عرض التفاصيل"
+ *     button), past the filters that fill the first screen on a phone.
+ *   Both are only scroll hints: an unsupported browser, or text that is not
+ *   found, just opens the page at the top as before. The Google fallback has
+ *   no anchor.
+ *
  * The button is greyed for a moment while the link lookup runs, so a quick
  * tap cannot open a search for a drug that does have a page.
  *
@@ -33,9 +44,18 @@ import { Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
+// Scroll hints (see the header). The Arabic text is what DawaaGate prints on
+// the page: the label on the price card, and the button on each result card.
+const PRICE_CARD_HASH = `#price:~:text=${encodeURIComponent('السعر الحالي للعلبة')}`
+const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('عرض التفاصيل')}`
+
 function buildDawaaGateSearchUrl(drug) {
   const name = (drug.tradenameClean || drug.nameAr || '').trim()
-  return `https://www.dawaagate.com/search?q=${encodeURIComponent(name)}`
+  return `https://www.dawaagate.com/search?q=${encodeURIComponent(name)}${FIRST_RESULT_HASH}`
+}
+
+function withPriceCardHash(url) {
+  return url.includes('#') ? url : `${url}${PRICE_CARD_HASH}`
 }
 
 function buildWebSearchUrl(drug) {
@@ -70,7 +90,7 @@ export default function CheckPriceButton({ drug }) {
 
   const handleClick = () => {
     if (!ready) return
-    openInAppBrowser(link ?? buildDawaaGateSearchUrl(drug))
+    openInAppBrowser(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug))
   }
 
   const handleWebSearch = () => {
