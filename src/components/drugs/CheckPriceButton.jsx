@@ -28,30 +28,48 @@
  *     because DawaaGate does not list every brand or strength.
  *
  * Where the page lands (2026-10-16, Omar): not at the top.
- *   Text hints in the address ("#:~:text=...") were tried twice and ignored by
- *   the Android in-app browser (Chrome's built-in tab), so they are gone. The
- *   button now opens DawaaGate through openPriceBrowser (its own web view,
- *   @capgo/capacitor-inappbrowser), which scrolls after the page loads:
- *     - DawaaGate drug page: to the FIRST price card (label "السعر الحالي
- *       للعلبة"), not the second price section the page's own #price anchor
- *       points to.
- *     - DawaaGate search: to the first result card, past the filters.
- *   If that browser is unavailable (older app build, web), the page opens at
- *   the top through openInAppBrowser. The Google link is unchanged.
+ *   The address ends with a text hint ("#:~:text=...") that tells Chrome to
+ *   scroll to a printed word. Drug page: single words that appear only in the
+ *   FIRST price card ("للعلبة" from "السعر الحالي للعلبة", "الشريط", "الكبرى");
+ *   the page's own #price anchor is a second, lower price section, so it is
+ *   not used. Search page: "التفاصيل" (the button on each result card), which
+ *   is the first result card, past the filters.
+ *   Why the earlier tries did nothing (found 2026-10-16, Omar uses the PWA, not
+ *   the Android app): in the browser the page was opened with a plain
+ *   window.open, which keeps a link back to our app, and Chrome ignores text
+ *   hints for such pages. On the web the page is now opened with 'noopener',
+ *   which Chrome requires for the hint to work. In the Android app the hint is
+ *   still ignored by Chrome's built-in tab (nothing more is done there).
+ *   Only a scroll hint: if it fails, the page opens at the top.
  *
  * The button is greyed for a moment while the link lookup runs, so a quick
  * tap cannot open a search for a drug that does have a page.
  *
- * DawaaGate pages open through openPriceBrowser; the Google link opens through
- * openInAppBrowser (same helper as the image-search icon in DrugHeader.jsx).
- * Nothing is stored; nothing is shown as our price.
+ * Native app: openInAppBrowser (same helper as the image-search icon in
+ * DrugHeader.jsx). Web/PWA: window.open with 'noopener' for DawaaGate pages
+ * (see above). Nothing is stored; nothing is shown as our price.
  */
 
 import { useEffect, useState } from 'react'
 import { Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { Capacitor } from '@capacitor/core'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
-import { openPriceBrowser } from '../../utils/openPriceBrowser'
+
+// Scroll hints (see the header). The Arabic text is what DawaaGate prints on
+// the page.
+const PRICE_CARD_HASH = '#:~:text=' + [
+  'للعلبة',
+  'الشريط',
+  'الكبرى',
+].map(encodeURIComponent).join('&text=')
+const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('التفاصيل')}`
+
+// Opens a DawaaGate page. 'noopener' is what lets Chrome apply the scroll hint.
+function openDawaaGate(url) {
+  if (Capacitor.isNativePlatform()) openInAppBrowser(url)
+  else window.open(url, '_blank', 'noopener')
+}
 
 // First number of the strength: "500mg" -> "500", "250mg/5ml" -> "250",
 // "0.5%" -> "0.5". No unit: DawaaGate writes both "500 mg" and "400mg".
@@ -63,7 +81,11 @@ function strengthNumber(drug) {
 function buildDawaaGateSearchUrl(drug, withStrength) {
   const name = (drug.tradenameClean || drug.nameAr || '').trim()
   const query = withStrength ? [name, strengthNumber(drug)].filter(Boolean).join(' ') : name
-  return `https://www.dawaagate.com/search?q=${encodeURIComponent(query)}`
+  return `https://www.dawaagate.com/search?q=${encodeURIComponent(query)}${FIRST_RESULT_HASH}`
+}
+
+function withPriceCardHash(url) {
+  return url.includes('#') ? url : `${url}${PRICE_CARD_HASH}`
 }
 
 function buildWebSearchUrl(drug) {
@@ -98,12 +120,11 @@ export default function CheckPriceButton({ drug }) {
 
   const handleClick = () => {
     if (!ready) return
-    if (link) openPriceBrowser(link, 'price')
-    else openPriceBrowser(buildDawaaGateSearchUrl(drug, true), 'result')
+    openDawaaGate(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug, true))
   }
 
   const handleNameSearch = () => {
-    openPriceBrowser(buildDawaaGateSearchUrl(drug, false), 'result')
+    openDawaaGate(buildDawaaGateSearchUrl(drug, false))
   }
 
   const handleWebSearch = () => {
