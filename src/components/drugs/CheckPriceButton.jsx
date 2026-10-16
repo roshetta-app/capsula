@@ -22,10 +22,14 @@
  *     every brand and its search can come back empty.
  *
  * Where the page lands (2026-10-16, Omar): not at the top.
- *   - DawaaGate drug page: jumps to the price card ("السعر الحالي للعلبة").
- *     The address ends with #price:~:text=... : browsers that support text
- *     fragments (Chrome and Chrome Custom Tabs, Safari 16.1+) scroll to that
- *     text; if the text is not found, the page's own #price section is used.
+ *   - DawaaGate drug page: jumps to the FIRST price card, the one with
+ *     "السعر الحالي للعلبة" near the top (not the second price section lower
+ *     down, which is what the page's own #price anchor points to, so that
+ *     anchor is deliberately not used). The address ends with
+ *     #:~:text=A&text=B&text=C : browsers that support text fragments (Chrome
+ *     and Chrome Custom Tabs, Safari 16.1+) scroll to the first text found.
+ *     Three texts that appear only in that card are listed, so one missing
+ *     match does not lose the jump.
  *   - DawaaGate search: jumps to the first result card (first "عرض التفاصيل"
  *     button), past the filters that fill the first screen on a phone.
  *   Both are only scroll hints: an unsupported browser, or text that is not
@@ -45,8 +49,13 @@ import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
 // Scroll hints (see the header). The Arabic text is what DawaaGate prints on
-// the page: the label on the price card, and the button on each result card.
-const PRICE_CARD_HASH = `#price:~:text=${encodeURIComponent('السعر الحالي للعلبة')}`
+// the page: three labels inside the first price card, and the button on each
+// result card.
+const PRICE_CARD_HASH = '#:~:text=' + [
+  'السعر الحالي للعلبة',
+  'آخر تغيير في السعر',
+  'المصدر: بيانات سوق الدواء المصري',
+].map(encodeURIComponent).join('&text=')
 const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('عرض التفاصيل')}`
 
 function buildDawaaGateSearchUrl(drug) {
