@@ -28,18 +28,20 @@
  *     because DawaaGate does not list every brand or strength.
  *
  * Where the page lands (2026-10-16, Omar): not at the top.
- *   The address ends with a text hint ("#:~:text=...") that tells Chrome to
- *   scroll to a printed word. Drug page: the word "تغيير" from "آخر تغيير في
- *   السعر", a line low in the FIRST price card (see the note at the hints below);
- *   the page's own #price anchor is a second, lower price section, so it is
- *   not used. Search page: "التفاصيل" (the button on each result card), which
- *   is the first result card, past the filters.
- *   Why the earlier tries did nothing (found 2026-10-16, Omar uses the PWA, not
- *   the Android app): in the browser the page was opened with a plain
- *   window.open, which keeps a link back to our app, and Chrome ignores text
- *   hints for such pages. On the web the page is now opened with 'noopener',
- *   which Chrome requires for the hint to work. In the Android app the hint is
- *   still ignored by Chrome's built-in tab (nothing more is done there).
+ *   Drug page: the address ends with #ddm-share, a named spot in DawaaGate's
+ *   page code (found in a saved copy of one of their drug pages): the share
+ *   box that sits just above the first price card. A named spot needs no
+ *   highlight and no text matching, and works in every browser including the
+ *   Android app. The price card has its own name (#price-card), but DawaaGate's
+ *   top bar stays fixed over the page and would cover the first lines of the
+ *   card; the share box is about 100 px higher, which leaves the whole card in
+ *   view under the bar. The page's own #price anchor is a second, lower price
+ *   section, so it is not used.
+ *   Search page: a text hint ("#:~:text=التفاصيل", the button on each result
+ *   card) lands on the first result; Chrome highlights the word and centres it.
+ *   That hint only works in a browser tab opened with 'noopener' (below), so on
+ *   the web the page is opened that way; in the Android app it is ignored
+ *   (earlier tries all failed because of this: Omar uses the PWA).
  *   Only a scroll hint: if it fails, the page opens at the top.
  *
  * The button is greyed for a moment while the link lookup runs, so a quick
@@ -56,16 +58,9 @@ import { supabase } from '../../lib/supabase'
 import { Capacitor } from '@capacitor/core'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 
-// Scroll hints (see the header). The Arabic text is what DawaaGate prints on
-// the page.
-// One word only, because Chrome highlights every matched word and draws it
-// in purple (it cannot be hidden from the link), and Chrome puts the matched
-// word in the MIDDLE of the screen. "تغيير" is from "آخر تغيير في السعر", a line
-// near the bottom of the first price card, so centring it brings the top of the
-// card up to the top of the screen. (Phone test 2026-10-16: with the first
-// line of the card, "للعلبة", the card sat in the middle with other content
-// above it.)
-const PRICE_CARD_HASH = `#:~:text=${encodeURIComponent('تغيير')}`
+// Scroll hints (see the header). The search hint uses the Arabic text DawaaGate
+// prints on each result card.
+const PRICE_CARD_HASH = '#ddm-share'
 const FIRST_RESULT_HASH = `#:~:text=${encodeURIComponent('التفاصيل')}`
 
 // Opens a DawaaGate page. 'noopener' is what lets Chrome apply the scroll hint.
