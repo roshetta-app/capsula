@@ -181,6 +181,8 @@
 
 import { formatArabicFullName } from '../../utils/arabicName'
 import { useEffect, useRef, useState } from 'react'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useToast } from '../../context/ToastContext'
 import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
@@ -278,6 +280,8 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // none or the lookup fails. Looked up once per drug; the icon waits for it.
   const pictureRef = useRef(Promise.resolve(null))
   const [viewerImage, setViewerImage] = useState(null)
+  const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
   useEffect(() => {
     pictureRef.current = Promise.resolve(
       supabase.rpc('brand_image_url', { p_brand_id: drug.id })
@@ -312,6 +316,12 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // one's updated too.
   const handleSearchClick = async (e) => {
     e.stopPropagation()
+    // 2026-10-17 (Omar): pictures need the internet; offline the icon is
+    // dimmed and a tap shows a short message instead of opening anything.
+    if (!isOnline) {
+      toast.info('Pictures need an internet connection. Connect and try again.')
+      return
+    }
     const picture = await pictureRef.current
     if (picture) {
       setViewerImage(picture)
@@ -502,6 +512,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
               color: 'var(--color-text-primary)',
               display: 'flex', alignItems: 'center',
               lineHeight: 1,
+              opacity: isOnline ? 1 : 0.4,
             }}
           >
             <ScanSearch size={20} strokeWidth={1.8} color="currentColor" />

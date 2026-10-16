@@ -61,6 +61,8 @@ import { Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Capacitor } from '@capacitor/core'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
+import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useToast } from '../../context/ToastContext'
 
 // Named spots in DawaaGate's page code (see the header).
 const PRICE_CARD_HASH = '#ddm-share'
@@ -97,7 +99,13 @@ function buildWebSearchUrl(drug) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`
 }
 
+const OFFLINE_PRICE_MSG = 'Checking the price needs an internet connection. Connect and try again.'
+
 export default function CheckPriceButton({ drug }) {
+  // 2026-10-17 (Omar): offline, the button stays visible but dimmed; a tap
+  // shows a short message instead of opening anything.
+  const { isOnline } = useOnlineStatus()
+  const { toast } = useToast()
   // undefined = still looking, null = no page link, string = DawaaGate page
   const [link, setLink] = useState(undefined)
 
@@ -121,14 +129,17 @@ export default function CheckPriceButton({ drug }) {
 
   const handleClick = () => {
     if (!ready) return
+    if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
     openDawaaGate(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug, true))
   }
 
   const handleNameSearch = () => {
+    if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
     openDawaaGate(buildDawaaGateSearchUrl(drug, false))
   }
 
   const handleWebSearch = () => {
+    if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
     openInAppBrowser(buildWebSearchUrl(drug))
   }
 
@@ -160,7 +171,7 @@ export default function CheckPriceButton({ drug }) {
           fontSize: 15,
           fontWeight: 600,
           cursor: ready ? 'pointer' : 'default',
-          opacity: ready ? 1 : 0.6,
+          opacity: ready && isOnline ? 1 : 0.6,
           touchAction: 'manipulation',
         }}
       >
