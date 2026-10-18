@@ -9,7 +9,7 @@
  *
  * Layout (Omar, after phone tests, option B): ONE horizontal strip, no text
  * labels. Picture on the left, the Arabic name next to it (right-to-left, 2
- * lines at most, the letters shrink from 18 px down to 12 px until the name
+ * lines at most, the letters shrink from 16 px down to 12 px until the name
  * fits, and only at 12 px does a very long name get cut with dots), and the
  * price button as a side block at the right end.
  * No Arabic name: the name area is dropped and the price button stretches
@@ -39,7 +39,7 @@ import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
 
 const THUMB = 52 // px
-const NAME_MAX = 18 // px, Arabic name size when it is short
+const NAME_MAX = 16 // px, Arabic name size when it is short
 const NAME_MIN = 12 // px, smallest size before a very long name is cut with dots
 const NAME_LINE = 1.45 // line height of the Arabic name
 const OFFLINE_PICTURE_MSG = 'Pictures need an internet connection. Connect and try again.'
@@ -81,7 +81,7 @@ export default function DrugMediaStrip({ drug }) {
     getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS }),
   ].filter(Boolean).join(' ')
 
-  // Largest size (18 down to 12 px) at which the Arabic name fits in 2 lines.
+  // Largest size (16 down to 12 px) at which the Arabic name fits in 2 lines.
   // All sizing is written straight onto the element so a re-render never
   // undoes it; it re-runs when the name changes or the strip changes width.
   useLayoutEffect(() => {
