@@ -57,6 +57,8 @@ import Layout from './components/layout'
 import ConditionsScreen      from './pages/ConditionsScreen'
 import ConditionDetailScreen from './pages/ConditionDetailScreen'
 import DrugsScreen           from './pages/DrugsScreen'
+import DrugCategoriesScreen  from './pages/DrugCategoriesScreen'
+import DrugClassesScreen     from './pages/DrugClassesScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
@@ -93,6 +95,10 @@ export const ROUTES = {
   CONDITION_DETAIL:  (slug) => `/conditions/${slug}`,
   DRUGS:             '/drugs',
   DRUGS_CATEGORY:    (slug) => `/drugs/category/${slug}`,
+  // 2026-10-18 (Drugs groups plan, step 1.3): the Category and Class pages.
+  // Two segments after /drugs so they can never clash with /drugs/:slug.
+  DRUGS_BROWSE_CATEGORY: '/drugs/browse/category',
+  DRUGS_BROWSE_CLASS:    '/drugs/browse/class',
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
@@ -137,6 +143,8 @@ export function PublicRoutes() {
         <Route path="/conditions"          element={<ConditionsScreen />} />
         <Route path="/drugs"                        element={<DrugsScreen />} />
         <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
+        <Route path="/drugs/browse/category"          element={<DrugCategoriesScreen />} />
+        <Route path="/drugs/browse/class"             element={<DrugClassesScreen />} />
         <Route path="/favourites"          element={<FavouritesScreen />} />
         <Route path="/account"             element={<AccountScreen />} />
       </Route>
