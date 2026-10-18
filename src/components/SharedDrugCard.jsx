@@ -25,9 +25,11 @@
  *   line → 1d.3 / 1d.4 (generic line, category icon)
  *   trailing control  → 1d.5 / 1d.6 (bookmark, screen-owned per 4.16)
  *
- * 2026-10-14 (Arabic names, plan v9 Session 13): when the typed text has Arabic
- * letters and the search is in Brand mode, the matched drug's Arabic name shows
- * as a small right-to-left line under the generic line. Nowhere else.
+ * 2026-10-14 (Arabic names, plan v9 Session 13): the drug's Arabic name shows as a
+ * small right-to-left line under the generic line. 2026-10-18 (Omar): it now shows
+ * on every card whenever the drug has an Arabic name; before, only while Arabic
+ * letters were typed in Brand mode. Cards without an Arabic name keep the fixed
+ * row height; cards with one are a little taller.
  * 2026-10-14 (later): the typed name is bolded inside that Arabic line (see
  * utils/arabicHighlight.js), like the English title line.
  *
@@ -251,16 +253,18 @@ export default function SharedDrugCard({
   const titleSegments   = highlightMatch(toTitleCase(drug.tradenameClean), searchMode === 'brand'   ? highlight : '')
   const genericSegments = highlightMatch(genericLine || '',   searchMode === 'generic' ? highlight : '')
 
-  // Arabic line (plan v9 Session 13): only while the typed text has Arabic letters
-  // and the search is in Brand mode, so it shows which Arabic name matched and
-  // never appears in any other list or search. Full Arabic title with " - " between
-  // its parts; the Arabic brand name alone when there is no full title.
-  const arabicLine = searchMode === 'brand' && hasArabicLetters(highlight)
-    ? formatArabicFullName(drug.nameAr, drug.nameArFull)
-    : ''
-  // The typed name is bolded inside that line (spelling variants still match; a
-  // strength or form typed beside the name is not bolded).
-  const arabicSegments = arabicLine ? highlightArabic(arabicLine, highlight) : []
+  // Arabic line: always shown when the drug has an Arabic name (2026-10-18, Omar;
+  // it used to show only while Arabic letters were typed in Brand mode). Full Arabic
+  // title with " - " between its parts; the Arabic brand name alone when there is
+  // no full title; no line at all when the drug has neither.
+  const arabicLine = formatArabicFullName(drug.nameAr, drug.nameArFull)
+  // The typed name is bolded inside that line only while Arabic letters are typed
+  // in Brand mode (spelling variants still match; a strength or form typed beside
+  // the name is not bolded). Otherwise the line is plain.
+  const arabicTyped = searchMode === 'brand' && hasArabicLetters(highlight)
+  const arabicSegments = arabicLine
+    ? highlightArabic(arabicLine, arabicTyped ? highlight : '')
+    : []
 
   return (
     <div
