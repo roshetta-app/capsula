@@ -1,207 +1,94 @@
 /**
  * src/components/drugs/home/DrugsBrowseSection.jsx
- * 2026-10-04 (Drugs screen: Search and Browse as two equal areas): the 'Browse'
- * area of the Drugs home. Its header reads 'Browse drugs' on the left and, on the
- * right, a Category / Class button built like the Search area's mode button (the
- * same ModeButton: tinted pill with icon, name and a down arrow). Tapping it
- * opens a pop-up like the Search Mode pop-up (same FilterModal) to pick
- * Category or Class. Category is blue and Class is violet, the same accents
- * Brand and Class have in Search. Under the header it shows the category tiles
- * or every class (the same cards Class search uses), plus the loading and
- * failed-download states.
+ * 2026-10-18 (Drugs groups plan, step 1.4): the 'Browse' area of the Drugs
+ * home is now two big buttons, Category (blue) and Class (violet), each with
+ * a one-line subtitle. Each opens its own page (DrugCategoriesScreen at
+ * /drugs/browse/category, DrugClassesScreen at /drugs/browse/class). The
+ * Category / Class pop-up switch and the tiles and class list that used to be
+ * drawn inside this card moved to those pages (steps 1.1 and 1.2).
  *
- * Nothing here keeps the choice itself: 'browseMode' and its setter come from
- * the screen, and live in DrugContext so the choice is remembered when you
- * open a drug or switch tabs. Only whether the pop-up is open is held here.
+ * The colours are the same accents Category and Class had in the old switch
+ * and that Brand and Class have in Search. The buttons need no drug data, so
+ * there is no loading or failed state here any more; those live on the pages.
  *
- * Class view sort: a small sort button at the right of the class count line,
- * styled like the sort button on the Conditions screen (arrow icon + the name
- * of the other order). Two orders: Relevance (default, classes with the most
- * drugs first, ties A to Z) and A - Z. The choice ('classSortMode') lives in
- * DrugContext so it survives opening a drug or switching tabs; this file reads
- * it from there directly.
- *
- * Props:
- *   browseMode, onBrowseModeChange   'category' | 'class' and its setter
- *   loading, hasDrugs, error, onRetry  the library's loading / failed state
- *   categories                       categories that have drugs, with slug,
- *                                    name_en and the icon / colour fields
- *   allClasses                       every class (this file puts them in order)
- *   isDark                           for the category colours
- *   onOpenCategory(slug | 'all')     open a category (or All Drugs)
- *   onOpenClass, onOpenSubclass      open the class sheet from a class card
+ * The old props (browseMode, categories, allClasses and the rest) are no
+ * longer used. DrugsScreen still passes them until step 1.5 removes them.
  */
 
-import { useMemo, useState } from 'react'
-import { LayoutGrid, Layers, ArrowUpDown, Compass } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { LayoutGrid, Layers, ChevronRight } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
-import ModeButton from './ModeButton'
-import CategoryRow from './CategoryRow'
-import { DrugsSkeleton, LibraryErrorState } from './BrowseStates'
-import ClassSearchResults from '../classes/ClassSearchResults'
-import { FilterModal } from '../../ui/FilterModal'
-import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
-import { useDrugContext } from '../../../context/DrugContext'
+import { ROUTES } from '../../../router'
 
-// Browse pop-up options. Same shape as the Search Mode options. Category keeps
-// the app's blue accent, Class the violet it has in Search.
-const BROWSE_OPTIONS = [
-  { value: 'category', label: 'Category', icon: LayoutGrid, color: 'var(--color-accent)', tint: 'var(--color-accent-light)' },
-  { value: 'class',    label: 'Class',    icon: Layers,     color: 'var(--color-class)',  tint: 'var(--color-class-light)' },
+const BUTTONS = [
+  {
+    key:      'category',
+    label:    'Category',
+    subtitle: 'Browse drugs by category',
+    icon:     LayoutGrid,
+    color:    'var(--color-accent)',
+    tint:     'var(--color-accent-light)',
+    route:    ROUTES.DRUGS_BROWSE_CATEGORY,
+  },
+  {
+    key:      'class',
+    label:    'Class',
+    subtitle: 'Browse by drug class and family',
+    icon:     Layers,
+    color:    'var(--color-class)',
+    tint:     'var(--color-class-light)',
+    route:    ROUTES.DRUGS_BROWSE_CLASS,
+  },
 ]
 
-const CLASS_SORT_LABELS = { relevance: 'Relevance', az: 'A \u2013 Z' }
-
-// Sort button for the class list. Same look as the Conditions screen sort
-// button: no box, arrow icon, 13px medium text in the secondary colour. Like
-// that one it shows the order a tap will switch to, and says both in its
-// spoken label.
-function ClassSortButton({ sortMode, onToggle }) {
-  const nextMode = sortMode === 'relevance' ? 'az' : 'relevance'
+function BrowseButton({ label, subtitle, icon: Icon, color, tint, onTap }) {
   return (
     <button
-      onClick={onToggle}
-      aria-label={`Sort: currently ${CLASS_SORT_LABELS[sortMode]}. Tap to switch to ${CLASS_SORT_LABELS[nextMode]}.`}
+      onClick={onTap}
       style={{
-        display:                 'flex',
-        alignItems:              'center',
-        gap:                     4,
-        background:              'none',
-        border:                  'none',
-        cursor:                  'pointer',
-        padding:                 '4px 0 4px 8px',
-        fontSize:                13,
-        fontWeight:              500,
-        color:                   'var(--color-text-secondary)',
-        fontFamily:              'var(--font-body)',
+        display: 'flex', alignItems: 'center', gap: 12,
+        width: '100%', textAlign: 'left',
+        background: tint, border: 'none', borderRadius: 16,
+        padding: '14px 14px', cursor: 'pointer',
+        fontFamily: 'var(--font-body)',
         WebkitTapHighlightColor: 'transparent',
-        outline:                 'none',
       }}
     >
-      <ArrowUpDown size={13} strokeWidth={1.8} aria-hidden="true" />
-      {CLASS_SORT_LABELS[nextMode]}
+      <span style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+        background: 'var(--color-surface)', color,
+      }}>
+        <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
+      </span>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+        <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, color }}>{label}</span>
+        <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>{subtitle}</span>
+      </span>
+      <ChevronRight size={18} strokeWidth={2} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
     </button>
   )
 }
 
-export default function DrugsBrowseSection({
-  browseMode, onBrowseModeChange,
-  loading, hasDrugs, error, onRetry,
-  categories, allClasses, isDark,
-  onOpenCategory, onOpenClass, onOpenSubclass,
-}) {
-  const allDrugsColors = resolveToken(FALLBACK_TOKEN, isDark)
-
-  const { classSortMode, setClassSortMode } = useDrugContext()
-  const [menuOpen, setMenuOpen] = useState(false)
-  const currentOption = BROWSE_OPTIONS.find(o => o.value === browseMode) ?? BROWSE_OPTIONS[0]
-
-  function handlePick(value) {
-    onBrowseModeChange(value)
-    setMenuOpen(false)
-  }
-  const sortedClasses = useMemo(() => {
-    const list   = (allClasses ?? []).slice()
-    const byName = (a, b) => a.name.localeCompare(b.name)
-    if (classSortMode === 'az') return list.sort(byName)
-    return list.sort((a, b) => (b.brandCount - a.brandCount) || byName(a, b))
-  }, [allClasses, classSortMode])
-
+export default function DrugsBrowseSection() {
+  const navigate = useNavigate()
   const title = <span style={SECTION_TITLE_STYLE}>Browse drugs</span>
 
-  let body = null
-  if (loading && !hasDrugs) {
-    body = <DrugsSkeleton />
-  } else if (!loading && !hasDrugs && error) {
-    body = <LibraryErrorState onRetry={onRetry} />
-  } else if (!loading) {
-    body = browseMode === 'class' ? (
-      sortedClasses.length > 0 ? (
-        <ClassSearchResults
-          key="browse-classes"
-          results={{ classes: sortedClasses, subclasses: [] }}
-          countTrailing={
-            <ClassSortButton
-              sortMode={classSortMode}
-              onToggle={() => setClassSortMode(classSortMode === 'relevance' ? 'az' : 'relevance')}
-            />
-          }
-          startExpanded
-          hideKicker
-          onOpenClass={onOpenClass}
-          onOpenSubclass={onOpenSubclass}
-        />
-      ) : (
-        <div style={{ fontSize: 13, color: 'var(--color-text-tertiary)', padding: 'var(--space-4) 0' }}>
-          No classes to show yet.
-        </div>
-      )
-    ) : (
-      // Single column while no category has drugs yet, so 'All Drugs' fills
-      // the row instead of sitting next to an empty slot (2026-08-31 note in
-      // DrugsScreen.jsx). It goes back to two columns by itself the moment
-      // there are real categories.
-      <div style={{ display: 'grid', gridTemplateColumns: categories.length === 0 ? '1fr' : 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }}>
-        <CategoryRow
-          label="All Drugs"
-          iconType="lucide"
-          iconValue="Pill"
-          color={allDrugsColors.bg}
-          textColor={allDrugsColors.fg}
-          onTap={() => onOpenCategory('all')}
-        />
-        {categories.map(cat => {
-          const iconType  = cat.icon_type || 'lucide'
-          const iconValue = iconType === 'custom' ? (cat.icon_url || '') : (cat.icon_name || 'Pill')
-          const colors    = resolveToken(cat.color_token || FALLBACK_TOKEN, isDark)
-          return (
-            <CategoryRow
-              key={cat.id}
-              label={cat.name_en}
-              iconType={iconType}
-              iconValue={iconValue}
-              color={colors.bg}
-              textColor={colors.fg}
-              onTap={() => onOpenCategory(cat.slug)}
-            />
-          )
-        })}
-      </div>
-    )
-  }
-
   return (
-    <>
-      <DrugsSectionCard
-        label="Browse"
-        title={title}
-        trailing={
-          <ModeButton
-            icon={currentOption.icon}
-            label={currentOption.label}
-            color={currentOption.color}
-            tint={currentOption.tint}
-            onPress={() => setMenuOpen(true)}
+    <DrugsSectionCard label="Browse" title={title}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+        {BUTTONS.map(b => (
+          <BrowseButton
+            key={b.key}
+            label={b.label}
+            subtitle={b.subtitle}
+            icon={b.icon}
+            color={b.color}
+            tint={b.tint}
+            onTap={() => navigate(b.route)}
           />
-        }
-      >
-        {body}
-      </DrugsSectionCard>
-
-      {menuOpen && (
-        <FilterModal
-          onPage
-          title="Browse by"
-          titleIcon={Compass}
-          columns={1}
-          single
-          large
-          options={BROWSE_OPTIONS}
-          selected={[browseMode]}
-          onPick={handlePick}
-          onClose={() => setMenuOpen(false)}
-        />
-      )}
-    </>
+        ))}
+      </div>
+    </DrugsSectionCard>
   )
 }
