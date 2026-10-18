@@ -1,5 +1,11 @@
 /**
  * src/pages/DrugsScreen.jsx
+ *
+ * 2026-10-18 (search screen tidy-up, Omar): the 'From your recent searches'
+ * hints above the results are gone while typing (the history list shown
+ * before typing is unchanged), and 'Keep typing to narrow these results' is
+ * now part of the count line ('166 drugs for "Na" · type more to narrow').
+ *
  * Phase 2I — adds fuzzy search + autocomplete dropdown.
  * 1A.5 — swapped the static DRUG_CATEGORIES/getCategoryMeta pair for the
  *        live useCategories() hook. Category matching keys off the
@@ -309,7 +315,7 @@ import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { SpecialtyIcon, useIsDark } from '../utils/specialtyIcon'
 import { ROUTES } from '../router'
 import { useBackClose } from '../hooks/useBackClose'
-import { useSearchHistory, matchingSearches } from '../hooks/useSearchHistory'
+import { useSearchHistory } from '../hooks/useSearchHistory'
 import SearchHistoryList from '../components/drugs/home/SearchHistoryList'
 
 // ─── applyFilters ─────────────────────────────────────────────────────────────
@@ -716,10 +722,6 @@ export default function DrugsScreen() {
     }
     handleDrugTap(drug)
   }
-  const typingHints = useMemo(
-    () => (searchOpen && hasQuery ? matchingSearches(history, query, mode) : []),
-    [searchOpen, hasQuery, history, query, mode]
-  )
 
   // Fade while typing (reworked 2026-10-15): only real result cards fade, and only once the
   // search has been waiting a moment (120ms), gently; they stay tappable. Hints, empty
@@ -948,6 +950,9 @@ export default function DrugsScreen() {
                   above), leaving the category name with nowhere else
                   to show. */}
               {hasQuery && activeCategory && activeCategory !== '__all' && ` in ${categoryLabel}`}
+              {/* 2026-10-18 (Omar): the old separate 'Keep typing to narrow these
+                  results' line is folded into the count line, only past 100. */}
+              {displayed.length > 100 && ' · type more to narrow'}
             </div>
             )}
 
@@ -957,9 +962,6 @@ export default function DrugsScreen() {
                 search, so Sort is not offered there. 2026-10-05 (second
                 pass): also hidden when the search finds nothing (or a filter
                 hides everything), since there is no list to sort. */}
-            {/* 'Keep typing to narrow these results' sits right above the
-                Sort By button, and only shows for a list past 100. */}
-            {hasQuery && displayed.length > 100 && <NarrowResultsHint />}
             {hasQuery && displayed.length > 0 && (
               <div style={{ display: 'flex', justifyContent: 'flex-start', marginBottom: 'var(--space-2)' }}>
                 <SortByButton
@@ -1193,19 +1195,6 @@ export default function DrugsScreen() {
           </FadeIn>
         ) : (
           <>
-            {/* Past-search hints sit only above real result cards, never with the mode-switch,
-                'Did you mean', empty, filter or 'Keep typing' states. */}
-            {typingHints.length > 0 && cardsShowing && !queryTooShort && !resultsNotReady && !modeSwitching && (
-              <div style={{ marginBottom: 'var(--space-3)' }}>
-                <SearchHistoryList
-                  heading="From your recent searches"
-                  history={typingHints}
-                  onPick={handlePickHistory}
-                  showClear={false}
-                  showRemove={false}
-                />
-              </div>
-            )}
             {body}
           </>
         )}
@@ -2006,19 +1995,6 @@ function TooShortState() {
       <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
         Type at least 2 characters to search
       </div>
-    </div>
-  )
-}
-
-// ─── NarrowResultsHint ─────────────────────────────────────────────────────────
-// Shown above the list only once a result list passes 100 items (drug_search_plan
-// §5 point 4) — the vast majority of searches never get anywhere near this
-// size, so this stays out of the way for typical queries.
-
-function NarrowResultsHint() {
-  return (
-    <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
-      Keep typing to narrow these results
     </div>
   )
 }
