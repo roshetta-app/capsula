@@ -402,6 +402,16 @@ function SortByButton({ label, onPress }) {
 // top (see the layout effect in DrugsScreen).
 let scrollTopOnCategoryOpen = false
 
+// 2026-10-18 (Drugs groups plan, step 1.1): the two things a tapped category
+// does before the address changes, now shared so the new Category page does
+// exactly what the tile on the Drugs home does: start the list at the top and
+// forget the old scroll place. Used by handleOpenCategory below and by
+// DrugCategoriesScreen.jsx.
+export function prepareCategoryOpen(slug) {
+  scrollTopOnCategoryOpen = true
+  drugListMemory.delete(`cat:${slug === 'all' ? '__all' : slug}`)
+}
+
 export default function DrugsScreen() {
   const navigate           = useNavigate()
   const { categorySlug }   = useParams()
@@ -558,8 +568,7 @@ export default function DrugsScreen() {
 
   // A tapped category tile (or the All Drugs tile, slug 'all').
   function handleOpenCategory(slug) {
-    scrollTopOnCategoryOpen = true
-    drugListMemory.delete(`cat:${slug === 'all' ? '__all' : slug}`)
+    prepareCategoryOpen(slug)
     navigate(ROUTES.DRUGS_CATEGORY(slug))
   }
 
