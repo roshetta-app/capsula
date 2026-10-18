@@ -44,3 +44,20 @@ export const FAVOURITES_CAP_CLASSES = 5
  */
 export const NOTES_CHAR_CAP_FREE = 400
 export const NOTES_CHAR_CAP_PRO = 2000
+
+/**
+ * 2026-10-18 (Drug groups plan, step 3.1) — Drug groups.
+ *
+ * DRUG_GROUPS_ENABLED is the one switch for everything about groups in the
+ * app. It stays false until release (plan step 9.6), so group screens can
+ * be built and pushed without users ever seeing them.
+ *
+ * Caps mirror the database rules (plan section 6.1): the database refuses
+ * a 2nd group / 21st drug on a free account and a 101st group / 51st drug
+ * on a Pro account. Keep these numbers in step with the database.
+ */
+export const DRUG_GROUPS_ENABLED = false
+export const DRUG_GROUPS_CAP_FREE = 1
+export const DRUG_GROUP_DRUGS_CAP_FREE = 20
+export const DRUG_GROUPS_CAP_PRO = 100
+export const DRUG_GROUP_DRUGS_CAP_PRO = 50

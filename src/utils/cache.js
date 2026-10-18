@@ -320,9 +320,15 @@ export function writeIconCache(url, svg) {
 // 'note-photos' store above. IDB_VERSION bumped 5 -> 6; every other store and
 // its data is untouched by this bump.
 
+// 2026-10-18 (Drug groups plan, step 3.2): added a seventh store,
+// 'drug-groups', holding one saved copy of a signed-in user's groups (keyed
+// 'groups:<user id>') so the groups still show offline. IDB_VERSION bumped
+// 6 -> 7; the upgrade only creates the missing store, so every other store
+// and its data is untouched.
+
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 6
-const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures']
+const IDB_VERSION = 7
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures', 'drug-groups']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
@@ -332,6 +338,7 @@ const PHOTOS_STORE     = 'photos'
 const PENDING_NOTE_PHOTOS_STORE = 'pending-note-photos'
 const NOTE_PHOTOS_STORE = 'note-photos'
 const DRUG_PICTURES_STORE = 'drug-pictures'
+const DRUG_GROUPS_STORE = 'drug-groups'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -899,6 +906,72 @@ export async function getDrugPictureAddress(drugId) {
   } catch (err) {
     logCrash(err, 'utils/cache.js: getDrugPictureAddress')
     return undefined
+  } finally {
+    db?.close()
+  }
+}
+
+// ── Drug groups saved copy (2026-10-18, plan step 3.2) ──────────────────────
+// One record per signed-in user: { data, savedAt }. 'data' is whatever the
+// groups hook hands over (groups and their drugs). Every function here fails
+// quietly (reports to the crash log), like the drug-picture functions above.
+
+function drugGroupsKey(userId) {
+  return `groups:${userId}`
+}
+
+export async function writeGroupsCache(userId, data) {
+  if (!userId) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_GROUPS_STORE, 'readwrite')
+      tx.objectStore(DRUG_GROUPS_STORE).put({ data, savedAt: new Date().toISOString() }, drugGroupsKey(userId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: writeGroupsCache')
+  } finally {
+    db?.close()
+  }
+}
+
+/** Returns { data, savedAt } or null when nothing is saved for this user. */
+export async function readGroupsCache(userId) {
+  if (!userId) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    const rec = await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_GROUPS_STORE, 'readonly')
+      const req = tx.objectStore(DRUG_GROUPS_STORE).get(drugGroupsKey(userId))
+      req.onsuccess = () => resolve(req.result)
+      req.onerror   = () => reject(req.error)
+    })
+    return rec ?? null
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readGroupsCache')
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+export async function clearGroupsCache(userId) {
+  if (!userId) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_GROUPS_STORE, 'readwrite')
+      tx.objectStore(DRUG_GROUPS_STORE).delete(drugGroupsKey(userId))
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: clearGroupsCache')
   } finally {
     db?.close()
   }
