@@ -9,9 +9,13 @@
  *
  * Layout (Omar, after phone tests, option B): ONE horizontal strip, no text
  * labels. Picture on the left, the Arabic name next to it (right-to-left, 2
- * lines at most, the letters shrink from 16 px down to 12 px until the name
- * fits, and only at 12 px does a very long name get cut with dots), and the
- * price button as a side block at the right end.
+ * lines at most) and the price button as a side block at the right end.
+ * The Arabic name is split in two: the trade name on the first line, the rest
+ * (strength and pack) on the second, smaller and in a lighter colour. Both
+ * lines stay on one line each; the letters shrink (16 px down to 12 px for the
+ * trade name, 3 px smaller for the second line, never below 11 px) until both
+ * fit, and only then is a very long line cut with dots. When there is no
+ * second part, the trade name alone may wrap onto 2 lines, shrinking the same way.
  * No Arabic name: the name area is dropped and the price button stretches
  * across the rest of the strip. No generic name or other wording fills the gap.
  *
@@ -35,7 +39,7 @@ import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
-import { formatArabicFullName } from '../../utils/arabicName'
+import { splitArabicName } from '../../utils/arabicName'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
@@ -44,6 +48,7 @@ const THUMB = 52 // px
 const NAME_MAX = 16 // px, Arabic name size when it is short
 const NAME_MIN = 12 // px, smallest size before a very long name is cut with dots
 const NAME_LINE = 1.45 // line height of the Arabic name
+const REST_MIN = 11 // px, smallest size of the second line (strength and pack)
 const OFFLINE_PICTURE_MSG = 'Pictures need an internet connection. Connect and try again.'
 const noop = () => {}
 
@@ -57,6 +62,7 @@ export default function DrugMediaStrip({ drug }) {
   const [viewerOpen, setViewerOpen] = useState(false)
   const boxRef = useRef(null)
   const nameRef = useRef(null)
+  const restRef = useRef(null)
 
   useEffect(() => {
     if (!isOnline) return undefined
@@ -77,20 +83,39 @@ export default function DrugMediaStrip({ drug }) {
     return () => clearTimeout(t)
   }, [picture, imgState, isOnline])
 
-  const arabicFull = formatArabicFullName(drug.nameAr, drug.nameArFull)
+  const { brand: arabicBrand, rest: arabicRest } = splitArabicName(drug.nameAr, drug.nameArFull)
   const viewerTitle = [
     toTitleCase(drug.tradenameClean),
     getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS }),
   ].filter(Boolean).join(' ')
 
-  // Largest size (16 down to 12 px) at which the Arabic name fits in 2 lines.
-  // All sizing is written straight onto the element so a re-render never
-  // undoes it; it re-runs when the name changes or the strip changes width.
+  // Picks the largest letter size that fits. Two parts: each on its own single
+  // line (trade name 16 down to 12 px, second line 3 px smaller, min 11 px).
+  // One part only: up to 2 wrapped lines. All sizing is written straight onto
+  // the elements so a re-render never undoes it; it re-runs when the name
+  // changes or the strip changes width.
   useLayoutEffect(() => {
     const box = boxRef.current
     const el = nameRef.current
+    const sub = restRef.current
     if (!box || !el) return undefined
     const fit = () => {
+      if (sub) {
+        el.style.whiteSpace = 'nowrap'
+        el.style.display = 'block'
+        el.style.webkitLineClamp = ''
+        el.style.maxHeight = ''
+        let size = NAME_MAX
+        for (; size > NAME_MIN; size -= 1) {
+          el.style.fontSize = `${size}px`
+          sub.style.fontSize = `${Math.max(REST_MIN, size - 3)}px`
+          if (el.scrollWidth <= el.clientWidth && sub.scrollWidth <= sub.clientWidth) break
+        }
+        el.style.fontSize = `${size}px`
+        sub.style.fontSize = `${Math.max(REST_MIN, size - 3)}px`
+        return
+      }
+      el.style.whiteSpace = ''
       el.style.display = 'block'
       el.style.webkitLineClamp = ''
       el.style.maxHeight = 'none'
@@ -112,7 +137,7 @@ export default function DrugMediaStrip({ drug }) {
     const ro = new ResizeObserver(fit)
     ro.observe(box)
     return () => ro.disconnect()
-  }, [arabicFull])
+  }, [arabicBrand, arabicRest])
 
   const lookingUp = picture === undefined && isOnline
   const showImage = isOnline && typeof picture === 'string' && imgState !== 'error'
@@ -213,7 +238,7 @@ export default function DrugMediaStrip({ drug }) {
           )}
         </button>
 
-        {arabicFull ? (
+        {arabicBrand ? (
           <>
             <div ref={boxRef} style={{ flex: 1, minWidth: 0 }}>
               <div
@@ -222,11 +247,26 @@ export default function DrugMediaStrip({ drug }) {
                 lang="ar"
                 style={{
                   textAlign: 'right', fontWeight: 500, lineHeight: NAME_LINE,
-                  color: 'var(--color-text-primary)', overflowWrap: 'anywhere', overflow: 'hidden',
+                  color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
                 }}
               >
-                {arabicFull}
+                {arabicBrand}
               </div>
+              {arabicRest && (
+                <div
+                  ref={restRef}
+                  dir="rtl"
+                  lang="ar"
+                  style={{
+                    textAlign: 'right', fontWeight: 400, lineHeight: 1.4,
+                    color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  {arabicRest}
+                </div>
+              )}
             </div>
             <CheckPriceButton drug={drug} />
           </>

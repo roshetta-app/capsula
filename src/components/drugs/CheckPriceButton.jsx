@@ -68,7 +68,7 @@
  * the right end of the strip. Wide: the same button stretched across the rest of
  * the strip, labelled 'Check price', used when the drug has no Arabic name.
  * Offline and still-loading both just dim the button; offline taps show the
- * same short message as before.
+ * same short message as before. The tag icon is the app's accent blue.
  */
 
 import { useEffect, useState } from 'react'
@@ -170,7 +170,7 @@ export default function CheckPriceButton({ drug, wide = false }) {
       style={{ ...common, ...shape }}
     >
       <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'inherit', flexDirection: 'inherit', opacity: live ? 1 : 0.55 }}>
-        <Tag size={wide ? 18 : 20} strokeWidth={1.7} aria-hidden="true" style={{ color: 'var(--color-text-secondary)' }} />
+        <Tag size={wide ? 18 : 20} strokeWidth={1.7} aria-hidden="true" style={{ color: 'var(--color-accent)' }} />
         <span style={{ lineHeight: 1.2, whiteSpace: 'nowrap' }}>{wide ? 'Check price' : 'Price'}</span>
       </span>
     </button>
