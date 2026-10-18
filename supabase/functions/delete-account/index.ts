@@ -40,7 +40,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // Tables confirmed (2026-08-23 schema check) to hold rows keyed to a user,
 // each via a `user_id` column. profiles is handled separately below since
 // it's keyed by `id`, not `user_id`.
-const USER_ID_TABLES = ['favourites', 'notes', 'push_tokens', 'recently_viewed']
+// drug_groups (2026-10-18, Drugs groups plan step 2.5): a person's groups. Their drugs
+// (drug_group_items) and share links (drug_group_shares) are removed with them
+// automatically, so only drug_groups needs listing here.
+const USER_ID_TABLES = ['favourites', 'notes', 'push_tokens', 'recently_viewed', 'drug_groups']
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
