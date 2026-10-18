@@ -8,8 +8,9 @@
  * D25 (price and picture icons in the header) and keeps D24 (offline).
  *
  * Layout (Omar, after phone tests, option B): ONE horizontal strip, no text
- * labels. Picture on the left, the Arabic name next to it (right-to-left, 2
- * lines at most) and the price button as a side block at the right end.
+ * labels. Price button as a side block at the left end, the Arabic name in the
+ * middle (right-to-left, 2 lines at most) and the picture at the right end,
+ * next to where the right-to-left name starts (price and picture swapped, Omar).
  * The Arabic name is split in two: the trade name on the first line, the rest
  * (strength and pack) on the second, smaller and in a lighter colour. Both
  * lines stay on one line each; the letters shrink (16 px down to 12 px for the
@@ -173,6 +174,42 @@ export default function DrugMediaStrip({ drug }) {
         backgroundColor: 'var(--color-surface)',
         padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12,
       }}>
+        {arabicBrand ? (
+          <>
+            <CheckPriceButton drug={drug} />
+            <div ref={boxRef} style={{ flex: 1, minWidth: 0 }}>
+              <div
+                ref={nameRef}
+                dir="rtl"
+                lang="ar"
+                style={{
+                  textAlign: 'right', fontWeight: 500, lineHeight: NAME_LINE,
+                  color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
+                  overflow: 'hidden', textOverflow: 'ellipsis',
+                }}
+              >
+                {arabicBrand}
+              </div>
+              {arabicRest && (
+                <div
+                  ref={restRef}
+                  dir="rtl"
+                  lang="ar"
+                  style={{
+                    textAlign: 'right', fontWeight: 400, lineHeight: 1.4,
+                    color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
+                    overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  {arabicRest}
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <CheckPriceButton drug={drug} wide />
+        )}
+
         <button
           type="button"
           onClick={handleThumbClick}
@@ -237,42 +274,6 @@ export default function DrugMediaStrip({ drug }) {
             </span>
           )}
         </button>
-
-        {arabicBrand ? (
-          <>
-            <div ref={boxRef} style={{ flex: 1, minWidth: 0 }}>
-              <div
-                ref={nameRef}
-                dir="rtl"
-                lang="ar"
-                style={{
-                  textAlign: 'right', fontWeight: 500, lineHeight: NAME_LINE,
-                  color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
-                }}
-              >
-                {arabicBrand}
-              </div>
-              {arabicRest && (
-                <div
-                  ref={restRef}
-                  dir="rtl"
-                  lang="ar"
-                  style={{
-                    textAlign: 'right', fontWeight: 400, lineHeight: 1.4,
-                    color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
-                    overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}
-                >
-                  {arabicRest}
-                </div>
-              )}
-            </div>
-            <CheckPriceButton drug={drug} />
-          </>
-        ) : (
-          <CheckPriceButton drug={drug} wide />
-        )}
       </div>
 
       {viewerOpen && typeof picture === 'string' && (

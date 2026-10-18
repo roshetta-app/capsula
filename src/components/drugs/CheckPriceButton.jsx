@@ -64,8 +64,8 @@
  *
  * 2026-10-18 (Omar, one-strip card): the button no longer has a caption or an
  * EGP badge. It has two shapes, picked by the 'wide' prop. Side block (default):
- * a tag icon over the word 'Price', set off by a thin line on its left, sits at
- * the right end of the strip. Wide: the same button stretched across the rest of
+ * a tag icon over the word 'Price', set off by a thin line on its right, sits at
+ * the left end of the strip (swapped with the picture, Omar). Wide: the same button stretched across the rest of
  * the strip, labelled 'Check price', used when the drug has no Arabic name.
  * Offline and still-loading both just dim the button; offline taps show the
  * same short message as before. The tag icon is the app's accent blue.
@@ -157,8 +157,8 @@ export default function CheckPriceButton({ drug, wide = false }) {
       }
     : {
         flexShrink: 0, alignSelf: 'stretch', width: 60, flexDirection: 'column', gap: 2,
-        fontSize: 12, padding: '0 0 0 12px', marginLeft: -2,
-        border: 'none', borderLeft: '1px solid var(--color-border)', borderRadius: 0,
+        fontSize: 12, padding: '0 12px 0 0', marginRight: -2,
+        border: 'none', borderRight: '1px solid var(--color-border)', borderRadius: 0,
         backgroundColor: 'transparent',
       }
 
