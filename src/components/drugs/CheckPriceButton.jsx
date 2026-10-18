@@ -99,7 +99,7 @@ function withPriceCardHash(url) {
 
 const OFFLINE_PRICE_MSG = 'Checking the price needs an internet connection. Connect and try again.'
 
-export default function CheckPriceButton({ drug }) {
+export default function CheckPriceButton({ drug, fullWidth = false }) {
   // 2026-10-17 (Omar): offline, the button stays visible but dimmed; a tap
   // shows a short message instead of opening anything.
   const { isOnline } = useOnlineStatus()
@@ -138,7 +138,8 @@ export default function CheckPriceButton({ drug }) {
       onClick={handleClick}
       aria-label="Check price"
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        width: fullWidth ? '100%' : undefined,
         padding: '7px 14px', borderRadius: 999, cursor: ready && isOnline ? 'pointer' : 'default',
         border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
         color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500, lineHeight: 1.2,

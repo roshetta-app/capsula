@@ -28,7 +28,7 @@ import { formatArabicFullName } from '../../utils/arabicName'
 import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
 
-const THUMB = 96 // px
+const THUMB = 72 // px
 const OFFLINE_PICTURE_MSG = 'Pictures need an internet connection. Connect and try again.'
 const noop = () => {}
 
@@ -40,12 +40,6 @@ export default function DrugMediaStrip({ drug }) {
   const [picture, setPicture] = useState(undefined)
   const [imgState, setImgState] = useState('loading') // loading | loaded | error
   const [viewerOpen, setViewerOpen] = useState(false)
-
-  useEffect(() => {
-    setPicture(undefined)
-    setImgState('loading')
-    setViewerOpen(false)
-  }, [drug.id])
 
   useEffect(() => {
     if (!isOnline) return undefined
@@ -90,15 +84,19 @@ export default function DrugMediaStrip({ drug }) {
 
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+        padding: 8, marginTop: -12, marginBottom: 'var(--space-4)',
+        borderRadius: 16, border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-surface)',
+      }}>
         <button
           type="button"
           onClick={handleThumbClick}
           aria-label={showLoadedImage ? `Open picture of ${drug.tradenameClean}` : `Search pictures of ${drug.tradenameClean}`}
           style={{
             position: 'relative', width: THUMB, height: THUMB, flexShrink: 0, padding: 0,
-            borderRadius: 12, overflow: 'hidden', cursor: 'pointer',
-            border: '1px solid var(--color-border)',
+            borderRadius: 10, overflow: 'hidden', cursor: 'pointer', border: 'none',
             backgroundColor: showImage ? '#fff' : 'var(--color-surface-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
@@ -143,24 +141,26 @@ export default function DrugMediaStrip({ drug }) {
 
         <div style={{
           flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
-          justifyContent: arabicFull ? 'space-between' : 'center', gap: 'var(--space-3)',
+          justifyContent: 'center', gap: 6,
         }}>
-          {arabicFull && (
+          {arabicFull ? (
             <div
               dir="rtl"
               lang="ar"
               style={{
-                fontSize: 15, fontWeight: 500, lineHeight: 1.55, textAlign: 'right',
+                fontSize: 14, fontWeight: 500, lineHeight: 1.45, textAlign: 'right',
                 color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
-                display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
               }}
             >
               {arabicFull}
             </div>
+          ) : (
+            <div style={{ fontSize: 12, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
+              Latest price on DawaaGate
+            </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <CheckPriceButton drug={drug} />
-          </div>
+          <CheckPriceButton drug={drug} fullWidth />
         </div>
       </div>
 

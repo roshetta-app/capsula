@@ -1,11 +1,11 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
- * 2026-10-18 (header tidy-up, Omar): the header is now Back + category and the
- * Heart (top row), the brand name, and the strength line. The Share stub (it
- * did nothing), the picture and price icons and the Arabic name moved out; the
- * picture, Arabic name and price button now live in DrugMediaStrip.jsx, above
- * the first section, and scroll away with the page.
+ * 2026-10-18 (header tidy-up, Omar): the header is now Back + category and
+ * Share + Heart (top row), the brand name, and the strength line. Share copies
+ * a short message with the drug's page link (utils/shareDrugLink.js). The
+ * picture and price icons and the Arabic name moved out; they now live in
+ * DrugMediaStrip.jsx, above the first section, and scroll away with the page.
  *
  * 2026-10-17 (image icon, Omar; DawaaGate gave full permission to use their
  * drug pictures): for a drug whose DawaaGate page has a picture, the image
@@ -186,7 +186,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Heart } from 'lucide-react'
+import { ArrowLeft, Share2, Heart } from 'lucide-react'
+import { useToast } from '../../context/ToastContext'
+import { buildDrugShareText, copyText } from '../../utils/shareDrugLink'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
@@ -269,10 +271,17 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // (a standard "back out" cubic-bezier), not from the scale value
   // itself overshooting 1 — scale target is just 1, the curve does the
   // bounce on the way there.
+  const { toast } = useToast()
   const [popped, setPopped] = useState(false)
   const popTimeoutRef = useRef(null)
 
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
+
+  async function handleShare() {
+    const ok = await copyText(buildDrugShareText(drug))
+    if (ok) toast.success('Link copied. Paste it in any chat.')
+    else toast.error('Could not copy the link. Try again.')
+  }
 
   function handleToggleFav() {
     onToggleFav()
@@ -398,6 +407,18 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <button
+              onClick={handleShare}
+              aria-label="Copy link to this drug"
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                color: 'var(--color-text-primary)',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Share2 size={20} strokeWidth={2} />
+            </button>
+
             <button
               onClick={handleToggleFav}
               aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
