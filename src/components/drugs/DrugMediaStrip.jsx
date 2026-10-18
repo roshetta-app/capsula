@@ -16,19 +16,21 @@
  * across the rest of the strip. No generic name or other wording fills the gap.
  *
  * Picture, every case:
- *   - looking up / loading : soft pulsing placeholder
- *   - picture and online   : small preview; tap opens the full-screen viewer,
- *                            titled with the drug's full title
+ *   - looking up / loading : picture icon, dimmed and pulsing
+ *   - picture and online   : small preview on a blurred copy of itself (so
+ *                            pictures of any shape fill the square); tap opens
+ *                            the full-screen viewer, titled with the drug's
+ *                            full title
  *   - preview file fails (or takes over 8 s) / no picture address:
- *                            pill tile with a small search badge;
+ *                            picture icon with a small magnifier badge;
  *                            tap opens Google Images
- *   - offline              : dimmed no-picture tile; tap shows a message
+ *   - offline              : dimmed crossed-out picture icon; tap shows a message
  * The picture address comes from the database function brand_image_url
  * (unchanged); it returns nothing while the DawaaGate fallback switch is on.
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Pill, Search, ImageOff } from 'lucide-react'
+import { Image as ImageIcon, Search, ImageOff } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -130,11 +132,11 @@ export default function DrugMediaStrip({ drug }) {
   let placeholder = null
   if (!showLoadedImage) {
     if (offline) {
-      placeholder = { icon: <ImageOff size={20} strokeWidth={1.6} />, dim: true }
+      placeholder = { icon: <ImageOff size={22} strokeWidth={1.6} />, dim: true }
     } else if (lookingUp || (showImage && imgState === 'loading')) {
-      placeholder = { icon: <Pill size={20} strokeWidth={1.6} />, dim: true, pulse: true }
+      placeholder = { icon: <ImageIcon size={22} strokeWidth={1.6} />, dim: true, pulse: true }
     } else {
-      placeholder = { icon: <Pill size={20} strokeWidth={1.6} />, dim: false, searchBadge: true }
+      placeholder = { icon: <ImageIcon size={22} strokeWidth={1.6} />, dim: false, searchBadge: true }
     }
   }
 
@@ -154,11 +156,23 @@ export default function DrugMediaStrip({ drug }) {
             position: 'relative', width: THUMB, height: THUMB, flexShrink: 0, padding: 0,
             boxSizing: 'border-box', cursor: 'pointer', borderRadius: 12, overflow: 'hidden',
             border: '1px solid var(--color-border)',
-            backgroundColor: showImage ? '#fff' : 'var(--color-surface-muted)',
+            backgroundColor: 'var(--color-surface-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
           }}
         >
+          {showLoadedImage && (
+            <img
+              src={picture}
+              alt=""
+              aria-hidden="true"
+              style={{
+                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                objectFit: 'cover', filter: 'blur(10px)', transform: 'scale(1.4)',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
           {showImage && (
             <img
               src={picture}
@@ -168,7 +182,7 @@ export default function DrugMediaStrip({ drug }) {
               style={{
                 width: '100%', height: '100%', objectFit: 'contain',
                 opacity: imgState === 'loaded' ? 1 : 0,
-                position: imgState === 'loaded' ? 'static' : 'absolute',
+                position: imgState === 'loaded' ? 'relative' : 'absolute',
               }}
             />
           )}
