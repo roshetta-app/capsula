@@ -249,7 +249,9 @@
  * The counts come from useDrugSearch ('classHint'); Class mode itself is
  * unchanged.
  *
- * 2026-10-18 (Omar): that strip is now solid (page colour), no gradient fade.
+ * 2026-10-18 (Omar): that strip is now solid (page colour), no gradient fade. It is the
+ * sticky Search area's own bottom space, not an overlay, so it cannot hide the count line or
+ * the Class hint strip.
  * 2026-10-15 (search focus mode, refinements): (1) a soft fade strip sits under the sticky
  * Search card so results fade out below it instead of running up to its edge; (2) a single
  * 'Did you mean' guess is drawn like several (wide row); (3) the no-result cards (Did you
@@ -1140,7 +1142,10 @@ export default function DrugsScreen() {
           zIndex:          searchOpen ? 40 : 'auto',
           backgroundColor: searchOpen ? 'var(--color-bg)' : 'transparent',
           paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 16px)' : 0,
-          paddingBottom:   searchOpen ? 8 : 0,
+          // Solid band under the Search card (2026-10-18, Omar): results scroll
+          // behind this padding, which is drawn in the page colour, so it is solid
+          // and, being real space, never covers the first line of results.
+          paddingBottom:   searchOpen ? 20 : 0,
           transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease',
         }}>
         <DrugsSearchSection
@@ -1167,19 +1172,6 @@ export default function DrugsScreen() {
           categories={categories}
           isDark={isDark}
         />
-        {/* Buffer strip: a solid band just under the Search card so results scroll
-            behind it with a clean edge instead of running up to the card
-            (2026-10-18, Omar: solid, no gradient). */}
-        {searchOpen && (
-          <div
-            aria-hidden="true"
-            style={{
-              position: 'absolute', left: 0, right: 0, top: '100%', height: 18,
-              pointerEvents: 'none',
-              background: 'var(--color-bg)',
-            }}
-          />
-        )}
         </div>
 
         {searchOpen && !hasQuery ? (
