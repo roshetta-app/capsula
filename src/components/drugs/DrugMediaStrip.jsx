@@ -12,11 +12,13 @@
  * middle (right-to-left, 2 lines at most) and the picture at the right end,
  * next to where the right-to-left name starts (price and picture swapped, Omar).
  * The Arabic name is split in two: the trade name on the first line, the rest
- * (strength and pack) on the second, smaller and in a lighter colour. Both
- * lines stay on one line each; the letters shrink (16 px down to 12 px for the
- * trade name, 3 px smaller for the second line, never below 11 px) until both
- * fit, and only then is a very long line cut with dots. When there is no
- * second part, the trade name alone may wrap onto 2 lines, shrinking the same way.
+ * (strength and pack) on the second, smaller and in a lighter colour. Each
+ * stays on one line while it can: the letters shrink (16 px down to 12 px for
+ * the trade name, 3 px smaller for the second line, never below 11 px) until
+ * both fit. A name too long even then is NEVER cut with dots: it wraps onto as
+ * many lines as it needs and the strip grows taller (Omar, option B), so the
+ * full name is always readable. With no second part, the trade name alone
+ * shrinks to fit 2 lines, then wraps further the same way.
  * No Arabic name: the name area is dropped and the price button stretches
  * across the rest of the strip. No generic name or other wording fills the gap.
  *
@@ -90,22 +92,24 @@ export default function DrugMediaStrip({ drug }) {
     getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS }),
   ].filter(Boolean).join(' ')
 
-  // Picks the largest letter size that fits. Two parts: each on its own single
-  // line (trade name 16 down to 12 px, second line 3 px smaller, min 11 px).
-  // One part only: up to 2 wrapped lines. All sizing is written straight onto
-  // the elements so a re-render never undoes it; it re-runs when the name
-  // changes or the strip changes width.
+  // Picks the largest letter size at which the name fits on single lines
+  // (trade name 16 down to 12 px, second line 3 px smaller, min 11 px; with no
+  // second part, up to 2 lines). A name that still does not fit at the smallest
+  // size is never cut: its lines wrap onto as many lines as it needs and the
+  // strip grows taller. All sizing is written straight onto the elements so a
+  // re-render never undoes it; it re-runs when the name changes or the strip
+  // changes width.
   useLayoutEffect(() => {
     const box = boxRef.current
     const el = nameRef.current
     const sub = restRef.current
     if (!box || !el) return undefined
+    let lastWidth = -1
     const fit = () => {
+      lastWidth = box.clientWidth
       if (sub) {
         el.style.whiteSpace = 'nowrap'
-        el.style.display = 'block'
-        el.style.webkitLineClamp = ''
-        el.style.maxHeight = ''
+        sub.style.whiteSpace = 'nowrap'
         let size = NAME_MAX
         for (; size > NAME_MIN; size -= 1) {
           el.style.fontSize = `${size}px`
@@ -114,28 +118,25 @@ export default function DrugMediaStrip({ drug }) {
         }
         el.style.fontSize = `${size}px`
         sub.style.fontSize = `${Math.max(REST_MIN, size - 3)}px`
+        if (el.scrollWidth > el.clientWidth || sub.scrollWidth > sub.clientWidth) {
+          el.style.whiteSpace = 'normal'
+          sub.style.whiteSpace = 'normal'
+        }
         return
       }
-      el.style.whiteSpace = ''
-      el.style.display = 'block'
-      el.style.webkitLineClamp = ''
-      el.style.maxHeight = 'none'
+      el.style.whiteSpace = 'normal'
       let size = NAME_MAX
       for (; size > NAME_MIN; size -= 1) {
         el.style.fontSize = `${size}px`
         if (el.scrollHeight <= size * NAME_LINE * 2 + 1) break
       }
       el.style.fontSize = `${size}px`
-      el.style.maxHeight = `${Math.ceil(size * NAME_LINE * 2)}px`
-      if (el.scrollHeight > size * NAME_LINE * 2 + 1) {
-        el.style.display = '-webkit-box'
-        el.style.webkitBoxOrient = 'vertical'
-        el.style.webkitLineClamp = '2'
-      }
     }
     fit()
     if (typeof ResizeObserver === 'undefined') return undefined
-    const ro = new ResizeObserver(fit)
+    const ro = new ResizeObserver(() => {
+      if (box.clientWidth !== lastWidth) fit()
+    })
     ro.observe(box)
     return () => ro.disconnect()
   }, [arabicBrand, arabicRest])
@@ -185,7 +186,6 @@ export default function DrugMediaStrip({ drug }) {
                 style={{
                   textAlign: 'right', fontWeight: 500, lineHeight: NAME_LINE,
                   color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
-                  overflow: 'hidden', textOverflow: 'ellipsis',
                 }}
               >
                 {arabicBrand}
@@ -197,8 +197,7 @@ export default function DrugMediaStrip({ drug }) {
                   lang="ar"
                   style={{
                     textAlign: 'right', fontWeight: 400, lineHeight: 1.4,
-                    color: 'var(--color-text-secondary)', whiteSpace: 'nowrap',
-                    overflow: 'hidden', textOverflow: 'ellipsis',
+                    color: 'var(--color-text-secondary)', overflowWrap: 'anywhere',
                   }}
                 >
                   {arabicRest}
