@@ -310,9 +310,19 @@ export function writeIconCache(url, svg) {
 // the next time they open the app; every other store and its data is
 // untouched by this bump.
 
+// 2026-10-18 (drug picture offline, Omar): added a sixth store,
+// 'drug-pictures', so the picture strip on a drug page still shows a picture
+// that was opened before when the phone is offline. It holds two kinds of
+// entry: the picture file itself (a Blob, keyed by its web address, like
+// 'photos') and, per drug, the picture address the server gave for it (keyed
+// 'addr:<drug id>'; null means the drug has no picture). Its own store, not
+// 'photos', for the same pruneOrphanedPhotos reason documented on the
+// 'note-photos' store above. IDB_VERSION bumped 5 -> 6; every other store and
+// its data is untouched by this bump.
+
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 5
-const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos']
+const IDB_VERSION = 6
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
@@ -321,6 +331,7 @@ const CONDITIONS_KEY   = 'conditions'
 const PHOTOS_STORE     = 'photos'
 const PENDING_NOTE_PHOTOS_STORE = 'pending-note-photos'
 const NOTE_PHOTOS_STORE = 'note-photos'
+const DRUG_PICTURES_STORE = 'drug-pictures'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -779,6 +790,115 @@ export async function getCachedNotePhoto(url) {
   } catch (err) {
     logCrash(err, 'utils/cache.js: getCachedNotePhoto')
     return null
+  } finally {
+    db?.close()
+  }
+}
+
+// ─── Drug pictures (drug page picture strip) ──────────────────────────────
+//
+// Added 2026-10-18 (drug picture offline, Omar). See the header note on
+// DRUG_PICTURES_STORE above. Every function here fails quietly (reports to
+// the crash log) so a storage problem can never break the drug page.
+
+/** Save one drug picture file, keyed by its web address. */
+export async function saveDrugPicture(url, blob) {
+  if (!url || !blob) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_PICTURES_STORE, 'readwrite')
+      tx.objectStore(DRUG_PICTURES_STORE).put(blob, url)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: saveDrugPicture')
+  } finally {
+    db?.close()
+  }
+}
+
+/** Read one saved drug picture file, or null if none is saved for that address. */
+export async function getCachedDrugPicture(url) {
+  if (!url) return null
+  let db
+  try {
+    db = await openCapsulaDB()
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_PICTURES_STORE, 'readonly')
+      const req = tx.objectStore(DRUG_PICTURES_STORE).get(url)
+      req.onsuccess = () => resolve(req.result ?? null)
+      req.onerror   = () => reject(req.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: getCachedDrugPicture')
+    return null
+  } finally {
+    db?.close()
+  }
+}
+
+/** Delete one saved drug picture file (used when a drug's picture is replaced or removed). */
+export async function deleteDrugPicture(url) {
+  if (!url) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_PICTURES_STORE, 'readwrite')
+      tx.objectStore(DRUG_PICTURES_STORE).delete(url)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: deleteDrugPicture')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Remember the picture address the server gave for a drug (a string), or
+ * that it has none (null).
+ */
+export async function saveDrugPictureAddress(drugId, address) {
+  if (drugId === undefined || drugId === null) return
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_PICTURES_STORE, 'readwrite')
+      tx.objectStore(DRUG_PICTURES_STORE).put(address ?? null, `addr:${drugId}`)
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: saveDrugPictureAddress')
+  } finally {
+    db?.close()
+  }
+}
+
+/**
+ * Read the remembered picture address for a drug: a string (address), null
+ * (the drug has no picture), or undefined (never looked up on this phone).
+ */
+export async function getDrugPictureAddress(drugId) {
+  if (drugId === undefined || drugId === null) return undefined
+  let db
+  try {
+    db = await openCapsulaDB()
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_PICTURES_STORE, 'readonly')
+      const req = tx.objectStore(DRUG_PICTURES_STORE).get(`addr:${drugId}`)
+      req.onsuccess = () => resolve(req.result)
+      req.onerror   = () => reject(req.error)
+    })
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: getDrugPictureAddress')
+    return undefined
   } finally {
     db?.close()
   }

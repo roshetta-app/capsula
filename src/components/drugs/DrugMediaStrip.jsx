@@ -22,6 +22,13 @@
  * No Arabic name: the name area is dropped and the price button stretches
  * across the rest of the strip. No generic name or other wording fills the gap.
  *
+ * 2026-10-18 (drug picture offline, Omar): a picture that was opened before
+ * on this phone still shows when the phone is offline (or goes offline while
+ * the page is open), exactly like online, with no offline icon. The picture
+ * address and the picture file are saved on the phone the first time the
+ * drug is opened online (utils/cache.js, 'drug-pictures'). A drug never
+ * opened online before still shows the crossed-out icon while offline.
+ *
  * Picture, every case:
  *   - looking up / loading : picture icon, dimmed and pulsing
  *   - picture and online   : small preview on a blurred copy of itself (so
@@ -32,7 +39,7 @@
  *   - preview file fails (or takes over 8 s) / no picture address:
  *                            picture icon with a small magnifier badge;
  *                            tap opens Google Images
- *   - offline              : dimmed crossed-out picture icon; tap shows a message
+ *   - offline, nothing saved: dimmed crossed-out picture icon; tap shows a message
  * The picture address comes from the database function brand_image_url
  * (unchanged); it returns nothing while the DawaaGate fallback switch is on.
  */
@@ -42,6 +49,8 @@ import { Image as ImageIcon, Search, ImageOff, ZoomIn } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
+import { useCachedImage } from '../../hooks/useCachedImage'
+import { getDrugPictureAddress, saveDrugPictureAddress, deleteDrugPicture } from '../../utils/cache'
 import { useToast } from '../../context/ToastContext'
 import { usePressed } from '../../hooks/usePressed'
 import { splitArabicName } from '../../utils/arabicName'
@@ -65,10 +74,29 @@ export default function DrugMediaStrip({ drug }) {
   const [picture, setPicture] = useState(undefined)
   const [imgState, setImgState] = useState('loading') // loading | loaded | error
   const [viewerOpen, setViewerOpen] = useState(false)
+  const [addrReady, setAddrReady] = useState(false) // saved address read finished
+  const pictureRef = useRef(undefined) // always the latest picture value
+  const lookedUpRef = useRef(null) // drug id whose address came from the server
+  pictureRef.current = picture
   const { pressed, handlers: pressHandlers } = usePressed()
   const boxRef = useRef(null)
   const nameRef = useRef(null)
   const restRef = useRef(null)
+
+  // Saved address first (works offline, instant), so a picture opened before
+  // shows at once. The server answer below always wins when it arrives.
+  useEffect(() => {
+    let cancelled = false
+    setPicture(undefined)
+    setImgState('loading')
+    setAddrReady(false)
+    getDrugPictureAddress(drug.id).then(saved => {
+      if (cancelled) return
+      if (saved !== undefined && lookedUpRef.current !== drug.id) setPicture(saved)
+      setAddrReady(true)
+    })
+    return () => { cancelled = true }
+  }, [drug.id])
 
   useEffect(() => {
     if (!isOnline) return undefined
@@ -76,18 +104,46 @@ export default function DrugMediaStrip({ drug }) {
     Promise.resolve(supabase.rpc('brand_image_url', { p_brand_id: drug.id }))
       .then(({ data, error }) => {
         if (cancelled) return
-        setPicture(!error && typeof data === 'string' && data ? data : null)
-        setImgState('loading')
+        if (error) {
+          // Keep a saved address if there is one; otherwise treat as no picture.
+          if (pictureRef.current === undefined) setPicture(null)
+          return
+        }
+        const fresh = typeof data === 'string' && data ? data : null
+        const before = pictureRef.current
+        lookedUpRef.current = drug.id
+        if (before !== fresh) {
+          setPicture(fresh)
+          setImgState('loading')
+          // Picture replaced or removed: drop the old saved file.
+          if (typeof before === 'string') deleteDrugPicture(before)
+        }
+        saveDrugPictureAddress(drug.id, fresh)
       })
-      .catch(() => { if (!cancelled) setPicture(null) })
+      .catch(() => { if (!cancelled && pictureRef.current === undefined) setPicture(null) })
     return () => { cancelled = true }
   }, [drug.id, isOnline])
 
+  // Picture file: saved copy first, then network (and a copy is saved).
+  const cachedImg = useCachedImage(typeof picture === 'string' ? picture : undefined, { store: 'drugs' })
+  const imgSrc = typeof picture === 'string' && cachedImg.status === 'ready' ? cachedImg.src : null
+
+  // Back online after a failed offline load: try the picture again.
+  const wasOnlineRef = useRef(isOnline)
   useEffect(() => {
-    if (!isOnline || typeof picture !== 'string' || imgState !== 'loading') return undefined
+    if (isOnline && !wasOnlineRef.current && imgState === 'error' && typeof picture === 'string') {
+      setImgState('loading')
+      cachedImg.retry()
+    }
+    wasOnlineRef.current = isOnline
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnline])
+
+  useEffect(() => {
+    if (typeof picture !== 'string' || imgState !== 'loading') return undefined
     const t = setTimeout(() => setImgState('error'), 8000)
     return () => clearTimeout(t)
-  }, [picture, imgState, isOnline])
+  }, [picture, imgState])
 
   const { brand: arabicBrand, rest: arabicRest } = splitArabicName(drug.nameAr, drug.nameArFull)
   const viewerTitle = [
@@ -144,18 +200,20 @@ export default function DrugMediaStrip({ drug }) {
     return () => ro.disconnect()
   }, [arabicBrand, arabicRest])
 
-  const lookingUp = picture === undefined && isOnline
-  const showImage = isOnline && typeof picture === 'string' && imgState !== 'error'
+  const lookingUp = picture === undefined && (isOnline || !addrReady)
+  const showImage = typeof picture === 'string' && imgState !== 'error'
   const showLoadedImage = showImage && imgState === 'loaded'
-  const offline = !isOnline
+  const loadingNow = lookingUp || (showImage && imgState === 'loading')
+  // Offline state only when there is no picture to show and nothing is loading.
+  const offline = !isOnline && !showLoadedImage && !loadingNow
 
   // Tap feedback only where a tap does something (not while still looking up).
-  const thumbTappable = showLoadedImage || offline || !(lookingUp || (showImage && imgState === 'loading'))
+  const thumbTappable = showLoadedImage || offline || !loadingNow
 
   function handleThumbClick() {
     if (showLoadedImage) { setViewerOpen(true); return }
     if (offline) { toast.info(OFFLINE_PICTURE_MSG); return }
-    if (lookingUp || (showImage && imgState === 'loading')) return
+    if (loadingNow) return
     const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
       .filter(Boolean)
       .join(' ')
@@ -166,7 +224,7 @@ export default function DrugMediaStrip({ drug }) {
   if (!showLoadedImage) {
     if (offline) {
       placeholder = { icon: <ImageOff size={22} strokeWidth={1.6} />, dim: true }
-    } else if (lookingUp || (showImage && imgState === 'loading')) {
+    } else if (loadingNow) {
       placeholder = { icon: <ImageIcon size={22} strokeWidth={1.6} />, dim: true, pulse: true }
     } else {
       placeholder = { icon: <ImageIcon size={22} strokeWidth={1.6} />, dim: false, searchBadge: true }
@@ -237,9 +295,9 @@ export default function DrugMediaStrip({ drug }) {
             transition: 'transform var(--motion-fast) var(--ease-settle)',
           }}
         >
-          {showLoadedImage && (
+          {showLoadedImage && imgSrc && (
             <img
-              src={picture}
+              src={imgSrc}
               alt=""
               aria-hidden="true"
               style={{
@@ -249,9 +307,9 @@ export default function DrugMediaStrip({ drug }) {
               }}
             />
           )}
-          {showImage && (
+          {showImage && imgSrc && (
             <img
-              src={picture}
+              src={imgSrc}
               alt={`${drug.tradenameClean} pack`}
               onLoad={() => setImgState('loaded')}
               onError={() => setImgState('error')}
@@ -296,6 +354,7 @@ export default function DrugMediaStrip({ drug }) {
           activeIndex={0}
           onClose={() => setViewerOpen(false)}
           onGo={noop}
+          imageStore="drugs"
         />
       )}
     </>

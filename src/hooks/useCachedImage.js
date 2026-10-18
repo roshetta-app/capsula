@@ -25,7 +25,7 @@
  *      caller can show ImageLoadError.
  *
  * notes-offline-prefetch (2026-09-05): added an optional second argument,
- * `{ store: 'gallery' | 'notes' }`, defaulting to `'gallery'` — picks which
+ * `{ store: 'gallery' | 'notes' | 'drugs' }`, defaulting to `'gallery'` — picks which
  * on-device store (and matching save function) step 1 and step 2's
  * cache-on-view save target. Every existing call (ImageCarousel.jsx,
  * Lightbox.jsx's gallery use) passes no second argument at all, so they
@@ -37,11 +37,11 @@
  * store in utils/cache.js.
  *
  * @param {string} url — the photo's web address
- * @param {{ store?: 'gallery'|'notes' }} [options]
+ * @param {{ store?: 'gallery'|'notes'|'drugs' }} [options]
  * @returns {{ src: string|null, status: 'loading'|'ready'|'error', retry: () => void }}
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { getCachedPhoto, savePhotoToCache, getCachedNotePhoto, saveNotePhotoToCache } from '../utils/cache'
+import { getCachedPhoto, savePhotoToCache, getCachedNotePhoto, saveNotePhotoToCache, getCachedDrugPicture, saveDrugPicture } from '../utils/cache'
 import { logCrash } from '../utils/crashLogger'
 
 // notes-offline-prefetch: maps the optional `store` option to its matching
@@ -51,6 +51,9 @@ import { logCrash } from '../utils/crashLogger'
 const STORE_FUNCS = {
   gallery: { get: getCachedPhoto,     save: savePhotoToCache },
   notes:   { get: getCachedNotePhoto, save: saveNotePhotoToCache },
+  // 2026-10-18 (drug picture offline): the drug page picture strip and its
+  // full-screen viewer use their own store, never touched by gallery cleanup.
+  drugs:   { get: getCachedDrugPicture, save: saveDrugPicture },
 }
 
 export function useCachedImage(url, { store = 'gallery' } = {}) {
