@@ -12,7 +12,9 @@
  * there is no loading or failed state here any more; those live on the pages.
  *
  * The old props (browseMode, categories, allClasses and the rest) are no
- * longer used. DrugsScreen still passes them until step 1.5 removes them.
+ * longer used. (Step 1.5 removed them from DrugsScreen.)
+ * Blank-screen fix (2026-10-18): the button routes are read when tapped, not
+ * when this file loads, because ROUTES is not ready at load time.
  */
 
 import { useNavigate } from 'react-router-dom'
@@ -20,6 +22,8 @@ import { LayoutGrid, Layers, ChevronRight } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import { ROUTES } from '../../../router'
 
+// 'route' is a function on purpose: this file and router.jsx import each other,
+// so ROUTES does not exist yet while this file loads. It is read at tap time.
 const BUTTONS = [
   {
     key:      'category',
@@ -28,7 +32,7 @@ const BUTTONS = [
     icon:     LayoutGrid,
     color:    'var(--color-accent)',
     tint:     'var(--color-accent-light)',
-    route:    ROUTES.DRUGS_BROWSE_CATEGORY,
+    route:    () => ROUTES.DRUGS_BROWSE_CATEGORY,
   },
   {
     key:      'class',
@@ -37,7 +41,7 @@ const BUTTONS = [
     icon:     Layers,
     color:    'var(--color-class)',
     tint:     'var(--color-class-light)',
-    route:    ROUTES.DRUGS_BROWSE_CLASS,
+    route:    () => ROUTES.DRUGS_BROWSE_CLASS,
   },
 ]
 
@@ -85,7 +89,7 @@ export default function DrugsBrowseSection() {
             icon={b.icon}
             color={b.color}
             tint={b.tint}
-            onTap={() => navigate(b.route)}
+            onTap={() => navigate(b.route())}
           />
         ))}
       </div>
