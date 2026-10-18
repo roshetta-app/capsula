@@ -99,7 +99,7 @@ function withPriceCardHash(url) {
 
 const OFFLINE_PRICE_MSG = 'Checking the price needs an internet connection. Connect and try again.'
 
-export default function CheckPriceButton({ drug, fullWidth = false }) {
+export default function CheckPriceButton({ drug }) {
   // 2026-10-17 (Omar): offline, the button stays visible but dimmed; a tap
   // shows a short message instead of opening anything.
   const { isOnline } = useOnlineStatus()
@@ -132,35 +132,41 @@ export default function CheckPriceButton({ drug, fullWidth = false }) {
     openDawaaGate(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug, true))
   }
 
+  const live = ready && isOnline
+
   return (
     <button
       type="button"
       onClick={handleClick}
       aria-label="Check price"
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        flex: fullWidth ? '1 1 0' : undefined,
-        minWidth: fullWidth ? 0 : undefined,
-        boxSizing: 'border-box',
-        padding: '7px 14px', borderRadius: 999, cursor: ready && isOnline ? 'pointer' : 'default',
-        border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
-        color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500, lineHeight: 1.2,
-        fontFamily: 'var(--font-body)', flexShrink: fullWidth ? 1 : 0,
-        opacity: ready && isOnline ? 1 : 0.45,
+        flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', textAlign: 'left',
+        display: 'flex', alignItems: 'center', gap: 8, padding: 6,
+        borderRadius: 12, border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-surface-muted)',
+        color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+        cursor: live ? 'pointer' : 'default',
         WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
       }}
     >
       <span
         aria-hidden="true"
         style={{
-          fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', padding: '1px 5px',
-          borderRadius: 4, border: '1px solid var(--color-border)',
-          color: 'var(--color-text-secondary)',
+          width: 40, height: 40, flexShrink: 0, borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, fontWeight: 600, letterSpacing: '0.03em',
+          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+          color: 'var(--color-text-secondary)', opacity: live ? 1 : 0.55,
         }}
       >
         EGP
       </span>
-      Check price
+      <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, opacity: live ? 1 : 0.55 }}>
+        <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.2, whiteSpace: 'nowrap' }}>Check price</span>
+        <span style={{ fontSize: 11, lineHeight: 1.2, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {!isOnline ? 'Offline' : ready ? 'Latest price' : 'Loading'}
+        </span>
+      </span>
     </button>
   )
 }

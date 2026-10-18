@@ -8,8 +8,9 @@
  * D25 (price and picture icons in the header) and keeps D24 (offline).
  *
  * Layout: one card. Upper part (only when the drug has an Arabic name) is the
- * Arabic title, then a divider, then the lower part: picture preview on the
- * left and the price button filling the rest. No Arabic name = lower part only.
+ * Arabic title with a small language icon, then a divider, then the lower part:
+ * two equal action tiles, Pictures (small preview inside) and Check price.
+ * No Arabic name = lower part only.
  *
  * Picture, every case:
  *   - looking up / loading : soft pulsing placeholder
@@ -24,7 +25,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Pill, Search, ImageOff } from 'lucide-react'
+import { Pill, Search, ImageOff, Languages } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -34,7 +35,7 @@ import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../
 import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
 
-const THUMB = 72 // px
+const THUMB = 40 // px
 const OFFLINE_PICTURE_MSG = 'Pictures need an internet connection. Connect and try again.'
 const noop = () => {}
 
@@ -87,14 +88,19 @@ export default function DrugMediaStrip({ drug }) {
     openInAppBrowser(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`)
   }
 
+  let pictureSub = 'Pack photo'
+  if (offline) pictureSub = 'Offline'
+  else if (lookingUp || (showImage && imgState === 'loading')) pictureSub = 'Loading'
+  else if (!showLoadedImage) pictureSub = 'Search online'
+
   let placeholder = null
   if (!showLoadedImage) {
     if (offline) {
-      placeholder = { icon: <ImageOff size={28} strokeWidth={1.5} />, dim: true }
+      placeholder = { icon: <ImageOff size={20} strokeWidth={1.6} />, dim: true }
     } else if (lookingUp || (showImage && imgState === 'loading')) {
-      placeholder = { icon: <Pill size={28} strokeWidth={1.5} />, dim: true, pulse: true }
+      placeholder = { icon: <Pill size={20} strokeWidth={1.6} />, dim: true, pulse: true }
     } else {
-      placeholder = { icon: <Pill size={28} strokeWidth={1.5} />, dim: false, searchBadge: true }
+      placeholder = { icon: <Pill size={20} strokeWidth={1.6} />, dim: false, searchBadge: true }
     }
   }
 
@@ -110,73 +116,95 @@ export default function DrugMediaStrip({ drug }) {
             <div
               dir="rtl"
               lang="ar"
-              style={{
-                fontSize: 14, fontWeight: 500, lineHeight: 1.5, textAlign: 'right',
-                color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
-                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-              }}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}
             >
-              {arabicFull}
+              <Languages
+                size={16}
+                strokeWidth={1.8}
+                aria-hidden="true"
+                style={{ flexShrink: 0, marginTop: 4, color: 'var(--color-text-secondary)' }}
+              />
+              <div
+                style={{
+                  flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500, lineHeight: 1.5, textAlign: 'right',
+                  color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
+                  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                }}
+              >
+                {arabicFull}
+              </div>
             </div>
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'stretch', gap: 8, padding: 8 }}>
           <button
             type="button"
             onClick={handleThumbClick}
             aria-label={showLoadedImage ? `Open picture of ${drug.tradenameClean}` : `Search pictures of ${drug.tradenameClean}`}
             style={{
-              position: 'relative', width: THUMB, height: THUMB, flexShrink: 0, padding: 0,
-              borderRadius: 10, overflow: 'hidden', cursor: 'pointer', border: 'none',
-              backgroundColor: showImage ? '#fff' : 'var(--color-surface-muted)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', cursor: 'pointer', textAlign: 'left',
+              display: 'flex', alignItems: 'center', gap: 8, padding: 6,
+              borderRadius: 12, border: '1px solid var(--color-border)',
+              backgroundColor: 'var(--color-surface-muted)',
+              fontFamily: 'var(--font-body)', color: 'var(--color-text-primary)',
               WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
             }}
           >
-            {showImage && (
-              <img
-                src={picture}
-                alt={`${drug.tradenameClean} pack`}
-                onLoad={() => setImgState('loaded')}
-                onError={() => setImgState('error')}
-                style={{
-                  width: '100%', height: '100%', objectFit: 'contain',
-                  opacity: imgState === 'loaded' ? 1 : 0,
-                  position: imgState === 'loaded' ? 'static' : 'absolute',
-                }}
-              />
-            )}
-            {placeholder && (
-            <span
-              className={placeholder.pulse ? 'shimmer' : undefined}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: '100%', height: '100%',
-                color: 'var(--color-text-secondary)',
-                opacity: placeholder.dim ? 0.55 : 1,
-                background: 'none',
-              }}
-            >
-              {placeholder.icon}
+            <span style={{
+              position: 'relative', width: THUMB, height: THUMB, flexShrink: 0, borderRadius: 8, overflow: 'hidden',
+              backgroundColor: showImage ? '#fff' : 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {showImage && (
+                <img
+                  src={picture}
+                  alt={`${drug.tradenameClean} pack`}
+                  onLoad={() => setImgState('loaded')}
+                  onError={() => setImgState('error')}
+                  style={{
+                    width: '100%', height: '100%', objectFit: 'contain',
+                    opacity: imgState === 'loaded' ? 1 : 0,
+                    position: imgState === 'loaded' ? 'static' : 'absolute',
+                  }}
+                />
+              )}
+              {placeholder && (
+                <span
+                  className={placeholder.pulse ? 'shimmer' : undefined}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '100%', height: '100%', color: 'var(--color-text-secondary)',
+                    opacity: placeholder.dim ? 0.55 : 1, background: 'none',
+                  }}
+                >
+                  {placeholder.icon}
+                </span>
+              )}
+              {placeholder?.searchBadge && (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: 'absolute', right: 1, bottom: 1, width: 14, height: 14, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                    color: 'var(--color-text-secondary)',
+                  }}
+                >
+                  <Search size={8} strokeWidth={2.6} />
+                </span>
+              )}
             </span>
-          )}
-          {placeholder?.searchBadge && (
-            <span
-              aria-hidden="true"
-              style={{
-                position: 'absolute', right: 5, bottom: 5, width: 20, height: 20, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              <Search size={11} strokeWidth={2.2} />
+            <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, opacity: offline ? 0.55 : 1 }}>
+              <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.2, whiteSpace: 'nowrap' }}>Pictures</span>
+              <span style={{ fontSize: 11, lineHeight: 1.2, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {pictureSub}
+              </span>
             </span>
-          )}
-        </button>
+          </button>
 
-          <CheckPriceButton drug={drug} fullWidth />
+          <CheckPriceButton drug={drug} />
         </div>
       </div>
 
