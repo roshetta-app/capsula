@@ -139,11 +139,13 @@ export default function CheckPriceButton({ drug, fullWidth = false }) {
       aria-label="Check price"
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        width: fullWidth ? '100%' : undefined,
+        flex: fullWidth ? '1 1 0' : undefined,
+        minWidth: fullWidth ? 0 : undefined,
+        boxSizing: 'border-box',
         padding: '7px 14px', borderRadius: 999, cursor: ready && isOnline ? 'pointer' : 'default',
         border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
         color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500, lineHeight: 1.2,
-        fontFamily: 'var(--font-body)', flexShrink: 0,
+        fontFamily: 'var(--font-body)', flexShrink: fullWidth ? 1 : 0,
         opacity: ready && isOnline ? 1 : 0.45,
         WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
       }}
