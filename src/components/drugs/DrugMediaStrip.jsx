@@ -23,8 +23,8 @@
  *   - looking up / loading : picture icon, dimmed and pulsing
  *   - picture and online   : small preview on a blurred copy of itself (so
  *                            pictures of any shape fill the square); tap opens
- *                            the full-screen viewer, titled with the drug's
- *                            full title
+ *                            the full-screen viewer; the drug's full title is
+ *                            the caption under the picture (no top title)
  *   - preview file fails (or takes over 8 s) / no picture address:
  *                            picture icon with a small magnifier badge;
  *                            tap opens Google Images
@@ -277,11 +277,10 @@ export default function DrugMediaStrip({ drug }) {
 
       {viewerOpen && typeof picture === 'string' && (
         <Lightbox
-          images={[{ id: drug.id, url: picture }]}
+          images={[{ id: drug.id, url: picture, caption: viewerTitle }]}
           activeIndex={0}
           onClose={() => setViewerOpen(false)}
           onGo={noop}
-          title={viewerTitle}
         />
       )}
     </>
