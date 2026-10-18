@@ -12,11 +12,10 @@
  * (banner with Retry), could not load with no saved copy, offline (saved
  * copy plus a line), and the lapsed read-only banner.
  *
- * TEMPORARY until the group editor (Phase 4) and the group page (Phase 6):
- *  - New group creates a ready-made test group (names and colours rotate, one
- *    name is Arabic and one is 40 characters) so the states can be tried.
- *  - Tapping a group offers to delete it.
- * Both are marked below and are replaced by the real screens.
+ * 2026-10-19 (step 4.1): New group and the empty-state Create group button
+ * open the group editor sheet. TEMPORARY until the group page (Phase 6):
+ * tapping a group opens the same sheet to change it. Delete group joins the
+ * sheet at step 4.4.
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -27,6 +26,7 @@ import GroupTile from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
 import GroupStateMessage from './GroupStateMessage'
+import GroupEditorSheet from './GroupEditorSheet'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -38,15 +38,6 @@ import { DRUG_GROUPS_CAP_FREE } from '../../../constants/features'
 const SORT_LABELS = { newest: 'Newest first', az: 'A \u2013 Z' }
 const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
 const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade to edit.'
-
-// TEMPORARY test groups (see the header note).
-const TEST_NAMES = [
-  'ICU drips',
-  '\u0645\u062C\u0645\u0648\u0639\u0629 \u0627\u0644\u0637\u0648\u0627\u0631\u0626',
-  'Very long group name to test two lines',
-  'ER quick list',
-]
-const TEST_COLORS = ['blue', 'teal', 'violet', 'amber', 'rose']
 
 // Same look as the sort button on the Class page: no box, arrow icon, 13px
 // medium text in the secondary colour. Shows the order a tap switches to.
@@ -106,11 +97,12 @@ export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsFromCache, groupsLoadError, isReadOnly,
-    canCreateGroup, reloadGroups, createGroup, deleteGroup, promptSignIn,
+    canCreateGroup, reloadGroups, promptSignIn,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
   const { toast } = useToast()
+  const [editor, setEditor] = useState({ open: false, group: null })
 
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
   useEffect(() => {
@@ -147,8 +139,8 @@ export default function GroupsSection() {
       .slice(0, 3)
   }
 
-  // New group. The message cases are final; the last branch is TEMPORARY.
-  async function handleNewGroup() {
+  // New group: the message cases come first, otherwise the editor opens.
+  function handleNewGroup() {
     if (!user) { promptSignIn('groups', 'new'); return }
     if (!online || groupsFromCache) { toast.info(OFFLINE_MESSAGE); return }
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
@@ -158,16 +150,16 @@ export default function GroupsSection() {
         : 'Free accounts can keep 1 group. Upgrade to Pro for more.')
       return
     }
-    // TEMPORARY (replaced by the group editor in Phase 4).
-    const n = groups.length
-    await createGroup({ name: TEST_NAMES[n % TEST_NAMES.length], color: TEST_COLORS[n % TEST_COLORS.length] })
+    setEditor({ open: true, group: null })
   }
 
-  // TEMPORARY (replaced by the group page in Phase 6).
-  async function handleOpenGroup(g) {
-    if (window.confirm(`Delete "${g.name}"? (Test build only. The group page comes in a later step.)`)) {
-      await deleteGroup(g.id)
-    }
+  // TEMPORARY (the group page replaces this in Phase 6).
+  function handleOpenGroup(g) {
+    setEditor({ open: true, group: g })
+  }
+
+  function closeEditor() {
+    setEditor(e => ({ ...e, open: false }))
   }
 
   const title = <span style={SECTION_TITLE_STYLE}>My drug groups</span>
@@ -247,8 +239,11 @@ export default function GroupsSection() {
   }
 
   return (
-    <DrugsSectionCard label="My drug groups" title={title} trailing={trailing}>
-      {content}
-    </DrugsSectionCard>
+    <>
+      <DrugsSectionCard label="My drug groups" title={title} trailing={trailing}>
+        {content}
+      </DrugsSectionCard>
+      <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} />
+    </>
   )
 }
