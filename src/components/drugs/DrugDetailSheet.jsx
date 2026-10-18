@@ -1,4 +1,4 @@
-import { forwardRef } from 'react'
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from 'react'
 
 /**
  * DrugDetailSheet — the white, rounded content panel for the drug detail
@@ -80,51 +80,72 @@ import { forwardRef } from 'react'
  *
  * Renders whatever section children are passed to it; doesn't know or
  * care what those sections are (that's Phase 1's job).
+ *
+ * 2026-10-18 (rebuilt, Omar: "a little space between the header and the sheet
+ * flickers when changing drug"): the rounded corners, the shadow and the 20 px
+ * cap now live on a STABLE outer box that is never rebuilt; the scroll box sits
+ * inside it, with no rounded corners of its own and no pinned (sticky) strip.
+ * Before, the whole rounded scroll box was thrown away and rebuilt on every
+ * drug change (DrugDetailScreen keyed it by drug id), and its pinned strip
+ * could paint for a moment before the rounded corners were applied, which read
+ * as a flickering gap under the header. Now only the content wrapper is keyed
+ * (so each drug still starts fresh) and the scroll position is reset by hand.
+ * The cap is plain padding above the scroll box, so content still disappears
+ * under a hard line 20 px below the sheet's top edge, exactly as before.
+ * New prop 'resetKey' (pass the drug id) replaces the key the screen used to
+ * put on this component.
  */
-const STRIP_HEIGHT = 20 // px — height of the buffer strip (was 40 — reduced this session, per feedback it read too tall now that it's a solid cap rather than a fade)
 
-const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children }, ref) {
+const CAP_HEIGHT = 20 // px — solid cap above the scroll box (content disappears under its lower edge)
+
+const DrugDetailSheet = forwardRef(function DrugDetailSheet({ children, resetKey }, ref) {
+  const scrollRef = useRef(null)
+  useImperativeHandle(ref, () => scrollRef.current)
+
+  // A different drug starts at the top. Runs before paint so there is never a
+  // frame showing the new drug at the old scroll position.
+  useLayoutEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = 0
+  }, [resetKey])
+
   return (
     <div
-      ref={ref}
       style={{
         flex: 1,
         minHeight: 0, // lets this flex child actually shrink and scroll instead of pushing its parent taller
-        overflowY: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        touchAction: 'pan-y',
+        display: 'flex',
+        flexDirection: 'column',
+        boxSizing: 'border-box',
+        paddingTop: `${CAP_HEIGHT}px`,
         backgroundColor: 'var(--color-bg)',
         borderRadius: '24px 24px 0 0',
         boxShadow: '0 -2px 6px rgba(0,0,0,0.05)',
+        overflow: 'hidden', // clips the scrolling content to the rounded corners
       }}
     >
-      {/* Sticky buffer strip — see the dated note above. Purely
-          decorative, so it's aria-hidden and never intercepts scroll/tap.
-          Solid, matching the sheet's own background — no fade. */}
       <div
-        aria-hidden="true"
+        ref={scrollRef}
         style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 1,
-          height: `${STRIP_HEIGHT}px`,
-          marginBottom: `-${STRIP_HEIGHT}px`,
-          backgroundColor: 'var(--color-bg)',
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          maxWidth: 680,
-          margin: '0 auto',
-          padding: 'var(--space-5) var(--space-6)',
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
         }}
       >
-        {children}
+        <div
+          key={resetKey}
+          style={{
+            maxWidth: 680,
+            margin: '0 auto',
+            padding: `0 var(--space-6) var(--space-5)`,
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   )
 })
 
 export default DrugDetailSheet
-

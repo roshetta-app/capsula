@@ -26,7 +26,8 @@
  *   - looking up / loading : picture icon, dimmed and pulsing
  *   - picture and online   : small preview on a blurred copy of itself (so
  *                            pictures of any shape fill the square); tap opens
- *                            the full-screen viewer; the drug's full title is
+ *                            the full-screen viewer (a small zoom badge sits in
+ *                            the corner); the drug's full title is
  *                            the caption under the picture (no top title)
  *   - preview file fails (or takes over 8 s) / no picture address:
  *                            picture icon with a small magnifier badge;
@@ -37,7 +38,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { Image as ImageIcon, Search, ImageOff } from 'lucide-react'
+import { Image as ImageIcon, Search, ImageOff, ZoomIn } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -172,6 +173,12 @@ export default function DrugMediaStrip({ drug }) {
     }
   }
 
+  // Small round badge in the picture's corner: a magnifier with a plus (zoom)
+  // on a loaded picture, a magnifier on the no-picture tile (search).
+  const cornerIcon = showLoadedImage
+    ? <ZoomIn size={9} strokeWidth={2.6} />
+    : placeholder?.searchBadge ? <Search size={9} strokeWidth={2.6} /> : null
+
   return (
     <>
       <div style={{
@@ -267,7 +274,7 @@ export default function DrugMediaStrip({ drug }) {
               {placeholder.icon}
             </span>
           )}
-          {placeholder?.searchBadge && (
+          {cornerIcon && (
             <span
               aria-hidden="true"
               style={{
@@ -277,7 +284,7 @@ export default function DrugMediaStrip({ drug }) {
                 color: 'var(--color-text-secondary)',
               }}
             >
-              <Search size={9} strokeWidth={2.6} />
+              {cornerIcon}
             </span>
           )}
         </button>

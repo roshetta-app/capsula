@@ -101,7 +101,7 @@
  * Route: /drugs/:slug
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
@@ -315,7 +315,9 @@ export default function DrugDetailScreen() {
   const rootRef = useRef(null)
   const [availableHeight, setAvailableHeight] = useState(null)
 
-  useEffect(() => {
+  // 2026-10-18: runs before the first paint (was after it), so the page is
+  // never drawn for a frame at the placeholder 100dvh height and then resized.
+  useLayoutEffect(() => {
     function measure() {
       if (rootRef.current) {
         setAvailableHeight(window.innerHeight - rootRef.current.getBoundingClientRect().top)
@@ -500,7 +502,7 @@ export default function DrugDetailScreen() {
             Pharmacology → Sources. paddingTop kept per
             drug_detail_moa_spacing_fix; paddingBottom kept so content still
             clears the fixed BottomNav below, same as today. */}
-        <DrugDetailSheet key={drug.id}>
+        <DrugDetailSheet resetKey={drug.id}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
             {/* 2026-10-18: picture, Arabic name and "Check price" live in this
                 strip above the first section (moved out of the header). */}
