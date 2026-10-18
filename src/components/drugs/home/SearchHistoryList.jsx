@@ -1,6 +1,9 @@
 /**
  * src/components/drugs/home/SearchHistoryList.jsx
  *
+ * 2026-10-18 (Omar): 'Clear all' is red (the app's danger colour), and the mode
+ * word on each row is quiet plain grey text instead of a coloured pill.
+ *
  * 2026-10-15: the empty message moved to DrugsScreen (same look as the other search
  * states). 'heading', 'showClear' and 'showRemove' let the same rows serve as the short
  * hints under the typed text (no Clear all, no X).
@@ -13,9 +16,9 @@
 import { Clock, X } from 'lucide-react'
 
 const MODE_META = {
-  brand:   { label: 'Brand',   color: 'var(--color-accent)',  tint: 'var(--color-accent-light)' },
-  generic: { label: 'Generic', color: 'var(--color-generic)', tint: 'var(--color-generic-light)' },
-  class:   { label: 'Class',   color: 'var(--color-class)',   tint: 'var(--color-class-light)' },
+  brand:   { label: 'Brand' },
+  generic: { label: 'Generic' },
+  class:   { label: 'Class' },
 }
 
 export default function SearchHistoryList({
@@ -40,7 +43,7 @@ export default function SearchHistoryList({
           onClick={onClear}
           style={{
             background: 'none', border: 'none', padding: '4px 2px', cursor: 'pointer',
-            fontSize: 13, fontWeight: 500, color: 'var(--color-accent)',
+            fontSize: 13, fontWeight: 500, color: 'var(--color-danger)',
             fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
           }}
         >
@@ -81,8 +84,8 @@ export default function SearchHistoryList({
                   {entry.text}
                 </span>
                 <span style={{
-                  flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '2px 8px',
-                  borderRadius: 999, color: meta.color, backgroundColor: meta.tint,
+                  flexShrink: 0, fontSize: 11, fontWeight: 400,
+                  color: 'var(--color-text-tertiary)',
                 }}>
                   {meta.label}
                 </span>
