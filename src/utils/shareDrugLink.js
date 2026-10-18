@@ -1,8 +1,9 @@
 /**
  * src/utils/shareDrugLink.js
  *
- * 2026-10-18 (header tidy-up, Omar): the Share icon in the drug header copies
- * a short message with the drug's page link to the clipboard.
+ * 2026-10-18 (header tidy-up, Omar): the Share icon in the drug header opens
+ * the phone's share sheet with a short friendly message and the drug's page
+ * link; where there is no share sheet it copies the same message instead.
  *
  * Link: on the website it is the page's own address; inside the Android app
  * the app's own address is not a public page, so the public site address below
@@ -22,11 +23,32 @@ export function buildDrugLink(drug) {
   return `${base}/drugs/${slug}`
 }
 
-export function buildDrugShareText(drug) {
+export function buildDrugShareMessage(drug) {
   const suffix = getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
-  const title = [toTitleCase(drug.tradenameClean), suffix].filter(Boolean).join(' ')
-  const generic = drug.genericName ? `Active ingredient: ${toTitleCase(drug.genericName)}\n` : ''
-  return `${title}\n${generic}Uses, dose, safety and interactions on Capsula:\n${buildDrugLink(drug)}`
+  const name = [toTitleCase(drug.tradenameClean), suffix].filter(Boolean).join(' ')
+  const generic = drug.genericName ? ` (${toTitleCase(drug.genericName)})` : ''
+  return {
+    title: `${name} on Capsula`,
+    text: `\u{1F48A} ${name}${generic}\nDose, safety and interactions in seconds, on Capsula, the drug reference made for doctors \u{1FA7A}`,
+    url: buildDrugLink(drug),
+  }
+}
+
+// Phone share sheet first (one tap to WhatsApp and friends, with Copy inside
+// it); copy to the clipboard when the device has no share sheet.
+// Returns 'shared' | 'cancelled' | 'copied' | 'failed'.
+export async function shareDrug(drug) {
+  const msg = buildDrugShareMessage(drug)
+  if (typeof navigator.share === 'function') {
+    try {
+      await navigator.share(msg)
+      return 'shared'
+    } catch (err) {
+      if (err && err.name === 'AbortError') return 'cancelled'
+    }
+  }
+  const ok = await copyText(`${msg.text}\n\u{1F449} ${msg.url}`)
+  return ok ? 'copied' : 'failed'
 }
 
 export async function copyText(text) {

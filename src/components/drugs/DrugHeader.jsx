@@ -2,8 +2,9 @@
  * src/components/drugs/DrugHeader.jsx
  *
  * 2026-10-18 (header tidy-up, Omar): the header is now Back + category and
- * Share + Heart (top row), the brand name, and the strength line. Share copies
- * a short message with the drug's page link (utils/shareDrugLink.js). The
+ * Share + Heart (top row), the brand name, and the strength line. Share opens
+ * the phone share sheet with a short message and the drug's page link, or
+ * copies it (utils/shareDrugLink.js). The
  * picture and price icons and the Arabic name moved out; they now live in
  * DrugMediaStrip.jsx, above the first section, and scroll away with the page.
  *
@@ -188,7 +189,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
-import { buildDrugShareText, copyText } from '../../utils/shareDrugLink'
+import { shareDrug } from '../../utils/shareDrugLink'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
@@ -278,9 +279,9 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
 
   async function handleShare() {
-    const ok = await copyText(buildDrugShareText(drug))
-    if (ok) toast.success('Link copied. Paste it in any chat.')
-    else toast.error('Could not copy the link. Try again.')
+    const result = await shareDrug(drug)
+    if (result === 'copied') toast.success('Link copied. Paste it in any chat.')
+    else if (result === 'failed') toast.error('Could not share the link. Try again.')
   }
 
   function handleToggleFav() {
@@ -409,7 +410,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <button
               onClick={handleShare}
-              aria-label="Copy link to this drug"
+              aria-label="Share this drug"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                 color: 'var(--color-text-primary)',
