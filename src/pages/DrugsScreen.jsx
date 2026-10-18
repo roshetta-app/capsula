@@ -1145,7 +1145,7 @@ export default function DrugsScreen() {
           // Solid band under the Search card (2026-10-18, Omar): results scroll
           // behind this padding, which is drawn in the page colour, so it is solid
           // and, being real space, never covers the first line of results.
-          paddingBottom:   searchOpen ? 20 : 0,
+          paddingBottom:   searchOpen ? 10 : 0,
           transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease',
         }}>
         <DrugsSearchSection
