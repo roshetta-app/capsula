@@ -15,15 +15,16 @@
  *   - looking up / loading : soft pulsing placeholder
  *   - picture and online   : small preview; tap opens the full-screen viewer,
  *                            titled with the drug's full title
- *   - preview file fails   : "Find pictures" placeholder; tap opens Google Images
- *   - no picture address   : same "Find pictures" placeholder
- *   - offline              : dimmed "Offline" placeholder; tap shows a message
+ *   - preview file fails (or takes over 8 s) / no picture address:
+ *                            pill tile with a small search badge, no text;
+ *                            tap opens Google Images
+ *   - offline              : dimmed no-picture tile; tap shows a message
  * The picture address comes from the database function brand_image_url
  * (unchanged); it returns nothing while the DawaaGate fallback switch is on.
  */
 
 import { useEffect, useState } from 'react'
-import { Pill, ScanSearch, ImageOff } from 'lucide-react'
+import { Pill, Search, ImageOff } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
@@ -59,6 +60,12 @@ export default function DrugMediaStrip({ drug }) {
     return () => { cancelled = true }
   }, [drug.id, isOnline])
 
+  useEffect(() => {
+    if (!isOnline || typeof picture !== 'string' || imgState !== 'loading') return undefined
+    const t = setTimeout(() => setImgState('error'), 8000)
+    return () => clearTimeout(t)
+  }, [picture, imgState, isOnline])
+
   const arabicFull = formatArabicFullName(drug.nameAr, drug.nameArFull)
   const viewerTitle = [
     toTitleCase(drug.tradenameClean),
@@ -83,11 +90,11 @@ export default function DrugMediaStrip({ drug }) {
   let placeholder = null
   if (!showLoadedImage) {
     if (offline) {
-      placeholder = { icon: <ImageOff size={26} strokeWidth={1.6} />, label: 'Offline', dim: true }
+      placeholder = { icon: <ImageOff size={28} strokeWidth={1.5} />, dim: true }
     } else if (lookingUp || (showImage && imgState === 'loading')) {
-      placeholder = { icon: <Pill size={26} strokeWidth={1.6} />, label: '', dim: true, pulse: true }
+      placeholder = { icon: <Pill size={28} strokeWidth={1.5} />, dim: true, pulse: true }
     } else {
-      placeholder = { icon: <ScanSearch size={26} strokeWidth={1.6} />, label: 'Find pictures', dim: false }
+      placeholder = { icon: <Pill size={28} strokeWidth={1.5} />, dim: false, searchBadge: true }
     }
   }
 
@@ -141,20 +148,33 @@ export default function DrugMediaStrip({ drug }) {
               />
             )}
             {placeholder && (
-              <span
-                className={placeholder.pulse ? 'shimmer' : undefined}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
-                  color: 'var(--color-text-secondary)',
-                  opacity: placeholder.dim ? 0.55 : 1,
-                  background: 'none',
-                }}
-              >
-                {placeholder.icon}
-                {placeholder.label && <span style={{ fontSize: 11, lineHeight: 1.2 }}>{placeholder.label}</span>}
-              </span>
-            )}
-          </button>
+            <span
+              className={placeholder.pulse ? 'shimmer' : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '100%', height: '100%',
+                color: 'var(--color-text-secondary)',
+                opacity: placeholder.dim ? 0.55 : 1,
+                background: 'none',
+              }}
+            >
+              {placeholder.icon}
+            </span>
+          )}
+          {placeholder?.searchBadge && (
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute', right: 5, bottom: 5, width: 20, height: 20, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              <Search size={11} strokeWidth={2.2} />
+            </span>
+          )}
+        </button>
 
           <CheckPriceButton drug={drug} fullWidth />
         </div>
