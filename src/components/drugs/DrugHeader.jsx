@@ -1,6 +1,12 @@
 /**
  * src/components/drugs/DrugHeader.jsx
  *
+ * 2026-10-18 (header tidy-up, Omar): the header is now Back + category and the
+ * Heart (top row), the brand name, and the strength line. The Share stub (it
+ * did nothing), the picture and price icons and the Arabic name moved out; the
+ * picture, Arabic name and price button now live in DrugMediaStrip.jsx, above
+ * the first section, and scroll away with the page.
+ *
  * 2026-10-17 (image icon, Omar; DawaaGate gave full permission to use their
  * drug pictures): for a drug whose DawaaGate page has a picture, the image
  * icon opens that picture in the app's full-screen viewer (ui/Lightbox.jsx:
@@ -179,16 +185,9 @@
  *   onToggleFav   — () => void
  */
 
-import { formatArabicFullName } from '../../utils/arabicName'
 import { useEffect, useRef, useState } from 'react'
-import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { useToast } from '../../context/ToastContext'
-import { ArrowLeft, Share2, Heart, ScanSearch } from 'lucide-react'
+import { ArrowLeft, Heart } from 'lucide-react'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
-import { openInAppBrowser } from '../../utils/openInAppBrowser'
-import { supabase } from '../../lib/supabase'
-import Lightbox from '../ui/Lightbox'
-import CheckPriceButton from './CheckPriceButton'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
 const FADE_WIDTH = 20 // px — width of the edge-fade cue on scrollable rows
@@ -247,7 +246,6 @@ function edgeFadeStyle(fade) {
   return { WebkitMaskImage: gradient, maskImage: gradient }
 }
 
-const noop = () => {}
 
 export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, category, colors }) {
   const brandFade  = useEdgeFade(drug.id)
@@ -260,7 +258,6 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // uses for its title line (see utils/drugTitleFormat.js), including the
   // shared list of modifier tags left out of the suffix (2026-09-19).
   const titleSuffix = getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
-  const arabicFull = formatArabicFullName(drug.nameAr, drug.nameArFull)
 
   // Favourite-toggle pop animation (this session) — no existing precedent
   // in the codebase to match (checked RowStarButton.jsx and
@@ -276,20 +273,6 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   const popTimeoutRef = useRef(null)
 
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
-
-  // DawaaGate picture address for this drug (string), or null when there is
-  // none or the lookup fails. Looked up once per drug; the icon waits for it.
-  const pictureRef = useRef(Promise.resolve(null))
-  const [viewerImage, setViewerImage] = useState(null)
-  const { isOnline } = useOnlineStatus()
-  const { toast } = useToast()
-  useEffect(() => {
-    pictureRef.current = Promise.resolve(
-      supabase.rpc('brand_image_url', { p_brand_id: drug.id })
-    )
-      .then(({ data, error }) => (!error && typeof data === 'string' && data ? data : null))
-      .catch(() => null)
-  }, [drug.id])
 
   function handleToggleFav() {
     onToggleFav()
@@ -315,27 +298,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   // own copy of this same handler still uses window.open — not touched
   // here, out of this session's scope, so the two now differ until that
   // one's updated too.
-  const handleSearchClick = async (e) => {
-    e.stopPropagation()
-    // 2026-10-17 (Omar): pictures need the internet; offline the icon is
-    // dimmed and a tap shows a short message instead of opening anything.
-    if (!isOnline) {
-      toast.info('Pictures need an internet connection. Connect and try again.')
-      return
-    }
-    const picture = await pictureRef.current
-    if (picture) {
-      setViewerImage(picture)
-      return
-    }
-    const query = [drug.tradenameClean, drug.concentration, drug.form, 'Egypt']
-      .filter(Boolean)
-      .join(' ')
-    openInAppBrowser(`https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`)
-  }
-
   return (
-    <>
     <header style={{
       // 2026-07-25 (step 0.4 fix, same session): no longer sticky/rounded/
       // shadowed — those made this read as a separate floating card on top
@@ -435,20 +398,6 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-            {/* Share — visual stub only, per 4.24. No real share-image
-                concept exists yet for a single drug; wiring real behavior
-                is deferred to a separate future task. */}
-            <button
-              aria-label="Share"
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                color: 'var(--color-text-primary)',
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              <Share2 size={20} strokeWidth={2} />
-            </button>
-
             <button
               onClick={handleToggleFav}
               aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
@@ -504,23 +453,6 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-          <CheckPriceButton drug={drug} />
-          <button
-            onClick={handleSearchClick}
-            aria-label={`Search images for ${drug.tradenameClean}`}
-            style={{
-              background: 'none', border: 'none', padding: 2,
-              cursor: 'pointer', flexShrink: 0,
-              color: 'var(--color-text-primary)',
-              display: 'flex', alignItems: 'center',
-              lineHeight: 1,
-              opacity: isOnline ? 1 : 0.4,
-            }}
-          >
-            <ScanSearch size={20} strokeWidth={1.8} color="currentColor" />
-          </button>
-          </div>
         </div>
 
         {/* Row 3: strength/form suffix — own line beneath the brand name
@@ -549,44 +481,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           </div>
         )}
 
-        {/* Arabic name (plan v9 Session 13): last row of the title block, under all
-            the English lines. Full Arabic title with " - " between brand, strength
-            and pack; Arabic brand name alone when there is no full title; nothing
-            when there is neither. Right to left; scrolls sideways if long. */}
-        {arabicFull && (
-          <div
-            dir="rtl"
-            lang="ar"
-            style={{
-              fontSize:                14,
-              fontWeight:              500,
-              lineHeight:              1.5,
-              color:                   'var(--color-text-secondary)',
-              textAlign:               'right',
-              marginTop:               2,
-              overflowX:               'auto',
-              whiteSpace:              'nowrap',
-              scrollbarWidth:          'none',
-              msOverflowStyle:         'none',
-              WebkitOverflowScrolling: 'touch',
-              touchAction:             'pan-x',
-            }}
-          >
-            {arabicFull}
-          </div>
-        )}
-
       </div>
     </header>
-    {viewerImage && (
-      <Lightbox
-        images={[{ id: drug.id, url: viewerImage, caption: 'Source: DawaaGate' }]}
-        activeIndex={0}
-        onClose={() => setViewerImage(null)}
-        onGo={noop}
-        title={drug.tradenameClean || ''}
-      />
-    )}
-    </>
   )
 }

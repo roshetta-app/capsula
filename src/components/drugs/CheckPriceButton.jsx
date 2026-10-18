@@ -64,7 +64,6 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Tag } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { Capacitor } from '@capacitor/core'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
@@ -122,14 +121,14 @@ export default function CheckPriceButton({ drug }) {
         if (!cancelled) setLink(null)
       })
     return () => { cancelled = true }
-  }, [drug.id])
+  }, [drug.id, isOnline])
 
   const ready = link !== undefined
 
   const handleClick = (e) => {
     e.stopPropagation()
-    if (!ready) return
     if (!isOnline) { toast.info(OFFLINE_PRICE_MSG); return }
+    if (!ready) return
     openDawaaGate(link ? withPriceCardHash(link) : buildDawaaGateSearchUrl(drug, true))
   }
 
@@ -137,19 +136,28 @@ export default function CheckPriceButton({ drug }) {
     <button
       type="button"
       onClick={handleClick}
-      disabled={!ready}
       aria-label="Check price"
       style={{
-        background: 'none', border: 'none', padding: 2,
-        cursor: ready ? 'pointer' : 'default', flexShrink: 0,
-        color: 'var(--color-text-primary)',
-        display: 'flex', alignItems: 'center',
-        lineHeight: 1,
-        opacity: ready && isOnline ? 1 : 0.4,
-        touchAction: 'manipulation',
+        display: 'inline-flex', alignItems: 'center', gap: 8,
+        padding: '7px 14px', borderRadius: 999, cursor: ready && isOnline ? 'pointer' : 'default',
+        border: '1px solid var(--color-border)', backgroundColor: 'var(--color-surface)',
+        color: 'var(--color-text-primary)', fontSize: 14, fontWeight: 500, lineHeight: 1.2,
+        fontFamily: 'var(--font-body)', flexShrink: 0,
+        opacity: ready && isOnline ? 1 : 0.45,
+        WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
       }}
     >
-      <Tag size={20} strokeWidth={1.8} color="currentColor" aria-hidden="true" />
+      <span
+        aria-hidden="true"
+        style={{
+          fontSize: 11, fontWeight: 600, letterSpacing: '0.03em', padding: '1px 5px',
+          borderRadius: 4, border: '1px solid var(--color-border)',
+          color: 'var(--color-text-secondary)',
+        }}
+      >
+        EGP
+      </span>
+      Check price
     </button>
   )
 }

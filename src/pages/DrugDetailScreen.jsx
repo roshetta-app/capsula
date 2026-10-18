@@ -105,6 +105,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
+import DrugMediaStrip                    from '../components/drugs/DrugMediaStrip'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
 import BottomNav                         from '../components/BottomNav'
 import GenericOverviewSection            from '../components/drugs/sections/GenericOverviewSection'
@@ -501,8 +502,10 @@ export default function DrugDetailScreen() {
             clears the fixed BottomNav below, same as today. */}
         <DrugDetailSheet key={drug.id}>
           <div style={{ paddingTop: 'var(--space-5)', paddingBottom: 'var(--space-12)' }}>
-            {/* 2026-10-17: the "Check price" button moved to the drug header
-                (small tag icon next to the image icon). */}
+            {/* 2026-10-18: picture, Arabic name and "Check price" live in this
+                strip above the first section (moved out of the header). */}
+            <DrugMediaStrip drug={drug} />
+
             <GenericOverviewSection
               drug={drug}
               siblings={siblings}
