@@ -367,11 +367,13 @@ export default function SharedDrugCard({
             dir="rtl"
             lang="ar"
             style={{
-              fontSize:     13,
-              fontWeight:   500,
+              // 2026-10-18 (Omar): quieter than the English lines. Arabic letters look
+              // larger than Latin ones at the same size, so 12 not 13, regular weight.
+              fontSize:     12,
+              fontWeight:   400,
               color:        'var(--color-text-secondary)',
-              lineHeight:   1.3,
-              marginTop:    4,
+              lineHeight:   1.35,
+              marginTop:    3,
               // Starts at the same left edge as the English lines. Right-aligning it made
               // it move left whenever a saved-drug heart narrowed the text column.
               textAlign:    'left',
