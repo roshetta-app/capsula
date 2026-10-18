@@ -61,11 +61,20 @@
  * the caption are gone; an unmatched drug keeps the DawaaGate search with
  * the strength number (the old primary button behaviour). Offline: the icon
  * is dimmed and a tap shows a message (same as the image icon).
+ *
+ * 2026-10-18 (Omar, one-strip card): the button no longer has a caption or an
+ * EGP badge. It has two shapes, picked by the 'wide' prop. Side block (default):
+ * a tag icon over the word 'Price', set off by a thin line on its left, sits at
+ * the right end of the strip. Wide: the same button stretched across the rest of
+ * the strip, labelled 'Check price', used when the drug has no Arabic name.
+ * Offline and still-loading both just dim the button; offline taps show the
+ * same short message as before.
  */
 
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Capacitor } from '@capacitor/core'
+import { Tag } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
@@ -99,7 +108,7 @@ function withPriceCardHash(url) {
 
 const OFFLINE_PRICE_MSG = 'Checking the price needs an internet connection. Connect and try again.'
 
-export default function CheckPriceButton({ drug }) {
+export default function CheckPriceButton({ drug, wide = false }) {
   // 2026-10-17 (Omar): offline, the button stays visible but dimmed; a tap
   // shows a short message instead of opening anything.
   const { isOnline } = useOnlineStatus()
@@ -134,38 +143,35 @@ export default function CheckPriceButton({ drug }) {
 
   const live = ready && isOnline
 
+  const common = {
+    boxSizing: 'border-box', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+    cursor: live ? 'pointer' : 'default', fontWeight: 500,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+  }
+  const shape = wide
+    ? {
+        flex: '1 1 0', minWidth: 0, height: 52, gap: 8, fontSize: 14, padding: '0 12px',
+        borderRadius: 12, border: '1px solid var(--color-border)',
+        backgroundColor: 'var(--color-surface-muted)',
+      }
+    : {
+        flexShrink: 0, alignSelf: 'stretch', width: 60, flexDirection: 'column', gap: 2,
+        fontSize: 12, padding: '0 0 0 12px', marginLeft: -2,
+        border: 'none', borderLeft: '1px solid var(--color-border)', borderRadius: 0,
+        backgroundColor: 'transparent',
+      }
+
   return (
     <button
       type="button"
       onClick={handleClick}
       aria-label="Check price"
-      style={{
-        flex: '1 1 0', minWidth: 0, boxSizing: 'border-box', textAlign: 'left',
-        display: 'flex', alignItems: 'center', gap: 8, padding: 6,
-        borderRadius: 12, border: '1px solid var(--color-border)',
-        backgroundColor: 'var(--color-surface-muted)',
-        color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-        cursor: live ? 'pointer' : 'default',
-        WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
-      }}
+      style={{ ...common, ...shape }}
     >
-      <span
-        aria-hidden="true"
-        style={{
-          width: 40, height: 40, flexShrink: 0, borderRadius: 8,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, fontWeight: 600, letterSpacing: '0.03em',
-          backgroundColor: 'var(--color-surface)', border: '1px solid var(--color-border)',
-          color: 'var(--color-text-secondary)', opacity: live ? 1 : 0.55,
-        }}
-      >
-        EGP
-      </span>
-      <span style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1, opacity: live ? 1 : 0.55 }}>
-        <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.2, whiteSpace: 'nowrap' }}>Check price</span>
-        <span style={{ fontSize: 11, lineHeight: 1.2, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {!isOnline ? 'Offline' : ready ? 'Latest price' : 'Loading'}
-        </span>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'inherit', flexDirection: 'inherit', opacity: live ? 1 : 0.55 }}>
+        <Tag size={wide ? 18 : 20} strokeWidth={1.7} aria-hidden="true" style={{ color: 'var(--color-text-secondary)' }} />
+        <span style={{ lineHeight: 1.2, whiteSpace: 'nowrap' }}>{wide ? 'Check price' : 'Price'}</span>
       </span>
     </button>
   )
