@@ -21,10 +21,14 @@ import { useCategories } from '../hooks/useCategories'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken, FALLBACK_TOKEN } from '../utils/specialtyTokens'
 import { ROUTES } from '../router'
+import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 import { prepareCategoryOpen } from './DrugsScreen'
 
 export default function DrugCategoriesScreen() {
   const navigate = useNavigate()
+  // Back (arrow and phone button) goes to the real previous screen; if this page
+  // is opened straight from a link, the Drugs home is put behind it first.
+  useDeepLinkParent(ROUTES.DRUGS)
   const isDark = useIsDark()
   const { drugs, loading, error, retry } = useDrugContext()
   const { categories } = useCategories()
@@ -87,7 +91,7 @@ export default function DrugCategoriesScreen() {
     <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--page-gutter) var(--space-4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <button
-          onClick={() => navigate(ROUTES.DRUGS)}
+          onClick={() => navigate(-1)}
           aria-label="Back to Drugs"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,

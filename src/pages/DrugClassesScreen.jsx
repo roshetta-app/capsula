@@ -23,6 +23,7 @@ import { useDrugContext } from '../context/DrugContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
 import { ROUTES } from '../router'
+import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 
 const CLASS_SORT_LABELS = { relevance: 'Relevance', az: 'A \u2013 Z' }
 
@@ -50,6 +51,9 @@ function ClassSortButton({ sortMode, onToggle }) {
 
 export default function DrugClassesScreen() {
   const navigate = useNavigate()
+  // Back (arrow and phone button) goes to the real previous screen; if this page
+  // is opened straight from a link, the Drugs home is put behind it first.
+  useDeepLinkParent(ROUTES.DRUGS)
   const { drugs, loading, error, retry, classSortMode, setClassSortMode } = useDrugContext()
   const { addRecentlyViewed: addRecentDrug } = useRecentlyViewed('drug')
 
@@ -130,7 +134,7 @@ export default function DrugClassesScreen() {
     <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--page-gutter) var(--space-4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <button
-          onClick={() => navigate(ROUTES.DRUGS)}
+          onClick={() => navigate(-1)}
           aria-label="Back to Drugs"
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
