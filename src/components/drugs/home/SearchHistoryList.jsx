@@ -2,7 +2,8 @@
  * src/components/drugs/home/SearchHistoryList.jsx
  *
  * 2026-10-18 (Omar): 'Clear all' is red (the app's danger colour), and the mode
- * word on each row is quiet plain grey text instead of a coloured pill.
+ * tag on each row is the mode's own icon and name in the mode's colour, with no
+ * pill behind it (same icons as the mode menu: Tag, FlaskConical, Layers).
  *
  * 2026-10-15: the empty message moved to DrugsScreen (same look as the other search
  * states). 'heading', 'showClear' and 'showRemove' let the same rows serve as the short
@@ -13,12 +14,12 @@
  * again at once, in that mode. The small X removes one row, 'Clear all' empties the list.
  */
 
-import { Clock, X } from 'lucide-react'
+import { Clock, X, Tag, FlaskConical, Layers } from 'lucide-react'
 
 const MODE_META = {
-  brand:   { label: 'Brand' },
-  generic: { label: 'Generic' },
-  class:   { label: 'Class' },
+  brand:   { label: 'Brand',   icon: Tag,          color: 'var(--color-accent)' },
+  generic: { label: 'Generic', icon: FlaskConical, color: 'var(--color-generic)' },
+  class:   { label: 'Class',   icon: Layers,       color: 'var(--color-class)' },
 }
 
 export default function SearchHistoryList({
@@ -84,9 +85,10 @@ export default function SearchHistoryList({
                   {entry.text}
                 </span>
                 <span style={{
-                  flexShrink: 0, fontSize: 11, fontWeight: 400,
-                  color: 'var(--color-text-tertiary)',
+                  flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 11, fontWeight: 500, color: meta.color,
                 }}>
+                  <meta.icon size={12} strokeWidth={2} />
                   {meta.label}
                 </span>
               </button>
