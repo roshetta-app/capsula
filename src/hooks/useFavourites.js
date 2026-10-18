@@ -487,7 +487,9 @@ export function useFavourites() {
         const pending = pendingFavouriteRef.current
         // 2026-10-08: a pending class/family heart (type 'classes') is folded in
         // by useFavouriteClasses, not here, and stays recorded until it does.
-        if (pending && pending.type !== 'classes') {
+        // 2026-10-18: a pending 'groups' tap (a guest tapping New group) is
+        // handled by useDrugGroups in the same way.
+        if (pending && pending.type !== 'classes' && pending.type !== 'groups') {
           if (!next[pending.type].includes(pending.id)) {
             const atCap = !isProRef.current && next[pending.type].length >= CAPS[pending.type]
             if (atCap) {

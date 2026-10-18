@@ -1,0 +1,346 @@
+/**
+ * src/hooks/useDrugGroups.js
+ *
+ * 2026-10-18 (Drug groups plan, steps 3.3 and 3.4): keeps the signed-in
+ * person's drug groups. Same house rules as useFavouriteClasses.
+ *
+ * Covers: load, create, edit (rename, description, colour) and delete a
+ * group. Adding and removing drugs, sharing and saving a shared copy come in
+ * later phases (4, 5, 8) and are not here yet.
+ *
+ * Rules:
+ *  - A guest tap saves nothing: it asks to sign in (promptSignIn) and the
+ *    mutator answers { ok: false, reason: 'guest' }.
+ *  - Offline: the saved copy (utils/cache.js, store 'drug-groups') shows
+ *    instead of the live list. Changing anything while offline shows
+ *    "You're offline. Reconnect to change your groups." and answers
+ *    reason 'offline'.
+ *  - Limits (constants/features.js) are checked here and in the database.
+ *    Reaching one answers reason 'limit'. The screens decide what to show
+ *    (the limit sheet is wired in Phase 7), so nothing is shown from here.
+ *  - Lapsed account (not Pro and over the free limits): isReadOnly is true.
+ *    Everything except delete answers reason 'read_only'. Mirrors the
+ *    database function dg_is_read_only (plan section 6.1).
+ *  - A write that fails is undone on screen with a short message.
+ *
+ * Takes the object returned by useFavourites (for the sign-in prompt and the
+ * pending tap), so it is created once, inside FavouritesProvider, and read
+ * with useFavouritesContext().
+ *
+ * Returns:
+ *   groups          { id, name, description, color, createdAt, brandIds }[]  newest first
+ *   groupsStatus    'loading' | 'ready' | 'error'
+ *   groupsFromCache true while the list shown is the saved copy
+ *   groupsLoadError true when the last refresh failed (with a saved copy still shown)
+ *   isReadOnly      boolean
+ *   canCreateGroup  boolean (false when at the limit or read only)
+ *   reloadGroups    () => Promise<void>
+ *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
+ *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
+ *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
+ */
+
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useAuth } from './useAuth'
+import { useIsPro } from './useIsPro'
+import { useToast } from '../context/ToastContext'
+import { supabase } from '../lib/supabase'
+import { readGroupsCache, writeGroupsCache, clearGroupsCache } from '../utils/cache'
+import {
+  DRUG_GROUPS_CAP_FREE,
+  DRUG_GROUP_DRUGS_CAP_FREE,
+  DRUG_GROUPS_CAP_PRO,
+} from '../constants/features'
+
+export const GROUP_NAME_MAX = 40
+export const GROUP_DESCRIPTION_MAX = 200
+export const GROUP_COLORS = ['blue', 'teal', 'violet', 'amber', 'rose']
+
+const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
+
+function isOffline() {
+  return typeof navigator !== 'undefined' && navigator.onLine === false
+}
+
+function mapGroupRow(r) {
+  return {
+    id: r.id,
+    name: r.name,
+    description: r.description ?? '',
+    color: r.color,
+    createdAt: r.created_at,
+    brandIds: (r.drug_group_items ?? []).map(i => i.brand_id),
+  }
+}
+
+// Newest first, the default order. The screens sort again for "A to Z".
+function newestFirst(list) {
+  return list.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
+}
+
+export function useDrugGroups(fav) {
+  const { user, loading: authLoading } = useAuth()
+  const isPro = useIsPro()
+  const { toast } = useToast()
+  const { pendingFavourite, dismissPendingFavourite, promptSignIn } = fav
+
+  const [groups, setGroups] = useState([])
+  const [groupsStatus, setGroupsStatus] = useState('loading')
+  const [groupsFromCache, setGroupsFromCache] = useState(false)
+  const [groupsLoadError, setGroupsLoadError] = useState(false)
+
+  const groupsRef = useRef(groups)
+  useEffect(() => { groupsRef.current = groups }, [groups])
+  const isProRef = useRef(isPro)
+  useEffect(() => { isProRef.current = isPro }, [isPro])
+  const userRef = useRef(user)
+  useEffect(() => { userRef.current = user }, [user])
+
+  // Same rule as the database function dg_is_read_only.
+  const isReadOnly = !isPro && (
+    groups.length > DRUG_GROUPS_CAP_FREE ||
+    groups.some(g => g.brandIds.length > DRUG_GROUP_DRUGS_CAP_FREE)
+  )
+  const groupCap = isPro ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
+  const canCreateGroup = !isReadOnly && groups.length < groupCap
+
+  // ── Load ──────────────────────────────────────────────────────────────────
+  // shownFromCacheRef: true while the list on screen is the saved copy, so a
+  // failed refresh keeps it instead of emptying the screen.
+  const shownFromCacheRef = useRef(false)
+  const loadSeqRef = useRef(0)
+
+  const loadGroups = useCallback(async (u) => {
+    const seq = ++loadSeqRef.current
+    const stale = () => seq !== loadSeqRef.current || userRef.current?.id !== u.id
+
+    // 1. Saved copy first, so something shows at once (and offline).
+    const cached = await readGroupsCache(u.id)
+    if (stale()) return
+    if (cached && Array.isArray(cached.data)) {
+      shownFromCacheRef.current = true
+      setGroups(cached.data)
+      setGroupsFromCache(true)
+      setGroupsStatus('ready')
+    } else {
+      shownFromCacheRef.current = false
+      setGroups([])
+      setGroupsFromCache(false)
+      setGroupsStatus('loading')
+    }
+
+    // 2. Offline: stay on the saved copy (or fail if there is none).
+    if (isOffline()) {
+      setGroupsLoadError(!!cached)
+      if (!cached) setGroupsStatus('error')
+      return
+    }
+
+    // 3. Live list.
+    const { data, error } = await supabase
+      .from('drug_groups')
+      .select('id, name, description, color, created_at, drug_group_items(brand_id)')
+      .order('created_at', { ascending: false })
+    if (stale()) return
+
+    if (error || !data) {
+      setGroupsLoadError(!!cached)
+      if (!cached) setGroupsStatus('error')
+      return
+    }
+    shownFromCacheRef.current = false
+    setGroups(newestFirst(data.map(mapGroupRow)))
+    setGroupsFromCache(false)
+    setGroupsLoadError(false)
+    setGroupsStatus('ready')
+  }, [])
+
+  const reloadGroups = useCallback(async () => {
+    const u = userRef.current
+    if (!u) return
+    setGroupsLoadError(false)
+    await loadGroups(u)
+  }, [loadGroups])
+
+  // Load when someone signs in; empty everything (and the saved copy) when
+  // they sign out. The copy is removed so a shared phone keeps nothing.
+  const lastUserIdRef = useRef(null)
+  useEffect(() => {
+    if (authLoading) return
+    if (!user) {
+      const previousId = lastUserIdRef.current
+      lastUserIdRef.current = null
+      loadSeqRef.current++
+      shownFromCacheRef.current = false
+      setGroups([])
+      setGroupsFromCache(false)
+      setGroupsLoadError(false)
+      setGroupsStatus('ready')
+      if (previousId) clearGroupsCache(previousId)
+      return
+    }
+    lastUserIdRef.current = user.id
+    loadGroups(user)
+  }, [user, authLoading, loadGroups])
+
+  // Come back online with only the saved copy on screen: refresh it.
+  useEffect(() => {
+    function onOnline() {
+      if (userRef.current && (shownFromCacheRef.current || groupsStatus === 'error')) {
+        loadGroups(userRef.current)
+      }
+    }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [loadGroups, groupsStatus])
+
+  // Keep the saved copy in step with the live list.
+  useEffect(() => {
+    if (!user || groupsStatus !== 'ready' || groupsFromCache) return
+    writeGroupsCache(user.id, groups)
+  }, [user, groups, groupsStatus, groupsFromCache])
+
+  // A guest "New group" tap that triggered sign-in is only a request to sign
+  // in. Once the account's groups are loaded the request is done; the screen
+  // opens the editor itself (Phase 4).
+  useEffect(() => {
+    if (!user || authLoading) return
+    if (!pendingFavourite || pendingFavourite.type !== 'groups') return
+    if (groupsStatus === 'loading') return
+    dismissPendingFavourite()
+  }, [user, authLoading, pendingFavourite, groupsStatus, dismissPendingFavourite])
+
+  // ── Guards shared by every change ─────────────────────────────────────────
+  // Returns a refusal ({ ok: false, reason }) or null when the change may go on.
+  const refuseChange = useCallback(({ needsEditable = true } = {}) => {
+    if (!userRef.current) {
+      promptSignIn('groups', 'new')
+      return { ok: false, reason: 'guest' }
+    }
+    if (isOffline()) {
+      toast.info(OFFLINE_MESSAGE)
+      return { ok: false, reason: 'offline' }
+    }
+    if (shownFromCacheRef.current) {
+      // Only the saved copy is on screen, so we do not know the real list.
+      toast.info(OFFLINE_MESSAGE)
+      return { ok: false, reason: 'offline' }
+    }
+    if (needsEditable && isReadOnlyNow()) return { ok: false, reason: 'read_only' }
+    return null
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptSignIn, toast])
+
+  function isReadOnlyNow() {
+    const list = groupsRef.current
+    return !isProRef.current && (
+      list.length > DRUG_GROUPS_CAP_FREE ||
+      list.some(g => g.brandIds.length > DRUG_GROUP_DRUGS_CAP_FREE)
+    )
+  }
+
+  function cleanFields({ name, description, color }, { requireName }) {
+    const out = {}
+    if (name !== undefined || requireName) {
+      const n = String(name ?? '').trim()
+      if (!n || n.length > GROUP_NAME_MAX) return null
+      out.name = n
+    }
+    if (description !== undefined) {
+      const d = String(description ?? '').trim()
+      if (d.length > GROUP_DESCRIPTION_MAX) return null
+      out.description = d
+    }
+    if (color !== undefined) {
+      if (!GROUP_COLORS.includes(color)) return null
+      out.color = color
+    }
+    return out
+  }
+
+  // ── Create ────────────────────────────────────────────────────────────────
+  const createGroup = useCallback(async ({ name, description = '', color = 'blue' } = {}) => {
+    const refused = refuseChange()
+    if (refused) return refused
+    const cap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
+    if (groupsRef.current.length >= cap) return { ok: false, reason: 'limit' }
+
+    const fields = cleanFields({ name, description, color }, { requireName: true })
+    if (!fields) return { ok: false, reason: 'invalid' }
+
+    const { data, error } = await supabase
+      .from('drug_groups')
+      .insert(fields)
+      .select('id, name, description, color, created_at')
+      .single()
+
+    if (error || !data) {
+      if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
+        return { ok: false, reason: 'limit' }
+      }
+      toast.error('Could not create the group. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+    const group = mapGroupRow({ ...data, drug_group_items: [] })
+    setGroups(prev => newestFirst([group, ...prev]))
+    return { ok: true, group }
+  }, [refuseChange, toast])
+
+  // ── Edit ──────────────────────────────────────────────────────────────────
+  const updateGroup = useCallback(async (id, changes = {}) => {
+    const refused = refuseChange()
+    if (refused) return refused
+    const before = groupsRef.current.find(g => g.id === id)
+    if (!before) return { ok: false, reason: 'missing' }
+
+    const fields = cleanFields(changes, { requireName: false })
+    if (!fields) return { ok: false, reason: 'invalid' }
+
+    const patch = {}
+    if (fields.name !== undefined) patch.name = fields.name
+    if (fields.description !== undefined) patch.description = fields.description
+    if (fields.color !== undefined) patch.color = fields.color
+    setGroups(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)))
+
+    const { error } = await supabase.from('drug_groups').update(fields).eq('id', id)
+    if (error) {
+      setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
+      toast.error('Could not save the changes. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+    return { ok: true }
+  }, [refuseChange, toast])
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  // Always allowed for the signed-in owner, even when read only (decision 6).
+  const deleteGroup = useCallback(async (id) => {
+    const refused = refuseChange({ needsEditable: false })
+    if (refused) return refused
+    const list = groupsRef.current
+    const index = list.findIndex(g => g.id === id)
+    if (index < 0) return { ok: false, reason: 'missing' }
+    const group = list[index]
+
+    setGroups(list.filter(g => g.id !== id))
+    const { error } = await supabase.from('drug_groups').delete().eq('id', id)
+    if (error) {
+      setGroups(prev => (prev.some(g => g.id === id) ? prev : newestFirst([...prev, group])))
+      toast.error('Could not delete the group. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+    return { ok: true, group, index }
+  }, [refuseChange, toast])
+
+  return {
+    groups,
+    groupsStatus,
+    groupsFromCache,
+    groupsLoadError,
+    isReadOnly,
+    canCreateGroup,
+    reloadGroups,
+    createGroup,
+    updateGroup,
+    deleteGroup,
+  }
+}
