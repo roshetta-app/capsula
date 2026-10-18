@@ -2,7 +2,8 @@
  * src/components/drugs/DrugHeader.jsx
  *
  * 2026-10-18 (header tidy-up, Omar): the header is now Back + category and
- * Share + Heart (top row), the brand name, and the strength line. Share opens
+ * Share (top row), the brand name and the strength line, with the Favourite
+ * heart (bigger, 28px) at the right end, centred across those two lines. Share opens
  * the phone share sheet with a short message and the drug's page link, or
  * copies it (utils/shareDrugLink.js). The
  * picture and price icons and the Arabic name moved out; they now live in
@@ -425,89 +426,99 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
             >
               <Share2 size={20} strokeWidth={2} />
             </button>
+          </div>
+        </div>
 
-            <button
-              onClick={handleToggleFav}
-              aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
-              style={{
-                background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                display: 'flex', alignItems: 'center',
-                color: 'var(--color-favourite)',
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              <Heart
-                size={20}
-                strokeWidth={2}
-                fill={isFavourited ? 'currentColor' : 'none'}
+        {/* Rows 2 and 3 (brand name, strength line) on the left; the Favourite heart
+            sits at the right end, vertically centred across both lines (bigger,
+            2026-10-18, Omar). */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Row 2: brand name, on its own line — horizontal scroll for long
+                names/combo generics, never wraps/truncates/shrinks (4.22).
+                touchAction reset to pan-x so sideways swiping here still works
+                despite the header's own touchAction: 'none'. Image-search icon
+                sits at the end of this same line (space-between), matching
+                where PrescriptionSheetBlock.jsx's DrugMainLine places its own
+                copy of this icon. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+              <div
+                ref={brandFade.ref}
+                onScroll={brandFade.onScroll}
                 style={{
-                  transform:  popped ? 'scale(1.2)' : 'scale(1)',
-                  transition: 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+                  display:                 'flex',
+                  overflowX:               'auto',
+                  whiteSpace:              'nowrap',
+                  scrollbarWidth:          'none',
+                  msOverflowStyle:         'none',
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction:             'pan-x',
+                  flex:                    1,
+                  minWidth:                0,
+                  ...edgeFadeStyle(brandFade.fade),
                 }}
-              />
-            </button>
-          </div>
-        </div>
+              >
+                <span style={{
+                  fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
+                  lineHeight: 1.2,
+                }}>
+                  {toTitleCase(drug.tradenameClean)}
+                </span>
+              </div>
 
-        {/* Row 2: brand name, on its own line — horizontal scroll for long
-            names/combo generics, never wraps/truncates/shrinks (4.22).
-            touchAction reset to pan-x so sideways swiping here still works
-            despite the header's own touchAction: 'none'. Image-search icon
-            sits at the end of this same line (space-between), matching
-            where PrescriptionSheetBlock.jsx's DrugMainLine places its own
-            copy of this icon. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-          <div
-            ref={brandFade.ref}
-            onScroll={brandFade.onScroll}
+            </div>
+
+            {/* Row 3: strength/form suffix — own line beneath the brand name
+                now, instead of sharing row 2's single scrolling line. Same
+                edge-fade + horizontal-scroll treatment as the brand-name line
+                above, reusing the same hook. Whole row hidden if there's no
+                suffix to show. */}
+            {titleSuffix && (
+              <div
+                ref={suffixFade.ref}
+                onScroll={suffixFade.onScroll}
+                style={{
+                  fontSize:                14,
+                  fontWeight:              500,
+                  color:                   'var(--color-text-primary)',
+                  overflowX:               'auto',
+                  whiteSpace:              'nowrap',
+                  scrollbarWidth:          'none',
+                  msOverflowStyle:         'none',
+                  WebkitOverflowScrolling: 'touch',
+                  touchAction:             'pan-x',
+                  ...edgeFadeStyle(suffixFade.fade),
+                }}
+              >
+                {titleSuffix}
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleToggleFav}
+            aria-label={isFavourited ? 'Remove from favourites' : 'Add to favourites'}
             style={{
-              display:                 'flex',
-              overflowX:               'auto',
-              whiteSpace:              'nowrap',
-              scrollbarWidth:          'none',
-              msOverflowStyle:         'none',
-              WebkitOverflowScrolling: 'touch',
-              touchAction:             'pan-x',
-              flex:                    1,
-              minWidth:                0,
-              ...edgeFadeStyle(brandFade.fade),
+              flexShrink: 0,
+              // 44px tap area (icon 28px + 8px around it). The negative top and
+              // bottom margin keeps a one-line title from growing taller.
+              margin: '-10px -8px -10px 0', padding: 8,
+              background: 'none', border: 'none', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--color-favourite)',
+              WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
           >
-            <span style={{
-              fontSize: 20, fontWeight: 700, color: 'var(--color-text-primary)',
-              lineHeight: 1.2,
-            }}>
-              {toTitleCase(drug.tradenameClean)}
-            </span>
-          </div>
-
+            <Heart
+              size={28}
+              strokeWidth={2}
+              fill={isFavourited ? 'currentColor' : 'none'}
+              style={{
+                transform:  popped ? 'scale(1.2)' : 'scale(1)',
+                transition: 'transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1)',
+              }}
+            />
+          </button>
         </div>
-
-        {/* Row 3: strength/form suffix — own line beneath the brand name
-            now, instead of sharing row 2's single scrolling line. Same
-            edge-fade + horizontal-scroll treatment as the brand-name line
-            above, reusing the same hook. Whole row hidden if there's no
-            suffix to show. */}
-        {titleSuffix && (
-          <div
-            ref={suffixFade.ref}
-            onScroll={suffixFade.onScroll}
-            style={{
-              fontSize:                14,
-              fontWeight:              500,
-              color:                   'var(--color-text-primary)',
-              overflowX:               'auto',
-              whiteSpace:              'nowrap',
-              scrollbarWidth:          'none',
-              msOverflowStyle:         'none',
-              WebkitOverflowScrolling: 'touch',
-              touchAction:             'pan-x',
-              ...edgeFadeStyle(suffixFade.fade),
-            }}
-          >
-            {titleSuffix}
-          </div>
-        )}
 
       </div>
     </header>
