@@ -39,6 +39,7 @@
  *   Class keywords E1 — fetchClassKeywords, fetchClassFamilyPairs,
  *           insertClassKeyword, updateClassKeyword, toggleClassKeywordActive,
  *           deleteClassKeyword (new)
+ *   S15s Part B — getDawaagateStatus, setDawaagateFallback (new)
  */
 
 import { supabase }  from './supabase'
@@ -1728,4 +1729,27 @@ export async function toggleGateActive(id, isActive, title = null) {
     .eq('id', id)
   if (!error) await logAudit(isActive ? 'publish' : 'unpublish', 'app_gates', id, title)
   return { error }
+}
+
+// ─── DawaaGate status card (S15s Part B) ─────────────────────────────────────
+
+/**
+ * Read the DawaaGate status for the admin Home card: status, since when, hand
+ * switch, last check and the last few flips. The database function refuses
+ * anyone who is not an admin.
+ */
+export async function getDawaagateStatus() {
+  const { data, error } = await supabase.rpc('admin_dawaagate_status')
+  return { data: data ?? null, error }
+}
+
+/**
+ * Turn the DawaaGate fallback on or off by hand. The database function checks
+ * admin and writes its own history row, so no audit call is needed here.
+ *
+ * @param {boolean} on
+ */
+export async function setDawaagateFallback(on) {
+  const { data, error } = await supabase.rpc('admin_set_dawaagate_fallback', { p_on: on })
+  return { data: data ?? null, error }
 }

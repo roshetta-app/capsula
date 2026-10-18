@@ -4,6 +4,7 @@ import { faUsers, faCapsules, faNotesMedical } from '@fortawesome/free-solid-svg
 import { supabase } from '../../lib/supabase'
 import { fetchAllUsers } from '../../lib/adminQueries'
 import AdminPageHeader from '../../components/admin/AdminPageHeader'
+import DawaaGateCard from '../../components/admin/DawaaGateCard'
 
 /**
  * AdminSummary — /admin's index route content (D3).
@@ -129,6 +130,7 @@ export default function AdminSummary() {
             </div>
           </div>
         ))}
+        <DawaaGateCard />
       </div>
     </AdminPageHeader>
   )
