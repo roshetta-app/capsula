@@ -249,6 +249,7 @@
  * The counts come from useDrugSearch ('classHint'); Class mode itself is
  * unchanged.
  *
+ * 2026-10-18 (Omar): that strip is now solid (page colour), no gradient fade.
  * 2026-10-15 (search focus mode, refinements): (1) a soft fade strip sits under the sticky
  * Search card so results fade out below it instead of running up to its edge; (2) a single
  * 'Did you mean' guess is drawn like several (wide row); (3) the no-result cards (Did you
@@ -1166,15 +1167,16 @@ export default function DrugsScreen() {
           categories={categories}
           isDark={isDark}
         />
-        {/* Buffer strip: the results fade out just under the Search card instead of running
-            right up to its edge. */}
+        {/* Buffer strip: a solid band just under the Search card so results scroll
+            behind it with a clean edge instead of running up to the card
+            (2026-10-18, Omar: solid, no gradient). */}
         {searchOpen && (
           <div
             aria-hidden="true"
             style={{
               position: 'absolute', left: 0, right: 0, top: '100%', height: 18,
               pointerEvents: 'none',
-              background: 'linear-gradient(to bottom, var(--color-bg), transparent)',
+              background: 'var(--color-bg)',
             }}
           />
         )}
