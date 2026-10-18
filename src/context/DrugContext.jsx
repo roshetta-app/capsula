@@ -5,6 +5,30 @@ import { useClassKeywords } from '../hooks/useClassKeywords'
 
 const DrugContext = createContext(null)
 
+// 2026-10-18 (Drug groups plan, step 3.6): the two choices of the My drug groups
+// area are remembered on the phone, so they survive closing the app.
+const GROUPS_VIEW_KEY = 'capsula_groups_view'
+const GROUPS_SORT_KEY = 'capsula_groups_sort'
+
+function readStored(key, valid, fallback) {
+  try {
+    const v = localStorage.getItem(key)
+    return valid.includes(v) ? v : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function useStoredChoice(key, valid, fallback) {
+  const [value, setValue] = useState(() => readStored(key, valid, fallback))
+  const set = next => {
+    if (!valid.includes(next)) return
+    setValue(next)
+    try { localStorage.setItem(key, next) } catch { /* in memory only */ }
+  }
+  return [value, set]
+}
+
 /**
  * DrugProvider — wraps the app and makes drug data available everywhere.
  * Uses useDrugs() internally so cache-first logic runs once at the top level.
@@ -92,9 +116,11 @@ export function DrugProvider({ children }) {
   const [activeFilters, setActiveFilters] = useState(null)
   const [sortMode, setSortMode] = useState('relevance')
   const [classSortMode, setClassSortMode] = useState('relevance')
+  const [groupsView, setGroupsView] = useStoredChoice(GROUPS_VIEW_KEY, ['tiles', 'list'], 'tiles')
+  const [groupsSortMode, setGroupsSortMode] = useStoredChoice(GROUPS_SORT_KEY, ['newest', 'az'], 'newest')
   const { classKeywords } = useClassKeywords()
   const searchValue = useDrugSearch(drugsValue.drugs, mode, classKeywords)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, classSortMode, setClassSortMode, classKeywords, ...searchValue }
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, classSortMode, setClassSortMode, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode, classKeywords, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
@@ -102,7 +128,8 @@ export function DrugProvider({ children }) {
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
  * setActiveFilters, sortMode, setSortMode,
- * classSortMode, setClassSortMode, classKeywords, query,
+ * classSortMode, setClassSortMode, groupsView, setGroupsView,
+ * groupsSortMode, setGroupsSortMode, classKeywords, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
  * classHint, crossModeTargets }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTargets

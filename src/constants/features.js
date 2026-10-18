@@ -61,3 +61,30 @@ export const DRUG_GROUPS_CAP_FREE = 1
 export const DRUG_GROUP_DRUGS_CAP_FREE = 20
 export const DRUG_GROUPS_CAP_PRO = 100
 export const DRUG_GROUP_DRUGS_CAP_PRO = 50
+
+/**
+ * 2026-10-18 (Drug groups plan, step 3.6) — test preview on one phone.
+ *
+ * The pushed code keeps DRUG_GROUPS_ENABLED false, so nobody sees groups. To
+ * try the screens on your own phone, open the app address with ?groups=on
+ * once (for example https://roshetta-app.github.io/capsula/?groups=on). That
+ * is remembered on that phone only. ?groups=off turns it off again.
+ * Remove this preview at release (plan step 9.6).
+ */
+const GROUPS_PREVIEW_KEY = 'capsula_groups_preview'
+try {
+  const flag = new URLSearchParams(window.location.search).get('groups')
+  if (flag === 'on') localStorage.setItem(GROUPS_PREVIEW_KEY, '1')
+  if (flag === 'off') localStorage.removeItem(GROUPS_PREVIEW_KEY)
+} catch {
+  // no window or storage: the preview stays off
+}
+
+export function isDrugGroupsOn() {
+  if (DRUG_GROUPS_ENABLED) return true
+  try {
+    return localStorage.getItem(GROUPS_PREVIEW_KEY) === '1'
+  } catch {
+    return false
+  }
+}

@@ -300,6 +300,8 @@ import DrugsInfoSheet from '../components/drugs/DrugsInfoSheet'
 import DrugsSearchSection, { MODE_OPTIONS } from '../components/drugs/home/DrugsSearchSection'
 import ModeButton from '../components/drugs/home/ModeButton'
 import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
+import GroupsSection from '../components/drugs/groups/GroupsSection'
+import { isDrugGroupsOn } from '../constants/features'
 import FilledHintButton from '../components/drugs/home/FilledHintButton'
 import { shimmer } from '../components/drugs/home/shimmer'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -1037,7 +1039,15 @@ export default function DrugsScreen() {
     // ── Home view: the Browse area ────────────────────────────────────────
     // 2026-10-18 (Drugs groups plan, step 1.5): Browse is two buttons that
     // open the Category and Class pages; it needs no data from this screen.
-    body = <DrugsBrowseSection />
+    // 2026-10-18 (Drug groups plan, step 3.6): under Browse sits the My drug
+    // groups area, drawn only when the groups switch (or the test preview on
+    // this phone) is on.
+    body = (
+      <>
+        <DrugsBrowseSection />
+        {isDrugGroupsOn() && <GroupsSection />}
+      </>
+    )
   }
 
   // Phase 5 (§4.3, step 5c) — wires the filter-masked usageEvent (added in
