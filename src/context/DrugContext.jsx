@@ -54,6 +54,10 @@ const DrugContext = createContext(null)
  * survive opening a drug and coming back like everything else. Only these doc
  * comments were updated.
  *
+ * 2026-10-18 (Drugs groups plan, step 1.5): 'browseMode' and its setter are
+ * gone; Browse is now two buttons that open their own pages, so there is no
+ * choice to remember. The note below is kept as history.
+ *
  * 2026-10-04 (remembered Browse choice): 'browseMode' ('category' | 'class')
  * joins 'mode', 'activeFilters' and 'sortMode' here. It is the Category / Class
  * switch in the title of the Browse area on the Drugs screen. It used to be
@@ -87,23 +91,22 @@ export function DrugProvider({ children }) {
   const [mode, setMode] = useState('brand')
   const [activeFilters, setActiveFilters] = useState(null)
   const [sortMode, setSortMode] = useState('relevance')
-  const [browseMode, setBrowseMode] = useState('category')
   const [classSortMode, setClassSortMode] = useState('relevance')
   const { classKeywords } = useClassKeywords()
   const searchValue = useDrugSearch(drugsValue.drugs, mode, classKeywords)
-  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode, classSortMode, setClassSortMode, classKeywords, ...searchValue }
+  const value = { ...drugsValue, mode, setMode, activeFilters, setActiveFilters, sortMode, setSortMode, classSortMode, setClassSortMode, classKeywords, ...searchValue }
   return <DrugContext.Provider value={value}>{children}</DrugContext.Provider>
 }
 
 /**
  * useDrugContext — consume drug data anywhere in the tree.
  * Returns { drugs, loading, error, refresh, mode, setMode, activeFilters,
- * setActiveFilters, sortMode, setSortMode, browseMode, setBrowseMode,
+ * setActiveFilters, sortMode, setSortMode,
  * classSortMode, setClassSortMode, classKeywords, query,
  * setQuery, results, queryTooShort, suggestions, crossModeMatch, classResults,
  * classHint, crossModeTargets }
  * (mode is 'brand' | 'generic' | 'class'; classResults and crossModeTargets
- * are only filled in Class mode, classHint only in Brand and Generic mode; browseMode is 'category' | 'class';
+ * are only filled in Class mode, classHint only in Brand and Generic mode;
  * classSortMode is 'relevance' | 'az'; classKeywords is the list of active
  * class keywords, [{ id, keyword, targets: [{ class, subclass }] }])
  */

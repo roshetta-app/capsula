@@ -311,7 +311,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useToast } from '../context/ToastContext'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { normalizeSearchText } from '../utils/searchUtils'
-import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
+import { titleCaseWords } from '../utils/classSearch'
 import { useCategories } from '../hooks/useCategories'
 import { useBackToTop } from '../hooks/useBackToTop'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
@@ -405,8 +405,8 @@ let scrollTopOnCategoryOpen = false
 // 2026-10-18 (Drugs groups plan, step 1.1): the two things a tapped category
 // does before the address changes, now shared so the new Category page does
 // exactly what the tile on the Drugs home does: start the list at the top and
-// forget the old scroll place. Used by handleOpenCategory below and by
-// DrugCategoriesScreen.jsx.
+// forget the old scroll place. Used by DrugCategoriesScreen.jsx (the Drugs
+// home no longer has category tiles; step 1.5 removed them).
 export function prepareCategoryOpen(slug) {
   scrollTopOnCategoryOpen = true
   drugListMemory.delete(`cat:${slug === 'all' ? '__all' : slug}`)
@@ -420,7 +420,6 @@ export default function DrugsScreen() {
     mode, setMode,
     activeFilters, setActiveFilters,
     sortMode, setSortMode,
-    browseMode, setBrowseMode,
     query, setQuery,
     results:         searchResults,
     queryTooShort,
@@ -461,7 +460,7 @@ export default function DrugsScreen() {
   const activeCategory = categorySlug === 'all' ? '__all' : (categorySlug ?? null)
 
   // A tapped category card (or the All Drugs tile) starts the page at the top.
-  // handleOpenCategory leaves a note (a module-level flag, so it survives the
+  // prepareCategoryOpen (above) leaves a note (a module-level flag, so it survives the
   // screen being rebuilt when the address changes) and this runs as soon as
   // the category is on screen, before it is drawn. Coming back from a drug
   // page or leaving a category sets no note, so those keep their place.
@@ -566,12 +565,6 @@ export default function DrugsScreen() {
     setShowSortMenu(false)
   }
 
-  // A tapped category tile (or the All Drugs tile, slug 'all').
-  function handleOpenCategory(slug) {
-    prepareCategoryOpen(slug)
-    navigate(ROUTES.DRUGS_CATEGORY(slug))
-  }
-
   // Class search mode: open the class sheet for a tapped card. 'direct' is the
   // sheet's 'open straight on this' value: a subclass name, or the 'all drugs'
   // row for a class that has no subclasses to choose from; null means the
@@ -584,7 +577,7 @@ export default function DrugsScreen() {
 
   function handleOpenClass(className) {
     if (hasQuery && mode === 'class') addSearch(className, 'class')
-    const card = classResults?.classes?.find(c => c.name === className) ?? allClasses.find(c => c.name === className)
+    const card = classResults?.classes?.find(c => c.name === className)
     openClassSheet(className, card && card.subclassCount === 0 ? ALL_CLASS_DRUGS_KEY : null)
   }
 
@@ -592,13 +585,6 @@ export default function DrugsScreen() {
     if (hasQuery && mode === 'class') addSearch(subclassName || className, 'class')
     openClassSheet(className, subclassName)
   }
-
-  // Every class in the library, A to Z, for the Browse area's Class list.
-  // (Which list the Browse area shows, browseMode, lives in DrugContext.)
-  const allClasses = useMemo(
-    () => buildClassIndex(drugs).classes.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    [drugs]
-  )
 
   // Every brand in the tapped class, the same list the drug page gives the sheet.
   const classSheetDrugs = useMemo(
@@ -768,14 +754,6 @@ export default function DrugsScreen() {
   // in the search bar is greyed out and not tappable then (the sheet would be
   // empty).
   const filtersApply = !isClassSearch
-
-  // Same list the category tiles render from (the Browse area).
-  const categoriesWithCounts = categories
-    .map(cat => ({
-      ...cat,
-      count: drugs.filter(d => d.category === cat.slug).length,
-    }))
-    .filter(c => c.count > 0)
 
   // activeCategory holds the category's stable slug (see plan's decided
   // design — generics.category stores a drug_categories.slug, not the
@@ -1057,29 +1035,9 @@ export default function DrugsScreen() {
     )
   } else {
     // ── Home view: the Browse area ────────────────────────────────────────
-    // Category tiles are matched by slug, the category's stable internal code
-    // — not name_en, which is just the editable display label. This is the
-    // plan's decided design (a generic's category is stored as a
-    // drug_categories.slug, kept as plain text rather than a foreign key, but
-    // still the stable code, not the human-facing name that can be renamed
-    // later). categoriesWithCounts is computed once above (1c.2) so the tile
-    // list and the results view share the exact same list.
-    body = (
-      <DrugsBrowseSection
-        browseMode={browseMode}
-        onBrowseModeChange={setBrowseMode}
-        loading={loading}
-        hasDrugs={drugs.length > 0}
-        error={error}
-        onRetry={retry}
-        categories={categoriesWithCounts}
-        allClasses={allClasses}
-        isDark={isDark}
-        onOpenCategory={handleOpenCategory}
-        onOpenClass={handleOpenClass}
-        onOpenSubclass={handleOpenSubclass}
-      />
-    )
+    // 2026-10-18 (Drugs groups plan, step 1.5): Browse is two buttons that
+    // open the Category and Class pages; it needs no data from this screen.
+    body = <DrugsBrowseSection />
   }
 
   // Phase 5 (§4.3, step 5c) — wires the filter-masked usageEvent (added in
