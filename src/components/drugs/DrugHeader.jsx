@@ -190,6 +190,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, Share2, Heart } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { shareDrug } from '../../utils/shareDrugLink'
+import { usePressed } from '../../hooks/usePressed'
 import { SpecialtyIcon } from '../../utils/specialtyIcon'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 
@@ -275,6 +276,7 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
   const { toast } = useToast()
   const [popped, setPopped] = useState(false)
   const popTimeoutRef = useRef(null)
+  const { pressed: sharePressed, handlers: shareHandlers } = usePressed()
 
   useEffect(() => () => clearTimeout(popTimeoutRef.current), [])
 
@@ -410,11 +412,15 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
             <button
               onClick={handleShare}
+              {...shareHandlers}
               aria-label="Share this drug"
               style={{
                 background: 'none', border: 'none', cursor: 'pointer', padding: 2,
                 color: 'var(--color-text-primary)',
                 WebkitTapHighlightColor: 'transparent', outline: 'none',
+                transform: sharePressed ? 'scale(0.86)' : 'scale(1)',
+                opacity: sharePressed ? 0.6 : 1,
+                transition: 'transform var(--motion-fast) var(--ease-settle), opacity var(--motion-fast) var(--ease-settle)',
               }}
             >
               <Share2 size={20} strokeWidth={2} />

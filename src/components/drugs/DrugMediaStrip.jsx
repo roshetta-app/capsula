@@ -42,12 +42,13 @@ import { supabase } from '../../lib/supabase'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
+import { usePressed } from '../../hooks/usePressed'
 import { splitArabicName } from '../../utils/arabicName'
 import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../utils/drugTitleFormat'
 import Lightbox from '../ui/Lightbox'
 import CheckPriceButton from './CheckPriceButton'
 
-const THUMB = 52 // px
+const THUMB = 46 // px
 const NAME_MAX = 16 // px, Arabic name size when it is short
 const NAME_MIN = 12 // px, smallest size before a very long name is cut with dots
 const NAME_LINE = 1.45 // line height of the Arabic name
@@ -63,6 +64,7 @@ export default function DrugMediaStrip({ drug }) {
   const [picture, setPicture] = useState(undefined)
   const [imgState, setImgState] = useState('loading') // loading | loaded | error
   const [viewerOpen, setViewerOpen] = useState(false)
+  const { pressed, handlers: pressHandlers } = usePressed()
   const boxRef = useRef(null)
   const nameRef = useRef(null)
   const restRef = useRef(null)
@@ -146,6 +148,9 @@ export default function DrugMediaStrip({ drug }) {
   const showLoadedImage = showImage && imgState === 'loaded'
   const offline = !isOnline
 
+  // Tap feedback only where a tap does something (not while still looking up).
+  const thumbTappable = showLoadedImage || offline || !(lookingUp || (showImage && imgState === 'loading'))
+
   function handleThumbClick() {
     if (showLoadedImage) { setViewerOpen(true); return }
     if (offline) { toast.info(OFFLINE_PICTURE_MSG); return }
@@ -173,7 +178,7 @@ export default function DrugMediaStrip({ drug }) {
         marginTop: -12, marginBottom: 'var(--space-4)',
         borderRadius: 14, border: '1px solid var(--color-border)',
         backgroundColor: 'var(--color-surface)',
-        padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12,
+        padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 12,
       }}>
         {arabicBrand ? (
           <>
@@ -212,6 +217,7 @@ export default function DrugMediaStrip({ drug }) {
         <button
           type="button"
           onClick={handleThumbClick}
+          {...pressHandlers}
           aria-label={showLoadedImage ? `Open picture of ${drug.tradenameClean}` : `Search pictures of ${drug.tradenameClean}`}
           style={{
             position: 'relative', width: THUMB, height: THUMB, flexShrink: 0, padding: 0,
@@ -220,6 +226,8 @@ export default function DrugMediaStrip({ drug }) {
             backgroundColor: 'var(--color-surface-muted)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+            transform: pressed && thumbTappable ? 'scale(0.94)' : 'scale(1)',
+            transition: 'transform var(--motion-fast) var(--ease-settle)',
           }}
         >
           {showLoadedImage && (

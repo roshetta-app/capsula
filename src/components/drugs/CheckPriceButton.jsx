@@ -78,6 +78,7 @@ import { Tag } from 'lucide-react'
 import { openInAppBrowser } from '../../utils/openInAppBrowser'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
+import { usePressed } from '../../hooks/usePressed'
 
 // Named spots in DawaaGate's page code (see the header).
 const PRICE_CARD_HASH = '#ddm-share'
@@ -142,16 +143,21 @@ export default function CheckPriceButton({ drug, wide = false }) {
   }
 
   const live = ready && isOnline
+  const { pressed, handlers } = usePressed()
+  // Tap feedback only where a tap does something (offline shows a message).
+  const down = pressed && (ready || !isOnline)
+  const settle = 'transform var(--motion-fast) var(--ease-settle)'
 
   const common = {
     boxSizing: 'border-box', color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
     cursor: live ? 'pointer' : 'default', fontWeight: 500,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation',
+    ...(wide ? { transform: down ? 'scale(0.97)' : 'scale(1)', transition: settle } : {}),
   }
   const shape = wide
     ? {
-        flex: '1 1 0', minWidth: 0, height: 52, gap: 8, fontSize: 14, padding: '0 12px',
+        flex: '1 1 0', minWidth: 0, height: 46, gap: 8, fontSize: 14, padding: '0 12px',
         borderRadius: 12, border: '1px solid var(--color-border)',
         backgroundColor: 'var(--color-surface-muted)',
       }
@@ -166,10 +172,11 @@ export default function CheckPriceButton({ drug, wide = false }) {
     <button
       type="button"
       onClick={handleClick}
+      {...handlers}
       aria-label="Check price"
       style={{ ...common, ...shape }}
     >
-      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'inherit', flexDirection: 'inherit', opacity: live ? 1 : 0.55 }}>
+      <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'inherit', flexDirection: 'inherit', opacity: live ? 1 : 0.55, ...(wide ? {} : { transform: down ? 'scale(0.9)' : 'scale(1)', transition: settle }) }}>
         <Tag size={wide ? 18 : 20} strokeWidth={1.7} aria-hidden="true" style={{ color: 'var(--color-accent)' }} />
         <span style={{ lineHeight: 1.2, whiteSpace: 'nowrap' }}>{wide ? 'Check price' : 'Price'}</span>
       </span>
