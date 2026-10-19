@@ -25,6 +25,19 @@
  *                                 §4.6/§4.7 — UX signal only, tracked
  *                                 separately so it never counts as a
  *                                 content gap)
+ *   group_create               — a drug group was created (entity_id = group id)
+ *   group_drug_add             — one drug was added to a group (entity_id =
+ *                                 brand id), logged once per drug
+ *   group_share_create         — a share link was made (entity_id = group id)
+ *   shared_group_open          — a shared group page opened and showed the
+ *                                 group (nothing identifying is sent)
+ *   shared_group_save          — a shared group was saved as a copy
+ *                                 (entity_id = the new group's id)
+ *   group_limit_hit            — a group limit was reached; entity_name is
+ *                                 one of free_groups, free_drugs,
+ *                                 pro_groups, pro_drugs
+ *   (Drug groups, step 9.5: group events never carry a group name or
+ *   description. The database list usage_events_event_type_check has them.)
  *
  * Call sites (wired up in Phase 3J):
  *   ConditionDetailScreen — on mount  → condition_view
@@ -42,7 +55,7 @@ import { getDeviceId, getSessionId, getPlatform, getCurrentUserId } from './devi
 /**
  * Log a usage event to Supabase.
  *
- * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'} eventType
+ * @param {'condition_view'|'drug_view'|'condition_search'|'drug_search'|'drug_search_near_miss'|'drug_search_filter_masked'|'group_create'|'group_drug_add'|'group_share_create'|'shared_group_open'|'shared_group_save'|'group_limit_hit'} eventType
  * @param {string|null} entityId   — UUID of the entity, or null for search events
  * @param {string|null} entityName — Name snapshot at time of event
  * @param {'brand'|'generic'|null} [mode] — Brand/Generic mode, for drug-search

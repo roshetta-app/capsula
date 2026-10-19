@@ -71,6 +71,7 @@ import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
+import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache } from '../utils/cache'
 import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
@@ -316,6 +317,8 @@ export function useDrugGroups(fav) {
     }
     const group = mapGroupRow({ ...data, drug_group_items: [] })
     setGroups(prev => newestFirst([group, ...prev]))
+    // Analytics (step 9.5): the group id only, never its name or description.
+    logUsageEvent('group_create', group.id)
     return { ok: true, group }
   }, [refuseChange, toast])
 
@@ -409,6 +412,9 @@ export function useDrugGroups(fav) {
       toast.error('Could not save the drugs. Check your connection and try again.')
       return { ok: false, reason: 'error' }
     }
+    // Analytics (step 9.5): one event per drug added, after the save worked.
+    // The drug's id only, no names. Removing a drug logs nothing.
+    toAdd.forEach(brandId => logUsageEvent('group_drug_add', brandId))
     return { ok: true }
   }, [refuseChange, reloadGroups, toast])
 
@@ -501,6 +507,8 @@ export function useDrugGroups(fav) {
 
     const group = mapGroupRow({ ...data, drug_group_items: kept.map(brand_id => ({ brand_id })) })
     setGroups(prev => newestFirst([group, ...prev]))
+    // Analytics (step 9.5): the new copy's id only; nothing about the link or the owner.
+    logUsageEvent('shared_group_save', group.id)
     return { ok: true, group, saved: kept.length, total: all.length }
   }, [refuseChange, toast])
 
@@ -530,7 +538,11 @@ export function useDrugGroups(fav) {
       .insert({ group_id: groupId })
       .select('share_code')
       .single()
-    if (!error && data?.share_code) return { ok: true, code: data.share_code }
+    if (!error && data?.share_code) {
+      // Analytics (step 9.5): only a link that was really made now, not one found again.
+      logUsageEvent('group_share_create', groupId)
+      return { ok: true, code: data.share_code }
+    }
     if (error?.code === '23505') {
       // Already shared (another device, or a double tap): use the live code.
       const existing = await getShareCode(groupId)
@@ -550,6 +562,9 @@ export function useDrugGroups(fav) {
   }, [refuseChange])
 
   const showGroupLimit = useCallback((kind) => {
+    // Analytics (step 9.5): every limit hit goes through here, so it is logged
+    // once, here. Only a fixed label (free_groups, free_drugs, pro_groups, pro_drugs).
+    logUsageEvent('group_limit_hit', null, `${isProRef.current ? 'pro' : 'free'}_${kind === 'drugs' ? 'drugs' : 'groups'}`)
     if (isProRef.current) {
       toast.info(kind === 'drugs' ? drugsLimitMessage(true) : groupsLimitMessage(true))
       return

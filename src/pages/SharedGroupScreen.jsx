@@ -55,6 +55,7 @@ import { SAVE_READ_ONLY_MESSAGE, savedGroupMessage } from '../components/drugs/g
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
+import { logUsageEvent } from '../analytics/usageEvents'
 import { ROUTES } from '../router'
 
 function SkeletonCard() {
@@ -105,6 +106,16 @@ function SharedGroupBody({ code }) {
     })
     return () => { cancelled = true }
   }, [code, attempt])
+
+  // Analytics (step 9.5): one 'shared_group_open' per link opened, when the group
+  // really shows. No code, name or description is sent, and Retry or coming back
+  // online does not count it twice.
+  const openLoggedFor = useRef(null)
+  useEffect(() => {
+    if (result.status !== 'ok' || openLoggedFor.current === code) return
+    openLoggedFor.current = code
+    logUsageEvent('shared_group_open')
+  }, [result.status, code])
 
   const retry = useCallback(() => {
     setResult({ status: 'loading' })
