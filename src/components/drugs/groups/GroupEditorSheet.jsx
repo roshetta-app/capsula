@@ -10,6 +10,8 @@
  *                         question is asked here first when needed)
  *   group    the group being changed, or null for a new group
  *   onSaved  (group | null) => void   called after a successful save
+ *   initialBrandIds  brand ids a NEW group starts with (the Add to group sheet
+ *                    passes the drug being added); ignored when changing a group
  *   onDeleted (group) => void         called after a successful delete, with
  *                                     the group as it was (for Undo)
  *
@@ -103,7 +105,7 @@ const FIELD_STYLE = {
   fontFamily: 'var(--font-body)', outline: 'none',
 }
 
-export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted }) {
+export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [] }) {
   const { createGroup, updateGroup, setGroupDrugs, deleteGroup } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
@@ -112,12 +114,13 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
   // What the sheet starts with each time it opens.
+  const startKey = initialBrandIds.join('|')
   const initial = useMemo(
     () => (group
       ? { name: group.name ?? '', description: group.description ?? '', color: group.color ?? BLANK.color, brandIds: group.brandIds ?? [] }
-      : BLANK),
+      : { ...BLANK, brandIds: initialBrandIds }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isOpen, group?.id],
+    [isOpen, group?.id, startKey],
   )
 
   const [name, setName] = useState(initial.name)

@@ -185,10 +185,13 @@
  *   isFavourited  — boolean
  *   onBack        — () => void
  *   onToggleFav   — () => void
+ *   onAddToGroup  — optional () => void. When given, a folder-plus icon shows
+ *                   next to Share (2026-10-19, drug groups plan step 5.2);
+ *                   the screen only passes it when groups are switched on.
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Share2, Heart } from 'lucide-react'
+import { ArrowLeft, Share2, Heart, FolderPlus } from 'lucide-react'
 import { useToast } from '../../context/ToastContext'
 import { shareDrug } from '../../utils/shareDrugLink'
 import { usePressed } from '../../hooks/usePressed'
@@ -252,7 +255,7 @@ function edgeFadeStyle(fade) {
 }
 
 
-export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, category, colors }) {
+export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, onAddToGroup, category, colors }) {
   const brandFade  = useEdgeFade(drug.id)
   const suffixFade = useEdgeFade(drug.id)
 
@@ -411,6 +414,19 @@ export default function DrugHeader({ drug, isFavourited, onBack, onToggleFav, ca
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            {onAddToGroup && (
+              <button
+                onClick={onAddToGroup}
+                aria-label="Add to group"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: 'var(--color-text-primary)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <FolderPlus size={20} strokeWidth={2} />
+              </button>
+            )}
             <button
               onClick={handleShare}
               {...shareHandlers}

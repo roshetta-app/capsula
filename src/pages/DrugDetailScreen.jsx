@@ -105,6 +105,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { WifiOff }                       from 'lucide-react'
 import DrugHeader                        from '../components/drugs/DrugHeader'
+import AddToGroupSheet                   from '../components/drugs/groups/AddToGroupSheet'
+import { isDrugGroupsOn }                from '../constants/features'
+import { useAuth }                       from '../hooks/useAuth'
 import DrugMediaStrip                    from '../components/drugs/DrugMediaStrip'
 import DrugDetailSheet                   from '../components/drugs/DrugDetailSheet'
 import BottomNav                         from '../components/BottomNav'
@@ -228,10 +231,32 @@ export default function DrugDetailScreen() {
   useDeepLinkParent('/drugs')
 
   const { drugs, loading, error, retry } = useDrugContext()
-  const { isDrugFavourited, toggleDrug } = useFavouritesContext()
+  const { isDrugFavourited, toggleDrug, pendingFavourite, promptSignIn, groupsStatus } = useFavouritesContext()
+
+  // 2026-10-19 (drug groups plan, step 5.2): the Add to group icon and sheet,
+  // drawn only when groups are switched on. A signed-out tap asks to sign in
+  // and the sheet opens by itself once the account is signed in and its
+  // groups are loaded ('armedId' remembers whose drug asked, and also covers a
+  // sign-in that reloads the page, as the pending request is saved).
+  const { user: groupsUser, loading: groupsAuthLoading } = useAuth()
+  const groupsOn = isDrugGroupsOn()
+  const [groupSheetOpen, setGroupSheetOpen] = useState(false)
+  const [armedId, setArmedId] = useState(() => (
+    pendingFavourite?.type === 'groups' && pendingFavourite.id !== 'new' ? pendingFavourite.id : null
+  ))
 
   // Match by formulation slug first, fall back to id
   const drug = drugs.find(d => d.slug === slug || d.id === slug)
+
+  // Add to group (step 5.2): opened by the header icon, or by itself after a
+  // signed-out tap once the account is signed in and its groups are loaded.
+  const groupSheetAuto = !!armedId && drug?.id === armedId && !!groupsUser
+    && !pendingFavourite && groupsStatus !== 'loading'
+  function handleAddToGroup() {
+    if (!drug || groupsAuthLoading) return
+    if (!groupsUser) { setArmedId(drug.id); promptSignIn('groups', drug.id); return }
+    setGroupSheetOpen(true)
+  }
 
   // Siblings for BrandsList (ADR-034): every other item sharing this drug's
   // generic, across every form — not just this exact strength/form. The
@@ -493,7 +518,15 @@ export default function DrugDetailScreen() {
           isFavourited={isDrugFavourited(drug.id)}
           onBack={() => navigate(-1)}
           onToggleFav={() => toggleDrug(drug.id)}
+          onAddToGroup={groupsOn ? handleAddToGroup : undefined}
         />
+        {groupsOn && (
+          <AddToGroupSheet
+            isOpen={groupSheetOpen || groupSheetAuto}
+            onClose={() => { setGroupSheetOpen(false); setArmedId(null) }}
+            drug={drug}
+          />
+        )}
 
         {/* 0.2 — DrugDetailSheet (step 0.1) is the single scrolling child.
             Every section below is mounted per the locked §11.3 order:
