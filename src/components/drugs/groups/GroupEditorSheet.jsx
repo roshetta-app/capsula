@@ -33,7 +33,11 @@
  * the draft. At the limit (free 20, Pro 50 per group) the plus shows a message
  * (the limit sheet arrives in Phase 7).
  *
- * Later steps add the group's own drug list (4.3) and Delete group (4.4).
+ * 2026-10-19 (step 4.3): while the search box is empty the sheet shows the
+ * group's own drugs, A to Z, each with a remove button (GroupDrugList). Removing
+ * only changes the draft. With no drugs the search hint shows.
+ *
+ * Later step: Delete group (4.4).
  */
 
 import { useMemo, useRef, useState } from 'react'
@@ -41,6 +45,7 @@ import { Check, X } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupDrugSearch from './GroupDrugSearch'
+import GroupDrugList from './GroupDrugList'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
 import { useToast } from '../../../context/ToastContext'
@@ -146,6 +151,10 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     if (saving) return
     if (isDirty) { setConfirmOpen(true); return }
     onClose()
+  }
+
+  function handleRemoveDrug(id) {
+    setBrandIds(prev => prev.filter(b => b !== id))
   }
 
   function handleAddDrug(id) {
@@ -331,7 +340,13 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
                 {brandIds.length}/{drugsCap}
               </span>
             </div>
-            <GroupDrugSearch addedIds={brandIds} onAdd={handleAddDrug} />
+            <GroupDrugSearch
+              addedIds={brandIds}
+              onAdd={handleAddDrug}
+              emptyContent={brandIds.length > 0
+                ? <GroupDrugList ids={brandIds} onRemove={handleRemoveDrug} />
+                : null}
+            />
           </div>
         </div>
 

@@ -16,14 +16,17 @@
  * was typed), results with a plus or "Added". The plus keeps the keyboard up
  * (no blur on press) so adding several drugs in a row is one tap each.
  * Shows the first 25 matches; typing more narrows them.
+ *
+ * 2026-10-19 (step 4.3): 'emptyContent' is what shows while the box is empty
+ * (the editor passes the group's own drug list); without it the hint shows.
  */
 
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Plus, Search } from 'lucide-react'
 import { useDrugContext } from '../../../context/DrugContext'
 import { searchDrugsTiered } from '../../../utils/searchUtils'
-import { toTitleCase, getDrugTitleSuffix, TITLE_HIDDEN_MODIFIER_TAGS } from '../../../utils/drugTitleFormat'
-import { formatArabicFullName } from '../../../utils/arabicName'
+import GroupDrugRowInfo from './GroupDrugRowInfo'
+import { drugRowTitle } from './groupDrugText'
 
 const MAX_SHOWN = 25
 const DEBOUNCE_MS = 180
@@ -33,20 +36,8 @@ const HINT_STYLE = {
   color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
 }
 
-function genericLine(drug) {
-  if (drug.ingredients?.length > 0) {
-    return drug.ingredients.length > 2
-      ? `${drug.ingredients.slice(0, 2).map(toTitleCase).join(', ')} +${drug.ingredients.length - 2}`
-      : drug.ingredients.map(toTitleCase).join(', ')
-  }
-  return toTitleCase(drug.genericName || '')
-}
-
 function ResultRow({ drug, added, onAdd }) {
-  const suffix = getDrugTitleSuffix(drug, { omitModifierTags: TITLE_HIDDEN_MODIFIER_TAGS })
-  const title = [toTitleCase(drug.tradenameClean || ''), suffix].filter(Boolean).join(' ')
-  const generic = genericLine(drug)
-  const arabic = formatArabicFullName(drug.nameAr, drug.nameArFull)
+  const title = drugRowTitle(drug)
 
   return (
     <div style={{
@@ -54,30 +45,7 @@ function ResultRow({ drug, added, onAdd }) {
       padding: '10px var(--space-1)',
       borderBottom: '1px solid var(--color-border)',
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 14, fontWeight: 600, lineHeight: 1.3, color: 'var(--color-text-primary)',
-          fontFamily: 'var(--font-body)', overflowWrap: 'anywhere',
-        }}>
-          {title}
-        </div>
-        {generic && (
-          <div style={{
-            fontSize: 12, lineHeight: 1.35, color: 'var(--color-text-secondary)',
-            fontFamily: 'var(--font-body)', overflowWrap: 'anywhere',
-          }}>
-            {generic}
-          </div>
-        )}
-        {arabic && (
-          <div dir="ltr" style={{
-            fontSize: 12, lineHeight: 1.35, color: 'var(--color-text-tertiary)',
-            fontFamily: 'var(--font-body)', overflowWrap: 'anywhere',
-          }}>
-            {arabic}
-          </div>
-        )}
-      </div>
+      <GroupDrugRowInfo drug={drug} />
 
       {added ? (
         <div style={{
@@ -107,7 +75,7 @@ function ResultRow({ drug, added, onAdd }) {
   )
 }
 
-export default function GroupDrugSearch({ addedIds = [], onAdd }) {
+export default function GroupDrugSearch({ addedIds = [], onAdd, emptyContent = null }) {
   const { drugs } = useDrugContext()
   const [text, setText] = useState('')
   const [query, setQuery] = useState('')
@@ -129,7 +97,7 @@ export default function GroupDrugSearch({ addedIds = [], onAdd }) {
 
   let body = null
   if (typed.length === 0) {
-    body = <div style={HINT_STYLE}>Search a drug by name to add it</div>
+    body = emptyContent ?? <div style={HINT_STYLE}>Search a drug by name to add it</div>
   } else if (typed.length === 1) {
     body = <div style={HINT_STYLE}>Type at least 2 characters to search</div>
   } else if (!waiting && results.length === 0) {
