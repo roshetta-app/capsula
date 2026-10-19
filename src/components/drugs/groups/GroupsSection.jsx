@@ -13,12 +13,14 @@
  * copy plus a line), and the lapsed read-only banner.
  *
  * 2026-10-19 (step 4.1): New group and the empty-state Create group button
- * open the group editor sheet. TEMPORARY until the group page (Phase 6):
- * tapping a group opens the same sheet to change it. Delete group joins the
- * sheet at step 4.4.
+ * open the group editor sheet. 2026-10-19 (step 6.2): tapping a group opens its
+ * own page (/drugs/group/:id); changing or deleting it now happens from there.
+ * The Undo message for a group deleted from its page is shown here, handed
+ * over by pendingUndo.js.
  */
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
@@ -28,6 +30,8 @@ import GroupViewToggle from './GroupViewToggle'
 import GroupStateMessage from './GroupStateMessage'
 import GroupEditorSheet from './GroupEditorSheet'
 import Snackbar from '../../ui/Snackbar'
+import { takePendingUndo } from './pendingUndo'
+import { ROUTES } from '../../../router'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -105,10 +109,19 @@ export default function GroupsSection() {
   const { toast } = useToast()
   const [editor, setEditor] = useState({ open: false, group: null })
 
-  // Undo for Delete group (step 4.4): a message with Undo for 5 seconds.
-  const [undo, setUndo] = useState({ group: null, visible: false })
-  const undoTimer = useRef(null)
-  useEffect(() => () => clearTimeout(undoTimer.current), [])
+  const navigate = useNavigate()
+
+  // Undo for Delete group (step 4.4): a message with Undo for 5 seconds. Starts
+  // already showing when the group was just deleted from its page (6.2).
+  const [undo, setUndo] = useState(() => {
+    const g = takePendingUndo()
+    return { group: g, visible: !!g }
+  })
+  useEffect(() => {
+    if (!undo.visible) return
+    const t = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+    return () => clearTimeout(t)
+  }, [undo.visible, undo.group])
 
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
   useEffect(() => {
@@ -159,19 +172,11 @@ export default function GroupsSection() {
     setEditor({ open: true, group: null })
   }
 
-  // TEMPORARY (the group page replaces this in Phase 6).
   function handleOpenGroup(g) {
-    setEditor({ open: true, group: g })
-  }
-
-  function handleDeleted(deletedGroup) {
-    clearTimeout(undoTimer.current)
-    setUndo({ group: deletedGroup, visible: true })
-    undoTimer.current = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+    navigate(ROUTES.DRUGS_GROUP(g.id))
   }
 
   async function handleUndo() {
-    clearTimeout(undoTimer.current)
     const restored = undo.group
     setUndo(u => ({ ...u, visible: false }))
     const res = await restoreGroup(restored)
@@ -270,7 +275,7 @@ export default function GroupsSection() {
       <DrugsSectionCard label="My drug groups" title={title} trailing={trailing}>
         {content}
       </DrugsSectionCard>
-      <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} onDeleted={handleDeleted} />
+      <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} />
       <Snackbar visible={undo.visible} message="Group deleted" actionLabel="Undo" onAction={handleUndo} />
     </>
   )

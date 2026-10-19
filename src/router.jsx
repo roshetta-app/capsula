@@ -59,6 +59,7 @@ import ConditionDetailScreen from './pages/ConditionDetailScreen'
 import DrugsScreen           from './pages/DrugsScreen'
 import DrugCategoriesScreen  from './pages/DrugCategoriesScreen'
 import DrugClassesScreen     from './pages/DrugClassesScreen'
+import DrugGroupScreen       from './pages/DrugGroupScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
@@ -99,6 +100,9 @@ export const ROUTES = {
   // Two segments after /drugs so they can never clash with /drugs/:slug.
   DRUGS_BROWSE_CATEGORY: '/drugs/browse/category',
   DRUGS_BROWSE_CLASS:    '/drugs/browse/class',
+  // 2026-10-19 (Drugs groups plan, step 6.2): a group's own page. Two segments
+  // after /drugs, so it can never clash with /drugs/:slug.
+  DRUGS_GROUP:           (id) => `/drugs/group/${id}`,
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
@@ -145,6 +149,7 @@ export function PublicRoutes() {
         <Route path="/drugs/category/:categorySlug"  element={<DrugsScreen />} />
         <Route path="/drugs/browse/category"          element={<DrugCategoriesScreen />} />
         <Route path="/drugs/browse/class"             element={<DrugClassesScreen />} />
+        <Route path="/drugs/group/:groupId"           element={<DrugGroupScreen />} />
         <Route path="/favourites"          element={<FavouritesScreen />} />
         <Route path="/account"             element={<AccountScreen />} />
       </Route>
