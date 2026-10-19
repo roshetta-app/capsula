@@ -24,23 +24,44 @@
  *    the sheet no longer shrinks when the keyboard opens, and tapping a
  *    toast or the discard dialog above it does not count as a tap outside.
  *
- * Later steps add the drug search (4.2), the group's own drug list (4.3) and
- * Delete group (4.4) inside this sheet.
+ * 2026-10-19 (step 4.2): the sheet also holds the group's drugs as a draft
+ * (brandIds). A search box under Colour (GroupDrugSearch) adds drugs to the
+ * draft; nothing is written until Save, which saves the group first and then
+ * its drugs in one call (setGroupDrugs). A new group is created first, so if
+ * the drugs fail to save the sheet stays open knowing the group now exists
+ * (createdId) and a second Save does not make a duplicate. Discarding drops
+ * the draft. At the limit (free 20, Pro 50 per group) the plus shows a message
+ * (the limit sheet arrives in Phase 7).
+ *
+ * Later steps add the group's own drug list (4.3) and Delete group (4.4).
  */
 
 import { useMemo, useRef, useState } from 'react'
 import { Check, X } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
+import GroupDrugSearch from './GroupDrugSearch'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
+import { useToast } from '../../../context/ToastContext'
+import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
 import { useDirtyState } from '../../../hooks/useDirtyState'
 import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
 const COLOR_LABELS = { blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose' }
-const BLANK = { name: '', description: '', color: GROUP_COLORS[0] }
+const BLANK = { name: '', description: '', color: GROUP_COLORS[0], brandIds: [] }
+
+function drugsLimitMessage(isPro) {
+  return isPro
+    ? 'A group can hold 50 drugs. Remove one to add another.'
+    : 'Free accounts can keep 20 drugs in a group. Upgrade to Pro for 50.'
+}
+
+function sameIds(a, b) {
+  return a.length === b.length && a.slice().sort().join('|') === b.slice().sort().join('|')
+}
 
 function saveFailureMessage(reason, isPro) {
   switch (reason) {
@@ -50,6 +71,8 @@ function saveFailureMessage(reason, isPro) {
     case 'limit':     return isPro
       ? "You've reached 100 groups. Delete one to add another."
       : 'Free accounts can keep 1 group. Upgrade to Pro for more.'
+    case 'drugs_limit': return drugsLimitMessage(isPro)
+    case 'drugs_error': return 'Group saved, but its drugs were not. Tap Save to try again.'
     default:          return "Couldn't save your group. Try again."
   }
 }
@@ -70,15 +93,17 @@ const FIELD_STYLE = {
 }
 
 export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved }) {
-  const { createGroup, updateGroup } = useFavouritesContext()
+  const { createGroup, updateGroup, setGroupDrugs } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
+  const { toast } = useToast()
   const isEdit = !!group
+  const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
   // What the sheet starts with each time it opens.
   const initial = useMemo(
     () => (group
-      ? { name: group.name ?? '', description: group.description ?? '', color: group.color ?? BLANK.color }
+      ? { name: group.name ?? '', description: group.description ?? '', color: group.color ?? BLANK.color, brandIds: group.brandIds ?? [] }
       : BLANK),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [isOpen, group?.id],
@@ -87,6 +112,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const [name, setName] = useState(initial.name)
   const [description, setDescription] = useState(initial.description)
   const [color, setColor] = useState(initial.color)
+  const [brandIds, setBrandIds] = useState(initial.brandIds)
+  const [createdId, setCreatedId] = useState(null)
   const [nameError, setNameError] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -101,6 +128,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       setName(initial.name)
       setDescription(initial.description)
       setColor(initial.color)
+      setBrandIds(initial.brandIds)
+      setCreatedId(null)
       setNameError(false)
       setSaveError('')
       setSaving(false)
@@ -108,14 +137,24 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     }
   }
 
-  const current = useMemo(() => ({ name, description, color }), [name, description, color])
-  const isDirty = useDirtyState(initial, current)
+  const current = useMemo(() => ({ name, description, color, brandIds: brandIds.slice().sort() }), [name, description, color, brandIds])
+  const initialCompare = useMemo(() => ({ ...initial, brandIds: initial.brandIds.slice().sort() }), [initial])
+  const isDirty = useDirtyState(initialCompare, current)
 
   // Every way of closing comes through here.
   function requestClose() {
     if (saving) return
     if (isDirty) { setConfirmOpen(true); return }
     onClose()
+  }
+
+  function handleAddDrug(id) {
+    if (brandIds.includes(id)) return
+    if (brandIds.length >= drugsCap) {
+      toast.info(drugsLimitMessage(isPro))
+      return
+    }
+    setBrandIds(prev => (prev.includes(id) ? prev : [...prev, id]))
   }
 
   async function handleSave() {
@@ -130,19 +169,44 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     setSaving(true)
     setSaveError('')
     const fields = { name: cleanName, description: description.trim(), color }
+
+    // 1. The group itself (made first when new, so it has an id).
+    let id = group?.id ?? createdId
     let res
     try {
-      res = isEdit ? await updateGroup(group.id, fields) : await createGroup(fields)
+      res = id ? await updateGroup(id, fields) : await createGroup(fields)
     } catch {
       res = { ok: false, reason: 'error' }
     }
-    setSaving(false)
-    if (res?.ok) {
-      onSaved?.(res.group ?? null)
-      onClose()
+    if (!res?.ok) {
+      setSaving(false)
+      setSaveError(saveFailureMessage(res?.reason, isPro))
       return
     }
-    setSaveError(saveFailureMessage(res?.reason, isPro))
+    if (!id) {
+      id = res.group?.id
+      setCreatedId(id ?? null)
+    }
+
+    // 2. Its drugs, when they differ from what the group already holds.
+    const held = group?.brandIds ?? []
+    if (id && !sameIds(brandIds, held)) {
+      let drugsRes
+      try {
+        drugsRes = await setGroupDrugs(id, brandIds)
+      } catch {
+        drugsRes = { ok: false, reason: 'error' }
+      }
+      if (!drugsRes?.ok) {
+        setSaving(false)
+        setSaveError(saveFailureMessage(drugsRes?.reason === 'limit' ? 'drugs_limit' : 'drugs_error', isPro))
+        return
+      }
+    }
+
+    setSaving(false)
+    onSaved?.(res.group ?? null)
+    onClose()
   }
 
   return (
@@ -258,6 +322,16 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
                 )
               })}
             </div>
+          </div>
+
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ ...LABEL_STYLE, marginBottom: 0 }}>Drugs in this group</span>
+              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
+                {brandIds.length}/{drugsCap}
+              </span>
+            </div>
+            <GroupDrugSearch addedIds={brandIds} onAdd={handleAddDrug} />
           </div>
         </div>
 

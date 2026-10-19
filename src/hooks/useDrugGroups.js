@@ -38,6 +38,10 @@
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
+ *   setGroupDrugs   (id, brandIds) => Promise<{ ok, reason? }>   (2026-10-19, step 4.2)
+ *                   Makes the group hold exactly these brand ids: adds the new
+ *                   ones and removes the missing ones in one go. The editor
+ *                   keeps its drugs as a draft and calls this on Save.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -50,6 +54,7 @@ import {
   DRUG_GROUPS_CAP_FREE,
   DRUG_GROUP_DRUGS_CAP_FREE,
   DRUG_GROUPS_CAP_PRO,
+  DRUG_GROUP_DRUGS_CAP_PRO,
 } from '../constants/features'
 
 export const GROUP_NAME_MAX = 40
@@ -331,6 +336,54 @@ export function useDrugGroups(fav) {
     return { ok: true, group, index }
   }, [refuseChange, toast])
 
+  // ── Drugs in a group ──────────────────────────────────────────────────────
+  // 2026-10-19 (step 4.2). Sets the whole list in one call: rows for the new
+  // brand ids are added, rows for the dropped ones are removed. On a failed
+  // write the screen goes back to what it showed and the groups are loaded
+  // again from the server, because a remove can succeed while the add after
+  // it fails.
+  const setGroupDrugs = useCallback(async (id, brandIds = []) => {
+    const refused = refuseChange()
+    if (refused) return refused
+    const before = groupsRef.current.find(g => g.id === id)
+    if (!before) return { ok: false, reason: 'missing' }
+
+    const next = Array.from(new Set(brandIds))
+    const cap = isProRef.current ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
+    if (next.length > cap) return { ok: false, reason: 'limit' }
+
+    const had = new Set(before.brandIds)
+    const wants = new Set(next)
+    const toAdd = next.filter(b => !had.has(b))
+    const toRemove = before.brandIds.filter(b => !wants.has(b))
+    if (toAdd.length === 0 && toRemove.length === 0) return { ok: true }
+
+    setGroups(prev => prev.map(g => (g.id === id ? { ...g, brandIds: next } : g)))
+
+    let error = null
+    if (toRemove.length > 0) {
+      const res = await supabase
+        .from('drug_group_items').delete().eq('group_id', id).in('brand_id', toRemove)
+      error = res.error
+    }
+    if (!error && toAdd.length > 0) {
+      const res = await supabase
+        .from('drug_group_items').insert(toAdd.map(brand_id => ({ group_id: id, brand_id })))
+      error = res.error
+    }
+
+    if (error) {
+      setGroups(prev => prev.map(g => (g.id === id ? { ...g, brandIds: before.brandIds } : g)))
+      reloadGroups()
+      if (String(error.message ?? '').includes('drug_group_items_limit_reached')) {
+        return { ok: false, reason: 'limit' }
+      }
+      toast.error('Could not save the drugs. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+    return { ok: true }
+  }, [refuseChange, reloadGroups, toast])
+
   return {
     groups,
     groupsStatus,
@@ -342,5 +395,6 @@ export function useDrugGroups(fav) {
     createGroup,
     updateGroup,
     deleteGroup,
+    setGroupDrugs,
   }
 }
