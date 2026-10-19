@@ -58,6 +58,18 @@
  *   likely real explanation for why every earlier attempt at the `<html>`
  *   lock alone (see history above) never fully settled — this flag lets
  *   the `<html>` lock above be the only one running.
+ * - Two opt-in props for sheets that hold a text field
+ *   (2026-10-19, drug group editor), both off by default so no existing
+ *   sheet changes:
+ *     keyboardAware: stops vaul from resizing the sheet when the phone
+ *       keyboard opens or closes (its own fix rewrites the sheet's height
+ *       and leaves it shrunk) and instead lifts the sheet above the
+ *       keyboard and caps its height to the space left, then puts both
+ *       back when the keyboard goes.
+ *     dismissOnlyByBackdrop: the sheet closes only when the dim background
+ *       itself is tapped (or by drag or the phone back button). A tap on
+ *       anything else outside it, such as a toast or a confirm dialog drawn
+ *       above it, no longer counts as a tap outside.
  */
 
 import { useEffect, useState } from 'react'
@@ -86,6 +98,8 @@ export default function SheetShell({
   backdropOpacity = 0.4,
   maxHeight = '85dvh',
   closeThreshold = 0.4,
+  keyboardAware = false,
+  dismissOnlyByBackdrop = false,
 }) {
   useBackClose(isOpen, onClose)
 
@@ -98,6 +112,36 @@ export default function SheetShell({
   }, [isOpen])
 
   const [contentEl, setContentEl] = useState(null)
+
+  // keyboardAware: lift the sheet above the keyboard and cap its height.
+  useEffect(() => {
+    if (!isOpen || !keyboardAware || !contentEl) return
+    const vv = window.visualViewport
+    if (!vv) return
+    const node = contentEl
+    const prevBottom = node.style.bottom
+    const prevMax = node.style.maxHeight
+    const setStyle = (prop, value) => node.style.setProperty(prop, value)
+    const apply = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
+      if (kb > 80) {
+        setStyle('bottom', kb + 'px')
+        setStyle('max-height', Math.max(240, vv.height - 16) + 'px')
+      } else {
+        setStyle('bottom', prevBottom)
+        setStyle('max-height', prevMax)
+      }
+    }
+    vv.addEventListener('resize', apply)
+    vv.addEventListener('scroll', apply)
+    apply()
+    return () => {
+      vv.removeEventListener('resize', apply)
+      vv.removeEventListener('scroll', apply)
+      setStyle('bottom', prevBottom)
+      setStyle('max-height', prevMax)
+    }
+  }, [isOpen, keyboardAware, contentEl])
 
   // Hold the open sheet steady while the page resizes on return from another
   // tab (2026-09-19). In the installed PWA, for about 0.2s after coming back
@@ -165,6 +209,7 @@ export default function SheetShell({
       onOpenChange={(open) => { if (!open) onClose() }}
       closeThreshold={closeThreshold}
       disablePreventScroll
+      repositionInputs={!keyboardAware}
     >
       <Drawer.Portal>
         <Drawer.Overlay
@@ -178,6 +223,10 @@ export default function SheetShell({
         <Drawer.Content
           ref={setContentEl}
           aria-describedby={undefined}
+          onInteractOutside={dismissOnlyByBackdrop ? (e) => {
+            const t = e.target
+            if (!(t instanceof Element) || !t.closest('[data-vaul-overlay]')) e.preventDefault()
+          } : undefined}
           style={{
             position:        'fixed',
             bottom:          0,

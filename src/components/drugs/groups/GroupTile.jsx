@@ -12,14 +12,13 @@
  *
  * The group's colour is one of five fixed names (blue, teal, violet, amber,
  * rose), read through the app's colour tokens so light and dark both work.
- * A name typed in Arabic reads right-to-left.
+ * An Arabic name is left-aligned like an English one (decision 2026-10-19).
  */
 
 import { useState } from 'react'
 import { Folder, Plus } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
-import { getTextDirection } from '../../../utils/textDirection'
 
 export function drugCountLabel(n) {
   return n === 1 ? '1 drug' : `${n} drugs`
@@ -43,7 +42,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
-  const dir = isNew ? 'ltr' : getTextDirection(name)
+  const dir = 'ltr'
   const count = group?.brandIds?.length ?? 0
 
   return (

@@ -18,7 +18,11 @@
  *    button asks first when something was changed (useDirtyState).
  *  - If saving fails the sheet stays open with a short message and nothing
  *    typed is lost.
- *  - Names and descriptions typed in Arabic read right-to-left.
+ *  - Arabic names and descriptions sit left-aligned, like English ones
+ *    (decision 2026-10-19; the letters themselves still join as Arabic).
+ *  - Opens with keyboardAware and dismissOnlyByBackdrop (see SheetShell):
+ *    the sheet no longer shrinks when the keyboard opens, and tapping a
+ *    toast or the discard dialog above it does not count as a tap outside.
  *
  * Later steps add the drug search (4.2), the group's own drug list (4.3) and
  * Delete group (4.4) inside this sheet.
@@ -34,7 +38,6 @@ import { useDirtyState } from '../../../hooks/useDirtyState'
 import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
-import { getTextDirection } from '../../../utils/textDirection'
 
 const COLOR_LABELS = { blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose' }
 const BLANK = { name: '', description: '', color: GROUP_COLORS[0] }
@@ -144,7 +147,13 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
 
   return (
     <>
-      <SheetShell isOpen={isOpen} onClose={requestClose} ariaLabel={isEdit ? 'Edit group' : 'New group'}>
+      <SheetShell
+        isOpen={isOpen}
+        onClose={requestClose}
+        ariaLabel={isEdit ? 'Edit group' : 'New group'}
+        keyboardAware
+        dismissOnlyByBackdrop
+      >
         {/* Title row */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -186,7 +195,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               onChange={e => { setName(e.target.value.slice(0, GROUP_NAME_MAX)); if (nameError) setNameError(false) }}
               maxLength={GROUP_NAME_MAX}
               placeholder="For example ICU drips"
-              dir={getTextDirection(name)}
+              dir="ltr"
               aria-invalid={nameError}
               aria-describedby={nameError ? 'group-name-error' : undefined}
               style={{
@@ -212,7 +221,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               maxLength={GROUP_DESCRIPTION_MAX}
               rows={3}
               placeholder="What is this group for?"
-              dir={getTextDirection(description)}
+              dir="ltr"
               style={{ ...FIELD_STYLE, border: '1.5px solid transparent', resize: 'none' }}
             />
             <div style={{

@@ -17,7 +17,6 @@ import { useState } from 'react'
 import { Folder, Plus, ChevronRight } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
-import { getTextDirection } from '../../../utils/textDirection'
 import { drugCountLabel, ProPill } from './GroupTile'
 
 export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, onOpen }) {
@@ -25,7 +24,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
   const name = isNew ? 'New group' : (group?.name ?? '')
-  const dir = isNew ? 'ltr' : getTextDirection(name)
+  const dir = 'ltr'
   const count = group?.brandIds?.length ?? 0
   const preview = drugNames.filter(Boolean).slice(0, 3).join(', ')
 
