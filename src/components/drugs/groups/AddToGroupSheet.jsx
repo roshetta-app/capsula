@@ -51,7 +51,7 @@ import {
 } from '../../../constants/features'
 import { drugRowTitle } from './groupDrugText'
 import {
-  OFFLINE_MESSAGE, READ_ONLY_MESSAGE, groupsLimitMessage, drugsLimitMessage,
+  OFFLINE_MESSAGE, READ_ONLY_MESSAGE,
 } from './groupMessages'
 
 const ROW_STYLE = {
@@ -93,7 +93,7 @@ function TickBox({ checked }) {
 
 export default function AddToGroupSheet({ isOpen, onClose, drug }) {
   const {
-    groups, groupsStatus, isReadOnly, canCreateGroup, reloadGroups, setGroupDrugs, promptSignIn,
+    groups, groupsStatus, isReadOnly, canCreateGroup, reloadGroups, setGroupDrugs, promptSignIn, showGroupLimit,
   } = useFavouritesContext()
   const { groupsSortMode } = useDrugContext()
   const { user } = useAuth()
@@ -118,7 +118,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
     if (!drugId || busy.has(g.id)) return
     const has = g.brandIds.includes(drugId)
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
-    if (!has && g.brandIds.length >= drugsCap) { toast.info(drugsLimitMessage(isPro)); return }
+    if (!has && g.brandIds.length >= drugsCap) { showGroupLimit('drugs'); return }
     setBusy(prev => new Set(prev).add(g.id))
     const next = has ? g.brandIds.filter(b => b !== drugId) : [...g.brandIds, drugId]
     try {
@@ -134,7 +134,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
     if (!user) { promptSignIn('groups', drugId ?? 'new'); return }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) { toast.info(OFFLINE_MESSAGE); return }
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
-    if (!canCreateGroup) { toast.info(groupsLimitMessage(isPro)); return }
+    if (!canCreateGroup) { showGroupLimit('groups'); return }
     setEditorOpen(true)
     onClose()
   }

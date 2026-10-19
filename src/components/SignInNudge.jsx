@@ -38,6 +38,9 @@
  * available. Renders nothing visible of its own except whichever sheet is
  * currently open.
  *
+ * 2026-10-19 (Drug groups plan, step 7.1): also mounts GroupLimitSheet, opened by
+ * showGroupLimit in useDrugGroups.js (free accounts only).
+ *
  * Props: none — reads everything it needs from context.
  */
 
@@ -46,6 +49,7 @@ import { useFavouritesContext } from '../context/FavouritesContext'
 import { useNotesSignInContext } from '../context/NotesSignInContext'
 import AccountSheet from './ui/AccountSheet'
 import FavouriteLimitSheet from './ui/FavouriteLimitSheet'
+import GroupLimitSheet from './drugs/groups/GroupLimitSheet'
 
 export default function SignInNudge() {
   const { user, signInWithGoogle, signOut } = useAuth()
@@ -54,6 +58,8 @@ export default function SignInNudge() {
     capBlocked,
     dismissPendingFavourite,
     dismissCapBlocked,
+    groupLimit,
+    dismissGroupLimit,
   } = useFavouritesContext()
   const { pendingNoteConditionId, dismissNoteSignIn } = useNotesSignInContext()
 
@@ -83,6 +89,11 @@ export default function SignInNudge() {
         isOpen={!!capBlocked}
         listType={capBlocked}
         onClose={dismissCapBlocked}
+      />
+      <GroupLimitSheet
+        isOpen={!!groupLimit?.open}
+        kind={groupLimit?.kind}
+        onClose={dismissGroupLimit}
       />
     </>
   )

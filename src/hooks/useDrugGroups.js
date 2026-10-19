@@ -16,8 +16,9 @@
  *    "You're offline. Reconnect to change your groups." and answers
  *    reason 'offline'.
  *  - Limits (constants/features.js) are checked here and in the database.
- *    Reaching one answers reason 'limit'. The screens decide what to show
- *    (the limit sheet is wired in Phase 7), so nothing is shown from here.
+ *    Reaching one answers reason 'limit'. The screens decide when to show
+ *    it, by calling showGroupLimit (2026-10-19, step 7.1): a free account
+ *    gets the limit sheet, a Pro account gets a short message.
  *  - Lapsed account (not Pro and over the free limits): isReadOnly is true.
  *    Everything except delete answers reason 'read_only'. Mirrors the
  *    database function dg_is_read_only (plan section 6.1).
@@ -38,6 +39,9 @@
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
+ *   groupLimit      { open, kind }  the limit sheet state ('groups' | 'drugs'), read by SignInNudge
+ *   showGroupLimit  (kind) => void  free: opens the limit sheet; Pro: shows the short message
+ *   dismissGroupLimit () => void
  *   restoreGroup    (group) => Promise<{ ok, reason? }>   (2026-10-19, step 4.4)
  *                   Puts a just-deleted group back (same id, name, description,
  *                   colour, created date and drugs). The Undo of Delete group.
@@ -53,6 +57,7 @@ import { useIsPro } from './useIsPro'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache } from '../utils/cache'
+import { groupsLimitMessage, drugsLimitMessage } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
   DRUG_GROUP_DRUGS_CAP_FREE,
@@ -96,6 +101,9 @@ export function useDrugGroups(fav) {
   const [groupsStatus, setGroupsStatus] = useState('loading')
   const [groupsFromCache, setGroupsFromCache] = useState(false)
   const [groupsLoadError, setGroupsLoadError] = useState(false)
+
+  // Limit sheet (step 7.1). The kind is kept after closing so the text stays put while it slides away.
+  const [groupLimit, setGroupLimit] = useState({ open: false, kind: 'groups' })
 
   const groupsRef = useRef(groups)
   useEffect(() => { groupsRef.current = groups }, [groups])
@@ -431,6 +439,18 @@ export function useDrugGroups(fav) {
     return { ok: true }
   }, [refuseChange, toast])
 
+  const showGroupLimit = useCallback((kind) => {
+    if (isProRef.current) {
+      toast.info(kind === 'drugs' ? drugsLimitMessage(true) : groupsLimitMessage(true))
+      return
+    }
+    setGroupLimit({ open: true, kind: kind === 'drugs' ? 'drugs' : 'groups' })
+  }, [toast])
+
+  const dismissGroupLimit = useCallback(() => {
+    setGroupLimit(g => ({ ...g, open: false }))
+  }, [])
+
   return {
     groups,
     groupsStatus,
@@ -444,5 +464,8 @@ export function useDrugGroups(fav) {
     deleteGroup,
     setGroupDrugs,
     restoreGroup,
+    groupLimit,
+    showGroupLimit,
+    dismissGroupLimit,
   }
 }

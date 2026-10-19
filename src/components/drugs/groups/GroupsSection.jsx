@@ -102,7 +102,7 @@ export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsFromCache, groupsLoadError, isReadOnly,
-    canCreateGroup, reloadGroups, restoreGroup, promptSignIn,
+    canCreateGroup, reloadGroups, restoreGroup, promptSignIn, showGroupLimit,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -163,12 +163,7 @@ export default function GroupsSection() {
     if (!user) { promptSignIn('groups', 'new'); return }
     if (!online || groupsFromCache) { toast.info(OFFLINE_MESSAGE); return }
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
-    if (!canCreateGroup) {
-      toast.info(isPro
-        ? "You've reached 100 groups. Delete one to add another."
-        : 'Free accounts can keep 1 group. Upgrade to Pro for more.')
-      return
-    }
+    if (!canCreateGroup) { showGroupLimit('groups'); return }
     setEditor({ open: true, group: null })
   }
 
@@ -182,9 +177,7 @@ export default function GroupsSection() {
     const res = await restoreGroup(restored)
     if (res?.ok) return
     if (res?.reason === 'limit') {
-      toast.info(isPro
-        ? "You've reached 100 groups. Delete one to add another."
-        : 'Free accounts can keep 1 group. Upgrade to Pro for more.')
+      showGroupLimit('groups')
     } else if (res?.reason === 'read_only') {
       toast.info(READ_ONLY_MESSAGE)
     }

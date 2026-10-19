@@ -56,7 +56,6 @@ import GroupDrugSearch from './GroupDrugSearch'
 import GroupDrugList from './GroupDrugList'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
-import { useToast } from '../../../context/ToastContext'
 import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
 import { useDirtyState } from '../../../hooks/useDirtyState'
 import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS } from '../../../hooks/useDrugGroups'
@@ -106,10 +105,9 @@ const FIELD_STYLE = {
 }
 
 export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [] }) {
-  const { createGroup, updateGroup, setGroupDrugs, deleteGroup } = useFavouritesContext()
+  const { createGroup, updateGroup, setGroupDrugs, deleteGroup, showGroupLimit } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
-  const { toast } = useToast()
   const isEdit = !!group
   const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
@@ -180,7 +178,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   function handleAddDrug(id) {
     if (brandIds.includes(id)) return
     if (brandIds.length >= drugsCap) {
-      toast.info(drugsLimitMessage(isPro))
+      showGroupLimit('drugs')
       return
     }
     setBrandIds(prev => (prev.includes(id) ? prev : [...prev, id]))
