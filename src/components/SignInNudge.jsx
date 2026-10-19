@@ -40,6 +40,8 @@
  *
  * 2026-10-19 (Drug groups plan, step 7.1): also mounts GroupLimitSheet, opened by
  * showGroupLimit in useDrugGroups.js (free accounts only).
+ * 2026-10-19 (7.2 restored, 8.3): a pending groups tap gets groups wording
+ * (or save wording for a shared group) instead of the favourites wording.
  *
  * Props: none — reads everything it needs from context.
  */
@@ -74,6 +76,13 @@ export default function SignInNudge() {
     }
   }
 
+  // 2026-10-19 (Drug groups plan, 7.2 restored, 8.3): a groups tap gets its own
+  // wording. A guest Save on a shared group remembers 'save:<link code>'.
+  const groupsTap = pendingFavourite?.type === 'groups'
+  const groupContext = groupsTap
+    ? (String(pendingFavourite.id).startsWith('save:') ? 'save' : 'groups')
+    : false
+
   return (
     <>
       <AccountSheet
@@ -82,7 +91,8 @@ export default function SignInNudge() {
         user={user}
         signInWithGoogle={signInWithGoogle}
         signOut={signOut}
-        favouriteContext={!!pendingFavourite}
+        favouriteContext={!!pendingFavourite && !groupsTap}
+        groupContext={groupContext}
         noteContext={!!pendingNoteConditionId}
       />
       <FavouriteLimitSheet

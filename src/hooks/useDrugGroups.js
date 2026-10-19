@@ -5,8 +5,8 @@
  * person's drug groups. Same house rules as useFavouriteClasses.
  *
  * Covers: load, create, edit (rename, description, colour) and delete a
- * group. Adding and removing drugs, sharing and saving a shared copy come in
- * later phases (4, 5, 8) and are not here yet.
+ * group, drugs in a group, sharing, and saving a copy of a shared group
+ * (2026-10-19, step 8.3).
  *
  * Rules:
  *  - A guest tap saves nothing: it asks to sign in (promptSignIn) and the
@@ -48,6 +48,15 @@
  *   groupLimit      { open, kind }  the limit sheet state ('groups' | 'drugs'), read by SignInNudge
  *   showGroupLimit  (kind) => void  free: opens the limit sheet; Pro: shows the short message
  *   dismissGroupLimit () => void
+ *   saveSharedGroup ({ name, description, color, brandIds, signInId }) =>
+ *                   Promise<{ ok, reason?, group?, saved?, total? }>   (2026-10-19, step 8.3)
+ *                   Makes the viewer's own copy of a shared group: a new group
+ *                   (new id, not linked to the original, no share link, nothing
+ *                   about the owner) with the drugs in the order given. A free
+ *                   account keeps the first 20, Pro the first 50; saved/total
+ *                   tell the screen when some were left out. If the drugs fail
+ *                   to save the new group is removed again. Reasons: guest,
+ *                   offline, read_only, limit, invalid, error.
  *   restoreGroup    (group) => Promise<{ ok, reason? }>   (2026-10-19, step 4.4)
  *                   Puts a just-deleted group back (same id, name, description,
  *                   colour, created date and drugs). The Undo of Delete group.
@@ -63,7 +72,7 @@ import { useIsPro } from './useIsPro'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache } from '../utils/cache'
-import { groupsLimitMessage, drugsLimitMessage } from '../components/drugs/groups/groupMessages'
+import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
   DRUG_GROUP_DRUGS_CAP_FREE,
@@ -234,18 +243,20 @@ export function useDrugGroups(fav) {
 
   // ── Guards shared by every change ─────────────────────────────────────────
   // Returns a refusal ({ ok: false, reason }) or null when the change may go on.
-  const refuseChange = useCallback(({ needsEditable = true } = {}) => {
+  // signInId: what the sign-in prompt remembers ('new' by default; the shared
+  // page passes its own). offlineMessage: the wording for the offline refusal.
+  const refuseChange = useCallback(({ needsEditable = true, signInId = 'new', offlineMessage = OFFLINE_MESSAGE } = {}) => {
     if (!userRef.current) {
-      promptSignIn('groups', 'new')
+      promptSignIn('groups', signInId)
       return { ok: false, reason: 'guest' }
     }
     if (isOffline()) {
-      toast.info(OFFLINE_MESSAGE)
+      toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
     }
     if (shownFromCacheRef.current) {
       // Only the saved copy is on screen, so we do not know the real list.
-      toast.info(OFFLINE_MESSAGE)
+      toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
     }
     if (needsEditable && isReadOnlyNow()) return { ok: false, reason: 'read_only' }
@@ -445,6 +456,54 @@ export function useDrugGroups(fav) {
     return { ok: true }
   }, [refuseChange, toast])
 
+  // ── Save a copy of a shared group (step 8.3) ──────────────────────────────
+  // Not optimistic: the list changes once the server has the group and its
+  // drugs. A free account keeps the first 20 drugs in the order given (the
+  // shared page lists them A to Z), Pro the first 50. The copy is an ordinary
+  // group: new id, no share link, and the shared page never carries the owner.
+  // If the drugs fail to save, the new group row is removed again.
+  const saveSharedGroup = useCallback(async ({ name, description = '', color = 'blue', brandIds = [], signInId } = {}) => {
+    const refused = refuseChange({ signInId, offlineMessage: SAVE_OFFLINE_MESSAGE })
+    if (refused) return refused
+    const groupCap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
+    if (groupsRef.current.length >= groupCap) return { ok: false, reason: 'limit' }
+
+    const fields = cleanFields({ name, description, color }, { requireName: true })
+    if (!fields) return { ok: false, reason: 'invalid' }
+
+    const all = Array.from(new Set(brandIds))
+    const drugCap = isProRef.current ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
+    const kept = all.slice(0, drugCap)
+
+    const { data, error } = await supabase
+      .from('drug_groups')
+      .insert(fields)
+      .select('id, name, description, color, created_at')
+      .single()
+    if (error || !data) {
+      if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
+        return { ok: false, reason: 'limit' }
+      }
+      toast.error('Could not save the group. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+
+    if (kept.length > 0) {
+      const { error: itemsError } = await supabase
+        .from('drug_group_items')
+        .insert(kept.map(brand_id => ({ group_id: data.id, brand_id })))
+      if (itemsError) {
+        await supabase.from('drug_groups').delete().eq('id', data.id)
+        toast.error('Could not save the group. Check your connection and try again.')
+        return { ok: false, reason: 'error' }
+      }
+    }
+
+    const group = mapGroupRow({ ...data, drug_group_items: kept.map(brand_id => ({ brand_id })) })
+    setGroups(prev => newestFirst([group, ...prev]))
+    return { ok: true, group, saved: kept.length, total: all.length }
+  }, [refuseChange, toast])
+
   // ── Sharing (step 8.1) ────────────────────────────────────────────────────
   // The share code lives only in drug_group_shares (not in the group list), so
   // a phone never keeps a stale copy of it. Offline answers reason 'offline'
@@ -515,6 +574,7 @@ export function useDrugGroups(fav) {
     deleteGroup,
     setGroupDrugs,
     restoreGroup,
+    saveSharedGroup,
     getShareCode,
     createShareLink,
     stopSharing,

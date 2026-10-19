@@ -21,3 +21,13 @@ export function drugsLimitMessage(isPro) {
     ? 'A group can hold 50 drugs. Remove one to add another.'
     : 'Free accounts can keep 20 drugs in a group. Upgrade to Pro for 50.'
 }
+
+// 2026-10-19 (Drug groups plan, step 8.3): Save to my groups, on the shared page.
+export const SAVE_OFFLINE_MESSAGE = "You're offline. Reconnect to save."
+export const SAVE_READ_ONLY_MESSAGE = 'Your groups are read only. Upgrade to save this group.'
+
+export function savedGroupMessage(saved, total) {
+  return saved < total
+    ? `Saved ${saved} of ${total} drugs. Upgrade to Pro to keep all of them.`
+    : 'Saved to your groups'
+}

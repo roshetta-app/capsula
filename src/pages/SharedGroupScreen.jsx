@@ -15,7 +15,17 @@
  * The first screen of a session has no Back button (nothing behind it).
  *
  * No edit controls, no heart, and the owner is never shown (the database
- * function does not return it). Save to my groups arrives at step 8.3.
+ * function does not return it).
+ *
+ * 2026-10-19 (step 8.3): Save to my groups, at the bottom, only when the groups
+ * switch is on and the group has drugs. It makes the viewer's own copy (a new
+ * group, not linked to this one, nothing about the owner). A guest is asked to
+ * sign in first: the page remembers the link (the sign-in prompt keeps
+ * 'save:<code>') and finishes the save by itself once signed in; closing the
+ * sign-in sheet cancels it. After saving the button becomes "Saved to your
+ * groups" with View. Free accounts keep the first 20 drugs as listed here
+ * (A to Z), with a note; the limit sheet, read only and offline messages come
+ * from the same places as the rest of groups.
  *
  * States (plan section 5, Sharing, Viewer rows):
  *   - loading: placeholder cards.
@@ -28,7 +38,7 @@
  *   - a drug removed from the app: left out (the database function does it).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Folder } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
@@ -38,6 +48,10 @@ import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
 import { useAuth } from '../hooks/useAuth'
+import { useToast } from '../context/ToastContext'
+import { useFavouritesContext } from '../context/FavouritesContext'
+import { isDrugGroupsOn } from '../constants/features'
+import { SAVE_READ_ONLY_MESSAGE, savedGroupMessage } from '../components/drugs/groups/groupMessages'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
@@ -71,6 +85,9 @@ function SharedGroupBody({ code }) {
   // The first screen of the session has nothing behind it, so no Back button.
   const canGoBack = location.key !== 'default'
   const { user, loading: authLoading } = useAuth()
+  const { toast } = useToast()
+  const { promptSignIn, pendingFavourite, groupsStatus, saveSharedGroup, showGroupLimit } = useFavouritesContext()
+  const groupsOn = isDrugGroupsOn()
 
   const isDark = useIsDark()
   const { categories } = useCategories()
@@ -106,6 +123,69 @@ function SharedGroupBody({ code }) {
     list.sort((a, b) => drugRowTitle(a).localeCompare(drugRowTitle(b), undefined, { sensitivity: 'base' }))
     return list
   }, [result])
+
+  // ── Save to my groups (step 8.3) ──────────────────────────────────────────
+  // { phase: 'idle' | 'saving' | 'saved', groupId?, saved?, total? }
+  const [saveState, setSaveState] = useState({ phase: 'idle' })
+  const savingRef = useRef(false)
+  const signInId = `save:${code}`
+  // A guest tapped Save and is signing in. Also true after a sign-in that
+  // reloaded the page, because the prompt keeps the request.
+  const armedRef = useRef(pendingFavourite?.type === 'groups' && pendingFavourite.id === signInId)
+
+  const runSave = useCallback(async () => {
+    if (savingRef.current || result.status !== 'ok') return
+    savingRef.current = true
+    setSaveState({ phase: 'saving' })
+    const g = result.group
+    const r = await saveSharedGroup({
+      name: g.name,
+      description: g.description,
+      color: g.color,
+      brandIds: drugs.map(d => d.id),
+      signInId,
+    })
+    savingRef.current = false
+    if (r.ok) {
+      setSaveState({ phase: 'saved', groupId: r.group.id, saved: r.saved, total: r.total })
+      return
+    }
+    setSaveState({ phase: 'idle' })
+    // guest, offline and error already told the person; these two are ours.
+    if (r.reason === 'limit') showGroupLimit('groups')
+    else if (r.reason === 'read_only') toast.info(SAVE_READ_ONLY_MESSAGE)
+  }, [result, drugs, saveSharedGroup, signInId, showGroupLimit, toast])
+
+  function handleSaveTap() {
+    if (authLoading || saveState.phase !== 'idle') return
+    if (!user) {
+      armedRef.current = true
+      promptSignIn('groups', signInId)
+      return
+    }
+    runSave()
+  }
+
+  // Finish a save that waited for sign-in, or cancel it when the sign-in sheet
+  // was closed without signing in.
+  useEffect(() => {
+    if (!armedRef.current || authLoading) return
+    if (!user) {
+      if (!pendingFavourite) armedRef.current = false
+      return
+    }
+    if (groupsStatus === 'loading' || result.status !== 'ok') return
+    // Started on the next tick, so the save's own state change is not made
+    // inside this effect. The request is only cleared when it really starts.
+    const t = setTimeout(() => {
+      armedRef.current = false
+      runSave()
+    }, 0)
+    return () => clearTimeout(t)
+  }, [authLoading, user, pendingFavourite, groupsStatus, result.status, runSave])
+
+  const showSave = groupsOn && result.status === 'ok' && drugs.length > 0
+  const saveBusy = saveState.phase === 'saving' || authLoading || (!!user && groupsStatus === 'loading')
 
   const backButton = (
     <button
@@ -233,11 +313,51 @@ function SharedGroupBody({ code }) {
         </div>
       )}
       {content}
+      {showSave && (
+        <div style={{ marginTop: 'var(--space-5)' }}>
+          {saveState.phase === 'saved' ? (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+              padding: 'var(--space-3)', borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--color-border)', fontFamily: 'var(--font-body)',
+            }}>
+              <span style={{ fontSize: 14, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
+                {savedGroupMessage(saveState.saved, saveState.total)}
+              </span>
+              <button
+                onClick={() => navigate(ROUTES.DRUGS_GROUP(saveState.groupId))}
+                style={{
+                  flexShrink: 0, border: 'none', cursor: 'pointer', padding: '8px 16px',
+                  borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+                  fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent',
+                }}
+              >
+                View
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleSaveTap}
+              disabled={saveBusy}
+              style={{
+                display: 'block', width: '100%', border: 'none', padding: '12px 16px',
+                borderRadius: 'var(--radius-md)', backgroundColor: 'var(--color-accent)', color: '#fff',
+                fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
+                cursor: saveBusy ? 'default' : 'pointer', opacity: saveBusy ? 0.6 : 1,
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
+              {saveState.phase === 'saving' ? 'Saving…' : 'Save to my groups'}
+            </button>
+          )}
+        </div>
+      )}
       {!authLoading && !user && result.status !== 'loading' && (
         <button
           onClick={() => navigate(ROUTES.DRUGS)}
           style={{
-            display: 'block', margin: 'var(--space-5) auto 0',
+            display: 'block', margin: `${showSave ? 'var(--space-3)' : 'var(--space-5)'} auto 0`,
             background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px',
             fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
             fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',

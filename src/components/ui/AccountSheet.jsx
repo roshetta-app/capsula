@@ -91,6 +91,13 @@
  *                                 signed-out copy only; everything else
  *                                 about the sheet is unchanged. Defaults
  *                                 to false.
+ *   groupContext        false | 'groups' | 'save' — 'groups' when a drug
+ *                                 groups tap is why this sheet is open
+ *                                 ("Keep your drug groups"), 'save' when a guest
+ *                                 tapped Save on a shared group ("Save this
+ *                                 group"). Swaps the signed-out copy only.
+ *                                 Defaults to false. (2026-10-19, restored
+ *                                 from step 7.2 and extended at step 8.3.)
  *   noteContext         boolean — true when a pending note sign-in
  *                                 request (see NotesSignInContext.jsx) is
  *                                 why this sheet is open. Swaps the
@@ -122,6 +129,7 @@ export default function AccountSheet({
   signInWithGoogle,
   signOut,
   favouriteContext = false,
+  groupContext = false,
   noteContext = false,
 }) {
   const [busy, setBusy]     = useState(false)
@@ -136,13 +144,13 @@ export default function AccountSheet({
   // freezes at its last value for the entire close-transition window
   // rather than snapping to whatever the live props become the moment
   // dismissal starts.
-  const [display, setDisplay] = useState({ user, favouriteContext, noteContext })
+  const [display, setDisplay] = useState({ user, favouriteContext, groupContext, noteContext })
   useEffect(() => {
     if (isOpen) {
-      setDisplay({ user, favouriteContext, noteContext })
+      setDisplay({ user, favouriteContext, groupContext, noteContext })
       setError(null)
     }
-  }, [isOpen, user, favouriteContext, noteContext])
+  }, [isOpen, user, favouriteContext, groupContext, noteContext])
 
   async function handleGoogleSignIn() {
     if (busy) return
@@ -246,9 +254,13 @@ export default function AccountSheet({
             }}>
               {display.favouriteContext
                 ? 'Save this to Favourites'
-                : display.noteContext
-                  ? 'Add your notes'
-                  : 'Sign in or create account'}
+                : display.groupContext === 'save'
+                  ? 'Save this group'
+                  : display.groupContext
+                    ? 'Keep your drug groups'
+                    : display.noteContext
+                      ? 'Add your notes'
+                      : 'Sign in or create account'}
             </div>
             <p style={{
               margin:     '0 0 var(--space-4)',
@@ -258,9 +270,13 @@ export default function AccountSheet({
             }}>
               {display.favouriteContext
                 ? 'Sign in to save it and access it on any device.'
-                : display.noteContext
-                  ? 'Sign in to add notes and access them everywhere.'
-                  : 'Sync your favourites across devices with your Google account.'}
+                : display.groupContext === 'save'
+                  ? 'Sign in to save a copy to your groups and open it on any device.'
+                  : display.groupContext
+                    ? 'Sign in to save your groups and open them on any device.'
+                    : display.noteContext
+                      ? 'Sign in to add notes and access them everywhere.'
+                      : 'Sync your favourites across devices with your Google account.'}
             </p>
 
             {error && (
