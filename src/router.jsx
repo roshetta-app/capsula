@@ -60,6 +60,7 @@ import DrugsScreen           from './pages/DrugsScreen'
 import DrugCategoriesScreen  from './pages/DrugCategoriesScreen'
 import DrugClassesScreen     from './pages/DrugClassesScreen'
 import DrugGroupScreen       from './pages/DrugGroupScreen'
+import SharedGroupScreen     from './pages/SharedGroupScreen'
 import DrugDetailScreen      from './pages/DrugDetailScreen'
 import FavouritesScreen      from './pages/FavouritesScreen'
 import AccountScreen         from './pages/AccountScreen'
@@ -103,6 +104,9 @@ export const ROUTES = {
   // 2026-10-19 (Drugs groups plan, step 6.2): a group's own page. Two segments
   // after /drugs, so it can never clash with /drugs/:slug.
   DRUGS_GROUP:           (id) => `/drugs/group/${id}`,
+  // 2026-10-19 (Drugs groups plan, step 8.2): the public shared-group page opened
+  // from a share link. No sign-in needed.
+  SHARED_GROUP:          (code) => `/g/${code}`,
   DRUG_DETAIL:       (slug) => `/drugs/${slug}`,
   FAVOURITES:        '/favourites',
   ACCOUNT:           '/account',
@@ -160,6 +164,7 @@ export function PublicRoutes() {
           back-arrow header, no BottomNav) — see file header note above. */}
       <Route path="/conditions/:slug"    element={<ConditionDetailScreen />} />
       <Route path="/drugs/:slug"                   element={<DrugDetailScreen />} />
+      <Route path="/g/:code"                       element={<SharedGroupScreen />} />
       <Route path="/account/edit"        element={<AccountEditScreen />} />
       <Route path="/account/faq"         element={<AccountFaqScreen />} />
 
