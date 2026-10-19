@@ -33,6 +33,13 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 let hasMountedAnyScreen = false
 
+// 2026-10-19 (Drug groups plan, step 8.2): the public shared-group page does not
+// want the Drugs home put behind it, but it still counts as a screen that was
+// shown first, so a drug opened from it keeps the group behind it for Back.
+export function markScreenMounted() {
+  hasMountedAnyScreen = true
+}
+
 export function useDeepLinkParent(parentPath) {
   const navigate = useNavigate()
   const location = useLocation()

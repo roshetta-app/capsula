@@ -9,6 +9,11 @@
  * normal drug cards, A to Z by brand name. Tapping a drug opens it; back
  * returns here.
  *
+ * No welcome screen and no drug library download just to look at the group
+ * (OnboardingGate lets /g/ pages through). A guest gets an Open Capsula link at
+ * the bottom; that, or opening a drug, is where the welcome screen appears.
+ * The first screen of a session has no Back button (nothing behind it).
+ *
  * No edit controls, no heart, and the owner is never shown (the database
  * function does not return it). Save to my groups arrives at step 8.3.
  *
@@ -24,14 +29,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Folder } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
-import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
+import { markScreenMounted } from '../hooks/useDeepLinkParent'
+import { useAuth } from '../hooks/useAuth'
 import { useIsDark } from '../utils/specialtyIcon'
 import { resolveToken } from '../utils/specialtyTokens'
 import { fetchSharedGroup } from '../utils/sharedGroup'
@@ -56,9 +62,15 @@ export default function SharedGroupScreen() {
 
 function SharedGroupBody({ code }) {
   const navigate = useNavigate()
-  // Opened straight from a link, the Drugs home is put behind this page so
-  // Back has somewhere to go.
-  useDeepLinkParent(ROUTES.DRUGS)
+  // This page does not put the Drugs home behind itself (a person opening a
+  // link just wants the group), but it counts as a screen that was shown first,
+  // so a drug opened from here keeps this page behind it for Back.
+  useEffect(() => { markScreenMounted() }, [])
+
+  const location = useLocation()
+  // The first screen of the session has nothing behind it, so no Back button.
+  const canGoBack = location.key !== 'default'
+  const { user, loading: authLoading } = useAuth()
 
   const isDark = useIsDark()
   const { categories } = useCategories()
@@ -215,10 +227,25 @@ function SharedGroupBody({ code }) {
 
   return (
     <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--page-gutter) var(--space-4)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-        {backButton}
-      </div>
+      {canGoBack && (
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+          {backButton}
+        </div>
+      )}
       {content}
+      {!authLoading && !user && result.status !== 'loading' && (
+        <button
+          onClick={() => navigate(ROUTES.DRUGS)}
+          style={{
+            display: 'block', margin: 'var(--space-5) auto 0',
+            background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px',
+            fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
+            fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Open Capsula
+        </button>
+      )}
     </div>
   )
 }
