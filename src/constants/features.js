@@ -49,42 +49,24 @@ export const NOTES_CHAR_CAP_PRO = 2000
  * 2026-10-18 (Drug groups plan, step 3.1) — Drug groups.
  *
  * DRUG_GROUPS_ENABLED is the one switch for everything about groups in the
- * app. It stays false until release (plan step 9.6), so group screens can
- * be built and pushed without users ever seeing them.
+ * app. It was false while groups were built (so nobody saw half-finished
+ * screens) and is true from release (plan step 9.6, 2026-10-20).
  *
  * Caps mirror the database rules (plan section 6.1): the database refuses
  * a 2nd group / 21st drug on a free account and a 101st group / 51st drug
  * on a Pro account. Keep these numbers in step with the database.
  */
-export const DRUG_GROUPS_ENABLED = false
+export const DRUG_GROUPS_ENABLED = true
 export const DRUG_GROUPS_CAP_FREE = 1
 export const DRUG_GROUP_DRUGS_CAP_FREE = 20
 export const DRUG_GROUPS_CAP_PRO = 100
 export const DRUG_GROUP_DRUGS_CAP_PRO = 50
 
 /**
- * 2026-10-18 (Drug groups plan, step 3.6) — test preview on one phone.
- *
- * The pushed code keeps DRUG_GROUPS_ENABLED false, so nobody sees groups. To
- * try the screens on your own phone, open the app address with ?groups=on
- * once (for example https://roshetta-app.github.io/capsula/?groups=on). That
- * is remembered on that phone only. ?groups=off turns it off again.
- * Remove this preview at release (plan step 9.6).
+ * 2026-10-20 (Drug groups plan, step 9.6): the one-phone preview (?groups=on)
+ * is gone. Groups follow DRUG_GROUPS_ENABLED alone, for everyone. To switch
+ * them off again, set DRUG_GROUPS_ENABLED back to false and push.
  */
-const GROUPS_PREVIEW_KEY = 'capsula_groups_preview'
-try {
-  const flag = new URLSearchParams(window.location.search).get('groups')
-  if (flag === 'on') localStorage.setItem(GROUPS_PREVIEW_KEY, '1')
-  if (flag === 'off') localStorage.removeItem(GROUPS_PREVIEW_KEY)
-} catch {
-  // no window or storage: the preview stays off
-}
-
 export function isDrugGroupsOn() {
-  if (DRUG_GROUPS_ENABLED) return true
-  try {
-    return localStorage.getItem(GROUPS_PREVIEW_KEY) === '1'
-  } catch {
-    return false
-  }
+  return DRUG_GROUPS_ENABLED
 }
