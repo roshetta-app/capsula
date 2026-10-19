@@ -39,6 +39,12 @@
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
+ *   getShareCode    (groupId) => Promise<{ ok, code?, reason? }>   (2026-10-19, step 8.1)
+ *                   Reads this group's live share code (null when not shared).
+ *   createShareLink (groupId) => Promise<{ ok, code?, reason? }>
+ *                   Makes the share link (the database makes the code); if one
+ *                   already exists it returns that one.
+ *   stopSharing     (groupId) => Promise<{ ok, reason? }>   Deletes the code, so the link stops at once.
  *   groupLimit      { open, kind }  the limit sheet state ('groups' | 'drugs'), read by SignInNudge
  *   showGroupLimit  (kind) => void  free: opens the limit sheet; Pro: shows the short message
  *   dismissGroupLimit () => void
@@ -439,6 +445,51 @@ export function useDrugGroups(fav) {
     return { ok: true }
   }, [refuseChange, toast])
 
+  // ── Sharing (step 8.1) ────────────────────────────────────────────────────
+  // The share code lives only in drug_group_shares (not in the group list), so
+  // a phone never keeps a stale copy of it. Offline answers reason 'offline'
+  // without a toast; the share sheet shows its own line.
+  const getShareCode = useCallback(async (groupId) => {
+    if (!userRef.current) return { ok: false, reason: 'guest' }
+    if (isOffline()) return { ok: false, reason: 'offline' }
+    const { data, error } = await supabase
+      .from('drug_group_shares')
+      .select('share_code')
+      .eq('group_id', groupId)
+      .maybeSingle()
+    if (error) return { ok: false, reason: 'error' }
+    return { ok: true, code: data?.share_code ?? null }
+  }, [])
+
+  const createShareLink = useCallback(async (groupId) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    if (!groupsRef.current.some(g => g.id === groupId)) return { ok: false, reason: 'missing' }
+    const { data, error } = await supabase
+      .from('drug_group_shares')
+      .insert({ group_id: groupId })
+      .select('share_code')
+      .single()
+    if (!error && data?.share_code) return { ok: true, code: data.share_code }
+    if (error?.code === '23505') {
+      // Already shared (another device, or a double tap): use the live code.
+      const existing = await getShareCode(groupId)
+      if (existing.ok && existing.code) return { ok: true, code: existing.code }
+    }
+    toast.error("Couldn't create the link. Check your connection and try again.")
+    return { ok: false, reason: 'error' }
+  }, [refuseChange, getShareCode, toast])
+
+  const stopSharing = useCallback(async (groupId) => {
+    if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
+    const refused = refuseChange()
+    if (refused) return refused
+    const { error } = await supabase.from('drug_group_shares').delete().eq('group_id', groupId)
+    if (error) return { ok: false, reason: 'error' }
+    return { ok: true }
+  }, [refuseChange])
+
   const showGroupLimit = useCallback((kind) => {
     if (isProRef.current) {
       toast.info(kind === 'drugs' ? drugsLimitMessage(true) : groupsLimitMessage(true))
@@ -464,6 +515,9 @@ export function useDrugGroups(fav) {
     deleteGroup,
     setGroupDrugs,
     restoreGroup,
+    getShareCode,
+    createShareLink,
+    stopSharing,
     groupLimit,
     showGroupLimit,
     dismissGroupLimit,

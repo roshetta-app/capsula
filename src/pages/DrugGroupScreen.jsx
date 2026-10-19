@@ -25,6 +25,11 @@
  *   - read only (lapsed): no Edit, no Add, no Remove; a Delete group button
  *     stays at the bottom.
  *
+ * 2026-10-19 (step 8.1): a Share icon left of Edit opens ShareGroupSheet (not
+ * shown to a read-only account, whose database rules refuse making or stopping
+ * a link). The page also asks whether the group has a live link, so the delete
+ * question can say the link stops working too.
+ *
  * Deleting (from the editor, or the button on a read-only group) takes the
  * person back to the Drugs home, which offers Undo for 5 seconds
  * (pendingUndo.js). While the editor or delete question is open the page
@@ -32,13 +37,14 @@
  * flashes "not found".
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Folder, Pencil, Trash2 } from 'lucide-react'
+import { Folder, Pencil, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
+import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
@@ -80,7 +86,7 @@ export default function DrugGroupScreen() {
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
     groups, groupsStatus, isReadOnly, reloadGroups, setGroupDrugs, deleteGroup,
-    isDrugFavourited, toggleDrug, promptSignIn,
+    isDrugFavourited, toggleDrug, promptSignIn, getShareCode,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -89,6 +95,10 @@ export default function DrugGroupScreen() {
 
   const [editorOpen, setEditorOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  // Whether this group has a live share link (step 8.1): so the delete question
+  // can say the link stops too. null = no link or not known (for example offline).
+  const [shareCode, setShareCode] = useState(null)
 
   // Keep the last copy of the group while the editor or delete question is
   // open, so a delete in progress does not flash "not found".
@@ -96,6 +106,16 @@ export default function DrugGroupScreen() {
   const [snapshot, setSnapshot] = useState(null)
   if (live && live !== snapshot) setSnapshot(live)
   const group = live ?? ((editorOpen || deleteOpen) ? snapshot : null)
+
+  const liveGroupId = live?.id
+  useEffect(() => {
+    if (!user || !liveGroupId) return
+    let cancelled = false
+    getShareCode(liveGroupId).then(r => {
+      if (!cancelled && r.ok) setShareCode(r.code ?? null)
+    })
+    return () => { cancelled = true }
+  }, [user, liveGroupId, getShareCode])
 
   const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
@@ -160,17 +180,30 @@ export default function DrugGroupScreen() {
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
       {backButton}
       {canEdit && (
-        <button
-          onClick={() => setEditorOpen(true)}
-          aria-label="Edit group"
-          style={{
-            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-            color: 'var(--color-text-primary)',
-            WebkitTapHighlightColor: 'transparent', outline: 'none',
-          }}
-        >
-          <Pencil size={20} strokeWidth={2} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            onClick={() => setShareOpen(true)}
+            aria-label="Share group"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              color: 'var(--color-text-primary)',
+              WebkitTapHighlightColor: 'transparent', outline: 'none',
+            }}
+          >
+            <Share2 size={20} strokeWidth={2} />
+          </button>
+          <button
+            onClick={() => setEditorOpen(true)}
+            aria-label="Edit group"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+              color: 'var(--color-text-primary)',
+              WebkitTapHighlightColor: 'transparent', outline: 'none',
+            }}
+          >
+            <Pencil size={20} strokeWidth={2} />
+          </button>
+        </div>
       )}
     </div>
   )
@@ -348,13 +381,22 @@ export default function DrugGroupScreen() {
         onClose={() => setEditorOpen(false)}
         group={group}
         onDeleted={handleDeleted}
+        shared={!!shareCode}
       />
+      {group && (
+        <ShareGroupSheet
+          isOpen={shareOpen}
+          onClose={() => setShareOpen(false)}
+          group={group}
+          onShareChange={setShareCode}
+        />
+      )}
       <ConfirmSheet
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleReadOnlyDelete}
         title="Delete group?"
-        message={`"${group?.name ?? ''}" and its list of drugs will be deleted. The drugs themselves stay in the app.`}
+        message={`"${group?.name ?? ''}" and its list of drugs will be deleted. The drugs themselves stay in the app.${shareCode ? ' Its share link will stop working too.' : ''}`}
         confirmLabel="Delete"
         confirmingLabel={'Deleting\u2026'}
         destructive

@@ -14,6 +14,8 @@
  *                    passes the drug being added); ignored when changing a group
  *   onDeleted (group) => void         called after a successful delete, with
  *                                     the group as it was (for Undo)
+ *   shared   boolean  (2026-10-19, step 8.1) true when the group has a live share
+ *                     link; the delete question then says the link stops too
  *
  * Rules:
  *  - Save with an empty name shows "Enter a group name" under the name. The
@@ -104,7 +106,7 @@ const FIELD_STYLE = {
   fontFamily: 'var(--font-body)', outline: 'none',
 }
 
-export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [] }) {
+export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [], shared = false }) {
   const { createGroup, updateGroup, setGroupDrugs, deleteGroup, showGroupLimit } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
@@ -424,7 +426,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
         onClose={() => setDeleteOpen(false)}
         onConfirm={handleDelete}
         title="Delete group?"
-        message={`"${group?.name ?? ''}" and its list of drugs will be deleted. The drugs themselves stay in the app.`}
+        message={`"${group?.name ?? ''}" and its list of drugs will be deleted. The drugs themselves stay in the app.${shared ? ' Its share link will stop working too.' : ''}`}
         confirmLabel="Delete"
         confirmingLabel="Deleting\u2026"
         destructive
