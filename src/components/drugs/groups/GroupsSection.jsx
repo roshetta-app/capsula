@@ -18,7 +18,7 @@
  * sheet at step 4.4.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ArrowUpDown } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
 import { shimmer } from '../home/shimmer'
@@ -27,6 +27,7 @@ import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
 import GroupStateMessage from './GroupStateMessage'
 import GroupEditorSheet from './GroupEditorSheet'
+import Snackbar from '../../ui/Snackbar'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
@@ -97,12 +98,17 @@ export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsFromCache, groupsLoadError, isReadOnly,
-    canCreateGroup, reloadGroups, promptSignIn,
+    canCreateGroup, reloadGroups, restoreGroup, promptSignIn,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
   const { toast } = useToast()
   const [editor, setEditor] = useState({ open: false, group: null })
+
+  // Undo for Delete group (step 4.4): a message with Undo for 5 seconds.
+  const [undo, setUndo] = useState({ group: null, visible: false })
+  const undoTimer = useRef(null)
+  useEffect(() => () => clearTimeout(undoTimer.current), [])
 
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
   useEffect(() => {
@@ -156,6 +162,27 @@ export default function GroupsSection() {
   // TEMPORARY (the group page replaces this in Phase 6).
   function handleOpenGroup(g) {
     setEditor({ open: true, group: g })
+  }
+
+  function handleDeleted(deletedGroup) {
+    clearTimeout(undoTimer.current)
+    setUndo({ group: deletedGroup, visible: true })
+    undoTimer.current = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+  }
+
+  async function handleUndo() {
+    clearTimeout(undoTimer.current)
+    const restored = undo.group
+    setUndo(u => ({ ...u, visible: false }))
+    const res = await restoreGroup(restored)
+    if (res?.ok) return
+    if (res?.reason === 'limit') {
+      toast.info(isPro
+        ? "You've reached 100 groups. Delete one to add another."
+        : 'Free accounts can keep 1 group. Upgrade to Pro for more.')
+    } else if (res?.reason === 'read_only') {
+      toast.info(READ_ONLY_MESSAGE)
+    }
   }
 
   function closeEditor() {
@@ -243,7 +270,8 @@ export default function GroupsSection() {
       <DrugsSectionCard label="My drug groups" title={title} trailing={trailing}>
         {content}
       </DrugsSectionCard>
-      <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} />
+      <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} onDeleted={handleDeleted} />
+      <Snackbar visible={undo.visible} message="Group deleted" actionLabel="Undo" onAction={handleUndo} />
     </>
   )
 }

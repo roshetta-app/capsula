@@ -10,6 +10,8 @@
  *                         question is asked here first when needed)
  *   group    the group being changed, or null for a new group
  *   onSaved  (group | null) => void   called after a successful save
+ *   onDeleted (group) => void         called after a successful delete, with
+ *                                     the group as it was (for Undo)
  *
  * Rules:
  *  - Save with an empty name shows "Enter a group name" under the name. The
@@ -37,11 +39,15 @@
  * group's own drugs, A to Z, each with a remove button (GroupDrugList). Removing
  * only changes the draft. With no drugs the search hint shows.
  *
- * Later step: Delete group (4.4).
+ * 2026-10-19 (step 4.4): when changing an existing group, a Delete group
+ * button sits at the bottom of the fields. It asks first (ConfirmSheet), then
+ * deletes, closes the sheet and tells the caller (onDeleted) so it can offer
+ * Undo. If the delete fails the confirm stays open with a short message.
+ * Deleting needs no 'discard changes' question: it replaces it.
  */
 
 import { useMemo, useRef, useState } from 'react'
-import { Check, X } from 'lucide-react'
+import { Check, Trash2, X } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
 import GroupDrugSearch from './GroupDrugSearch'
@@ -97,8 +103,8 @@ const FIELD_STYLE = {
   fontFamily: 'var(--font-body)', outline: 'none',
 }
 
-export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved }) {
-  const { createGroup, updateGroup, setGroupDrugs } = useFavouritesContext()
+export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted }) {
+  const { createGroup, updateGroup, setGroupDrugs, deleteGroup } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
   const { toast } = useToast()
@@ -123,6 +129,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const nameRef = useRef(null)
 
   // Start fresh each time the sheet opens (set while drawing, not in an effect).
@@ -139,6 +146,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       setSaveError('')
       setSaving(false)
       setConfirmOpen(false)
+      setDeleteOpen(false)
     }
   }
 
@@ -150,6 +158,15 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   function requestClose() {
     if (saving) return
     if (isDirty) { setConfirmOpen(true); return }
+    onClose()
+  }
+
+  // Delete group. Throws on failure so the confirm stays open with its message
+  // (the hook has already shown its own toast or the offline message).
+  async function handleDelete() {
+    const res = await deleteGroup(group.id)
+    if (!res?.ok) throw new Error(res?.reason ?? 'error')
+    onDeleted?.(res.group ?? group)
     onClose()
   }
 
@@ -348,6 +365,22 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
                 : null}
             />
           </div>
+
+          {isEdit && (
+            <button
+              onClick={() => setDeleteOpen(true)}
+              style={{
+                alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6,
+                background: 'none', border: 'none', cursor: 'pointer',
+                padding: '8px 12px', fontSize: 14, fontWeight: 600,
+                color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
+                WebkitTapHighlightColor: 'transparent', outline: 'none',
+              }}
+            >
+              <Trash2 size={16} aria-hidden="true" />
+              Delete group
+            </button>
+          )}
         </div>
 
         {/* Save */}
@@ -382,6 +415,17 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
         title="Discard changes?"
         message="Your changes to this group won't be saved."
         confirmLabel="Discard"
+        destructive
+      />
+
+      <ConfirmSheet
+        isOpen={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+        title="Delete group?"
+        message={`"${group?.name ?? ''}" and its list of drugs will be deleted. The drugs themselves stay in the app.`}
+        confirmLabel="Delete"
+        confirmingLabel="Deleting\u2026"
         destructive
       />
     </>

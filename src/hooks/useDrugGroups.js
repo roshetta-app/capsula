@@ -38,6 +38,9 @@
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
+ *   restoreGroup    (group) => Promise<{ ok, reason? }>   (2026-10-19, step 4.4)
+ *                   Puts a just-deleted group back (same id, name, description,
+ *                   colour, created date and drugs). The Undo of Delete group.
  *   setGroupDrugs   (id, brandIds) => Promise<{ ok, reason? }>   (2026-10-19, step 4.2)
  *                   Makes the group hold exactly these brand ids: adds the new
  *                   ones and removes the missing ones in one go. The editor
@@ -384,6 +387,50 @@ export function useDrugGroups(fav) {
     return { ok: true }
   }, [refuseChange, reloadGroups, toast])
 
+  // ── Undo a delete ─────────────────────────────────────────────────────────
+  // 2026-10-19 (step 4.4). Puts the group back exactly as it was (same id and
+  // created date, so it returns to its place in the newest-first order), then
+  // its drugs. Not optimistic: the list changes once the server has the group.
+  // If the drugs fail to go back, the group row is removed again so no
+  // half-restored group is left behind. A share link is not restored.
+  const restoreGroup = useCallback(async (group) => {
+    const refused = refuseChange()
+    if (refused) return refused
+    if (!group?.id) return { ok: false, reason: 'missing' }
+    if (groupsRef.current.some(g => g.id === group.id)) return { ok: true }
+    const cap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
+    if (groupsRef.current.length >= cap) return { ok: false, reason: 'limit' }
+
+    const { error } = await supabase.from('drug_groups').insert({
+      id: group.id,
+      name: group.name,
+      description: group.description ?? '',
+      color: group.color,
+      created_at: group.createdAt,
+    })
+    if (error) {
+      if (String(error.message ?? '').includes('drug_group_limit_reached')) {
+        return { ok: false, reason: 'limit' }
+      }
+      toast.error('Could not restore the group. Check your connection and try again.')
+      return { ok: false, reason: 'error' }
+    }
+
+    if (group.brandIds?.length > 0) {
+      const { error: itemsError } = await supabase
+        .from('drug_group_items')
+        .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id })))
+      if (itemsError) {
+        await supabase.from('drug_groups').delete().eq('id', group.id)
+        toast.error('Could not restore the group. Check your connection and try again.')
+        return { ok: false, reason: 'error' }
+      }
+    }
+
+    setGroups(prev => newestFirst([group, ...prev.filter(g => g.id !== group.id)]))
+    return { ok: true }
+  }, [refuseChange, toast])
+
   return {
     groups,
     groupsStatus,
@@ -396,5 +443,6 @@ export function useDrugGroups(fav) {
     updateGroup,
     deleteGroup,
     setGroupDrugs,
+    restoreGroup,
   }
 }
