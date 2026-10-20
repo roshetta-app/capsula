@@ -1,6 +1,4 @@
 /**
- * 2026-10-21 (step 11.7): new 'flat' option (default false): the row has no fill and no corners, a thin
- * line under it, and a fade instead of a shrink when pressed. Only the Drugs search uses it.
  * src/components/drugs/classes/ClassCard.jsx
  *
  * 2026-10-08 (colours): the matched word follows the card's tone (violet on a
@@ -80,7 +78,6 @@ export default function ClassCard({
   trailing = null,
   onClick,
   variant = 'list',
-  flat = false,
 }) {
   const [pressed, setPressed] = useState(false)
   const isSearch = variant === 'search'
@@ -240,18 +237,16 @@ export default function ClassCard({
         ...(isSearch ? { minWidth: 0 } : null),
         boxSizing:       'border-box',
         flexShrink:      0,
-        minHeight:       flat ? 60 : (isSearch ? 64 : 56),
-        padding:         flat ? '10px 2px' : (isSearch ? '12px 16px' : '14px 16px'),
+        minHeight:       isSearch ? 64 : 56,
+        padding:         isSearch ? '12px 16px' : '14px 16px',
         border:          'none',
-        // Flat look (step 11.7): no fill, no corners, a thin line under the row.
-        ...(flat ? { borderBottom: '1px solid var(--color-border)' } : null),
-        borderRadius:    flat ? 0 : 16,
-        backgroundColor: flat ? 'transparent' : 'var(--color-surface-muted)',
+        borderRadius:    16,
+        backgroundColor: 'var(--color-surface-muted)',
         // The 'All drugs' row: same quiet look as the family cards, only a
         // hairline outline and the class-coloured icon set it apart.
         boxShadow:       featured ? 'inset 0 0 0 0.5px var(--color-border)' : 'none',
-        opacity:         pressed ? (flat ? 0.6 : 0.8) : 1,
-        transform:       pressed && !flat ? 'scale(0.985)' : 'scale(1)',
+        opacity:         pressed ? 0.8 : 1,
+        transform:       pressed ? 'scale(0.985)' : 'scale(1)',
         transition:      press,
         fontFamily:      'var(--font-body)',
         textAlign:       'left',

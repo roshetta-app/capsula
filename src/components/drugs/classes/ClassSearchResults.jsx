@@ -75,8 +75,6 @@
  *   hideKicker      boolean (default false): leave off the small 'Class' label
  *                   above each class name. The 'Browse by class' view uses
  *                   this, since the whole list is classes.
- *   flat            boolean (default false): flat rows with thin lines instead of cards (the
- *                   Drugs search uses it, step 11.7; the Classes screen does not).
  *   countTrailing   node (optional): drawn at the right end of the count line
  *                   ('42 classes'). The Browse area puts its sort button here.
  *
@@ -131,7 +129,7 @@ function matchNode(keyword, typed) {
 }
 
 // The 'Show all N ...' row under a group that was cut short.
-function ShowAllRow({ label, onClick, flat = false }) {
+function ShowAllRow({ label, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -146,7 +144,7 @@ function ShowAllRow({ label, onClick, flat = false }) {
         minHeight:       44,
         padding:         '10px 16px',
         border:          'none',
-        borderRadius:    flat ? 0 : 14,
+        borderRadius:    14,
         backgroundColor: 'transparent',
         fontFamily:      'var(--font-body)',
         fontSize:        13.5,
@@ -178,7 +176,7 @@ function GroupLabel({ children }) {
   )
 }
 
-export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false, hideKicker = false, countTrailing = null, flat = false }) {
+export default function ClassSearchResults({ results, query = '', onOpenClass, onOpenSubclass, startExpanded = false, hideKicker = false, countTrailing = null }) {
   const [showAllClasses,    setShowAllClasses]    = useState(startExpanded)
   const [showAllSubclasses, setShowAllSubclasses] = useState(false)
 
@@ -217,12 +215,11 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
       {classes.length > 0 && (
         <>
           {subclasses.length > 0 && <GroupLabel>Drug classes</GroupLabel>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: flat ? 0 : 'var(--space-2)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownClasses.map(c => (
               <ClassCard
                 key={`class:${c.name}`}
                 variant="search"
-                flat={flat}
                 tone="class"
                 name={spaceSlashes(titleCaseWords(c.name))}
                 matches={matchNode(c.matchedKeyword, highlightText)}
@@ -236,7 +233,6 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ShowAllRow
                 label={`Show all ${classes.length} classes`}
                 onClick={() => setShowAllClasses(true)}
-                flat={flat}
               />
             )}
           </div>
@@ -246,12 +242,11 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
       {subclasses.length > 0 && (
         <>
           {classes.length > 0 && <GroupLabel>Drug families</GroupLabel>}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: flat ? 0 : 'var(--space-2)' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {shownSubclasses.map(s => (
               <ClassCard
                 key={`sub:${s.className}\u0000${s.name}`}
                 variant="search"
-                flat={flat}
                 tone="accent"
                 name={spaceSlashes(titleCaseWords(s.name))}
                 detail={`in ${spaceSlashes(titleCaseWords(s.className))}`}
@@ -266,7 +261,6 @@ export default function ClassSearchResults({ results, query = '', onOpenClass, o
               <ShowAllRow
                 label={`Show all ${subclasses.length} drug families`}
                 onClick={() => setShowAllSubclasses(true)}
-                flat={flat}
               />
             )}
           </div>

@@ -4,7 +4,7 @@
  * 2026-10-21 (Drug groups plan, step 11.7): the search messages and lists (Keep typing, no recent
  * searches, loading rows, 'Did you mean', found in other modes, nothing found, your filter is
  * hiding these results, nothing in this category, the Class hint) moved to
- * components/drugs/search/SearchStates.jsx and are drawn flat; the Class results are flat rows.
+ * components/drugs/search/SearchStates.jsx and keep their original look.
  * Wording, behaviour and the drug rows are unchanged.
  *
  * 2026-10-18 (search screen tidy-up, Omar): the 'From your recent searches'
@@ -913,7 +913,6 @@ export default function DrugsScreen() {
           (classResults.classes.length + classResults.subclasses.length) > 0 ? (
             <ClassSearchResults
               key={query.trim()}
-              flat
               results={classResults}
               query={query}
               onOpenClass={handleOpenClass}
@@ -993,10 +992,9 @@ export default function DrugsScreen() {
                 takes over; with nothing anywhere, there is no button. */}
             {hasQuery && displayed.length > 0 && otherCategoryCount > 0 && (
               <SearchAllButton
-                flat
                 count={otherCategoryCount}
                 onClick={goSearchAll}
-                style={{ marginBottom: 'var(--space-2)' }}
+                style={{ width: '100%', marginBottom: 'var(--space-3)' }}
               />
             )}
 

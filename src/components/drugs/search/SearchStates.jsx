@@ -4,9 +4,9 @@
  * 2026-10-21 (Drug groups plan, step 11.7): every message and list the search shows
  * besides the drug rows themselves, moved out of DrugsScreen.jsx so the Drugs home and
  * the Add drugs screen (12.5) can use the same ones. All wording is unchanged. The look
- * is flat: messages are a centred icon with text and no box; lists (the Class hint,
- * 'found in other modes', 'Did you mean', the loading rows, 'Search all drugs instead'
- * inside a category) are flat rows with thin lines between them, no fills or corners.
+ * is the original one: tinted rounded buttons for the Class hint, 'found in other modes' and
+ * 'Did you mean', the filled 'Search all drugs instead' button, and card placeholders while
+ * loading (restored on request after the first flat try). Messages are a centred icon with text.
  *
  * The 'allowClass' setting (default true): when it is false the Class hint strip draws
  * nothing, Class is never offered as a place the text was found, and the no-result
@@ -33,40 +33,6 @@ const STATE_LINE_STYLE = {
   color: 'var(--color-text-secondary)', overflowWrap: 'anywhere',
 }
 
-// A flat tappable row: no fill, no corners, a thin line under it. A light press fade.
-function FlatRowButton({ onClick, children, style }) {
-  const [pressed, setPressed] = useState(false)
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      onPointerDown={() => setPressed(true)}
-      onPointerUp={() => setPressed(false)}
-      onPointerLeave={() => setPressed(false)}
-      onPointerCancel={() => setPressed(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', minHeight: 52, boxSizing: 'border-box', textAlign: 'left',
-        padding: '10px 2px',
-        border: 'none', borderBottom: '1px solid var(--color-border)', borderRadius: 0,
-        background: 'none', fontFamily: 'var(--font-body)', cursor: 'pointer',
-        opacity: pressed ? 0.6 : 1, transition: 'opacity var(--motion-fast, 120ms) ease',
-        WebkitTapHighlightColor: 'transparent',
-        ...style,
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// The wrapper for a short list of flat rows inside a centred message: a thin line on top.
-const FLAT_LIST_STYLE = {
-  display: 'flex', flexDirection: 'column',
-  width: '100%', maxWidth: 420, margin: '0 auto', textAlign: 'left',
-  borderTop: '1px solid var(--color-border)',
-}
-
 // ─── FadeIn ──────────────────────────────────────────────────────────────────
 // Eases a state in when it appears (instant when the phone asks for reduced motion).
 export function FadeIn({ children, disabled = false, ms = 200, rise = 6 }) {
@@ -90,25 +56,16 @@ export function FadeIn({ children, disabled = false, ms = 200, rise = 6 }) {
 
 // ─── SearchSwitchingState ────────────────────────────────────────────────────
 // Shown for a moment while the results of a new mode or a new search are on their way:
-// flat placeholder rows with a thin line under each, in the shape of a result row.
-const SWITCH_SKELETON_ROWS = 6
+// a short title line, then a few placeholder cards (the original look).
+const SWITCH_SKELETON_ROWS = 5
 
 export function SearchSwitchingState() {
   return (
     <div role="status" aria-label="Loading results">
       <div style={shimmer({ width: 110, height: 13, marginBottom: 'var(--space-3)' })} />
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {Array.from({ length: SWITCH_SKELETON_ROWS }, (_, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex', flexDirection: 'column', gap: 8,
-              padding: '14px 2px', borderBottom: '1px solid var(--color-border)',
-            }}
-          >
-            <div style={shimmer({ width: i % 2 === 0 ? '62%' : '48%', height: 15 })} />
-            <div style={shimmer({ width: i % 2 === 0 ? '34%' : '40%', height: 12 })} />
-          </div>
+          <div key={i} style={shimmer({ height: 64, borderRadius: 'var(--radius-lg)' })} />
         ))}
       </div>
     </div>
@@ -148,27 +105,15 @@ export function RecentEmptyState() {
 }
 
 // ─── SearchAllButton ─────────────────────────────────────────────────────────
-// 'Search all drugs instead' with a globe icon ('count' adds '· 12 more'). Inside a
-// message it is the filled button; with 'flat' it is a flat row (the line above the
-// results of an open category).
-export function SearchAllButton({ onClick, count, style, flat = false }) {
-  const label = count > 0 ? `Search all drugs instead · ${count} more` : 'Search all drugs instead'
-  if (flat) {
-    return (
-      <FlatRowButton onClick={onClick} style={{ minHeight: 44, color: 'var(--color-accent)', ...style }}>
-        <Globe size={17} style={{ flexShrink: 0 }} />
-        <span style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 600 }}>{label}</span>
-        <ChevronRight size={16} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-      </FlatRowButton>
-    )
-  }
+// 'Search all drugs instead' with a globe icon ('count' adds '· 12 more'): the filled button.
+export function SearchAllButton({ onClick, count, style }) {
   return (
     <FilledHintButton
       onClick={onClick}
       style={{ fontSize: 14, padding: '10px 16px', gap: 8, ...style }}
     >
       <Globe size={17} style={{ flexShrink: 0 }} />
-      {label}
+      {count > 0 ? `Search all drugs instead · ${count} more` : 'Search all drugs instead'}
     </FilledHintButton>
   )
 }
@@ -247,28 +192,39 @@ export function EmptyState({ query, mode, onClear, allowClass = true }) {
 
 // ─── ClassHintStrip ──────────────────────────────────────────────────────────
 // The typed text is also a class, a drug family or a class keyword. 'hint' is
-// { classes, subclasses } (counts). A flat row above a list that already has drugs, in
-// the Class mode's violet, with a thin line under it. Only switches the mode.
+// { classes, subclasses } (counts). A slim tinted violet strip above a list that already
+// has drugs (the original look). Only switches the mode.
 export function ClassHintStrip({ hint, onSwitch, allowClass = true }) {
   if (!allowClass || !hint) return null
   const total = hint.classes + hint.subclasses
   const opt = MODE_OPTIONS.find(o => o.value === 'class')
   const Icon = opt.icon
   return (
-    <FlatRowButton
+    <button
+      type="button"
       onClick={onSwitch}
-      style={{ minHeight: 44, gap: 8, marginBottom: 'var(--space-2)', color: opt.color, fontSize: 13.5, fontWeight: 500 }}
+      style={{
+        display: 'flex', alignItems: 'center',
+        gap: 'var(--space-2)',
+        width: '100%', minHeight: 40, textAlign: 'left',
+        marginBottom: 'var(--space-3)',
+        padding: 'var(--space-2) var(--space-3)',
+        border: 'none', borderRadius: 'var(--radius-lg)',
+        background: opt.tint, color: opt.color,
+        fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+      }}
     >
       <Icon size={16} color={opt.color} style={{ flexShrink: 0 }} />
       <span style={{ flex: 1, minWidth: 0 }}>{`See ${total} ${total === 1 ? 'match' : 'matches'} in Class mode`}</span>
       <ChevronRight size={16} color={opt.color} style={{ flexShrink: 0 }} />
-    </FlatRowButton>
+    </button>
   )
 }
 
 // ─── ModeSwitchState ─────────────────────────────────────────────────────────
 // 'Not here, but found in another mode': the top says this mode has nothing, then one
-// flat row per mode that has the text, each with that mode's own icon and colour.
+// button per mode that has the text, each tinted in that mode's own colour (the original look).
 // 'targets' lists those modes, most useful first. Tapping a row only switches the mode.
 function modeSwitchSubline(target, hint) {
   if (target === 'class') {
@@ -298,27 +254,43 @@ export function ModeSwitchState({ query, mode, hint, targets, onSwitch, allowCla
           ? 'But it has results in other search modes'
           : 'But it has results in another search mode'}
       </div>
-      <div style={FLAT_LIST_STYLE}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+        width: '100%', maxWidth: 360, margin: '0 auto',
+      }}>
         {shownTargets.map(t => {
           const opt = MODE_OPTIONS.find(o => o.value === t)
           if (!opt) return null
           const Icon = opt.icon
           const sub = modeSwitchSubline(t, hint)
           return (
-            <FlatRowButton key={t} onClick={() => onSwitch(t)}>
+            <button
+              key={t}
+              type="button"
+              onClick={() => onSwitch(t)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+                width: '100%', minHeight: 52, boxSizing: 'border-box', textAlign: 'left',
+                padding: 'var(--space-2) var(--space-3)',
+                border: 'none', borderRadius: 'var(--radius-lg)',
+                background: opt.tint, color: opt.color,
+                fontFamily: 'var(--font-body)', cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+            >
               <Icon size={22} color={opt.color} style={{ flexShrink: 0 }} />
               <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.25, color: 'var(--color-text-primary)' }}>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.25 }}>
                   {`See ${opt.label} results`}
                 </span>
                 {sub && (
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 400, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 400, lineHeight: 1.3, opacity: 0.85 }}>
                     {sub}
                   </span>
                 )}
               </span>
-              <ChevronRight size={18} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-            </FlatRowButton>
+              <ChevronRight size={18} color={opt.color} style={{ flexShrink: 0 }} />
+            </button>
           )
         })}
       </div>
@@ -353,7 +325,7 @@ export function FilterMaskedState({ count, query, onClearFilter }) {
 
 // ─── DidYouMeanState ─────────────────────────────────────────────────────────
 // Nothing matched, but there are one to three close guesses. One guess or several: the
-// same flat rows. A long name wraps onto a second line and is cut after that. Every
+// same equal full-width rows. A long name wraps onto a second line and is cut after that. Every
 // name is shown capitalised (display only); the search uses it exactly as given.
 export function DidYouMeanState({ query, suggestions, onSelect }) {
   const single = suggestions.length === 1
@@ -369,19 +341,33 @@ export function DidYouMeanState({ query, suggestions, onSelect }) {
       <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-4)' }}>
         {`No exact match${query ? ` for "${query}"` : ''}`}
       </div>
-      <div style={FLAT_LIST_STYLE}>
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
+        width: '100%', maxWidth: 360, margin: '0 auto',
+      }}>
         {suggestions.map(name => (
-          <FlatRowButton key={name} onClick={() => onSelect(name)} style={{ minHeight: 48 }}>
-            <Search size={18} color="var(--color-accent)" style={{ flexShrink: 0 }} />
+          <button
+            key={name}
+            type="button"
+            onClick={() => onSelect(name)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+              width: '100%', minHeight: 48, boxSizing: 'border-box', textAlign: 'left',
+              padding: 'var(--space-2) var(--space-3)',
+              border: 'none', borderRadius: 'var(--radius-lg)',
+              background: 'var(--color-accent-light)', color: 'var(--color-accent)',
+              fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
+              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            <Search size={18} style={{ flexShrink: 0 }} />
             <span style={{
               flex: 1, minWidth: 0, overflowWrap: 'anywhere',
-              fontSize: 15, fontWeight: 600, lineHeight: 1.3, color: 'var(--color-text-primary)',
               display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
             }}>
               {titleCaseWords(name)}
             </span>
-            <ChevronRight size={18} color="var(--color-text-tertiary)" style={{ flexShrink: 0 }} />
-          </FlatRowButton>
+          </button>
         ))}
       </div>
     </div>
