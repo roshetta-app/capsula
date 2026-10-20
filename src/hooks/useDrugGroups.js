@@ -62,6 +62,7 @@
  *   waitingGroupIds ids of the groups that have unsent changes (the small mark on a group)
  *   syncState       'idle' | 'syncing' | 'saved' ('saved' shows for 3 seconds after a send)
  *   failedCount     number of waiting changes the server refused (step 17.4)
+ *   failedList      those changes, oldest first (step 17.6b), for the "could not be saved" sheet
  *   retryFailedChanges    () => void   tries the failed changes again
  *   discardFailedChanges  () => void   drops the failed changes and shows the server's groups
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
@@ -212,6 +213,7 @@ export function useDrugGroups(fav) {
   const [groupsLoadError, setGroupsLoadError] = useState(false)
   const [failedCount, setFailedCount] = useState(0)
   const [waitingCount, setWaitingCount] = useState(0)
+  const [failedList, setFailedList] = useState([])
   const [waitingGroupIds, setWaitingGroupIds] = useState([])
   const [syncState, setSyncState] = useState('idle')
   const savedTimerRef = useRef(null)
@@ -222,6 +224,7 @@ export function useDrugGroups(fav) {
   const applySummary = useCallback((queue) => {
     const s = summarizeQueue(queue)
     setFailedCount(s.failed)
+    setFailedList(prev => (prev.length === s.failedList.length && prev.every((c, i) => c.id === s.failedList[i].id) ? prev : s.failedList))
     setWaitingCount(s.waiting)
     setWaitingGroupIds(prev => (prev.length === s.ids.length && prev.every(id => s.ids.includes(id)) ? prev : s.ids))
   }, [])
@@ -986,6 +989,7 @@ export function useDrugGroups(fav) {
     waitingGroupIds,
     syncState,
     failedCount,
+    failedList,
     retryFailedChanges,
     discardFailedChanges,
     createGroup,

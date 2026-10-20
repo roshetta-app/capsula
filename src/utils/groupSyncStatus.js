@@ -14,3 +14,30 @@ export function syncStatusLine({ online, failedCount, waitingCount, syncState })
   if (syncState === 'saved') return { tone: 'neutral', title: 'All changes saved' }
   return null
 }
+
+// Plain words for one change the server refused (step 17.6b), for the list in
+// the "could not be saved" sheet. groupName / drugName may be null.
+const REASON_TEXT = {
+  name_taken: 'That name is already in use.',
+  group_gone: 'The group was deleted on another device.',
+  group_limit: 'You have reached the limit of groups.',
+  drug_limit: 'The group is full.',
+  read_only: 'Your groups are read only.',
+  error: 'The server could not take it.',
+}
+
+export function describeFailedChange(change, { groupName = null, drugName = null } = {}) {
+  const quote = t => `\u201c${t}\u201d`
+  const g = groupName ?? change.data?.name ?? null
+  const group = g ? quote(g) : 'a group'
+  let title
+  switch (change.type) {
+    case 'create': title = `New group ${group}`; break
+    case 'update': title = `Changes to ${group}`; break
+    case 'add_drug': title = `Adding ${drugName ? quote(drugName) : 'a drug'} to ${group}`; break
+    case 'remove_drug': title = `Removing ${drugName ? quote(drugName) : 'a drug'} from ${group}`; break
+    case 'delete': title = `Deleting ${group}`; break
+    default: title = `A change to ${group}`
+  }
+  return { title, reason: REASON_TEXT[change.failed?.reason] ?? REASON_TEXT.error }
+}
