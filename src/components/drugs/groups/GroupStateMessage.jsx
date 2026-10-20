@@ -28,7 +28,8 @@ export default function GroupStateMessage({
           display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
           padding: '8px var(--space-3)',
           borderRadius: 'var(--radius-md)',
-          backgroundColor: warn ? 'var(--color-warning-light)' : 'var(--color-surface-muted)',
+          backgroundColor: warn ? 'var(--color-warning-light)' : 'var(--color-surface)',
+          border: warn ? 'none' : '1px solid var(--color-border)',
           color: warn ? 'var(--color-warning)' : 'var(--color-text-secondary)',
           fontSize: 12, fontWeight: 500, fontFamily: font, lineHeight: 1.35,
         }}
@@ -58,13 +59,14 @@ export default function GroupStateMessage({
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: 'var(--space-2)', textAlign: 'center',
-        backgroundColor: 'var(--color-surface-muted)',
+        backgroundColor: 'var(--color-surface)',
+        border: '1px solid var(--color-border)',
         borderRadius: 16, padding: 'var(--space-5) var(--space-4)',
       }}
     >
       <div style={{
         width: 36, height: 36, borderRadius: '50%',
-        backgroundColor: 'var(--color-surface)',
+        backgroundColor: 'var(--color-surface-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         <Folder size={17} color="var(--color-text-tertiary)" aria-hidden="true" />

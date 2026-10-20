@@ -68,8 +68,9 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        backgroundColor: 'var(--color-surface-muted)',
-        border: isNew ? '1.5px dashed var(--color-border)' : 'none',
+        // 11.1: no card behind the groups area any more, so a group needs its own fill and line.
+        backgroundColor: 'var(--color-surface)',
+        border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
         borderRadius: 16,
         padding: 'var(--space-3)',
         minHeight: 84,

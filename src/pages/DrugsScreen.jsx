@@ -1275,18 +1275,14 @@ export default function DrugsScreen() {
 function DrugsHero({ heroRef, isDark, onInfoTap }) {
   return (
     <div ref={heroRef} style={{
-      backgroundColor: 'var(--color-surface)',
-      borderRadius:    16,
-      padding:         '14px 14px 14px',
-      marginTop:       'var(--space-4)',
-      marginBottom:    'var(--space-4)',
-      boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
+      marginTop:    'var(--space-4)',
+      marginBottom: 'var(--space-3)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 44 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
           <div style={{
-            width:           38,
-            height:          38,
+            width:           32,
+            height:          32,
             borderRadius:    '50%',
             backgroundColor: 'var(--color-accent)',
             display:         'flex',
@@ -1294,29 +1290,21 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
             justifyContent:  'center',
             flexShrink:      0,
           }}>
-            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={18} color="#fff" />
+            <SpecialtyIcon iconType="lucide" iconValue="Pill" size={16} color="#fff" />
           </div>
 
-          <div style={{ minWidth: 0 }}>
-            <h1 style={{
-              fontSize:      19,
-              lineHeight:    1.15,
-              fontWeight:    700,
-              color:         'var(--color-text-primary)',
-              margin:        0,
-              letterSpacing: '-0.2px',
-            }}>
-              Drug Library
-            </h1>
-            <div style={{
-              fontSize:   12,
-              lineHeight: 1.2,
-              color:      'var(--color-text-tertiary)',
-              marginTop:  1,
-            }}>
-              Know your meds
-            </div>
-          </div>
+          {/* 2026-10-20 (plan step 11.1): flat header, no card and no subtitle. */}
+          <h1 style={{
+            fontSize:      24,
+            lineHeight:    1.15,
+            fontWeight:    700,
+            color:         'var(--color-text-primary)',
+            margin:        0,
+            letterSpacing: '-0.3px',
+            minWidth:      0,
+          }}>
+            Drugs
+          </h1>
         </div>
 
         {/* Action-button slot — 2026-08-09: now holds the info button that
@@ -1329,8 +1317,9 @@ function DrugsHero({ heroRef, isDark, onInfoTap }) {
             display:                 'flex',
             alignItems:              'center',
             justifyContent:          'center',
-            width:                   34,
-            height:                  34,
+            width:                   44,
+            height:                  44,
+            marginRight:             -12,
             borderRadius:            '50%',
             background:              'none',
             border:                  'none',
@@ -1408,7 +1397,7 @@ function StickyDrugsHeader({ watchRef, query, onQueryChange, onSearchFocus, plac
               letterSpacing: '-0.2px',
               minWidth:      0,
             }}>
-              Drug Library
+              Drugs
             </div>
           </div>
 

@@ -13,6 +13,11 @@
  *   trailing  optional control at the right end of the title row
  *   children  the area's content, under the title row
  *
+ * 2026-10-20 (Drug groups plan, step 11.1): new `flat` option. Flat sections have no card:
+ * no fill, corners or shadow, and no side padding (the layout owns the 16px side gap),
+ * with a thin line above the section unless `divider` is false (the first section).
+ * Cards stay as they were when `flat` is off (the search focus mode, until step 11.6).
+ *
  * The title text style is exported (SECTION_TITLE_STYLE) so the pieces of both
  * titles (the word 'Search', the words 'Browse by', and the switch words) match
  * exactly.
@@ -26,17 +31,24 @@ export const SECTION_TITLE_STYLE = {
   fontFamily: 'var(--font-body)',
 }
 
-export default function DrugsSectionCard({ label, title, trailing = null, children }) {
-  return (
-    <section
-      aria-label={label}
-      style={{
+export default function DrugsSectionCard({ label, title, trailing = null, flat = false, divider = true, children }) {
+  const frame = flat
+    ? {
+        padding:   '16px 0',
+        marginBottom: 0,
+        borderTop: divider ? '1px solid var(--color-border)' : 'none',
+      }
+    : {
         backgroundColor: 'var(--color-surface)',
         borderRadius:    16,
         padding:         '14px 14px',
         marginBottom:    'var(--space-4)',
         boxShadow:       '0 4px 16px rgba(0, 0, 0, 0.045)',
-      }}
+      }
+  return (
+    <section
+      aria-label={label}
+      style={frame}
     >
       <div style={{
         display:        'flex',

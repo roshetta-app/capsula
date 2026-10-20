@@ -266,7 +266,7 @@ export default function GroupsSection() {
 
   return (
     <>
-      <DrugsSectionCard label="My drug groups" title={title} trailing={trailing}>
+      <DrugsSectionCard label="My drug groups" flat title={title} trailing={trailing}>
         {content}
       </DrugsSectionCard>
       <GroupEditorSheet isOpen={editor.open} onClose={closeEditor} group={editor.group} />

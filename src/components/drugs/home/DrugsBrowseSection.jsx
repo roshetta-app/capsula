@@ -79,7 +79,7 @@ export default function DrugsBrowseSection() {
   const title = <span style={SECTION_TITLE_STYLE}>Browse drugs</span>
 
   return (
-    <DrugsSectionCard label="Browse" title={title}>
+    <DrugsSectionCard label="Browse" flat title={title}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
         {BUTTONS.map(b => (
           <BrowseButton

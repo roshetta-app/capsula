@@ -135,6 +135,8 @@ export default function DrugsSearchSection({
     <>
       <DrugsSectionCard
         label="Search"
+        flat={!searchOpen}
+        divider={false}
         title={title}
         trailing={
           <ModeButton
