@@ -51,7 +51,7 @@ import {
 } from '../../../constants/features'
 import { drugRowTitle } from './groupDrugText'
 import {
-  OFFLINE_MESSAGE, READ_ONLY_MESSAGE,
+  READ_ONLY_MESSAGE,
 } from './groupMessages'
 
 const ROW_STYLE = {
@@ -132,7 +132,6 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
 
   function handleNewGroup() {
     if (!user) { promptSignIn('groups', drugId ?? 'new'); return }
-    if (typeof navigator !== 'undefined' && navigator.onLine === false) { toast.info(OFFLINE_MESSAGE); return }
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
     if (!canCreateGroup) { showGroupLimit('groups'); return }
     setEditorOpen(true)

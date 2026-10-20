@@ -41,7 +41,6 @@ import { toTitleCase } from '../../../utils/drugTitleFormat'
 import { DRUG_GROUPS_CAP_FREE } from '../../../constants/features'
 
 const SORT_LABELS = { newest: 'Newest first', az: 'A \u2013 Z' }
-const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
 const READ_ONLY_MESSAGE = 'Your groups are read only. Delete a group or upgrade to edit.'
 
 // Same look as the sort button on the Class page: no box, arrow icon, 13px
@@ -161,7 +160,6 @@ export default function GroupsSection() {
   // New group: the message cases come first, otherwise the editor opens.
   function handleNewGroup() {
     if (!user) { promptSignIn('groups', 'new'); return }
-    if (!online || groupsFromCache) { toast.info(OFFLINE_MESSAGE); return }
     if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
     if (!canCreateGroup) { showGroupLimit('groups'); return }
     setEditor({ open: true, group: null })
@@ -240,7 +238,7 @@ export default function GroupsSection() {
           <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />
         )}
         {!online && groupsFromCache ? (
-          <GroupStateMessage variant="banner" title="You're offline. Showing your saved groups." />
+          <GroupStateMessage variant="banner" title="You're offline. Changes are saved on this phone." />
         ) : groupsLoadError ? (
           <GroupStateMessage variant="banner" title="Couldn't refresh your groups" actionLabel="Retry" onAction={reloadGroups} />
         ) : null}
