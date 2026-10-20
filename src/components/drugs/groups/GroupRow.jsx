@@ -17,9 +17,9 @@ import { useState } from 'react'
 import { Folder, Plus, ChevronRight } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
-import { drugCountLabel, ProPill } from './GroupTile'
+import { drugCountLabel, ProPill, WaitingMark } from './GroupTile'
 
-export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, onOpen }) {
+export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, waiting = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
@@ -96,6 +96,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
         )}
       </div>
 
+      {!isNew && waiting && <WaitingMark />}
       {isNew && showProBadge ? <ProPill /> : (
         <ChevronRight size={16} color="var(--color-text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
       )}

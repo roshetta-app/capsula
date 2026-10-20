@@ -58,6 +58,9 @@
  *   isReadOnly      boolean
  *   canCreateGroup  boolean (false when at the limit or read only)
  *   reloadGroups    () => Promise<void>
+ *   waitingCount    number of changes saved on the phone and not yet sent (step 17.6)
+ *   waitingGroupIds ids of the groups that have unsent changes (the small mark on a group)
+ *   syncState       'idle' | 'syncing' | 'saved' ('saved' shows for 3 seconds after a send)
  *   failedCount     number of waiting changes the server refused (step 17.4)
  *   retryFailedChanges    () => void   tries the failed changes again
  *   discardFailedChanges  () => void   drops the failed changes and shows the server's groups
@@ -99,7 +102,7 @@ import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
-import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, failedChanges, retryFailed, discardFailed } from '../utils/groupChanges'
+import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
 import { runSync, sendChange, describeEvents } from '../utils/groupSync'
 import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
@@ -208,6 +211,20 @@ export function useDrugGroups(fav) {
   const [groupsFromCache, setGroupsFromCache] = useState(false)
   const [groupsLoadError, setGroupsLoadError] = useState(false)
   const [failedCount, setFailedCount] = useState(0)
+  const [waitingCount, setWaitingCount] = useState(0)
+  const [waitingGroupIds, setWaitingGroupIds] = useState([])
+  const [syncState, setSyncState] = useState('idle')
+  const savedTimerRef = useRef(null)
+  useEffect(() => () => clearTimeout(savedTimerRef.current), [])
+
+  // Tells the screens what is waiting (step 17.6). Keeps the same list object
+  // when nothing changed, so screens do not redraw for nothing.
+  const applySummary = useCallback((queue) => {
+    const s = summarizeQueue(queue)
+    setFailedCount(s.failed)
+    setWaitingCount(s.waiting)
+    setWaitingGroupIds(prev => (prev.length === s.ids.length && prev.every(id => s.ids.includes(id)) ? prev : s.ids))
+  }, [])
 
   // Limit sheet (step 7.1). The kind is kept after closing so the text stays put while it slides away.
   const [groupLimit, setGroupLimit] = useState({ open: false, kind: 'groups' })
@@ -249,12 +266,12 @@ export function useDrugGroups(fav) {
 
   const persistQueue = useCallback(() => {
     const u = userRef.current
-    setFailedCount(failedChanges(queueRef.current).length)
+    applySummary(queueRef.current)
     if (!u) return Promise.resolve(false)
     const run = () => writeGroupChanges(u.id, queueRef.current)
     writeChainRef.current = writeChainRef.current.then(run, run)
     return writeChainRef.current
-  }, [])
+  }, [applySummary])
 
   // Shows the new list at once and saves the waiting list. When the phone can
   // not save it, everything goes back and the person is told.
@@ -311,7 +328,7 @@ export function useDrugGroups(fav) {
       // (sending twice is safe, see utils/groupSync.js).
       queueRef.current = clearSending(waiting)
       queueUserRef.current = u.id
-      setFailedCount(failedChanges(queueRef.current).length)
+      applySummary(queueRef.current)
     }
     const withWaiting = list => applyQueue(list, queueRef.current)
 
@@ -356,7 +373,7 @@ export function useDrugGroups(fav) {
     setGroupsStatus('ready')
     // Changes may be waiting from an earlier offline session (step 17.3).
     syncRef.current?.()
-  }, [])
+  }, [applySummary])
 
   const reloadGroups = useCallback(async () => {
     const u = userRef.current
@@ -381,6 +398,8 @@ export function useDrugGroups(fav) {
     if (isOffline() || !nextToSend(queueRef.current)) return
 
     syncingRef.current = true
+    clearTimeout(savedTimerRef.current)
+    setSyncState('syncing')
     let result
     try {
       result = await runSync({
@@ -398,8 +417,14 @@ export function useDrugGroups(fav) {
       })
     } finally {
       syncingRef.current = false
+      setSyncState('idle')
     }
     if (userRef.current?.id !== u.id) return
+    // "All changes saved" shows for 3 seconds once everything has gone through.
+    if (result.sent > 0 && result.failed === 0 && queueRef.current.length === 0) {
+      setSyncState('saved')
+      savedTimerRef.current = setTimeout(() => setSyncState('idle'), 3000)
+    }
 
     // Tell the person in plain words (step 17.4): one message for the whole run.
     const { messages, severe } = describeEvents(result.events, result.failed)
@@ -459,7 +484,7 @@ export function useDrugGroups(fav) {
       loadSeqRef.current++
       queueRef.current = []
       queueUserRef.current = null
-      setFailedCount(0)
+      applySummary([])
       shownFromCacheRef.current = false
       setGroups([])
       setGroupsFromCache(false)
@@ -470,7 +495,7 @@ export function useDrugGroups(fav) {
     }
     lastUserIdRef.current = user.id
     loadGroups(user)
-  }, [user, authLoading, loadGroups])
+  }, [user, authLoading, loadGroups, applySummary])
 
   // Come back online with only the saved copy on screen: refresh it. Uses the
   // app's shared online signal (step 17.1), so it also fires when a Wi-Fi with
@@ -957,6 +982,9 @@ export function useDrugGroups(fav) {
     isReadOnly,
     canCreateGroup,
     reloadGroups,
+    waitingCount,
+    waitingGroupIds,
+    syncState,
     failedCount,
     retryFailedChanges,
     discardFailedChanges,

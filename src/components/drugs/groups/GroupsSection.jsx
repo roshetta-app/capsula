@@ -37,6 +37,8 @@ import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useIsPro } from '../../../hooks/useIsPro'
+import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
+import GroupSyncStatus from './GroupSyncStatus'
 import { toTitleCase } from '../../../utils/drugTitleFormat'
 import { DRUG_GROUPS_CAP_FREE } from '../../../constants/features'
 
@@ -100,8 +102,9 @@ const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 'var(--space
 export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
-    groups, groupsStatus, groupsFromCache, groupsLoadError, isReadOnly,
+    groups, groupsStatus, groupsLoadError, isReadOnly,
     canCreateGroup, reloadGroups, restoreGroup, promptSignIn, showGroupLimit,
+    waitingGroupIds = [],
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -122,6 +125,7 @@ export default function GroupsSection() {
     return () => clearTimeout(t)
   }, [undo.visible, undo.group])
 
+  const { isOnline: appOnline } = useOnlineStatus()
   const [online, setOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine !== false)
   useEffect(() => {
     const on = () => setOnline(true)
@@ -237,22 +241,21 @@ export default function GroupsSection() {
         {isReadOnly && (
           <GroupStateMessage variant="banner" tone="warning" title={READ_ONLY_MESSAGE} />
         )}
-        {!online && groupsFromCache ? (
-          <GroupStateMessage variant="banner" title="You're offline. Changes are saved on this phone." />
-        ) : groupsLoadError ? (
+        <GroupSyncStatus />
+        {groupsLoadError && online && appOnline ? (
           <GroupStateMessage variant="banner" title="Couldn't refresh your groups" actionLabel="Retry" onAction={reloadGroups} />
         ) : null}
         {groupsView === 'list' ? (
           <div style={LIST_STYLE}>
             {sorted.map(g => (
-              <GroupRow key={g.id} group={g} drugNames={previewNames(g)} onOpen={() => handleOpenGroup(g)} />
+              <GroupRow key={g.id} group={g} drugNames={previewNames(g)} waiting={waitingGroupIds.includes(g.id)} onOpen={() => handleOpenGroup(g)} />
             ))}
             {showNew && <GroupRow isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
           <div style={GRID_STYLE}>
             {sorted.map(g => (
-              <GroupTile key={g.id} group={g} onOpen={() => handleOpenGroup(g)} />
+              <GroupTile key={g.id} group={g} waiting={waitingGroupIds.includes(g.id)} onOpen={() => handleOpenGroup(g)} />
             ))}
             {showNew && <GroupTile isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>

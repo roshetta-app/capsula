@@ -8,6 +8,7 @@
  *   group        { id, name, color, brandIds }  (not needed when isNew)
  *   isNew        true -> the "New group" tile
  *   showProBadge on the New group tile: free account at its limit
+ *   waiting      true when this group has changes saved on the phone and not yet sent
  *   onOpen       tap handler
  *
  * The group's colour is one of five fixed names (blue, teal, violet, amber,
@@ -16,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import { Folder, Plus } from 'lucide-react'
+import { Folder, Plus, CloudUpload } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
@@ -37,7 +38,16 @@ export function ProPill() {
   )
 }
 
-export default function GroupTile({ group, isNew = false, showProBadge = false, onOpen }) {
+// The small mark on a group that has changes not yet sent (step 17.6a).
+export function WaitingMark({ size = 14 }) {
+  return (
+    <span role="img" aria-label="Waiting to sync" title="Waiting to sync" style={{ display: 'flex', flexShrink: 0 }}>
+      <CloudUpload size={size} color="var(--color-text-tertiary)" aria-hidden="true" />
+    </span>
+  )
+}
+
+export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
@@ -84,6 +94,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
             : <Folder size={15} color={colors.fg} aria-hidden="true" />}
         </div>
         {isNew && showProBadge && <ProPill />}
+        {!isNew && waiting && <WaitingMark />}
       </div>
 
       <div

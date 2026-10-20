@@ -160,6 +160,13 @@ export function isGroupWaiting(queue, groupId) {
   return queue.some(forGroup(groupId))
 }
 
+// What the screens need to know about the list (step 17.6): how many changes
+// are waiting, how many the server refused, and which groups have unsent changes.
+export function summarizeQueue(queue) {
+  const failed = queue.filter(c => c.failed).length
+  return { failed, waiting: queue.length - failed, ids: Array.from(new Set(queue.map(c => c.groupId))) }
+}
+
 export function waitingGroupIds(queue) {
   return new Set(queue.map(c => c.groupId))
 }

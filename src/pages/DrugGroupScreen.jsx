@@ -46,6 +46,7 @@ import ConfirmSheet from '../components/ui/ConfirmSheet'
 import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
+import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
 import { shimmer } from '../components/drugs/home/shimmer'
@@ -339,6 +340,8 @@ export default function DrugGroupScreen() {
             {group.description}
           </p>
         )}
+
+        <GroupSyncStatus marginTop="var(--space-3)" />
 
         {isReadOnly && (
           <div style={{ marginTop: 'var(--space-3)' }}>
