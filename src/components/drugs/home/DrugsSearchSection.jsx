@@ -1,5 +1,15 @@
 /**
  * src/components/drugs/home/DrugsSearchSection.jsx
+ * 2026-10-20 (Drug groups plan, step 11.6): search focus mode, the frame. No card any more.
+ * The Search area is one plain section drawn the same way in both views, and what changes
+ * is only how its parts are laid out (CSS 'order' and direction, never a different set of
+ * elements), so the one search field is never rebuilt and the keyboard stays up:
+ *   home:   'Find a drug' heading with the info button and the mode button, then the tall
+ *           search field, then Recently viewed and Clear filter (unchanged from 11.2);
+ *   focus:  one flat bar: back arrow and the search field (clear and filter buttons inside
+ *           it), and under it the mode button with the info button. The heading is hidden.
+ * The sticky wrapper in DrugsScreen.jsx adds the thin line under the bar once the list
+ * scrolls (the old solid band under the card is gone).
  * 2026-10-15 (search focus mode): the Cancel button beside the bar is gone. While the
  * search is open, a small back arrow sits at the left of the 'Search' title and leaves
  * the search (and clears the text), so the bar keeps its full width. 'onSearchSubmit' is
@@ -43,7 +53,7 @@
 
 import { useState } from 'react'
 import { Search, Tag, FlaskConical, Layers, Info, ArrowLeft } from 'lucide-react'
-import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
+import { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import ModeButton from './ModeButton'
 import ClearFiltersButton from './ClearFiltersButton'
 import RecentlyViewedButton from './RecentlyViewedButton'
@@ -80,69 +90,65 @@ export default function DrugsSearchSection({
     onModeMenuChange(false)
   }
 
-  const title = (
-    <>
-      {searchOpen && (
-        <button
-          onClick={onSearchCancel}
-          aria-label="Close search"
-          style={{
-            display:                 'flex',
-            alignItems:              'center',
-            justifyContent:          'center',
-            width:                   32,
-            height:                  32,
-            marginLeft:              -6,
-            borderRadius:            '50%',
-            background:              'none',
-            border:                  'none',
-            padding:                 0,
-            cursor:                  'pointer',
-            color:                   'var(--color-text-primary)',
-            WebkitTapHighlightColor: 'transparent',
-            outline:                 'none',
-          }}
-        >
-          <ArrowLeft size={20} />
-        </button>
-      )}
-      {/* 2026-10-20 (plan step 11.2): on the home the heading is "Find a drug", bigger; focus mode keeps "Search" until 11.6. */}
-      <span style={searchOpen ? SECTION_TITLE_STYLE : { ...SECTION_TITLE_STYLE, fontSize: 20, letterSpacing: '-0.2px' }}>
-        {searchOpen ? 'Search' : 'Find a drug'}
-      </span>
-      <button
-        onClick={() => setShowModeInfo(true)}
-        aria-label="How search modes work"
-        style={{
-          display:                 'flex',
-          alignItems:              'center',
-          justifyContent:          'center',
-          width:                   searchOpen ? 28 : 44,
-          height:                  searchOpen ? 28 : 44,
-          margin:                  searchOpen ? 0 : '0 -8px',
-          borderRadius:            '50%',
-          background:              'none',
-          border:                  'none',
-          padding:                 0,
-          cursor:                  'pointer',
-          color:                   'var(--color-text-tertiary)',
-          WebkitTapHighlightColor: 'transparent',
-          outline:                 'none',
-        }}
-      >
-        <Info size={searchOpen ? 14 : 16} />
-      </button>
-    </>
-  )
+  // One layout switch: 'order' puts the bar first in focus mode, 'row-reverse' puts the
+  // mode button before the info button under it. The elements and their positions in
+  // the tree are the same in both views.
+  const infoSize = searchOpen ? 36 : 44
 
   return (
     <>
-      <DrugsSectionCard
-        label="Search"
-        flat={!searchOpen}
-        divider={false}
-        title={title}
-        trailing={
+      <section
+        aria-label="Search"
+        style={{
+          display:       'flex',
+          flexDirection: 'column',
+          padding:       searchOpen ? 0 : '16px 0',
+        }}
+      >
+        {/* Heading row: 'Find a drug' + info on the left and the mode button on the right (home);
+            in focus mode the heading is hidden and this row sits under the bar with the mode
+            button first, then the info button. */}
+        <div style={{
+          order:          searchOpen ? 1 : 0,
+          display:        'flex',
+          flexDirection:  searchOpen ? 'row-reverse' : 'row',
+          alignItems:     'center',
+          justifyContent: searchOpen ? 'flex-end' : 'space-between',
+          gap:            searchOpen ? 4 : 'var(--space-2)',
+          minHeight:      searchOpen ? 36 : 34,
+          marginTop:      searchOpen ? 8 : 0,
+          marginBottom:   searchOpen ? 0 : 'var(--space-3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+            <span style={{
+              ...SECTION_TITLE_STYLE, fontSize: 20, letterSpacing: '-0.2px',
+              display: searchOpen ? 'none' : 'inline',
+            }}>
+              Find a drug
+            </span>
+            <button
+              onClick={() => setShowModeInfo(true)}
+              aria-label="How search modes work"
+              style={{
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                width:                   infoSize,
+                height:                  infoSize,
+                margin:                  searchOpen ? 0 : '0 -8px',
+                borderRadius:            '50%',
+                background:              'none',
+                border:                  'none',
+                padding:                 0,
+                cursor:                  'pointer',
+                color:                   'var(--color-text-tertiary)',
+                WebkitTapHighlightColor: 'transparent',
+                outline:                 'none',
+              }}
+            >
+              <Info size={16} />
+            </button>
+          </div>
           <ModeButton
             icon={currentMode.icon}
             label={currentMode.label}
@@ -150,12 +156,38 @@ export default function DrugsSearchSection({
             tint={currentMode.tint}
             onPress={() => onModeMenuChange(true)}
           />
-        }
-      >
-        {/* The one search bar of the screen. Nothing is added or removed
-            above it, so React keeps the same input (and the keyboard) while
-            the view below changes. */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        </div>
+
+        {/* The one search bar of the screen. Nothing is added or removed above it
+            except the back arrow, which sits in this same row ('false' holds its place
+            when closed), so React keeps the same input (and the keyboard) while the
+            view below changes. */}
+        <div style={{ order: searchOpen ? 0 : 1, display: 'flex', alignItems: 'center', gap: 4 }}>
+          {searchOpen && (
+            <button
+              onClick={onSearchCancel}
+              aria-label="Close search"
+              style={{
+                display:                 'flex',
+                alignItems:              'center',
+                justifyContent:          'center',
+                width:                   40,
+                height:                  40,
+                marginLeft:              -8,
+                flexShrink:              0,
+                borderRadius:            '50%',
+                background:              'none',
+                border:                  'none',
+                padding:                 0,
+                cursor:                  'pointer',
+                color:                   'var(--color-text-primary)',
+                WebkitTapHighlightColor: 'transparent',
+                outline:                 'none',
+              }}
+            >
+              <ArrowLeft size={22} />
+            </button>
+          )}
           <div style={{ flex: 1, minWidth: 0 }}>
             <SearchBar
               ref={searchInputRef}
@@ -174,28 +206,27 @@ export default function DrugsSearchSection({
 
         {/* Recently viewed: a shortcut to drugs, so it belongs with search. */}
         {showRecent && recentDrugs.length > 0 && (
-          <div style={{ marginTop: 'var(--space-3)' }}>
+          <div style={{ order: 2, marginTop: 'var(--space-3)' }}>
             <RecentlyViewedButton
               onTap={onOpenRecent}
               drugs={recentDrugs}
               categories={categories}
               isDark={isDark}
-              onPage={!searchOpen}
+              onPage
             />
           </div>
         )}
 
-        {/* Clear filter: the last thing in the card, full width, only while a
-            filter is on. */}
+        {/* Clear filter: the last thing in the area, full width, only while a filter is on. */}
         {showClear && (
-          <div style={{ marginTop: 'var(--space-3)' }}>
+          <div style={{ order: 3, marginTop: 'var(--space-3)' }}>
             <ClearFiltersButton
               onClick={onClearFilters}
               style={{ display: 'block', width: '100%' }}
             />
           </div>
         )}
-      </DrugsSectionCard>
+      </section>
 
       {modeMenuOpen && (
         <FilterModal

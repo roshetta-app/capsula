@@ -249,6 +249,10 @@
  * The counts come from useDrugSearch ('classHint'); Class mode itself is
  * unchanged.
  *
+ * 2026-10-20 (Drug groups plan, step 11.6): the strip under the sticky Search area is gone. The
+ * area is now one flat bar with no card; once the list has scrolled, a thin line shows under
+ * it (searchScrolled below). The page colour behind it stays solid so results never show
+ * through.
  * 2026-10-18 (Omar): that strip is now solid (page colour), no gradient fade. It is the
  * sticky Search area's own bottom space, not an overlay, so it cannot hide the count line or
  * the Class hint strip.
@@ -636,12 +640,23 @@ export default function DrugsScreen() {
   const reduceMotion = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
+  // Thin line under the sticky bar, only once the list has scrolled (step 11.6).
+  const [searchScrolled, setSearchScrolled] = useState(false)
+  useEffect(() => {
+    if (!searchOpen) return undefined
+    const check = () => setSearchScrolled(window.scrollY > 4)
+    window.addEventListener('scroll', check, { passive: true })
+    const frame = requestAnimationFrame(check)
+    return () => { window.removeEventListener('scroll', check); cancelAnimationFrame(frame) }
+  }, [searchOpen])
+
   function openSearch() {
     restoredOpenRef.current = false
     setSearchOpen(true)
   }
   function closeSearch() {
     setSearchOpen(false)
+    setSearchScrolled(false)
     handleQueryChange('')
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
   }
@@ -1118,12 +1133,13 @@ export default function DrugsScreen() {
           top:             0,
           zIndex:          searchOpen ? 40 : 'auto',
           backgroundColor: searchOpen ? 'var(--color-bg)' : 'transparent',
-          paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 16px)' : 0,
-          // Solid band under the Search card (2026-10-18, Omar): results scroll
-          // behind this padding, which is drawn in the page colour, so it is solid
-          // and, being real space, never covers the first line of results.
-          paddingBottom:   searchOpen ? 10 : 0,
-          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease',
+          paddingTop:      searchOpen ? 'calc(env(safe-area-inset-top, 0px) + 8px)' : 0,
+          // Flat bar (step 11.6): a little space under it, then a thin line that shows only
+          // once the list has scrolled. The page colour behind stays solid, and being real
+          // space it never covers the first line of results.
+          paddingBottom:   searchOpen ? 8 : 0,
+          borderBottom:    searchOpen ? `1px solid ${searchScrolled ? 'var(--color-border)' : 'transparent'}` : '1px solid transparent',
+          transition:      reduceMotion ? 'none' : 'padding-top 220ms ease, padding-bottom 220ms ease, border-color 160ms ease',
         }}>
         <DrugsSearchSection
           searchOpen={searchOpen}
