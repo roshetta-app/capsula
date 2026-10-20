@@ -62,13 +62,22 @@ export async function fetchSharedGroup(code) {
     return { status: 'offline' }
   }
 
+  // 2026-10-20 (step 17.1): no answer within 8 seconds counts as offline, so a
+  // Wi-Fi with no internet shows the offline message with Retry, not a page that waits forever.
   let res
+  let timer
   try {
-    res = await supabase.rpc('get_shared_group', { p_code: clean })
+    res = await Promise.race([
+      supabase.rpc('get_shared_group', { p_code: clean }),
+      new Promise(resolve => { timer = setTimeout(() => resolve({ data: null, error: { code: 'request_timeout' } }), 8000) }),
+    ])
   } catch {
     return { status: 'error' }
+  } finally {
+    clearTimeout(timer)
   }
   if (res.error) {
+    if (res.error.code === 'request_timeout') return { status: 'offline' }
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return { status: 'offline' }
     return { status: 'error' }
   }

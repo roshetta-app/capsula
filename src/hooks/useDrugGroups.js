@@ -11,6 +11,9 @@
  * Rules:
  *  - A guest tap saves nothing: it asks to sign in (promptSignIn) and the
  *    mutator answers { ok: false, reason: 'guest' }.
+ *  - Offline (step 17.1): decided by the app's shared online signal, and any request
+ *    that takes longer than 8 seconds counts as offline too, so a Wi-Fi with no
+ *    internet behaves like airplane mode.
  *  - Offline: the saved copy (utils/cache.js, store 'drug-groups') shows
  *    instead of the live list. Changing anything while offline shows
  *    "You're offline. Reconnect to change your groups." and answers
@@ -69,6 +72,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from './useAuth'
 import { useIsPro } from './useIsPro'
+import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
@@ -87,8 +91,37 @@ export const GROUP_COLORS = ['blue', 'teal', 'violet', 'amber', 'rose']
 
 const OFFLINE_MESSAGE = "You're offline. Reconnect to change your groups."
 
+// ── Reliable offline detection (2026-10-20, Drug groups plan step 17.1) ──────
+// The groups used the phone's raw online flag, which says "online" on a Wi-Fi
+// with no internet, so a request then hung with no end. Now:
+//  1. The hook copies the app's shared online signal (it confirms real
+//     reachability, see OnlineStatusContext) into appOnline below, and
+//     isOffline() reads that as well as the raw flag.
+//  2. Every request has a time limit (REQUEST_TIMEOUT_MS). A request that
+//     takes longer is treated exactly like being offline.
+const REQUEST_TIMEOUT_MS = 8000
+let appOnline = true
+
 function isOffline() {
-  return typeof navigator !== 'undefined' && navigator.onLine === false
+  return appOnline === false || (typeof navigator !== 'undefined' && navigator.onLine === false)
+}
+
+const TIMEOUT_ERROR = { code: 'request_timeout', message: 'request_timeout' }
+
+function isTimeout(error) {
+  return error?.code === 'request_timeout'
+}
+
+// Wraps one Supabase request. Always resolves with { data, error }: the real
+// answer, or a timeout error when the answer takes longer than the limit.
+function withLimit(request) {
+  return new Promise(resolve => {
+    const timer = setTimeout(() => resolve({ data: null, error: TIMEOUT_ERROR }), REQUEST_TIMEOUT_MS)
+    Promise.resolve(request).then(
+      res => { clearTimeout(timer); resolve(res) },
+      err => { clearTimeout(timer); resolve({ data: null, error: err ?? TIMEOUT_ERROR }) },
+    )
+  })
 }
 
 function mapGroupRow(r) {
@@ -144,6 +177,7 @@ export function useDrugGroups(fav) {
   const isPro = useIsPro()
   const { toast } = useToast()
   const { pendingFavourite, dismissPendingFavourite, promptSignIn } = fav
+  const { isOnline } = useOnlineStatus()
 
   const [groups, setGroups] = useState([])
   const [groupsStatus, setGroupsStatus] = useState('loading')
@@ -159,6 +193,8 @@ export function useDrugGroups(fav) {
   useEffect(() => { isProRef.current = isPro }, [isPro])
   const userRef = useRef(user)
   useEffect(() => { userRef.current = user }, [user])
+  // Hand the app's shared online signal to isOffline() (step 17.1).
+  useEffect(() => { appOnline = isOnline }, [isOnline])
 
   // Same rule as the database function dg_is_read_only.
   const isReadOnly = !isPro && (
@@ -201,10 +237,10 @@ export function useDrugGroups(fav) {
     }
 
     // 3. Live list.
-    const { data, error } = await supabase
+    const { data, error } = await withLimit(supabase
       .from('drug_groups')
       .select('id, name, description, color, created_at, drug_group_items(brand_id)')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }))
     if (stale()) return
 
     if (error || !data) {
@@ -247,16 +283,26 @@ export function useDrugGroups(fav) {
     loadGroups(user)
   }, [user, authLoading, loadGroups])
 
-  // Come back online with only the saved copy on screen: refresh it.
+  // Come back online with only the saved copy on screen: refresh it. Uses the
+  // app's shared online signal (step 17.1), so it also fires when a Wi-Fi with
+  // no internet gets its internet back, not only on the phone's own event.
+  const groupsStatusRef = useRef(groupsStatus)
+  useEffect(() => { groupsStatusRef.current = groupsStatus }, [groupsStatus])
   useEffect(() => {
-    function onOnline() {
-      if (userRef.current && (shownFromCacheRef.current || groupsStatus === 'error')) {
-        loadGroups(userRef.current)
-      }
+    if (!isOnline) return
+    if (userRef.current && (shownFromCacheRef.current || groupsStatusRef.current === 'error')) {
+      loadGroups(userRef.current)
     }
-    window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
-  }, [loadGroups, groupsStatus])
+  }, [isOnline, loadGroups])
+
+  // A change that got no answer in time counts as offline. The screen already
+  // went back to what it showed; the real list is loaded again in case the
+  // change did reach the server after all.
+  const timedOut = useCallback((message = OFFLINE_MESSAGE) => {
+    toast.info(message)
+    if (userRef.current) loadGroups(userRef.current)
+    return { ok: false, reason: 'offline' }
+  }, [toast, loadGroups])
 
   // Keep the saved copy in step with the live list.
   useEffect(() => {
@@ -335,13 +381,14 @@ export function useDrugGroups(fav) {
     if (!fields) return { ok: false, reason: 'invalid' }
     if (nameTakenIn(groupsRef.current, fields.name)) return { ok: false, reason: 'name_taken' }
 
-    const { data, error } = await supabase
+    const { data, error } = await withLimit(supabase
       .from('drug_groups')
       .insert(fields)
       .select('id, name, description, color, created_at')
-      .single()
+      .single())
 
     if (error || !data) {
+      if (isTimeout(error)) return timedOut()
       if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
@@ -354,7 +401,7 @@ export function useDrugGroups(fav) {
     // Analytics (step 9.5): the group id only, never its name or description.
     logUsageEvent('group_create', group.id)
     return { ok: true, group }
-  }, [refuseChange, toast])
+  }, [refuseChange, timedOut, toast])
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   const updateGroup = useCallback(async (id, changes = {}) => {
@@ -375,15 +422,16 @@ export function useDrugGroups(fav) {
     if (fields.color !== undefined) patch.color = fields.color
     setGroups(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)))
 
-    const { error } = await supabase.from('drug_groups').update(fields).eq('id', id)
+    const { error } = await withLimit(supabase.from('drug_groups').update(fields).eq('id', id))
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
+      if (isTimeout(error)) return timedOut()
       if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
       toast.error('Could not save the changes. Check your connection and try again.')
       return { ok: false, reason: 'error' }
     }
     return { ok: true }
-  }, [refuseChange, toast])
+  }, [refuseChange, timedOut, toast])
 
   // ── Delete ────────────────────────────────────────────────────────────────
   // Always allowed for the signed-in owner, even when read only (decision 6).
@@ -396,14 +444,15 @@ export function useDrugGroups(fav) {
     const group = list[index]
 
     setGroups(list.filter(g => g.id !== id))
-    const { error } = await supabase.from('drug_groups').delete().eq('id', id)
+    const { error } = await withLimit(supabase.from('drug_groups').delete().eq('id', id))
     if (error) {
       setGroups(prev => (prev.some(g => g.id === id) ? prev : newestFirst([...prev, group])))
+      if (isTimeout(error)) return timedOut()
       toast.error('Could not delete the group. Check your connection and try again.')
       return { ok: false, reason: 'error' }
     }
     return { ok: true, group, index }
-  }, [refuseChange, toast])
+  }, [refuseChange, timedOut, toast])
 
   // ── Drugs in a group ──────────────────────────────────────────────────────
   // 2026-10-19 (step 4.2). Sets the whole list in one call: rows for the new
@@ -431,19 +480,23 @@ export function useDrugGroups(fav) {
 
     let error = null
     if (toRemove.length > 0) {
-      const res = await supabase
-        .from('drug_group_items').delete().eq('group_id', id).in('brand_id', toRemove)
+      const res = await withLimit(supabase
+        .from('drug_group_items').delete().eq('group_id', id).in('brand_id', toRemove))
       error = res.error
     }
     if (!error && toAdd.length > 0) {
-      const res = await supabase
-        .from('drug_group_items').insert(toAdd.map(brand_id => ({ group_id: id, brand_id })))
+      const res = await withLimit(supabase
+        .from('drug_group_items').insert(toAdd.map(brand_id => ({ group_id: id, brand_id }))))
       error = res.error
     }
 
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, brandIds: before.brandIds } : g)))
       reloadGroups()
+      if (isTimeout(error)) {
+        toast.info(OFFLINE_MESSAGE)
+        return { ok: false, reason: 'offline' }
+      }
       if (String(error.message ?? '').includes('drug_group_items_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
@@ -472,14 +525,15 @@ export function useDrugGroups(fav) {
 
     // If the name was taken while the group was deleted, it comes back numbered.
     const restoredName = numberedNameIn(groupsRef.current, group.name)
-    const { error } = await supabase.from('drug_groups').insert({
+    const { error } = await withLimit(supabase.from('drug_groups').insert({
       id: group.id,
       name: restoredName,
       description: group.description ?? '',
       color: group.color,
       created_at: group.createdAt,
-    })
+    }))
     if (error) {
+      if (isTimeout(error)) return timedOut()
       if (String(error.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
@@ -488,11 +542,11 @@ export function useDrugGroups(fav) {
     }
 
     if (group.brandIds?.length > 0) {
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await withLimit(supabase
         .from('drug_group_items')
-        .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id })))
+        .insert(group.brandIds.map(brand_id => ({ group_id: group.id, brand_id }))))
       if (itemsError) {
-        await supabase.from('drug_groups').delete().eq('id', group.id)
+        await withLimit(supabase.from('drug_groups').delete().eq('id', group.id))
         toast.error('Could not restore the group. Check your connection and try again.')
         return { ok: false, reason: 'error' }
       }
@@ -501,7 +555,7 @@ export function useDrugGroups(fav) {
     const restored = restoredName === group.name ? group : { ...group, name: restoredName }
     setGroups(prev => newestFirst([restored, ...prev.filter(g => g.id !== group.id)]))
     return { ok: true }
-  }, [refuseChange, toast])
+  }, [refuseChange, timedOut, toast])
 
   // ── Save a copy of a shared group (step 8.3) ──────────────────────────────
   // Not optimistic: the list changes once the server has the group and its
@@ -528,17 +582,18 @@ export function useDrugGroups(fav) {
     let data = null
     let error = null
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      const res = await supabase
+      const res = await withLimit(supabase
         .from('drug_groups')
         .insert({ ...fields, name: copyName })
         .select('id, name, description, color, created_at')
-        .single()
+        .single())
       data = res.data
       error = res.error
       if (!isNameClash(error)) break
       copyName = numberedNameIn([...groupsRef.current, { id: null, name: copyName }], fields.name)
     }
     if (error || !data) {
+      if (isTimeout(error)) return timedOut(SAVE_OFFLINE_MESSAGE)
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
@@ -547,11 +602,12 @@ export function useDrugGroups(fav) {
     }
 
     if (kept.length > 0) {
-      const { error: itemsError } = await supabase
+      const { error: itemsError } = await withLimit(supabase
         .from('drug_group_items')
-        .insert(kept.map(brand_id => ({ group_id: data.id, brand_id })))
+        .insert(kept.map(brand_id => ({ group_id: data.id, brand_id }))))
       if (itemsError) {
-        await supabase.from('drug_groups').delete().eq('id', data.id)
+        await withLimit(supabase.from('drug_groups').delete().eq('id', data.id))
+        if (isTimeout(itemsError)) return timedOut(SAVE_OFFLINE_MESSAGE)
         toast.error('Could not save the group. Check your connection and try again.')
         return { ok: false, reason: 'error' }
       }
@@ -562,7 +618,7 @@ export function useDrugGroups(fav) {
     // Analytics (step 9.5): the new copy's id only; nothing about the link or the owner.
     logUsageEvent('shared_group_save', group.id)
     return { ok: true, group, saved: kept.length, total: all.length }
-  }, [refuseChange, toast])
+  }, [refuseChange, timedOut, toast])
 
   // ── Sharing (step 8.1) ────────────────────────────────────────────────────
   // The share code lives only in drug_group_shares (not in the group list), so
@@ -571,11 +627,12 @@ export function useDrugGroups(fav) {
   const getShareCode = useCallback(async (groupId) => {
     if (!userRef.current) return { ok: false, reason: 'guest' }
     if (isOffline()) return { ok: false, reason: 'offline' }
-    const { data, error } = await supabase
+    const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
       .select('share_code')
       .eq('group_id', groupId)
-      .maybeSingle()
+      .maybeSingle())
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     return { ok: true, code: data?.share_code ?? null }
   }, [])
@@ -585,11 +642,12 @@ export function useDrugGroups(fav) {
     const refused = refuseChange()
     if (refused) return refused
     if (!groupsRef.current.some(g => g.id === groupId)) return { ok: false, reason: 'missing' }
-    const { data, error } = await supabase
+    const { data, error } = await withLimit(supabase
       .from('drug_group_shares')
       .insert({ group_id: groupId })
       .select('share_code')
-      .single()
+      .single())
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (!error && data?.share_code) {
       // Analytics (step 9.5): only a link that was really made now, not one found again.
       logUsageEvent('group_share_create', groupId)
@@ -608,7 +666,8 @@ export function useDrugGroups(fav) {
     if (userRef.current && isOffline()) return { ok: false, reason: 'offline' }
     const refused = refuseChange()
     if (refused) return refused
-    const { error } = await supabase.from('drug_group_shares').delete().eq('group_id', groupId)
+    const { error } = await withLimit(supabase.from('drug_group_shares').delete().eq('group_id', groupId))
+    if (isTimeout(error)) return { ok: false, reason: 'offline' }
     if (error) return { ok: false, reason: 'error' }
     return { ok: true }
   }, [refuseChange])
