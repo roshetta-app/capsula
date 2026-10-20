@@ -30,7 +30,7 @@
  *    the sheet no longer shrinks when the keyboard opens, and tapping a
  *    toast or the discard dialog above it does not count as a tap outside.
  *
- * 2026-10-19 (step 4.2): the sheet also holds the group's drugs as a draft
+ * 2026-10-19 (step 4.2, retired in step 13.2, see the last note): the sheet also held the group's drugs as a draft
  * (brandIds). A search box under Colour (GroupDrugSearch) adds drugs to the
  * draft; nothing is written until Save, which saves the group first and then
  * its drugs in one call (setGroupDrugs). A new group is created first, so if
@@ -39,7 +39,7 @@
  * the draft. At the limit (free 20, Pro 50 per group) the plus shows a message
  * (the limit sheet arrives in Phase 7).
  *
- * 2026-10-19 (step 4.3): while the search box is empty the sheet shows the
+ * 2026-10-19 (step 4.3, retired in step 13.2): while the search box was empty the sheet shows the
  * group's own drugs, A to Z, each with a remove button (GroupDrugList). Removing
  * only changes the draft. With no drugs the search hint shows.
  *
@@ -48,17 +48,27 @@
  * deletes, closes the sheet and tells the caller (onDeleted) so it can offer
  * Undo. If the delete fails the confirm stays open with a short message.
  * Deleting needs no 'discard changes' question: it replaces it.
+ *
+ * 2026-10-21 (Drug groups plan, step 13.2, decision 7 and findings F15, F16): slim sheet.
+ * Drugs are no longer added or removed here (the group page has Add and Remove; the
+ * drug search and list that lived in this sheet are retired). The sheet has the name,
+ * description, colour, Delete group (editing only) and a fixed Save.
+ *   - A NEW group still starts with 'initialBrandIds' (the Add to group sheet passes the
+ *     drug being viewed) and receives them when it is created; with none, it is created
+ *     empty and its page invites Add. Changing an existing group never touches its drugs.
+ *   - Colour (F15): the five group colours as solid 32 px circles (44 px to tap) with a
+ *     ring and a tick on the chosen one; the tiles and headers keep their soft tint.
+ *   - Close button is 44 px. Delete group sits at the very end of the form, apart from
+ *     the fields, under a thin line. Field limits (40 and 200), the unsaved-changes and
+ *     delete questions are unchanged.
  */
 
 import { useMemo, useRef, useState } from 'react'
 import { Check, Trash2, X } from 'lucide-react'
 import SheetShell from '../../ui/SheetShell'
 import ConfirmSheet from '../../ui/ConfirmSheet'
-import GroupDrugSearch from './GroupDrugSearch'
-import GroupDrugList from './GroupDrugList'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
-import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
 import { useDirtyState } from '../../../hooks/useDirtyState'
 import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS, NAME_TAKEN_MESSAGE, groupNameKey } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
@@ -107,11 +117,10 @@ const FIELD_STYLE = {
 }
 
 export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [], shared = false }) {
-  const { groups, createGroup, updateGroup, setGroupDrugs, deleteGroup, showGroupLimit } = useFavouritesContext()
+  const { groups, createGroup, updateGroup, setGroupDrugs, deleteGroup } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
   const isEdit = !!group
-  const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
   // What the sheet starts with each time it opens.
   const startKey = initialBrandIds.join('|')
@@ -126,7 +135,6 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const [name, setName] = useState(initial.name)
   const [description, setDescription] = useState(initial.description)
   const [color, setColor] = useState(initial.color)
-  const [brandIds, setBrandIds] = useState(initial.brandIds)
   const [createdId, setCreatedId] = useState(null)
   const [nameError, setNameError] = useState(false)
   // The database refused the name (another phone took it a moment ago).
@@ -145,7 +153,6 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       setName(initial.name)
       setDescription(initial.description)
       setColor(initial.color)
-      setBrandIds(initial.brandIds)
       setCreatedId(null)
       setNameError(false)
       setSaveError('')
@@ -155,8 +162,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     }
   }
 
-  const current = useMemo(() => ({ name, description, color, brandIds: brandIds.slice().sort() }), [name, description, color, brandIds])
-  const initialCompare = useMemo(() => ({ ...initial, brandIds: initial.brandIds.slice().sort() }), [initial])
+  const current = useMemo(() => ({ name, description, color }), [name, description, color])
+  const initialCompare = useMemo(() => ({ name: initial.name, description: initial.description, color: initial.color }), [initial])
   const isDirty = useDirtyState(initialCompare, current)
 
   // Unique names (step 13.5): checked while typing, ignoring capitals and spaces at the ends.
@@ -179,19 +186,6 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     if (!res?.ok) throw new Error(res?.reason ?? 'error')
     onDeleted?.(res.group ?? group)
     onClose()
-  }
-
-  function handleRemoveDrug(id) {
-    setBrandIds(prev => prev.filter(b => b !== id))
-  }
-
-  function handleAddDrug(id) {
-    if (brandIds.includes(id)) return
-    if (brandIds.length >= drugsCap) {
-      showGroupLimit('drugs')
-      return
-    }
-    setBrandIds(prev => (prev.includes(id) ? prev : [...prev, id]))
   }
 
   async function handleSave() {
@@ -234,12 +228,14 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       setCreatedId(id ?? null)
     }
 
-    // 2. Its drugs, when they differ from what the group already holds.
+    // 2. Its drugs, only for a NEW group that starts with some (the drug being viewed in
+    // the Add to group sheet). An existing group's drugs are never touched here.
     const held = group?.brandIds ?? []
-    if (id && !sameIds(brandIds, held)) {
+    const wanted = isEdit ? held : initial.brandIds
+    if (id && !sameIds(wanted, held)) {
       let drugsRes
       try {
-        drugsRes = await setGroupDrugs(id, brandIds)
+        drugsRes = await setGroupDrugs(id, wanted)
       } catch {
         drugsRes = { ok: false, reason: 'error' }
       }
@@ -267,10 +263,10 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
         {/* Title row */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 var(--space-4) var(--space-3)', flexShrink: 0,
+          padding: '0 var(--space-4) var(--space-2)', flexShrink: 0,
         }}>
           <div style={{
-            fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)',
+            fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)',
             fontFamily: 'var(--font-body)',
           }}>
             {isEdit ? 'Edit group' : 'New group'}
@@ -279,13 +275,13 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
             onClick={requestClose}
             aria-label="Close"
             style={{
-              width: 36, height: 36, borderRadius: '50%', border: 'none',
+              width: 44, height: 44, borderRadius: '50%', border: 'none',
               backgroundColor: 'var(--color-surface-muted)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               WebkitTapHighlightColor: 'transparent', outline: 'none',
             }}
           >
-            <X size={18} color="var(--color-text-secondary)" aria-hidden="true" />
+            <X size={20} color="var(--color-text-secondary)" aria-hidden="true" />
           </button>
         </div>
 
@@ -344,7 +340,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
 
           <div>
             <span id="group-colour-label" style={LABEL_STYLE}>Colour</span>
-            <div role="radiogroup" aria-labelledby="group-colour-label" style={{ display: 'flex', gap: 'var(--space-3)' }}>
+            <div role="radiogroup" aria-labelledby="group-colour-label" style={{ display: 'flex', gap: 'var(--space-1)', marginInlineStart: -6 }}>
               {GROUP_COLORS.map(c => {
                 const tone = resolveToken(c, isDark)
                 const selected = c === color
@@ -356,50 +352,41 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
                     aria-label={COLOR_LABELS[c]}
                     onClick={() => setColor(c)}
                     style={{
-                      width: 40, height: 40, borderRadius: '50%', padding: 0, cursor: 'pointer',
-                      backgroundColor: tone.bg,
-                      border: selected ? `2px solid ${tone.fg}` : '2px solid transparent',
+                      width: 44, height: 44, padding: 0, border: 'none', background: 'none', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       WebkitTapHighlightColor: 'transparent', outline: 'none',
                     }}
                   >
-                    {selected && <Check size={18} strokeWidth={2.4} color={tone.fg} aria-hidden="true" />}
+                    <span style={{
+                      width: 32, height: 32, borderRadius: '50%', backgroundColor: tone.pill,
+                      boxShadow: selected ? `0 0 0 2px var(--color-surface), 0 0 0 4px ${tone.pill}` : 'none',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'box-shadow var(--motion-fast) var(--ease-settle)',
+                    }}>
+                      {selected && <Check size={18} strokeWidth={3} color="#fff" aria-hidden="true" />}
+                    </span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ ...LABEL_STYLE, marginBottom: 0 }}>Drugs in this group</span>
-              <span style={{ fontSize: 12, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-                {brandIds.length}/{drugsCap}
-              </span>
-            </div>
-            <GroupDrugSearch
-              addedIds={brandIds}
-              onAdd={handleAddDrug}
-              emptyContent={brandIds.length > 0
-                ? <GroupDrugList ids={brandIds} onRemove={handleRemoveDrug} />
-                : null}
-            />
-          </div>
-
           {isEdit && (
-            <button
-              onClick={() => setDeleteOpen(true)}
-              style={{
-                alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 6,
-                background: 'none', border: 'none', cursor: 'pointer',
-                padding: '8px 12px', fontSize: 14, fontWeight: 600,
-                color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
-                WebkitTapHighlightColor: 'transparent', outline: 'none',
-              }}
-            >
-              <Trash2 size={16} aria-hidden="true" />
-              Delete group
-            </button>
+            <div style={{ marginTop: 'var(--space-4)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--color-border)' }}>
+              <button
+                onClick={() => setDeleteOpen(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, minHeight: 44,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '0 var(--space-1)', fontSize: 15, fontWeight: 600,
+                  color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
+                  WebkitTapHighlightColor: 'transparent', outline: 'none',
+                }}
+              >
+                <Trash2 size={18} aria-hidden="true" />
+                Delete group
+              </button>
+            </div>
           )}
         </div>
 
