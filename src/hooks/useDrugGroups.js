@@ -29,6 +29,12 @@
  *    after the groups load, and every 30 seconds. Two runs never overlap. No
  *    answer means stop and try later; a server refusal marks that change failed
  *    (it is not sent again, and later changes to the same group wait behind it).
+ *  - Conflicts and refusals (2026-10-20, step 17.4, plan section 21.3): a name
+ *    taken elsewhere is saved with a number and the person is told; a group
+ *    deleted on another device, a full group list, a full group and a lapsed plan
+ *    drop what cannot be saved and say so in plain words; any other refusal
+ *    stays as a failed change (failedCount) until retryFailedChanges() or
+ *    discardFailedChanges(). The screens for them come in step 17.6.
  *    Sharing, saving a shared group and the share links still need internet and
  *    keep the offline message.
  *  - Limits (constants/features.js) are checked here and in the database.
@@ -52,6 +58,9 @@
  *   isReadOnly      boolean
  *   canCreateGroup  boolean (false when at the limit or read only)
  *   reloadGroups    () => Promise<void>
+ *   failedCount     number of waiting changes the server refused (step 17.4)
+ *   retryFailedChanges    () => void   tries the failed changes again
+ *   discardFailedChanges  () => void   drops the failed changes and shows the server's groups
  *   createGroup     ({ name, description?, color? }) => Promise<{ ok, reason?, group? }>
  *   updateGroup     (id, { name?, description?, color? }) => Promise<{ ok, reason? }>
  *   deleteGroup     (id) => Promise<{ ok, reason?, group?, index? }>
@@ -90,8 +99,8 @@ import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
-import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend } from '../utils/groupChanges'
-import { runSync, sendChange } from '../utils/groupSync'
+import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, failedChanges, retryFailed, discardFailed } from '../utils/groupChanges'
+import { runSync, sendChange, describeEvents } from '../utils/groupSync'
 import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
@@ -198,6 +207,7 @@ export function useDrugGroups(fav) {
   const [groupsStatus, setGroupsStatus] = useState('loading')
   const [groupsFromCache, setGroupsFromCache] = useState(false)
   const [groupsLoadError, setGroupsLoadError] = useState(false)
+  const [failedCount, setFailedCount] = useState(0)
 
   // Limit sheet (step 7.1). The kind is kept after closing so the text stays put while it slides away.
   const [groupLimit, setGroupLimit] = useState({ open: false, kind: 'groups' })
@@ -239,6 +249,7 @@ export function useDrugGroups(fav) {
 
   const persistQueue = useCallback(() => {
     const u = userRef.current
+    setFailedCount(failedChanges(queueRef.current).length)
     if (!u) return Promise.resolve(false)
     const run = () => writeGroupChanges(u.id, queueRef.current)
     writeChainRef.current = writeChainRef.current.then(run, run)
@@ -300,6 +311,7 @@ export function useDrugGroups(fav) {
       // (sending twice is safe, see utils/groupSync.js).
       queueRef.current = clearSending(waiting)
       queueUserRef.current = u.id
+      setFailedCount(failedChanges(queueRef.current).length)
     }
     const withWaiting = list => applyQueue(list, queueRef.current)
 
@@ -375,6 +387,7 @@ export function useDrugGroups(fav) {
         getQueue: () => queueRef.current,
         update: fn => updateQueueFor(u.id, fn),
         send: change => sendChange(supabase, change, withLimit),
+        groupName: id => groupsRef.current.find(g => g.id === id)?.name ?? null,
         canRun: () => userRef.current?.id === u.id && !isOffline(),
         // Analytics: a change counts once, when the server newly takes it. The
         // group's or the drug's id only, as before.
@@ -388,14 +401,34 @@ export function useDrugGroups(fav) {
     }
     if (userRef.current?.id !== u.id) return
 
-    if (result.failed > 0) {
-      toast.error(`${result.failed} change${result.failed === 1 ? '' : 's'} could not be saved.`)
+    // Tell the person in plain words (step 17.4): one message for the whole run.
+    const { messages, severe } = describeEvents(result.events, result.failed)
+    if (messages.length > 0) {
+      const text = messages.join(' ')
+      if (severe) toast.error(text, 7000)
+      else toast.info(text, 6000)
     } else if (result.sent > 0) {
       toast.success('Your offline changes are saved.')
     }
-    // Something reached the server: show the real list again.
-    if (result.sent > 0 || result.failed > 0) loadGroups(u)
+    // Something reached the server or was settled: show the real list again.
+    if (result.sent > 0 || result.failed > 0 || result.events.length > 0) loadGroups(u)
   }, [updateQueueFor, toast, loadGroups])
+
+  // Retry and Discard for the changes the server refused (step 17.4). The
+  // screens that offer them are step 17.6.
+  const retryFailedChanges = useCallback(async () => {
+    const u = userRef.current
+    if (!u) return
+    await updateQueueFor(u.id, retryFailed)
+    syncRef.current?.()
+  }, [updateQueueFor])
+
+  const discardFailedChanges = useCallback(async () => {
+    const u = userRef.current
+    if (!u) return
+    await updateQueueFor(u.id, discardFailed)
+    loadGroups(u)
+  }, [updateQueueFor, loadGroups])
 
   useEffect(() => { syncRef.current = syncQueue }, [syncQueue])
 
@@ -426,6 +459,7 @@ export function useDrugGroups(fav) {
       loadSeqRef.current++
       queueRef.current = []
       queueUserRef.current = null
+      setFailedCount(0)
       shownFromCacheRef.current = false
       setGroups([])
       setGroupsFromCache(false)
@@ -923,6 +957,9 @@ export function useDrugGroups(fav) {
     isReadOnly,
     canCreateGroup,
     reloadGroups,
+    failedCount,
+    retryFailedChanges,
+    discardFailedChanges,
     createGroup,
     updateGroup,
     deleteGroup,

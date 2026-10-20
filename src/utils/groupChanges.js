@@ -192,6 +192,24 @@ export function failedChanges(queue) {
   return queue.filter(c => c.failed)
 }
 
+// Retry (step 17.4): takes the failed mark off every failed change so the next
+// sync sends them again.
+export function retryFailed(queue) {
+  return queue.map(c => {
+    if (!c.failed) return c
+    const rest = { ...c }
+    delete rest.failed
+    return rest
+  })
+}
+
+// Discard (step 17.4): removes the failed changes. When a group's create failed,
+// the group never reached the server, so everything waiting for it goes too.
+export function discardFailed(queue) {
+  const lostGroups = new Set(queue.filter(c => c.failed && c.type === 'create').map(c => c.groupId))
+  return queue.filter(c => !c.failed && !lostGroups.has(c.groupId))
+}
+
 export function markSending(queue, changeId) {
   return queue.map(c => (c.id === changeId ? { ...c, sending: true } : c))
 }
