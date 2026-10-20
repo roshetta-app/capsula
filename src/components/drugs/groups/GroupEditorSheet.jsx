@@ -60,7 +60,7 @@ import { useFavouritesContext } from '../../../context/FavouritesContext'
 import { useIsPro } from '../../../hooks/useIsPro'
 import { DRUG_GROUP_DRUGS_CAP_FREE, DRUG_GROUP_DRUGS_CAP_PRO } from '../../../constants/features'
 import { useDirtyState } from '../../../hooks/useDirtyState'
-import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS } from '../../../hooks/useDrugGroups'
+import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS, NAME_TAKEN_MESSAGE, groupNameKey } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
@@ -107,7 +107,7 @@ const FIELD_STYLE = {
 }
 
 export default function GroupEditorSheet({ isOpen, onClose, group = null, onSaved, onDeleted, initialBrandIds = [], shared = false }) {
-  const { createGroup, updateGroup, setGroupDrugs, deleteGroup, showGroupLimit } = useFavouritesContext()
+  const { groups, createGroup, updateGroup, setGroupDrugs, deleteGroup, showGroupLimit } = useFavouritesContext()
   const isPro = useIsPro()
   const isDark = useIsDark()
   const isEdit = !!group
@@ -129,6 +129,8 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const [brandIds, setBrandIds] = useState(initial.brandIds)
   const [createdId, setCreatedId] = useState(null)
   const [nameError, setNameError] = useState(false)
+  // The database refused the name (another phone took it a moment ago).
+  const [nameTakenByServer, setNameTakenByServer] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -156,6 +158,12 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
   const current = useMemo(() => ({ name, description, color, brandIds: brandIds.slice().sort() }), [name, description, color, brandIds])
   const initialCompare = useMemo(() => ({ ...initial, brandIds: initial.brandIds.slice().sort() }), [initial])
   const isDirty = useDirtyState(initialCompare, current)
+
+  // Unique names (step 13.5): checked while typing, ignoring capitals and spaces at the ends.
+  const ownId = group?.id ?? createdId
+  const nameKey = groupNameKey(name)
+  const nameTaken = nameKey !== '' && (groups ?? []).some(g => g.id !== ownId && groupNameKey(g.name) === nameKey)
+  const showNameTaken = nameTaken || nameTakenByServer
 
   // Every way of closing comes through here.
   function requestClose() {
@@ -195,6 +203,10 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
       return
     }
     if (isEdit && !isDirty) { onClose(); return }
+    if (nameTaken) {
+      nameRef.current?.focus()
+      return
+    }
     setSaving(true)
     setSaveError('')
     const fields = { name: cleanName, description: description.trim(), color }
@@ -209,6 +221,11 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
     }
     if (!res?.ok) {
       setSaving(false)
+      if (res?.reason === 'name_taken') {
+        setNameTakenByServer(true)
+        nameRef.current?.focus()
+        return
+      }
       setSaveError(saveFailureMessage(res?.reason, isPro))
       return
     }
@@ -285,22 +302,22 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
               ref={nameRef}
               type="text"
               value={name}
-              onChange={e => { setName(e.target.value.slice(0, GROUP_NAME_MAX)); if (nameError) setNameError(false) }}
+              onChange={e => { setName(e.target.value.slice(0, GROUP_NAME_MAX)); if (nameError) setNameError(false); if (nameTakenByServer) setNameTakenByServer(false) }}
               maxLength={GROUP_NAME_MAX}
               placeholder="For example ICU drips"
               dir="ltr"
-              aria-invalid={nameError}
-              aria-describedby={nameError ? 'group-name-error' : undefined}
+              aria-invalid={nameError || showNameTaken}
+              aria-describedby={nameError || showNameTaken ? 'group-name-error' : undefined}
               style={{
                 ...FIELD_STYLE,
-                border: nameError ? '1.5px solid var(--color-danger)' : '1.5px solid transparent',
+                border: nameError || showNameTaken ? '1.5px solid var(--color-danger)' : '1.5px solid transparent',
               }}
             />
-            {nameError && (
+            {(nameError || showNameTaken) && (
               <div id="group-name-error" role="alert" style={{
                 marginTop: 6, fontSize: 12, color: 'var(--color-danger)', fontFamily: 'var(--font-body)',
               }}>
-                Enter a group name
+                {showNameTaken ? NAME_TAKEN_MESSAGE : 'Enter a group name'}
               </div>
             )}
           </div>

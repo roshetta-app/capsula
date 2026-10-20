@@ -107,6 +107,38 @@ function newestFirst(list) {
   return list.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
 }
 
+// ── Unique group names (2026-10-20, Drug groups plan step 13.5) ──────────────
+// Two groups of one person may not share a name, ignoring capitals and spaces at
+// the ends. The database enforces it with the index drug_groups_user_name_unique;
+// these helpers let the app check first and give a clear message.
+export const NAME_TAKEN_MESSAGE = 'You already have a group with this name.'
+
+export function groupNameKey(name) {
+  return String(name ?? '').trim().toLowerCase()
+}
+
+function nameTakenIn(list, name, exceptId = null) {
+  const key = groupNameKey(name)
+  return list.some(g => g.id !== exceptId && groupNameKey(g.name) === key)
+}
+
+// The name itself when it is free, otherwise the name with a number, for
+// example "HPB (2)", cut so the result still fits the 40 character limit.
+function numberedNameIn(list, base) {
+  if (!nameTakenIn(list, base)) return base
+  for (let n = 2; n < 1000; n += 1) {
+    const suffix = ` (${n})`
+    const candidate = base.slice(0, GROUP_NAME_MAX - suffix.length).trimEnd() + suffix
+    if (!nameTakenIn(list, candidate)) return candidate
+  }
+  return base
+}
+
+// The database refused a duplicate name (two phones saving the same name at once).
+function isNameClash(error) {
+  return error?.code === '23505' && String(error?.message ?? '').includes('drug_groups_user_name_unique')
+}
+
 export function useDrugGroups(fav) {
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -301,6 +333,7 @@ export function useDrugGroups(fav) {
 
     const fields = cleanFields({ name, description, color }, { requireName: true })
     if (!fields) return { ok: false, reason: 'invalid' }
+    if (nameTakenIn(groupsRef.current, fields.name)) return { ok: false, reason: 'name_taken' }
 
     const { data, error } = await supabase
       .from('drug_groups')
@@ -309,6 +342,7 @@ export function useDrugGroups(fav) {
       .single()
 
     if (error || !data) {
+      if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
@@ -331,6 +365,9 @@ export function useDrugGroups(fav) {
 
     const fields = cleanFields(changes, { requireName: false })
     if (!fields) return { ok: false, reason: 'invalid' }
+    if (fields.name !== undefined && nameTakenIn(groupsRef.current, fields.name, id)) {
+      return { ok: false, reason: 'name_taken' }
+    }
 
     const patch = {}
     if (fields.name !== undefined) patch.name = fields.name
@@ -341,6 +378,7 @@ export function useDrugGroups(fav) {
     const { error } = await supabase.from('drug_groups').update(fields).eq('id', id)
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
+      if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
       toast.error('Could not save the changes. Check your connection and try again.')
       return { ok: false, reason: 'error' }
     }
@@ -432,9 +470,11 @@ export function useDrugGroups(fav) {
     const cap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
     if (groupsRef.current.length >= cap) return { ok: false, reason: 'limit' }
 
+    // If the name was taken while the group was deleted, it comes back numbered.
+    const restoredName = numberedNameIn(groupsRef.current, group.name)
     const { error } = await supabase.from('drug_groups').insert({
       id: group.id,
-      name: group.name,
+      name: restoredName,
       description: group.description ?? '',
       color: group.color,
       created_at: group.createdAt,
@@ -458,7 +498,8 @@ export function useDrugGroups(fav) {
       }
     }
 
-    setGroups(prev => newestFirst([group, ...prev.filter(g => g.id !== group.id)]))
+    const restored = restoredName === group.name ? group : { ...group, name: restoredName }
+    setGroups(prev => newestFirst([restored, ...prev.filter(g => g.id !== group.id)]))
     return { ok: true }
   }, [refuseChange, toast])
 
@@ -481,11 +522,22 @@ export function useDrugGroups(fav) {
     const drugCap = isProRef.current ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
     const kept = all.slice(0, drugCap)
 
-    const { data, error } = await supabase
-      .from('drug_groups')
-      .insert(fields)
-      .select('id, name, description, color, created_at')
-      .single()
+    // Not a name the person typed, so a taken name is not refused: the copy gets a
+    // number ("HPB (2)"). If another phone takes that number first, try the next one.
+    let copyName = numberedNameIn(groupsRef.current, fields.name)
+    let data = null
+    let error = null
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const res = await supabase
+        .from('drug_groups')
+        .insert({ ...fields, name: copyName })
+        .select('id, name, description, color, created_at')
+        .single()
+      data = res.data
+      error = res.error
+      if (!isNameClash(error)) break
+      copyName = numberedNameIn([...groupsRef.current, { id: null, name: copyName }], fields.name)
+    }
     if (error || !data) {
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
