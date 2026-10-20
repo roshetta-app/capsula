@@ -15,9 +15,17 @@
  *    that takes longer than 8 seconds counts as offline too, so a Wi-Fi with no
  *    internet behaves like airplane mode.
  *  - Offline: the saved copy (utils/cache.js, store 'drug-groups') shows
- *    instead of the live list. Changing anything while offline shows
- *    "You're offline. Reconnect to change your groups." and answers
- *    reason 'offline'.
+ *    instead of the live list.
+ *  - Local first (2026-10-20, step 17.2b): create, edit, delete, undo of a
+ *    delete and the drugs in a group work offline. The change shows at once and
+ *    is saved on a list of waiting changes on the phone (utils/groupChanges.js,
+ *    stored by utils/cache.js), and the answer is { ok: true, queued: true }.
+ *    The same happens when a request times out, and while changes are already
+ *    waiting (new ones join the list so the order is kept). The list is laid
+ *    over the saved or live groups every time they load. Sending the list to
+ *    the server is step 17.3; until then waiting changes only live on the phone.
+ *    Sharing, saving a shared group and the share links still need internet and
+ *    keep the offline message.
  *  - Limits (constants/features.js) are checked here and in the database.
  *    Reaching one answers reason 'limit'. The screens decide when to show
  *    it, by calling showGroupLimit (2026-10-19, step 7.1): a free account
@@ -76,7 +84,8 @@ import { useOnlineStatus } from './useOnlineStatus'
 import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
-import { readGroupsCache, writeGroupsCache, clearGroupsCache } from '../utils/cache'
+import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
+import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete } from '../utils/groupChanges'
 import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
@@ -210,16 +219,80 @@ export function useDrugGroups(fav) {
   const shownFromCacheRef = useRef(false)
   const loadSeqRef = useRef(0)
 
+  // ── Waiting changes (step 17.2b) ──────────────────────────────────────────
+  // queueRef is the list of changes made on this phone that the server has not
+  // taken yet (oldest first). queueUserRef says whose list it holds, so it is
+  // read from storage once per sign-in. writeChainRef keeps the saves in order.
+  const queueRef = useRef([])
+  const queueUserRef = useRef(null)
+  const writeChainRef = useRef(Promise.resolve(true))
+
+  const persistQueue = useCallback(() => {
+    const u = userRef.current
+    if (!u) return Promise.resolve(false)
+    const run = () => writeGroupChanges(u.id, queueRef.current)
+    writeChainRef.current = writeChainRef.current.then(run, run)
+    return writeChainRef.current
+  }, [])
+
+  // Shows the new list at once and saves the waiting list. When the phone can
+  // not save it, everything goes back and the person is told.
+  const commitQueue = useCallback(async (nextQueue, nextGroups) => {
+    const prevQueue = queueRef.current
+    const prevGroups = groupsRef.current
+    queueRef.current = nextQueue
+    groupsRef.current = nextGroups
+    setGroups(nextGroups)
+    const saved = await persistQueue()
+    if (!saved) {
+      if (queueRef.current === nextQueue) {
+        queueRef.current = prevQueue
+        groupsRef.current = prevGroups
+        setGroups(prevGroups)
+      }
+      toast.error("Couldn't save this change on your phone. Reconnect and try again.")
+      return false
+    }
+    return true
+  }, [persistQueue, toast])
+
+  // Applies changes on the phone and puts them on the waiting list. true when saved.
+  const queueChanges = useCallback((changes) => {
+    let nextQueue = queueRef.current
+    let nextGroups = groupsRef.current
+    for (const c of changes) {
+      nextQueue = addChange(nextQueue, c)
+      nextGroups = applyChange(nextGroups, c)
+    }
+    return commitQueue(nextQueue, nextGroups)
+  }, [commitQueue])
+
+  // A change goes on the waiting list instead of straight to the server when
+  // the phone is offline, only the saved copy is on screen, or changes are
+  // already waiting (so the order is kept).
+  function shouldQueue() {
+    return isOffline() || shownFromCacheRef.current || queueRef.current.length > 0
+  }
+
   const loadGroups = useCallback(async (u) => {
     const seq = ++loadSeqRef.current
     const stale = () => seq !== loadSeqRef.current || userRef.current?.id !== u.id
+
+    // 0. The waiting changes (read once per sign-in; after that the copy in memory is the truth).
+    if (queueUserRef.current !== u.id) {
+      const waiting = await readGroupChanges(u.id)
+      if (stale()) return
+      queueRef.current = waiting
+      queueUserRef.current = u.id
+    }
+    const withWaiting = list => applyQueue(list, queueRef.current)
 
     // 1. Saved copy first, so something shows at once (and offline).
     const cached = await readGroupsCache(u.id)
     if (stale()) return
     if (cached && Array.isArray(cached.data)) {
       shownFromCacheRef.current = true
-      setGroups(cached.data)
+      setGroups(withWaiting(cached.data))
       setGroupsFromCache(true)
       setGroupsStatus('ready')
     } else {
@@ -249,7 +322,7 @@ export function useDrugGroups(fav) {
       return
     }
     shownFromCacheRef.current = false
-    setGroups(newestFirst(data.map(mapGroupRow)))
+    setGroups(newestFirst(withWaiting(data.map(mapGroupRow))))
     setGroupsFromCache(false)
     setGroupsLoadError(false)
     setGroupsStatus('ready')
@@ -271,6 +344,8 @@ export function useDrugGroups(fav) {
       const previousId = lastUserIdRef.current
       lastUserIdRef.current = null
       loadSeqRef.current++
+      queueRef.current = []
+      queueUserRef.current = null
       shownFromCacheRef.current = false
       setGroups([])
       setGroupsFromCache(false)
@@ -324,16 +399,17 @@ export function useDrugGroups(fav) {
   // Returns a refusal ({ ok: false, reason }) or null when the change may go on.
   // signInId: what the sign-in prompt remembers ('new' by default; the shared
   // page passes its own). offlineMessage: the wording for the offline refusal.
-  const refuseChange = useCallback(({ needsEditable = true, signInId = 'new', offlineMessage = OFFLINE_MESSAGE } = {}) => {
+  const refuseChange = useCallback(({ needsEditable = true, signInId = 'new', offlineMessage = OFFLINE_MESSAGE, allowOffline = false } = {}) => {
     if (!userRef.current) {
       promptSignIn('groups', signInId)
       return { ok: false, reason: 'guest' }
     }
-    if (isOffline()) {
+    // allowOffline (step 17.2b): the change is saved on the phone and sent later.
+    if (!allowOffline && isOffline()) {
       toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
     }
-    if (shownFromCacheRef.current) {
+    if (!allowOffline && shownFromCacheRef.current) {
       // Only the saved copy is on screen, so we do not know the real list.
       toast.info(offlineMessage)
       return { ok: false, reason: 'offline' }
@@ -372,7 +448,7 @@ export function useDrugGroups(fav) {
 
   // ── Create ────────────────────────────────────────────────────────────────
   const createGroup = useCallback(async ({ name, description = '', color = 'blue' } = {}) => {
-    const refused = refuseChange()
+    const refused = refuseChange({ allowOffline: true })
     if (refused) return refused
     const cap = isProRef.current ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE
     if (groupsRef.current.length >= cap) return { ok: false, reason: 'limit' }
@@ -381,14 +457,28 @@ export function useDrugGroups(fav) {
     if (!fields) return { ok: false, reason: 'invalid' }
     if (nameTakenIn(groupsRef.current, fields.name)) return { ok: false, reason: 'name_taken' }
 
+    // The id is made here, so the group can be changed again before it reaches
+    // the server, and sending it twice makes only one group (step 17.2b).
+    const id = newId()
+    const makeLocally = async () => {
+      const change = makeChange('create', id, { ...fields, createdAt: new Date().toISOString() })
+      if (!(await queueChanges([change]))) return { ok: false, reason: 'error' }
+      return { ok: true, group: groupsRef.current.find(g => g.id === id), queued: true }
+    }
+    if (shouldQueue()) return makeLocally()
+
     const { data, error } = await withLimit(supabase
       .from('drug_groups')
-      .insert(fields)
+      .insert({ id, ...fields })
       .select('id, name, description, color, created_at')
       .single())
 
     if (error || !data) {
-      if (isTimeout(error)) return timedOut()
+      if (isTimeout(error)) {
+        const local = await makeLocally()
+        if (local.ok) return local
+        return timedOut()
+      }
       if (isNameClash(error)) return { ok: false, reason: 'name_taken' }
       if (String(error?.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
@@ -401,11 +491,11 @@ export function useDrugGroups(fav) {
     // Analytics (step 9.5): the group id only, never its name or description.
     logUsageEvent('group_create', group.id)
     return { ok: true, group }
-  }, [refuseChange, timedOut, toast])
+  }, [refuseChange, queueChanges, timedOut, toast])
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   const updateGroup = useCallback(async (id, changes = {}) => {
-    const refused = refuseChange()
+    const refused = refuseChange({ allowOffline: true })
     if (refused) return refused
     const before = groupsRef.current.find(g => g.id === id)
     if (!before) return { ok: false, reason: 'missing' }
@@ -420,9 +510,14 @@ export function useDrugGroups(fav) {
     if (fields.name !== undefined) patch.name = fields.name
     if (fields.description !== undefined) patch.description = fields.description
     if (fields.color !== undefined) patch.color = fields.color
+    const change = makeChange('update', id, patch)
+    if (shouldQueue()) {
+      return (await queueChanges([change])) ? { ok: true, queued: true } : { ok: false, reason: 'error' }
+    }
     setGroups(prev => prev.map(g => (g.id === id ? { ...g, ...patch } : g)))
 
     const { error } = await withLimit(supabase.from('drug_groups').update(fields).eq('id', id))
+    if (isTimeout(error) && await queueChanges([change])) return { ok: true, queued: true }
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, name: before.name, description: before.description, color: before.color } : g)))
       if (isTimeout(error)) return timedOut()
@@ -431,20 +526,26 @@ export function useDrugGroups(fav) {
       return { ok: false, reason: 'error' }
     }
     return { ok: true }
-  }, [refuseChange, timedOut, toast])
+  }, [refuseChange, queueChanges, timedOut, toast])
 
   // ── Delete ────────────────────────────────────────────────────────────────
   // Always allowed for the signed-in owner, even when read only (decision 6).
   const deleteGroup = useCallback(async (id) => {
-    const refused = refuseChange({ needsEditable: false })
+    const refused = refuseChange({ needsEditable: false, allowOffline: true })
     if (refused) return refused
     const list = groupsRef.current
     const index = list.findIndex(g => g.id === id)
     if (index < 0) return { ok: false, reason: 'missing' }
     const group = list[index]
 
+    const change = makeChange('delete', id)
+    if (shouldQueue()) {
+      if (!(await queueChanges([change]))) return { ok: false, reason: 'error' }
+      return { ok: true, group, index, queued: true }
+    }
     setGroups(list.filter(g => g.id !== id))
     const { error } = await withLimit(supabase.from('drug_groups').delete().eq('id', id))
+    if (isTimeout(error) && await queueChanges([change])) return { ok: true, group, index, queued: true }
     if (error) {
       setGroups(prev => (prev.some(g => g.id === id) ? prev : newestFirst([...prev, group])))
       if (isTimeout(error)) return timedOut()
@@ -452,7 +553,7 @@ export function useDrugGroups(fav) {
       return { ok: false, reason: 'error' }
     }
     return { ok: true, group, index }
-  }, [refuseChange, timedOut, toast])
+  }, [refuseChange, queueChanges, timedOut, toast])
 
   // ── Drugs in a group ──────────────────────────────────────────────────────
   // 2026-10-19 (step 4.2). Sets the whole list in one call: rows for the new
@@ -461,7 +562,7 @@ export function useDrugGroups(fav) {
   // again from the server, because a remove can succeed while the add after
   // it fails.
   const setGroupDrugs = useCallback(async (id, brandIds = []) => {
-    const refused = refuseChange()
+    const refused = refuseChange({ allowOffline: true })
     if (refused) return refused
     const before = groupsRef.current.find(g => g.id === id)
     if (!before) return { ok: false, reason: 'missing' }
@@ -475,6 +576,15 @@ export function useDrugGroups(fav) {
     const toAdd = next.filter(b => !had.has(b))
     const toRemove = before.brandIds.filter(b => !wants.has(b))
     if (toAdd.length === 0 && toRemove.length === 0) return { ok: true }
+
+    // One waiting change per drug, never the whole list (step 17.2b).
+    const changes = [
+      ...toRemove.map(brandId => makeChange('remove_drug', id, { brandId })),
+      ...toAdd.map(brandId => makeChange('add_drug', id, { brandId })),
+    ]
+    if (shouldQueue()) {
+      return (await queueChanges(changes)) ? { ok: true, queued: true } : { ok: false, reason: 'error' }
+    }
 
     setGroups(prev => prev.map(g => (g.id === id ? { ...g, brandIds: next } : g)))
 
@@ -490,6 +600,7 @@ export function useDrugGroups(fav) {
       error = res.error
     }
 
+    if (isTimeout(error) && await queueChanges(changes)) return { ok: true, queued: true }
     if (error) {
       setGroups(prev => prev.map(g => (g.id === id ? { ...g, brandIds: before.brandIds } : g)))
       reloadGroups()
@@ -507,7 +618,7 @@ export function useDrugGroups(fav) {
     // The drug's id only, no names. Removing a drug logs nothing.
     toAdd.forEach(brandId => logUsageEvent('group_drug_add', brandId))
     return { ok: true }
-  }, [refuseChange, reloadGroups, toast])
+  }, [refuseChange, queueChanges, reloadGroups, toast])
 
   // ── Undo a delete ─────────────────────────────────────────────────────────
   // 2026-10-19 (step 4.4). Puts the group back exactly as it was (same id and
@@ -516,7 +627,7 @@ export function useDrugGroups(fav) {
   // If the drugs fail to go back, the group row is removed again so no
   // half-restored group is left behind. A share link is not restored.
   const restoreGroup = useCallback(async (group) => {
-    const refused = refuseChange()
+    const refused = refuseChange({ allowOffline: true })
     if (refused) return refused
     if (!group?.id) return { ok: false, reason: 'missing' }
     if (groupsRef.current.some(g => g.id === group.id)) return { ok: true }
@@ -525,6 +636,40 @@ export function useDrugGroups(fav) {
 
     // If the name was taken while the group was deleted, it comes back numbered.
     const restoredName = numberedNameIn(groupsRef.current, group.name)
+
+    // On the phone (step 17.2b). If the delete is still waiting, Undo just takes
+    // it off the list. Otherwise the group is made again with the same id,
+    // details and drugs.
+    const restoreLocally = () => {
+      const { queue: without, cancelled } = cancelDelete(queueRef.current, group.id)
+      let nextQueue = without
+      let nextGroups = groupsRef.current
+      if (cancelled) {
+        nextGroups = newestFirst([{ ...group, name: restoredName }, ...nextGroups.filter(g => g.id !== group.id)])
+        if (restoredName !== group.name) {
+          nextQueue = addChange(nextQueue, makeChange('update', group.id, { name: restoredName }))
+        }
+      } else {
+        const changes = [
+          makeChange('create', group.id, {
+            name: restoredName,
+            description: group.description ?? '',
+            color: group.color,
+            createdAt: group.createdAt,
+          }),
+          ...(group.brandIds ?? []).map(brandId => makeChange('add_drug', group.id, { brandId })),
+        ]
+        for (const c of changes) {
+          nextQueue = addChange(nextQueue, c)
+          nextGroups = applyChange(nextGroups, c)
+        }
+      }
+      return commitQueue(nextQueue, nextGroups)
+    }
+    if (shouldQueue()) {
+      return (await restoreLocally()) ? { ok: true, queued: true } : { ok: false, reason: 'error' }
+    }
+
     const { error } = await withLimit(supabase.from('drug_groups').insert({
       id: group.id,
       name: restoredName,
@@ -533,7 +678,10 @@ export function useDrugGroups(fav) {
       created_at: group.createdAt,
     }))
     if (error) {
-      if (isTimeout(error)) return timedOut()
+      if (isTimeout(error)) {
+        if (await restoreLocally()) return { ok: true, queued: true }
+        return timedOut()
+      }
       if (String(error.message ?? '').includes('drug_group_limit_reached')) {
         return { ok: false, reason: 'limit' }
       }
@@ -555,7 +703,7 @@ export function useDrugGroups(fav) {
     const restored = restoredName === group.name ? group : { ...group, name: restoredName }
     setGroups(prev => newestFirst([restored, ...prev.filter(g => g.id !== group.id)]))
     return { ok: true }
-  }, [refuseChange, timedOut, toast])
+  }, [refuseChange, commitQueue, timedOut, toast])
 
   // ── Save a copy of a shared group (step 8.3) ──────────────────────────────
   // Not optimistic: the list changes once the server has the group and its

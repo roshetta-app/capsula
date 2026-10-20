@@ -93,8 +93,9 @@ const isFree = c => !c.sending
 
 // Puts a new change on the end of the list, tidying the list so it never holds
 // work that cancels out:
-//  - delete: everything still waiting for that group is dropped. A group that
-//    was made on this phone and never sent disappears without a trace.
+//  - delete: a group made on this phone and never sent disappears without a
+//    trace (everything waiting for it is dropped). Any other group gets the
+//    delete added after its waiting edits.
 //  - update: joins the waiting create or update of the same group (the latest
 //    value of each field wins).
 //  - add_drug / remove_drug: cancel each other when the same drug is added and
@@ -107,9 +108,10 @@ export function addChange(queue, change) {
     const madeHereNotSent = mine.some(c => c.type === 'create') && !mine.some(c => c.sending)
     // Made on this phone and never sent: nothing to tell the server at all.
     if (madeHereNotSent) return queue.filter(c => c.groupId !== groupId)
-    // Otherwise drop what is still waiting for the group (it is going away) and
-    // keep any change already on its way.
-    return [...queue.filter(c => c.groupId !== groupId || c.sending), change]
+    // Otherwise the delete goes on the end. Earlier waiting edits stay, so
+    // that Undo can simply take the delete away again; they harm nothing, the
+    // group is gone once the delete is sent.
+    return [...queue, change]
   }
 
   if (type === 'update') {
@@ -140,6 +142,16 @@ export function addChange(queue, change) {
 }
 
 // ── Looking at the list ──────────────────────────────────────────────────────
+
+// Undo of a delete that has not been sent yet: takes the delete off the list.
+// { queue, cancelled }. cancelled is false when there was no such delete (it
+// was already sent, or the group never reached the server), and the caller then
+// has to make the group again.
+export function cancelDelete(queue, groupId) {
+  const target = queue.find(c => c.groupId === groupId && c.type === 'delete' && isFree(c))
+  if (!target) return { queue, cancelled: false }
+  return { queue: queue.filter(c => c !== target), cancelled: true }
+}
 
 export function isGroupWaiting(queue, groupId) {
   return queue.some(forGroup(groupId))
