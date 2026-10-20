@@ -326,9 +326,15 @@ export function writeIconCache(url, svg) {
 // 6 -> 7; the upgrade only creates the missing store, so every other store
 // and its data is untouched.
 
+// 2026-10-20 (Drug groups plan, step 17.2): added an eighth store,
+// 'drug-group-changes', holding one saved list of waiting changes per signed-in
+// user (keyed 'changes:<user id>'): the group changes made on this phone that
+// the server has not accepted yet. IDB_VERSION bumped 7 -> 8; the upgrade only
+// creates the missing store, so every other store and its data is untouched.
+
 const IDB_NAME    = 'capsula-cache'
-const IDB_VERSION = 7
-const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures', 'drug-groups']
+const IDB_VERSION = 8
+const IDB_STORES  = ['drugs', 'conditions', 'photos', 'pending-note-photos', 'note-photos', 'drug-pictures', 'drug-groups', 'drug-group-changes']
 
 const DRUGS_STORE      = 'drugs'
 const DRUGS_KEY        = 'drugs'
@@ -339,6 +345,7 @@ const PENDING_NOTE_PHOTOS_STORE = 'pending-note-photos'
 const NOTE_PHOTOS_STORE = 'note-photos'
 const DRUG_PICTURES_STORE = 'drug-pictures'
 const DRUG_GROUPS_STORE = 'drug-groups'
+const DRUG_GROUP_CHANGES_STORE = 'drug-group-changes'
 
 function openCapsulaDB() {
   return new Promise((resolve, reject) => {
@@ -975,4 +982,67 @@ export async function clearGroupsCache(userId) {
   } finally {
     db?.close()
   }
+}
+
+// ── Drug groups: waiting changes (2026-10-20, plan step 17.2) ────────────────
+// One record per signed-in user: the list of changes made on this phone that
+// the server has not accepted yet (see utils/groupChanges.js for what a change
+// is). Unlike the saved copy above, a failed write here matters: the person
+// must not be told a change is saved when it is not. So writeGroupChanges
+// answers true or false, and an empty list removes the record.
+
+function drugGroupChangesKey(userId) {
+  return `changes:${userId}`
+}
+
+/** Returns true when the list was saved, false when it could not be. */
+export async function writeGroupChanges(userId, changes) {
+  if (!userId) return false
+  let db
+  try {
+    db = await openCapsulaDB()
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_GROUP_CHANGES_STORE, 'readwrite')
+      const store = tx.objectStore(DRUG_GROUP_CHANGES_STORE)
+      if (Array.isArray(changes) && changes.length > 0) {
+        store.put({ changes, savedAt: new Date().toISOString() }, drugGroupChangesKey(userId))
+      } else {
+        store.delete(drugGroupChangesKey(userId))
+      }
+      tx.oncomplete = () => resolve()
+      tx.onerror    = () => reject(tx.error)
+      tx.onabort    = () => reject(tx.error)
+    })
+    return true
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: writeGroupChanges')
+    return false
+  } finally {
+    db?.close()
+  }
+}
+
+/** Returns the waiting changes (oldest first), or [] when there are none or storage fails. */
+export async function readGroupChanges(userId) {
+  if (!userId) return []
+  let db
+  try {
+    db = await openCapsulaDB()
+    const rec = await new Promise((resolve, reject) => {
+      const tx = db.transaction(DRUG_GROUP_CHANGES_STORE, 'readonly')
+      const req = tx.objectStore(DRUG_GROUP_CHANGES_STORE).get(drugGroupChangesKey(userId))
+      req.onsuccess = () => resolve(req.result)
+      req.onerror   = () => reject(req.error)
+    })
+    return Array.isArray(rec?.changes) ? rec.changes : []
+  } catch (err) {
+    logCrash(err, 'utils/cache.js: readGroupChanges')
+    return []
+  } finally {
+    db?.close()
+  }
+}
+
+export async function clearGroupChanges(userId) {
+  await writeGroupChanges(userId, [])
 }
