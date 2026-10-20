@@ -36,6 +36,15 @@
  * removed today; step 12.4 (remove mode) and step 12.5 (Add drugs search) replace them.
  * The drug cards are not changed.
  *
+ * 2026-10-21 (steps 12.4 to 12.6): Add opens the Add drugs screen (/drugs/group/:id/add,
+ * AddDrugsToGroupScreen.jsx, built from the Drugs search). Remove turns into Done and every
+ * card gets a round minus beside it (the card keeps its layout and is not tappable then);
+ * a minus removes that drug at once and a "Drug removed" message with Undo shows for 5
+ * seconds (Undo puts the last removed drug back). Adds and removes go through
+ * useGroupDrugEdits, which sends quick taps one after the other so none is lost. Page
+ * states: the empty group invites Add (opens the Add drugs screen); a full group shows
+ * its limit line under the list header. The Edit sheet is unchanged until step 13.2.
+ *
  * 2026-10-19 (step 8.1): a Share icon left of Edit opens ShareGroupSheet (not
  * shown to a read-only account, whose database rules refuse making or stopping
  * a link). The page also asks whether the group has a live link, so the delete
@@ -50,15 +59,18 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Folder, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
+import { Check, Folder, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
+import Snackbar from '../components/ui/Snackbar'
 import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
+import { drugsLimitMessage } from '../components/drugs/groups/groupMessages'
+import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useDrugContext } from '../context/DrugContext'
@@ -97,7 +109,7 @@ export default function DrugGroupScreen() {
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
-    groups, groupsStatus, isReadOnly, reloadGroups, setGroupDrugs, deleteGroup,
+    groups, groupsStatus, isReadOnly, reloadGroups, deleteGroup,
     isDrugFavourited, toggleDrug, promptSignIn, getShareCode,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
@@ -111,6 +123,14 @@ export default function DrugGroupScreen() {
   // Whether this group has a live share link (step 8.1): so the delete question
   // can say the link stops too. null = no link or not known (for example offline).
   const [shareCode, setShareCode] = useState(null)
+  // Remove mode (step 12.4) and its Undo message (5 seconds, the last drug removed).
+  const [removeMode, setRemoveMode] = useState(false)
+  const [undo, setUndo] = useState({ visible: false, id: null })
+  useEffect(() => {
+    if (!undo.visible) return undefined
+    const timer = setTimeout(() => setUndo(u => ({ ...u, visible: false })), 5000)
+    return () => clearTimeout(timer)
+  }, [undo.visible, undo.id])
 
   // Keep the last copy of the group while the editor or delete question is
   // open, so a delete in progress does not flash "not found".
@@ -118,6 +138,11 @@ export default function DrugGroupScreen() {
   const [snapshot, setSnapshot] = useState(null)
   if (live && live !== snapshot) setSnapshot(live)
   const group = live ?? ((editorOpen || deleteOpen) ? snapshot : null)
+
+  // Quick adds and removes are sent one after the other (step 12.4); 'ids' is the list as
+  // the person's taps have left it.
+  const edits = useGroupDrugEdits(group)
+  const ids = edits.ids
 
   const liveGroupId = live?.id
   useEffect(() => {
@@ -135,14 +160,14 @@ export default function DrugGroupScreen() {
     const byId = new Map((drugs ?? []).map(d => [d.id, d]))
     const known = []
     const missing = []
-    for (const id of group?.brandIds ?? []) {
+    for (const id of ids) {
       const d = byId.get(id)
       if (d) known.push(d)
       else missing.push(id)
     }
     known.sort((a, b) => drugRowTitle(a).localeCompare(drugRowTitle(b), undefined, { sensitivity: 'base' }))
     return { known, missing }
-  }, [drugs, group])
+  }, [drugs, ids])
 
   function goHome() {
     navigate(ROUTES.DRUGS, { replace: true })
@@ -164,7 +189,26 @@ export default function DrugGroupScreen() {
 
   async function handleRemoveMissing(id) {
     if (!group) return
-    await setGroupDrugs(group.id, group.brandIds.filter(b => b !== id))
+    await edits.remove(id)
+  }
+
+  function openAddDrugs() {
+    setRemoveMode(false)
+    navigate(ROUTES.DRUGS_GROUP_ADD(group.id))
+  }
+
+  // A minus in remove mode: the drug goes at once, with an Undo for 5 seconds. If the save is
+  // refused (the hook says why), the message is taken back.
+  function handleMinus(id) {
+    setUndo({ visible: true, id })
+    edits.remove(id).then(res => {
+      if (!res?.ok && res?.reason !== 'missing') setUndo(u => ({ ...u, visible: false }))
+    })
+  }
+  function handleUndo() {
+    const id = undo.id
+    setUndo(u => ({ ...u, visible: false }))
+    if (id) edits.add(id)
   }
 
   const backButton = (
@@ -201,7 +245,7 @@ export default function DrugGroupScreen() {
       <button onClick={() => setShareOpen(true)} aria-label="Share group" style={roundButtonStyle}>
         <Share2 size={20} strokeWidth={2} />
       </button>
-      <button onClick={() => setEditorOpen(true)} aria-label="Edit group" style={roundButtonStyle}>
+      <button onClick={() => { setRemoveMode(false); setEditorOpen(true) }} aria-label="Edit group" style={roundButtonStyle}>
         <Pencil size={20} strokeWidth={2} />
       </button>
     </div>
@@ -249,7 +293,8 @@ export default function DrugGroupScreen() {
     )
   } else {
     const tone = resolveToken(group.color, isDark)
-    const count = group.brandIds.length
+    const count = ids.length
+    const removing = removeMode && count > 0
     const full = count >= drugsCap
     const waitingForDrugs = drugsLoading && (drugs ?? []).length === 0
 
@@ -258,8 +303,9 @@ export default function DrugGroupScreen() {
       list = (
         <GroupStateMessage
           title="No drugs in this group yet"
+          body={isReadOnly ? undefined : 'Search for a drug and tap + to add it.'}
           actionLabel={isReadOnly ? undefined : 'Add drugs'}
-          onAction={isReadOnly ? undefined : () => setEditorOpen(true)}
+          onAction={isReadOnly ? undefined : openAddDrugs}
         />
       )
     } else if (waitingForDrugs) {
@@ -267,22 +313,44 @@ export default function DrugGroupScreen() {
     } else {
       list = (
         <div>
-          {known.map((drug, i) => (
-            <SharedDrugCard
-              key={drug.id}
-              drug={drug}
-              categories={categories}
-              isDark={isDark}
-              isLast={i === known.length - 1 && missing.length === 0}
-              onTap={() => navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))}
-              trailing={
-                <RowStarButton
-                  isFavourited={isDrugFavourited(drug.id)}
-                  onPress={() => toggleDrug(drug.id)}
-                />
-              }
-            />
-          ))}
+          {known.map((drug, i) => {
+            const card = (
+              <SharedDrugCard
+                key={removing ? undefined : drug.id}
+                drug={drug}
+                categories={categories}
+                isDark={isDark}
+                isLast={i === known.length - 1 && missing.length === 0}
+                onTap={() => navigate(ROUTES.DRUG_DETAIL(drug.slug || drug.id))}
+                disableTap={removing}
+                trailing={
+                  <RowStarButton
+                    isFavourited={isDrugFavourited(drug.id)}
+                    onPress={() => toggleDrug(drug.id)}
+                  />
+                }
+              />
+            )
+            if (!removing) return card
+            return (
+              <div key={drug.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+                <button
+                  onClick={() => handleMinus(drug.id)}
+                  aria-label={`Remove ${drugRowTitle(drug)} from this group`}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 44, height: 44, borderRadius: '50%', flexShrink: 0, padding: 0,
+                    border: 'none', cursor: 'pointer',
+                    backgroundColor: 'var(--color-danger-light)', color: 'var(--color-danger)',
+                    WebkitTapHighlightColor: 'transparent', outline: 'none',
+                  }}
+                >
+                  <Minus size={20} strokeWidth={2.5} aria-hidden="true" />
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>{card}</div>
+              </div>
+            )
+          })}
           {missing.map(id => (
             <div key={id} style={REMOVE_ROW_STYLE}>
               <div style={{
@@ -405,22 +473,39 @@ export default function DrugGroupScreen() {
             </h2>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
               <button
-                onClick={() => setEditorOpen(true)}
+                onClick={openAddDrugs}
                 aria-label="Add drugs to this group"
                 style={{ ...pillButtonStyle, color: 'var(--color-accent)' }}
               >
                 <Search size={18} strokeWidth={2} aria-hidden="true" />
                 Add
               </button>
-              <button
-                onClick={() => setEditorOpen(true)}
-                aria-label="Remove drugs from this group"
-                style={{ ...pillButtonStyle, color: 'var(--color-danger)' }}
-              >
-                <Minus size={18} strokeWidth={2} aria-hidden="true" />
-                Remove
-              </button>
+              {removing ? (
+                <button
+                  onClick={() => setRemoveMode(false)}
+                  aria-label="Done removing drugs"
+                  style={{ ...pillButtonStyle, backgroundColor: 'var(--color-accent)', color: '#fff' }}
+                >
+                  <Check size={18} strokeWidth={2.5} aria-hidden="true" />
+                  Done
+                </button>
+              ) : (
+                <button
+                  onClick={() => setRemoveMode(true)}
+                  aria-label="Remove drugs from this group"
+                  style={{ ...pillButtonStyle, color: 'var(--color-danger)' }}
+                >
+                  <Minus size={18} strokeWidth={2} aria-hidden="true" />
+                  Remove
+                </button>
+              )}
             </div>
+          </div>
+        )}
+
+        {!isReadOnly && full && count > 0 && (
+          <div style={{ marginTop: 'var(--space-2)' }}>
+            <GroupStateMessage variant="banner" title={drugsLimitMessage(isPro)} />
           </div>
         )}
 
@@ -466,6 +551,7 @@ export default function DrugGroupScreen() {
           onShareChange={setShareCode}
         />
       )}
+      <Snackbar visible={undo.visible} message="Drug removed" actionLabel="Undo" onAction={handleUndo} />
       <ConfirmSheet
         isOpen={deleteOpen}
         onClose={() => setDeleteOpen(false)}
