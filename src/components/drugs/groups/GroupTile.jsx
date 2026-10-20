@@ -9,15 +9,22 @@
  *   isNew        true -> the "New group" tile
  *   showProBadge on the New group tile: free account at its limit
  *   waiting      true when this group has changes saved on the phone and not yet sent
+ *   animate      true -> soft fade-in (a group just added or renamed)
  *   onOpen       tap handler
  *
  * The group's colour is one of five fixed names (blue, teal, violet, amber,
  * rose), read through the app's colour tokens so light and dark both work.
  * An Arabic name is left-aligned like an English one (decision 2026-10-19).
+ *
+ * 2026-10-20 (Drug groups plan, step 11.5): flat look. A group is a tile filled with its
+ * own soft colour, a big drug count at the top and the name under it, no border. The
+ * New group tile is the same size with a dashed line and a plus. 'animate' gives a tile
+ * that was just added or renamed a short soft fade-in (the class is defined in
+ * GroupsSection.jsx).
  */
 
 import { useState } from 'react'
-import { Folder, Plus, CloudUpload } from 'lucide-react'
+import { Plus, CloudUpload } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
@@ -39,15 +46,15 @@ export function ProPill() {
 }
 
 // The small mark on a group that has changes not yet sent (step 17.6a).
-export function WaitingMark({ size = 14 }) {
+export function WaitingMark({ size = 14, color = 'var(--color-text-tertiary)' }) {
   return (
     <span role="img" aria-label="Waiting to sync" title="Waiting to sync" style={{ display: 'flex', flexShrink: 0 }}>
-      <CloudUpload size={size} color="var(--color-text-tertiary)" aria-hidden="true" />
+      <CloudUpload size={size} color={color} aria-hidden="true" />
     </span>
   )
 }
 
-export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, onOpen }) {
+export default function GroupTile({ group, isNew = false, showProBadge = false, waiting = false, animate = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
@@ -60,6 +67,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onClick={onOpen}
       role="button"
       tabIndex={0}
+      className={animate ? 'group-soft-in' : undefined}
       aria-label={isNew ? 'New group' : `${name}, ${drugCountLabel(count)}`}
       onKeyDown={e => e.key === 'Enter' && onOpen?.()}
       onPointerDown={() => setPressed(true)}
@@ -67,13 +75,12 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       onPointerLeave={() => setPressed(false)}
       onPointerCancel={() => setPressed(false)}
       style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        // 11.1: no card behind the groups area any more, so a group needs its own fill and line.
-        backgroundColor: 'var(--color-surface)',
-        border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
-        borderRadius: 16,
-        padding: 'var(--space-3)',
-        minHeight: 84,
+        display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 'var(--space-3)',
+        backgroundColor: isNew ? 'transparent' : colors.bg,
+        border: isNew ? '1.5px dashed var(--color-border)' : 'none',
+        borderRadius: 18,
+        padding: 14,
+        minHeight: 96,
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -83,27 +90,29 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
         boxSizing: 'border-box',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          backgroundColor: colors.bg,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          flexShrink: 0,
-        }}>
-          {isNew
-            ? <Plus size={16} color="var(--color-text-secondary)" aria-hidden="true" />
-            : <Folder size={15} color={colors.fg} aria-hidden="true" />}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+        {isNew ? (
+          <Plus size={24} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, minWidth: 0 }}>
+            <span style={{ fontSize: 28, fontWeight: 800, lineHeight: 1, color: colors.fg, fontFamily: 'var(--font-body)' }}>
+              {count}
+            </span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: colors.fg, opacity: 0.8, fontFamily: 'var(--font-body)' }}>
+              {count === 1 ? 'drug' : 'drugs'}
+            </span>
+          </div>
+        )}
         {isNew && showProBadge && <ProPill />}
-        {!isNew && waiting && <WaitingMark />}
+        {!isNew && waiting && <WaitingMark color={colors.fg} />}
       </div>
 
       <div
         dir={dir}
         style={{
           width: '100%', textAlign: 'start',
-          fontSize: 13, fontWeight: 600, lineHeight: 1.3,
-          color: isNew ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+          fontSize: 14, fontWeight: 600, lineHeight: 1.3,
+          color: isNew ? 'var(--color-text-secondary)' : colors.fg,
           fontFamily: 'var(--font-body)',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
           overflow: 'hidden', overflowWrap: 'anywhere',
@@ -111,12 +120,6 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       >
         {name}
       </div>
-
-      {!isNew && (
-        <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)' }}>
-          {drugCountLabel(count)}
-        </div>
-      )}
     </div>
   )
 }

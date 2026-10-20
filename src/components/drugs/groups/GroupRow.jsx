@@ -10,16 +10,23 @@
  *                looks them up from the drug library)
  *   isNew        true -> the "New group" row
  *   showProBadge on the New group row: free account at its limit
+ *   waiting      true when this group has changes saved on the phone and not yet sent
+ *   last         true on the last row of the list (no thin line under it)
+ *   animate      true -> soft fade-in (a group just added or renamed)
  *   onOpen       tap handler
+ *
+ * 2026-10-20 (Drug groups plan, step 11.5): flat look to match the tiles. No box: a thin
+ * line between rows. A rounded square in the group's colour carries the big drug count;
+ * the New group row has a dashed square with a plus.
  */
 
 import { useState } from 'react'
-import { Folder, Plus, ChevronRight } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 import { drugCountLabel, ProPill, WaitingMark } from './GroupTile'
 
-export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, waiting = false, onOpen }) {
+export default function GroupRow({ group, drugNames = [], isNew = false, showProBadge = false, waiting = false, last = false, animate = false, onOpen }) {
   const [pressed, setPressed] = useState(false)
   const isDark = useIsDark()
   const colors = resolveToken(isNew ? 'slate' : group?.color, isDark)
@@ -27,12 +34,14 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
   const dir = 'ltr'
   const count = group?.brandIds?.length ?? 0
   const preview = drugNames.filter(Boolean).slice(0, 3).join(', ')
+  const second = preview || (count === 0 ? 'No drugs yet' : drugCountLabel(count))
 
   return (
     <div
       onClick={onOpen}
       role="button"
       tabIndex={0}
+      className={animate ? 'group-soft-in' : undefined}
       aria-label={isNew ? 'New group' : `${name}, ${drugCountLabel(count)}`}
       onKeyDown={e => e.key === 'Enter' && onOpen?.()}
       onPointerDown={() => setPressed(true)}
@@ -41,58 +50,49 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
       onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-        // 11.1: no card behind the groups area any more, so a group needs its own fill and line.
-        backgroundColor: 'var(--color-surface)',
-        border: isNew ? '1.5px dashed var(--color-border)' : '1px solid var(--color-border)',
-        borderRadius: 16,
-        padding: 'var(--space-3)',
+        padding: '12px 0',
+        minHeight: 68,
+        borderBottom: last ? 'none' : '1px solid var(--color-border)',
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.8 : 1,
-        transform: pressed ? 'scale(0.985)' : 'scale(1)',
-        transition: 'opacity var(--motion-fast) var(--ease-settle), transform var(--motion-fast) var(--ease-settle)',
+        opacity: pressed ? 0.7 : 1,
+        transition: 'opacity var(--motion-fast) var(--ease-settle)',
         boxSizing: 'border-box',
       }}
     >
       <div style={{
-        width: 36, height: 36, borderRadius: '50%',
-        backgroundColor: colors.bg,
+        width: 44, height: 44, borderRadius: 14, boxSizing: 'border-box',
+        backgroundColor: isNew ? 'transparent' : colors.bg,
+        border: isNew ? '1.5px dashed var(--color-border)' : 'none',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexShrink: 0,
       }}>
         {isNew
-          ? <Plus size={17} color="var(--color-text-secondary)" aria-hidden="true" />
-          : <Folder size={16} color={colors.fg} aria-hidden="true" />}
+          ? <Plus size={20} strokeWidth={2} color="var(--color-text-secondary)" aria-hidden="true" />
+          : <span style={{ fontSize: 17, fontWeight: 800, color: colors.fg, fontFamily: 'var(--font-body)' }}>{count}</span>}
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-          <div
-            dir={dir}
-            style={{
-              minWidth: 0, flex: '0 1 auto', textAlign: 'start',
-              fontSize: 14, fontWeight: 600, lineHeight: 1.3,
-              color: isNew ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
-              fontFamily: 'var(--font-body)',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}
-          >
-            {name}
-          </div>
-          {!isNew && (
-            <div style={{ fontSize: 11, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)', flexShrink: 0 }}>
-              {drugCountLabel(count)}
-            </div>
-          )}
+        <div
+          dir={dir}
+          style={{
+            textAlign: 'start',
+            fontSize: 15, fontWeight: 600, lineHeight: 1.3,
+            color: isNew ? 'var(--color-text-secondary)' : 'var(--color-text-primary)',
+            fontFamily: 'var(--font-body)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >
+          {name}
         </div>
-        {!isNew && preview && (
+        {!isNew && (
           <div style={{
             marginTop: 2, fontSize: 12, color: 'var(--color-text-secondary)',
             fontFamily: 'var(--font-body)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
-            {preview}
+            {second}
           </div>
         )}
       </div>

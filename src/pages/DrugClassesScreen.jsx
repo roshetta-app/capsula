@@ -10,18 +10,26 @@
  * Drugs home: a class with no subclasses goes straight to its drugs, otherwise
  * the subclass list shows first. Tapping a drug in the sheet opens the drug
  * page and adds it to recently viewed. Back returns to the Drugs home.
+ *
+ * 2026-10-20 (Drug groups plan, step 11.4): the page now opens from the 'Browse by class'
+ * row on the Drugs home and has a search box under its title. Typing 2 or more letters
+ * shows the classes and drug families whose names match (the same name search the Drugs
+ * screen uses in Class mode); fewer letters show the full list with its sort button. The
+ * search box stays in the same place the whole time, so the keyboard does not close while
+ * typing. The title reads 'Browse by class' to match the row.
  */
 
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
+import SearchBar from '../components/ui/SearchBar'
 import ClassSearchResults from '../components/drugs/classes/ClassSearchResults'
 import ClassSheet from '../components/drugs/classes/ClassSheet'
 import { ALL_KEY as ALL_CLASS_DRUGS_KEY } from '../components/drugs/classes/classKeys'
 import { DrugsSkeleton, LibraryErrorState } from '../components/drugs/home/BrowseStates'
 import { useDrugContext } from '../context/DrugContext'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { titleCaseWords, buildClassIndex } from '../utils/classSearch'
+import { titleCaseWords, buildClassIndex, searchClassIndex } from '../utils/classSearch'
 import { ROUTES } from '../router'
 import { useDeepLinkParent } from '../hooks/useDeepLinkParent'
 
@@ -64,9 +72,19 @@ export default function DrugClassesScreen() {
   const [classTarget,    setClassTarget]    = useState(null)   // { className, direct }
   const [classSheetKey,  setClassSheetKey]  = useState(0)
 
+  const [query, setQuery] = useState('')
+
+  const classIndex = useMemo(() => buildClassIndex(drugs), [drugs])
   const allClasses = useMemo(
-    () => buildClassIndex(drugs).classes.slice().sort((a, b) => a.name.localeCompare(b.name)),
-    [drugs]
+    () => classIndex.classes.slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [classIndex]
+  )
+
+  // Name search, from 2 letters. null = not searching (show the full list).
+  const typed = query.trim()
+  const searchResults = useMemo(
+    () => (typed.length >= 2 ? searchClassIndex(classIndex, typed) : null),
+    [classIndex, typed]
   )
 
   const sortedClasses = useMemo(() => {
@@ -107,6 +125,21 @@ export default function DrugClassesScreen() {
     body = <DrugsSkeleton />
   } else if (!loading && !hasDrugs && error) {
     body = <LibraryErrorState onRetry={retry} />
+  } else if (!loading && searchResults) {
+    const found = searchResults.classes.length + searchResults.subclasses.length
+    body = found > 0 ? (
+      <ClassSearchResults
+        key="search-classes"
+        results={searchResults}
+        query={typed}
+        onOpenClass={handleOpenClass}
+        onOpenSubclass={handleOpenSubclass}
+      />
+    ) : (
+      <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-4)', color: 'var(--color-text-secondary)', fontSize: 14, lineHeight: 1.4 }}>
+        No classes or drug families match &ldquo;{typed}&rdquo;
+      </div>
+    )
   } else if (!loading) {
     body = sortedClasses.length > 0 ? (
       <ClassSearchResults
@@ -152,8 +185,17 @@ export default function DrugClassesScreen() {
         </button>
       </div>
       <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 20, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
-        Class
+        Browse by class
       </h1>
+      {hasDrugs && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <SearchBar
+            value={query}
+            onChange={setQuery}
+            placeholder="Search classes and drug families…"
+          />
+        </div>
+      )}
       {body}
 
       <ClassSheet

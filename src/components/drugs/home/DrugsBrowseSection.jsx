@@ -21,8 +21,11 @@
  * with a 'Try again' button. With three categories or fewer there is no '+N more'
  * tile. With none, only the 'View all' link (no number) is shown.
  *
- * The Class button is left exactly as it was; step 11.4 replaces it with the
- * 'Browse by class' row.
+ * 2026-10-20 (step 11.4): the Class button is replaced by one full-width flat row under
+ * the strip, with a thin line above it: a violet icon square, 'Browse by class', and
+ * '<N> classes and families, searchable' (N is live: every class plus every drug family
+ * the Classes screen lists). It opens the Classes screen. Until the library is loaded
+ * the second line reads 'Search by class or drug family' with no number.
  *
  * Blank-screen fix (2026-10-18): the routes are read when tapped, not when this
  * file loads, because ROUTES is not ready at load time (router.jsx and this file
@@ -32,6 +35,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layers, ChevronRight } from 'lucide-react'
+import { buildClassIndex } from '../../../utils/classSearch'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from './DrugsSectionCard'
 import { shimmer } from './shimmer'
 import { SpecialtyIcon, useIsDark } from '../../../utils/specialtyIcon'
@@ -44,42 +48,38 @@ import { prepareCategoryOpen } from '../../../pages/DrugsScreen'
 // How many category tiles show before the dashed '+N more' tile.
 const STRIP_COUNT = 3
 
-// 'route' is a function on purpose: this file and router.jsx import each other,
-// so ROUTES does not exist yet while this file loads. It is read at tap time.
-const CLASS_BUTTON = {
-  label:    'Class',
-  subtitle: 'Browse by drug class and family',
-  icon:     Layers,
-  color:    'var(--color-class)',
-  tint:     'var(--color-class-light)',
-  route:    () => ROUTES.DRUGS_BROWSE_CLASS,
-}
-
-function BrowseButton({ label, subtitle, icon: Icon, color, tint, onTap }) {
+function ClassRow({ subtitle, onTap }) {
+  const [pressed, setPressed] = useState(false)
   return (
     <button
+      type="button"
       onClick={onTap}
+      onPointerDown={() => setPressed(true)}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
       style={{
         display: 'flex', alignItems: 'center', gap: 12,
-        width: '100%', textAlign: 'left',
-        background: tint, border: 'none', borderRadius: 16,
-        padding: '14px 14px', cursor: 'pointer',
+        width: '100%', minHeight: 56, textAlign: 'left',
+        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
         fontFamily: 'var(--font-body)',
         WebkitTapHighlightColor: 'transparent',
+        opacity: pressed ? 0.7 : 1,
+        transition: 'opacity var(--motion-fast) var(--ease-settle)',
       }}
     >
       <span style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-        background: 'var(--color-surface)', color,
+        width: 44, height: 44, borderRadius: 14, flexShrink: 0,
+        background: 'var(--color-class-light)', color: 'var(--color-class)',
       }}>
-        <Icon size={20} strokeWidth={1.9} aria-hidden="true" />
+        <Layers size={21} strokeWidth={1.9} aria-hidden="true" />
       </span>
       <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
-        <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, color }}>{label}</span>
+        <span style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)' }}>Browse by class</span>
         <span style={{ fontSize: 13, lineHeight: 1.3, color: 'var(--color-text-secondary)' }}>{subtitle}</span>
       </span>
-      <ChevronRight size={18} strokeWidth={2} color={color} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <ChevronRight size={18} strokeWidth={2} color="var(--color-text-tertiary)" aria-hidden="true" style={{ flexShrink: 0 }} />
     </button>
   )
 }
@@ -170,11 +170,21 @@ export default function DrugsBrowseSection() {
     return categories.filter(c => (counts.get(c.slug) || 0) > 0)
   }, [categories, drugs])
 
+  // Live count for the Class row: classes plus drug families, as the Classes screen lists them.
+  const classTotal = useMemo(() => {
+    const idx = buildClassIndex(drugs)
+    return idx.classes.length + idx.subclasses.length
+  }, [drugs])
+  const classSubtitle = classTotal > 0
+    ? `${classTotal} classes and families, searchable`
+    : 'Search by class or drug family'
+
   const shown = withDrugs.slice(0, STRIP_COUNT)
   const restCount = Math.max(0, withDrugs.length - STRIP_COUNT)
   const total = withDrugs.length
 
   function openAll() { navigate(ROUTES.DRUGS_BROWSE_CATEGORY) }
+  function openClasses() { navigate(ROUTES.DRUGS_BROWSE_CLASS) }
   function openCategory(slug) {
     prepareCategoryOpen(slug)
     navigate(ROUTES.DRUGS_CATEGORY(slug))
@@ -246,18 +256,16 @@ export default function DrugsBrowseSection() {
   }
 
   return (
-    <DrugsSectionCard label="Browse" flat title={title} trailing={viewAll}>
-      {strip}
-      <div style={{ marginTop: 'var(--space-4)' }}>
-        <BrowseButton
-          label={CLASS_BUTTON.label}
-          subtitle={CLASS_BUTTON.subtitle}
-          icon={CLASS_BUTTON.icon}
-          color={CLASS_BUTTON.color}
-          tint={CLASS_BUTTON.tint}
-          onTap={() => navigate(CLASS_BUTTON.route())}
-        />
-      </div>
-    </DrugsSectionCard>
+    <>
+      <DrugsSectionCard label="Browse" flat title={title} trailing={viewAll}>
+        {strip}
+      </DrugsSectionCard>
+      <section
+        aria-label="Browse by class"
+        style={{ borderTop: '1px solid var(--color-border)', padding: '12px 0' }}
+      >
+        <ClassRow subtitle={classSubtitle} onTap={openClasses} />
+      </section>
+    </>
   )
 }

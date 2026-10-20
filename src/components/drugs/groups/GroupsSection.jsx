@@ -17,6 +17,13 @@
  * own page (/drugs/group/:id); changing or deleting it now happens from there.
  * The Undo message for a group deleted from its page is shown here, handed
  * over by pendingUndo.js.
+ *
+ * 2026-10-20 (step 11.5): flat look. Colour tiles with a big drug count, flat list rows
+ * with thin lines, a dashed New group tile or row at the end, centred messages with no
+ * box, and placeholders in the same shapes while loading. A group that is added or
+ * renamed fades in softly (not on the first draw of the page); a deleted group goes at
+ * once and the Undo message stays. The soft fade uses the app's motion speed, so it
+ * is instant when the phone asks for reduced motion.
  */
 
 import { useState, useEffect, useMemo } from 'react'
@@ -68,36 +75,32 @@ function GroupSortButton({ sortMode, onToggle }) {
 }
 
 function SkeletonTile() {
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-      backgroundColor: 'var(--color-surface-muted)', borderRadius: 16,
-      padding: 'var(--space-3)', minHeight: 84, boxSizing: 'border-box',
-    }}>
-      <div style={shimmer({ width: 32, height: 32, borderRadius: '50%' })} />
-      <div style={shimmer({ width: '70%', height: 13 })} />
-    </div>
-  )
+  return <div style={shimmer({ minHeight: 96, borderRadius: 18 })} />
 }
 
-function SkeletonRow() {
+function SkeletonRow({ last = false }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-      backgroundColor: 'var(--color-surface-muted)', borderRadius: 16,
-      padding: 'var(--space-3)',
+      padding: '12px 0', minHeight: 68, boxSizing: 'border-box',
+      borderBottom: last ? 'none' : '1px solid var(--color-border)',
     }}>
-      <div style={shimmer({ width: 32, height: 32, borderRadius: '50%', flexShrink: 0 })} />
+      <div style={shimmer({ width: 44, height: 44, borderRadius: 14, flexShrink: 0 })} />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={shimmer({ width: '55%', height: 13 })} />
-        <div style={shimmer({ width: '30%', height: 11 })} />
+        <div style={shimmer({ width: '35%', height: 11 })} />
       </div>
     </div>
   )
 }
 
+// Soft fade-in for a group that was just added or renamed. Written once here for the
+// tiles and rows; the speed comes from the motion token, which is near zero when the
+// phone asks for reduced motion.
+const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } } .group-soft-in { animation: groupSoftIn var(--motion-base) var(--ease-settle) both; }'
+
 const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }
-const LIST_STYLE = { display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }
+const LIST_STYLE = { display: 'flex', flexDirection: 'column' }
 
 export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
@@ -153,6 +156,21 @@ export default function GroupsSection() {
     return list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
   }, [groups, groupsSortMode])
 
+  // Soft change: a group whose id and name were not on screen a moment ago fades in.
+  // 'known' is empty (null) until the first real list has been drawn, so the first
+  // draw of the page never animates; later it trails the list by a short delay so a
+  // new tile finishes its fade before it counts as known.
+  const [known, setKnown] = useState(null)
+  const listKey = groupsStatus === 'ready' ? groups.map(g => `${g.id}:${g.name}`).join('|') : null
+  useEffect(() => {
+    if (listKey === null) return undefined
+    const next = new Set(groups.map(g => `${g.id}:${g.name}`))
+    const t = setTimeout(() => setKnown(next), known === null ? 0 : 450)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listKey])
+  const isFresh = g => known !== null && !known.has(`${g.id}:${g.name}`)
+
   function previewNames(g) {
     return g.brandIds
       .map(id => brandNameById.get(id))
@@ -204,7 +222,7 @@ export default function GroupsSection() {
   let content
   if (authLoading || (user && groupsStatus === 'loading')) {
     content = groupsView === 'list'
-      ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow /></div>
+      ? <div style={LIST_STYLE}><SkeletonRow /><SkeletonRow /><SkeletonRow last /></div>
       : <div style={GRID_STYLE}><SkeletonTile /><SkeletonTile /><SkeletonTile /><SkeletonTile /></div>
   } else if (!user) {
     content = (
@@ -213,6 +231,7 @@ export default function GroupsSection() {
         body="Collect drugs into your own lists and reach them in one tap."
         actionLabel="Sign in"
         onAction={() => promptSignIn('groups', 'new')}
+        flat
       />
     )
   } else if (groupsStatus === 'error' && groups.length === 0) {
@@ -222,6 +241,7 @@ export default function GroupsSection() {
         body={online ? undefined : "You're offline. Check your connection and try again."}
         actionLabel="Retry"
         onAction={reloadGroups}
+        flat
       />
     )
   } else if (groups.length === 0) {
@@ -231,6 +251,7 @@ export default function GroupsSection() {
         body="Make a group for a ward, a shift or a patient type."
         actionLabel="Create group"
         onAction={handleNewGroup}
+        flat
       />
     )
   } else {
@@ -247,15 +268,24 @@ export default function GroupsSection() {
         ) : null}
         {groupsView === 'list' ? (
           <div style={LIST_STYLE}>
-            {sorted.map(g => (
-              <GroupRow key={g.id} group={g} drugNames={previewNames(g)} waiting={waitingGroupIds.includes(g.id)} onOpen={() => handleOpenGroup(g)} />
+            {sorted.map((g, i) => (
+              <GroupRow
+                key={`${g.id}:${g.name}`} group={g} drugNames={previewNames(g)}
+                waiting={waitingGroupIds.includes(g.id)} animate={isFresh(g)}
+                last={!showNew && i === sorted.length - 1}
+                onOpen={() => handleOpenGroup(g)}
+              />
             ))}
-            {showNew && <GroupRow isNew showProBadge={showPro} onOpen={handleNewGroup} />}
+            {showNew && <GroupRow isNew last showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
         ) : (
           <div style={GRID_STYLE}>
             {sorted.map(g => (
-              <GroupTile key={g.id} group={g} waiting={waitingGroupIds.includes(g.id)} onOpen={() => handleOpenGroup(g)} />
+              <GroupTile
+                key={`${g.id}:${g.name}`} group={g}
+                waiting={waitingGroupIds.includes(g.id)} animate={isFresh(g)}
+                onOpen={() => handleOpenGroup(g)}
+              />
             ))}
             {showNew && <GroupTile isNew showProBadge={showPro} onOpen={handleNewGroup} />}
           </div>
@@ -266,6 +296,7 @@ export default function GroupsSection() {
 
   return (
     <>
+      <style>{SOFT_IN_CSS}</style>
       <DrugsSectionCard label="My drug groups" flat title={title} trailing={trailing}>
         {content}
       </DrugsSectionCard>

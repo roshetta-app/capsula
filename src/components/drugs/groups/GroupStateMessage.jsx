@@ -10,6 +10,8 @@
  *   body         optional second line
  *   actionLabel  optional button text (for example 'Retry', 'Sign in')
  *   onAction     tap handler for that button
+ *   flat         card variant only: no box, just the centred icon and text (the Drugs home,
+ *                step 11.5). Default false, so every other screen keeps the boxed look.
  */
 
 import { Folder } from 'lucide-react'
@@ -17,7 +19,7 @@ import { Folder } from 'lucide-react'
 const font = 'var(--font-body)'
 
 export default function GroupStateMessage({
-  variant = 'card', tone = 'neutral', title, body, actionLabel, onAction,
+  variant = 'card', tone = 'neutral', title, body, actionLabel, onAction, flat = false,
 }) {
   if (variant === 'banner') {
     const warn = tone === 'warning'
@@ -59,17 +61,21 @@ export default function GroupStateMessage({
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: 'var(--space-2)', textAlign: 'center',
-        backgroundColor: 'var(--color-surface)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 16, padding: 'var(--space-5) var(--space-4)',
+        ...(flat
+          ? { padding: 'var(--space-4) var(--space-4)' }
+          : {
+              backgroundColor: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 16, padding: 'var(--space-5) var(--space-4)',
+            }),
       }}
     >
       <div style={{
-        width: 36, height: 36, borderRadius: '50%',
-        backgroundColor: 'var(--color-surface-muted)',
+        width: flat ? 44 : 36, height: flat ? 44 : 36, borderRadius: flat ? 14 : '50%',
+        backgroundColor: flat ? 'var(--color-accent-light)' : 'var(--color-surface-muted)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        <Folder size={17} color="var(--color-text-tertiary)" aria-hidden="true" />
+        <Folder size={flat ? 20 : 17} color={flat ? 'var(--color-accent)' : 'var(--color-text-tertiary)'} aria-hidden="true" />
       </div>
       <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', fontFamily: font }}>
         {title}
