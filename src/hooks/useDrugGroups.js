@@ -22,8 +22,13 @@
  *    stored by utils/cache.js), and the answer is { ok: true, queued: true }.
  *    The same happens when a request times out, and while changes are already
  *    waiting (new ones join the list so the order is kept). The list is laid
- *    over the saved or live groups every time they load. Sending the list to
- *    the server is step 17.3; until then waiting changes only live on the phone.
+ *    over the saved or live groups every time they load.
+ *  - Sync (2026-10-20, step 17.3): the waiting changes are sent one at a time,
+ *    in order (utils/groupSync.js), when the phone comes back online, when the
+ *    app returns to the screen, right after a change is queued while online,
+ *    after the groups load, and every 30 seconds. Two runs never overlap. No
+ *    answer means stop and try later; a server refusal marks that change failed
+ *    (it is not sent again, and later changes to the same group wait behind it).
  *    Sharing, saving a shared group and the share links still need internet and
  *    keep the offline message.
  *  - Limits (constants/features.js) are checked here and in the database.
@@ -85,7 +90,8 @@ import { useToast } from '../context/ToastContext'
 import { supabase } from '../lib/supabase'
 import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
-import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete } from '../utils/groupChanges'
+import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend } from '../utils/groupChanges'
+import { runSync, sendChange } from '../utils/groupSync'
 import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
@@ -226,6 +232,10 @@ export function useDrugGroups(fav) {
   const queueRef = useRef([])
   const queueUserRef = useRef(null)
   const writeChainRef = useRef(Promise.resolve(true))
+  // Step 17.3: the latest syncQueue, so earlier functions can start a send, and
+  // a flag so two runs never overlap.
+  const syncRef = useRef(null)
+  const syncingRef = useRef(false)
 
   const persistQueue = useCallback(() => {
     const u = userRef.current
@@ -264,7 +274,11 @@ export function useDrugGroups(fav) {
       nextQueue = addChange(nextQueue, c)
       nextGroups = applyChange(nextGroups, c)
     }
-    return commitQueue(nextQueue, nextGroups)
+    return commitQueue(nextQueue, nextGroups).then(saved => {
+      // Online and saved: send it now (step 17.3).
+      if (saved && !isOffline()) syncRef.current?.()
+      return saved
+    })
   }, [commitQueue])
 
   // A change goes on the waiting list instead of straight to the server when
@@ -282,7 +296,9 @@ export function useDrugGroups(fav) {
     if (queueUserRef.current !== u.id) {
       const waiting = await readGroupChanges(u.id)
       if (stale()) return
-      queueRef.current = waiting
+      // A change that was on its way when the app was closed is sent again
+      // (sending twice is safe, see utils/groupSync.js).
+      queueRef.current = clearSending(waiting)
       queueUserRef.current = u.id
     }
     const withWaiting = list => applyQueue(list, queueRef.current)
@@ -326,6 +342,8 @@ export function useDrugGroups(fav) {
     setGroupsFromCache(false)
     setGroupsLoadError(false)
     setGroupsStatus('ready')
+    // Changes may be waiting from an earlier offline session (step 17.3).
+    syncRef.current?.()
   }, [])
 
   const reloadGroups = useCallback(async () => {
@@ -334,6 +352,68 @@ export function useDrugGroups(fav) {
     setGroupsLoadError(false)
     await loadGroups(u)
   }, [loadGroups])
+
+  // ── Sync (step 17.3) ──────────────────────────────────────────────────────
+  // Puts a new list in place and saves it, but only for the person the run was
+  // started for (a sign-out or another account in between changes nothing).
+  const updateQueueFor = useCallback(async (uid, fn) => {
+    if (userRef.current?.id !== uid) return
+    queueRef.current = fn(queueRef.current)
+    await persistQueue()
+  }, [persistQueue])
+
+  const syncQueue = useCallback(async () => {
+    const u = userRef.current
+    if (!u || syncingRef.current) return
+    if (queueUserRef.current !== u.id) return // the saved list is not read yet
+    if (isOffline() || !nextToSend(queueRef.current)) return
+
+    syncingRef.current = true
+    let result
+    try {
+      result = await runSync({
+        getQueue: () => queueRef.current,
+        update: fn => updateQueueFor(u.id, fn),
+        send: change => sendChange(supabase, change, withLimit),
+        canRun: () => userRef.current?.id === u.id && !isOffline(),
+        // Analytics: a change counts once, when the server newly takes it. The
+        // group's or the drug's id only, as before.
+        onSent: change => {
+          if (change.type === 'create') logUsageEvent('group_create', change.groupId)
+          else if (change.type === 'add_drug') logUsageEvent('group_drug_add', change.data?.brandId)
+        },
+      })
+    } finally {
+      syncingRef.current = false
+    }
+    if (userRef.current?.id !== u.id) return
+
+    if (result.failed > 0) {
+      toast.error(`${result.failed} change${result.failed === 1 ? '' : 's'} could not be saved.`)
+    } else if (result.sent > 0) {
+      toast.success('Your offline changes are saved.')
+    }
+    // Something reached the server: show the real list again.
+    if (result.sent > 0 || result.failed > 0) loadGroups(u)
+  }, [updateQueueFor, toast, loadGroups])
+
+  useEffect(() => { syncRef.current = syncQueue }, [syncQueue])
+
+  // Back online, back on screen, and a gentle retry while changes are waiting.
+  useEffect(() => {
+    if (isOnline) syncRef.current?.()
+  }, [isOnline])
+  useEffect(() => {
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') syncRef.current?.()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = setInterval(() => syncRef.current?.(), 30000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      clearInterval(timer)
+    }
+  }, [])
 
   // Load when someone signs in; empty everything (and the saved copy) when
   // they sign out. The copy is removed so a shared phone keeps nothing.

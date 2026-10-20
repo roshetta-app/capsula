@@ -19,7 +19,10 @@
  *
  * The list is oldest first. 'sending: true' marks the change that is on its
  * way to the server right now (step 17.3); such a change is never merged or
- * dropped, because the server may already have it.
+ * dropped, because the server may already have it. 'failed: { reason }' marks
+ * a change the server refused (step 17.3): it stays on the list, is not sent
+ * again, and later changes to the same group wait behind it (step 17.4 shows
+ * the person what to do with it).
  *
  * Every function returns new objects and never changes what it was given.
  */
@@ -89,7 +92,7 @@ export function applyQueue(groups, queue) {
 // ── Adding to the list ───────────────────────────────────────────────────────
 
 const forGroup = groupId => c => c.groupId === groupId
-const isFree = c => !c.sending
+const isFree = c => !c.sending && !c.failed
 
 // Puts a new change on the end of the list, tidying the list so it never holds
 // work that cancels out:
@@ -162,6 +165,32 @@ export function waitingGroupIds(queue) {
 }
 
 // ── Sending (used by step 17.3) ──────────────────────────────────────────────
+
+// The next change to send: the first one that is not failed, unless an earlier
+// change to the same group failed (that group waits; other groups carry on).
+// Nothing is returned while a change is already on its way.
+export function nextToSend(queue) {
+  if (queue.some(c => c.sending)) return null
+  const blocked = new Set()
+  for (const c of queue) {
+    if (c.failed) { blocked.add(c.groupId); continue }
+    if (!blocked.has(c.groupId)) return c
+  }
+  return null
+}
+
+export function markFailed(queue, changeId, reason) {
+  return queue.map(c => {
+    if (c.id !== changeId) return c
+    const rest = { ...c, failed: { reason } }
+    delete rest.sending
+    return rest
+  })
+}
+
+export function failedChanges(queue) {
+  return queue.filter(c => c.failed)
+}
 
 export function markSending(queue, changeId) {
   return queue.map(c => (c.id === changeId ? { ...c, sending: true } : c))
