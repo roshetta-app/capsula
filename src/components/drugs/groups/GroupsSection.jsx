@@ -41,7 +41,6 @@ import { takePendingUndo } from './pendingUndo'
 import { ROUTES } from '../../../router'
 import { useDrugContext } from '../../../context/DrugContext'
 import { useFavouritesContext } from '../../../context/FavouritesContext'
-import { useToast } from '../../../context/ToastContext'
 import { useAuth } from '../../../hooks/useAuth'
 import { useIsPro } from '../../../hooks/useIsPro'
 import { useOnlineStatus } from '../../../hooks/useOnlineStatus'
@@ -106,12 +105,11 @@ export default function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsLoadError, isReadOnly,
-    canCreateGroup, reloadGroups, restoreGroup, promptSignIn, showGroupLimit,
+    canCreateGroup, reloadGroups, restoreGroup, promptSignIn, showGroupLimit, showGroupReadOnly,
     waitingGroupIds = [],
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
-  const { toast } = useToast()
   const [editor, setEditor] = useState({ open: false, group: null })
 
   const navigate = useNavigate()
@@ -182,7 +180,7 @@ export default function GroupsSection() {
   // New group: the message cases come first, otherwise the editor opens.
   function handleNewGroup() {
     if (!user) { promptSignIn('groups', 'new'); return }
-    if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
+    if (isReadOnly) { showGroupReadOnly(); return }
     if (!canCreateGroup) { showGroupLimit('groups'); return }
     setEditor({ open: true, group: null })
   }
@@ -199,7 +197,7 @@ export default function GroupsSection() {
     if (res?.reason === 'limit') {
       showGroupLimit('groups')
     } else if (res?.reason === 'read_only') {
-      toast.info(READ_ONLY_MESSAGE)
+      showGroupReadOnly()
     }
   }
 

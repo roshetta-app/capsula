@@ -21,6 +21,8 @@
  * 2026-10-08: also handles listType 'classes' (drug classes and families,
  * one shared cap).
  *
+ * 2026-10-21 (Drug groups plan, step 13.3): dismiss reads "Not now", the same word as every other sheet.
+ *
  * Props:
  *   isOpen     boolean
  *   listType   'drugs' | 'conditions'
@@ -48,7 +50,7 @@ export default function FavouriteLimitSheet({ isOpen, listType, onClose }) {
       countLabel={`${cap}/${cap}`}
       headline="Favourites limit reached"
       message={<>You've reached your limit of favourite {listType === 'classes' ? 'classes and families' : listType}, go <strong>Pro</strong> for unlimited access.</>}
-      dismissLabel="Maybe Later"
+      dismissLabel="Not now"
     />
   )
 }

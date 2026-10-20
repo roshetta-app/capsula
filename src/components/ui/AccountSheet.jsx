@@ -79,6 +79,12 @@
  *            still applies unchanged: it only depends on 'isOpen', not on
  *            the removed shouldRender/animateIn state.
  *
+ * 2026-10-21 (Drug groups plan, step 13.3, F17, F18): when the sign-in was asked by a
+ * groups tap (groupContext) the sheet is drawn as the same family as the group limit
+ * sheet: a 64 px icon circle with a folder and a small cloud badge (groups saved to
+ * your account), and the body text 15 px in the primary text colour. "Not now" is a
+ * 44 px text button in a readable grey with no underline in every sign-in context.
+ *
  * Props:
  *   isOpen             boolean
  *   onClose            () => void   — call on any dismissal (backdrop tap,
@@ -117,7 +123,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { User } from 'lucide-react'
+import { User, Folder, Cloud } from 'lucide-react'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useToast } from '../../context/ToastContext'
 import SheetShell from './SheetShell'
@@ -244,18 +250,50 @@ export default function AccountSheet({
           // stands in for that card's own bordered box, so no extra border
           // is added here.
           <div style={{ textAlign: 'center' }}>
-            <div style={{
-              width:           48,
-              height:          48,
-              borderRadius:    'var(--radius-full)',
-              backgroundColor: 'var(--color-bg)',
-              display:         'flex',
-              alignItems:      'center',
-              justifyContent:  'center',
-              margin:          '0 auto var(--space-3)',
-            }}>
-              <User size={22} color="var(--color-text-secondary)" strokeWidth={1.8} />
-            </div>
+            {display.groupContext ? (
+              // Groups: same icon circle as the limit sheet, folder with a small cloud badge.
+              <div style={{ position: 'relative', width: 64, height: 64, margin: '0 auto var(--space-4)' }}>
+                <div style={{
+                  width:           64,
+                  height:          64,
+                  borderRadius:    'var(--radius-full)',
+                  backgroundColor: 'var(--color-accent-light)',
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'center',
+                }}>
+                  <Folder size={28} color="var(--color-accent)" strokeWidth={1.8} />
+                </div>
+                <div style={{
+                  position:        'absolute',
+                  bottom:          -2,
+                  right:           -2,
+                  width:           22,
+                  height:          22,
+                  borderRadius:    'var(--radius-full)',
+                  backgroundColor: 'var(--color-accent)',
+                  border:          '2px solid var(--color-surface)',
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'center',
+                }}>
+                  <Cloud size={12} color="#fff" strokeWidth={2.2} />
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                width:           48,
+                height:          48,
+                borderRadius:    'var(--radius-full)',
+                backgroundColor: 'var(--color-bg)',
+                display:         'flex',
+                alignItems:      'center',
+                justifyContent:  'center',
+                margin:          '0 auto var(--space-3)',
+              }}>
+                <User size={22} color="var(--color-text-secondary)" strokeWidth={1.8} />
+              </div>
+            )}
 
             <div style={{
               fontSize:     16,
@@ -275,9 +313,9 @@ export default function AccountSheet({
             </div>
             <p style={{
               margin:     '0 0 var(--space-4)',
-              fontSize:   14,
+              fontSize:   display.groupContext ? 15 : 14,
               lineHeight: 1.55,
-              color:      'var(--color-text-secondary)',
+              color:      display.groupContext ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
             }}>
               {display.favouriteContext
                 ? 'Sign in to save it and access it on any device.'
@@ -386,12 +424,17 @@ const secondaryButtonStyle = {
 }
 
 const linkButtonStyle = {
-  padding:         'var(--space-1) 0',
+  display:         'block',
+  width:           '100%',
+  minHeight:       44,
+  padding:         'var(--space-2) 0',
   border:          'none',
   background:      'none',
-  color:           'var(--color-text-tertiary)',
-  fontSize:        13,
+  color:           'var(--color-text-secondary)',
+  fontSize:        15,
+  fontWeight:      600,
   fontFamily:      'var(--font-body)',
   cursor:          'pointer',
-  textDecoration:  'underline',
+  textDecoration:  'none',
+  WebkitTapHighlightColor: 'transparent',
 }

@@ -40,7 +40,10 @@
  *  - Limits (constants/features.js) are checked here and in the database.
  *    Reaching one answers reason 'limit'. The screens decide when to show
  *    it, by calling showGroupLimit (2026-10-19, step 7.1): a free account
- *    gets the limit sheet, a Pro account gets a short message.
+ *    gets the limit sheet with the upgrade button; since step 13.3 (2026-10-21)
+ *    a Pro account gets the same sheet with one OK button instead of a floating
+ *    message bar. A tap refused because the account is read only calls
+ *    showGroupReadOnly, which opens the same sheet with the read only message.
  *  - Lapsed account (not Pro and over the free limits): isReadOnly is true.
  *    Everything except delete answers reason 'read_only'. Mirrors the
  *    database function dg_is_read_only (plan section 6.1).
@@ -74,8 +77,9 @@
  *                   Makes the share link (the database makes the code); if one
  *                   already exists it returns that one.
  *   stopSharing     (groupId) => Promise<{ ok, reason? }>   Deletes the code, so the link stops at once.
- *   groupLimit      { open, kind }  the limit sheet state ('groups' | 'drugs'), read by SignInNudge
- *   showGroupLimit  (kind) => void  free: opens the limit sheet; Pro: shows the short message
+ *   groupLimit      { open, kind, isPro }  the limit sheet state ('groups' | 'drugs' | 'readonly'), read by SignInNudge
+ *   showGroupLimit  (kind) => void  opens the limit sheet (Free: with Upgrade; Pro: with OK)
+ *   showGroupReadOnly () => void    opens the sheet with the read only message (not counted as a limit hit)
  *   dismissGroupLimit () => void
  *   saveSharedGroup ({ name, description, color, brandIds, signInId }) =>
  *                   Promise<{ ok, reason?, group?, saved?, total? }>   (2026-10-19, step 8.3)
@@ -105,7 +109,7 @@ import { logUsageEvent } from '../analytics/usageEvents'
 import { readGroupsCache, writeGroupsCache, clearGroupsCache, readGroupChanges, writeGroupChanges } from '../utils/cache'
 import { newId, makeChange, applyChange, applyQueue, addChange, cancelDelete, clearSending, nextToSend, summarizeQueue, retryFailed, discardFailed } from '../utils/groupChanges'
 import { runSync, sendChange, describeEvents } from '../utils/groupSync'
-import { groupsLimitMessage, drugsLimitMessage, SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
+import { SAVE_OFFLINE_MESSAGE } from '../components/drugs/groups/groupMessages'
 import {
   DRUG_GROUPS_CAP_FREE,
   DRUG_GROUP_DRUGS_CAP_FREE,
@@ -230,7 +234,7 @@ export function useDrugGroups(fav) {
   }, [])
 
   // Limit sheet (step 7.1). The kind is kept after closing so the text stays put while it slides away.
-  const [groupLimit, setGroupLimit] = useState({ open: false, kind: 'groups' })
+  const [groupLimit, setGroupLimit] = useState({ open: false, kind: 'groups', isPro: false })
 
   const groupsRef = useRef(groups)
   useEffect(() => { groupsRef.current = groups }, [groups])
@@ -966,12 +970,14 @@ export function useDrugGroups(fav) {
     // Analytics (step 9.5): every limit hit goes through here, so it is logged
     // once, here. Only a fixed label (free_groups, free_drugs, pro_groups, pro_drugs).
     logUsageEvent('group_limit_hit', null, `${isProRef.current ? 'pro' : 'free'}_${kind === 'drugs' ? 'drugs' : 'groups'}`)
-    if (isProRef.current) {
-      toast.info(kind === 'drugs' ? drugsLimitMessage(true) : groupsLimitMessage(true))
-      return
-    }
-    setGroupLimit({ open: true, kind: kind === 'drugs' ? 'drugs' : 'groups' })
-  }, [toast])
+    setGroupLimit({ open: true, kind: kind === 'drugs' ? 'drugs' : 'groups', isPro: !!isProRef.current })
+  }, [])
+
+  // Step 13.3: a tap refused because the account is read only (lapsed). Same sheet,
+  // read only wording. Not logged as a limit hit.
+  const showGroupReadOnly = useCallback(() => {
+    setGroupLimit({ open: true, kind: 'readonly', isPro: false })
+  }, [])
 
   const dismissGroupLimit = useCallback(() => {
     setGroupLimit(g => ({ ...g, open: false }))
@@ -1003,6 +1009,7 @@ export function useDrugGroups(fav) {
     stopSharing,
     groupLimit,
     showGroupLimit,
+    showGroupReadOnly,
     dismissGroupLimit,
   }
 }

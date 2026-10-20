@@ -32,7 +32,6 @@ import AddDrugsResultList from '../components/drugs/groups/AddDrugsResultList'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
 import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
-import { READ_ONLY_MESSAGE } from '../components/drugs/groups/groupMessages'
 import { shimmer } from '../components/drugs/home/shimmer'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import { useDrugContext } from '../context/DrugContext'
@@ -78,7 +77,7 @@ export default function AddDrugsToGroupScreen() {
 
   const { drugs, loading: drugsLoading } = useDrugContext()
   const {
-    groups, groupsStatus, isReadOnly, reloadGroups, promptSignIn, showGroupLimit,
+    groups, groupsStatus, isReadOnly, reloadGroups, promptSignIn, showGroupLimit, showGroupReadOnly,
   } = useFavouritesContext()
   const { user, loading: authLoading } = useAuth()
   const isPro = useIsPro()
@@ -212,7 +211,7 @@ export default function AddDrugsToGroupScreen() {
   }
   function handleAdd(drug) {
     if (!group) return
-    if (isReadOnly) { toast.info(READ_ONLY_MESSAGE); return }
+    if (isReadOnly) { showGroupReadOnly(); return }
     if (inGroup.has(drug.id)) return
     if (count >= drugsCap) { showGroupLimit('drugs'); return }
     if (hasQuery) addSearch(savedName(drug), mode)

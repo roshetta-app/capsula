@@ -43,6 +43,12 @@
  *            same reasoning as AccountSheet.jsx. Fixing it here again
  *            covers both callers built on this shared shell at once.
  *
+ * 2026-10-21 (Drug groups plan, step 13.3, F17): the dismiss is now "Not now" in
+ * every caller, as a 44 px text button in a readable grey with no underline; the
+ * body text is 15 px. New props for a limit message that has nothing to upgrade
+ * to (a Pro account at its limit): showUpgrade={false} swaps the Upgrade button
+ * for one plain OK button and drops the lock badge (lockBadge={false}).
+ *
  * Props:
  *   isOpen       boolean
  *   onClose      () => void
@@ -55,6 +61,9 @@
  *                Accepts a JSX fragment (not just a plain string) so a
  *                caller can bold part of the message, e.g. the word "Pro".
  *   dismissLabel string   — text of the plain-link dismiss underneath.
+ *   showUpgrade  boolean  — default true. false: one OK button instead of Upgrade + dismiss.
+ *   lockBadge    boolean  — default true. false: no lock on the icon.
+ *   okLabel      string   — label of the OK button when showUpgrade is false (default "OK").
  */
 
 import { Lock } from 'lucide-react'
@@ -68,6 +77,9 @@ export default function PaywallGateSheet({
   headline,
   message,
   dismissLabel,
+  showUpgrade = true,
+  lockBadge = true,
+  okLabel = 'OK',
 }) {
   return (
     <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel={headline} zIndex={1000}>
@@ -91,7 +103,7 @@ export default function PaywallGateSheet({
             }}>
               {IconComponent && <IconComponent size={28} color="var(--color-accent)" strokeWidth={1.8} />}
             </div>
-            <div style={{
+            {lockBadge && <div style={{
               position:        'absolute',
               bottom:          -2,
               right:           -2,
@@ -105,7 +117,7 @@ export default function PaywallGateSheet({
               justifyContent:  'center',
             }}>
               <Lock size={11} color="#fff" strokeWidth={2.2} />
-            </div>
+            </div>}
           </div>
 
           {countLabel && (
@@ -135,7 +147,7 @@ export default function PaywallGateSheet({
 
           <p style={{
             margin:     '0 0 var(--space-4)',
-            fontSize:   14,
+            fontSize:   15,
             lineHeight: 1.55,
             color:      'var(--color-text-secondary)',
           }}>
@@ -143,13 +155,21 @@ export default function PaywallGateSheet({
           </p>
         </div>
 
-        <div style={upgradeButtonStyle}>
-          Upgrade to Capsula Pro
-        </div>
+        {showUpgrade ? (
+          <>
+            <div style={upgradeButtonStyle}>
+              Upgrade to Capsula Pro
+            </div>
 
-        <button onClick={onClose} style={dismissLinkStyle}>
-          {dismissLabel}
-        </button>
+            <button onClick={onClose} style={dismissLinkStyle}>
+              {dismissLabel}
+            </button>
+          </>
+        ) : (
+          <button onClick={onClose} style={okButtonStyle}>
+            {okLabel}
+          </button>
+        )}
       </div>
     </SheetShell>
   )
@@ -176,13 +196,27 @@ const upgradeButtonStyle = {
 const dismissLinkStyle = {
   display:         'block',
   width:           '100%',
-  padding:         'var(--space-1) 0',
+  minHeight:       44,
+  padding:         'var(--space-2) 0',
   border:          'none',
   background:      'none',
-  color:           'var(--color-text-tertiary)',
-  fontSize:        13,
+  color:           'var(--color-text-secondary)',
+  fontSize:        15,
+  fontWeight:      600,
   fontFamily:      'var(--font-body)',
   textAlign:       'center',
-  textDecoration:  'underline',
+  textDecoration:  'none',
   cursor:          'pointer',
+  WebkitTapHighlightColor: 'transparent',
+}
+
+// OK button (no upgrade to offer): same size and shape as the Upgrade button, but tappable.
+const okButtonStyle = {
+  ...upgradeButtonStyle,
+  display:         'block',
+  minHeight:       44,
+  marginBottom:    0,
+  border:          'none',
+  cursor:          'pointer',
+  WebkitTapHighlightColor: 'transparent',
 }

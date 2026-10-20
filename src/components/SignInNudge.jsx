@@ -43,6 +43,9 @@
  * 2026-10-19 (7.2 restored, 8.3): a pending groups tap gets groups wording
  * (or save wording for a shared group) instead of the favourites wording.
  *
+ * 2026-10-21 (step 13.3): the groups sheet also opens for a Pro account at its
+ * limit and for a refused read only tap (isPro and kind 'readonly' come from groupLimit).
+ *
  * Props: none — reads everything it needs from context.
  */
 
@@ -107,6 +110,7 @@ export default function SignInNudge() {
       <GroupLimitSheet
         isOpen={!!groupLimit?.open}
         kind={groupLimit?.kind}
+        isPro={!!groupLimit?.isPro}
         onClose={dismissGroupLimit}
       />
     </>
