@@ -48,6 +48,7 @@
 
 import { useAuth } from '../hooks/useAuth'
 import { useFavouritesContext } from '../context/FavouritesContext'
+import { signOutGroupNote } from '../utils/groupSignOutNote'
 import { useNotesSignInContext } from '../context/NotesSignInContext'
 import AccountSheet from './ui/AccountSheet'
 import FavouriteLimitSheet from './ui/FavouriteLimitSheet'
@@ -62,6 +63,8 @@ export default function SignInNudge() {
     dismissCapBlocked,
     groupLimit,
     dismissGroupLimit,
+    waitingCount = 0,
+    failedCount = 0,
   } = useFavouritesContext()
   const { pendingNoteConditionId, dismissNoteSignIn } = useNotesSignInContext()
 
@@ -94,6 +97,7 @@ export default function SignInNudge() {
         favouriteContext={!!pendingFavourite && !groupsTap}
         groupContext={groupContext}
         noteContext={!!pendingNoteConditionId}
+        signOutNote={signOutGroupNote({ waitingCount, failedCount })}
       />
       <FavouriteLimitSheet
         isOpen={!!capBlocked}

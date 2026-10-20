@@ -192,6 +192,8 @@ import {
   Sun, Moon, Monitor, MessageCircle, Flag, FileText, ShieldCheck, AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
+import { useFavouritesContext } from '../context/FavouritesContext'
+import { signOutGroupNote } from '../utils/groupSignOutNote'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { usePushSubscriptionContext } from '../context/PushSubscriptionContext'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
@@ -579,6 +581,9 @@ export default function AccountScreen() {
   const { isOnline } = useOnlineStatus()
   const { toast } = useToast()
   const navigate = useNavigate()
+  // Step 17.6c: group changes not yet sent are mentioned in the sign-out question.
+  const { waitingCount = 0, failedCount = 0 } = useFavouritesContext()
+  const groupNote = signOutGroupNote({ waitingCount, failedCount })
   const [busy, setBusy]   = useState(false)
   const [error, setError] = useState(null)
   const [googlePressed, setGooglePressed] = useState(false)
@@ -1140,7 +1145,7 @@ export default function AccountScreen() {
         onClose={() => setSignOutConfirmOpen(false)}
         onConfirm={handleSignOut}
         title="Sign out?"
-        message="You can sign back in with Google anytime."
+        message={groupNote ? `You can sign back in with Google anytime. ${groupNote}` : 'You can sign back in with Google anytime.'}
         confirmLabel={busy ? 'Signing out…' : 'Sign out'}
         destructive
       />

@@ -131,6 +131,7 @@ export default function AccountSheet({
   favouriteContext = false,
   groupContext = false,
   noteContext = false,
+  signOutNote = '',
 }) {
   const [busy, setBusy]     = useState(false)
   const [error, setError]   = useState(null)
@@ -218,6 +219,16 @@ export default function AccountSheet({
             }}>
               {display.user.email}
             </p>
+            {signOutNote && (
+              <p style={{
+                margin:     '0 0 var(--space-4)',
+                fontSize:   13,
+                lineHeight: 1.5,
+                color:      'var(--color-text-secondary)',
+              }}>
+                {signOutNote}
+              </p>
+            )}
             <button
               onClick={handleSignOut}
               disabled={busy}
