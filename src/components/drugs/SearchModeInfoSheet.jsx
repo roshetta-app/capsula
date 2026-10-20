@@ -110,7 +110,8 @@ function QueryTag({ children }) {
   )
 }
 
-export default function SearchModeInfoSheet({ isOpen, onClose }) {
+// 'allowClass' (default true): false leaves the Class row out (search without Class, step 11.7).
+export default function SearchModeInfoSheet({ isOpen, onClose, allowClass = true }) {
   return (
     <SheetShell isOpen={isOpen} onClose={onClose} ariaLabel="How search works" maxHeight="85dvh">
       {/* Fixed header: title and close button. */}
@@ -183,14 +184,16 @@ export default function SearchModeInfoSheet({ isOpen, onClose }) {
             color="var(--color-generic)"
             tint="color-mix(in srgb, var(--color-generic) 14%, transparent)"
           />
-          <ModeRow
-            icon={Layers}
-            title="Class"
-            examples={['Proton pump inhibitor', 'vomiting', 'allergy', 'Beta blocker']}
-            note="Names or everyday words."
-            color="var(--color-class)"
-            tint="color-mix(in srgb, var(--color-class) 14%, transparent)"
-          />
+          {allowClass && (
+            <ModeRow
+              icon={Layers}
+              title="Class"
+              examples={['Proton pump inhibitor', 'vomiting', 'allergy', 'Beta blocker']}
+              note="Names or everyday words."
+              color="var(--color-class)"
+              tint="color-mix(in srgb, var(--color-class) 14%, transparent)"
+            />
+          )}
         </div>
 
         {/* Hint: a subtle card, not a fourth mode. The examples sit on their own

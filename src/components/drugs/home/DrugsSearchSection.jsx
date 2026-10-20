@@ -1,5 +1,7 @@
 /**
  * src/components/drugs/home/DrugsSearchSection.jsx
+ * 2026-10-21 (step 11.7): new 'allowClass' setting (default true). False leaves Class out of the
+ * mode pop-up and the info sheet. The Add drugs screen (12.5) will pass false.
  * 2026-10-20 (Drug groups plan, step 11.6): search focus mode, the frame. No card any more.
  * The Search area is one plain section drawn the same way in both views, and what changes
  * is only how its parts are laid out (CSS 'order' and direction, never a different set of
@@ -81,6 +83,7 @@ export default function DrugsSearchSection({
   showRecent, recentDrugs, onOpenRecent,
   categories, isDark,
   searchOpen = false, onSearchFocus, onSearchCancel, onSearchSubmit, searchInputRef,
+  allowClass = true,
 }) {
   const [showModeInfo, setShowModeInfo] = useState(false)
   const currentMode = MODE_OPTIONS.find(o => o.value === mode) ?? MODE_OPTIONS[0]
@@ -236,7 +239,7 @@ export default function DrugsSearchSection({
           columns={1}
           single
           large
-          options={MODE_POPUP_OPTIONS}
+          options={allowClass ? MODE_POPUP_OPTIONS : MODE_POPUP_OPTIONS.filter(o => o.value !== 'class')}
           selected={[mode]}
           onPick={handlePickMode}
           onClose={() => onModeMenuChange(false)}
@@ -248,6 +251,7 @@ export default function DrugsSearchSection({
         onClose={() => setShowModeInfo(false)}
         categories={categories}
         isDark={isDark}
+        allowClass={allowClass}
       />
     </>
   )

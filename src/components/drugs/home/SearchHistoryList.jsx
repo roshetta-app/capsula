@@ -1,5 +1,7 @@
 /**
  * src/components/drugs/home/SearchHistoryList.jsx
+ * 2026-10-21 (step 11.7): new 'allowClass' setting (default true); false hides the Class entries.
+ * The rows were already flat with thin lines, so the look is unchanged.
  *
  * 2026-10-18 (Omar): 'Clear all' is red (the app's danger colour), and the mode
  * tag on each row is the mode's own icon and name in the mode's colour, with no
@@ -23,9 +25,12 @@ const MODE_META = {
 }
 
 export default function SearchHistoryList({
-  history, onPick, onRemove, onClear,
+  history: fullHistory, onPick, onRemove, onClear,
   heading = 'Recent searches', showClear = true, showRemove = true,
+  allowClass = true,
 }) {
+  // Without Class (step 11.7) the Class searches are left out of the list.
+  const history = allowClass ? fullHistory : fullHistory.filter(entry => entry.mode !== 'class')
   if (history.length === 0) return null
 
   return (

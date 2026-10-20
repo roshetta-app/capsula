@@ -194,7 +194,14 @@ const NO_TARGETS = []
 // below the name matches. One shared empty list when none are loaded.
 const NO_KEYWORDS = []
 
-export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS) {
+// 2026-10-21 (Drug groups plan, step 11.7): the fourth input is the search's settings. With
+// { allowClass: false } Class does not exist for this search: a 'class' mode is read as
+// Brand, and the Class hint (the 'See N matches in Class mode' counts) is never worked out.
+// The Add drugs screen (12.5) uses this. The default is unchanged (Class allowed).
+const NO_OPTIONS = {}
+
+export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS, options = NO_OPTIONS) {
+  const allowClass = options.allowClass !== false
   const [query,          setQuery]          = useState('')
   const [results,        setResults]        = useState(drugs)
   const [queryTooShort,  setQueryTooShort]  = useState(false)
@@ -274,8 +281,9 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     if (query.trim().length > 0) runSearch(query, mode)
   }, [classKeywords]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const runSearch = useCallback((q, currentMode) => {
+  const runSearch = useCallback((q, requestedMode) => {
     if (!drugs) return
+    const currentMode = !allowClass && requestedMode === 'class' ? 'brand' : requestedMode
     setSettledQuery(q)
 
     const trimmed = q.trim()
@@ -373,7 +381,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
     // here. Computed as a local value so the
     // gap check below can use it in this same run.
     let classHintValue = null
-    if (trimmed.length >= 3) {
+    if (allowClass && trimmed.length >= 3) {
       const classIndex = classIndexRef.current ?? buildClassIndex(drugs)
       const classFound = searchClassHint(classIndex, trimmed, classKeywordIndexRef.current)
       if (classFound.classes.length + classFound.subclasses.length > 0) {
@@ -467,7 +475,7 @@ export function useDrugSearch(drugs, mode = 'brand', classKeywords = NO_KEYWORDS
       loggedGapTermsRef.current.add(gapDedupKey)
       logSearchGap(trimmed, 'drugs', currentMode)
     }
-  }, [drugs])
+  }, [drugs, allowClass])
 
   // 150ms debounce — reacts to query typing AND mode toggling. No index
   // rebuild happens here either way (both indexes are already built above),

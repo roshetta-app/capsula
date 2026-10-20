@@ -1,6 +1,12 @@
 /**
  * src/pages/DrugsScreen.jsx
  *
+ * 2026-10-21 (Drug groups plan, step 11.7): the search messages and lists (Keep typing, no recent
+ * searches, loading rows, 'Did you mean', found in other modes, nothing found, your filter is
+ * hiding these results, nothing in this category, the Class hint) moved to
+ * components/drugs/search/SearchStates.jsx and are drawn flat; the Class results are flat rows.
+ * Wording, behaviour and the drug rows are unchanged.
+ *
  * 2026-10-18 (search screen tidy-up, Omar): the 'From your recent searches'
  * hints above the results are gone while typing (the history list shown
  * before typing is unchanged), and 'Keep typing to narrow these results' is
@@ -288,7 +294,7 @@
  * 'widen the search' card; nothing anywhere shows the plain no-results card.
  */
 
-import { History as HistoryIcon, FilterX, SearchX, Lightbulb, ArrowLeftRight, Globe, Search, Target, ArrowDown01, ArrowUpDown, ChevronDown, ChevronRight } from 'lucide-react'
+import { Search, Target, ArrowDown01, ArrowUpDown, ChevronDown } from 'lucide-react'
 import { useState, useEffect, useLayoutEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useWindowVirtualizer, observeWindowOffset } from '@tanstack/react-virtual'
@@ -306,8 +312,10 @@ import ModeButton from '../components/drugs/home/ModeButton'
 import DrugsBrowseSection from '../components/drugs/home/DrugsBrowseSection'
 import GroupsSection from '../components/drugs/groups/GroupsSection'
 import { isDrugGroupsOn } from '../constants/features'
-import FilledHintButton from '../components/drugs/home/FilledHintButton'
-import { shimmer } from '../components/drugs/home/shimmer'
+import {
+  FadeIn, SearchSwitchingState, TooShortState, RecentEmptyState, SearchAllButton, WidenSearchState,
+  EmptyState, ClassHintStrip, ModeSwitchState, FilterMaskedState, DidYouMeanState,
+} from '../components/drugs/search/SearchStates'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
 import BackToTopButton from '../components/ui/BackToTopButton'
 import SearchBar from '../components/drugs/DrugSearchBar'
@@ -905,6 +913,7 @@ export default function DrugsScreen() {
           (classResults.classes.length + classResults.subclasses.length) > 0 ? (
             <ClassSearchResults
               key={query.trim()}
+              flat
               results={classResults}
               query={query}
               onOpenClass={handleOpenClass}
@@ -984,9 +993,10 @@ export default function DrugsScreen() {
                 takes over; with nothing anywhere, there is no button. */}
             {hasQuery && displayed.length > 0 && otherCategoryCount > 0 && (
               <SearchAllButton
+                flat
                 count={otherCategoryCount}
                 onClick={goSearchAll}
-                style={{ width: '100%', marginBottom: 'var(--space-3)' }}
+                style={{ marginBottom: 'var(--space-2)' }}
               />
             )}
 
@@ -1450,27 +1460,6 @@ function StickyDrugsHeader({ watchRef, query, onQueryChange, onSearchFocus, plac
   )
 }
 
-// ─── SearchSwitchingState ───────────────────────────────────────────────────
-// Shown for a moment when the search mode changes while a search is on screen
-// (Brand, Generic and Class draw different results, so the old ones cannot
-// stay). Same shimmer look as DrugsSkeleton: a short title line, then a few
-// rows. A fixed count, only meant to read as 'results are loading'.
-
-const SWITCH_SKELETON_ROWS = 5
-
-function SearchSwitchingState() {
-  return (
-    <div role="status" aria-label="Loading results">
-      <div style={shimmer({ width: 110, height: 13, marginBottom: 'var(--space-3)' })} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-        {Array.from({ length: SWITCH_SKELETON_ROWS }, (_, i) => (
-          <div key={i} style={shimmer({ height: 64, borderRadius: 'var(--radius-lg)' })} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ─── VirtualDrugList ────────────────────────────────────────────────────────
 // Renders a long drug list against the page's own window scroll instead of
 // a plain .map() — only the rows actually on screen (plus a small overscan
@@ -1577,400 +1566,6 @@ function VirtualDrugList({ drugs, onTap, categories, isDark, isDrugFavourited, o
           </div>
         )
       })}
-    </div>
-  )
-}
-
-// ─── Shared look of the no-result cards ──────────────────────────────────────
-// 2026-10-05: the 'nothing found', 'Did you mean' and switch-mode cards share
-// one size: a bigger icon, a bold title and a larger supporting line. The
-// 'Keep typing', loading and filter-hiding cards keep their own look.
-const STATE_BOX_STYLE = { textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }
-const STATE_ICON_SIZE = 40
-const STATE_ICON_ROW_STYLE = { display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }
-const STATE_TITLE_STYLE = {
-  fontSize: 19, fontWeight: 700, lineHeight: 1.25, marginBottom: 6,
-  color: 'var(--color-text-primary)', overflowWrap: 'anywhere',
-}
-const STATE_LINE_STYLE = {
-  fontSize: 15, lineHeight: 1.4, marginBottom: 'var(--space-4)',
-  color: 'var(--color-text-secondary)', overflowWrap: 'anywhere',
-}
-
-// ─── SearchAllButton ─────────────────────────────────────────────────────────
-// 'Search all drugs instead' with a globe icon so it reads as 'widen the search
-// to every category'. 'count' (optional) adds how many more drugs that would
-// show ('Search all drugs instead · 12 more').
-function SearchAllButton({ onClick, count, style }) {
-  return (
-    <FilledHintButton
-      onClick={onClick}
-      style={{ fontSize: 14, padding: '10px 16px', gap: 8, ...style }}
-    >
-      <Globe size={17} style={{ flexShrink: 0 }} />
-      {count > 0 ? `Search all drugs instead · ${count} more` : 'Search all drugs instead'}
-    </FilledHintButton>
-  )
-}
-
-// ─── WidenSearchState ────────────────────────────────────────────────────────
-// Nothing in the open category, but other categories have matches ('count').
-// A 'widen the search' card, not a no-results card: a globe badge in the app's
-// accent, a line saying how many drugs match elsewhere, and the button.
-function WidenSearchState({ query, scopeLabel, count, onSearchAll }) {
-  return (
-    <FadeIn ms={170} rise={4}>
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <div style={{
-          width: 64, height: 64, borderRadius: '50%',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'var(--color-accent-light)',
-        }}>
-          <Globe size={32} color="var(--color-accent)" />
-        </div>
-      </div>
-      <div style={STATE_TITLE_STYLE}>
-        {`Nothing in ${scopeLabel}${query ? ` for "${query}"` : ''}`}
-      </div>
-      <div style={STATE_LINE_STYLE}>
-        {`${count} ${count === 1 ? 'drug matches' : 'drugs match'} in other categories`}
-      </div>
-      <SearchAllButton onClick={onSearchAll} />
-    </div>
-    </FadeIn>
-  )
-}
-
-// ─── RecentEmptyState / FadeIn ───────────────────────────────────────────────
-// 2026-10-15: the search focus mode's empty list, built like the other search states
-// (icon, bold title, supporting line). FadeIn eases the list in when the search opens.
-function RecentEmptyState() {
-  return (
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <HistoryIcon size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={STATE_TITLE_STYLE}>No recent searches</div>
-      <div style={{ ...STATE_LINE_STYLE, marginBottom: 0 }}>
-        Drugs you open from a search will show up here
-      </div>
-    </div>
-  )
-}
-
-function FadeIn({ children, disabled = false, ms = 200, rise = 6 }) {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => setOn(true))
-    return () => cancelAnimationFrame(frame)
-  }, [])
-  const still = disabled || (typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-    && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-  return (
-    <div style={{
-      opacity:    on || still ? 1 : 0,
-      transform:  on || still ? 'none' : `translateY(${rise}px)`,
-      transition: still ? 'none' : `opacity ${ms}ms ease, transform ${ms}ms ease`,
-    }}>
-      {children}
-    </div>
-  )
-}
-
-// ─── EmptyState ───────────────────────────────────────────────────────────────
-// Nothing found here, no typo guess, and no other mode has it: a plain dead end,
-// so it does NOT point to other modes (a garbage search like 'zzqx' should not
-// send anyone on a tour of the other modes). Same wording in every mode ('No
-// drugs match', or 'No classes or drug families match' in Class mode) and a
-// line that says how to search; one quiet 'Clear search' action. Inside a
-// category it reads the same, because by this point no category has it.
-function EmptyState({ query, mode, onClear }) {
-  const inClassMode = mode === 'class'
-  const quoted = query ? ` "${query}"` : ''
-  return (
-    <FadeIn ms={170} rise={4}>
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <SearchX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={STATE_TITLE_STYLE}>
-        {inClassMode ? `No classes or drug families match${quoted}` : `No drugs match${quoted}`}
-      </div>
-      <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-3)' }}>
-        {inClassMode
-          ? 'Try part of a class or drug family name, or a common word like "vomiting"'
-          : 'Check the spelling, or try the first letters of the name'}
-      </div>
-      <QuietLinkButton onClick={onClear}>Clear search</QuietLinkButton>
-    </div>
-    </FadeIn>
-  )
-}
-
-// A text-only button for the less important actions on the cards above.
-function QuietLinkButton({ onClick, children }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        background: 'none', border: 'none', cursor: 'pointer',
-        padding: 'var(--space-1) var(--space-1)',
-        color: 'var(--color-accent)', fontFamily: 'var(--font-body)',
-        fontSize: 15, fontWeight: 600,
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      {children}
-    </button>
-  )
-}
-
-// ─── ClassHintStrip / ModeSwitchState ───────────────────────────────────────
-// 2026-10-05 (Class hint in Brand and Generic mode): the typed text is also a
-// class, a drug family or a class keyword. 'hint' is { classes, subclasses },
-// the counts the Class hint found (from useDrugSearch). The strip is a slim
-// tappable row above a list that already has drugs (one line, the classes and
-// drug families counted together, with an arrow). When this mode found no
-// drugs at all, the full ModeSwitchState card below is used instead. Both only
-// switch the mode; the typed text stays and searches again.
-function ClassHintStrip({ hint, onSwitch }) {
-  const total = hint.classes + hint.subclasses
-  // 2026-10-05: wears the Class mode's own icon, colour and tint (violet), the
-  // same ones the Search mode button and the switch-mode card use.
-  const opt = MODE_OPTIONS.find(o => o.value === 'class')
-  const Icon = opt.icon
-  return (
-    <button
-      type="button"
-      onClick={onSwitch}
-      style={{
-        display: 'flex', alignItems: 'center',
-        gap: 'var(--space-2)',
-        width: '100%', minHeight: 40, textAlign: 'left',
-        marginBottom: 'var(--space-3)',
-        padding: 'var(--space-2) var(--space-3)',
-        border: 'none', borderRadius: 'var(--radius-lg)',
-        background: opt.tint, color: opt.color,
-        fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
-        WebkitTapHighlightColor: 'transparent',
-      }}
-    >
-      <Icon size={16} color={opt.color} style={{ flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0 }}>{`See ${total} ${total === 1 ? 'match' : 'matches'} in Class mode`}</span>
-      <ChevronRight size={16} color={opt.color} style={{ flexShrink: 0 }} />
-    </button>
-  )
-}
-
-// ─── ModeSwitchState ─────────────────────────────────────────────────────────
-// 2026-10-05 (second pass): the 'not here, but found in another mode' card.
-// Two clear parts: the top says this mode has nothing (same look as the plain
-// nothing-found card), then a small label 'Found in other modes' with one
-// button per mode that has the text. Each button wears that mode's own icon,
-// colour and tint (MODE_OPTIONS, the same ones the Search mode button and the
-// info sheet use), so Brand is blue, Generic green and Class violet everywhere.
-// 'targets' lists those modes, most useful first. The small line on a button is
-// the number of results for Class (from 'hint'), or which kind of name matched
-// for Brand and Generic. Tapping a button only switches the mode; the typed
-// text stays and searches again (the loading placeholder covers the moment
-// between).
-function modeSwitchSubline(target, hint) {
-  if (target === 'class') {
-    const total = hint ? hint.classes + hint.subclasses : 0
-    return total > 0 ? `${total} ${total === 1 ? 'result' : 'results'}` : null
-  }
-  return `Matches a ${target} name`
-}
-
-function ModeSwitchState({ query, mode, hint, targets, onSwitch }) {
-  const quoted = query ? ` "${query}"` : ''
-  return (
-    <FadeIn ms={170} rise={4}>
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <ArrowLeftRight size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={STATE_TITLE_STYLE}>
-        {mode === 'class'
-          ? `No classes or drug families match${quoted}`
-          : `No drugs match${quoted}`}
-      </div>
-      <div style={STATE_LINE_STYLE}>
-        {targets.length > 1
-          ? 'But it has results in other search modes'
-          : 'But it has results in another search mode'}
-      </div>
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        width: '100%', maxWidth: 360, margin: '0 auto',
-      }}>
-        {targets.map(t => {
-          const opt = MODE_OPTIONS.find(o => o.value === t)
-          if (!opt) return null
-          const Icon = opt.icon
-          const sub = modeSwitchSubline(t, hint)
-          return (
-            <button
-              key={t}
-              type="button"
-              onClick={() => onSwitch(t)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-                width: '100%', minHeight: 52, boxSizing: 'border-box', textAlign: 'left',
-                padding: 'var(--space-2) var(--space-3)',
-                border: 'none', borderRadius: 'var(--radius-lg)',
-                background: opt.tint, color: opt.color,
-                fontFamily: 'var(--font-body)', cursor: 'pointer',
-                WebkitTapHighlightColor: 'transparent',
-              }}
-            >
-              <Icon size={22} color={opt.color} style={{ flexShrink: 0 }} />
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 15, fontWeight: 600, lineHeight: 1.25 }}>
-                  {`See ${opt.label} results`}
-                </span>
-                {sub && (
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 400, lineHeight: 1.3, opacity: 0.85 }}>
-                    {sub}
-                  </span>
-                )}
-              </span>
-              <ChevronRight size={18} color={opt.color} style={{ flexShrink: 0 }} />
-            </button>
-          )
-        })}
-      </div>
-    </div>
-    </FadeIn>
-  )
-}
-
-// ─── FilterMaskedState ──────────────────────────────────────────────────────
-// Phase 5 (§4.3, step 5b; copy/visuals CORRECTED 2026-08-29 after on-device
-// testing): shown instead of EmptyState/DidYouMeanState when the search
-// itself found real results but the active Form/Route filter hid all of
-// them (see isFilterMasked, computed above where base/filtered exist) — the
-// most actionable cause, so it takes priority over both other empty states.
-// Icon is filter-off, not a magnifying glass — a magnifying glass reads as
-// "nothing found," which contradicts the message here (results exist, the
-// filter hid them). Headline states the cause first; the count/query is a
-// secondary supporting line. onClearFilter is requestClearFilters, so this
-// goes through the exact same confirm step every other Clear Filters button
-// in this file already uses — no new confirmation pattern introduced.
-
-function FilterMaskedState({ count, query, onClearFilter }) {
-  // 2026-10-05 (second pass): same refined look as the other no-result cards
-  // (bigger icon, bold title, larger supporting line).
-  return (
-    <FadeIn ms={170} rise={4}>
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <FilterX size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={STATE_TITLE_STYLE}>
-        Your filter is hiding these results
-      </div>
-      <div style={STATE_LINE_STYLE}>
-        {count} drug{count !== 1 ? 's' : ''} match{query ? ` "${query}"` : ''}
-      </div>
-      <FilledHintButton onClick={onClearFilter}>
-        Clear filter
-      </FilledHintButton>
-    </div>
-    </FadeIn>
-  )
-}
-
-// ─── DidYouMeanState ────────────────────────────────────────────────────────
-// Shown instead of EmptyState when the strict prefix check finds nothing but
-// getDrugSearchSuggestion (searchUtils.js) found one or more close-enough
-// guesses. Tapping any suggestion just re-runs the search with it, which then
-// matches normally through the prefix check — no separate navigation or
-// lookup needed here.
-//
-// Phase 6 (§4.8, 2026-08-29): getDrugSearchSuggestion now returns up to 3
-// ranked candidates instead of one. Single-candidate case is unchanged from
-// the Phase 5 follow-up design (bold accent headline naming the guess, one
-// button). 2-3 candidates: headline becomes the generic "Did you mean one of
-// these?" (no single guess to commit to), and every candidate renders as an
-// equal-weight FilledHintButton chip in a wrapping row — user-confirmed
-// design, so there's no "primary vs secondary" distinction to maintain.
-
-// 2026-10-15: one guess now looks like several: the same title line ('Did you mean this?'),
-// the 'No exact match' line, and one full-width row with a search icon. Every name is
-// shown capitalised ('titleCaseWords', display only); the search uses the name exactly
-// as the app gave it.
-function DidYouMeanState({ query, suggestions, onSelect }) {
-  const single = suggestions.length === 1
-  return (
-    <FadeIn ms={170} rise={4}>
-    <div style={STATE_BOX_STYLE}>
-      <div style={STATE_ICON_ROW_STYLE}>
-        <Lightbulb size={STATE_ICON_SIZE} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={STATE_TITLE_STYLE}>
-        {single ? 'Did you mean this?' : 'Did you mean one of these?'}
-      </div>
-      <div style={{ ...STATE_LINE_STYLE, marginBottom: 'var(--space-4)' }}>
-        {`No exact match${query ? ` for \"${query}\"` : ''}`}
-      </div>
-      {/* One guess or several: the same equal full-width rows (same height and shape every
-          time, whatever the name length). A long combo name wraps onto a second line and is
-          cut with '...' after that, so a row never grows tall. */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-        width: '100%', maxWidth: 360, margin: '0 auto',
-      }}>
-        {suggestions.map(name => (
-          <button
-            key={name}
-            type="button"
-            onClick={() => onSelect(name)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-              width: '100%', minHeight: 48, boxSizing: 'border-box', textAlign: 'left',
-              padding: 'var(--space-2) var(--space-3)',
-              border: 'none', borderRadius: 'var(--radius-lg)',
-              background: 'var(--color-accent-light)', color: 'var(--color-accent)',
-              fontFamily: 'var(--font-body)', fontSize: 15, fontWeight: 600, lineHeight: 1.3,
-              cursor: 'pointer', WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <Search size={18} style={{ flexShrink: 0 }} />
-            <span style={{
-              flex: 1, minWidth: 0, overflowWrap: 'anywhere',
-              display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, overflow: 'hidden',
-            }}>
-              {titleCaseWords(name)}
-            </span>
-          </button>
-        ))}
-      </div>
-    </div>
-    </FadeIn>
-  )
-}
-
-// ─── TooShortState ────────────────────────────────────────────────────────────
-// Shown for a 1-character query instead of a results list (drug_search_plan
-// §5 point 1) — a single letter matches thousands of drug names, so search
-// simply asks for one more character rather than showing an unusably long
-// or misleading list.
-
-function TooShortState() {
-  return (
-    <div style={{ textAlign: 'center', padding: 'var(--space-12) var(--space-4)', color: 'var(--color-text-tertiary)' }}>
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)' }}>
-        <Search size={28} color="var(--color-text-tertiary)" />
-      </div>
-      <div style={{ fontSize: 15, marginBottom: 4, color: 'var(--color-text-primary)' }}>
-        Keep typing
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>
-        Type at least 2 characters to search
-      </div>
     </div>
   )
 }
