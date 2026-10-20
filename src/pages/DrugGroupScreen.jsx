@@ -29,6 +29,13 @@
  * the icon with the Share and Edit buttons (44 px, round) on the first line, the name, the count
  * with a capacity bar, then the description. Back stays above the block. Nothing else changes.
  *
+ * 2026-10-21 (step 12.3): the list gets its own header row, "Drugs" with the count, an Add
+ * button (search icon) and a Remove button, both 44 px tall. Not shown to a read-only account
+ * or on an empty group (the empty message keeps its own Add drugs button); Remove is only
+ * shown when the group has drugs. For now both open the editor, where drugs are added and
+ * removed today; step 12.4 (remove mode) and step 12.5 (Add drugs search) replace them.
+ * The drug cards are not changed.
+ *
  * 2026-10-19 (step 8.1): a Share icon left of Edit opens ShareGroupSheet (not
  * shown to a read-only account, whose database rules refuse making or stopping
  * a link). The page also asks whether the group has a live link, so the delete
@@ -43,7 +50,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Folder, Pencil, Share2, Trash2 } from 'lucide-react'
+import { Folder, Minus, Pencil, Search, Share2, Trash2 } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import RowStarButton from '../components/ui/RowStarButton'
 import ConfirmSheet from '../components/ui/ConfirmSheet'
@@ -199,6 +206,15 @@ export default function DrugGroupScreen() {
       </button>
     </div>
   )
+
+  // Add and Remove: 44 px tall pill buttons in the list header (step 12.3).
+  const pillButtonStyle = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    height: 44, minWidth: 44, padding: '0 var(--space-4)', borderRadius: 22, flexShrink: 0,
+    background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
+    fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
+    WebkitTapHighlightColor: 'transparent', outline: 'none',
+  }
 
   const topRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
@@ -371,6 +387,40 @@ export default function DrugGroupScreen() {
               tone="warning"
               title="Your groups are read only. Delete a group or upgrade to edit."
             />
+          </div>
+        )}
+
+        {!isReadOnly && count > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            flexWrap: 'wrap', gap: 'var(--space-2)', marginTop: 'var(--space-4)',
+          }}>
+            <h2 style={{
+              margin: 0, display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)',
+              fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)',
+              fontFamily: 'var(--font-body)',
+            }}>
+              Drugs
+              <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-secondary)' }}>{count}</span>
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <button
+                onClick={() => setEditorOpen(true)}
+                aria-label="Add drugs to this group"
+                style={{ ...pillButtonStyle, color: 'var(--color-accent)' }}
+              >
+                <Search size={18} strokeWidth={2} aria-hidden="true" />
+                Add
+              </button>
+              <button
+                onClick={() => setEditorOpen(true)}
+                aria-label="Remove drugs from this group"
+                style={{ ...pillButtonStyle, color: 'var(--color-danger)' }}
+              >
+                <Minus size={18} strokeWidth={2} aria-hidden="true" />
+                Remove
+              </button>
+            </div>
           </div>
         )}
 
