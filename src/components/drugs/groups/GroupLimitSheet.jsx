@@ -52,19 +52,20 @@ export default function GroupLimitSheet({ isOpen, kind, isPro = false, onClose }
     ? (isPro ? DRUG_GROUPS_CAP_PRO : DRUG_GROUPS_CAP_FREE)
     : (isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE)
 
+  // A Pro account's group cap is a safety cap that is never shown as a number, so no count line there.
   const countLabel = isGroups
-    ? `${cap} of ${cap} ${groupWord(cap)} used`
+    ? (isPro ? undefined : `${cap} of ${cap} ${groupWord(cap)} used`)
     : `${cap} of ${cap} ${drugWord(cap)} used`
   const headline = isGroups ? 'Group limit reached' : 'This group is full'
 
   let message
   if (isPro) {
     message = isGroups
-      ? `You have ${DRUG_GROUPS_CAP_PRO} groups, the most Pro allows. Delete one to add another.`
+      ? "You've reached the most groups an account can have. Delete one to add another."
       : `A group can hold up to ${DRUG_GROUP_DRUGS_CAP_PRO} drugs. Remove one to add another.`
   } else {
     message = isGroups
-      ? <>Free accounts can have {DRUG_GROUPS_CAP_FREE} {groupWord(DRUG_GROUPS_CAP_FREE)}. <strong>Pro</strong> lets you have up to {DRUG_GROUPS_CAP_PRO}.</>
+      ? <>Free accounts can have {DRUG_GROUPS_CAP_FREE} {groupWord(DRUG_GROUPS_CAP_FREE)}. <strong>Pro</strong> lets you add many more.</>
       : <>Free accounts can have {DRUG_GROUP_DRUGS_CAP_FREE} drugs in a group. <strong>Pro</strong> lets you have up to {DRUG_GROUP_DRUGS_CAP_PRO}.</>
   }
 

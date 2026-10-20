@@ -73,15 +73,10 @@ import { useDirtyState } from '../../../hooks/useDirtyState'
 import { GROUP_NAME_MAX, GROUP_DESCRIPTION_MAX, GROUP_COLORS, NAME_TAKEN_MESSAGE, groupNameKey } from '../../../hooks/useDrugGroups'
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
+import { groupsLimitMessage, drugsLimitMessage } from './groupMessages'
 
 const COLOR_LABELS = { blue: 'Blue', teal: 'Teal', violet: 'Violet', amber: 'Amber', rose: 'Rose' }
 const BLANK = { name: '', description: '', color: GROUP_COLORS[0], brandIds: [] }
-
-function drugsLimitMessage(isPro) {
-  return isPro
-    ? 'A group can hold 50 drugs. Remove one to add another.'
-    : 'Free accounts can keep 20 drugs in a group. Upgrade to Pro for 50.'
-}
 
 function sameIds(a, b) {
   return a.length === b.length && a.slice().sort().join('|') === b.slice().sort().join('|')
@@ -92,9 +87,7 @@ function saveFailureMessage(reason, isPro) {
     case 'guest':     return 'Sign in to save groups.'
     case 'offline':   return "You're offline. Reconnect to change your groups."
     case 'read_only': return 'Your groups are read only. Delete a group or upgrade to edit.'
-    case 'limit':     return isPro
-      ? "You've reached 100 groups. Delete one to add another."
-      : 'Free accounts can keep 1 group. Upgrade to Pro for more.'
+    case 'limit':     return groupsLimitMessage(isPro)
     case 'drugs_limit': return drugsLimitMessage(isPro)
     case 'drugs_error': return 'Group saved, but its drugs were not. Tap Save to try again.'
     default:          return "Couldn't save your group. Try again."

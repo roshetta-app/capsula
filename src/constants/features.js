@@ -53,14 +53,17 @@ export const NOTES_CHAR_CAP_PRO = 2000
  * screens) and is true from release (plan step 9.6, 2026-10-20).
  *
  * Caps mirror the database rules (plan section 6.1): the database refuses
- * a 2nd group / 21st drug on a free account and a 101st group / 51st drug
+ * a 4th group / 21st drug on a free account and a 501st group / 101st drug
  * on a Pro account. Keep these numbers in step with the database.
+ * 2026-10-21 (limits review, plan section 23.20): free groups 1 -> 3, Pro groups
+ * 100 -> 500 (a safety cap the app never shows), Pro drugs per group 50 -> 100.
+ * Database migration drug_groups_raise_limits_3_groups_100_drugs.
  */
 export const DRUG_GROUPS_ENABLED = true
-export const DRUG_GROUPS_CAP_FREE = 1
+export const DRUG_GROUPS_CAP_FREE = 3
 export const DRUG_GROUP_DRUGS_CAP_FREE = 20
-export const DRUG_GROUPS_CAP_PRO = 100
-export const DRUG_GROUP_DRUGS_CAP_PRO = 50
+export const DRUG_GROUPS_CAP_PRO = 500
+export const DRUG_GROUP_DRUGS_CAP_PRO = 100
 
 /**
  * 2026-10-20 (Drug groups plan, step 9.6): the one-phone preview (?groups=on)
