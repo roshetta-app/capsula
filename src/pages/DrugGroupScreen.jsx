@@ -25,6 +25,10 @@
  *   - read only (lapsed): no Edit, no Add, no Remove; a Delete group button
  *     stays at the bottom.
  *
+ * 2026-10-21 (Drug groups plan, step 12.2): the header is one tinted block in the group's colour:
+ * the icon with the Share and Edit buttons (44 px, round) on the first line, the name, the count
+ * with a capacity bar, then the description. Back stays above the block. Nothing else changes.
+ *
  * 2026-10-19 (step 8.1): a Share icon left of Edit opens ShareGroupSheet (not
  * shown to a read-only account, whose database rules refuse making or stopping
  * a link). The page also asks whether the group has a live link, so the delete
@@ -177,35 +181,28 @@ export default function DrugGroupScreen() {
 
   const canEdit = !!group && !isReadOnly
 
+  // Share and Edit: 44 px round buttons, drawn inside the header block (step 12.2).
+  const roundButtonStyle = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+    background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
+    color: 'var(--color-text-primary)',
+    WebkitTapHighlightColor: 'transparent', outline: 'none',
+  }
+  const actionButtons = canEdit && (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+      <button onClick={() => setShareOpen(true)} aria-label="Share group" style={roundButtonStyle}>
+        <Share2 size={20} strokeWidth={2} />
+      </button>
+      <button onClick={() => setEditorOpen(true)} aria-label="Edit group" style={roundButtonStyle}>
+        <Pencil size={20} strokeWidth={2} />
+      </button>
+    </div>
+  )
+
   const topRow = (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
       {backButton}
-      {canEdit && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <button
-            onClick={() => setShareOpen(true)}
-            aria-label="Share group"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-              color: 'var(--color-text-primary)',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            <Share2 size={20} strokeWidth={2} />
-          </button>
-          <button
-            onClick={() => setEditorOpen(true)}
-            aria-label="Edit group"
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-              color: 'var(--color-text-primary)',
-              WebkitTapHighlightColor: 'transparent', outline: 'none',
-            }}
-          >
-            <Pencil size={20} strokeWidth={2} />
-          </button>
-        </div>
-      )}
     </div>
   )
 
@@ -298,48 +295,72 @@ export default function DrugGroupScreen() {
 
     content = (
       <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-            backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Folder size={22} color={tone.fg} aria-hidden="true" />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <h1 dir="ltr" style={{
-              margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.25, textAlign: 'start',
-              color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-              overflowWrap: 'anywhere',
-            }}>
-              {group.name}
-            </h1>
+        <div style={{
+          backgroundColor: tone.bg, borderRadius: 20, padding: 'var(--space-4)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 2,
-              fontSize: 13, color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
+              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+              backgroundColor: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Folder size={22} color={tone.fg} aria-hidden="true" />
+            </div>
+            {actionButtons}
+          </div>
+
+          <h1 dir="ltr" style={{
+            margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.25, textAlign: 'start',
+            color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+            overflowWrap: 'anywhere',
+          }}>
+            {group.name}
+          </h1>
+
+          <div>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 'var(--space-2)',
+              fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
             }}>
               <span>{count} of {drugsCap} drugs</span>
               {full && (
                 <span style={{
                   fontSize: 11, fontWeight: 700, letterSpacing: '0.04em',
-                  color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface-muted)',
+                  color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface)',
                   borderRadius: 8, padding: '2px 8px',
                 }}>
                   Full
                 </span>
               )}
             </div>
+            <div
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={drugsCap}
+              aria-valuenow={count}
+              aria-label={`${count} of ${drugsCap} drugs`}
+              style={{
+                marginTop: 'var(--space-2)', height: 6, borderRadius: 3, overflow: 'hidden',
+                backgroundColor: 'var(--color-surface)',
+              }}
+            >
+              <div style={{
+                width: `${Math.min(100, (count / drugsCap) * 100)}%`, height: '100%',
+                borderRadius: 3, backgroundColor: tone.fg, transition: 'width 200ms ease',
+              }} />
+            </div>
           </div>
-        </div>
 
-        {group.description && (
-          <p dir="ltr" style={{
-            margin: 'var(--space-3) 0 0', fontSize: 14, lineHeight: 1.5, textAlign: 'start',
-            color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-            whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
-          }}>
-            {group.description}
-          </p>
-        )}
+          {group.description && (
+            <p dir="ltr" style={{
+              margin: 0, fontSize: 14, lineHeight: 1.5, textAlign: 'start',
+              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+              whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
+            }}>
+              {group.description}
+            </p>
+          )}
+        </div>
 
         <GroupSyncStatus marginTop="var(--space-3)" />
 
