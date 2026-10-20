@@ -87,8 +87,9 @@ export default function DrugCategoriesScreen() {
     )
   }
 
+  // Side gap and max width come from Layout (Drug groups plan, step 12.0 / F1); this page adds top and bottom space only.
   return (
-    <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--page-gutter) var(--space-4)' }}>
+    <div style={{ padding: 'var(--space-3) 0 var(--space-4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
         <button
           onClick={() => navigate(-1)}
