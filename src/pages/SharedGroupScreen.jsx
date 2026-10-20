@@ -317,7 +317,14 @@ function SharedGroupBody({ code }) {
   }
 
   return (
-    <div style={{ maxWidth: 680, margin: '0 auto', padding: 'var(--space-3) var(--page-gutter) var(--space-4)' }}>
+    <div style={{
+      // 2026-10-20 (Drug groups plan, step 14.0 / F20): this route is opened outside
+      // Layout, so the side gap is defined here instead of read from Layout.
+      // Without it the padding below was invalid and the browser dropped all of it.
+      '--page-gutter': 'var(--space-4)',
+      maxWidth: 680, margin: '0 auto',
+      padding: 'calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px))',
+    }}>
       {canGoBack && (
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
           {backButton}
