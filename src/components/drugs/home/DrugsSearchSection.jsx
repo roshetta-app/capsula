@@ -106,7 +106,10 @@ export default function DrugsSearchSection({
           <ArrowLeft size={20} />
         </button>
       )}
-      <span style={SECTION_TITLE_STYLE}>Search</span>
+      {/* 2026-10-20 (plan step 11.2): on the home the heading is "Find a drug", bigger; focus mode keeps "Search" until 11.6. */}
+      <span style={searchOpen ? SECTION_TITLE_STYLE : { ...SECTION_TITLE_STYLE, fontSize: 20, letterSpacing: '-0.2px' }}>
+        {searchOpen ? 'Search' : 'Find a drug'}
+      </span>
       <button
         onClick={() => setShowModeInfo(true)}
         aria-label="How search modes work"
@@ -114,8 +117,9 @@ export default function DrugsSearchSection({
           display:                 'flex',
           alignItems:              'center',
           justifyContent:          'center',
-          width:                   28,
-          height:                  28,
+          width:                   searchOpen ? 28 : 44,
+          height:                  searchOpen ? 28 : 44,
+          margin:                  searchOpen ? 0 : '0 -8px',
           borderRadius:            '50%',
           background:              'none',
           border:                  'none',
@@ -126,7 +130,7 @@ export default function DrugsSearchSection({
           outline:                 'none',
         }}
       >
-        <Info size={14} />
+        <Info size={searchOpen ? 14 : 16} />
       </button>
     </>
   )
@@ -163,6 +167,7 @@ export default function DrugsSearchSection({
               onFilter={onFilter}
               filterDisabled={filterDisabled}
               hasActiveFilters={hasActiveFilters}
+              tall={!searchOpen}
             />
           </div>
         </div>
@@ -175,6 +180,7 @@ export default function DrugsSearchSection({
               drugs={recentDrugs}
               categories={categories}
               isDark={isDark}
+              onPage={!searchOpen}
             />
           </div>
         )}

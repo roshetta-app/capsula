@@ -76,6 +76,9 @@
  *   hasActiveFilters boolean                 — highlights filter icon when true
  *   filterDisabled   boolean                 — greys out the filter icon and ignores taps (default false)
  *   compact          boolean                 — slightly shorter variant (44px vs 46px)
+ *   tall             boolean                 — 2026-10-20 (Drug groups plan, step 11.2): taller variant (52px,
+ *                                              16px text, 44px filter button). Default false: every other
+ *                                              call site is unchanged.
  *   icon             Component               — icon rendered at the input's left edge, defaults to Search
  */
 
@@ -90,11 +93,12 @@ const SearchBar = forwardRef(function SearchBar({
   hasActiveFilters = false,
   filterDisabled = false,
   compact = false,
+  tall = false,
   icon: Icon = Search,
   onInputFocus,
   onSubmit,
 }, ref) {
-  const height = compact ? 44 : 46
+  const height = tall ? 52 : compact ? 44 : 46
 
   // Right-edge icon cluster, innermost first: the filter trigger always
   // sits at the very edge when present; the clear button sits just inside
@@ -102,9 +106,10 @@ const SearchBar = forwardRef(function SearchBar({
   // the two are actually present. filterEdge matches the search icon's
   // left inset (16px) so both ends of the pill sit at the same distance
   // from their edge.
-  const filterEdge   = 16
-  const clearEdge    = onFilter ? filterEdge + 34 : 8
-  const paddingRight = 16 + (onFilter ? 34 : 0) + (value ? 30 : 0)
+  const filterSize   = tall ? 44 : 30
+  const filterEdge   = tall ? 6 : 16
+  const clearEdge    = onFilter ? filterEdge + filterSize + 4 : 8
+  const paddingRight = 16 + (onFilter ? (tall ? 48 : 34) : 0) + (value ? 30 : 0)
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -142,7 +147,7 @@ const SearchBar = forwardRef(function SearchBar({
           borderRadius:    'var(--radius-full)',
           border:          '1px solid var(--color-search-border)',
           backgroundColor: 'var(--color-surface)',
-          fontSize:        14,
+          fontSize:        tall ? 16 : 14,
           color:           'var(--color-text-primary)',
           fontFamily:      'var(--font-body)',
           outline:         'none',
@@ -193,8 +198,8 @@ const SearchBar = forwardRef(function SearchBar({
             right:           filterEdge,
             top:             '50%',
             transform:       'translateY(-50%) scale(1)',
-            width:           30,
-            height:          30,
+            width:           filterSize,
+            height:          filterSize,
             borderRadius:    '50%',
             border:          'none',
             backgroundColor: 'transparent',

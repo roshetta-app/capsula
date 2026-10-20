@@ -23,7 +23,9 @@ import { resolveToken, FALLBACK_TOKEN } from '../../../utils/specialtyTokens'
 // however many are actually in `drugs` (already capped at MAX_RECENT
 // upstream, but this row itself only ever shows the first 3).
 
-export default function RecentlyViewedButton({ onTap, drugs, categories, isDark }) {
+// onPage (step 11.2): true when there is no card behind the button (the flat Drugs home), so the
+// avatar rings and the pressed fill use the page colour instead of the card colour.
+export default function RecentlyViewedButton({ onTap, drugs, categories, isDark, onPage = false }) {
   const [pressed, setPressed] = useState(false)
   const preview = drugs.slice(0, 3)
 
@@ -50,7 +52,7 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark 
         alignItems:              'center',
         gap:                     'var(--space-2)',
         width:                   '100%',
-        backgroundColor:         pressed ? 'var(--color-surface-muted)' : 'transparent',
+        backgroundColor:         pressed ? (onPage ? 'var(--color-surface)' : 'var(--color-surface-muted)') : 'transparent',
         border:                  'none',
         borderRadius:            'var(--radius-lg)',
         padding:                 'var(--space-1) 0',
@@ -79,7 +81,7 @@ export default function RecentlyViewedButton({ onTap, drugs, categories, isDark 
                 justifyContent:  'center',
                 fontSize:        11,
                 fontWeight:      600,
-                border:          '2px solid var(--color-surface)',
+                border:          `2px solid ${onPage ? 'var(--color-bg)' : 'var(--color-surface)'}`,
                 marginLeft:      i === 0 ? 0 : -10,
               }}
             >
