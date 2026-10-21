@@ -108,7 +108,7 @@ export default function DrugCategoriesScreen() {
           Drugs
         </button>
       </div>
-      <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 20, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+      <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 22, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
         Category
       </h1>
       {body}

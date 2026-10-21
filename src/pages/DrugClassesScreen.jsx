@@ -184,7 +184,7 @@ export default function DrugClassesScreen() {
           Drugs
         </button>
       </div>
-      <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 20, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+      <h1 style={{ margin: '0 0 var(--space-3)', fontSize: 22, fontWeight: 700, lineHeight: 1.2, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
         Browse by class
       </h1>
       {hasDrugs && (

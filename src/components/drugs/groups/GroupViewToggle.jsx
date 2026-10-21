@@ -21,12 +21,16 @@ export default function GroupViewToggle({ value = 'tiles', onChange }) {
     <div
       role="group"
       aria-label="Groups view"
-      style={{
-        display: 'inline-flex', gap: 2, padding: 2,
-        backgroundColor: 'var(--color-surface-muted)',
-        borderRadius: 'var(--radius-md)',
-      }}
+      style={{ position: 'relative', display: 'inline-flex' }}
     >
+      {/* The soft track sits behind the two 44 px tap areas, so the look stays small. */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute', insetInline: 0, top: '50%', height: 32, transform: 'translateY(-50%)',
+          backgroundColor: 'var(--color-surface-muted)', borderRadius: 'var(--radius-md)',
+        }}
+      />
       {OPTIONS.map(({ key, label, Icon }) => {
         const active = value === key
         return (
@@ -37,18 +41,24 @@ export default function GroupViewToggle({ value = 'tiles', onChange }) {
             aria-pressed={active}
             onClick={() => { if (!active) onChange?.(key) }}
             style={{
-              width: 30, height: 28,
+              position: 'relative', width: 44, height: 44, padding: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: 'none', cursor: 'pointer',
-              borderRadius: 8,
-              backgroundColor: active ? 'var(--color-surface)' : 'transparent',
-              boxShadow: active ? 'var(--shadow-card)' : 'none',
+              border: 'none', cursor: 'pointer', background: 'none',
               color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
-              WebkitTapHighlightColor: 'transparent',
-              transition: 'background-color var(--motion-fast) var(--ease-settle), color var(--motion-fast) var(--ease-settle)',
+              WebkitTapHighlightColor: 'transparent', outline: 'none',
+              transition: 'color var(--motion-fast) var(--ease-settle)',
             }}
           >
-            <Icon size={15} aria-hidden="true" />
+            <span
+              aria-hidden="true"
+              style={{
+                position: 'absolute', width: 38, height: 28, borderRadius: 8,
+                backgroundColor: active ? 'var(--color-surface)' : 'transparent',
+                boxShadow: active ? 'var(--shadow-card)' : 'none',
+                transition: 'background-color var(--motion-fast) var(--ease-settle)',
+              }}
+            />
+            <Icon size={15} aria-hidden="true" style={{ position: 'relative' }} />
           </button>
         )
       })}

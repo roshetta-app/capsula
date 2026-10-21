@@ -66,14 +66,14 @@ export default function FailedChangesSheet({ isOpen, onClose }) {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
           padding: '0 var(--space-4) var(--space-3)', flexShrink: 0,
         }}>
-          <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)' }}>
             Changes not saved
           </div>
           <button
             onClick={onClose}
             aria-label="Close"
             style={{
-              width: 36, height: 36, borderRadius: '50%', border: 'none', flexShrink: 0,
+              width: 44, height: 44, borderRadius: '50%', border: 'none', flexShrink: 0,
               backgroundColor: 'var(--color-surface-muted)', cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               WebkitTapHighlightColor: 'transparent', outline: 'none',

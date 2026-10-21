@@ -340,7 +340,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
             <button
               onClick={handleNewGroup}
               style={{
-                width: '100%', minHeight: 48, borderRadius: 14, border: 'none', cursor: 'pointer',
+                width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none', cursor: 'pointer',
                 backgroundColor: 'var(--color-accent)', color: '#fff',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)',
                 fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-body)',
@@ -351,7 +351,7 @@ export default function AddToGroupSheet({ isOpen, onClose, drug }) {
               {noGroups ? 'Create a group' : 'New group'}
               {showProTag && (
                 <span style={{
-                  fontSize: 10, fontWeight: 800, letterSpacing: '0.06em',
+                  fontSize: 11, fontWeight: 800, letterSpacing: '0.06em',
                   backgroundColor: 'rgba(255,255,255,0.22)', color: '#fff',
                   borderRadius: 6, padding: '2px 6px',
                 }}>

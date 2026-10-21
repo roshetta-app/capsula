@@ -396,7 +396,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
           <button
             onClick={handleSave}
             style={{
-              width: '100%', height: 48, borderRadius: 12, border: 'none',
+              width: '100%', height: 48, borderRadius: 'var(--radius-md)', border: 'none',
               backgroundColor: 'var(--color-accent)', color: '#fff',
               fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
               cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.75 : 1,

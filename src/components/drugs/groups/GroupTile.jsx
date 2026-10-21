@@ -35,7 +35,7 @@ export function drugCountLabel(n) {
 export function ProPill() {
   return (
     <span style={{
-      fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+      fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
       padding: '2px 7px', borderRadius: 'var(--radius-pill)',
       backgroundColor: 'var(--color-accent-light)', color: 'var(--color-accent)',
       fontFamily: 'var(--font-body)', flexShrink: 0,
