@@ -307,8 +307,8 @@ export default function AddDrugsToGroupScreen() {
     )
   } else {
     body = (
-      <div style={{ opacity: searchPending ? 0.7 : 1, transition: 'opacity 150ms ease' }}>
-        <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-2)' }}>
+      <div style={{ opacity: searchPending ? 0.7 : 1, transition: 'opacity var(--motion-fast) var(--ease-reveal)' }}>
+        <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 'var(--space-2)' }}>
           {results.length} drug{results.length !== 1 ? 's' : ''} for &quot;{query}&quot;
           {results.length > 100 && ' · type more to narrow'}
         </div>
@@ -334,7 +334,7 @@ export default function AddDrugsToGroupScreen() {
         position: 'sticky', top: 0, zIndex: 40, backgroundColor: 'var(--color-bg)',
         paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)', paddingBottom: 8,
         borderBottom: `1px solid ${scrolled ? 'var(--color-border)' : 'transparent'}`,
-        transition: reduceMotion ? 'none' : 'border-color 160ms ease',
+        transition: 'border-color var(--motion-base) var(--ease-reveal)',
       }}>
         <DrugsSearchSection
           searchOpen

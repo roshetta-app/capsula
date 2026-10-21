@@ -43,7 +43,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
       tabIndex={0}
       className={animate ? 'group-soft-in' : undefined}
       aria-label={isNew ? 'New group' : `${name}, ${drugCountLabel(count)}`}
-      onKeyDown={e => e.key === 'Enter' && onOpen?.()}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}
@@ -56,7 +56,7 @@ export default function GroupRow({ group, drugNames = [], isNew = false, showPro
         cursor: 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
-        opacity: pressed ? 0.7 : 1,
+        opacity: pressed ? 0.8 : 1,
         transition: 'opacity var(--motion-fast) var(--ease-settle)',
         boxSizing: 'border-box',
       }}

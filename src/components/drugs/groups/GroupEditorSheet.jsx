@@ -325,7 +325,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
             />
             <div style={{
               marginTop: 4, textAlign: 'end', fontSize: 11,
-              color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
+              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
             }}>
               {description.length}/{GROUP_DESCRIPTION_MAX}
             </div>
@@ -396,7 +396,7 @@ export default function GroupEditorSheet({ isOpen, onClose, group = null, onSave
           <button
             onClick={handleSave}
             style={{
-              width: '100%', height: 48, borderRadius: 'var(--radius-md)', border: 'none',
+              width: '100%', minHeight: 48, borderRadius: 'var(--radius-md)', border: 'none',
               backgroundColor: 'var(--color-accent)', color: '#fff',
               fontSize: 15, fontWeight: 600, fontFamily: 'var(--font-body)',
               cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.75 : 1,

@@ -46,7 +46,7 @@ export function ProPill() {
 }
 
 // The small mark on a group that has changes not yet sent (step 17.6a).
-export function WaitingMark({ size = 14, color = 'var(--color-text-tertiary)' }) {
+export function WaitingMark({ size = 14, color = 'var(--color-text-secondary)' }) {
   return (
     <span role="img" aria-label="Waiting to sync" title="Waiting to sync" style={{ display: 'flex', flexShrink: 0 }}>
       <CloudUpload size={size} color={color} aria-hidden="true" />
@@ -69,7 +69,7 @@ export default function GroupTile({ group, isNew = false, showProBadge = false, 
       tabIndex={0}
       className={animate ? 'group-soft-in' : undefined}
       aria-label={isNew ? 'New group' : `${name}, ${drugCountLabel(count)}`}
-      onKeyDown={e => e.key === 'Enter' && onOpen?.()}
+      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen?.() } }}
       onPointerDown={() => setPressed(true)}
       onPointerUp={() => setPressed(false)}
       onPointerLeave={() => setPressed(false)}

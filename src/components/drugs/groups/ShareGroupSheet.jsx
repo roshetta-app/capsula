@@ -42,6 +42,12 @@ import { buildGroupLink, shareGroup, copyText } from '../../../utils/shareGroupL
 import { resolveToken } from '../../../utils/specialtyTokens'
 import { useIsDark } from '../../../utils/specialtyIcon'
 
+// Read out by a screen reader only; takes no room on screen.
+const VISUALLY_HIDDEN = {
+  position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden',
+  clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+}
+
 const OFFLINE_SHARE_MESSAGE = "You're offline. Reconnect to share."
 
 const PRIMARY_BUTTON = {
@@ -235,6 +241,7 @@ export default function ShareGroupSheet({ isOpen, onClose, group, onShareChange 
               ? <><Check size={16} strokeWidth={2.6} aria-hidden="true" />Copied</>
               : <><Copy size={16} strokeWidth={2} aria-hidden="true" />Copy</>}
           </button>
+          <span role="status" aria-live="polite" style={VISUALLY_HIDDEN}>{copied ? 'Link copied' : ''}</span>
         </div>
 
         <button onClick={() => handleShare(result.code)} style={PRIMARY_BUTTON}>

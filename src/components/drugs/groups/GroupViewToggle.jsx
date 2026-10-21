@@ -44,7 +44,7 @@ export default function GroupViewToggle({ value = 'tiles', onChange }) {
               position: 'relative', width: 44, height: 44, padding: 0,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: 'none', cursor: 'pointer', background: 'none',
-              color: active ? 'var(--color-accent)' : 'var(--color-text-tertiary)',
+              color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
               WebkitTapHighlightColor: 'transparent', outline: 'none',
               transition: 'color var(--motion-fast) var(--ease-settle)',
             }}

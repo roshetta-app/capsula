@@ -32,7 +32,7 @@ export default function GroupStateMessage({
           borderRadius: 'var(--radius-md)',
           backgroundColor: warn ? 'var(--color-warning-light)' : 'var(--color-surface)',
           border: warn ? 'none' : '1px solid var(--color-border)',
-          color: warn ? 'var(--color-warning)' : 'var(--color-text-secondary)',
+          color: warn ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
           fontSize: 12, fontWeight: 500, fontFamily: font, lineHeight: 1.35,
         }}
       >
@@ -42,8 +42,9 @@ export default function GroupStateMessage({
             type="button"
             onClick={onAction}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: '4px 2px',
-              color: warn ? 'var(--color-warning)' : 'var(--color-accent)',
+              background: 'none', border: 'none', cursor: 'pointer', padding: '0 var(--space-2)', minHeight: 44, minWidth: 44,
+              color: warn ? 'var(--color-text-primary)' : 'var(--color-accent-text)',
+              textDecoration: warn ? 'underline' : 'none',
               fontSize: 12, fontWeight: 700, fontFamily: font,
               WebkitTapHighlightColor: 'transparent', flexShrink: 0,
             }}
@@ -91,7 +92,7 @@ export default function GroupStateMessage({
           onClick={onAction}
           style={{
             marginTop: 'var(--space-1)',
-            padding: '8px 20px', borderRadius: 'var(--radius-md)',
+            padding: '0 20px', minHeight: 44, borderRadius: 'var(--radius-md)',
             border: 'none', cursor: 'pointer',
             backgroundColor: 'var(--color-accent)', color: '#fff',
             fontSize: 13, fontWeight: 600, fontFamily: font,

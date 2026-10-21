@@ -277,7 +277,7 @@ function SharedGroupBody({ code }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+        color: 'var(--color-accent-text)', fontSize: 14, fontWeight: 500,
         fontFamily: 'var(--font-body)', padding: '4px 0',
         WebkitTapHighlightColor: 'transparent',
       }}
@@ -309,7 +309,7 @@ function SharedGroupBody({ code }) {
           onClick={() => navigate(ROUTES.DRUGS)}
           style={{
             flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
-            cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
+            cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent-text)',
             fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
           }}
         >

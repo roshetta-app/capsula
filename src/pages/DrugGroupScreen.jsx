@@ -218,7 +218,7 @@ export default function DrugGroupScreen() {
       style={{
         display: 'flex', alignItems: 'center', gap: 6,
         background: 'none', border: 'none', cursor: 'pointer',
-        color: 'var(--color-accent)', fontSize: 14, fontWeight: 500,
+        color: 'var(--color-accent-text)', fontSize: 14, fontWeight: 500,
         fontFamily: 'var(--font-body)', padding: '4px 0',
         WebkitTapHighlightColor: 'transparent',
       }}
@@ -254,7 +254,7 @@ export default function DrugGroupScreen() {
   // Add and Remove: 44 px tall pill buttons in the list header (step 12.3).
   const pillButtonStyle = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-    height: 44, minWidth: 44, padding: '0 var(--space-4)', borderRadius: 22, flexShrink: 0,
+    minHeight: 44, minWidth: 44, padding: '0 var(--space-4)', borderRadius: 22, flexShrink: 0,
     background: 'var(--color-surface)', border: 'none', cursor: 'pointer',
     fontSize: 14, fontWeight: 600, fontFamily: 'var(--font-body)',
     WebkitTapHighlightColor: 'transparent', outline: 'none',
@@ -354,7 +354,7 @@ export default function DrugGroupScreen() {
           {missing.map(id => (
             <div key={id} style={REMOVE_ROW_STYLE}>
               <div style={{
-                flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text-tertiary)',
+                flex: 1, minWidth: 0, fontSize: 13, color: 'var(--color-text-secondary)',
                 fontFamily: 'var(--font-body)',
               }}>
                 This drug is no longer available
@@ -364,7 +364,7 @@ export default function DrugGroupScreen() {
                   onClick={() => handleRemoveMissing(id)}
                   style={{
                     background: 'none', border: 'none', cursor: 'pointer', padding: '6px 4px',
-                    fontSize: 13, fontWeight: 600, color: 'var(--color-accent)',
+                    fontSize: 13, fontWeight: 600, color: 'var(--color-accent-text)',
                     fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
                   }}
                 >
@@ -430,7 +430,7 @@ export default function DrugGroupScreen() {
             >
               <div style={{
                 width: `${Math.min(100, (count / drugsCap) * 100)}%`, height: '100%',
-                borderRadius: 3, backgroundColor: tone.fg, transition: 'width 200ms ease',
+                borderRadius: 3, backgroundColor: tone.fg, transition: 'width var(--motion-base) var(--ease-settle)',
               }} />
             </div>
           </div>
@@ -475,7 +475,7 @@ export default function DrugGroupScreen() {
               <button
                 onClick={openAddDrugs}
                 aria-label="Add drugs to this group"
-                style={{ ...pillButtonStyle, color: 'var(--color-accent)' }}
+                style={{ ...pillButtonStyle, color: 'var(--color-accent-text)' }}
               >
                 <Search size={18} strokeWidth={2} aria-hidden="true" />
                 Add
