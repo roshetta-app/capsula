@@ -68,7 +68,7 @@ import GroupEditorSheet from '../components/drugs/groups/GroupEditorSheet'
 import ShareGroupSheet from '../components/drugs/groups/ShareGroupSheet'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
 import GroupSyncStatus from '../components/drugs/groups/GroupSyncStatus'
-import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
+import { drugRowTitle, sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { drugsLimitMessage } from '../components/drugs/groups/groupMessages'
 import { useGroupDrugEdits } from '../components/drugs/groups/useGroupDrugEdits'
 import { setPendingUndo } from '../components/drugs/groups/pendingUndo'
@@ -156,8 +156,9 @@ export default function DrugGroupScreen() {
 
   const drugsCap = isPro ? DRUG_GROUP_DRUGS_CAP_PRO : DRUG_GROUP_DRUGS_CAP_FREE
 
+  // The lookup table depends on the whole drug list only, so a tap on Add or Remove does not rebuild it.
+  const byId = useMemo(() => new Map((drugs ?? []).map(d => [d.id, d])), [drugs])
   const { known, missing } = useMemo(() => {
-    const byId = new Map((drugs ?? []).map(d => [d.id, d]))
     const known = []
     const missing = []
     for (const id of ids) {
@@ -165,9 +166,8 @@ export default function DrugGroupScreen() {
       if (d) known.push(d)
       else missing.push(id)
     }
-    known.sort((a, b) => drugRowTitle(a).localeCompare(drugRowTitle(b), undefined, { sensitivity: 'base' }))
-    return { known, missing }
-  }, [drugs, ids])
+    return { known: sortDrugsByTitle(known), missing }
+  }, [byId, ids])
 
   function goHome() {
     navigate(ROUTES.DRUGS, { replace: true })

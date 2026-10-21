@@ -26,7 +26,7 @@
  * is instant when the phone asks for reduced motion.
  */
 
-import { useState, useEffect, useMemo } from 'react'
+import { memo, useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpDown } from 'lucide-react'
 import DrugsSectionCard, { SECTION_TITLE_STYLE } from '../home/DrugsSectionCard'
@@ -34,6 +34,9 @@ import { shimmer } from '../home/shimmer'
 import GroupTile from './GroupTile'
 import GroupRow from './GroupRow'
 import GroupViewToggle from './GroupViewToggle'
+import { firstNames } from './groupDrugText'
+
+const NAME_ORDER = new Intl.Collator(undefined, { sensitivity: 'base' })
 import GroupStateMessage from './GroupStateMessage'
 import GroupEditorSheet from './GroupEditorSheet'
 import Snackbar from '../../ui/Snackbar'
@@ -101,7 +104,7 @@ const SOFT_IN_CSS = '@keyframes groupSoftIn { from { opacity: 0; transform: tran
 const GRID_STYLE = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 'var(--space-2)' }
 const LIST_STYLE = { display: 'flex', flexDirection: 'column' }
 
-export default function GroupsSection() {
+function GroupsSection() {
   const { drugs, groupsView, setGroupsView, groupsSortMode, setGroupsSortMode } = useDrugContext()
   const {
     groups, groupsStatus, groupsLoadError, isReadOnly,
@@ -149,7 +152,7 @@ export default function GroupsSection() {
   const sorted = useMemo(() => {
     const list = groups.slice()
     if (groupsSortMode === 'az') {
-      return list.sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+      return list.sort((a, b) => NAME_ORDER.compare(a.name, b.name))
     }
     return list.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))
   }, [groups, groupsSortMode])
@@ -170,11 +173,7 @@ export default function GroupsSection() {
   const isFresh = g => known !== null && !known.has(`${g.id}:${g.name}`)
 
   function previewNames(g) {
-    return g.brandIds
-      .map(id => brandNameById.get(id))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b))
-      .slice(0, 3)
+    return firstNames(g.brandIds, brandNameById, 3)
   }
 
   // New group: the message cases come first, otherwise the editor opens.
@@ -303,3 +302,7 @@ export default function GroupsSection() {
     </>
   )
 }
+
+// The area takes no props, so it only redraws when its own data changes, not when the Drugs
+// page around it redraws (for example on every letter typed in search).
+export default memo(GroupsSection)

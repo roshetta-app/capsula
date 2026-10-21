@@ -68,7 +68,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Folder, FolderX, Check, WifiOff, CircleAlert } from 'lucide-react'
 import SharedDrugCard from '../components/SharedDrugCard'
 import GroupStateMessage from '../components/drugs/groups/GroupStateMessage'
-import { drugRowTitle } from '../components/drugs/groups/groupDrugText'
+import { sortDrugsByTitle } from '../components/drugs/groups/groupDrugText'
 import { shimmer } from '../components/drugs/home/shimmer'
 import { useCategories } from '../hooks/useCategories'
 import { markScreenMounted } from '../hooks/useDeepLinkParent'
@@ -195,9 +195,7 @@ function SharedGroupBody({ code }) {
   }, [result.status, retry])
 
   const drugs = useMemo(() => {
-    const list = result.status === 'ok' ? [...result.group.drugs] : []
-    list.sort((a, b) => drugRowTitle(a).localeCompare(drugRowTitle(b), undefined, { sensitivity: 'base' }))
-    return list
+    return result.status === 'ok' ? sortDrugsByTitle(result.group.drugs) : []
   }, [result])
 
   // ── Save to my groups (step 8.3) ──────────────────────────────────────────
