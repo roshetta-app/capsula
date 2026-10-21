@@ -1307,14 +1307,13 @@ function DrugsHero({ onInfoTap }) {
   return (
     <div style={{ paddingBottom: 'var(--space-3)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44 }}>
-        <span style={{
-          fontSize:      11,
-          fontWeight:    700,
-          letterSpacing: '1.4px',
-          color:         'var(--color-accent-text)',
-        }}>
-          CAPSULA
-        </span>
+        {/* Same wordmark as the top of the Conditions screen (2026-10-22). */}
+        <img
+          src={`${import.meta.env.BASE_URL}logo.svg`}
+          alt="Capsula"
+          className="capsula-logo"
+          style={{ display: 'block', height: 30, width: 'auto' }}
+        />
 
         {/* The info button opens DrugsInfoSheet (sources and disclaimer). */}
         <button
