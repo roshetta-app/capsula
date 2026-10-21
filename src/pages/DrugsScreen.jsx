@@ -1343,15 +1343,16 @@ function DrugsHero({ onInfoTap }) {
         </button>
       </div>
 
+      {/* Small grey line under the logo, same slot and size as the tagline on the Conditions
+          screen (2026-10-22: the big "Drugs" title next to the logo looked crowded). */}
       <h1 style={{
-        fontSize:      26,
-        lineHeight:    1.15,
-        fontWeight:    700,
-        color:         'var(--color-text-primary)',
-        margin:        0,
-        letterSpacing: '-0.3px',
+        fontSize:   16,
+        lineHeight: 1.3,
+        fontWeight: 500,
+        color:      'var(--color-text-secondary)',
+        margin:     '4px 0 0',
       }}>
-        Drugs
+        Drug library
       </h1>
     </div>
   )
