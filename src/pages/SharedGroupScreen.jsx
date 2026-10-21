@@ -27,6 +27,15 @@
  * (A to Z), with a note; the limit sheet, read only and offline messages come
  * from the same places as the rest of groups.
  *
+ * 2026-10-21 (step 14.1, F21, F22): first impression for someone who has never seen the
+ * app. A slim top bar with the Capsula logo and an "Open Capsula" text button (a person
+ * who came from inside the app gets the Back button in place of both, because they are
+ * already in it), then the group in the same tinted header block as the group page: the
+ * folder tile, the name, the drug count, a "Shared group" tag and, inside the block, the
+ * note that a Capsula user wrote it. The drug list is unchanged. The old "Open Capsula"
+ * link under the list is gone (the top bar has it). The fixed Save bar is step 14.2 and
+ * the link problem states are step 14.3.
+ *
  * States (plan section 5, Sharing, Viewer rows):
  *   - loading: placeholder cards.
  *   - link not available: "This link isn't available. The owner may have
@@ -217,6 +226,36 @@ function SharedGroupBody({ code }) {
     </button>
   )
 
+  // Top bar (F21): the logo says what this is, "Open Capsula" is the way in. Someone who
+  // arrived from inside the app (there is a screen behind this one) gets Back instead.
+  const topBar = (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)',
+      minHeight: 44, marginBottom: 'var(--space-3)',
+    }}>
+      {canGoBack ? backButton : (
+        <img
+          src={`${import.meta.env.BASE_URL}logo.svg`}
+          alt="Capsula"
+          className="capsula-logo"
+          style={{ display: 'block', height: 22, width: 'auto' }}
+        />
+      )}
+      {!canGoBack && (
+        <button
+          onClick={() => navigate(ROUTES.DRUGS)}
+          style={{
+            flexShrink: 0, minHeight: 44, padding: '0 var(--space-1)', background: 'none', border: 'none',
+            cursor: 'pointer', fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
+            fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent', outline: 'none',
+          }}
+        >
+          Open Capsula
+        </button>
+      )}
+    </div>
+  )
+
   let content
   if (result.status === 'loading') {
     content = <div><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
@@ -253,48 +292,57 @@ function SharedGroupBody({ code }) {
 
     content = (
       <>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: '50%', flexShrink: 0,
-            backgroundColor: tone.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Folder size={22} color={tone.fg} aria-hidden="true" />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <h1 dir="ltr" style={{
-              margin: 0, fontSize: 20, fontWeight: 700, lineHeight: 1.25, textAlign: 'start',
-              color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
-              overflowWrap: 'anywhere',
-            }}>
-              {group.name}
-            </h1>
+        <div style={{
+          backgroundColor: tone.bg, borderRadius: 20, padding: 'var(--space-4)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--space-3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)' }}>
             <div style={{
-              marginTop: 2, fontSize: 13, color: 'var(--color-text-tertiary)',
-              fontFamily: 'var(--font-body)',
+              width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+              backgroundColor: 'var(--color-surface)', display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
-              {count} {count === 1 ? 'drug' : 'drugs'}
+              <Folder size={22} color={tone.fg} aria-hidden="true" />
             </div>
+            <span style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase',
+              color: 'var(--color-text-secondary)', backgroundColor: 'var(--color-surface)',
+              borderRadius: 8, padding: '3px 10px', fontFamily: 'var(--font-body)',
+            }}>
+              Shared group
+            </span>
           </div>
+
+          <h1 dir="ltr" style={{
+            margin: 0, fontSize: 22, fontWeight: 700, lineHeight: 1.25, textAlign: 'start',
+            color: 'var(--color-text-primary)', fontFamily: 'var(--font-body)',
+            overflowWrap: 'anywhere',
+          }}>
+            {group.name}
+          </h1>
+
+          <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)' }}>
+            {count} {count === 1 ? 'drug' : 'drugs'}
+          </div>
+
+          {group.description && (
+            <p dir="ltr" style={{
+              margin: 0, fontSize: 14, lineHeight: 1.5, textAlign: 'start',
+              color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+              whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
+            }}>
+              {group.description}
+            </p>
+          )}
+
+          <p style={{
+            margin: 0, paddingTop: 'var(--space-3)', borderTop: '1px solid var(--color-surface)',
+            fontSize: 12, lineHeight: 1.45, color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
+          }}>
+            Shared by a Capsula user. The name and description were written by them, not by Capsula.
+          </p>
         </div>
 
-        {group.description && (
-          <p dir="ltr" style={{
-            margin: 'var(--space-3) 0 0', fontSize: 14, lineHeight: 1.5, textAlign: 'start',
-            color: 'var(--color-text-secondary)', fontFamily: 'var(--font-body)',
-            whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
-          }}>
-            {group.description}
-          </p>
-        )}
-
-        <p style={{
-          margin: 'var(--space-3) 0 0', fontSize: 12, lineHeight: 1.4,
-          color: 'var(--color-text-tertiary)', fontFamily: 'var(--font-body)',
-        }}>
-          Shared by a Capsula user. The name and description were written by them, not by Capsula.
-        </p>
-
-        <div style={{ marginTop: 'var(--space-3)' }}>
+        <div style={{ marginTop: 'var(--space-4)' }}>
           {count === 0 ? (
             <GroupStateMessage title="No drugs in this group" />
           ) : (
@@ -325,11 +373,7 @@ function SharedGroupBody({ code }) {
       maxWidth: 680, margin: '0 auto',
       padding: 'calc(var(--space-3) + env(safe-area-inset-top, 0px)) var(--page-gutter) calc(var(--space-4) + env(safe-area-inset-bottom, 0px))',
     }}>
-      {canGoBack && (
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-          {backButton}
-        </div>
-      )}
+      {topBar}
       {content}
       {showSave && (
         <div style={{ marginTop: 'var(--space-5)' }}>
@@ -370,19 +414,6 @@ function SharedGroupBody({ code }) {
             </button>
           )}
         </div>
-      )}
-      {!authLoading && !user && result.status !== 'loading' && (
-        <button
-          onClick={() => navigate(ROUTES.DRUGS)}
-          style={{
-            display: 'block', margin: `${showSave ? 'var(--space-3)' : 'var(--space-5)'} auto 0`,
-            background: 'none', border: 'none', cursor: 'pointer', padding: '8px 12px',
-            fontSize: 14, fontWeight: 600, color: 'var(--color-accent)',
-            fontFamily: 'var(--font-body)', WebkitTapHighlightColor: 'transparent',
-          }}
-        >
-          Open Capsula
-        </button>
       )}
     </div>
   )
