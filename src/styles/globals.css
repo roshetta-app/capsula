@@ -43,10 +43,6 @@
   /* Header block of the home screens (UI refresh plan, step 8.1): the soft tint behind the
      title and search, the track of the mode switch, and its raised thumb. The blue text on
      the tint is 4.5:1 or better. */
-  --color-header-tint:      #EEF4FF;
-  --color-seg-track:        #DCE7FB;
-  --color-seg-thumb:        #FFFFFF;
-  --color-seg-thumb-text:   #2563EB;
 
   /* Semantic */
   --color-danger:        #DC2626;
@@ -85,6 +81,11 @@
 
 /* ─── CSS custom properties — light mode (root) ──────────────────────────────── */
 :root {
+  /* Home header (step 8.1). Kept here, not in @theme: unused @theme variables are dropped from the build. */
+  --color-header-tint:      #E6EEFE;
+  --color-seg-track:        #CBDAF8;
+  --color-seg-thumb:        #FFFFFF;
+  --color-seg-thumb-text:   #2563EB;
   --color-bg:               #F7F8FA;
   --color-surface:          #FFFFFF;
   --color-surface-muted:    #F9FAFB;
